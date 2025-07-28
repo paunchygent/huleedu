@@ -21,7 +21,7 @@ from common_core.metadata_models import EntityReference, SystemProcessingMetadat
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -309,7 +309,9 @@ class TestAtomicBatchCreationIntegration:
         )
 
     @pytest.fixture
-    def session_factory(self, postgres_repository: PostgreSQLEssayRepository):
+    def session_factory(
+        self, postgres_repository: PostgreSQLEssayRepository
+    ) -> async_sessionmaker[AsyncSession]:
         """Get session factory from repository for Unit of Work pattern."""
         return postgres_repository.get_session_factory()
 
@@ -319,7 +321,7 @@ class TestAtomicBatchCreationIntegration:
         batch_tracker: DefaultBatchEssayTracker,
         postgres_repository: PostgreSQLEssayRepository,
         event_publisher: MockEventPublisher,
-        session_factory,
+        session_factory: async_sessionmaker[AsyncSession],
     ) -> DefaultBatchCoordinationHandler:
         """Create coordination handler with real components including session factory."""
         return DefaultBatchCoordinationHandler(

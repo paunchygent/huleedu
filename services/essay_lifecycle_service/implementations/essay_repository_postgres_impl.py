@@ -337,7 +337,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         )
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
+        self,
+        essay_ref: EntityReference,
+        session: AsyncSession | None = None,
+        correlation_id: UUID | None = None,
     ) -> ConcreteEssayState:
         """Create new essay record from entity reference."""
         # Generate correlation_id if not provided for error handling
@@ -544,8 +547,15 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         if session is None:
             async with self.session() as session:
                 return await self.create_or_update_essay_state_for_slot_assignment(
-                    internal_essay_id, batch_id, text_storage_id, original_file_name,
-                    file_size, content_hash, initial_status, session, correlation_id
+                    internal_essay_id,
+                    batch_id,
+                    text_storage_id,
+                    original_file_name,
+                    file_size,
+                    content_hash,
+                    initial_status,
+                    session,
+                    correlation_id,
                 )
 
         try:
@@ -643,6 +653,9 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         phase_statuses = phase_status_mapping[phase_name]
 
+        # Declare essays list once
+        essays: list[EssayState] = []
+
         # Use provided session or create new one
         if session is not None:
             stmt = select(EssayStateDB).where(
@@ -652,7 +665,6 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             result = await session.execute(stmt)
             db_essays = result.scalars().all()
 
-            essays: list[EssayState] = []
             for db_essay in db_essays:
                 essay_state = self._db_to_essay_state(db_essay)
                 essays.append(essay_state)  # type: ignore[arg-type]
@@ -667,7 +679,6 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 result = await session.execute(stmt)
                 db_essays = result.scalars().all()
 
-                essays: list[EssayState] = []
                 for db_essay in db_essays:
                     essay_state = self._db_to_essay_state(db_essay)
                     essays.append(essay_state)  # type: ignore[arg-type]

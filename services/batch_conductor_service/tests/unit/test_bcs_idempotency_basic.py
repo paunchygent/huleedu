@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 
@@ -779,67 +780,68 @@ async def test_async_confirmation_pattern(
     """Test realistic async confirmation pattern with potential failure scenarios."""
     import asyncio
     import sys
-    sys.path.insert(0, '/Users/olofs_mba/Documents/Repos/huledu-reboot')
+
+    sys.path.insert(0, "/Users/olofs_mba/Documents/Repos/huledu-reboot")
     from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
-    
+
     # Arrange
     essay_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
-    
+
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
         topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         event_envelope=envelope,
     )
-    
+
     config = IdempotencyConfig(
         service_name="batch-conductor-service",
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     helper = AsyncConfirmationTestHelper()
-    
+
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_with_controlled_confirmation(
-        msg: ConsumerRecord, *, confirm_idempotency
-    ) -> bool:
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
+    ) -> Any:
         return await helper.process_with_controlled_confirmation(
-            bcs_kafka_consumer._handle_spellcheck_completed,
-            msg,
-            confirm_idempotency
+            bcs_kafka_consumer._handle_spellcheck_completed, msg, confirm_idempotency
         )
-    
-    # Start processing in background
-    process_task = asyncio.create_task(handle_message_with_controlled_confirmation(record))
-    
+
+    # Start processing in background  
+    coro = handle_message_with_controlled_confirmation(record)
+    process_task: asyncio.Task[Any] = asyncio.create_task(coro)
+
     # Wait for processing to complete but before confirmation
     await helper.wait_for_processing_complete()
-    
+
     # At this point, Redis should have "processing" status
     assert len(mock_redis_client.set_calls) == 1
     redis_key = mock_redis_client.set_calls[0][0]
     stored_value = mock_redis_client.keys.get(redis_key)
     assert stored_value is not None
-    
+
     import json
+
     stored_data = json.loads(stored_value)
     assert stored_data["status"] == "processing"
     assert "started_at" in stored_data
-    
+
     # Verify TTL is 300s for processing state
     assert mock_redis_client.set_calls[0][2] == 300
-    
+
     # Now allow confirmation to proceed
     helper.allow_confirmation()
-    
+
     # Wait for task to complete
     result = await process_task
-    
+
     # Verify confirmation happened
     assert helper.confirmed is True
     assert result is True
-    
+
     # Verify business logic was executed
     assert len(mock_batch_state_repo.recorded_completions) == 1
     completion = mock_batch_state_repo.recorded_completions[0]
@@ -856,67 +858,68 @@ async def test_crash_before_confirmation(
     """Test that a crash before confirmation leaves message in processing state."""
     import asyncio
     import sys
-    sys.path.insert(0, '/Users/olofs_mba/Documents/Repos/huledu-reboot')
-    from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
-    
+
+    sys.path.insert(0, "/Users/olofs_mba/Documents/Repos/huledu-reboot")
+
     # Arrange
     essay_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
-    
+
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
         topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         event_envelope=envelope,
     )
-    
+
     config = IdempotencyConfig(
         service_name="batch-conductor-service",
         default_ttl=86400,
         enable_debug_logging=True,
     )
-    
+
     # Simulate crash by not allowing confirmation
     crash_simulation = asyncio.Event()
-    
+
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
-    async def handle_message_that_crashes(
-        msg: ConsumerRecord, *, confirm_idempotency
-    ) -> bool:
+    async def handle_message_that_crashes(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         # Process successfully
         await bcs_kafka_consumer._handle_spellcheck_completed(msg)
-        
+
         # Wait indefinitely (simulating crash)
         await crash_simulation.wait()
-        
+
         # Never reaches confirmation
         await confirm_idempotency()
         return True
-    
-    # Start processing with timeout
-    process_task = asyncio.create_task(handle_message_that_crashes(record))
-    
+
+    # Start processing with timeout  
+    coro = handle_message_that_crashes(record)
+    process_task: asyncio.Task[Any] = asyncio.create_task(coro)
+
     # Give it time to process but not confirm
     await asyncio.sleep(0.1)
-    
+
     # Cancel to simulate crash
     process_task.cancel()
-    
+
     try:
         await process_task
     except asyncio.CancelledError:
         pass
-    
+
     # Verify state is still "processing"
     assert len(mock_redis_client.set_calls) == 1
     redis_key = mock_redis_client.set_calls[0][0]
     stored_value = mock_redis_client.keys.get(redis_key)
-    
+    assert stored_value is not None
+
     import json
+
     stored_data = json.loads(stored_value)
     assert stored_data["status"] == "processing"
-    
+
     # Verify business logic was executed (but not confirmed)
     assert len(mock_batch_state_repo.recorded_completions) == 1
-    
+
     # Now another worker should be able to detect and retry
     # (after processing TTL expires - not tested here)

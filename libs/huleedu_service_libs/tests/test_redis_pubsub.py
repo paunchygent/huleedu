@@ -149,7 +149,7 @@ class TestRedisPubSubFunctionality:
         client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
         # Don't start the client
 
-        with pytest.raises(RuntimeError, match="Redis client 'test-client' is not running"):
+        with pytest.raises(RuntimeError, match="Redis client 'test-client' PubSub not initialized"):
             await client.publish("test:channel", "message")
 
     @pytest.mark.asyncio
@@ -192,7 +192,7 @@ class TestRedisPubSubFunctionality:
         client = RedisClient(client_id="test-client", redis_url="redis://localhost:6379")
         # Don't start the client
 
-        with pytest.raises(RuntimeError, match="Redis client 'test-client' is not running"):
+        with pytest.raises(RuntimeError, match="Redis client 'test-client' PubSub not initialized"):
             async with client.subscribe("test:channel"):
                 pass
 

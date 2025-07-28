@@ -4,7 +4,7 @@ Common test utilities and fixtures for Essay Lifecycle Service unit tests.
 Provides reusable mocks and fixtures for Unit of Work pattern testing.
 """
 
-from typing import Callable
+from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

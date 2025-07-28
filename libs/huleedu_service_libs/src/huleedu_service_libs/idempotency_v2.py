@@ -23,7 +23,7 @@ from __future__ import annotations
 import functools
 import json
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Dict
 
 from aiokafka import ConsumerRecord
@@ -105,7 +105,7 @@ class IdempotencyConfig:
 def idempotent_consumer(
     redis_client: RedisClientProtocol,
     config: IdempotencyConfig,
-) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any | None]]]:
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Coroutine[Any, Any, Any | None]]]:
     """
     Transaction-aware idempotency decorator for Kafka message handlers with Unit of Work.
 
@@ -142,7 +142,7 @@ def idempotent_consumer(
         ```
     """
 
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any | None]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Coroutine[Any, Any, Any | None]]:
         @functools.wraps(func)
         async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
             try:

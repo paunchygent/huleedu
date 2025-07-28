@@ -7,6 +7,7 @@ Implements protocol-based mocking following HuleEdu testing standards.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -186,8 +187,9 @@ class MockRedisClient(AtomicRedisClientProtocol):
         # Return a mock result
         return True
 
-    async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
-        """Mock subscription to Redis channel with proper async generator."""
+    @asynccontextmanager
+    async def subscribe(self, channel: str) -> AsyncIterator[redis.client.PubSub]:
+        """Mock subscription to Redis channel with proper async context manager."""
         self.subscribe_calls.append(channel)
         yield self._mock_pubsub
 
@@ -318,8 +320,8 @@ class MockMessageListener:
         # Simulate the behavior of the real listener - must call Redis methods
         channel = self.redis_client.get_user_channel(user_id)  # This will track the call
 
-        # Use the async generator properly
-        async for pubsub in self.redis_client.subscribe(channel):  # This will track the call
+        # Use the async context manager properly
+        async with self.redis_client.subscribe(channel) as pubsub:  # This will track the call
             # In tests, we process one message iteration to track calls
             message = await pubsub.get_message(timeout=0.001)  # Quick timeout for tests
             if message and message.get("type") == "message":
@@ -327,8 +329,6 @@ class MockMessageListener:
                 await self.websocket_manager.send_message_to_user(
                     user_id, message["data"].decode("utf-8")
                 )
-            # Exit immediately to avoid infinite loop in tests
-            break
 
 
 class MockWebSocketServiceProvider(Provider):

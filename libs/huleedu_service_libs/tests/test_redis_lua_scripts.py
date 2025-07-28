@@ -7,11 +7,13 @@ for atomic operations support.
 
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
 from huleedu_service_libs.redis_client import RedisClient
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 
 class TestRedisLuaScripts:
@@ -158,16 +160,21 @@ class TestRedisLuaScripts:
 class TestLuaScriptIntegration:
     """Integration tests with actual Redis if available."""
 
-    @pytest.mark.integration
     @pytest_asyncio.fixture
     async def real_redis_client(self):
         """Create a real Redis client for integration tests."""
-        client = RedisClient(client_id="test-lua-integration")
+        # Use localhost for local testing, or REDIS_URL if set
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        client = RedisClient(client_id="test-lua-integration", redis_url=redis_url)
         try:
             await client.start()
             yield client
+        except RedisConnectionError as e:
+            # Skip if Redis is not available
+            pytest.skip(f"Redis not available for integration test: {e}")
         finally:
-            await client.stop()
+            if client._started:
+                await client.stop()
 
     @pytest.mark.integration
     async def test_real_lua_script_execution(self, real_redis_client: RedisClient):

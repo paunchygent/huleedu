@@ -8,11 +8,9 @@ Follows the same lifecycle management pattern as KafkaBus.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncGenerator
 from typing import Any
 
 import redis.asyncio as aioredis
-import redis.client
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
@@ -828,7 +826,7 @@ class RedisClient(AtomicRedisClientProtocol):
             )
         return await self._pubsub.publish(channel, message)
 
-    async def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+    def subscribe(self, channel: str):
         """
         Subscribe to a Redis channel within an async context manager.
 
@@ -836,15 +834,14 @@ class RedisClient(AtomicRedisClientProtocol):
             channel: The channel to subscribe to
 
         Returns:
-            Async generator that yields a PubSub object
+            Async context manager that yields a PubSub object
         """
         if not self._pubsub:
             raise RuntimeError(
                 f"Redis client '{self.client_id}' PubSub not initialized. "
                 f"Ensure start() was called."
             )
-        async with self._pubsub.subscribe(channel) as pubsub:
-            yield pubsub
+        return self._pubsub.subscribe(channel)
 
     def get_user_channel(self, user_id: str) -> str:
         """

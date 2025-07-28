@@ -123,7 +123,9 @@ class BatchKafkaConsumer:
 
         # Apply idempotency v2 decorator with service-specific configuration
         @idempotent_consumer(redis_client=self.redis_client, config=idempotency_config)
-        async def handle_message_idempotently(msg: Any, *, confirm_idempotency: Callable[[], Awaitable[None]]) -> bool:
+        async def handle_message_idempotently(
+            msg: Any, *, confirm_idempotency: Callable[[], Awaitable[None]]
+        ) -> bool:
             await self._handle_message(msg)
             await confirm_idempotency()  # Confirm after successful processing
             return True  # Success - existing _handle_message raises on failure

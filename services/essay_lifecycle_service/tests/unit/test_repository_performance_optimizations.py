@@ -83,7 +83,7 @@ class TestRepositoryPerformanceOptimizations:
                 EntityReference(
                     entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
                 ),
-                session=None
+                session=None,
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status
@@ -128,7 +128,7 @@ class TestRepositoryPerformanceOptimizations:
                 EntityReference(
                     entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
                 ),
-                session=None
+                session=None,
             )
 
         # Update one essay to SPELLCHECKED_SUCCESS status to create variation

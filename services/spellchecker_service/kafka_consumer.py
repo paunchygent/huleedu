@@ -82,7 +82,9 @@ class SpellCheckerKafkaConsumer:
 
         # Create idempotent message processor with v2 decorator
         @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: object, *, confirm_idempotency: Callable[[], Awaitable[None]]) -> bool | None:
+        async def process_message_idempotently(
+            msg: object, *, confirm_idempotency: Callable[[], Awaitable[None]]
+        ) -> bool | None:
             result = await process_single_message(
                 msg=msg,
                 http_session=self.http_session,

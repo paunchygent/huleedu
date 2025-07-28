@@ -16,6 +16,8 @@ import sys
 from typing import TYPE_CHECKING, Any, Set
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from opentelemetry.trace import Tracer
 
 from aiokafka import AIOKafkaConsumer
@@ -65,7 +67,9 @@ async def run_consumer(
     )
 
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: Any, *, confirm_idempotency) -> bool:
+    async def handle_message_idempotently(
+        msg: Any, *, confirm_idempotency: Callable[[], Awaitable[None]]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             database=database,

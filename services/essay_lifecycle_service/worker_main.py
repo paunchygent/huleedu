@@ -108,7 +108,9 @@ async def run_consumer_loop(
     global should_stop
 
     # Define the base message handler with confirmation callback
-    async def _process_message_wrapper(msg: ConsumerRecord, *, confirm_idempotency=None) -> bool:
+    async def _process_message_wrapper(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Awaitable[None]] | None = None
+    ) -> bool:
         return await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,

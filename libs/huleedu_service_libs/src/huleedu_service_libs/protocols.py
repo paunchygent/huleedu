@@ -9,6 +9,7 @@ shared infrastructure components provided by huleedu_service_libs.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol, TypeVar
 
 import redis.client
@@ -144,7 +145,7 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
         """
         pass
 
-    def subscribe(self, channel: str) -> AsyncGenerator[redis.client.PubSub, None]:
+    def subscribe(self, channel: str) -> AbstractAsyncContextManager[redis.client.PubSub]:
         """
         Subscribe to a Redis channel within an async context manager, ensuring
         proper connection and disconnection.

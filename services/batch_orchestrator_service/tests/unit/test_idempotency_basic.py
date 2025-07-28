@@ -10,18 +10,17 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime
-from typing import cast
 from collections.abc import Callable, Coroutine
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
 from common_core.pipeline_models import PhaseName
-from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
 
+from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -356,7 +355,7 @@ class TestBOSIdempotencyBasic:
         @idempotent_consumer(redis_client=redis_client, config=config)
         async def handle_message_with_controlled_confirmation(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
-        ) -> bool:
+        ) -> Any:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -369,8 +368,9 @@ class TestBOSIdempotencyBasic:
                 consumer._handle_message, msg, confirm_idempotency
             )
 
-        # Start processing in background
-        process_task = asyncio.create_task(handle_message_with_controlled_confirmation(kafka_msg))
+        # Start processing in background  
+        coro = handle_message_with_controlled_confirmation(kafka_msg)
+        process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 
         # Wait for processing to complete but before confirmation
         await helper.wait_for_processing_complete()
@@ -414,7 +414,7 @@ class TestBOSIdempotencyBasic:
         @idempotent_consumer(redis_client=redis_client, config=config)
         async def handle_message_with_controlled_confirmation(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
-        ) -> bool:
+        ) -> Any:
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
@@ -427,8 +427,9 @@ class TestBOSIdempotencyBasic:
                 consumer._handle_message, msg, confirm_idempotency
             )
 
-        # Start processing in background
-        process_task = asyncio.create_task(handle_message_with_controlled_confirmation(kafka_msg))
+        # Start processing in background  
+        coro = handle_message_with_controlled_confirmation(kafka_msg)
+        process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 
         # Wait for processing to complete but before confirmation
         await helper.wait_for_processing_complete()

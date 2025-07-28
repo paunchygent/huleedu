@@ -69,7 +69,10 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
+        self,
+        essay_ref: EntityReference,
+        session: AsyncSession | None = None,
+        correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create new essay record from entity reference."""
         ...

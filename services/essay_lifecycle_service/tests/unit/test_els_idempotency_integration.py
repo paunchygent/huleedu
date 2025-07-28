@@ -152,7 +152,9 @@ async def test_first_time_event_processing_success(
 
     # Apply v2 idempotency decorator to real message processor
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
@@ -279,7 +281,9 @@ async def test_processing_failure_keeps_lock(
 
     # Apply v2 idempotency decorator
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
@@ -319,7 +323,9 @@ async def test_exception_failure_releases_lock(
 
     # Apply v2 idempotency decorator to a function that raises an exception
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_with_exception(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]) -> bool:
+    async def handle_message_with_exception(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]
+    ) -> bool:
         raise RuntimeError("Unhandled exception (e.g., network failure)")
 
     # Process message - should raise exception
@@ -358,7 +364,9 @@ async def test_redis_failure_fallback(
 
     # Apply v2 idempotency decorator
     @idempotent_consumer(redis_client=redis_client, config=config)
-    async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]) -> bool:
+    async def handle_message_idempotently(
+        msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Any]
+    ) -> bool:
         result = await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,

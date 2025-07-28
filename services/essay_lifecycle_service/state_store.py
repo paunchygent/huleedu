@@ -85,13 +85,19 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
         await self.crud_ops.update_essay_state(essay_id, new_status, metadata)
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, session: AsyncSession | None = None, correlation_id: UUID | None = None
+        self,
+        essay_ref: EntityReference,
+        session: AsyncSession | None = None,
+        correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create new essay record from entity reference."""
         return await self.crud_ops.create_essay_record(essay_ref=essay_ref)
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], session: AsyncSession | None = None, correlation_id: UUID | None = None
+        self,
+        essay_refs: list[EntityReference],
+        session: AsyncSession | None = None,
+        correlation_id: UUID | None = None,
     ) -> list[ProtocolEssayState]:
         """Create multiple essay records in single atomic transaction."""
         results = []
@@ -390,7 +396,7 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
     def get_session_factory(self) -> Any:
         """Get the session factory for transaction management.
-        
+
         For SQLite implementation, returns None as we manage connections directly.
         This method exists to satisfy the protocol but is not used in SQLite context.
         """

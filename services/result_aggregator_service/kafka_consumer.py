@@ -81,7 +81,9 @@ class ResultAggregatorKafkaConsumer:
 
         # Create idempotent message processor with v2 configuration
         @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
-        async def process_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Awaitable[None]]) -> bool:
+        async def process_message_idempotently(
+            msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Awaitable[None]]
+        ) -> bool:
             result = await self._process_message_impl(msg)
             await confirm_idempotency()  # Confirm after successful processing
             return result

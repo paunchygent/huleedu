@@ -72,7 +72,7 @@ class RedisMessageListener:
         correlation_id = uuid4()
 
         try:
-            async for pubsub in self._redis_client.subscribe(channel_name):
+            async with self._redis_client.subscribe(channel_name) as pubsub:
                 while True:
                     message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                     if message and message.get("type") == "message":
