@@ -10,7 +10,7 @@ import pytest
 import redis.asyncio as aioredis
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from tests.utils.distributed_state_manager import ensure_clean_test_environment
+# Removed unused import - now using distributed_state_manager directly
 
 logger = create_service_logger("test.functional.conftest")
 
@@ -20,9 +20,13 @@ async def clean_distributed_state():
     """
     Fixture that ensures clean distributed state before tests.
 
-    This calls the DistributedStateManager to clean Redis and Kafka state.
+    This calls the DistributedStateManager to clean Redis and Kafka state
+    with verification and retry logic to handle timing issues.
     """
-    await ensure_clean_test_environment("comprehensive_test")
+    from tests.utils.distributed_state_manager import distributed_state_manager
+
+    # Use verified cleanup with retry logic to handle race conditions
+    await distributed_state_manager.ensure_verified_clean_state("comprehensive_test")
     yield
 
 

@@ -8,6 +8,10 @@ from fastapi import FastAPI
 
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_tracing_middleware
+from huleedu_service_libs.middleware.frameworks.fastapi_metrics_middleware import (
+    setup_standard_service_metrics_middleware,
+)
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.app.di import ApiGatewayProvider
 
@@ -41,16 +45,18 @@ def setup_dependency_injection(app: FastAPI, container):
         raise
 
 
-def setup_tracing(app: FastAPI):
-    """Setup distributed tracing for the API Gateway."""
+def setup_tracing_and_middleware(app: FastAPI):
+    """Setup distributed tracing and tracing middleware for the API Gateway."""
     try:
         logger.info("Initializing distributed tracing...")
         tracer = init_tracing("api_gateway_service")
+        
         # Store tracer in app state for access in routes
         app.state.tracer = tracer
-
-        # TODO: Add FastAPI middleware for tracing when available
-        # For now, tracing will be manual in routes that need it
+        
+        # Add FastAPI tracing middleware from service libraries
+        setup_tracing_middleware(app, tracer)
+        logger.info("Tracing middleware added successfully")
 
         logger.info("Distributed tracing initialized successfully")
         return tracer
@@ -58,6 +64,25 @@ def setup_tracing(app: FastAPI):
         logger.error(f"Failed to initialize tracing: {e}", exc_info=True)
         # Don't fail startup if tracing fails
         return None
+
+
+def setup_standard_metrics_middleware(app: FastAPI, registry=None):
+    """Setup standard HTTP metrics middleware for the API Gateway.
+    
+    This adds infrastructure-level HTTP metrics while preserving existing 
+    business-specific GatewayMetrics for route-level metrics.
+    
+    Args:
+        app: FastAPI application instance
+        registry: Optional Prometheus registry for test isolation
+    """
+    try:
+        logger.info("Setting up standard HTTP metrics middleware...")
+        setup_standard_service_metrics_middleware(app, "api_gateway", registry=registry)
+        logger.info("Standard HTTP metrics middleware added successfully")
+    except Exception as e:
+        logger.error(f"Failed to setup metrics middleware: {e}", exc_info=True)
+        # Don't fail startup if metrics middleware fails
 
 
 async def shutdown_services() -> None:

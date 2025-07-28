@@ -9,6 +9,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ### Module Breakdown
 
 #### **Module 1: `redis_scripts.py`** (~150 LoC)
+
 **Purpose:** Centralize all Lua scripts and Redis key naming utilities
 
 ```python
@@ -20,6 +21,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 2: `batch_slot_manager.py`** (~280 LoC)
+
 **Purpose:** Handle atomic slot assignment and return operations
 
 ```python
@@ -31,6 +33,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 3: `batch_state_tracker.py`** (~320 LoC)
+
 **Purpose:** Manage batch metadata and state queries
 
 ```python
@@ -42,6 +45,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 4: `batch_timeout_manager.py`** (~280 LoC)
+
 **Purpose:** Handle batch lifecycle and cleanup
 
 ```python
@@ -53,6 +57,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 5: `batch_coordinator.py`** (~350 LoC)
+
 **Purpose:** Main coordinator facade implementing protocols
 
 ```python
@@ -68,6 +73,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ### Module Breakdown
 
 #### **Module 1: `event_types.py`** (~120 LoC)
+
 **Purpose:** Event schemas and topic mappings
 
 ```python
@@ -79,6 +85,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 2: `redis_event_publisher.py`** (~280 LoC)
+
 **Purpose:** Redis-specific event publishing
 
 ```python
@@ -90,6 +97,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 3: `kafka_event_publisher.py`** (~320 LoC)
+
 **Purpose:** Kafka event publishing logic
 
 ```python
@@ -101,6 +109,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 4: `outbox_publisher.py`** (~280 LoC)
+
 **Purpose:** Transactional outbox pattern
 
 ```python
@@ -112,6 +121,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 5: `batch_event_publisher.py`** (~300 LoC)
+
 **Purpose:** Batch-specific event coordination
 
 ```python
@@ -123,6 +133,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ```
 
 #### **Module 6: `default_event_publisher.py`** (~320 LoC)
+
 **Purpose:** Main publisher facade implementing protocols
 
 ```python
@@ -136,6 +147,7 @@ This plan details the complete refactor strategy to split the two largest servic
 ## Phase 3: Migration Strategy
 
 ### Step 1: Create New Modules (Week 1)
+
 - Create all new module files with extracted functionality
 - Maintain original files for backward compatibility
 - No breaking changes to existing interfaces
@@ -158,18 +170,21 @@ from services.essay_lifecycle_service.implementations.batch_coordinator import B
 ```
 
 ### Step 3: Update Test Infrastructure (Week 3)
+
 - Update all test fixtures and mocks
 - Update test import statements
 - Run comprehensive test suite
 - Validate integration tests
 
 ### Step 4: Protocol Verification (Week 4)
+
 - Ensure all protocol contracts remain unchanged
 - Verify backward compatibility
 - Update any direct class references to protocol types
 - Final validation testing
 
 ### Step 5: Cleanup (Week 5)
+
 - Remove original large files
 - Update documentation
 - Final codebase verification
@@ -178,12 +193,14 @@ from services.essay_lifecycle_service.implementations.batch_coordinator import B
 ## Impact Analysis Summary
 
 ### Files Directly Affected
+
 - **8 DI container files** requiring import updates
 - **12+ test files** requiring fixture/mock updates
 - **5 protocol interfaces** requiring verification
 - **Multiple service integration points**
 
 ### Risk Mitigation
+
 - **Zero breaking changes** during migration
 - **Maintained protocol contracts** throughout
 - **Comprehensive test coverage** at each phase
@@ -192,11 +209,13 @@ from services.essay_lifecycle_service.implementations.batch_coordinator import B
 ## Implementation Checklist
 
 ### Pre-Implementation
+
 - [ ] Approve module boundaries and naming
 - [ ] Create migration branch
 - [ ] Set up comprehensive test environment
 
 ### RedisBatchCoordinator
+
 - [ ] Create `redis_scripts.py`
 - [ ] Create `batch_slot_manager.py`
 - [ ] Create `batch_state_tracker.py`
@@ -207,6 +226,7 @@ from services.essay_lifecycle_service.implementations.batch_coordinator import B
 - [ ] Validate functionality
 
 ### EventPublisher
+
 - [ ] Create `event_types.py`
 - [ ] Create `redis_event_publisher.py`
 - [ ] Create `kafka_event_publisher.py`
@@ -218,6 +238,7 @@ from services.essay_lifecycle_service.implementations.batch_coordinator import B
 - [ ] Validate functionality
 
 ### Final Validation
+
 - [ ] All tests pass
 - [ ] Integration tests pass
 - [ ] Performance benchmarks maintained

@@ -19,7 +19,7 @@ from services.api_gateway_service.config import Settings
 from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
 
-class TestAuthProvider(Provider):
+class AuthTestProvider(Provider):
     """
     Test authentication provider that provides mock user_id and correlation_id.
 
@@ -56,7 +56,7 @@ class TestAuthProvider(Provider):
         return BearerToken(f"test-token-{self.user_id}")
 
 
-class TestApiGatewayProvider(Provider):
+class InfrastructureTestProvider(Provider):
     """
     Test provider for API Gateway infrastructure dependencies.
 
@@ -84,9 +84,15 @@ class TestApiGatewayProvider(Provider):
         """Provide test settings."""
         return self.settings
 
-    @provide
-    async def get_http_client(self) -> AsyncIterator[HttpClientProtocol]:
+    @provide(scope=Scope.APP)
+    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
         """Provide real HTTP client for tests that use respx mocking."""
+        async with httpx.AsyncClient() as client:
+            yield client
+
+    @provide(scope=Scope.APP)
+    async def get_http_client_protocol(self) -> AsyncIterator[HttpClientProtocol]:
+        """Provide HTTP client as protocol for interface-expecting routes."""
         async with httpx.AsyncClient() as client:
             yield client
 
@@ -102,45 +108,23 @@ class TestApiGatewayProvider(Provider):
         mock_kafka = AsyncMock(spec=KafkaBus)
         yield mock_kafka
 
-    @provide
-    def provide_metrics(self) -> MetricsProtocol:
-        """Provide mocked metrics following protocol-based testing patterns."""
-        from typing import cast
-        from unittest.mock import Mock
+    @provide(scope=Scope.APP)
+    def provide_metrics(self, registry: CollectorRegistry) -> GatewayMetrics:
+        """Provide real GatewayMetrics with isolated registry for testing."""
+        return GatewayMetrics(registry=registry)
 
-        mock_metrics = Mock(spec=GatewayMetrics)
+    @provide(scope=Scope.APP, provides=MetricsProtocol)
+    def provide_metrics_protocol(self, registry: CollectorRegistry) -> MetricsProtocol:
+        """Provide GatewayMetrics as MetricsProtocol for interface-expecting routes."""
+        return GatewayMetrics(registry=registry)
 
-        # Create mock Counter and Histogram objects with labels() method
-        def create_mock_counter():
-            mock_counter = Mock()
-            mock_counter.labels.return_value = mock_counter
-            mock_counter.inc.return_value = None
-            return mock_counter
-
-        def create_mock_histogram():
-            mock_histogram = Mock()
-            mock_histogram.labels.return_value = mock_histogram
-            mock_histogram.time.return_value.__enter__ = Mock()
-            mock_histogram.time.return_value.__exit__ = Mock(return_value=None)
-            return mock_histogram
-
-        # Configure all protocol properties
-        mock_metrics.http_requests_total = create_mock_counter()
-        mock_metrics.http_request_duration_seconds = create_mock_histogram()
-        mock_metrics.events_published_total = create_mock_counter()
-        mock_metrics.downstream_service_calls_total = create_mock_counter()
-        mock_metrics.downstream_service_call_duration_seconds = create_mock_histogram()
-        mock_metrics.api_errors_total = create_mock_counter()
-
-        return cast(MetricsProtocol, mock_metrics)
-
-    @provide
+    @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:
         """Provide isolated Prometheus registry."""
         return CollectorRegistry()
 
 
-class TestHttpClientProvider(Provider):
+class HttpClientTestProvider(Provider):
     """
     Provider for custom HTTP client mocking when specific HTTP behavior is needed.
 
@@ -169,9 +153,14 @@ class TestHttpClientProvider(Provider):
         """Provide test settings."""
         return self.settings
 
-    @provide
+    @provide(scope=Scope.APP)
     async def get_http_client(self) -> AsyncIterator[HttpClientProtocol]:
         """Provide mocked HTTP client."""
+        yield self.mock_http_client
+
+    @provide(scope=Scope.APP, provides=httpx.AsyncClient)
+    async def get_async_client(self) -> AsyncIterator[httpx.AsyncClient]:
+        """Provide mocked HTTP client as AsyncClient for class routes."""
         yield self.mock_http_client
 
     @provide
@@ -186,12 +175,17 @@ class TestHttpClientProvider(Provider):
         mock_kafka = AsyncMock(spec=KafkaBus)
         yield mock_kafka
 
-    @provide
-    def provide_metrics(self) -> MetricsProtocol:
+    @provide(scope=Scope.APP)
+    def provide_metrics(self, registry: CollectorRegistry) -> GatewayMetrics:
         """Provide metrics with isolated registry."""
-        return GatewayMetrics(registry=CollectorRegistry())
+        return GatewayMetrics(registry=registry)
 
-    @provide
+    @provide(scope=Scope.APP, provides=MetricsProtocol)
+    def provide_metrics_protocol(self, registry: CollectorRegistry) -> MetricsProtocol:
+        """Provide GatewayMetrics as MetricsProtocol for interface-expecting routes."""
+        return GatewayMetrics(registry=registry)
+
+    @provide(scope=Scope.APP)
     def provide_registry(self) -> CollectorRegistry:
         """Provide isolated Prometheus registry."""
         return CollectorRegistry()

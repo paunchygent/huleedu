@@ -142,7 +142,9 @@ def idempotent_consumer(
         ```
     """
 
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Coroutine[Any, Any, Any | None]]:
+    def decorator(
+        func: Callable[..., Awaitable[Any]],
+    ) -> Callable[..., Coroutine[Any, Any, Any | None]]:
         @functools.wraps(func)
         async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
             try:

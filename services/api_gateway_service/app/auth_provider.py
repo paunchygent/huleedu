@@ -9,6 +9,7 @@ from dishka import Provider, Scope, from_context, provide
 from fastapi import Request
 
 from huleedu_service_libs.error_handling import raise_authentication_error
+from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import Settings
 
@@ -129,6 +130,9 @@ class AuthProvider(Provider):
                 correlation_id=correlation_id,
                 reason="jwt_invalid",
             )
+        except HuleEduError:
+            # Re-raise HuleEduError without wrapping it
+            raise
         except Exception as e:
             # Log unexpected errors but don't expose internal details
             logger.error(f"Unexpected error in JWT validation: {e}", exc_info=True)

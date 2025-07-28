@@ -13,7 +13,8 @@ from huleedu_service_libs.error_handling.fastapi import (
 from services.api_gateway_service.app.startup_setup import (
     create_di_container,
     setup_dependency_injection,
-    setup_tracing,
+    setup_standard_metrics_middleware,
+    setup_tracing_and_middleware,
 )
 from services.api_gateway_service.config import settings
 
@@ -34,6 +35,12 @@ def create_app() -> FastAPI:
 
     # Add Correlation ID Middleware (must be early in chain)
     app.add_middleware(CorrelationIDMiddleware)
+
+    # Setup distributed tracing and tracing middleware (second in chain)
+    setup_tracing_and_middleware(app)
+
+    # Setup standard HTTP metrics middleware (third in chain)
+    setup_standard_metrics_middleware(app)
 
     # Add Rate Limiting Middleware
     app.state.limiter = limiter
@@ -68,9 +75,6 @@ def create_app() -> FastAPI:
 
     # Store container reference for cleanup
     app.state.di_container = container
-
-    # Setup distributed tracing
-    setup_tracing(app)
 
     return app
 

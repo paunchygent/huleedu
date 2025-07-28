@@ -47,24 +47,19 @@ class TestJWTAuthentication:
         mock_request.state.correlation_id = uuid4()
         return mock_request
 
-    async def _test_auth_through_container(
-        self, mock_request: Mock, expected_exception: bool = False
-    ) -> str:
-        """Test authentication following proper error handling patterns."""
-        from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+    async def _test_auth_through_container(self, mock_request: Mock) -> str:
+        """Test authentication following proper error handling patterns.
 
+        This method directly calls AuthProvider methods and lets any exceptions
+        (including HuleEduError) bubble up to the caller for proper testing.
+        """
         # Test AuthProvider directly - no container needed for this unit test
         auth_provider = AuthProvider()
 
-        if expected_exception:
-            with pytest.raises(HuleEduError):
-                bearer_token = auth_provider.extract_bearer_token(mock_request)
-                auth_provider.provide_user_id(bearer_token, settings, mock_request)
-            return ""  # Never reached
-        else:
-            bearer_token = auth_provider.extract_bearer_token(mock_request)
-            user_id: str = auth_provider.provide_user_id(bearer_token, settings, mock_request)
-            return user_id
+        # Let exceptions bubble up naturally - the calling test will handle pytest.raises()
+        bearer_token = auth_provider.extract_bearer_token(mock_request)
+        user_id: str = auth_provider.provide_user_id(bearer_token, settings, mock_request)
+        return user_id
 
     @pytest.mark.asyncio
     async def test_valid_token_successful_authentication(self):
@@ -87,7 +82,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         # Verify the error contains expected information
         assert "expired" in exc_info.value.error_detail.message.lower()
@@ -102,7 +97,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "missing expiration claim" in exc_info.value.error_detail.message.lower()
 
@@ -115,7 +110,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
@@ -131,7 +126,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {invalid_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
@@ -144,7 +139,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {malformed_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
@@ -156,7 +151,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request()
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "not authenticated" in exc_info.value.error_detail.message.lower()
 
@@ -168,7 +163,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request("InvalidFormat token123")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "invalid authentication format" in exc_info.value.error_detail.message.lower()
 
@@ -184,7 +179,7 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {wrong_algorithm_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
 
@@ -233,9 +228,9 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
-        assert "missing subject" in exc_info.value.error_detail.message.lower()
+        assert "subject must be a string" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_empty_subject_claim_handling(self):
@@ -247,6 +242,6 @@ class TestJWTAuthentication:
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
-            await self._test_auth_through_container(mock_request, expected_exception=True)
+            await self._test_auth_through_container(mock_request)
 
         assert "missing subject" in exc_info.value.error_detail.message.lower()

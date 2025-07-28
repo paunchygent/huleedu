@@ -9,8 +9,8 @@ from respx import MockRouter
 from services.api_gateway_service.app.main import create_app
 from services.api_gateway_service.config import settings
 from services.api_gateway_service.tests.test_provider import (
-    TestApiGatewayProvider,
-    TestAuthProvider,
+    AuthTestProvider,
+    InfrastructureTestProvider,
 )
 
 USER_ID = "test-user-123"
@@ -31,8 +31,8 @@ def _clear_prometheus_registry():
 async def container():
     """Create test container with standardized test providers."""
     container = make_async_container(
-        TestApiGatewayProvider(),
-        TestAuthProvider(user_id=USER_ID),
+        InfrastructureTestProvider(),
+        AuthTestProvider(user_id=USER_ID),
         FastapiProvider(),  # Required for Request context
     )
     yield container

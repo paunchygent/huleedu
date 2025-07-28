@@ -8,8 +8,8 @@ from respx import MockRouter
 
 from services.api_gateway_service.config import settings
 from services.api_gateway_service.tests.test_provider import (
-    TestApiGatewayProvider,
-    TestAuthProvider,
+    AuthTestProvider,
+    InfrastructureTestProvider,
 )
 
 USER_ID = "test-user-123"
@@ -21,8 +21,8 @@ async def client():
     """Create test client with pure Dishka container and test providers."""
     # Create test container with all required providers
     container = make_async_container(
-        TestApiGatewayProvider(),
-        TestAuthProvider(user_id=USER_ID),
+        InfrastructureTestProvider(),
+        AuthTestProvider(user_id=USER_ID),
         FastapiProvider(),  # Required for Request context
     )
 

@@ -368,7 +368,7 @@ class TestBOSIdempotencyBasic:
                 consumer._handle_message, msg, confirm_idempotency
             )
 
-        # Start processing in background  
+        # Start processing in background
         coro = handle_message_with_controlled_confirmation(kafka_msg)
         process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 
@@ -427,7 +427,7 @@ class TestBOSIdempotencyBasic:
                 consumer._handle_message, msg, confirm_idempotency
             )
 
-        # Start processing in background  
+        # Start processing in background
         coro = handle_message_with_controlled_confirmation(kafka_msg)
         process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 

@@ -157,6 +157,11 @@ async def request_pipeline_execution(
             }
 
         except Exception as e:
+            # Let HuleEduError bubble up to error handlers
+            from huleedu_service_libs.error_handling import HuleEduError
+
+            if isinstance(e, HuleEduError):
+                raise
             logger.error(
                 f"Failed to publish pipeline request: batch_id='{batch_id}', "
                 f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",

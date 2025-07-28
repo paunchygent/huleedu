@@ -18,8 +18,8 @@ from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.kafka_client import KafkaBus
 from services.api_gateway_service.app.main import create_app
 from services.api_gateway_service.tests.test_provider import (
-    TestApiGatewayProvider,
-    TestAuthProvider,
+    AuthTestProvider,
+    InfrastructureTestProvider,
 )
 
 USER_ID = "test_user_123"
@@ -40,8 +40,8 @@ def _clear_prometheus_registry():
 async def container():
     """Create test container with standardized test providers."""
     container = make_async_container(
-        TestApiGatewayProvider(),
-        TestAuthProvider(user_id=USER_ID),
+        InfrastructureTestProvider(),
+        AuthTestProvider(user_id=USER_ID),
         FastapiProvider(),  # Required for Request context
     )
     yield container
@@ -123,7 +123,11 @@ async def test_batch_id_mismatch_validation(client_with_mocks):
     response = client_with_mocks.post(f"/v1/batches/{path_batch_id}/pipelines", json=request_data)
 
     assert response.status_code == 400
-    assert "Batch ID in path must match batch ID in request body" in response.json()["detail"]
+    response_json = response.json()
+    assert "error" in response_json
+    error = response_json["error"]
+    assert error["code"] == "VALIDATION_ERROR"
+    assert "Batch ID in path must match batch ID in request body" in error["message"]
 
 
 @pytest.mark.asyncio
@@ -159,7 +163,11 @@ async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus)
     response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
 
     assert response.status_code == 503
-    assert "Failed to process pipeline request" in response.json()["detail"]
+    response_json = response.json()
+    assert "error" in response_json
+    error = response_json["error"]
+    assert error["code"] == "KAFKA_PUBLISH_ERROR"
+    assert "Failed to publish pipeline request" in error["message"]
 
 
 @pytest.mark.asyncio
@@ -216,13 +224,20 @@ async def test_invalid_enum_value_for_pipeline(client_with_mocks):
     response = client_with_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
 
     assert response.status_code == 422  # Unprocessable Entity
-    error_detail = response.json()["detail"][0]
-    assert error_detail["type"] == "enum"
-    assert error_detail["loc"] == ["body", "requested_pipeline"]
+    response_json = response.json()
+    assert "error" in response_json
+    error = response_json["error"]
+    assert error["code"] == "VALIDATION_ERROR"
     assert (
-        "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment' or 'nlp'"
-        in error_detail["msg"]
+        "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment' or 'nlp'" in error["message"]
     )
+
+    # Check validation error details
+    assert "details" in error
+    assert "validation_errors" in error["details"]
+    validation_error = error["details"]["validation_errors"][0]
+    assert validation_error["type"] == "enum"
+    assert validation_error["loc"] == ["body", "requested_pipeline"]
 
 
 @pytest.mark.asyncio

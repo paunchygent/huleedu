@@ -153,3 +153,83 @@ def cleanup_registry():
     """
     yield
     # Registry cleanup happens automatically with isolated CollectorRegistry
+
+
+def create_test_app_with_isolated_registry(registry: CollectorRegistry):
+    """Create a test FastAPI app with isolated Prometheus registry.
+
+    This function creates an app similar to create_app() but uses
+    the provided isolated registry to prevent metric collisions in tests.
+
+    Args:
+        registry: Isolated CollectorRegistry for test metrics
+
+    Returns:
+        FastAPI app configured for testing with isolated metrics
+    """
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+
+    from huleedu_service_libs.error_handling.fastapi import (
+        register_error_handlers as register_fastapi_error_handlers,
+    )
+    from services.api_gateway_service.app.startup_setup import (
+        setup_standard_metrics_middleware,
+        setup_tracing_and_middleware,
+    )
+    from services.api_gateway_service.config import settings
+
+    from ..app.middleware import CorrelationIDMiddleware
+    from ..app.rate_limiter import limiter
+    from ..routers import batch_routes, class_routes, file_routes, status_routes
+    from ..routers.health_routes import router as health_router
+    
+    app = FastAPI(
+        title=settings.SERVICE_NAME,
+        version="1.0.0",
+    )
+
+    # Register error handlers
+    register_fastapi_error_handlers(app)
+
+    # Add Correlation ID Middleware (must be early in chain)
+    app.add_middleware(CorrelationIDMiddleware)
+
+    # Setup distributed tracing and tracing middleware (second in chain)
+    setup_tracing_and_middleware(app)
+
+    # Setup standard HTTP metrics middleware with isolated registry (third in chain)
+    setup_standard_metrics_middleware(app, registry=registry)
+
+    # Add Rate Limiting Middleware
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_exceeded_handler(_request: Request, exc: RateLimitExceeded):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": f"Rate limit exceeded: {exc.detail}"},
+        )
+
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+        allow_methods=settings.CORS_ALLOW_METHODS,
+        allow_headers=settings.CORS_ALLOW_HEADERS,
+    )
+
+    # Include routers
+    app.include_router(health_router, tags=["Health"])
+    app.include_router(class_routes.router, prefix="/v1", tags=["Classes"])
+    app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
+    app.include_router(batch_routes.router, prefix="/v1", tags=["Batches"])
+    app.include_router(file_routes.router, prefix="/v1", tags=["Files"])
+
+    return app

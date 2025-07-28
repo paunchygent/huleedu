@@ -810,7 +810,7 @@ async def test_async_confirmation_pattern(
             bcs_kafka_consumer._handle_spellcheck_completed, msg, confirm_idempotency
         )
 
-    # Start processing in background  
+    # Start processing in background
     coro = handle_message_with_controlled_confirmation(record)
     process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 
@@ -892,7 +892,7 @@ async def test_crash_before_confirmation(
         await confirm_idempotency()
         return True
 
-    # Start processing with timeout  
+    # Start processing with timeout
     coro = handle_message_that_crashes(record)
     process_task: asyncio.Task[Any] = asyncio.create_task(coro)
 

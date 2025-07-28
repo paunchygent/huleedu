@@ -6,8 +6,8 @@ Implements protocol-based mocking following HuleEdu testing standards.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, AsyncIterator, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4

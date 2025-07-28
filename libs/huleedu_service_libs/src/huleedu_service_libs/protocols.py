@@ -8,7 +8,6 @@ shared infrastructure components provided by huleedu_service_libs.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol, TypeVar
 

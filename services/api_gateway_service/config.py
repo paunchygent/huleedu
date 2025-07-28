@@ -89,6 +89,20 @@ class Settings(BaseSettings):
     # Environment type
     ENV_TYPE: str = Field(default="development", description="Environment type")
 
+    # Circuit breaker configuration
+    CIRCUIT_BREAKER_ENABLED: bool = Field(
+        default=True, description="Enable circuit breaker protection for HTTP clients"
+    )
+    HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = Field(
+        default=5, description="Circuit breaker failure threshold"
+    )
+    HTTP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = Field(
+        default=60, description="Circuit breaker recovery timeout in seconds"
+    )
+    HTTP_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = Field(
+        default=2, description="Circuit breaker success threshold for half-open state"
+    )
+
 
 # Global settings instance
 settings = Settings()

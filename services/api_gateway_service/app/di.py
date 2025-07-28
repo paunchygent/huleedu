@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import timedelta
 
 import httpx
 from dishka import Provider, Scope, provide
@@ -9,6 +10,8 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from huleedu_service_libs.resilience.resilient_client import make_resilient
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
 from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
@@ -21,15 +24,33 @@ class ApiGatewayProvider(Provider):
     def get_config(self) -> Settings:
         return settings
 
-    @provide
-    async def get_http_client(self, config: Settings) -> AsyncIterator[HttpClientProtocol]:
+    @provide(scope=Scope.APP)
+    def provide_circuit_breaker_registry(self) -> CircuitBreakerRegistry:
+        return CircuitBreakerRegistry()
+
+    @provide(scope=Scope.APP)
+    async def get_http_client(
+        self, config: Settings, registry: CircuitBreakerRegistry
+    ) -> AsyncIterator[HttpClientProtocol]:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(
                 config.HTTP_CLIENT_TIMEOUT_SECONDS,
                 connect=config.HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS,
             )
         ) as client:
-            yield client
+            if config.CIRCUIT_BREAKER_ENABLED:
+                # Create circuit breaker for HTTP client
+                circuit_breaker = CircuitBreaker(
+                    name=f"{config.SERVICE_NAME}.http_client",
+                    failure_threshold=config.HTTP_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                    recovery_timeout=timedelta(seconds=config.HTTP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                    success_threshold=config.HTTP_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                    expected_exception=httpx.HTTPError,
+                )
+                registry.register("http_client", circuit_breaker)
+                yield make_resilient(client, circuit_breaker)
+            else:
+                yield client
 
     @provide
     async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:
