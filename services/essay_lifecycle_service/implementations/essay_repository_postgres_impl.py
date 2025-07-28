@@ -171,6 +171,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         finally:
             await session.close()
 
+    def get_session_factory(self) -> async_sessionmaker:
+        """Get the session factory for transaction management."""
+        return self.async_session_maker
+
     def _db_to_essay_state(self, db_essay: EssayStateDB) -> ConcreteEssayState:
         """Convert database model to EssayState."""
         # Convert timeline from string to datetime
@@ -217,6 +221,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -228,70 +233,69 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             correlation_id = uuid4()
 
         try:
-            async with self.session() as session:
-                # Use SELECT FOR UPDATE to prevent race conditions
-                stmt = (
-                    select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
-                )
-                result = await session.execute(stmt)
-                db_essay = result.scalars().first()
+            # Use SELECT FOR UPDATE to prevent race conditions
+            stmt = (
+                select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
+            )
+            result = await session.execute(stmt)
+            db_essay = result.scalars().first()
 
-                if db_essay is None:
-                    raise_resource_not_found(
-                        service="essay_lifecycle_service",
-                        operation="update_essay_state",
-                        resource_type="Essay",
-                        resource_id=essay_id,
-                        correlation_id=correlation_id,
-                    )
-
-                # Convert to ConcreteEssayState
-                current_state = self._db_to_essay_state(db_essay)
-
-                # Log the transition for debugging
-                self.logger.debug(
-                    f"Updating essay {essay_id} from {current_state.current_status.value} to {new_status.value}"
+            if db_essay is None:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_state",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
                 )
 
-                # Update the state object
-                current_state.update_status(new_status, metadata)
-                if storage_reference:
-                    content_type, storage_id = storage_reference
-                    current_state.storage_references[content_type] = storage_id
+            # Convert to ConcreteEssayState
+            current_state = self._db_to_essay_state(db_essay)
 
-                # Convert timeline to proper format for JSON storage
-                timeline_for_db = {k: v.isoformat() for k, v in current_state.timeline.items()}
+            # Log the transition for debugging
+            self.logger.debug(
+                f"Updating essay {essay_id} from {current_state.current_status.value} to {new_status.value}"
+            )
 
-                # Convert storage_references keys (ContentType enum) to strings for JSONB
-                storage_references_for_db = {
-                    k.value: v for k, v in current_state.storage_references.items()
-                }
+            # Update the state object
+            current_state.update_status(new_status, metadata)
+            if storage_reference:
+                content_type, storage_id = storage_reference
+                current_state.storage_references[content_type] = storage_id
 
-                update_stmt = (
-                    update(EssayStateDB)
-                    .where(EssayStateDB.essay_id == essay_id)
-                    .values(
-                        current_status=current_state.current_status,
-                        processing_metadata=current_state.processing_metadata,
-                        storage_references=storage_references_for_db,
-                        timeline=timeline_for_db,
-                        batch_id=current_state.batch_id,
-                        updated_at=datetime.now(UTC).replace(tzinfo=None),
-                    )
+            # Convert timeline to proper format for JSON storage
+            timeline_for_db = {k: v.isoformat() for k, v in current_state.timeline.items()}
+
+            # Convert storage_references keys (ContentType enum) to strings for JSONB
+            storage_references_for_db = {
+                k.value: v for k, v in current_state.storage_references.items()
+            }
+
+            update_stmt = (
+                update(EssayStateDB)
+                .where(EssayStateDB.essay_id == essay_id)
+                .values(
+                    current_status=current_state.current_status,
+                    processing_metadata=current_state.processing_metadata,
+                    storage_references=storage_references_for_db,
+                    timeline=timeline_for_db,
+                    batch_id=current_state.batch_id,
+                    updated_at=datetime.now(UTC).replace(tzinfo=None),
                 )
-                update_result = await session.execute(update_stmt)
+            )
+            update_result = await session.execute(update_stmt)
 
-                if update_result.rowcount == 0:
-                    raise_resource_not_found(
-                        service="essay_lifecycle_service",
-                        operation="update_essay_state",
-                        resource_type="Essay",
-                        resource_id=essay_id,
-                        correlation_id=correlation_id,
-                        operation_details="Essay update failed after successful selection",
-                    )
+            if update_result.rowcount == 0:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_state",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
+                    operation_details="Essay update failed after successful selection",
+                )
 
-                self.logger.debug(f"Updated essay {essay_id} status to {new_status.value}")
+            self.logger.debug(f"Updated essay {essay_id} status to {new_status.value}")
 
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
@@ -314,6 +318,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -322,12 +327,13 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             essay_id,
             new_status,
             metadata,
+            session,
             storage_reference=storage_reference,
             correlation_id=correlation_id,
         )
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, session: AsyncSession, correlation_id: UUID | None = None
     ) -> ConcreteEssayState:
         """Create new essay record from entity reference."""
         # Generate correlation_id if not provided for error handling
@@ -349,13 +355,12 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 timeline={EssayStatus.UPLOADED.value: datetime.now(UTC)},
             )
 
-            async with self.session() as session:
-                db_data = self._essay_state_to_db_dict(essay_state)
-                db_essay = EssayStateDB(**db_data)
-                session.add(db_essay)
+            db_data = self._essay_state_to_db_dict(essay_state)
+            db_essay = EssayStateDB(**db_data)
+            session.add(db_essay)
 
-                self.logger.info(f"Created essay record {essay_ref.entity_id}")
-                return essay_state
+            self.logger.info(f"Created essay record {essay_ref.entity_id}")
+            return essay_state
 
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
@@ -374,7 +379,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 )
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
+        self, essay_refs: list[EntityReference], session: AsyncSession, correlation_id: UUID | None = None
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         # Generate correlation_id if not provided for error handling
@@ -406,17 +411,16 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 essay_states.append(essay_state)
 
             # Single atomic transaction for all essay records
-            async with self.session() as session:
-                for essay_state in essay_states:
-                    db_data = self._essay_state_to_db_dict(essay_state)
-                    db_essay = EssayStateDB(**db_data)
-                    session.add(db_essay)
+            for essay_state in essay_states:
+                db_data = self._essay_state_to_db_dict(essay_state)
+                db_essay = EssayStateDB(**db_data)
+                session.add(db_essay)
 
-                # All essays are committed together in a single transaction
-                self.logger.info(
-                    f"Successfully created batch of {len(essay_states)} essay records for batch {batch_id}"
-                )
-                return essay_states
+            # All essays are committed together in a single transaction
+            self.logger.info(
+                f"Successfully created batch of {len(essay_states)} essay records for batch {batch_id}"
+            )
+            return essay_states
 
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
@@ -512,6 +516,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
+        session: AsyncSession,
         correlation_id: UUID | None = None,
     ) -> ConcreteEssayState:
         """Create or update essay state for slot assignment with content metadata."""
@@ -542,7 +547,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 existing_essay.updated_at = datetime.now(UTC)
 
                 await self.update_essay_state(
-                    internal_essay_id, initial_status, metadata, correlation_id=correlation_id
+                    internal_essay_id, initial_status, metadata, session, correlation_id=correlation_id
                 )
                 return existing_essay
             else:
@@ -562,13 +567,12 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     timeline={initial_status.value: datetime.now(UTC)},
                 )
 
-                async with self.session() as session:
-                    db_data = self._essay_state_to_db_dict(essay_state)
-                    db_essay = EssayStateDB(**db_data)
-                    session.add(db_essay)
+                db_data = self._essay_state_to_db_dict(essay_state)
+                db_essay = EssayStateDB(**db_data)
+                session.add(db_essay)
 
-                    self.logger.info(f"Created essay {internal_essay_id} for slot assignment")
-                    return essay_state
+                self.logger.info(f"Created essay {internal_essay_id} for slot assignment")
+                return essay_state
 
         except Exception as e:
             # Re-raise HuleEduError as-is, or wrap other exceptions
@@ -634,6 +638,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         text_storage_id: str,
         essay_data: dict[str, Any],
         correlation_id: UUID,
+        session: AsyncSession,
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
@@ -656,103 +661,101 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             HuleEduError: For database errors or constraint violations
         """
         try:
-            async with self.session() as session:
-                # Use SELECT FOR UPDATE for row-level locking to prevent concurrent assignments
-                # First check if this content is already assigned to any essay in this batch
-                stmt = (
-                    select(EssayStateDB)
-                    .where(
-                        EssayStateDB.batch_id == batch_id,
-                        EssayStateDB.text_storage_id == text_storage_id,
-                    )
-                    .with_for_update()
+            # Use SELECT FOR UPDATE for row-level locking to prevent concurrent assignments
+            # First check if this content is already assigned to any essay in this batch
+            stmt = (
+                select(EssayStateDB)
+                .where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.text_storage_id == text_storage_id,
                 )
-                result = await session.execute(stmt)
-                existing_essay = result.scalars().first()
+                .with_for_update()
+            )
+            result = await session.execute(stmt)
+            existing_essay = result.scalars().first()
 
-                if existing_essay is not None:
-                    # Content already assigned - idempotent success case
-                    self.logger.info(
-                        "Content already assigned to essay, returning existing assignment",
-                        extra={
-                            "batch_id": batch_id,
-                            "text_storage_id": text_storage_id,
-                            "existing_essay_id": existing_essay.essay_id,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-                    return False, existing_essay.essay_id
-
-                # Get internal essay ID
-                internal_essay_id = essay_data["internal_essay_id"]
-                initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
-
-                # Check if essay already exists (created during batch registration)
-                existing_stmt = select(EssayStateDB).where(
-                    EssayStateDB.essay_id == internal_essay_id
+            if existing_essay is not None:
+                # Content already assigned - idempotent success case
+                self.logger.info(
+                    "Content already assigned to essay, returning existing assignment",
+                    extra={
+                        "batch_id": batch_id,
+                        "text_storage_id": text_storage_id,
+                        "existing_essay_id": existing_essay.essay_id,
+                        "correlation_id": str(correlation_id),
+                    },
                 )
-                existing_result = await session.execute(existing_stmt)
-                existing_essay_db = existing_result.scalars().first()
+                return False, existing_essay.essay_id
 
-                if existing_essay_db:
-                    # Update existing essay with content information
-                    existing_essay_db.text_storage_id = text_storage_id
-                    existing_essay_db.current_status = initial_status.value  # type: ignore[assignment]
-                    existing_essay_db.processing_metadata = {
-                        **existing_essay_db.processing_metadata,
+            # Get internal essay ID
+            internal_essay_id = essay_data["internal_essay_id"]
+            initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
+
+            # Check if essay already exists (created during batch registration)
+            existing_stmt = select(EssayStateDB).where(
+                EssayStateDB.essay_id == internal_essay_id
+            )
+            existing_result = await session.execute(existing_stmt)
+            existing_essay_db = existing_result.scalars().first()
+
+            if existing_essay_db:
+                # Update existing essay with content information
+                existing_essay_db.text_storage_id = text_storage_id
+                existing_essay_db.current_status = initial_status.value  # type: ignore[assignment]
+                existing_essay_db.processing_metadata = {
+                    **existing_essay_db.processing_metadata,
+                    "text_storage_id": text_storage_id,
+                    "original_file_name": essay_data.get("original_file_name", ""),
+                    "file_size": essay_data.get("file_size", 0),
+                    "content_hash": essay_data.get("content_hash"),
+                    "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
+                }
+                existing_essay_db.storage_references = {
+                    **existing_essay_db.storage_references,
+                    ContentType.ORIGINAL_ESSAY.value: text_storage_id,
+                }
+                existing_essay_db.timeline = {
+                    **existing_essay_db.timeline,
+                    initial_status.value: datetime.now(UTC).isoformat(),
+                }
+                existing_essay_db.version += 1
+            else:
+                # Create new essay state (shouldn't happen in normal flow)
+                essay_state = ConcreteEssayState(
+                    essay_id=internal_essay_id,
+                    batch_id=batch_id,
+                    current_status=initial_status,
+                    processing_metadata={
                         "text_storage_id": text_storage_id,
                         "original_file_name": essay_data.get("original_file_name", ""),
                         "file_size": essay_data.get("file_size", 0),
                         "content_hash": essay_data.get("content_hash"),
                         "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
-                    }
-                    existing_essay_db.storage_references = {
-                        **existing_essay_db.storage_references,
-                        ContentType.ORIGINAL_ESSAY.value: text_storage_id,
-                    }
-                    existing_essay_db.timeline = {
-                        **existing_essay_db.timeline,
-                        initial_status.value: datetime.now(UTC).isoformat(),
-                    }
-                    existing_essay_db.version += 1
-                else:
-                    # Create new essay state (shouldn't happen in normal flow)
-                    essay_state = ConcreteEssayState(
-                        essay_id=internal_essay_id,
-                        batch_id=batch_id,
-                        current_status=initial_status,
-                        processing_metadata={
-                            "text_storage_id": text_storage_id,
-                            "original_file_name": essay_data.get("original_file_name", ""),
-                            "file_size": essay_data.get("file_size", 0),
-                            "content_hash": essay_data.get("content_hash"),
-                            "slot_assignment_timestamp": datetime.now(UTC).isoformat(),
-                        },
-                        storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
-                        timeline={initial_status.value: datetime.now(UTC)},
-                    )
-
-                    # Convert to database format
-                    db_data = self._essay_state_to_db_dict(essay_state)
-                    # Explicitly set text_storage_id for the constraint
-                    db_data["text_storage_id"] = text_storage_id
-
-                    db_essay = EssayStateDB(**db_data)
-                    session.add(db_essay)
-
-                # Commit will trigger the unique constraint check
-                await session.commit()
-
-                self.logger.info(
-                    "Successfully created essay state with content assignment",
-                    extra={
-                        "batch_id": batch_id,
-                        "text_storage_id": text_storage_id,
-                        "essay_id": internal_essay_id,
-                        "correlation_id": str(correlation_id),
                     },
+                    storage_references={ContentType.ORIGINAL_ESSAY: text_storage_id},
+                    timeline={initial_status.value: datetime.now(UTC)},
                 )
-                return True, internal_essay_id
+
+                # Convert to database format
+                db_data = self._essay_state_to_db_dict(essay_state)
+                # Explicitly set text_storage_id for the constraint
+                db_data["text_storage_id"] = text_storage_id
+
+                db_essay = EssayStateDB(**db_data)
+                session.add(db_essay)
+
+            # No commit here - let the handler manage the transaction
+
+            self.logger.info(
+                "Successfully created essay state with content assignment",
+                extra={
+                    "batch_id": batch_id,
+                    "text_storage_id": text_storage_id,
+                    "essay_id": internal_essay_id,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            return True, internal_essay_id
 
         except IntegrityError as e:
             # Handle unique constraint violation as idempotent success
@@ -767,25 +770,24 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 )
             ):
                 # Another concurrent process assigned this content - find the existing assignment
-                async with self.session() as session:
-                    stmt = select(EssayStateDB).where(
-                        EssayStateDB.batch_id == batch_id,
-                        EssayStateDB.text_storage_id == text_storage_id,
-                    )
-                    result = await session.execute(stmt)
-                    existing_essay = result.scalars().first()
+                stmt = select(EssayStateDB).where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.text_storage_id == text_storage_id,
+                )
+                result = await session.execute(stmt)
+                existing_essay = result.scalars().first()
 
-                    if existing_essay:
-                        self.logger.info(
-                            "Concurrent content assignment detected, returning existing assignment",
-                            extra={
-                                "batch_id": batch_id,
-                                "text_storage_id": text_storage_id,
-                                "existing_essay_id": existing_essay.essay_id,
-                                "correlation_id": str(correlation_id),
-                            },
-                        )
-                        return False, existing_essay.essay_id
+                if existing_essay:
+                    self.logger.info(
+                        "Concurrent content assignment detected, returning existing assignment",
+                        extra={
+                            "batch_id": batch_id,
+                            "text_storage_id": text_storage_id,
+                            "existing_essay_id": existing_essay.essay_id,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+                    return False, existing_essay.essay_id
 
             # Re-raise as processing error for other integrity violations
             raise_processing_error(

@@ -8,7 +8,11 @@ This provides clean separation between individual essay processing and batch-lev
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from common_core.domain_enums import ContentType
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
@@ -36,16 +40,19 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
         batch_tracker: BatchEssayTracker,
+        session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.event_publisher = event_publisher
         self.batch_tracker = batch_tracker
+        self.session_factory = session_factory
 
     async def check_batch_completion(
         self,
         essay_state: EssayState,
         phase_name: PhaseName | str,
         correlation_id: UUID,
+        session: AsyncSession,
     ) -> None:
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
@@ -157,6 +164,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
                 completed_essays=completed_essays,
                 failed_essays=failed_essays,
                 correlation_id=correlation_id,
+                session=session,
             )
 
         except Exception as e:
@@ -250,6 +258,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         completed_essays: list[EssayState],
         failed_essays: list[EssayState],
         correlation_id: UUID,
+        session: AsyncSession,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event for completed batch phase."""
 
@@ -302,6 +311,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         await self.event_publisher.publish_els_batch_phase_outcome(
             event_data=outcome_event,
             correlation_id=correlation_id,
+            session=session,
         )
 
         # If this is the final phase (CJ Assessment), schedule delayed cleanup

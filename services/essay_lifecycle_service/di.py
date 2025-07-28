@@ -21,7 +21,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
 from prometheus_client import REGISTRY, CollectorRegistry
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.config import settings as app_settings
@@ -196,6 +196,11 @@ class CoreInfrastructureProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_session_factory(self, engine: AsyncEngine) -> async_sessionmaker:
+        """Provide async session factory for transaction management."""
+        return async_sessionmaker(engine, expire_on_commit=False)
+
+    @provide(scope=Scope.APP)
     async def provide_essay_repository(
         self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
     ) -> EssayRepositoryProtocol:
@@ -266,9 +271,10 @@ class CommandHandlerProvider(Provider):
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
+        session_factory: async_sessionmaker,
     ) -> SpellcheckCommandHandler:
         """Provide spellcheck command handler implementation."""
-        return SpellcheckCommandHandler(repository, request_dispatcher, event_publisher)
+        return SpellcheckCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_cj_assessment_command_handler(
@@ -276,9 +282,10 @@ class CommandHandlerProvider(Provider):
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
+        session_factory: async_sessionmaker,
     ) -> CJAssessmentCommandHandler:
         """Provide CJ assessment command handler implementation."""
-        return CJAssessmentCommandHandler(repository, request_dispatcher, event_publisher)
+        return CJAssessmentCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_future_services_command_handler(
@@ -286,9 +293,10 @@ class CommandHandlerProvider(Provider):
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
+        session_factory: async_sessionmaker,
     ) -> FutureServicesCommandHandler:
         """Provide future services command handler implementation."""
-        return FutureServicesCommandHandler(repository, request_dispatcher, event_publisher)
+        return FutureServicesCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_batch_command_handler(
@@ -310,9 +318,10 @@ class BatchCoordinationProvider(Provider):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
+        session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
         """Provide batch coordination handler implementation."""
-        return DefaultBatchCoordinationHandler(batch_tracker, repository, event_publisher)
+        return DefaultBatchCoordinationHandler(batch_tracker, repository, event_publisher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_batch_tracker_persistence(self, engine: AsyncEngine) -> BatchTrackerPersistence:
@@ -341,15 +350,17 @@ class BatchCoordinationProvider(Provider):
         repository: EssayRepositoryProtocol,
         event_publisher: EventPublisher,
         batch_tracker: BatchEssayTracker,
+        session_factory: async_sessionmaker,
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation."""
-        return DefaultBatchPhaseCoordinator(repository, event_publisher, batch_tracker)
+        return DefaultBatchPhaseCoordinator(repository, event_publisher, batch_tracker, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_service_result_handler(
         self,
         repository: EssayRepositoryProtocol,
         batch_coordinator: BatchPhaseCoordinator,
+        session_factory: async_sessionmaker,
     ) -> ServiceResultHandler:
         """Provide service result handler implementation."""
-        return DefaultServiceResultHandler(repository, batch_coordinator)
+        return DefaultServiceResultHandler(repository, batch_coordinator, session_factory)

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         BatchServiceAIFeedbackInitiateCommandDataV1,
         BatchServiceNLPInitiateCommandDataV1,
     )
+    from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -38,10 +39,12 @@ class FutureServicesCommandHandler:
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         event_publisher: EventPublisher,
+        session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.request_dispatcher = request_dispatcher
         self.event_publisher = event_publisher
+        self.session_factory = session_factory
 
     async def process_initiate_nlp_command(
         self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
@@ -49,6 +52,15 @@ class FutureServicesCommandHandler:
         """Process NLP initiation command from Batch Orchestrator Service."""
         # TODO: Implement when NLP Service is available
         logger.info("Received NLP initiation command (STUB)")
+        
+        # FUTURE IMPLEMENTATION PATTERN:
+        # async with self.session_factory() as session:
+        #     async with session.begin():
+        #         # 1. Process essay state transitions
+        #         # 2. Update repository with session parameter
+        #         # 3. Dispatch requests to NLP service
+        #         # 4. Publish events
+        #         # Transaction commits here
 
     async def process_initiate_ai_feedback_command(
         self,
@@ -58,3 +70,12 @@ class FutureServicesCommandHandler:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
         # TODO: Implement when AI Feedback Service is available
         logger.info("Received AI feedback initiation command (STUB)")
+        
+        # FUTURE IMPLEMENTATION PATTERN:
+        # async with self.session_factory() as session:
+        #     async with session.begin():
+        #         # 1. Process essay state transitions
+        #         # 2. Update repository with session parameter
+        #         # 3. Dispatch requests to AI Feedback service
+        #         # 4. Publish events
+        #         # Transaction commits here

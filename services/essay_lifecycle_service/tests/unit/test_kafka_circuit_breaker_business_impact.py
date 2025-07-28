@@ -42,6 +42,7 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     EssayRepositoryProtocol,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class BusinessWorkflowContext(BaseModel):
@@ -149,6 +150,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
+        mock_session_factory: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: BatchEssaysReady event storage fails during slot fulfillment.
@@ -173,6 +175,7 @@ class TestBatchCoordinationBusinessImpact:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             event_publisher=event_publisher,
+            session_factory=mock_session_factory,
         )
 
         batch_registered_event = BatchEssaysRegistered(
@@ -259,6 +262,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_outbox_repository: AsyncMock,
         mock_settings: Settings,
         business_context: BusinessWorkflowContext,
+        mock_session_factory: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: Content provisioning completes but readiness event storage fails.
@@ -286,6 +290,7 @@ class TestBatchCoordinationBusinessImpact:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             event_publisher=event_publisher,
+            session_factory=mock_session_factory,
         )
 
         # Mock batch tracker to assign a slot
@@ -716,6 +721,7 @@ class TestBusinessWorkflowRecoveryScenarios:
         mock_repository: AsyncMock,
         mock_redis_client: AsyncMock,
         business_context: BusinessWorkflowContext,
+        mock_session_factory: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: Kafka initially fails but recovers during batch processing.
@@ -815,6 +821,7 @@ class TestBusinessImpactIntegrationScenarios:
         mock_repository: AsyncMock,
         mock_redis_client: AsyncMock,
         business_context: BusinessWorkflowContext,
+        mock_session_factory: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: Complete batch workflow with intermittent Kafka failures.
@@ -853,6 +860,7 @@ class TestBusinessImpactIntegrationScenarios:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             event_publisher=event_publisher,
+            session_factory=mock_session_factory,
         )
 
         # Create dispatcher for potential use in extended test scenarios

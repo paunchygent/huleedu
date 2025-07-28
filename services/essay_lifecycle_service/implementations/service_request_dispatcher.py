@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from common_core.metadata_models import EssayProcessingInputRefV1
     from huleedu_service_libs.outbox import OutboxRepositoryProtocol
     from huleedu_service_libs.protocols import KafkaPublisherProtocol
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
 
@@ -48,6 +49,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         language: Language,
         batch_id: str,
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch individual spellcheck requests to Spell Checker Service."""
         from datetime import UTC, datetime
@@ -120,6 +122,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     event_data=event_data,
                     topic=topic,
                     event_key=essay_ref.essay_id,
+                    session=session,
                 )
 
                 logger.info(
@@ -164,6 +167,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch individual NLP requests to NLP Service."""
         # TODO: Implement when NLP Service is available
@@ -175,6 +179,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essays_to_process: list[EssayProcessingInputRefV1],
         context: AIFeedbackInputDataV1,
         batch_correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch individual AI feedback requests to AI Feedback Service."""
         # TODO: Implement when AI Feedback Service is available
@@ -189,6 +194,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essay_instructions: str,
         batch_id: str,
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch CJ assessment request to CJ Assessment Service."""
         from datetime import UTC, datetime
@@ -266,6 +272,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 event_data=event_data,
                 topic=topic,
                 event_key=batch_id,
+                session=session,
             )
 
             logger.info(

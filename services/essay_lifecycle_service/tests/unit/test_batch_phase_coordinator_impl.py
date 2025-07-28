@@ -7,7 +7,7 @@ ELSBatchPhaseOutcomeV1 event publishing for Task 2.3.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, ANY
 from uuid import uuid4
 
 import pytest
@@ -23,6 +23,7 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     EventPublisher,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestDefaultBatchPhaseCoordinator:
@@ -43,18 +44,22 @@ class TestDefaultBatchPhaseCoordinator:
         """Mock BatchEssayTracker for testing using protocol-based mocking."""
         return AsyncMock(spec=BatchEssayTracker)
 
+    # Using shared mock_session_factory fixture from test_utils
+
     @pytest.fixture
     def coordinator(
         self,
         mock_essay_repository: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_batch_tracker: AsyncMock,
+        mock_session_factory: AsyncMock,
     ) -> DefaultBatchPhaseCoordinator:
         """Create DefaultBatchPhaseCoordinator instance for testing."""
         return DefaultBatchPhaseCoordinator(
             repository=mock_essay_repository,
             event_publisher=mock_event_publisher,
             batch_tracker=mock_batch_tracker,
+            session_factory=mock_session_factory,
         )
 
     def create_mock_essay_state(
@@ -119,7 +124,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Execute
         await coordinator.check_batch_completion(
-            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id, ANY  # session
         )
 
         # Verify
@@ -186,7 +191,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Execute
         await coordinator.check_batch_completion(
-            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id, ANY  # session
         )
 
         # Verify
@@ -233,7 +238,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Execute
         await coordinator.check_batch_completion(
-            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id, ANY  # session
         )
 
         # Verify
@@ -285,7 +290,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Execute
         await coordinator.check_batch_completion(
-            test_essay_state, PhaseName.SPELLCHECK, correlation_id
+            test_essay_state, PhaseName.SPELLCHECK, correlation_id, ANY  # session
         )
 
         # Verify - no outcome event should be published
@@ -312,7 +317,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Execute
         await coordinator.check_batch_completion(
-            essay_state_wrong_phase, "spellcheck", correlation_id
+            essay_state_wrong_phase, "spellcheck", correlation_id, ANY  # session
         )
 
         # Verify - no database call or event publishing should occur
@@ -335,7 +340,7 @@ class TestDefaultBatchPhaseCoordinator:
         essay_state_no_batch.batch_id = None
 
         # Execute
-        await coordinator.check_batch_completion(essay_state_no_batch, "spellcheck", correlation_id)
+        await coordinator.check_batch_completion(essay_state_no_batch, "spellcheck", correlation_id, ANY)  # session
 
         # Verify - no database call or event publishing should occur
         mock_essay_repository.list_essays_by_batch_and_phase.assert_not_called()
@@ -462,7 +467,7 @@ class TestDefaultBatchPhaseCoordinator:
         ]
 
         # Execute
-        await coordinator.check_batch_completion(essay_state_cj, "cj_assessment", correlation_id)
+        await coordinator.check_batch_completion(essay_state_cj, "cj_assessment", correlation_id, ANY)  # session
 
         # Verify
         mock_event_publisher.publish_els_batch_phase_outcome.assert_called_once()

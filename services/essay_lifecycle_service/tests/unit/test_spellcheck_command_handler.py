@@ -8,7 +8,7 @@ and request dispatching using protocol-based mocking.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,6 +33,7 @@ from services.essay_lifecycle_service.protocols import (
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 if TYPE_CHECKING:
     pass
@@ -71,18 +72,22 @@ class TestSpellcheckCommandHandler:
         """Mock event publisher protocol using protocol-based mocking."""
         return AsyncMock(spec=EventPublisher)
 
+    # Using shared mock_session_factory fixture from test_utils
+
     @pytest.fixture
     def spellcheck_handler(
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         mock_event_publisher: AsyncMock,
+        mock_session_factory: AsyncMock,
     ) -> SpellcheckCommandHandler:
         """Create SpellcheckCommandHandler with mocked dependencies."""
         return SpellcheckCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
             event_publisher=mock_event_publisher,
+            session_factory=mock_session_factory,
         )
 
     @pytest.fixture
@@ -163,11 +168,17 @@ class TestSpellcheckCommandHandler:
                     "current_phase": "spellcheck",
                     "commanded_phases": ["spellcheck"],
                 },
+                ANY,  # session parameter (positional)
+                storage_reference=None,
+                correlation_id=correlation_id,
             )
             mock_repository.update_essay_status_via_machine.assert_any_call(
                 essay_id,
                 EssayStatus.AWAITING_SPELLCHECK,
                 {"spellcheck_phase": "started", "dispatch_completed": True},
+                ANY,  # session parameter (positional)
+                storage_reference=None,
+                correlation_id=correlation_id,
             )
 
             # Verify state machine interaction (called twice: initial + started event)
@@ -187,6 +198,7 @@ class TestSpellcheckCommandHandler:
                 language=Language.ENGLISH,
                 batch_id=batch_id,
                 correlation_id=correlation_id,
+                session=ANY,  # session parameter
             )
 
     # Test: State Machine Transition Failure
@@ -319,6 +331,7 @@ class TestSpellcheckCommandHandler:
             assert len(kwargs["essays_to_process"]) == 2
             assert kwargs["essays_to_process"][0].essay_id == "essay-1"
             assert kwargs["essays_to_process"][1].essay_id == "essay-2"
+            assert "session" in kwargs  # Verify session parameter is passed
 
     # Test: Metadata Update with Existing Phases
     @pytest.mark.asyncio
@@ -358,6 +371,8 @@ class TestSpellcheckCommandHandler:
 
             # Check the first call (initial transition) has the correct metadata
             first_call_args = mock_repository.update_essay_status_via_machine.call_args_list[0]
+            # Args are: essay_id, status, metadata, session (positional args)
+            # Kwargs are: storage_reference, correlation_id
             metadata = first_call_args.args[2]
 
             assert metadata["bos_command"] == "spellcheck_initiate"
@@ -365,3 +380,9 @@ class TestSpellcheckCommandHandler:
             assert "existing_phase" in metadata["commanded_phases"]
             assert "spellcheck" in metadata["commanded_phases"]
             assert len(metadata["commanded_phases"]) == 2
+            
+            # Verify session parameter was passed (4th positional arg)
+            assert first_call_args.args[3] is not None  # session parameter
+            # Verify keyword arguments
+            assert first_call_args.kwargs["storage_reference"] is None
+            assert first_call_args.kwargs["correlation_id"] == correlation_id

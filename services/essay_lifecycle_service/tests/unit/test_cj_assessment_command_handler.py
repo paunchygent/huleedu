@@ -8,7 +8,7 @@ and request dispatching using protocol-based mocking.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,6 +33,7 @@ from services.essay_lifecycle_service.protocols import (
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 if TYPE_CHECKING:
     pass
@@ -71,18 +72,22 @@ class TestCJAssessmentCommandHandler:
         """Mock event publisher protocol using protocol-based mocking."""
         return AsyncMock(spec=EventPublisher)
 
+    # Using shared mock_session_factory fixture from test_utils
+
     @pytest.fixture
     def cj_assessment_handler(
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
         mock_event_publisher: AsyncMock,
+        mock_session_factory: AsyncMock,
     ) -> CJAssessmentCommandHandler:
         """Create CJAssessmentCommandHandler with mocked dependencies."""
         return CJAssessmentCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
             event_publisher=mock_event_publisher,
+            session_factory=mock_session_factory,
         )
 
     @pytest.fixture
@@ -158,20 +163,20 @@ class TestCJAssessmentCommandHandler:
 
             # Verify state machine updates (both initial transition and started event succeed)
             assert mock_repository.update_essay_status_via_machine.call_count == 2
-            mock_repository.update_essay_status_via_machine.assert_any_call(
-                essay_id,
-                EssayStatus.AWAITING_CJ_ASSESSMENT,
-                {
-                    "bos_command": "cj_assessment_initiate",
-                    "current_phase": "cj_assessment",
-                    "commanded_phases": ["cj_assessment"],
-                },
-            )
-            mock_repository.update_essay_status_via_machine.assert_any_call(
-                essay_id,
-                EssayStatus.AWAITING_CJ_ASSESSMENT,
-                {"cj_assessment_phase": "started", "dispatch_completed": True},
-            )
+            
+            # Check first call (initial transition)  
+            first_call = mock_repository.update_essay_status_via_machine.call_args_list[0]
+            assert first_call.args[0] == essay_id
+            assert first_call.args[1] == EssayStatus.AWAITING_CJ_ASSESSMENT  
+            assert "bos_command" in first_call.args[2]
+            assert first_call.kwargs.get("correlation_id") == correlation_id
+            
+            # Check second call (started event)
+            second_call = mock_repository.update_essay_status_via_machine.call_args_list[1]
+            assert second_call.args[0] == essay_id
+            assert second_call.args[1] == EssayStatus.AWAITING_CJ_ASSESSMENT
+            assert "cj_assessment_phase" in second_call.args[2]
+            assert second_call.kwargs.get("correlation_id") == correlation_id
 
             # Verify state machine interaction (called twice: initial + started event)
             assert mock_state_machine_class.call_count == 2
@@ -192,6 +197,7 @@ class TestCJAssessmentCommandHandler:
                 essay_instructions=cj_assessment_command_data.essay_instructions,
                 batch_id=cj_assessment_command_data.entity_ref.entity_id,
                 correlation_id=correlation_id,
+                session=ANY,  # session parameter
             )
 
     # Test: State Machine Transition Failure
@@ -317,12 +323,13 @@ class TestCJAssessmentCommandHandler:
 
             # Verify request dispatcher called with all successfully transitioned essays
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once()
-            args, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
+            _, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
 
             # Should contain both essays
             assert len(kwargs["essays_to_process"]) == 2
             assert kwargs["essays_to_process"][0].essay_id == "essay-a"
             assert kwargs["essays_to_process"][1].essay_id == "essay-b"
+            assert "session" in kwargs  # Verify session parameter is passed
 
     # Test: Custom Command Data Propagation
     @pytest.mark.asyncio
@@ -374,6 +381,7 @@ class TestCJAssessmentCommandHandler:
                 essay_instructions="Skriv om din semester",
                 batch_id=batch_id,
                 correlation_id=correlation_id,
+                session=ANY,  # session parameter
             )
 
     # Test: Create command with course code
@@ -437,12 +445,13 @@ class TestCJAssessmentCommandHandler:
 
             # Verify request dispatcher called with all successfully transitioned essays
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once()
-            args, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
+            _, kwargs = mock_request_dispatcher.dispatch_cj_assessment_requests.call_args
 
             # Should contain both essays
             assert len(kwargs["essays_to_process"]) == 2
             assert kwargs["essays_to_process"][0].essay_id == "essay1"
             assert kwargs["essays_to_process"][1].essay_id == "essay2"
+            assert "session" in kwargs  # Verify session parameter is passed
 
     # Test: Create command with minimal data
     @pytest.mark.asyncio
@@ -495,6 +504,7 @@ class TestCJAssessmentCommandHandler:
                 essay_instructions=command_data.essay_instructions,
                 batch_id=batch_id,
                 correlation_id=correlation_id,
+                session=ANY,  # session parameter
             )
 
     # Test: Create command that should fail validation

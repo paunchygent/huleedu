@@ -35,6 +35,8 @@ from services.essay_lifecycle_service.essay_state_machine import (
 
 # Import at runtime to avoid circular imports
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
     from services.essay_lifecycle_service.essay_state_machine import EssayStateMachine
     from services.essay_lifecycle_service.protocols import (
         BatchPhaseCoordinator,
@@ -57,10 +59,11 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     """Default implementation of ServiceResultHandler protocol."""
 
     def __init__(
-        self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator
+        self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator, session_factory: async_sessionmaker
     ) -> None:
         self.repository = repository
         self.batch_coordinator = batch_coordinator
+        self.session_factory = session_factory
 
     async def handle_spellcheck_result(
         self,
@@ -125,74 +128,92 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
             # Attempt state transition
             if state_machine.trigger(trigger):
-                storage_ref_to_add = None
-                if is_success and result_data.storage_metadata:
-                    # Get tracer if available
-                    tracer = None
-                    if has_app_context() and hasattr(current_app, "tracer"):
-                        tracer = current_app.tracer
+                # START UNIT OF WORK
+                async with self.session_factory() as session:
+                    async with session.begin():
+                        storage_ref_to_add = None
+                        if is_success and result_data.storage_metadata:
+                            # Get tracer if available
+                            tracer = None
+                            if has_app_context() and hasattr(current_app, "tracer"):
+                                tracer = current_app.tracer
 
-                    # Trace storage reference extraction
-                    with (
-                        trace_operation(
-                            tracer or trace.get_tracer(__name__),
-                            "extract_storage_reference",
-                            {
-                                "essay_id": str(result_data.entity_ref.entity_id),
-                                "has_storage_metadata": True,
-                                "content_type": ContentType.CORRECTED_TEXT.value,
-                            },
-                        )
-                        if tracer
-                        else nullcontext()
-                    ):
-                        # Safely access the nested storage_id for the spellchecked essay
-                        spellchecked_ref = result_data.storage_metadata.references.get(
-                            ContentType.CORRECTED_TEXT
-                        )
-                        if spellchecked_ref:
-                            storage_id = spellchecked_ref.get("default")
-                            if storage_id:
-                                storage_ref_to_add = (ContentType.CORRECTED_TEXT, storage_id)
-                                logger.info(
-                                    "Extracted storage reference",
-                                    extra={
-                                        "storage_id": storage_id,
+                            # Trace storage reference extraction
+                            with (
+                                trace_operation(
+                                    tracer or trace.get_tracer(__name__),
+                                    "extract_storage_reference",
+                                    {
+                                        "essay_id": str(result_data.entity_ref.entity_id),
+                                        "has_storage_metadata": True,
                                         "content_type": ContentType.CORRECTED_TEXT.value,
-                                        "trace_id": get_current_trace_id(),
                                     },
                                 )
+                                if tracer
+                                else nullcontext()
+                            ):
+                                # Safely access the nested storage_id for the spellchecked essay
+                                spellchecked_ref = result_data.storage_metadata.references.get(
+                                    ContentType.CORRECTED_TEXT
+                                )
+                                if spellchecked_ref:
+                                    storage_id = spellchecked_ref.get("default")
+                                    if storage_id:
+                                        storage_ref_to_add = (ContentType.CORRECTED_TEXT, storage_id)
+                                        logger.info(
+                                            "Extracted storage reference",
+                                            extra={
+                                                "storage_id": storage_id,
+                                                "content_type": ContentType.CORRECTED_TEXT.value,
+                                                "trace_id": get_current_trace_id(),
+                                            },
+                                        )
 
-                await self.repository.update_essay_status_via_machine(
-                    essay_id=result_data.entity_ref.entity_id,
-                    new_status=state_machine.current_status,
-                    storage_reference=storage_ref_to_add,
-                    metadata={
-                        "spellcheck_result": {
-                            "success": is_success,
-                            "status": result_data.status.value,
-                            "original_text_storage_id": result_data.original_text_storage_id,
-                            "storage_metadata": result_data.storage_metadata.model_dump()
-                            if result_data.storage_metadata
-                            else None,
-                            "corrections_made": result_data.corrections_made,
-                            "error_info": result_data.system_metadata.error_info
-                            if result_data.system_metadata
-                            else None,
-                        },
-                        "current_phase": "spellcheck",
-                        "phase_outcome_status": result_data.status.value,
-                    },
-                )
+                        await self.repository.update_essay_status_via_machine(
+                            result_data.entity_ref.entity_id,
+                            state_machine.current_status,
+                            {
+                                "spellcheck_result": {
+                                    "success": is_success,
+                                    "status": result_data.status.value,
+                                    "original_text_storage_id": result_data.original_text_storage_id,
+                                    "storage_metadata": result_data.storage_metadata.model_dump()
+                                    if result_data.storage_metadata
+                                    else None,
+                                    "corrections_made": result_data.corrections_made,
+                                    "error_info": result_data.system_metadata.error_info
+                                    if result_data.system_metadata
+                                    else None,
+                                },
+                                "current_phase": "spellcheck",
+                                "phase_outcome_status": result_data.status.value,
+                            },
+                            session,
+                            storage_reference=storage_ref_to_add,
+                            correlation_id=correlation_id,
+                        )
 
-                logger.info(
-                    "Successfully updated essay status via state machine",
-                    extra={
-                        "essay_id": result_data.entity_ref.entity_id,
-                        "new_status": state_machine.current_status.value,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
+                        logger.info(
+                            "Successfully updated essay status via state machine",
+                            extra={
+                                "essay_id": result_data.entity_ref.entity_id,
+                                "new_status": state_machine.current_status.value,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+
+                        # Check for batch phase completion after individual essay state update
+                        updated_essay_state = await self.repository.get_essay_state(
+                            result_data.entity_ref.entity_id
+                        )
+                        if updated_essay_state:
+                            await self.batch_coordinator.check_batch_completion(
+                                essay_state=updated_essay_state,
+                                phase_name=PhaseName.SPELLCHECK,
+                                correlation_id=correlation_id,
+                                session=session,
+                            )
+                        # Transaction commits here
             else:
                 logger.error(
                     f"State machine trigger '{trigger}' failed for essay "
@@ -210,17 +231,6 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     "correlation_id": str(correlation_id),
                 },
             )
-
-            # Check for batch phase completion after individual essay state update
-            updated_essay_state = await self.repository.get_essay_state(
-                result_data.entity_ref.entity_id
-            )
-            if updated_essay_state:
-                await self.batch_coordinator.check_batch_completion(
-                    essay_state=updated_essay_state,
-                    phase_name=PhaseName.SPELLCHECK,
-                    correlation_id=correlation_id,
-                )
 
             return True
 
@@ -251,146 +261,153 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 },
             )
 
-            # CJ assessment results are batch-level, need to process each essay ranking
-            for ranking in result_data.rankings:
-                essay_id = ranking.get("els_essay_id")
-                if not essay_id:
-                    logger.warning(
-                        "Missing essay ID in CJ ranking",
-                        extra={"ranking": ranking, "correlation_id": str(correlation_id)},
-                    )
-                    continue
+            # START UNIT OF WORK
+            async with self.session_factory() as session:
+                async with session.begin():
+                    # CJ assessment results are batch-level, need to process each essay ranking
+                    for ranking in result_data.rankings:
+                        essay_id = ranking.get("els_essay_id")
+                        if not essay_id:
+                            logger.warning(
+                                "Missing essay ID in CJ ranking",
+                                extra={"ranking": ranking, "correlation_id": str(correlation_id)},
+                            )
+                            continue
 
-                # Get current essay state
-                essay_state = await self.repository.get_essay_state(essay_id)
-                if essay_state is None:
-                    logger.error(
-                        "Essay not found for CJ assessment result",
-                        extra={
-                            "essay_id": essay_id,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-                    continue
-
-                # Create state machine and trigger success event
-                state_machine = EssayStateMachine(
-                    essay_id=essay_id, initial_status=essay_state.current_status
-                )
-
-                # Attempt state transition
-                if state_machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED):
-                    # Preserve existing commanded_phases metadata
-                    existing_commanded_phases = essay_state.processing_metadata.get(
-                        "commanded_phases", []
-                    )
-
-                    # Ensure cj_assessment is in commanded_phases
-                    if "cj_assessment" not in existing_commanded_phases:
-                        existing_commanded_phases.append("cj_assessment")
-
-                    await self.repository.update_essay_status_via_machine(
-                        essay_id=essay_id,
-                        new_status=state_machine.current_status,
-                        metadata={
-                            "cj_assessment_result": {
-                                "success": True,
-                                "job_id": result_data.cj_assessment_job_id,
-                                "rank": ranking.get("rank"),
-                                "score": ranking.get("score"),
-                                "ranking_data": ranking,
-                            },
-                            "current_phase": "cj_assessment",
-                            "commanded_phases": existing_commanded_phases,
-                            "phase_outcome_status": "CJ_ASSESSMENT_SUCCESS",
-                        },
-                    )
-
-                    logger.info(
-                        "Successfully processed CJ assessment completion for essay",
-                        extra={
-                            "essay_id": essay_id,
-                            "new_status": state_machine.current_status.value,
-                            "rank": ranking.get("rank"),
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-                else:
-                    logger.error(
-                        f"State machine trigger '{EVT_CJ_ASSESSMENT_SUCCEEDED}' failed "
-                        f"for essay {essay_id} from status "
-                        f"{essay_state.current_status.value}.",
-                        extra={"correlation_id": str(correlation_id)},
-                    )
-                    continue
-
-            # After processing all essays in the CJ batch result
-            # Check batch completion for ALL essays, not just the first one
-            logger.info(
-                "Checking batch phase completion for CJ assessment",
-                extra={
-                    "batch_id": result_data.entity_ref.entity_id,
-                    "total_rankings": len(result_data.rankings),
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
-            # Get batch status summary to log
-            batch_status_summary = await self.repository.get_batch_status_summary(
-                result_data.entity_ref.entity_id
-            )
-
-            # Safely create status summary for logging, handling potential mock issues
-            status_summary_for_log: dict[str, int] | str
-            try:
-                if (
-                    hasattr(batch_status_summary, "items")
-                    and not asyncio.iscoroutine(batch_status_summary)
-                    and isinstance(batch_status_summary, dict)
-                ):
-                    status_summary_for_log = {
-                        k.value if hasattr(k, "value") and not asyncio.iscoroutine(k) else str(k): v
-                        for k, v in batch_status_summary.items()
-                    }
-                else:
-                    status_summary_for_log = str(batch_status_summary)
-            except Exception:
-                status_summary_for_log = f"<unavailable: {type(batch_status_summary).__name__}>"
-
-            logger.info(
-                "Batch status summary after CJ assessment processing",
-                extra={
-                    "batch_id": result_data.entity_ref.entity_id,
-                    "status_summary": status_summary_for_log,
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
-            # We need a representative essay_state from the batch to trigger check_batch_completion
-            if result_data.rankings:
-                # Try multiple essays in case the first one has metadata issues
-                for i, ranking in enumerate(result_data.rankings[:3]):  # Check first 3 essays
-                    essay_id_in_ranking = ranking.get("els_essay_id")
-                    if essay_id_in_ranking:
-                        batch_representative_essay_state = await self.repository.get_essay_state(
-                            essay_id_in_ranking
-                        )
-                        if batch_representative_essay_state:
-                            logger.info(
-                                f"Triggering batch completion check with essay {i + 1}/{len(result_data.rankings)}",
+                        # Get current essay state
+                        essay_state = await self.repository.get_essay_state(essay_id)
+                        if essay_state is None:
+                            logger.error(
+                                "Essay not found for CJ assessment result",
                                 extra={
-                                    "essay_id": essay_id_in_ranking,
-                                    "essay_status": batch_representative_essay_state.current_status.value,
-                                    "essay_metadata": batch_representative_essay_state.processing_metadata,
+                                    "essay_id": essay_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
-                            await self.batch_coordinator.check_batch_completion(
-                                essay_state=batch_representative_essay_state,
-                                phase_name=PhaseName.CJ_ASSESSMENT,
+                            continue
+
+                        # Create state machine and trigger success event
+                        state_machine = EssayStateMachine(
+                            essay_id=essay_id, initial_status=essay_state.current_status
+                        )
+
+                        # Attempt state transition
+                        if state_machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED):
+                            # Preserve existing commanded_phases metadata
+                            existing_commanded_phases = essay_state.processing_metadata.get(
+                                "commanded_phases", []
+                            )
+
+                            # Ensure cj_assessment is in commanded_phases
+                            if "cj_assessment" not in existing_commanded_phases:
+                                existing_commanded_phases.append("cj_assessment")
+
+                            await self.repository.update_essay_status_via_machine(
+                                essay_id,
+                                state_machine.current_status,
+                                {
+                                    "cj_assessment_result": {
+                                        "success": True,
+                                        "job_id": result_data.cj_assessment_job_id,
+                                        "rank": ranking.get("rank"),
+                                        "score": ranking.get("score"),
+                                        "ranking_data": ranking,
+                                    },
+                                    "current_phase": "cj_assessment",
+                                    "commanded_phases": existing_commanded_phases,
+                                    "phase_outcome_status": "CJ_ASSESSMENT_SUCCESS",
+                                },
+                                session,
                                 correlation_id=correlation_id,
                             )
-                            break  # Only need to check once
+
+                            logger.info(
+                                "Successfully processed CJ assessment completion for essay",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "new_status": state_machine.current_status.value,
+                                    "rank": ranking.get("rank"),
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                        else:
+                            logger.error(
+                                f"State machine trigger '{EVT_CJ_ASSESSMENT_SUCCEEDED}' failed "
+                                f"for essay {essay_id} from status "
+                                f"{essay_state.current_status.value}.",
+                                extra={"correlation_id": str(correlation_id)},
+                            )
+                            continue
+
+                    # After processing all essays in the CJ batch result
+                    # Check batch completion for ALL essays, not just the first one
+                    logger.info(
+                        "Checking batch phase completion for CJ assessment",
+                        extra={
+                            "batch_id": result_data.entity_ref.entity_id,
+                            "total_rankings": len(result_data.rankings),
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+
+                    # Get batch status summary to log
+                    batch_status_summary = await self.repository.get_batch_status_summary(
+                        result_data.entity_ref.entity_id
+                    )
+
+                    # Safely create status summary for logging, handling potential mock issues
+                    status_summary_for_log: dict[str, int] | str
+                    try:
+                        if (
+                            hasattr(batch_status_summary, "items")
+                            and not asyncio.iscoroutine(batch_status_summary)
+                            and isinstance(batch_status_summary, dict)
+                        ):
+                            status_summary_for_log = {
+                                k.value if hasattr(k, "value") and not asyncio.iscoroutine(k) else str(k): v
+                                for k, v in batch_status_summary.items()
+                            }
+                        else:
+                            status_summary_for_log = str(batch_status_summary)
+                    except Exception:
+                        status_summary_for_log = f"<unavailable: {type(batch_status_summary).__name__}>"
+
+                    logger.info(
+                        "Batch status summary after CJ assessment processing",
+                        extra={
+                            "batch_id": result_data.entity_ref.entity_id,
+                            "status_summary": status_summary_for_log,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+
+                    # We need a representative essay_state from the batch to trigger check_batch_completion
+                    if result_data.rankings:
+                        # Try multiple essays in case the first one has metadata issues
+                        for i, ranking in enumerate(result_data.rankings[:3]):  # Check first 3 essays
+                            essay_id_in_ranking = ranking.get("els_essay_id")
+                            if essay_id_in_ranking:
+                                batch_representative_essay_state = await self.repository.get_essay_state(
+                                    essay_id_in_ranking
+                                )
+                                if batch_representative_essay_state:
+                                    logger.info(
+                                        f"Triggering batch completion check with essay {i + 1}/{len(result_data.rankings)}",
+                                        extra={
+                                            "essay_id": essay_id_in_ranking,
+                                            "essay_status": batch_representative_essay_state.current_status.value,
+                                            "essay_metadata": batch_representative_essay_state.processing_metadata,
+                                            "correlation_id": str(correlation_id),
+                                        },
+                                    )
+                                    await self.batch_coordinator.check_batch_completion(
+                                        essay_state=batch_representative_essay_state,
+                                        phase_name=PhaseName.CJ_ASSESSMENT,
+                                        correlation_id=correlation_id,
+                                        session=session,
+                                    )
+                                    break  # Only need to check once
+                    # Transaction commits here
 
             return True
 
@@ -422,57 +439,63 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 },
             )
 
-            # CJ assessment failure affects all essays in the batch
-            # Need to find all essays in this batch and mark them as failed
-            batch_essays = await self.repository.list_essays_by_batch(
-                result_data.entity_ref.entity_id
-            )
-
-            for essay_state in batch_essays:
-                # Only update essays that are currently awaiting CJ assessment
-                if essay_state.current_status != EssayStatus.AWAITING_CJ_ASSESSMENT:
-                    continue
-
-                # Create state machine and trigger failure event
-                state_machine = EssayStateMachine(
-                    essay_id=essay_state.essay_id, initial_status=essay_state.current_status
-                )
-
-                # Attempt state transition
-                if state_machine.trigger(EVT_CJ_ASSESSMENT_FAILED):
-                    await self.repository.update_essay_status_via_machine(
-                        essay_id=essay_state.essay_id,
-                        new_status=state_machine.current_status,
-                        metadata={
-                            "cj_assessment_result": {
-                                "success": False,
-                                "job_id": result_data.cj_assessment_job_id,
-                                "batch_failure": True,
-                                "error_info": result_data.system_metadata.error_info
-                                if result_data.system_metadata
-                                else None,
-                            },
-                            "current_phase": "cj_assessment",
-                            "phase_outcome_status": "CJ_ASSESSMENT_FAILED",
-                        },
+            # START UNIT OF WORK
+            async with self.session_factory() as session:
+                async with session.begin():
+                    # CJ assessment failure affects all essays in the batch
+                    # Need to find all essays in this batch and mark them as failed
+                    batch_essays = await self.repository.list_essays_by_batch(
+                        result_data.entity_ref.entity_id
                     )
 
-                    logger.info(
-                        "Successfully processed CJ assessment failure for essay",
-                        extra={
-                            "essay_id": essay_state.essay_id,
-                            "new_status": state_machine.current_status.value,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-                else:
-                    logger.error(
-                        f"State machine trigger '{EVT_CJ_ASSESSMENT_FAILED}' failed "
-                        f"for essay {essay_state.essay_id} from status "
-                        f"{essay_state.current_status.value}.",
-                        extra={"correlation_id": str(correlation_id)},
-                    )
-                    continue
+                    for essay_state in batch_essays:
+                        # Only update essays that are currently awaiting CJ assessment
+                        if essay_state.current_status != EssayStatus.AWAITING_CJ_ASSESSMENT:
+                            continue
+
+                        # Create state machine and trigger failure event
+                        state_machine = EssayStateMachine(
+                            essay_id=essay_state.essay_id, initial_status=essay_state.current_status
+                        )
+
+                        # Attempt state transition
+                        if state_machine.trigger(EVT_CJ_ASSESSMENT_FAILED):
+                            await self.repository.update_essay_status_via_machine(
+                                essay_state.essay_id,
+                                state_machine.current_status,
+                                {
+                                    "cj_assessment_result": {
+                                        "success": False,
+                                        "job_id": result_data.cj_assessment_job_id,
+                                        "batch_failure": True,
+                                        "error_info": result_data.system_metadata.error_info
+                                        if result_data.system_metadata
+                                        else None,
+                                    },
+                                    "current_phase": "cj_assessment",
+                                    "phase_outcome_status": "CJ_ASSESSMENT_FAILED",
+                                },
+                                session,
+                                correlation_id=correlation_id,
+                            )
+
+                            logger.info(
+                                "Successfully processed CJ assessment failure for essay",
+                                extra={
+                                    "essay_id": essay_state.essay_id,
+                                    "new_status": state_machine.current_status.value,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                        else:
+                            logger.error(
+                                f"State machine trigger '{EVT_CJ_ASSESSMENT_FAILED}' failed "
+                                f"for essay {essay_state.essay_id} from status "
+                                f"{essay_state.current_status.value}.",
+                                extra={"correlation_id": str(correlation_id)},
+                            )
+                            continue
+                    # Transaction commits here
 
             return True
 

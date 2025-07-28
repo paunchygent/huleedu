@@ -15,6 +15,7 @@ from common_core.domain_enums import ContentType, CourseCode, Language
 from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class EssayState(Protocol):
@@ -48,6 +49,7 @@ class EssayRepositoryProtocol(Protocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -59,6 +61,7 @@ class EssayRepositoryProtocol(Protocol):
         essay_id: str,
         new_status: EssayStatus,
         metadata: dict[str, Any],
+        session: AsyncSession,
         storage_reference: tuple[ContentType, str] | None = None,
         correlation_id: UUID | None = None,
     ) -> None:
@@ -66,13 +69,13 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def create_essay_record(
-        self, essay_ref: EntityReference, correlation_id: UUID | None = None
+        self, essay_ref: EntityReference, session: AsyncSession, correlation_id: UUID | None = None
     ) -> EssayState:
         """Create new essay record from entity reference."""
         ...
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], correlation_id: UUID | None = None
+        self, essay_refs: list[EntityReference], session: AsyncSession, correlation_id: UUID | None = None
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         ...
@@ -106,6 +109,7 @@ class EssayRepositoryProtocol(Protocol):
         file_size: int,
         content_hash: str | None,
         initial_status: EssayStatus,
+        session: AsyncSession,
         correlation_id: UUID | None = None,
     ) -> EssayState:
         """Create or update essay state for slot assignment with content metadata."""
@@ -123,6 +127,7 @@ class EssayRepositoryProtocol(Protocol):
         text_storage_id: str,
         essay_data: dict[str, Any],
         correlation_id: UUID,
+        session: AsyncSession,
     ) -> tuple[bool, str | None]:
         """
         Create essay state with atomic idempotency check for content provisioning.
@@ -132,6 +137,10 @@ class EssayRepositoryProtocol(Protocol):
 
         Addresses ELS-002 Phase 1 requirements for database-level race condition prevention.
         """
+        ...
+
+    def get_session_factory(self) -> Any:
+        """Get the session factory for transaction management."""
         ...
 
 
@@ -171,6 +180,7 @@ class EventPublisher(Protocol):
         self,
         event_data: Any,  # ExcessContentProvisionedV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
         ...
@@ -179,6 +189,7 @@ class EventPublisher(Protocol):
         self,
         event_data: Any,  # BatchEssaysReady
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
         ...
@@ -187,6 +198,7 @@ class EventPublisher(Protocol):
         self,
         event_data: Any,  # EssaySlotAssignedV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish EssaySlotAssignedV1 event when content is assigned to a slot."""
         ...
@@ -195,6 +207,7 @@ class EventPublisher(Protocol):
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
         ...
@@ -300,6 +313,7 @@ class BatchPhaseCoordinator(Protocol):
         essay_state: EssayState,
         phase_name: PhaseName,
         correlation_id: UUID,
+        session: AsyncSession,
     ) -> None:
         """
         Check if all essays in a batch phase are complete and publish ELSBatchPhaseOutcomeV1 if so.
@@ -324,6 +338,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         language: Language,
         batch_id: str,
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch spellcheck requests to Spellcheck Service."""
         ...
@@ -333,6 +348,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch NLP requests to NLP Service."""
         ...
@@ -342,6 +358,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essays_to_process: list[EssayProcessingInputRefV1],
         context: Any,  # AIFeedbackBatchContextDataV1 (to be defined)
         batch_correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch AI feedback requests to AI Feedback Service."""
         ...
@@ -354,6 +371,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essay_instructions: str,
         batch_id: str,
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Dispatch CJ assessment requests to CJ Assessment Service."""
         ...

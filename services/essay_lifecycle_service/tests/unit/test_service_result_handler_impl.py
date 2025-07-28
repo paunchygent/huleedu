@@ -7,12 +7,13 @@ and batch phase coordination for Task 2.2.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, ANY
 from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType
 from common_core.metadata_models import StorageReferenceMetadata
+from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
@@ -22,6 +23,7 @@ from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestDefaultServiceResultHandler:
@@ -37,13 +39,15 @@ class TestDefaultServiceResultHandler:
         """Mock BatchPhaseCoordinator for testing using protocol-based mocking."""
         return AsyncMock(spec=BatchPhaseCoordinator)
 
+    # Using shared mock_session_factory fixture from test_utils
+
     @pytest.fixture
     def handler(
-        self, mock_essay_repository: AsyncMock, mock_batch_coordinator: AsyncMock
+        self, mock_essay_repository: AsyncMock, mock_batch_coordinator: AsyncMock, mock_session_factory: AsyncMock
     ) -> DefaultServiceResultHandler:
         """Create DefaultServiceResultHandler instance for testing."""
         return DefaultServiceResultHandler(
-            repository=mock_essay_repository, batch_coordinator=mock_batch_coordinator
+            repository=mock_essay_repository, batch_coordinator=mock_batch_coordinator, session_factory=mock_session_factory
         )
 
     @pytest.fixture
@@ -126,19 +130,20 @@ class TestDefaultServiceResultHandler:
         mock_essay_repository.get_essay_state.assert_called_with("test-essay-1")
         mock_essay_repository.update_essay_status_via_machine.assert_called_once()
 
-        # Check the call arguments
+        # Check the call arguments (positional args)
         call_args = mock_essay_repository.update_essay_status_via_machine.call_args
-        assert call_args[1]["essay_id"] == "test-essay-1"
-        assert call_args[1]["new_status"] == EssayStatus.SPELLCHECKED_SUCCESS
-        assert "spellcheck_result" in call_args[1]["metadata"]
-        assert call_args[1]["metadata"]["current_phase"] == "spellcheck"
-        assert call_args[1]["storage_reference"] == (
+        assert call_args.args[0] == "test-essay-1"  # essay_id (positional 1)
+        assert call_args.args[1] == EssayStatus.SPELLCHECKED_SUCCESS  # new_status (positional 2)
+        assert "spellcheck_result" in call_args.args[2]  # metadata (positional 3)
+        assert call_args.args[2]["current_phase"] == "spellcheck"
+        # session is positional arg 4, storage_reference and correlation_id are keyword args
+        assert call_args.kwargs["storage_reference"] == (
             ContentType.CORRECTED_TEXT,
             "corrected-456",
         )
 
         mock_batch_coordinator.check_batch_completion.assert_called_once_with(
-            essay_state=updated_essay_state, phase_name="spellcheck", correlation_id=correlation_id
+            essay_state=updated_essay_state, phase_name=PhaseName.SPELLCHECK, correlation_id=correlation_id, session=ANY
         )
 
     async def test_handle_spellcheck_result_failure(
@@ -171,8 +176,8 @@ class TestDefaultServiceResultHandler:
 
         # Check metadata includes error info
         call_args = mock_essay_repository.update_essay_status_via_machine.call_args
-        assert call_args[1]["new_status"] == EssayStatus.SPELLCHECK_FAILED
-        assert call_args[1]["metadata"]["spellcheck_result"]["error_info"] == {
+        assert call_args.args[1] == EssayStatus.SPELLCHECK_FAILED
+        assert call_args.args[2]["spellcheck_result"]["error_info"] == {
             "error": "Spell checker timeout"
         }
 
@@ -349,10 +354,10 @@ class TestDefaultServiceResultHandler:
 
         # Check that failures were recorded properly
         for call in mock_essay_repository.update_essay_status_via_machine.call_args_list:
-            assert call[1]["new_status"] == EssayStatus.CJ_ASSESSMENT_FAILED
-            assert "cj_assessment_result" in call[1]["metadata"]
-            assert call[1]["metadata"]["cj_assessment_result"]["success"] is False
-            assert call[1]["metadata"]["cj_assessment_result"]["batch_failure"] is True
+            assert call.args[1] == EssayStatus.CJ_ASSESSMENT_FAILED
+            assert "cj_assessment_result" in call.args[2]
+            assert call.args[2]["cj_assessment_result"]["success"] is False
+            assert call.args[2]["cj_assessment_result"]["batch_failure"] is True
 
     async def test_handle_cj_assessment_failed_essay_not_found(
         self,

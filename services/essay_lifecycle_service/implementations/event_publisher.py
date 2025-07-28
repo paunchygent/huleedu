@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from common_core.status_enums import EssayStatus
     from huleedu_service_libs.outbox import OutboxRepositoryProtocol
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
 
@@ -485,6 +486,7 @@ class DefaultEventPublisher(EventPublisher):
         self,
         event_data: Any,  # ExcessContentProvisionedV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
         from uuid import uuid4
@@ -592,6 +594,7 @@ class DefaultEventPublisher(EventPublisher):
         self,
         event_data: Any,  # BatchEssaysReady
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
         from uuid import uuid4
@@ -701,6 +704,7 @@ class DefaultEventPublisher(EventPublisher):
         self,
         event_data: Any,  # EssaySlotAssignedV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish EssaySlotAssignedV1 event when content is assigned to a slot."""
         from uuid import uuid4
