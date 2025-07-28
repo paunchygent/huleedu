@@ -3,11 +3,12 @@ description: Transactional Outbox Pattern as fallback for Kafka failures
 globs: 
 alwaysApply: false
 ---
-# 042.1: Transactional Outbox Pattern (Fallback Mechanism)
+# 042.1: Transactional Outbox Pattern (Hybrid Approach)
 
 ## 1. Core Principle
-**Primary Path (99.9%)**: Direct Kafka publishing.  
+**Primary Path (99.9%)**: Direct Kafka publishing with dual Redis publishing for real-time UI updates.  
 **Fallback Path**: Store events in database outbox ONLY when Kafka is unavailable. Redis BLPOP ensures zero-delay processing when events enter outbox.
+**Session Integration**: Support for Unit of Work pattern with session-aware publishing for atomic guarantees.
 
 ## 2. Required Components
 
@@ -19,80 +20,163 @@ from huleedu_service_libs.outbox import EventOutbox
 # Table: event_outbox with indexes for unpublished events polling
 ```
 
-### 2.2. Event Publisher Integration (Kafka-First Pattern)
+### 2.2. Event Publisher Integration (Kafka-First with Dual Publishing)
 ```python
 class DefaultEventPublisher(EventPublisherProtocol):
     def __init__(self, kafka_bus: KafkaPublisherProtocol, 
                  outbox_repository: OutboxRepositoryProtocol,
-                 redis_client: RedisClientProtocol):
+                 redis_client: AtomicRedisClientProtocol,
+                 batch_tracker: BatchEssayTracker):
         self.kafka_bus = kafka_bus
         self.outbox_repository = outbox_repository
         self.redis_client = redis_client
+        self.batch_tracker = batch_tracker
     
-    async def publish_event(self, event_data, correlation_id, aggregate_id):
+    async def publish_status_update(self, essay_ref, status, correlation_id):
         envelope = EventEnvelope(...)
+        topic = "essay.status.events"
+        key = str(essay_ref.entity_id)
         
         # PRIMARY PATH: Try Kafka first
         try:
             await self.kafka_bus.publish(
-                topic=self._get_topic_for_event_type(envelope.event_type),
-                key=aggregate_id.encode("utf-8"),
-                value=envelope.model_dump_json(mode="json").encode("utf-8"),
-                correlation_id=correlation_id,
+                topic=topic,
+                envelope=envelope,
+                key=key,
             )
-            return  # Success - no outbox needed
-        
-        except Exception as e:
+            logger.info("Event published directly to Kafka")
+        except Exception as kafka_error:
             # FALLBACK PATH: Store in outbox only on Kafka failure
-            await self.outbox_repository.add_event(
-                aggregate_id=aggregate_id,
-                aggregate_type="entity",
-                event_type=envelope.event_type,
-                event_data=envelope.model_dump(mode="json"),
-                topic=self._get_topic_for_event_type(envelope.event_type),
-                event_key=aggregate_id,
+            await self._publish_to_outbox(
+                aggregate_type="essay",
+                aggregate_id=str(essay_ref.entity_id),
+                event_type="essay.status.updated.v1",
+                event_data=envelope,
+                topic=topic,
             )
-            
             # Wake up relay worker immediately via Redis
-            await self.redis_client.lpush("outbox:wakeup", "1")
+            await self._notify_relay_worker()
+        
+        # DUAL PUBLISHING: Redis real-time notifications (always attempted)
+        await self._publish_essay_status_to_redis(essay_ref, status, correlation_id)
 ```
 
-### 2.3. Business Logic Pattern
+### 2.3. Business Logic Patterns
+
 **Primary approach**: Publish directly to Kafka after business operation.
 ```python
 async def business_operation(self, data, correlation_id):
     # 1. Business logic with transaction
-    async with self.repository.get_session() as session:
+    async with self.repository.session() as session:
         result = await self.repository.update(data, session=session)
-        await session.commit()
+        # Session commits automatically via context manager
     
-    # 2. Publish event (Kafka-first, outbox on failure)
-    await self.event_publisher.publish_event(
-        event_data={"result": result.model_dump()},
+    # 2. Publish event (Kafka-first, outbox on failure, dual Redis)
+    await self.event_publisher.publish_status_update(
+        essay_ref=result.entity_ref,
+        status=result.status,
         correlation_id=correlation_id,
-        aggregate_id=str(data.entity_id),
     )
 ```
 
-**Special case - Atomic guarantee required**:
+**Unit of Work pattern**: For coordinated multi-entity operations.
 ```python
-async def critical_operation(self, data, correlation_id):
-    async with self.repository.get_session() as session:
-        # 1. Business logic
+async def coordinated_operation(self, batch_data, correlation_id):
+    # Session-aware operations with explicit session management
+    async with self.session_factory() as session:
+        async with session.begin():
+            # 1. Business logic across multiple entities
+            for essay_data in batch_data.essays:
+                await self.repository.update_essay(
+                    essay_data, session=session
+                )
+            
+            # 2. Publish events within same transaction (outbox)
+            await self.event_publisher.publish_batch_event(
+                event_data=batch_data,
+                correlation_id=correlation_id,
+                session=session,  # Atomic with business changes
+            )
+            # Commit handled by context manager
+        
+        # 3. Wake up relay worker after successful commit
+        await self._notify_relay_worker()
+```
+
+### 2.4. Redis Integration Patterns
+
+**Dual Publishing**: Kafka for service-to-service + Redis for real-time UI.
+```python
+async def _publish_essay_status_to_redis(
+    self, essay_ref, status, correlation_id
+) -> None:
+    """Publish essay status update to Redis for real-time UI notifications."""
+    try:
+        user_id = await self.batch_tracker.get_user_id_for_essay(essay_ref.entity_id)
+        
+        if user_id:
+            await self.redis_client.publish_user_notification(
+                user_id=user_id,
+                event_type="essay_status_updated",
+                data={
+                    "essay_id": essay_ref.entity_id,
+                    "status": status.value,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+    except Exception as e:
+        # Re-raise as structured error for proper observability
+        if hasattr(e, "error_detail"):
+            raise
+        else:
+            raise_external_service_error(
+                service="essay_lifecycle_service",
+                operation="_publish_essay_status_to_redis",
+                external_service="Redis",
+                message=f"Failed to publish essay status to Redis: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+            )
+
+async def _notify_relay_worker(self) -> None:
+    """Notify the relay worker that new events are available in the outbox."""
+    try:
+        # Use service-specific wake-up key for isolation
+        await self.redis_client.lpush("outbox:wake:essay_lifecycle_service", "1")
+        logger.debug("Relay worker notified via Redis")
+    except Exception as e:
+        # Log but don't fail - the relay worker will still poll eventually
+        logger.warning(
+            "Failed to notify relay worker via Redis",
+            extra={"error": str(e)},
+        )
+```
+
+**Session-aware Publishing (Unit of Work Integration)**:
+```python
+async def critical_operation(self, data, correlation_id, session=None):
+    # Unit of Work pattern - session passed from coordinator
+    if session:
+        # Business logic and outbox in same transaction
         result = await self.repository.update(data, session=session)
         
-        # 2. Store event in outbox (same transaction)
-        # Only for operations requiring absolute atomicity
+        # Store event in outbox (same transaction for atomicity)
         await self.outbox_repository.add_event(
             aggregate_id=str(data.entity_id),
-            event_data={"result": result.model_dump()},
+            aggregate_type="entity",
+            event_type="entity.updated.v1",
+            event_data=envelope.model_dump(mode="json"),
+            topic=topic,
+            event_key=str(data.entity_id),
             session=session,  # Share transaction
         )
         
-        await session.commit()  # Atomic commit
-        
-        # 3. Wake up relay worker
-        await self.redis_client.lpush("outbox:wakeup", "1")
+        # Session commit handled by coordinator
+        # Wake up relay worker after commit
+        await self._notify_relay_worker()
+    else:
+        # Fallback to Kafka-first pattern
+        await self.publish_event_kafka_first(data, correlation_id)
 ```
 
 ## 3. Event Relay Worker (Redis-Driven)
@@ -189,23 +273,52 @@ async def test_outbox_stores_event():
 
 ## 7. Required Patterns
 
-✅ **PRIMARY PATTERN - Kafka-first with fallback**:
+✅ **PRIMARY PATTERN - Kafka-first with dual Redis publishing**:
 ```python
 # Business operation completes first
-await repository.save(entity)
+async with repository.session() as session:
+    entity = await repository.save(entity_data, session=session)
 
-# Then publish (Kafka-first, outbox on failure)
-await event_publisher.publish_event(...)  # Handles fallback internally
+# Then publish (Kafka-first, outbox on failure, Redis for UI)
+await event_publisher.publish_status_update(
+    essay_ref=entity.entity_ref,
+    status=entity.status,
+    correlation_id=correlation_id,
+)  # Handles both Kafka/outbox fallback AND Redis real-time
 ```
 
-✅ **SPECIAL CASE - Atomic guarantee required**:
+✅ **UNIT OF WORK PATTERN - Session-aware publishing**:
 ```python
-# Only for operations requiring absolute atomicity
-async with session.begin():
-    await repository.update(entity, session=session)
-    await outbox_repository.add_event(..., session=session)
-# Wake up relay worker
-await redis_client.lpush("outbox:wakeup", "1")
+# Coordinated operations with explicit session management
+async with session_factory() as session:
+    async with session.begin():
+        # Business logic
+        await repository.update_entities(batch_data, session=session)
+        
+        # Atomic event publishing (outbox + session)
+        await event_publisher.publish_batch_event(
+            event_data=batch_data,
+            correlation_id=correlation_id,
+            session=session,  # Share transaction for atomicity
+        )
+        # Commit handled by context manager
+    
+    # Wake up relay worker after successful commit
+    await event_publisher._notify_relay_worker()
+```
+
+✅ **SPECIALIZED DISPATCH PATTERN - Service-to-service with outbox**:
+```python
+# Direct outbox usage for service dispatch coordination
+await self.outbox_repository.add_event(
+    aggregate_id=essay_ref.essay_id,
+    aggregate_type="essay",
+    event_type=envelope.event_type,
+    event_data=event_data,
+    topic=topic,
+    event_key=essay_ref.essay_id,
+    session=session,  # Transaction coordination
+)
 ```
 
 ❌ **FORBIDDEN - Always using outbox**:
@@ -214,13 +327,30 @@ await redis_client.lpush("outbox:wakeup", "1")
 await outbox_repository.add_event(...)  # Should try Kafka first
 ```
 
+❌ **FORBIDDEN - Missing Redis real-time notifications**:
+```python
+# WRONG - Only Kafka, no real-time UI updates
+await kafka_bus.publish(topic, envelope)  # Missing Redis dual publishing
+```
+
+❌ **FORBIDDEN - Ignoring session parameter**:
+```python
+# WRONG - Session passed but not used for atomicity
+async def publish_event(self, data, session=None):
+    await kafka_bus.publish(...)  # Should use outbox with session
+```
+
 ## 8. Implementation Checklist
 - ✅ Event publisher tries Kafka FIRST, outbox on failure
+- ✅ **Dual publishing**: Kafka for service-to-service + Redis for real-time UI
+- ✅ **Session-aware publishing**: Support for Unit of Work pattern
+- ✅ **Service-specific wake-up keys**: `outbox:wake:{service_name}` for isolation
 - ✅ Redis LPUSH notification sent when events enter outbox
 - ✅ Relay worker uses Redis BLPOP for instant wake-up
 - ✅ Adaptive polling intervals based on ENVIRONMENT
 - ✅ Configuration centralized in huleedu_service_libs
 - ✅ Outbox table includes performance indexes
+- ✅ **Structured error handling** with HuleEduError for observability
 - ✅ 99.9% of events go directly to Kafka (monitor this metric)
 
 ## 9. Key Metrics to Monitor
@@ -228,3 +358,7 @@ await outbox_repository.add_event(...)  # Should try Kafka first
 - **outbox_fallback_rate**: Should be <0.1%
 - **outbox_processing_delay**: Should be <100ms with Redis wake-up
 - **outbox_queue_depth**: Should remain near zero
+- **redis_notification_success_rate**: For real-time UI updates
+- **session_aware_publish_rate**: Unit of Work pattern usage
+- **relay_worker_wake_up_latency**: Redis notification effectiveness
+- **dual_publishing_consistency**: Kafka vs Redis publishing alignment

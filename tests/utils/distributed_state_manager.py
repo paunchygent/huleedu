@@ -48,21 +48,21 @@ class DistributedStateManager:
     async def _clear_redis_idempotency_keys(self) -> None:
         """Clear all Redis idempotency keys that could cause event skipping."""
         try:
-            # Get count of existing keys
+            # Get count of v2 idempotency keys
             count_cmd = [
                 "docker",
                 "exec",
                 self.redis_container,
                 "redis-cli",
                 "EVAL",
-                "return #redis.call('keys', 'huleedu:events:seen:*')",
+                "return #redis.call('keys', 'huleedu:idempotency:v2:*')",
                 "0",
             ]
             result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
             key_count = int(result.stdout.strip())
 
             if key_count > 0:
-                # Clear all idempotency keys
+                # Clear all v2 idempotency keys
                 clear_cmd = [
                     "docker",
                     "exec",
@@ -70,14 +70,14 @@ class DistributedStateManager:
                     "redis-cli",
                     "EVAL",
                     (
-                        "local keys = redis.call('keys', 'huleedu:events:seen:*') "
+                        "local keys = redis.call('keys', 'huleedu:idempotency:v2:*') "
                         "for i=1,#keys do redis.call('del', keys[i]) end return #keys"
                     ),
                     "0",
                 ]
                 result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
                 cleared_count = int(result.stdout.strip())
-                logger.info(f"🗑️ Cleared {cleared_count} Redis idempotency keys")
+                logger.info(f"🗑️ Cleared {cleared_count} Redis v2 idempotency keys")
             else:
                 logger.info("✅ No Redis idempotency keys to clear")
 

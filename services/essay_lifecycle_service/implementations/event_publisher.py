@@ -814,6 +814,7 @@ class DefaultEventPublisher(EventPublisher):
         self,
         event_data: Any,  # ELSBatchPhaseOutcomeV1
         correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event when phase is complete."""
         from uuid import uuid4

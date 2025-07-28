@@ -82,6 +82,11 @@ class EssayStateMachine:
                 "dest": EssayStatus.SPELLCHECKED_SUCCESS.value,
             },
             {
+                "trigger": EVT_SPELLCHECK_SUCCEEDED,
+                "source": EssayStatus.AWAITING_SPELLCHECK.value,
+                "dest": EssayStatus.SPELLCHECKED_SUCCESS.value,
+            },
+            {
                 "trigger": EVT_SPELLCHECK_FAILED,
                 "source": EssayStatus.SPELLCHECKING_IN_PROGRESS.value,
                 "dest": EssayStatus.SPELLCHECK_FAILED.value,
@@ -136,6 +141,11 @@ class EssayStateMachine:
             {
                 "trigger": EVT_CJ_ASSESSMENT_SUCCEEDED,
                 "source": EssayStatus.CJ_ASSESSMENT_IN_PROGRESS.value,
+                "dest": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
+            },
+            {
+                "trigger": EVT_CJ_ASSESSMENT_SUCCEEDED,
+                "source": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
                 "dest": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
             },
             {

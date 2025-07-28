@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import nullcontext
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
@@ -72,6 +72,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         self,
         result_data: SpellcheckResultDataV1,
         correlation_id: UUID,
+        confirm_idempotency: Any = None,
     ) -> bool:
         """Handle spellcheck result from Spell Checker Service."""
         try:
@@ -220,6 +221,10 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 session=session,
                             )
                         # Transaction commits here
+                
+                # Confirm idempotency after successful transaction commit
+                if confirm_idempotency is not None:
+                    await confirm_idempotency()
             else:
                 logger.error(
                     f"State machine trigger '{trigger}' failed for essay "
@@ -255,6 +260,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         self,
         result_data: CJAssessmentCompletedV1,
         correlation_id: UUID,
+        confirm_idempotency: Any = None,
     ) -> bool:
         """Handle CJ assessment completion from CJ Assessment Service."""
         try:
@@ -420,6 +426,10 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                     )
                                     break  # Only need to check once
                     # Transaction commits here
+
+            # Confirm idempotency after successful transaction commit
+            if confirm_idempotency is not None:
+                await confirm_idempotency()
 
             return True
 

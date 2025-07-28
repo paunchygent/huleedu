@@ -39,6 +39,7 @@ async def process_single_message(
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
     tracer: Tracer | None = None,
+    confirm_idempotency: Any = None,
 ) -> bool:
     """
     Process a single Kafka message and update essay state accordingly.
@@ -87,6 +88,7 @@ async def process_single_message(
                         batch_coordination_handler,
                         batch_command_handler,
                         service_result_handler,
+                        confirm_idempotency,
                     )
         else:
             # No parent context or tracer, process without tracing
@@ -96,6 +98,7 @@ async def process_single_message(
                 batch_coordination_handler,
                 batch_command_handler,
                 service_result_handler,
+                confirm_idempotency,
             )
 
     except Exception as e:
@@ -112,6 +115,7 @@ async def _process_message_impl(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
+    confirm_idempotency: Any = None,
 ) -> bool:
     """Process the message after tracing context has been set up."""
     # Record Kafka queue latency
@@ -139,6 +143,7 @@ async def _process_message_impl(
         batch_coordination_handler=batch_coordination_handler,
         batch_command_handler=batch_command_handler,
         service_result_handler=service_result_handler,
+        confirm_idempotency=confirm_idempotency,
     )
 
     if success:
@@ -167,6 +172,7 @@ async def _route_event(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
+    confirm_idempotency: Any = None,
 ) -> bool:
     """Route events to appropriate handlers based on event type."""
     from huleedu_service_libs.observability import use_trace_context
@@ -297,7 +303,7 @@ async def _route_event(
                 ).inc()
 
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
-                result_data=result_data, correlation_id=correlation_id
+                result_data=result_data, correlation_id=correlation_id, confirm_idempotency=confirm_idempotency
             )
             return spellcheck_result
 
@@ -313,7 +319,7 @@ async def _route_event(
                 ).inc()
 
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(
-                result_data=cj_result_data, correlation_id=correlation_id
+                result_data=cj_result_data, correlation_id=correlation_id, confirm_idempotency=confirm_idempotency
             )
             return cj_result
 

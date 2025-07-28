@@ -119,7 +119,7 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def list_essays_by_batch_and_phase(
-        self, batch_id: str, phase_name: str
+        self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         ...
@@ -287,6 +287,7 @@ class ServiceResultHandler(Protocol):
         self,
         result_data: Any,  # SpellcheckResultDataV1
         correlation_id: UUID,
+        confirm_idempotency: Any = None,
     ) -> bool:
         """Handle spellcheck result from Spell Checker Service."""
         ...
@@ -295,6 +296,7 @@ class ServiceResultHandler(Protocol):
         self,
         result_data: Any,  # CJAssessmentCompletedV1
         correlation_id: UUID,
+        confirm_idempotency: Any = None,
     ) -> bool:
         """Handle CJ assessment completion from CJ Assessment Service."""
         ...

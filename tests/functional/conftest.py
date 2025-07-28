@@ -68,25 +68,17 @@ async def verify_redis_is_pristine(clean_distributed_state, get_redis_client):
     redis_client = get_redis_client
     found_keys: List[str] = []
 
-    # Use SCAN to find all idempotency keys
-    async for key in redis_client.scan_iter("huleedu:events:seen:*"):
+    # Use SCAN to find all v2 idempotency keys
+    async for key in redis_client.scan_iter("huleedu:idempotency:v2:*"):
         if isinstance(key, bytes):
             found_keys.append(key.decode("utf-8"))
         else:
             found_keys.append(str(key))
 
-    # Also check for any other ELS-related keys using different patterns
-    old_pattern_keys: List[str] = []
-    async for key in redis_client.scan_iter("els-msg-idempotency:*"):
-        if isinstance(key, bytes):
-            old_pattern_keys.append(key.decode("utf-8"))
-        else:
-            old_pattern_keys.append(str(key))
-
-    total_found = len(found_keys) + len(old_pattern_keys)
+    total_found = len(found_keys)
 
     if total_found > 0:
-        all_keys = found_keys + old_pattern_keys
+        all_keys = found_keys
         logger.critical(
             f"🚨 DIAGNOSTIC FAILURE: Found {total_found} ELS idempotency keys "
             f"in Redis AFTER cleanup! Keys found: {all_keys[:10]}"

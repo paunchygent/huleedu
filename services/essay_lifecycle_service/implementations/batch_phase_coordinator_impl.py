@@ -111,7 +111,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
             # Get all essays in this batch/phase
             essays_in_phase = await self.repository.list_essays_by_batch_and_phase(
-                batch_id=batch_id, phase_name=phase_name.value
+                batch_id=batch_id, phase_name=phase_name.value, session=session
             )
 
             if not essays_in_phase:

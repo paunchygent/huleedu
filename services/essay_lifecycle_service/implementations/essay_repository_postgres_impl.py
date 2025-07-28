@@ -597,7 +597,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 )
 
     async def list_essays_by_batch_and_phase(
-        self, batch_id: str, phase_name: str
+        self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
         # Define phase mappings using correct enum values - MUST include ALL statuses for each phase
@@ -622,7 +622,8 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         phase_statuses = phase_status_mapping[phase_name]
 
-        async with self.session() as session:
+        # Use provided session or create new one
+        if session is not None:
             stmt = select(EssayStateDB).where(
                 EssayStateDB.batch_id == batch_id,
                 EssayStateDB.current_status.in_(phase_statuses),
@@ -636,6 +637,21 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 essays.append(essay_state)  # type: ignore[arg-type]
 
             return essays
+        else:
+            async with self.session() as session:
+                stmt = select(EssayStateDB).where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.current_status.in_(phase_statuses),
+                )
+                result = await session.execute(stmt)
+                db_essays = result.scalars().all()
+
+                essays: list[EssayState] = []
+                for db_essay in db_essays:
+                    essay_state = self._db_to_essay_state(db_essay)
+                    essays.append(essay_state)  # type: ignore[arg-type]
+
+                return essays
 
     async def create_essay_state_with_content_idempotency(
         self,

@@ -21,7 +21,7 @@ from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
-from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_v2
+from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer_transaction_aware
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -104,14 +104,15 @@ async def run_consumer_loop(
     """Main message processing loop with idempotency support."""
     global should_stop
 
-    # Define the base message handler
-    async def _process_message_wrapper(msg: ConsumerRecord) -> bool:
+    # Define the base message handler with confirmation callback
+    async def _process_message_wrapper(msg: ConsumerRecord, *, confirm_idempotency=None) -> bool:
         return await process_single_message(
             msg=msg,
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
             tracer=tracer,
+            confirm_idempotency=confirm_idempotency,
         )
 
     # Create a wrapper that returns bool | None for non-idempotent case
@@ -134,8 +135,8 @@ async def run_consumer_loop(
             enable_debug_logging=False,  # Production mode - reduced logging
         )
 
-        # Apply v2 idempotency decorator
-        decorated_handler = idempotent_consumer_v2(
+        # Apply transaction-aware idempotency decorator
+        decorated_handler = idempotent_consumer_transaction_aware(
             redis_client=redis_client, config=idempotency_config
         )(_process_message_wrapper)
 
