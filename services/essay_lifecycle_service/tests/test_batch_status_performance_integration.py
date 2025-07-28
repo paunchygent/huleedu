@@ -107,14 +107,20 @@ class TestBatchStatusPerformanceIntegration:
             async with postgres_repository.get_session_factory()() as session:
                 async with session.begin():
                     await postgres_repository.update_essay_state(
-                        f"essay-{i:03d}", EssayStatus.SPELLCHECKED_SUCCESS, {"performance_test": True}, session=session
+                        f"essay-{i:03d}",
+                        EssayStatus.SPELLCHECKED_SUCCESS,
+                        {"performance_test": True},
+                        session=session,
                     )
 
         for i in range(20, 30):  # 10% to SPELLCHECK_FAILED
             async with postgres_repository.get_session_factory()() as session:
                 async with session.begin():
                     await postgres_repository.update_essay_state(
-                        f"essay-{i:03d}", EssayStatus.SPELLCHECK_FAILED, {"performance_test": True}, session=session
+                        f"essay-{i:03d}",
+                        EssayStatus.SPELLCHECK_FAILED,
+                        {"performance_test": True},
+                        session=session,
                     )
 
         # Test old N+1 pattern performance (simulated)
@@ -209,7 +215,10 @@ class TestBatchStatusPerformanceIntegration:
                 async with postgres_repository.get_session_factory()() as session:
                     async with session.begin():
                         await postgres_repository.update_essay_state(
-                            f"large-essay-{i:03d}", status, {"large_batch_test": True}, session=session
+                            f"large-essay-{i:03d}",
+                            status,
+                            {"large_batch_test": True},
+                            session=session,
                         )
 
         # Measure performance of optimized get_batch_status_summary

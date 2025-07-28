@@ -208,7 +208,10 @@ class CJAssessmentCommandHandler:
                                         await self.repository.update_essay_status_via_machine(
                                             essay_ref.essay_id,
                                             essay_machine.current_status,
-                                            {"cj_assessment_phase": "started", "dispatch_completed": True},
+                                            {
+                                                "cj_assessment_phase": "started",
+                                                "dispatch_completed": True,
+                                            },
                                             session,  # Positional parameter
                                             correlation_id=correlation_id,
                                         )

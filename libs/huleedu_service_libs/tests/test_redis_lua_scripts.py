@@ -7,10 +7,10 @@ for atomic operations support.
 
 from __future__ import annotations
 
-import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock
 
+import pytest
+import pytest_asyncio
 from huleedu_service_libs.redis_client import RedisClient
 
 
@@ -21,12 +21,12 @@ class TestRedisLuaScripts:
     async def redis_client(self):
         """Create a RedisClient instance with mocked Redis connection."""
         client = RedisClient(client_id="test-lua", redis_url="redis://localhost:6379")
-        
+
         # Mock the underlying Redis client
         mock_redis = AsyncMock()
         client.client = mock_redis
         client._started = True
-        
+
         yield client
 
     async def test_register_script_success(self, redis_client: RedisClient):
@@ -38,12 +38,12 @@ class TestRedisLuaScripts:
         return redis.call('SET', key, value)
         """
         expected_sha = "a1b2c3d4e5f6"
-        
+
         redis_client.client.script_load = AsyncMock(return_value=expected_sha)
-        
+
         # Act
         result_sha = await redis_client.register_script(test_script)
-        
+
         # Assert
         assert result_sha == expected_sha
         redis_client.client.script_load.assert_called_once_with(test_script)
@@ -53,7 +53,7 @@ class TestRedisLuaScripts:
         # Arrange
         client = RedisClient(client_id="test-lua", redis_url="redis://localhost:6379")
         client._started = False
-        
+
         # Act & Assert
         with pytest.raises(RuntimeError, match="Redis client 'test-lua' is not running"):
             await client.register_script("test script")
@@ -63,7 +63,7 @@ class TestRedisLuaScripts:
         # Arrange
         test_script = "invalid script"
         redis_client.client.script_load = AsyncMock(side_effect=Exception("Script error"))
-        
+
         # Act & Assert
         with pytest.raises(Exception, match="Script error"):
             await redis_client.register_script(test_script)
@@ -75,12 +75,12 @@ class TestRedisLuaScripts:
         test_keys = ["test:key1", "test:key2"]
         test_args = ["value1", "value2"]
         expected_result = "OK"
-        
+
         redis_client.client.evalsha = AsyncMock(return_value=expected_result)
-        
+
         # Act
         result = await redis_client.execute_script(test_sha, test_keys, test_args)
-        
+
         # Assert
         assert result == expected_result
         redis_client.client.evalsha.assert_called_once_with(
@@ -92,7 +92,7 @@ class TestRedisLuaScripts:
         # Arrange
         client = RedisClient(client_id="test-lua", redis_url="redis://localhost:6379")
         client._started = False
-        
+
         # Act & Assert
         with pytest.raises(RuntimeError, match="Redis client 'test-lua' is not running"):
             await client.execute_script("sha123", [], [])
@@ -102,7 +102,7 @@ class TestRedisLuaScripts:
         # Arrange
         test_sha = "invalid_sha"
         redis_client.client.evalsha = AsyncMock(side_effect=Exception("NOSCRIPT"))
-        
+
         # Act & Assert
         with pytest.raises(Exception, match="NOSCRIPT"):
             await redis_client.execute_script(test_sha, [], [])
@@ -112,10 +112,10 @@ class TestRedisLuaScripts:
         # Arrange
         test_sha = "test_sha"
         redis_client.client.evalsha = AsyncMock(return_value=None)
-        
+
         # Act
         result = await redis_client.execute_script(test_sha, ["key1"], ["arg1"])
-        
+
         # Assert
         assert result is None
 
@@ -136,25 +136,23 @@ class TestRedisLuaScripts:
         redis.call('SET', key, new_value)
         return new_value
         """
-        
+
         script_sha = "increment_sha"
         redis_client.client.script_load = AsyncMock(return_value=script_sha)
         redis_client.client.evalsha = AsyncMock(return_value=5)
-        
+
         # Act
         # Register script
         sha = await redis_client.register_script(increment_script)
-        
+
         # Execute script
         result = await redis_client.execute_script(sha, ["counter:1"], ["5"])
-        
+
         # Assert
         assert sha == script_sha
         assert result == 5
         redis_client.client.script_load.assert_called_once_with(increment_script)
-        redis_client.client.evalsha.assert_called_once_with(
-            script_sha, 1, "counter:1", "5"
-        )
+        redis_client.client.evalsha.assert_called_once_with(script_sha, 1, "counter:1", "5")
 
 
 class TestLuaScriptIntegration:
@@ -181,22 +179,22 @@ class TestLuaScriptIntegration:
         redis.call('SET', key, value)
         return redis.call('GET', key)
         """
-        
+
         # Register script
         sha = await real_redis_client.register_script(test_script)
         assert sha is not None
         assert len(sha) == 40  # SHA1 hash length
-        
+
         # Execute script
         test_key = "test:lua:key"
         test_value = "Hello from Lua!"
         result = await real_redis_client.execute_script(sha, [test_key], [test_value])
-        
+
         assert result == test_value
-        
+
         # Verify the value was actually set
         stored_value = await real_redis_client.get(test_key)
         assert stored_value == test_value
-        
+
         # Cleanup
         await real_redis_client.delete_key(test_key)

@@ -75,7 +75,10 @@ class EssayRepositoryProtocol(Protocol):
         ...
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], session: AsyncSession, correlation_id: UUID | None = None
+        self,
+        essay_refs: list[EntityReference],
+        session: AsyncSession,
+        correlation_id: UUID | None = None,
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         ...
@@ -429,7 +432,12 @@ class BatchEssayTracker(Protocol):
         ...
 
     async def persist_slot_assignment(
-        self, batch_id: str, internal_essay_id: str, text_storage_id: str, original_file_name: str
+        self,
+        batch_id: str,
+        internal_essay_id: str,
+        text_storage_id: str,
+        original_file_name: str,
+        session: AsyncSession | None = None,
     ) -> None:
         """Persist slot assignment to database."""
         ...

@@ -142,7 +142,8 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: EssayValidationFailedV1,
         correlation_id: uuid.UUID,
     ) -> None:
-        """Publish EssayValidationFailedV1 event with immediate Kafka attempt and outbox fallback."""
+        """Publish EssayValidationFailedV1 event with immediate Kafka attempt
+        and outbox fallback."""
         # Construct EventEnvelope
         from huleedu_service_libs.observability import inject_trace_context
 

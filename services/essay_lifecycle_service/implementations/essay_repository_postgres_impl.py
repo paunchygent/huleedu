@@ -234,9 +234,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         try:
             # Use SELECT FOR UPDATE to prevent race conditions
-            stmt = (
-                select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
-            )
+            stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
             result = await session.execute(stmt)
             db_essay = result.scalars().first()
 
@@ -379,7 +377,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 )
 
     async def create_essay_records_batch(
-        self, essay_refs: list[EntityReference], session: AsyncSession, correlation_id: UUID | None = None
+        self,
+        essay_refs: list[EntityReference],
+        session: AsyncSession,
+        correlation_id: UUID | None = None,
     ) -> list[EssayState]:
         """Create multiple essay records in single atomic transaction."""
         # Generate correlation_id if not provided for error handling
@@ -547,7 +548,11 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 existing_essay.updated_at = datetime.now(UTC)
 
                 await self.update_essay_state(
-                    internal_essay_id, initial_status, metadata, session, correlation_id=correlation_id
+                    internal_essay_id,
+                    initial_status,
+                    metadata,
+                    session,
+                    correlation_id=correlation_id,
                 )
                 return existing_essay
             else:
@@ -692,9 +697,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
 
             # Check if essay already exists (created during batch registration)
-            existing_stmt = select(EssayStateDB).where(
-                EssayStateDB.essay_id == internal_essay_id
-            )
+            existing_stmt = select(EssayStateDB).where(EssayStateDB.essay_id == internal_essay_id)
             existing_result = await session.execute(existing_stmt)
             existing_essay_db = existing_result.scalars().first()
 

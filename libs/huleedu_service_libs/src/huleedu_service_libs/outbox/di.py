@@ -86,7 +86,9 @@ class OutboxProvider(Provider):
             )
 
         print(
-            f"INFO: Outbox settings for environment '{environment}': poll_interval={settings.poll_interval_seconds}s, wake_notifications={settings.enable_wake_notifications}",
+            f"INFO: Outbox settings for environment '{environment}': "
+            f"poll_interval={settings.poll_interval_seconds}s, "
+            f"wake_notifications={settings.enable_wake_notifications}",
             file=sys.stderr,
         )
         return settings
@@ -199,7 +201,8 @@ class OutboxSettingsProvider(Provider):
         import sys
 
         print(
-            f"INFO: OutboxSettingsProvider.provide_outbox_settings called - poll_interval={self._settings.poll_interval_seconds}s",
+            "INFO: OutboxSettingsProvider.provide_outbox_settings called - "
+            f"poll_interval={self._settings.poll_interval_seconds}s",
             file=sys.stderr,
         )
         return self._settings

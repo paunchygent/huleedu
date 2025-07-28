@@ -205,7 +205,9 @@ class RedisBatchCoordinator:
             timeout_seconds: Optional timeout override
         """
         if not essay_ids:
-            correlation_id = metadata.get("correlation_id", UUID("00000000-0000-0000-0000-000000000000"))
+            correlation_id = metadata.get(
+                "correlation_id", UUID("00000000-0000-0000-0000-000000000000")
+            )
             error_detail = ErrorDetail(
                 error_code=ErrorCode.VALIDATION_ERROR,
                 message="Cannot register batch with empty essay_ids",
@@ -213,15 +215,14 @@ class RedisBatchCoordinator:
                 timestamp=datetime.now(UTC),
                 service="essay_lifecycle_service",
                 operation="register_batch_slots",
-                details={
-                    "batch_id": batch_id,
-                    "metadata": metadata
-                }
+                details={"batch_id": batch_id, "metadata": metadata},
             )
             raise HuleEduError(error_detail)
 
         timeout = timeout_seconds or self._default_timeout
-        correlation_id = metadata.get("correlation_id", UUID("00000000-0000-0000-0000-000000000000"))
+        correlation_id = metadata.get(
+            "correlation_id", UUID("00000000-0000-0000-0000-000000000000")
+        )
 
         try:
             # Create transaction pipeline - no watch needed for batch registration
@@ -261,10 +262,7 @@ class RedisBatchCoordinator:
                     timestamp=datetime.now(UTC),
                     service="essay_lifecycle_service",
                     operation="register_batch_slots",
-                    details={
-                        "batch_id": batch_id,
-                        "essay_count": len(essay_ids)
-                    }
+                    details={"batch_id": batch_id, "essay_count": len(essay_ids)},
                 )
                 raise HuleEduError(error_detail)
 
@@ -357,16 +355,13 @@ class RedisBatchCoordinator:
                 timestamp=datetime.now(UTC),
                 service="essay_lifecycle_service",
                 operation="assign_slot_atomic",
-                details={
-                    "batch_id": batch_id,
-                    "content_metadata": content_metadata
-                }
+                details={"batch_id": batch_id, "content_metadata": content_metadata},
             )
             raise HuleEduError(error_detail)
 
         try:
             await self._ensure_scripts_loaded()
-            
+
             # Type assertion: _ensure_scripts_loaded guarantees script is loaded
             assert self._atomic_assign_script_sha is not None, "Script SHA must be loaded"
 
@@ -387,7 +382,7 @@ class RedisBatchCoordinator:
                     f"No available slots in batch {batch_id} for content {text_storage_id}"
                 )
                 return None
-            
+
             # Validate that Redis returned a string essay_id
             if not isinstance(result, str):
                 if correlation_id is None:
@@ -406,8 +401,8 @@ class RedisBatchCoordinator:
                         "batch_id": batch_id,
                         "text_storage_id": text_storage_id,
                         "returned_type": type(result).__name__,
-                        "returned_value": str(result)
-                    }
+                        "returned_value": str(result),
+                    },
                 )
                 raise HuleEduError(error_detail)
 
@@ -424,7 +419,9 @@ class RedisBatchCoordinator:
             )
             raise
 
-    async def return_slot(self, batch_id: str, text_storage_id: str, correlation_id: UUID | None = None) -> bool:
+    async def return_slot(
+        self, batch_id: str, text_storage_id: str, correlation_id: UUID | None = None
+    ) -> bool:
         """
         Atomically return a previously assigned slot to the available pool.
 
@@ -444,7 +441,7 @@ class RedisBatchCoordinator:
         """
         try:
             await self._ensure_scripts_loaded()
-            
+
             # Type assertion: _ensure_scripts_loaded guarantees script is loaded
             assert self._atomic_return_script_sha is not None, "Script SHA must be loaded"
 
@@ -463,7 +460,7 @@ class RedisBatchCoordinator:
                     f"No slot assignment found for content {text_storage_id} in batch {batch_id}"
                 )
                 return False
-            
+
             # Validate the returned essay_id
             if not isinstance(result, str):
                 if correlation_id is None:
@@ -482,11 +479,11 @@ class RedisBatchCoordinator:
                         "batch_id": batch_id,
                         "text_storage_id": text_storage_id,
                         "returned_type": type(result).__name__,
-                        "returned_value": str(result)
-                    }
+                        "returned_value": str(result),
+                    },
                 )
                 raise HuleEduError(error_detail)
-            
+
             self._logger.info(
                 f"Returned slot {result} to batch {batch_id} for content {text_storage_id}"
             )

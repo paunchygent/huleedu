@@ -494,8 +494,8 @@ class TestDefaultEventPublisher:
         )
 
         # Type annotation for heterogeneous list of event publishing methods
-        from typing import Any, Callable
-        
+        from typing import Callable
+
         events_to_test: list[tuple[Callable[..., Any], Any, str, str]] = [
             (
                 event_publisher.publish_essay_content_provisioned,

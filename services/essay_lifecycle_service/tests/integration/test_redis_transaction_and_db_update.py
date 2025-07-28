@@ -188,13 +188,19 @@ class TestRedisTransactionAndDatabaseUpdate:
             "content_hash": "abc123",
         }
 
-        # This should UPDATE the existing essay, not try to create a new one
-        was_created, final_essay_id = await repository.create_essay_state_with_content_idempotency(
-            batch_id=batch_id,
-            text_storage_id=text_storage_id,
-            essay_data=essay_data,
-            correlation_id=correlation_id,
-        )
+        # This should UPDATE the existing essay, not try to create a new one using Unit of Work pattern
+        async with repository.get_session_factory()() as session:
+            async with session.begin():
+                (
+                    was_created,
+                    final_essay_id,
+                ) = await repository.create_essay_state_with_content_idempotency(
+                    batch_id=batch_id,
+                    text_storage_id=text_storage_id,
+                    essay_data=essay_data,
+                    correlation_id=correlation_id,
+                    session=session,
+                )
 
         assert was_created is True, "First content assignment should report as created"
         assert final_essay_id == assigned_essay_id, "Should return the same essay ID"
@@ -206,16 +212,19 @@ class TestRedisTransactionAndDatabaseUpdate:
         assert updated_essay.current_status == EssayStatus.READY_FOR_PROCESSING
         assert updated_essay.processing_metadata["text_storage_id"] == text_storage_id
 
-        # Step 4: Test idempotency
-        (
-            was_created2,
-            final_essay_id2,
-        ) = await repository.create_essay_state_with_content_idempotency(
-            batch_id=batch_id,
-            text_storage_id=text_storage_id,
-            essay_data=essay_data,
-            correlation_id=correlation_id,
-        )
+        # Step 4: Test idempotency using Unit of Work pattern
+        async with repository.get_session_factory()() as session:
+            async with session.begin():
+                (
+                    was_created2,
+                    final_essay_id2,
+                ) = await repository.create_essay_state_with_content_idempotency(
+                    batch_id=batch_id,
+                    text_storage_id=text_storage_id,
+                    essay_data=essay_data,
+                    correlation_id=correlation_id,
+                    session=session,
+                )
 
         assert was_created2 is False, "Second attempt should be idempotent"
         assert final_essay_id2 == assigned_essay_id, "Should return the same essay ID"
@@ -276,11 +285,11 @@ class TestRedisTransactionAndDatabaseUpdate:
 
         # Verify results
         successful_assignments = [r for r in results if r is not None]
-        
+
         # Under high concurrency with retries, not all assignments may succeed
         # But we should have at least some successes
         assert len(successful_assignments) > 0, "Should have at least some successful assignments"
-        
+
         # Key test: Verify all assigned essay IDs are unique (no duplicates)
         unique_assignments = set(successful_assignments)
         assert len(unique_assignments) == len(successful_assignments), (
@@ -290,20 +299,20 @@ class TestRedisTransactionAndDatabaseUpdate:
         # Verify Redis state consistency
         assignments = await redis_coordinator.get_batch_assignments(batch_id)
         remaining_slots = await redis_coordinator.get_available_slot_count(batch_id)
-        
+
         # Under high concurrency, some slots may be "lost" due to race conditions
         # where a slot is popped but the assignment fails and the slot isn't returned
         lost_slots = 5 - len(assignments) - remaining_slots
         assert len(assignments) + remaining_slots + lost_slots == 5, (
             f"Slot accounting error: {len(assignments)} + {remaining_slots} + {lost_slots} != 5"
         )
-        
+
         # Verify each successful assignment has metadata in Redis
         for essay_id in successful_assignments:
             assert essay_id in assignments, f"Essay {essay_id} not found in Redis assignments"
             metadata = assignments[essay_id]
             assert "text_storage_id" in metadata, f"Missing text_storage_id for essay {essay_id}"
-        
+
         # Log the results for debugging
         logger.info(
             f"Concurrent assignment results: {len(successful_assignments)}/5 succeeded, "

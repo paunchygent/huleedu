@@ -175,12 +175,12 @@ class MockRedisClient(AtomicRedisClientProtocol):
         """Track channel name generation."""
         self.get_user_channel_calls.append(user_id)
         return f"ws:{user_id}"
-    
+
     async def register_script(self, script: str) -> str:
         """Mock register_script method for Lua scripts."""
         # Return a mock SHA hash
         return "mock_script_sha_" + str(hash(script))[:8]
-    
+
     async def execute_script(self, sha: str, keys: list[str], args: list[Any]) -> Any:
         """Mock execute_script method for Lua scripts."""
         # Return a mock result

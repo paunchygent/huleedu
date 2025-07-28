@@ -901,7 +901,7 @@ class RedisClient(AtomicRedisClientProtocol):
         """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        
+
         try:
             # The script_load method returns the SHA1 hash of the script
             sha = await self.client.script_load(script_body)
@@ -932,7 +932,7 @@ class RedisClient(AtomicRedisClientProtocol):
         """
         if not self._started:
             raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
-        
+
         try:
             result = await self.client.evalsha(sha, len(keys), *keys, *args)
             logger.debug(

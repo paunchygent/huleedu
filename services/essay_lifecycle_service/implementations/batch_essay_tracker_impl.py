@@ -30,6 +30,7 @@ from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
@@ -169,7 +170,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             content_metadata = {
                 "text_storage_id": text_storage_id,
                 "original_file_name": original_file_name,
-                "assigned_at": datetime.now().isoformat(),
+                "assigned_at": datetime.now(UTC).isoformat(),
             }
 
             # Use Redis coordinator for atomic slot assignment
@@ -368,11 +369,16 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             raise
 
     async def persist_slot_assignment(
-        self, batch_id: str, internal_essay_id: str, text_storage_id: str, original_file_name: str
+        self,
+        batch_id: str,
+        internal_essay_id: str,
+        text_storage_id: str,
+        original_file_name: str,
+        session: AsyncSession | None = None,
     ) -> None:
         """Persist slot assignment to database via persistence layer."""
         await self._persistence.persist_slot_assignment(
-            batch_id, internal_essay_id, text_storage_id, original_file_name
+            batch_id, internal_essay_id, text_storage_id, original_file_name, session=session
         )
 
     async def remove_batch_from_database(self, batch_id: str) -> None:

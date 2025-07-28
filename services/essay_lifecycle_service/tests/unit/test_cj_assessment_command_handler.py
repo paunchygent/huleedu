@@ -8,7 +8,7 @@ and request dispatching using protocol-based mocking.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,7 +33,6 @@ from services.essay_lifecycle_service.protocols import (
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
-from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 if TYPE_CHECKING:
     pass
@@ -163,14 +162,14 @@ class TestCJAssessmentCommandHandler:
 
             # Verify state machine updates (both initial transition and started event succeed)
             assert mock_repository.update_essay_status_via_machine.call_count == 2
-            
-            # Check first call (initial transition)  
+
+            # Check first call (initial transition)
             first_call = mock_repository.update_essay_status_via_machine.call_args_list[0]
             assert first_call.args[0] == essay_id
-            assert first_call.args[1] == EssayStatus.AWAITING_CJ_ASSESSMENT  
+            assert first_call.args[1] == EssayStatus.AWAITING_CJ_ASSESSMENT
             assert "bos_command" in first_call.args[2]
             assert first_call.kwargs.get("correlation_id") == correlation_id
-            
+
             # Check second call (started event)
             second_call = mock_repository.update_essay_status_via_machine.call_args_list[1]
             assert second_call.args[0] == essay_id

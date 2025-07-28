@@ -18,6 +18,7 @@ from uuid import UUID
 import psutil
 from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.protocols import EventPublisher
@@ -84,24 +85,30 @@ class MockEventPublisher(EventPublisher):
                 )
             )
 
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_batch_essays_ready(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record batch essays ready events."""
         async with self.lock:
             self.published_events.append(("batch_essays_ready", event_data, correlation_id))
 
     async def publish_excess_content_provisioned(
-        self, event_data: Any, correlation_id: UUID
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
     ) -> None:
         """Record excess content events."""
         async with self.lock:
             self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
 
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_els_batch_phase_outcome(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record ELS batch phase outcome events."""
         async with self.lock:
             self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
-    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID) -> None:
+    async def publish_essay_slot_assigned(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record essay slot assigned events with validation."""
         async with self.lock:
             # Validate event data structure

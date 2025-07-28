@@ -19,20 +19,23 @@ from services.essay_lifecycle_service.protocols import (
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
-from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestFutureServicesCommandHandler:
     """Test FutureServicesCommandHandler stub methods."""
 
     @pytest.fixture
-    def future_services_handler(self, mock_session_factory: AsyncMock) -> FutureServicesCommandHandler:
+    def future_services_handler(
+        self, mock_session_factory: AsyncMock
+    ) -> FutureServicesCommandHandler:
         """Create FutureServicesCommandHandler instance using protocol-based mocking."""
         # Future services handler with protocol-based mocks for stub tests
         mock_repo = AsyncMock(spec=EssayRepositoryProtocol)
         mock_dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)
         mock_publisher = AsyncMock(spec=EventPublisher)
-        return FutureServicesCommandHandler(mock_repo, mock_dispatcher, mock_publisher, mock_session_factory)
+        return FutureServicesCommandHandler(
+            mock_repo, mock_dispatcher, mock_publisher, mock_session_factory
+        )
 
     @pytest.fixture
     def correlation_id(self) -> UUID:

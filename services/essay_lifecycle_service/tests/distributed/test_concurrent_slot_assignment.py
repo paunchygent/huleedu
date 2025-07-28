@@ -152,6 +152,7 @@ class TestConcurrentSlotAssignment:
                 batch_tracker=batch_tracker,
                 repository=repository,
                 event_publisher=event_publisher,
+                session_factory=repository.get_session_factory(),
             )
 
             instances.append((coordination_handler, repository, event_publisher))

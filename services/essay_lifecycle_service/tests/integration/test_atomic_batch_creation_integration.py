@@ -14,7 +14,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
@@ -22,6 +21,7 @@ from common_core.metadata_models import EntityReference, SystemProcessingMetadat
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from sqlalchemy.ext.asyncio import AsyncSession
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -48,7 +48,11 @@ class MockEventPublisher(EventPublisher):
         self.published_events: list[tuple[str, Any, Any]] = []
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID, session: AsyncSession | None = None
+        self,
+        essay_ref: EntityReference,
+        status: EssayStatus,
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
     ) -> None:
         """Record status update events for verification."""
         self.published_events.append(("status_update", (essay_ref, status), correlation_id))
@@ -96,7 +100,9 @@ class MockEventPublisher(EventPublisher):
             )
         )
 
-    async def publish_batch_essays_ready(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
+    async def publish_batch_essays_ready(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record published events for verification."""
         self.published_events.append(("batch_essays_ready", event_data, correlation_id))
 
@@ -106,11 +112,15 @@ class MockEventPublisher(EventPublisher):
         """Record published events for verification."""
         self.published_events.append(("excess_content_provisioned", event_data, correlation_id))
 
-    async def publish_els_batch_phase_outcome(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
+    async def publish_els_batch_phase_outcome(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record published events for verification."""
         self.published_events.append(("els_batch_phase_outcome", event_data, correlation_id))
 
-    async def publish_essay_slot_assigned(self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None) -> None:
+    async def publish_essay_slot_assigned(
+        self, event_data: Any, correlation_id: UUID, session: AsyncSession | None = None
+    ) -> None:
         """Record published events for verification."""
         # Validate EssaySlotAssignedV1 structure
         assert hasattr(event_data, "batch_id"), "EssaySlotAssignedV1 must have batch_id"
@@ -394,7 +404,10 @@ class TestAtomicBatchCreationIntegration:
             entity_type="essay",
             parent_id=sample_batch_event.batch_id,
         )
-        await postgres_repository.create_essay_record(existing_ref)
+        # Create essay using Unit of Work pattern
+        async with postgres_repository.get_session_factory()() as session:
+            async with session.begin():
+                await postgres_repository.create_essay_record(existing_ref, session=session)
 
         correlation_id = uuid4()
 
@@ -407,9 +420,9 @@ class TestAtomicBatchCreationIntegration:
         # Validate error structure
         error = exc_info.value
         assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
-        assert "Database error during batch essay creation" in error.error_detail.message
+        assert "Failed to process batch essays registration" in error.error_detail.message
         assert error.error_detail.service == "essay_lifecycle_service"
-        assert error.error_detail.operation == "create_essay_records_batch"
+        assert error.error_detail.operation == "handle_batch_essays_registered"
 
         # Assert - Only the manually created essay should exist (atomic rollback)
         existing_essay = await postgres_repository.get_essay_state("essay_001")
@@ -458,12 +471,9 @@ class TestAtomicBatchCreationIntegration:
 
         # Validate error
         error = exc_info.value
-        assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
-        # The specific error message is in the details field
-        assert (
-            error.error_detail.details.get("error_details")
-            == "Cannot register batch with empty essay_ids"
-        )
+        assert error.error_detail.error_code == ErrorCode.VALIDATION_ERROR
+        # The error message is in the message field
+        assert error.error_detail.message == "Cannot register batch with empty essay_ids"
 
         # Assert - No essays created
         batch_essays = await postgres_repository.list_essays_by_batch("empty-batch")

@@ -12,7 +12,7 @@ from uuid import UUID
 from common_core.domain_enums import CourseCode
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
@@ -75,14 +75,20 @@ class BatchTrackerPersistence:
             # Don't fail the operation if database persistence fails
 
     async def persist_slot_assignment(
-        self, batch_id: str, internal_essay_id: str, text_storage_id: str, original_file_name: str
+        self,
+        batch_id: str,
+        internal_essay_id: str,
+        text_storage_id: str,
+        original_file_name: str,
+        session: AsyncSession | None = None,
     ) -> None:
         """Persist slot assignment to database."""
         try:
-            async with self._session_factory() as session:
+
+            async def _do_persist(db_session: AsyncSession) -> None:
                 # Get batch tracker record
                 stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
-                result = await session.execute(stmt)
+                result = await db_session.execute(stmt)
                 tracker_db = result.scalar_one_or_none()
 
                 if not tracker_db:
@@ -97,7 +103,7 @@ class BatchTrackerPersistence:
                     original_file_name=original_file_name,
                 )
 
-                session.add(slot_db)
+                db_session.add(slot_db)
 
                 # Update tracker assigned_slots count
                 tracker_db.assigned_slots += 1
@@ -105,7 +111,14 @@ class BatchTrackerPersistence:
                     slot for slot in tracker_db.available_slots if slot != internal_essay_id
                 ]
 
-                await session.commit()
+            # Use provided session or create a new one
+            if session is not None:
+                await _do_persist(session)
+                # Don't commit when using provided session - let the outer transaction handle it
+            else:
+                async with self._session_factory() as new_session:
+                    await _do_persist(new_session)
+                    await new_session.commit()
 
                 self._logger.debug(
                     f"Persisted slot assignment: {internal_essay_id} -> {text_storage_id}"

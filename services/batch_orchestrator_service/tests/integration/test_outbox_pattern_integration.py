@@ -85,7 +85,7 @@ class OutboxTestProvider(Provider):
     def provide_redis_client(self) -> AtomicRedisClientProtocol:
         """Provide mock Redis client."""
         return self._redis_client
-    
+
     @provide(scope=Scope.REQUEST)
     def provide_event_publisher(
         self,
@@ -95,7 +95,9 @@ class OutboxTestProvider(Provider):
         settings: Settings,
     ) -> BatchEventPublisherProtocol:
         """Provide event publisher with outbox support."""
-        return DefaultBatchEventPublisherImpl(kafka_publisher, outbox_repository, redis_client, settings)
+        return DefaultBatchEventPublisherImpl(
+            kafka_publisher, outbox_repository, redis_client, settings
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_relay_worker(

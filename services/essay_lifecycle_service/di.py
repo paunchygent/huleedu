@@ -274,7 +274,9 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> SpellcheckCommandHandler:
         """Provide spellcheck command handler implementation."""
-        return SpellcheckCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
+        return SpellcheckCommandHandler(
+            repository, request_dispatcher, event_publisher, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_cj_assessment_command_handler(
@@ -285,7 +287,9 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> CJAssessmentCommandHandler:
         """Provide CJ assessment command handler implementation."""
-        return CJAssessmentCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
+        return CJAssessmentCommandHandler(
+            repository, request_dispatcher, event_publisher, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_future_services_command_handler(
@@ -296,7 +300,9 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> FutureServicesCommandHandler:
         """Provide future services command handler implementation."""
-        return FutureServicesCommandHandler(repository, request_dispatcher, event_publisher, session_factory)
+        return FutureServicesCommandHandler(
+            repository, request_dispatcher, event_publisher, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_command_handler(
@@ -321,7 +327,9 @@ class BatchCoordinationProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
         """Provide batch coordination handler implementation."""
-        return DefaultBatchCoordinationHandler(batch_tracker, repository, event_publisher, session_factory)
+        return DefaultBatchCoordinationHandler(
+            batch_tracker, repository, event_publisher, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_tracker_persistence(self, engine: AsyncEngine) -> BatchTrackerPersistence:
@@ -353,7 +361,9 @@ class BatchCoordinationProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation."""
-        return DefaultBatchPhaseCoordinator(repository, event_publisher, batch_tracker, session_factory)
+        return DefaultBatchPhaseCoordinator(
+            repository, event_publisher, batch_tracker, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_service_result_handler(

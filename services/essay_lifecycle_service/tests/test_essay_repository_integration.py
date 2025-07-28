@@ -146,7 +146,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Use Unit of Work pattern with session
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                created_essay = await postgres_repository.create_essay_record(essay_ref, session=session)
+                created_essay = await postgres_repository.create_essay_record(
+                    essay_ref, session=session
+                )
                 assert created_essay.essay_id == essay_id
                 assert created_essay.batch_id == batch_id
                 assert created_essay.current_status == EssayStatus.UPLOADED
@@ -169,7 +171,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Act - Create essay using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                created_essay = await postgres_repository.create_essay_record(sample_entity_reference, session=session)
+                created_essay = await postgres_repository.create_essay_record(
+                    sample_entity_reference, session=session
+                )
 
         # Act - Retrieve essay
         retrieved_essay = await postgres_repository.get_essay_state(
@@ -206,7 +210,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Arrange - Create essay using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                await postgres_repository.create_essay_record(sample_entity_reference, session=session)
+                await postgres_repository.create_essay_record(
+                    sample_entity_reference, session=session
+                )
 
         # Act - Update essay state using Unit of Work pattern
         new_metadata = {"updated_by": "test", "processing_step": "spellcheck"}
@@ -245,15 +251,17 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Act - Create essay for slot assignment using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                created_essay = await postgres_repository.create_or_update_essay_state_for_slot_assignment(
-                    internal_essay_id=essay_id,
-                    batch_id=batch_id,
-                    text_storage_id=text_storage_id,
-                    original_file_name="test_essay.txt",
-                    file_size=1024,
-                    content_hash="abc123",
-                    initial_status=EssayStatus.READY_FOR_PROCESSING,
-                    session=session,
+                created_essay = (
+                    await postgres_repository.create_or_update_essay_state_for_slot_assignment(
+                        internal_essay_id=essay_id,
+                        batch_id=batch_id,
+                        text_storage_id=text_storage_id,
+                        original_file_name="test_essay.txt",
+                        file_size=1024,
+                        content_hash="abc123",
+                        initial_status=EssayStatus.READY_FOR_PROCESSING,
+                        session=session,
+                    )
                 )
 
         # Assert essay creation
@@ -437,7 +445,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Arrange - Create essay using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                await postgres_repository.create_essay_record(sample_entity_reference, session=session)
+                await postgres_repository.create_essay_record(
+                    sample_entity_reference, session=session
+                )
 
         # Act - Update multiple times to build timeline using Unit of Work pattern
         metadata1 = {"step": "spellcheck", "data": {"corrections": 5}}
@@ -498,7 +508,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Act - Create all essays in atomic batch operation using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                created_essays = await postgres_repository.create_essay_records_batch(essay_refs, session=session)
+                created_essays = await postgres_repository.create_essay_records_batch(
+                    essay_refs, session=session
+                )
 
         # Assert - All essays created successfully
         assert len(created_essays) == 3
@@ -535,7 +547,9 @@ class TestPostgreSQLEssayRepositoryIntegration:
         # Act - Create batch with empty list using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                created_essays = await postgres_repository.create_essay_records_batch([], session=session)
+                created_essays = await postgres_repository.create_essay_records_batch(
+                    [], session=session
+                )
 
         # Assert - Empty list returned
         assert created_essays == []
@@ -571,11 +585,15 @@ class TestPostgreSQLEssayRepositoryIntegration:
             EntityReference(entity_id="new-essay-003", entity_type="essay", parent_id=batch_id),
         ]
 
-        # Act & Assert - Batch creation should fail completely
-        with pytest.raises(HuleEduError):
+        # Act & Assert - Batch creation should fail completely due to constraint violation
+        from sqlalchemy.exc import IntegrityError
+
+        with pytest.raises(IntegrityError):
             async with postgres_repository.get_session_factory()() as session:
                 async with session.begin():
-                    await postgres_repository.create_essay_records_batch(batch_refs, session=session)
+                    await postgres_repository.create_essay_records_batch(
+                        batch_refs, session=session
+                    )
 
         # Assert - No new essays should exist (atomic rollback)
         # The existing essay should still be there

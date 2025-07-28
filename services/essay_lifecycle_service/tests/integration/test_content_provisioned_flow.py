@@ -208,16 +208,19 @@ class TestContentProvisionedFlow:
 
         # In Kafka-first pattern, outbox is only used when Kafka fails
         # Since mock_kafka_bus is working correctly, no outbox usage expected
-        assert not mock_outbox_repository.add_event.called, "Should NOT add event to outbox when Kafka succeeds"
-        
+        assert not mock_outbox_repository.add_event.called, (
+            "Should NOT add event to outbox when Kafka succeeds"
+        )
+
         # Verify the event was published directly to Kafka
         published_events = test_infrastructure["published_events"]
         slot_assigned_events = [
-            e for e in published_events 
+            e
+            for e in published_events
             if e["envelope"].event_type == "huleedu.els.essay.slot.assigned.v1"
         ]
         assert len(slot_assigned_events) == 1, "Should publish EssaySlotAssignedV1 event to Kafka"
-        
+
         # Verify the event data
         slot_event = slot_assigned_events[0]["envelope"]
         assert slot_event.data.essay_id == str(assigned_essay.essay_id)
@@ -296,7 +299,7 @@ class TestContentProvisionedFlow:
                     successful_provisions.append((success, fid))
                 else:
                     failed_provisions.append((success, fid))
-        
+
         # Under high concurrency, some provisions may fail due to slot exhaustion
         # The key is that successes + failures = total attempts
         assert len(successful_provisions) + len(failed_provisions) == 5, (
@@ -315,25 +318,26 @@ class TestContentProvisionedFlow:
         # Verify Redis state consistency
         remaining_slots = await redis_coordinator.get_available_slot_count(batch_id)
         lost_slots = 5 - len(assigned_essays) - remaining_slots
-        
+
         # Under high concurrency, some slots might be "lost" due to race conditions
         # These are slots that were popped but not successfully assigned or returned
         assert len(assigned_essays) + remaining_slots + lost_slots == 5, (
             f"Inconsistent state: {len(assigned_essays)} assigned + {remaining_slots} remaining "
             f"+ {lost_slots} lost != 5"
         )
-        
+
         # Log the distribution for debugging
         logger.info(
             f"Slot distribution: {len(assigned_essays)} assigned, {remaining_slots} available, "
             f"{lost_slots} lost to race conditions"
         )
-        
+
         # If there were failures, verify ExcessContentProvisionedV1 events were published
         if failed_provisions:
             published_events = test_infrastructure["published_events"]
             excess_events = [
-                e for e in published_events 
+                e
+                for e in published_events
                 if e["envelope"].event_type == "huleedu.els.excess.content.provisioned.v1"
             ]
             assert len(excess_events) == len(failed_provisions), (

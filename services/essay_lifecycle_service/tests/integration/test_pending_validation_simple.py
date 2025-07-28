@@ -7,7 +7,7 @@ Focuses on testing the core flow without extensive mocking.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -110,7 +110,8 @@ class TestPendingValidationSimple:
 
         # Verify pending failures were deleted
         delete_operations = [
-            op for op in mock_pipeline.operations 
+            op
+            for op in mock_pipeline.operations
             if op[0] == "delete" and f"batch:{batch_id}:pending_failures" in op[1]
         ]
         assert len(delete_operations) > 0, "Expected delete operation for pending failures"

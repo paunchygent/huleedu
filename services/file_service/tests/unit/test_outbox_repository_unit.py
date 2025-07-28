@@ -51,9 +51,9 @@ class FakeResult:
 
 class MockAsyncSession(Mock):
     """Mock AsyncSession with custom test attributes."""
-    
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs['spec'] = AsyncSession
+        kwargs["spec"] = AsyncSession
         super().__init__(*args, **kwargs)
         self.added_objects: list[Any] = []
         self.committed: bool = False

@@ -179,7 +179,10 @@ class SpellcheckCommandHandler:
                                         await self.repository.update_essay_status_via_machine(
                                             essay_ref.essay_id,
                                             essay_machine.current_status,
-                                            {"spellcheck_phase": "started", "dispatch_completed": True},
+                                            {
+                                                "spellcheck_phase": "started",
+                                                "dispatch_completed": True,
+                                            },
                                             session,
                                             storage_reference=None,
                                             correlation_id=correlation_id,

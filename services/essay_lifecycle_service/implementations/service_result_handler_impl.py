@@ -59,7 +59,10 @@ class DefaultServiceResultHandler(ServiceResultHandler):
     """Default implementation of ServiceResultHandler protocol."""
 
     def __init__(
-        self, repository: EssayRepositoryProtocol, batch_coordinator: BatchPhaseCoordinator, session_factory: async_sessionmaker
+        self,
+        repository: EssayRepositoryProtocol,
+        batch_coordinator: BatchPhaseCoordinator,
+        session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.batch_coordinator = batch_coordinator
@@ -159,7 +162,10 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 if spellchecked_ref:
                                     storage_id = spellchecked_ref.get("default")
                                     if storage_id:
-                                        storage_ref_to_add = (ContentType.CORRECTED_TEXT, storage_id)
+                                        storage_ref_to_add = (
+                                            ContentType.CORRECTED_TEXT,
+                                            storage_id,
+                                        )
                                         logger.info(
                                             "Extracted storage reference",
                                             extra={
@@ -364,13 +370,17 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             and isinstance(batch_status_summary, dict)
                         ):
                             status_summary_for_log = {
-                                k.value if hasattr(k, "value") and not asyncio.iscoroutine(k) else str(k): v
+                                k.value
+                                if hasattr(k, "value") and not asyncio.iscoroutine(k)
+                                else str(k): v
                                 for k, v in batch_status_summary.items()
                             }
                         else:
                             status_summary_for_log = str(batch_status_summary)
                     except Exception:
-                        status_summary_for_log = f"<unavailable: {type(batch_status_summary).__name__}>"
+                        status_summary_for_log = (
+                            f"<unavailable: {type(batch_status_summary).__name__}>"
+                        )
 
                     logger.info(
                         "Batch status summary after CJ assessment processing",
@@ -384,11 +394,13 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     # We need a representative essay_state from the batch to trigger check_batch_completion
                     if result_data.rankings:
                         # Try multiple essays in case the first one has metadata issues
-                        for i, ranking in enumerate(result_data.rankings[:3]):  # Check first 3 essays
+                        for i, ranking in enumerate(
+                            result_data.rankings[:3]
+                        ):  # Check first 3 essays
                             essay_id_in_ranking = ranking.get("els_essay_id")
                             if essay_id_in_ranking:
-                                batch_representative_essay_state = await self.repository.get_essay_state(
-                                    essay_id_in_ranking
+                                batch_representative_essay_state = (
+                                    await self.repository.get_essay_state(essay_id_in_ranking)
                                 )
                                 if batch_representative_essay_state:
                                     logger.info(

@@ -113,7 +113,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             extra={
                                 "batch_id": batch_ready_event.batch_id,
                                 "ready_count": len(batch_ready_event.ready_essays),
-                                "validation_failures": len(batch_ready_event.validation_failures or []),
+                                "validation_failures": len(
+                                    batch_ready_event.validation_failures or []
+                                ),
                                 "correlation_id": str(publish_correlation_id),
                             },
                         )
@@ -187,7 +189,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     async with session.begin():
                         from datetime import UTC, datetime
 
-                        from common_core.events.batch_coordination_events import ExcessContentProvisionedV1
+                        from common_core.events.batch_coordination_events import (
+                            ExcessContentProvisionedV1,
+                        )
 
                         excess_event = ExcessContentProvisionedV1(
                             batch_id=event_data.batch_id,
@@ -240,6 +244,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             assigned_essay_id,
                             event_data.text_storage_id,
                             event_data.original_file_name,
+                            session=session,
                         )
 
                         logger.info(
@@ -290,7 +295,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             message=f"Unexpected None essay_id after content provisioning for batch {event_data.batch_id}",
                             correlation_id=correlation_id,
                             batch_id=event_data.batch_id,
-                            text_storage_id=event_data.text_storage_id
+                            text_storage_id=event_data.text_storage_id,
                         )
 
                     batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(
@@ -322,7 +327,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         # NOTE: Batch tracker record must persist for pipeline duration
                         # Essays need batch_id for phase outcome coordination throughout spellcheck/CJ phases
                         # Cleanup will happen at pipeline completion, not after content provisioning
-                    
+
                     # Transaction commits here
 
             return True
@@ -332,6 +337,17 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             if hasattr(e, "error_detail"):
                 raise
             else:
+                import traceback
+
+                stack_trace = traceback.format_exc()
+                logger.error(
+                    f"Detailed error in handle_essay_content_provisioned: {e.__class__.__name__}: {e}",
+                    extra={
+                        "stack_trace": stack_trace,
+                        "batch_id": event_data.batch_id,
+                        "text_storage_id": event_data.text_storage_id,
+                    },
+                )
                 raise_processing_error(
                     service="essay_lifecycle_service",
                     operation="handle_essay_content_provisioned",
@@ -342,6 +358,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     original_file_name=event_data.original_file_name,
                     error_type=e.__class__.__name__,
                     error_details=str(e),
+                    stack_trace=stack_trace,
                 )
 
     async def handle_essay_validation_failed(
@@ -380,12 +397,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         "using_correlation_id": str(publish_correlation_id),
                     },
                 )
-                
+
                 # START UNIT OF WORK for event publishing
                 async with self.session_factory() as session:
                     async with session.begin():
                         await self.event_publisher.publish_batch_essays_ready(
-                            batch_ready_event, correlation_id=publish_correlation_id, session=session
+                            batch_ready_event,
+                            correlation_id=publish_correlation_id,
+                            session=session,
                         )
                         # Transaction commits here
 

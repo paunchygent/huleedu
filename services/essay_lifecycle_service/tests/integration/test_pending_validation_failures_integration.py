@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock
-from uuid import UUID, uuid4
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
@@ -41,6 +41,7 @@ from services.essay_lifecycle_service.implementations.redis_batch_coordinator im
     RedisBatchCoordinator,
 )
 from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
+from services.essay_lifecycle_service.tests.unit.test_utils import create_mock_session
 
 
 @pytest.mark.integration
@@ -120,7 +121,7 @@ class TestPendingValidationFailuresIntegration:
             return str(value) if value is not None else None
 
         mock_redis.hget = AsyncMock(side_effect=mock_hget)
-        
+
         # Mock get for string values
         async def mock_get(key: str) -> str | None:
             value = mock_redis._data["strings"].get(key)
@@ -155,7 +156,9 @@ class TestPendingValidationFailuresIntegration:
         mock_redis.set = AsyncMock(side_effect=mock_set)
 
         # Mock set_if_not_exists for atomic completion flag
-        async def mock_set_if_not_exists(key: str, value: str, ttl_seconds: int | None = None) -> bool:
+        async def mock_set_if_not_exists(
+            key: str, value: str, ttl_seconds: int | None = None
+        ) -> bool:
             if key in mock_redis._data["strings"]:
                 return False
             mock_redis._data["strings"][key] = value
@@ -165,7 +168,7 @@ class TestPendingValidationFailuresIntegration:
 
         # Mock expire
         mock_redis.expire = AsyncMock(return_value=True)
-        
+
         # Mock ttl
         mock_redis.ttl = AsyncMock(return_value=86400)  # Return a default TTL
 
@@ -185,19 +188,18 @@ class TestPendingValidationFailuresIntegration:
         def create_stateful_pipeline() -> MockRedisPipeline:
             """Create a pipeline that modifies the mock Redis state during execute()."""
             pipeline = MockRedisPipeline()
-            
+
             # Override execute to actually modify the mock Redis state
-            original_execute = pipeline.execute
-            
+
             async def stateful_execute() -> list[Any]:
                 results: list[Any] = []
                 for op in pipeline.operations:
                     method_name, args, kwargs = op
-                    
+
                     # Skip multi() from results as it's not part of the actual command results
                     if method_name == "multi":
                         continue
-                    
+
                     if method_name == "rpush":
                         key, value = args[0], args[1]
                         if key not in mock_redis._data["lists"]:
@@ -283,9 +285,9 @@ class TestPendingValidationFailuresIntegration:
                     else:
                         # Default for unknown operations
                         results.append(True)
-                
+
                 return results
-            
+
             # Type ignore for assigning to method - this is intentional for testing
             pipeline.execute = stateful_execute  # type: ignore[method-assign]
             return pipeline
@@ -336,9 +338,11 @@ class TestPendingValidationFailuresIntegration:
         # Mock repository (we're testing coordination logic)
         mock_repository = AsyncMock()
         mock_repository.create_essay_records_batch = AsyncMock()
-        
+
         # Add mock session factory to repository
-        mock_session_factory_instance = mock_session_factory()
+        mock_session = create_mock_session()
+        def mock_session_factory_instance():
+            return mock_session
         mock_repository.get_session_factory = AsyncMock(return_value=mock_session_factory_instance)
 
         # Mock Kafka bus
@@ -350,7 +354,7 @@ class TestPendingValidationFailuresIntegration:
         mock_outbox_repository.add_event = AsyncMock(return_value=uuid4())
 
         # Add lpush to existing redis_client mock for wake-up notifications
-        if not hasattr(redis_client, 'lpush'):
+        if not hasattr(redis_client, "lpush"):
             redis_client.lpush = AsyncMock(return_value=1)
 
         # Create real event publisher with mocked dependencies
@@ -463,11 +467,11 @@ class TestPendingValidationFailuresIntegration:
         kafka_bus.publish.assert_called_once()
         call_args = kafka_bus.publish.call_args
         envelope = call_args.kwargs["envelope"]
-        
+
         # Extract the event data from the envelope
         # In Kafka-first pattern, the data is the actual object, not serialized
         ready_event = envelope.data
-        
+
         # Import the type to check
         from common_core.events.batch_coordination_events import BatchEssaysReady
 
@@ -547,7 +551,7 @@ class TestPendingValidationFailuresIntegration:
 
         # Unpack handler and event publisher
         handler, event_publisher = coordination_handler
-        
+
         # Track published events by wrapping the Kafka bus mock
         published_events = []
         kafka_bus = event_publisher.kafka_bus
@@ -576,10 +580,10 @@ class TestPendingValidationFailuresIntegration:
         # Batch should be completed immediately
         assert len(published_events) == 1
         ready_event = published_events[0]
-        
+
         # Import the type to check
         from common_core.events.batch_coordination_events import BatchEssaysReady
-        
+
         assert isinstance(ready_event, BatchEssaysReady)
         assert ready_event.batch_id == batch_id
         assert len(ready_event.ready_essays) == 0  # All failed
@@ -642,7 +646,7 @@ class TestPendingValidationFailuresIntegration:
 
         # Unpack handler and event publisher
         handler, event_publisher = coordination_handler
-        
+
         # Register batch (processes 1 pending failure, 2 slots remain)
         await handler.handle_batch_essays_registered(
             event_data=batch_registration,

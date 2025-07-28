@@ -7,7 +7,7 @@ and batch phase coordination for Task 2.2.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, ANY
+from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -23,7 +23,6 @@ from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
 )
-from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestDefaultServiceResultHandler:
@@ -43,11 +42,16 @@ class TestDefaultServiceResultHandler:
 
     @pytest.fixture
     def handler(
-        self, mock_essay_repository: AsyncMock, mock_batch_coordinator: AsyncMock, mock_session_factory: AsyncMock
+        self,
+        mock_essay_repository: AsyncMock,
+        mock_batch_coordinator: AsyncMock,
+        mock_session_factory: AsyncMock,
     ) -> DefaultServiceResultHandler:
         """Create DefaultServiceResultHandler instance for testing."""
         return DefaultServiceResultHandler(
-            repository=mock_essay_repository, batch_coordinator=mock_batch_coordinator, session_factory=mock_session_factory
+            repository=mock_essay_repository,
+            batch_coordinator=mock_batch_coordinator,
+            session_factory=mock_session_factory,
         )
 
     @pytest.fixture
@@ -143,7 +147,10 @@ class TestDefaultServiceResultHandler:
         )
 
         mock_batch_coordinator.check_batch_completion.assert_called_once_with(
-            essay_state=updated_essay_state, phase_name=PhaseName.SPELLCHECK, correlation_id=correlation_id, session=ANY
+            essay_state=updated_essay_state,
+            phase_name=PhaseName.SPELLCHECK,
+            correlation_id=correlation_id,
+            session=ANY,
         )
 
     async def test_handle_spellcheck_result_failure(

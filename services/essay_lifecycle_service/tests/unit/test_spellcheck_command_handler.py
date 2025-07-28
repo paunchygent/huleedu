@@ -8,7 +8,7 @@ and request dispatching using protocol-based mocking.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,7 +33,6 @@ from services.essay_lifecycle_service.protocols import (
     EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
-from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 if TYPE_CHECKING:
     pass
@@ -380,7 +379,7 @@ class TestSpellcheckCommandHandler:
             assert "existing_phase" in metadata["commanded_phases"]
             assert "spellcheck" in metadata["commanded_phases"]
             assert len(metadata["commanded_phases"]) == 2
-            
+
             # Verify session parameter was passed (4th positional arg)
             assert first_call_args.args[3] is not None  # session parameter
             # Verify keyword arguments

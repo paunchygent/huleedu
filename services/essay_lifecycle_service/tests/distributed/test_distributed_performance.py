@@ -155,6 +155,7 @@ class TestDistributedPerformance:
                 batch_tracker=batch_tracker,
                 repository=repo,
                 event_publisher=event_publisher,
+                session_factory=repo.get_session_factory(),
             )
 
             instances.append(coordination_handler)

@@ -52,7 +52,7 @@ class FutureServicesCommandHandler:
         """Process NLP initiation command from Batch Orchestrator Service."""
         # TODO: Implement when NLP Service is available
         logger.info("Received NLP initiation command (STUB)")
-        
+
         # FUTURE IMPLEMENTATION PATTERN:
         # async with self.session_factory() as session:
         #     async with session.begin():
@@ -70,7 +70,7 @@ class FutureServicesCommandHandler:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
         # TODO: Implement when AI Feedback Service is available
         logger.info("Received AI feedback initiation command (STUB)")
-        
+
         # FUTURE IMPLEMENTATION PATTERN:
         # async with self.session_factory() as session:
         #     async with session.begin():

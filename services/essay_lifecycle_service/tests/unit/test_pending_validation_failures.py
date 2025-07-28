@@ -7,7 +7,7 @@ Tests the race condition fix where validation failures arrive before batch regis
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
