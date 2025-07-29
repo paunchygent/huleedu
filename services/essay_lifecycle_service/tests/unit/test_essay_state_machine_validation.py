@@ -128,12 +128,12 @@ class TestEssayStateMachineGetValidTriggers:
         valid_triggers = machine.get_valid_triggers()
 
         assert EVT_SPELLCHECK_STARTED in valid_triggers
+        assert EVT_SPELLCHECK_SUCCEEDED in valid_triggers  # Direct success path allowed
         assert EVT_SPELLCHECK_FAILED in valid_triggers
         assert EVT_CRITICAL_FAILURE in valid_triggers
 
         # Should not include inappropriate triggers
         assert CMD_INITIATE_SPELLCHECK not in valid_triggers
-        assert EVT_SPELLCHECK_SUCCEEDED not in valid_triggers
 
     def test_get_valid_triggers_terminal_state(self) -> None:
         """Test valid triggers from terminal state."""

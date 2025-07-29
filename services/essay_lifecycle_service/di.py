@@ -253,13 +253,11 @@ class ServiceClientsProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_batch_lifecycle_publisher(
         self,
-        kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         outbox_manager: OutboxManager,
     ) -> BatchLifecyclePublisher:
-        """Provide batch lifecycle publisher for major batch events."""
-        return BatchLifecyclePublisher(kafka_bus, settings, outbox_manager)
-
+        """Provide batch lifecycle publisher using TRUE OUTBOX PATTERN for transactional safety."""
+        return BatchLifecyclePublisher(settings, outbox_manager)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:
@@ -288,9 +286,7 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> SpellcheckCommandHandler:
         """Provide spellcheck command handler implementation."""
-        return SpellcheckCommandHandler(
-            repository, request_dispatcher, session_factory
-        )
+        return SpellcheckCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_cj_assessment_command_handler(
@@ -300,9 +296,7 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> CJAssessmentCommandHandler:
         """Provide CJ assessment command handler implementation."""
-        return CJAssessmentCommandHandler(
-            repository, request_dispatcher, session_factory
-        )
+        return CJAssessmentCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_future_services_command_handler(
@@ -312,9 +306,7 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> FutureServicesCommandHandler:
         """Provide future services command handler implementation."""
-        return FutureServicesCommandHandler(
-            repository, request_dispatcher, session_factory
-        )
+        return FutureServicesCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_batch_command_handler(

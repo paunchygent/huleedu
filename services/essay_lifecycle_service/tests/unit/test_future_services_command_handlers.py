@@ -31,9 +31,7 @@ class TestFutureServicesCommandHandler:
         # Future services handler with protocol-based mocks for stub tests
         mock_repo = AsyncMock(spec=EssayRepositoryProtocol)
         mock_dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)
-        return FutureServicesCommandHandler(
-            mock_repo, mock_dispatcher, mock_session_factory
-        )
+        return FutureServicesCommandHandler(mock_repo, mock_dispatcher, mock_session_factory)
 
     @pytest.fixture
     def correlation_id(self) -> UUID:

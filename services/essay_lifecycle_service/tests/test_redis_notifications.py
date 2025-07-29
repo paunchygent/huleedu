@@ -18,7 +18,9 @@ from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
-from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import BatchLifecyclePublisher
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
 
@@ -99,41 +101,41 @@ class TestRedisNotifications:
 
         # Act
         await mock_redis_client.publish_user_notification(
-            user_id=user_id,
-            event_type=event_type,
-            data=notification_data
+            user_id=user_id, event_type=event_type, data=notification_data
         )
 
         # Assert
         mock_redis_client.publish_user_notification.assert_called_once_with(
-            user_id=user_id,
-            event_type=event_type,
-            data=notification_data
+            user_id=user_id, event_type=event_type, data=notification_data
         )
 
     async def test_batch_lifecycle_publisher_interface(
         self,
         mock_batch_publisher: AsyncMock,
     ) -> None:
-        """Test BatchLifecyclePublisher interface for notification publishing."""
-        # Arrange
-        essay_ref = EntityReference(
-            entity_id="essay_123",
-            entity_type="essay"
+        """Test BatchLifecyclePublisher interface for slot assignment events."""
+        # Arrange - Create proper slot assignment event data
+        from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event_data = EssaySlotAssignedV1(
+            batch_id="test_batch_123",
+            essay_id="essay_123",
+            file_upload_id="upload_456",
+            slot_assignment_id="slot_789",
+            text_storage_id="storage_abc",
+            metadata=SystemProcessingMetadata(
+                entity=EntityReference(entity_id="essay_123", entity_type="essay")
+            ),
         )
-        status = EssayStatus.AWAITING_SPELLCHECK
         correlation_id = uuid4()
 
-        # Act
-        await mock_batch_publisher.publish_status_update(
-            essay_ref=essay_ref,
-            status=status,
-            correlation_id=correlation_id
+        # Act - Use the actual BatchLifecyclePublisher method
+        await mock_batch_publisher.publish_essay_slot_assigned(
+            event_data=event_data, correlation_id=correlation_id
         )
 
         # Assert
-        mock_batch_publisher.publish_status_update.assert_called_once_with(
-            essay_ref=essay_ref,
-            status=status,
-            correlation_id=correlation_id
+        mock_batch_publisher.publish_essay_slot_assigned.assert_called_once_with(
+            event_data=event_data, correlation_id=correlation_id
         )

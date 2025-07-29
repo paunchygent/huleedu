@@ -118,27 +118,22 @@ class TestContentProvisionedFlow:
             )
             await batch_tracker.initialize_from_database()
 
-            # Mock Kafka bus - we'll spy on the events published
-            mock_kafka_bus = AsyncMock()
-            published_events = []
+            # TRUE OUTBOX PATTERN: No direct Kafka publishing, events go through outbox
+            # We track outbox operations instead of Kafka operations
+            published_events: list[dict[str, Any]] = []
 
-            async def capture_event(topic: str, envelope: Any, key: str | None = None) -> None:
-                # Serialize envelope to match actual Kafka publishing
-                import json
+            # Create real BatchLifecyclePublisher with mock outbox manager for TRUE OUTBOX PATTERN testing
+            mock_outbox_manager = AsyncMock()
+            mock_outbox_manager.publish_to_outbox = AsyncMock()
 
-                serialized = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-                published_events.append(
-                    {"topic": topic, "envelope": envelope, "serialized": serialized, "key": key}
-                )
+            # Import the Settings class for the publisher
+            test_settings = Settings()
 
-            mock_kafka_bus.publish.side_effect = capture_event
-
-            # Create mock outbox repository for testing
-            mock_outbox_repository = AsyncMock()
-            mock_outbox_repository.add_event.return_value = None
-
-            # Create mock BatchLifecyclePublisher
-            event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+            # Create REAL BatchLifecyclePublisher to test actual TRUE OUTBOX PATTERN behavior
+            event_publisher = BatchLifecyclePublisher(
+                settings=test_settings,
+                outbox_manager=mock_outbox_manager,
+            )
 
             handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
@@ -155,8 +150,7 @@ class TestContentProvisionedFlow:
                 "redis_client": redis_client,
                 "event_publisher": event_publisher,
                 "published_events": published_events,
-                "mock_kafka_bus": mock_kafka_bus,
-                "mock_outbox_repository": mock_outbox_repository,
+                "mock_outbox_manager": mock_outbox_manager,
             }
 
             # Cleanup
@@ -169,7 +163,6 @@ class TestContentProvisionedFlow:
         """Test atomic slot assignment with proper Redis transactions."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
-        mock_outbox_repository = test_infrastructure["mock_outbox_repository"]
 
         # Setup: Register batch
         batch_id = str(uuid4())
@@ -226,29 +219,25 @@ class TestContentProvisionedFlow:
         assert assigned_essay.storage_references[ContentType.ORIGINAL_ESSAY] == text_storage_id
         assert assigned_essay.current_status == EssayStatus.READY_FOR_PROCESSING
 
-        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
-        # Events are stored in outbox regardless of Kafka state for atomicity
-        assert mock_outbox_repository.add_event.called, (
-            "Should ALWAYS add event to outbox for transactional safety"
-        )
+        # TRUE OUTBOX PATTERN: Verify outbox_manager.publish_to_outbox was called
+        # This is the correct abstraction level for testing the outbox pattern
+        mock_outbox_manager = test_infrastructure["mock_outbox_manager"]
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
 
-        # With true outbox pattern, events are stored in outbox, not published directly to Kafka
-        # The relay worker will publish from outbox asynchronously
-        published_events = test_infrastructure["published_events"]
-        slot_assigned_events = [
-            e
-            for e in published_events
-            if e["envelope"].event_type == "huleedu.els.essay.slot.assigned.v1"
-        ]
-        assert len(slot_assigned_events) == 0, (
-            "Should NOT publish directly to Kafka with outbox pattern"
-        )
+        # Verify the outbox call parameters match the TRUE OUTBOX PATTERN
+        call_args = mock_outbox_manager.publish_to_outbox.call_args
+        assert call_args.kwargs["aggregate_type"] == "essay"
+        assert call_args.kwargs["aggregate_id"] == str(assigned_essay.essay_id)
+        assert call_args.kwargs["event_type"] == "huleedu.els.essay.slot.assigned.v1"
+        assert call_args.kwargs["topic"] == "huleedu.els.essay.slot.assigned.v1"
 
-        # Verify outbox was used instead
-        mock_outbox_repository.add_event.assert_called_once()
-        call_args = mock_outbox_repository.add_event.call_args
-        assert call_args[1]["aggregate_id"] == str(assigned_essay.essay_id)
-        assert call_args[1]["event_type"] == "huleedu.els.essay.slot.assigned.v1"
+        # Verify the event data envelope is properly structured
+        event_envelope = call_args.kwargs["event_data"]
+        assert event_envelope.event_type == "huleedu.els.essay.slot.assigned.v1"
+        assert (
+            event_envelope.source_service
+            == test_infrastructure["event_publisher"].settings.SERVICE_NAME
+        )
 
     async def test_concurrent_content_provisioning(
         self, test_infrastructure: dict[str, Any]
@@ -443,8 +432,7 @@ class TestContentProvisionedFlow:
     ) -> None:
         """Test behavior when event publishing fails - with outbox pattern, operations should succeed."""
         handler = test_infrastructure["handler"]
-        mock_kafka_bus = test_infrastructure["mock_kafka_bus"]
-        mock_outbox_repository = test_infrastructure["mock_outbox_repository"]
+        # Test that outbox pattern provides resilience against infrastructure failures
         repository = test_infrastructure["repository"]
 
         # Setup: Register batch
@@ -472,8 +460,8 @@ class TestContentProvisionedFlow:
 
         await handler.handle_batch_essays_registered(batch_event, correlation_id)
 
-        # Configure Kafka to fail - this should NOT affect the operation anymore
-        mock_kafka_bus.publish.side_effect = Exception("Kafka unavailable")
+        # With TRUE OUTBOX PATTERN, Kafka failures don't affect business operations
+        # The outbox manager handles reliable delivery asynchronously
 
         # Test: Try to provision content
         content_event = EssayContentProvisionedV1(
@@ -491,8 +479,12 @@ class TestContentProvisionedFlow:
         success = await handler.handle_essay_content_provisioned(content_event, correlation_id)
         assert success, "Content provisioning should succeed even when Kafka is unavailable"
 
-        # Verify the event was stored in the outbox
-        assert mock_outbox_repository.add_event.called, "Event should be stored in outbox"
+        # Verify the event was stored in the outbox using TRUE OUTBOX PATTERN
+        mock_outbox_manager = test_infrastructure["mock_outbox_manager"]
+        (
+            mock_outbox_manager.publish_to_outbox.assert_called(),
+            "Event should be stored in outbox for transactional safety",
+        )
 
         # Verify database state was updated
         essays = await repository.list_essays_by_batch(batch_id)

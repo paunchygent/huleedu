@@ -135,7 +135,7 @@ class TestPendingValidationFailuresIntegration:
         batch_tracker: DefaultBatchEssayTracker,
         test_infrastructure: dict[str, Any],
         settings: Settings,
-    ) -> tuple[DefaultBatchCoordinationHandler, AsyncMock]:
+    ) -> tuple[DefaultBatchCoordinationHandler, BatchLifecyclePublisher, AsyncMock]:
         """Create coordination handler with real Redis infrastructure."""
         from unittest.mock import AsyncMock
 
@@ -154,18 +154,17 @@ class TestPendingValidationFailuresIntegration:
 
         mock_repository.get_session_factory = AsyncMock(return_value=mock_session_factory_instance)
 
-        # Mock Kafka bus
-        mock_kafka_bus = AsyncMock()
-        mock_kafka_bus.publish = AsyncMock()
+        # Create real BatchLifecyclePublisher with mock outbox manager for TRUE OUTBOX PATTERN testing
+        mock_outbox_manager = AsyncMock()
+        mock_outbox_manager.publish_to_outbox = AsyncMock()
 
-        # Mock outbox repository
-        mock_outbox_repository = AsyncMock()
-        mock_outbox_repository.add_event = AsyncMock(return_value=uuid4())
+        test_settings = Settings()
 
-        # Create real event publisher with mocked dependencies
-        # Create mock BatchLifecyclePublisher with kafka_bus attribute for test assertions
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
-        event_publisher.kafka_bus = mock_kafka_bus
+        # Create REAL BatchLifecyclePublisher to test actual TRUE OUTBOX PATTERN behavior
+        event_publisher = BatchLifecyclePublisher(
+            settings=test_settings,
+            outbox_manager=mock_outbox_manager,
+        )
 
         handler = DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
@@ -174,12 +173,14 @@ class TestPendingValidationFailuresIntegration:
             session_factory=mock_session_factory_instance,
         )
 
-        return handler, event_publisher
+        return handler, event_publisher, mock_outbox_manager
 
     async def test_validation_failure_before_batch_registration_completes_batch(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
+        coordination_handler: tuple[
+            DefaultBatchCoordinationHandler, BatchLifecyclePublisher, AsyncMock
+        ],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """
@@ -238,8 +239,8 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and event publisher
-        handler, event_publisher = coordination_handler
+        # Unpack handler, event publisher, and outbox manager
+        handler, event_publisher, mock_outbox_manager = coordination_handler
 
         # Act 2: Register batch (should process pending failure and complete)
         registration_result = await handler.handle_batch_essays_registered(
@@ -264,21 +265,27 @@ class TestPendingValidationFailuresIntegration:
         is_completed = await redis_client.exists(completed_key)
         assert is_completed == 1  # Redis exists returns 1 for True
 
-        # Verify BatchEssaysReady event was published via Kafka (Kafka-first pattern)
-        # Access the underlying Kafka bus mock from the event publisher
-        kafka_bus = event_publisher.kafka_bus
-        kafka_bus.publish.assert_called_once()
-        call_args = kafka_bus.publish.call_args
-        envelope = call_args.kwargs["envelope"]
+        # Verify BatchEssaysReady event was published via TRUE OUTBOX PATTERN
+        # The real BatchLifecyclePublisher should have called outbox_manager.publish_to_outbox
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
+        call_args = mock_outbox_manager.publish_to_outbox.call_args
 
-        # Extract the event data from the envelope
-        # In Kafka-first pattern, the data is the actual object, not serialized
-        ready_event = envelope.data
+        # Verify the outbox call parameters match the TRUE OUTBOX PATTERN
+        assert call_args.kwargs["aggregate_type"] == "batch"
+        assert call_args.kwargs["aggregate_id"] == batch_id
+        assert call_args.kwargs["event_type"] == "huleedu.els.batch.essays.ready.v1"
+
+        # Extract the event envelope and verify its structure
+        event_envelope = call_args.kwargs["event_data"]
+        assert event_envelope.event_type == "huleedu.els.batch.essays.ready.v1"
+
+        # Extract the actual BatchEssaysReady event data from the envelope
+        ready_event = event_envelope.data
 
         # Import the type to check
         from common_core.events.batch_coordination_events import BatchEssaysReady
 
-        assert isinstance(ready_event, BatchEssaysReady)  # Event is the actual object
+        assert isinstance(ready_event, BatchEssaysReady)
         assert ready_event.batch_id == batch_id
         assert len(ready_event.ready_essays) == 0  # No successful essays
         assert ready_event.validation_failures is not None
@@ -298,7 +305,9 @@ class TestPendingValidationFailuresIntegration:
     async def test_multiple_pending_failures_all_processed_on_registration(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
+        coordination_handler: tuple[
+            DefaultBatchCoordinationHandler, BatchLifecyclePublisher, AsyncMock
+        ],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """Test that multiple pending failures are all processed when batch is registered."""
@@ -354,20 +363,19 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and event publisher
-        handler, event_publisher = coordination_handler
+        # Unpack handler, event publisher, and outbox manager
+        handler, event_publisher, mock_outbox_manager = coordination_handler
 
-        # Track published events by wrapping the Kafka bus mock
+        # Track published events by wrapping the outbox manager mock
         published_events = []
-        kafka_bus = event_publisher.kafka_bus
-        original_publish = kafka_bus.publish
+        original_publish = mock_outbox_manager.publish_to_outbox
 
         async def capture_publish(**kwargs: Any) -> None:
-            if "envelope" in kwargs:
-                published_events.append(kwargs["envelope"].data)
+            if "event_data" in kwargs:
+                published_events.append(kwargs["event_data"].data)
             await original_publish(**kwargs)
 
-        kafka_bus.publish = capture_publish
+        mock_outbox_manager.publish_to_outbox = capture_publish
 
         # Act: Register batch
         registration_result = await handler.handle_batch_essays_registered(
@@ -404,7 +412,9 @@ class TestPendingValidationFailuresIntegration:
     async def test_mixed_scenario_pending_and_normal_failures(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
+        coordination_handler: tuple[
+            DefaultBatchCoordinationHandler, BatchLifecyclePublisher, AsyncMock
+        ],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """Test scenario with both pending failures (before registration) and normal failures (after)."""
@@ -452,8 +462,8 @@ class TestPendingValidationFailuresIntegration:
             essay_instructions="Write an essay",
         )
 
-        # Unpack handler and event publisher
-        handler, event_publisher = coordination_handler
+        # Unpack handler, event publisher, and outbox manager
+        handler, event_publisher, mock_outbox_manager = coordination_handler
 
         # Register batch (processes 1 pending failure, 2 slots remain)
         await handler.handle_batch_essays_registered(
@@ -485,18 +495,17 @@ class TestPendingValidationFailuresIntegration:
             correlation_id=correlation_id,
         )
 
-        # Track completion event by wrapping Kafka bus
+        # Track completion event by wrapping outbox manager (TRUE OUTBOX PATTERN)
         completion_event = None
-        kafka_bus = event_publisher.kafka_bus
-        original_publish = kafka_bus.publish
+        original_publish = mock_outbox_manager.publish_to_outbox
 
         async def capture_publish(**kwargs: Any) -> None:
             nonlocal completion_event
-            if "envelope" in kwargs:
-                completion_event = kwargs["envelope"].data
+            if "event_data" in kwargs:
+                completion_event = kwargs["event_data"].data
             await original_publish(**kwargs)
 
-        kafka_bus.publish = capture_publish
+        mock_outbox_manager.publish_to_outbox = capture_publish
 
         # Process late failure
         late_result = await batch_tracker.handle_validation_failure(late_failure)

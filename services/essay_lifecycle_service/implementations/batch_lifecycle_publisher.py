@@ -10,12 +10,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from huleedu_service_libs.error_handling import raise_outbox_storage_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
 if TYPE_CHECKING:
-    from huleedu_service_libs.protocols import KafkaPublisherProtocol
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
@@ -29,16 +27,15 @@ class BatchLifecyclePublisher:
     Handles major batch lifecycle event publishing.
 
     Publishes events for batch completion, excess content handling,
-    slot assignments, and phase outcomes with Kafka-first + outbox fallback.
+    slot assignments, and phase outcomes using TRUE OUTBOX PATTERN for
+    transactional safety and reliable delivery.
     """
 
     def __init__(
         self,
-        kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         outbox_manager: OutboxManager,
     ) -> None:
-        self.kafka_bus = kafka_bus
         self.settings = settings
         self.outbox_manager = outbox_manager
 
@@ -89,57 +86,28 @@ class BatchLifecyclePublisher:
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Try immediate Kafka publishing first
+        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
+        # Store event in outbox within same transaction as business data
+        # The relay worker will publish from outbox asynchronously
         topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
         batch_id = getattr(event_data, "batch_id", "unknown")
-        key = batch_id
 
-        try:
-            await self.kafka_bus.publish(
-                topic=topic,
-                envelope=envelope,
-                key=key,
-            )
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id=batch_id,
+            event_type="huleedu.els.excess.content.provisioned.v1",
+            event_data=envelope,
+            topic=topic,
+        )
 
-            logger.info(
-                "Excess content provisioned event published directly to Kafka",
-                extra={
-                    "batch_id": batch_id,
-                    "correlation_id": str(correlation_id),
-                    "topic": topic,
-                },
-            )
-            return  # Success - no outbox needed!
-
-        except Exception as kafka_error:
-            # Check if it's already a HuleEduError and re-raise
-            if hasattr(kafka_error, "error_detail"):
-                raise
-
-            logger.warning(
-                "Kafka publish failed, will need outbox fallback",
-                extra={
-                    "batch_id": batch_id,
-                    "error": str(kafka_error),
-                    "error_type": kafka_error.__class__.__name__,
-                },
-            )
-
-            # Kafka failed - caller should handle outbox fallback
-            raise_outbox_storage_error(
-                service="essay_lifecycle_service",
-                operation="publish_excess_content_provisioned",
-                message=f"Kafka publish failed: {kafka_error.__class__.__name__}",
-                correlation_id=correlation_id,
-                aggregate_id=batch_id,
-                aggregate_type="batch",
-                event_type="huleedu.els.excess.content.provisioned.v1",
-                topic=topic,
-                batch_id=batch_id,
-                text_storage_id=getattr(event_data, "text_storage_id", "unknown"),
-                error_type=kafka_error.__class__.__name__,
-                error_details=str(kafka_error),
-            )
+        logger.info(
+            "ExcessContentProvisionedV1 event stored in outbox for reliable delivery",
+            extra={
+                "batch_id": batch_id,
+                "correlation_id": str(correlation_id),
+                "topic": topic,
+            },
+        )
 
     async def publish_batch_essays_ready(
         self,
@@ -177,58 +145,29 @@ class BatchLifecyclePublisher:
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Try immediate Kafka publishing first
+        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
+        # Store event in outbox within same transaction as business data
+        # The relay worker will publish from outbox asynchronously
         topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
         batch_id = getattr(event_data, "batch_id", "unknown")
-        key = batch_id
 
-        try:
-            await self.kafka_bus.publish(
-                topic=topic,
-                envelope=envelope,
-                key=key,
-            )
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id=batch_id,
+            event_type="huleedu.els.batch.essays.ready.v1",
+            event_data=envelope,
+            topic=topic,
+        )
 
-            logger.info(
-                "Batch essays ready event published directly to Kafka",
-                extra={
-                    "batch_id": batch_id,
-                    "ready_count": len(getattr(event_data, "ready_essays", [])),
-                    "correlation_id": str(correlation_id),
-                    "topic": topic,
-                },
-            )
-            return  # Success - no outbox needed!
-
-        except Exception as kafka_error:
-            # Check if it's already a HuleEduError and re-raise
-            if hasattr(kafka_error, "error_detail"):
-                raise
-
-            logger.warning(
-                "Kafka publish failed, will need outbox fallback",
-                extra={
-                    "batch_id": batch_id,
-                    "error": str(kafka_error),
-                    "error_type": kafka_error.__class__.__name__,
-                },
-            )
-
-            # Kafka failed - caller should handle outbox fallback
-            raise_outbox_storage_error(
-                service="essay_lifecycle_service",
-                operation="publish_batch_essays_ready",
-                message=f"Kafka publish failed: {kafka_error.__class__.__name__}",
-                correlation_id=correlation_id,
-                aggregate_id=batch_id,
-                aggregate_type="batch",
-                event_type="huleedu.els.batch.essays.ready.v1",
-                topic=topic,
-                batch_id=batch_id,
-                ready_count=len(getattr(event_data, "ready_essays", [])),
-                error_type=kafka_error.__class__.__name__,
-                error_details=str(kafka_error),
-            )
+        logger.info(
+            "BatchEssaysReady event stored in outbox for reliable delivery",
+            extra={
+                "batch_id": batch_id,
+                "ready_count": len(getattr(event_data, "ready_essays", [])),
+                "correlation_id": str(correlation_id),
+                "topic": topic,
+            },
+        )
 
     async def publish_essay_slot_assigned(
         self,
@@ -325,57 +264,27 @@ class BatchLifecyclePublisher:
                 envelope.metadata = {}
             inject_trace_context(envelope.metadata)
 
-        # Try immediate Kafka publishing first
+        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
+        # Store event in outbox within same transaction as business data
+        # The relay worker will publish from outbox asynchronously
         topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
         batch_id = getattr(event_data, "batch_id", "unknown")
-        key = batch_id
 
-        try:
-            await self.kafka_bus.publish(
-                topic=topic,
-                envelope=envelope,
-                key=key,
-            )
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id=batch_id,
+            event_type="huleedu.els.batch.phase.outcome.v1",
+            event_data=envelope,
+            topic=topic,
+        )
 
-            logger.info(
-                "ELS batch phase outcome event published directly to Kafka",
-                extra={
-                    "batch_id": batch_id,
-                    "phase": getattr(event_data, "phase", "unknown"),
-                    "outcome": getattr(event_data, "outcome", "unknown"),
-                    "correlation_id": str(correlation_id),
-                    "topic": topic,
-                },
-            )
-            return  # Success - no outbox needed!
-
-        except Exception as kafka_error:
-            # Check if it's already a HuleEduError and re-raise
-            if hasattr(kafka_error, "error_detail"):
-                raise
-
-            logger.warning(
-                "Kafka publish failed, will need outbox fallback",
-                extra={
-                    "batch_id": batch_id,
-                    "error": str(kafka_error),
-                    "error_type": kafka_error.__class__.__name__,
-                },
-            )
-
-            # Kafka failed - caller should handle outbox fallback
-            raise_outbox_storage_error(
-                service="essay_lifecycle_service",
-                operation="publish_els_batch_phase_outcome",
-                message=f"Kafka publish failed: {kafka_error.__class__.__name__}",
-                correlation_id=correlation_id,
-                aggregate_id=batch_id,
-                aggregate_type="batch",
-                event_type="huleedu.els.batch.phase.outcome.v1",
-                topic=topic,
-                batch_id=batch_id,
-                phase=getattr(event_data, "phase", "unknown"),
-                outcome=getattr(event_data, "outcome", "unknown"),
-                error_type=kafka_error.__class__.__name__,
-                error_details=str(kafka_error),
-            )
+        logger.info(
+            "ELSBatchPhaseOutcomeV1 event stored in outbox for reliable delivery",
+            extra={
+                "batch_id": batch_id,
+                "phase": getattr(event_data, "phase", "unknown"),
+                "outcome": getattr(event_data, "outcome", "unknown"),
+                "correlation_id": str(correlation_id),
+                "topic": topic,
+            },
+        )

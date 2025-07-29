@@ -65,7 +65,6 @@ class TestCJAssessmentCommandHandler:
         """Mock specialized service request dispatcher protocol using protocol-based mocking."""
         return AsyncMock(spec=SpecializedServiceRequestDispatcher)
 
-
     # Using shared mock_session_factory fixture from test_utils
 
     @pytest.fixture
