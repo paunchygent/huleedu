@@ -80,21 +80,11 @@ class DefaultEventPublisher:
         self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """Publish essay status update event to both Kafka and Redis."""
-        try:
-            await self._essay_status_publisher.publish_status_update(
-                essay_ref, status, correlation_id
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                # This is already a structured error from the publisher
-                # Try to use outbox as fallback
-                await self._handle_publish_failure_with_outbox(
-                    e, "essay.status.updated.v1", str(essay_ref.entity_id), "essay", correlation_id
-                )
-            else:
-                # Unexpected error - re-raise
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._essay_status_publisher.publish_status_update(
+            essay_ref, status, correlation_id
+        )
 
     # Batch Progress Events (delegate to BatchProgressPublisher)
     async def publish_batch_phase_progress(
@@ -107,23 +97,16 @@ class DefaultEventPublisher:
         correlation_id: UUID,
     ) -> None:
         """Report aggregated progress of a specific phase for a batch to BS."""
-        try:
-            await self._batch_progress_publisher.publish_batch_phase_progress(
-                batch_id,
-                phase,
-                completed_count,
-                failed_count,
-                total_essays_in_phase,
-                correlation_id,
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                await self._handle_publish_failure_with_outbox(
-                    e, "huleedu.els.batch_phase.progress.v1", batch_id, "batch", correlation_id
-                )
-            else:
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._batch_progress_publisher.publish_batch_phase_progress(
+            batch_id,
+            phase,
+            completed_count,
+            failed_count,
+            total_essays_in_phase,
+            correlation_id,
+        )
 
     async def publish_batch_phase_concluded(
         self,
@@ -134,18 +117,11 @@ class DefaultEventPublisher:
         correlation_id: UUID,
     ) -> None:
         """Report the final conclusion of a phase for a batch to BS."""
-        try:
-            await self._batch_progress_publisher.publish_batch_phase_concluded(
-                batch_id, phase, status, details, correlation_id
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                await self._handle_publish_failure_with_outbox(
-                    e, "huleedu.els.batch_phase.concluded.v1", batch_id, "batch", correlation_id
-                )
-            else:
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._batch_progress_publisher.publish_batch_phase_concluded(
+            batch_id, phase, status, details, correlation_id
+        )
 
     # Batch Lifecycle Events (delegate to BatchLifecyclePublisher)
     async def publish_excess_content_provisioned(
@@ -155,23 +131,11 @@ class DefaultEventPublisher:
         session: AsyncSession | None = None,
     ) -> None:
         """Publish ExcessContentProvisionedV1 event when no slots are available."""
-        try:
-            await self._batch_lifecycle_publisher.publish_excess_content_provisioned(
-                event_data, correlation_id, session
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                batch_id = getattr(event_data, "batch_id", "unknown")
-                await self._handle_publish_failure_with_outbox(
-                    e,
-                    "huleedu.els.excess.content.provisioned.v1",
-                    batch_id,
-                    "batch",
-                    correlation_id,
-                )
-            else:
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._batch_lifecycle_publisher.publish_excess_content_provisioned(
+            event_data, correlation_id, session
+        )
 
     async def publish_batch_essays_ready(
         self,
@@ -180,19 +144,11 @@ class DefaultEventPublisher:
         session: AsyncSession | None = None,
     ) -> None:
         """Publish BatchEssaysReady event when batch is complete."""
-        try:
-            await self._batch_lifecycle_publisher.publish_batch_essays_ready(
-                event_data, correlation_id, session
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                batch_id = getattr(event_data, "batch_id", "unknown")
-                await self._handle_publish_failure_with_outbox(
-                    e, "huleedu.els.batch.essays.ready.v1", batch_id, "batch", correlation_id
-                )
-            else:
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._batch_lifecycle_publisher.publish_batch_essays_ready(
+            event_data, correlation_id, session
+        )
 
     async def publish_essay_slot_assigned(
         self,
@@ -214,19 +170,11 @@ class DefaultEventPublisher:
         session: AsyncSession | None = None,
     ) -> None:
         """Publish ELSBatchPhaseOutcomeV1 event when batch phase is complete."""
-        try:
-            await self._batch_lifecycle_publisher.publish_els_batch_phase_outcome(
-                event_data, correlation_id, session
-            )
-        except Exception as e:
-            # If direct publishing failed, use outbox as fallback
-            if hasattr(e, "error_detail"):
-                batch_id = getattr(event_data, "batch_id", "unknown")
-                await self._handle_publish_failure_with_outbox(
-                    e, "huleedu.els.batch.phase.outcome.v1", batch_id, "batch", correlation_id
-                )
-            else:
-                raise
+        # TRUE OUTBOX PATTERN: No exception handling needed
+        # Events are always stored in outbox for transactional safety
+        await self._batch_lifecycle_publisher.publish_els_batch_phase_outcome(
+            event_data, correlation_id, session
+        )
 
     # Direct Outbox Interface (for protocol compliance)
     async def publish_to_outbox(

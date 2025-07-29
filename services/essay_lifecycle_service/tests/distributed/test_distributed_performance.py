@@ -37,8 +37,20 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+    RedisBatchQueries,
+)
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
+)
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 
 from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
@@ -144,10 +156,21 @@ class TestDistributedPerformance:
             await redis_client.start()
 
             repo = PostgreSQLEssayRepository(performance_settings)
-            redis_coordinator = RedisBatchCoordinator(redis_client, performance_settings)
+            
+            # Create modular Redis components
+            redis_script_manager = RedisScriptManager(redis_client)
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
+            
             batch_tracker_persistence = BatchTrackerPersistence(repo.engine)
             batch_tracker = DefaultBatchEssayTracker(
-                persistence=batch_tracker_persistence, redis_coordinator=redis_coordinator
+                persistence=batch_tracker_persistence,
+                batch_state=batch_state,
+                batch_queries=batch_queries,
+                failure_tracker=failure_tracker,
+                slot_operations=slot_operations,
             )
 
             event_publisher = MockEventPublisher()
@@ -173,10 +196,10 @@ class TestDistributedPerformance:
             for i, handler in enumerate(instances):
                 try:
                     tracker = handler.batch_tracker
-                    if hasattr(tracker, "_redis_coordinator") and hasattr(
-                        tracker._redis_coordinator, "_redis"
+                    if hasattr(tracker, "_batch_state") and hasattr(
+                        tracker._batch_state, "_redis_client"
                     ):
-                        redis_client = tracker._redis_coordinator._redis
+                        redis_client = tracker._batch_state._redis_client
                         redis_clients_to_cleanup.append((i, redis_client))
                 except Exception as e:
                     cleanup_errors.append(f"Redis client access error for instance {i}: {e}")

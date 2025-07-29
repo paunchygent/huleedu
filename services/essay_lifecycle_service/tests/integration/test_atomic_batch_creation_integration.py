@@ -516,7 +516,7 @@ class TestAtomicBatchCreationIntegration:
 
         correlation_id = uuid4()
 
-        # Act & Assert - Empty batches are rejected by RedisBatchCoordinator
+        # Act & Assert - Empty batches are rejected by batch state validation
         with pytest.raises(HuleEduError) as exc_info:
             await coordination_handler.handle_batch_essays_registered(empty_event, correlation_id)
 
