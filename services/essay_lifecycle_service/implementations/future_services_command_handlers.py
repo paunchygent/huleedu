@@ -24,7 +24,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
-    EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
 
@@ -38,12 +37,10 @@ class FutureServicesCommandHandler:
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher,
         session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.request_dispatcher = request_dispatcher
-        self.event_publisher = event_publisher
         self.session_factory = session_factory
 
     async def process_initiate_nlp_command(

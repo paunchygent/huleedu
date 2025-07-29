@@ -120,7 +120,8 @@ class TestValidationFailureCompletionFix:
         mock = AsyncMock(spec=RedisBatchQueries)
 
         async def get_batch_status(batch_id: str) -> dict[str, Any] | None:
-            return shared_test_state["batch_states"].get(batch_id)
+            batch_states: dict[str, dict[str, Any]] = shared_test_state["batch_states"]
+            return batch_states.get(batch_id)
 
         async def get_missing_slots(batch_id: str) -> list[str]:
             # Mock implementation - return empty list for simplicity
@@ -150,10 +151,12 @@ class TestValidationFailureCompletionFix:
                 shared_test_state["failure_data"][batch_id].append(data)
 
         async def get_validation_failure_count(batch_id: str) -> int:
-            return shared_test_state["failure_counts"].get(batch_id, 0)
+            failure_counts: dict[str, int] = shared_test_state["failure_counts"]
+            return failure_counts.get(batch_id, 0)
 
         async def get_validation_failures(batch_id: str) -> list[dict[str, Any]]:
-            return shared_test_state["failure_data"].get(batch_id, [])
+            failure_data: dict[str, list[dict[str, Any]]] = shared_test_state["failure_data"]
+            return failure_data.get(batch_id, [])
 
         mock.track_validation_failure.side_effect = track_validation_failure
         mock.get_validation_failure_count.side_effect = get_validation_failure_count

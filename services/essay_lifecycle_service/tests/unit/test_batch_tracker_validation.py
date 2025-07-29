@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -45,7 +45,6 @@ class TestBatchEssayTracker:
     @pytest.fixture
     def mock_persistence(self) -> AsyncMock:
         """Mock database persistence layer."""
-        from unittest.mock import AsyncMock
 
         from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
             BatchTrackerPersistence,
@@ -62,7 +61,6 @@ class TestBatchEssayTracker:
     @pytest.fixture
     def mock_batch_state(self, shared_test_state: dict[str, Any]) -> AsyncMock:
         """Mock Redis batch state with domain-specific behavior."""
-        from unittest.mock import AsyncMock
 
         from services.essay_lifecycle_service.implementations.redis_batch_state import (
             RedisBatchState,
@@ -129,7 +127,6 @@ class TestBatchEssayTracker:
     @pytest.fixture
     def mock_batch_queries(self, shared_test_state: dict[str, Any]) -> AsyncMock:
         """Mock Redis batch queries with domain-specific behavior."""
-        from unittest.mock import AsyncMock
 
         from services.essay_lifecycle_service.implementations.redis_batch_queries import (
             RedisBatchQueries,
@@ -140,7 +137,8 @@ class TestBatchEssayTracker:
         async def get_batch_status(batch_id: str) -> dict[str, Any] | None:
             if batch_id in shared_test_state["batch_states"]:
                 # Update ready_count in the returned status for compatibility
-                status = shared_test_state["batch_states"][batch_id].copy()
+                batch_states: dict[str, dict[str, Any]] = shared_test_state["batch_states"]
+                status: dict[str, Any] = batch_states[batch_id].copy()
                 status["ready_count"] = status["assigned_slots"]
                 return status
             return None
@@ -165,7 +163,6 @@ class TestBatchEssayTracker:
     @pytest.fixture
     def mock_failure_tracker(self, shared_test_state: dict[str, Any]) -> AsyncMock:
         """Mock Redis failure tracker with domain-specific behavior."""
-        from unittest.mock import AsyncMock
 
         from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
             RedisFailureTracker,
@@ -179,10 +176,12 @@ class TestBatchEssayTracker:
                 shared_test_state["failure_data"][batch_id].append(data)
 
         async def get_validation_failure_count(batch_id: str) -> int:
-            return shared_test_state["failure_counts"].get(batch_id, 0)
+            failure_counts: dict[str, int] = shared_test_state["failure_counts"]
+            return failure_counts.get(batch_id, 0)
 
         async def get_validation_failures(batch_id: str) -> list[dict[str, Any]]:
-            return shared_test_state["failure_data"].get(batch_id, [])
+            failure_data: dict[str, list[dict[str, Any]]] = shared_test_state["failure_data"]
+            return failure_data.get(batch_id, [])
 
         mock.track_validation_failure.side_effect = track_validation_failure
         mock.get_validation_failure_count.side_effect = get_validation_failure_count
@@ -192,7 +191,6 @@ class TestBatchEssayTracker:
     @pytest.fixture
     def mock_slot_operations(self, shared_test_state: dict[str, Any]) -> AsyncMock:
         """Mock Redis slot operations with domain-specific behavior."""
-        from unittest.mock import AsyncMock
 
         from services.essay_lifecycle_service.implementations.redis_slot_operations import (
             RedisSlotOperations,

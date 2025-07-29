@@ -15,13 +15,15 @@ from common_core.domain_enums import ContentType
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus
 
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
 )
 from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     EssayRepositoryProtocol,
-    EventPublisher,
 )
 
 
@@ -35,8 +37,8 @@ class TestDefaultBatchPhaseCoordinator:
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:
-        """Mock EventPublisher for testing using protocol-based mocking."""
-        return AsyncMock(spec=EventPublisher)
+        """Mock BatchLifecyclePublisher for testing using protocol-based mocking."""
+        return AsyncMock(spec=BatchLifecyclePublisher)
 
     @pytest.fixture
     def mock_batch_tracker(self) -> AsyncMock:
@@ -56,7 +58,7 @@ class TestDefaultBatchPhaseCoordinator:
         """Create DefaultBatchPhaseCoordinator instance for testing."""
         return DefaultBatchPhaseCoordinator(
             repository=mock_essay_repository,
-            event_publisher=mock_event_publisher,
+            batch_lifecycle_publisher=mock_event_publisher,
             batch_tracker=mock_batch_tracker,
             session_factory=mock_session_factory,
         )

@@ -16,7 +16,6 @@ from services.essay_lifecycle_service.implementations.future_services_command_ha
 )
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
-    EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
 
@@ -32,9 +31,8 @@ class TestFutureServicesCommandHandler:
         # Future services handler with protocol-based mocks for stub tests
         mock_repo = AsyncMock(spec=EssayRepositoryProtocol)
         mock_dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)
-        mock_publisher = AsyncMock(spec=EventPublisher)
         return FutureServicesCommandHandler(
-            mock_repo, mock_dispatcher, mock_publisher, mock_session_factory
+            mock_repo, mock_dispatcher, mock_session_factory
         )
 
     @pytest.fixture

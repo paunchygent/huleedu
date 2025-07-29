@@ -266,7 +266,6 @@ class BatchLifecyclePublisher:
         # Try immediate Kafka publishing first
         topic = topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
         essay_id = getattr(event_data, "essay_id", "unknown")
-        key = essay_id
 
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data

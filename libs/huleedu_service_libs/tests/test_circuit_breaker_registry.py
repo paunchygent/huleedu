@@ -63,7 +63,7 @@ class TestCircuitBreakerRegistryConstruction:
     def test_registry_initialization_logging(self, mock_logger: MagicMock) -> None:
         """Test initialization logging."""
         # Create registry after mock is in place
-        registry = CircuitBreakerRegistry()
+        CircuitBreakerRegistry()
         mock_logger.info.assert_called_with("CircuitBreakerRegistry initialized")
 
     def test_registry_empty_state_operations(self, registry: CircuitBreakerRegistry) -> None:

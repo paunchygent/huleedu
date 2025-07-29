@@ -20,11 +20,13 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
     EssayRepositoryProtocol,
-    EventPublisher,
 )
 
 logger = create_service_logger("batch_coordination_handler")
@@ -37,12 +39,12 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         self,
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
-        event_publisher: EventPublisher,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
         session_factory: async_sessionmaker | Callable[[], Any],
     ) -> None:
         self.batch_tracker = batch_tracker
         self.repository = repository
-        self.event_publisher = event_publisher
+        self.batch_lifecycle_publisher = batch_lifecycle_publisher
         self.session_factory = session_factory
 
     async def handle_batch_essays_registered(
@@ -121,7 +123,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             },
                         )
 
-                        await self.event_publisher.publish_batch_essays_ready(
+                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
                             event_data=batch_ready_event,
                             correlation_id=publish_correlation_id,
                             session=session,
@@ -203,7 +205,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             timestamp=datetime.now(UTC),
                         )
 
-                        await self.event_publisher.publish_excess_content_provisioned(
+                        await self.batch_lifecycle_publisher.publish_excess_content_provisioned(
                             event_data=excess_event,
                             correlation_id=correlation_id,
                             session=session,
@@ -269,7 +271,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         correlation_id=correlation_id,
                     )
 
-                    await self.event_publisher.publish_essay_slot_assigned(
+                    await self.batch_lifecycle_publisher.publish_essay_slot_assigned(
                         event_data=slot_assigned_event,
                         correlation_id=correlation_id,
                         session=session,
@@ -319,7 +321,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             },
                         )
 
-                        await self.event_publisher.publish_batch_essays_ready(
+                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
                             event_data=batch_ready_event,
                             correlation_id=publish_correlation_id,
                             session=session,
@@ -402,7 +404,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 # START UNIT OF WORK for event publishing
                 async with self.session_factory() as session:
                     async with session.begin():
-                        await self.event_publisher.publish_batch_essays_ready(
+                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
                             batch_ready_event,
                             correlation_id=publish_correlation_id,
                             session=session,

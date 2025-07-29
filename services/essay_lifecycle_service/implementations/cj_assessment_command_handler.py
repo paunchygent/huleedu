@@ -24,7 +24,6 @@ from services.essay_lifecycle_service.essay_state_machine import (
 )
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
-    EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
 
@@ -38,12 +37,10 @@ class CJAssessmentCommandHandler:
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher,
         session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.request_dispatcher = request_dispatcher
-        self.event_publisher = event_publisher
         self.session_factory = session_factory
 
     async def process_initiate_cj_assessment_command(

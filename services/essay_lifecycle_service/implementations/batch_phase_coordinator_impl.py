@@ -21,12 +21,14 @@ from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
     EssayState,
-    EventPublisher,
 )
 
 logger = create_service_logger("batch_phase_coordinator")
@@ -38,12 +40,12 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
     def __init__(
         self,
         repository: EssayRepositoryProtocol,
-        event_publisher: EventPublisher,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
         batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
-        self.event_publisher = event_publisher
+        self.batch_lifecycle_publisher = batch_lifecycle_publisher
         self.batch_tracker = batch_tracker
         self.session_factory = session_factory
 
@@ -308,7 +310,7 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         )
 
         # Publish the event
-        await self.event_publisher.publish_els_batch_phase_outcome(
+        await self.batch_lifecycle_publisher.publish_els_batch_phase_outcome(
             event_data=outcome_event,
             correlation_id=correlation_id,
             session=session,

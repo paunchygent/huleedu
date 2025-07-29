@@ -41,7 +41,7 @@ class TestDomainClassValidationFailures:
         mock.sadd = AsyncMock(return_value=1)  # Returns elements added count
 
         # Transaction pipeline mock - mirrors actual Redis pipeline behavior
-        def create_transaction_pipeline():
+        def create_transaction_pipeline() -> MagicMock:
             pipeline_mock = MagicMock()
             # Pipeline operations return the pipeline for chaining (Redis behavior)
             pipeline_mock.multi.return_value = None
@@ -179,7 +179,7 @@ class TestDomainClassValidationFailures:
         batch_id = "test-batch-789"
 
         # Mock pipeline to return completion state
-        def create_completion_pipeline():
+        def create_completion_pipeline() -> MagicMock:
             pipeline_mock = MagicMock()
             pipeline_mock.multi.return_value = None
             pipeline_mock.scard.return_value = pipeline_mock  # available slots

@@ -38,7 +38,9 @@ from services.essay_lifecycle_service.implementations.redis_slot_operations impo
 class RedisStateValidator:
     """Validates Redis state consistency and integrity."""
 
-    def __init__(self, redis_script_manager: RedisScriptManager, slot_operations: RedisSlotOperations) -> None:
+    def __init__(
+        self, redis_script_manager: RedisScriptManager, slot_operations: RedisSlotOperations
+    ) -> None:
         self._script_manager = redis_script_manager
         self._slot_operations = slot_operations
         self._redis = redis_script_manager._redis
@@ -189,13 +191,10 @@ class TestRedisStateConsistency:
             await redis_client.stop()
 
     @pytest.fixture
-    async def redis_validator(
-        self, redis_components: dict[str, Any]
-    ) -> RedisStateValidator:
+    async def redis_validator(self, redis_components: dict[str, Any]) -> RedisStateValidator:
         """Create Redis state validator."""
         return RedisStateValidator(
-            redis_components["script_manager"],
-            redis_components["slot_operations"]
+            redis_components["script_manager"], redis_components["slot_operations"]
         )
 
     async def test_redis_atomic_operations_performance(
@@ -260,7 +259,9 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
+            await redis_components["batch_state"].register_batch_slots(
+                batch_id, essay_ids, metadata
+            )
             batches.append(batch_id)
 
         # Act - Concurrent operations across all batches
@@ -274,7 +275,9 @@ class TestRedisStateConsistency:
                     "file_size_bytes": 1500 + i * 10,
                 }
 
-                task = redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
+                task = redis_components["slot_operations"].assign_slot_atomic(
+                    batch_id, content_metadata
+                )
                 all_tasks.append((batch_id, task))
 
         # Execute all operations concurrently
@@ -332,7 +335,9 @@ class TestRedisStateConsistency:
                 "file_size_bytes": 1200 + i * 5,
             }
 
-            task = redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
+            task = redis_components["slot_operations"].assign_slot_atomic(
+                batch_id, content_metadata
+            )
             content_tasks.append(task)
 
         # Execute with maximum concurrency
@@ -387,7 +392,9 @@ class TestRedisStateConsistency:
                 "file_size_bytes": 1300 + i * 15,
             }
 
-            result = await redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
+            result = await redis_components["slot_operations"].assign_slot_atomic(
+                batch_id, content_metadata
+            )
             assert result is not None
             pre_failure_assignments.append(result)
 
@@ -461,7 +468,9 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
+            await redis_components["batch_state"].register_batch_slots(
+                batch_id, essay_ids, metadata
+            )
 
             # Measure operation timings
             operation_times = []
@@ -474,7 +483,9 @@ class TestRedisStateConsistency:
                 }
 
                 start_time = asyncio.get_event_loop().time()
-                await redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
+                await redis_components["slot_operations"].assign_slot_atomic(
+                    batch_id, content_metadata
+                )
                 duration = asyncio.get_event_loop().time() - start_time
 
                 operation_times.append(duration)
@@ -512,9 +523,7 @@ class TestRedisStateConsistency:
                 f"Redis operation timing too inconsistent in {scenario_name}: {variance}s variance"
             )
 
-    async def test_redis_batch_metadata_consistency(
-        self, redis_components: dict[str, Any]
-    ) -> None:
+    async def test_redis_batch_metadata_consistency(self, redis_components: dict[str, Any]) -> None:
         """Test metadata consistency during concurrent batch operations."""
 
         # Arrange - Multiple batches with rich metadata
@@ -537,7 +546,9 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, complex_metadata)
+            await redis_components["batch_state"].register_batch_slots(
+                batch_id, essay_ids, complex_metadata
+            )
             batches_metadata.append((batch_id, complex_metadata))
 
         # Act - Concurrent metadata retrieval and slot operations
@@ -549,9 +560,9 @@ class TestRedisStateConsistency:
         for batch_id, _original_metadata in batches_metadata:
             # Metadata retrieval tasks
             for _ in range(3):
-                metadata_task: Coroutine[Any, Any, dict[str, Any] | None] = (
-                    redis_components["batch_queries"].get_batch_metadata(batch_id)
-                )
+                metadata_task: Coroutine[Any, Any, dict[str, Any] | None] = redis_components[
+                    "batch_queries"
+                ].get_batch_metadata(batch_id)
                 concurrent_tasks.append(("metadata", batch_id, metadata_task))
 
             # Slot assignment tasks
@@ -562,9 +573,9 @@ class TestRedisStateConsistency:
                     "file_size_bytes": 1250 + i * 12,
                 }
 
-                assignment_task: Coroutine[Any, Any, str | None] = (
-                    redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
-                )
+                assignment_task: Coroutine[Any, Any, str | None] = redis_components[
+                    "slot_operations"
+                ].assign_slot_atomic(batch_id, content_metadata)
                 concurrent_tasks.append(("assignment", batch_id, assignment_task))
 
         # Execute all operations concurrently

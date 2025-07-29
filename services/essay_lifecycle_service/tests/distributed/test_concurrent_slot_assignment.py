@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -29,6 +30,9 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 )
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
+)
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
 )
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
@@ -53,7 +57,7 @@ from services.essay_lifecycle_service.implementations.redis_slot_operations impo
 )
 
 from .test_sync_utils import wait_for_batch_ready, wait_for_condition
-from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
+from .test_utils import DistributedTestSettings, PerformanceMetrics
 
 
 @pytest.mark.docker
@@ -128,7 +132,7 @@ class TestConcurrentSlotAssignment:
     async def distributed_coordinator_instances(
         self, distributed_settings: Settings
     ) -> AsyncGenerator[
-        list[tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, MockEventPublisher]],
+        list[tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, AsyncMock]],
         None,
     ]:
         """Create multiple coordinator instances simulating distributed ELS workers."""
@@ -166,13 +170,13 @@ class TestConcurrentSlotAssignment:
             )
 
             # Event publisher
-            event_publisher = MockEventPublisher()
+            event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
 
             # Coordination handler
             coordination_handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
                 repository=repository,
-                event_publisher=event_publisher,
+                batch_lifecycle_publisher=event_publisher,
                 session_factory=repository.get_session_factory(),
             )
 
@@ -196,7 +200,7 @@ class TestConcurrentSlotAssignment:
     async def test_concurrent_identical_content_provisioning_race_prevention(
         self,
         distributed_coordinator_instances: list[
-            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, MockEventPublisher]
+            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, AsyncMock]
         ],
         clean_distributed_state: None,
     ) -> None:
@@ -247,7 +251,7 @@ class TestConcurrentSlotAssignment:
         await wait_for_condition(
             batch_is_available,
             timeout_seconds=3.0,
-            description=f"batch {batch_id} to be available with {len(essay_ids)} slots"
+            description=f"batch {batch_id} to be available with {len(essay_ids)} slots",
         )
 
         # Act - Send 20 IDENTICAL content events across all instances
@@ -337,7 +341,7 @@ class TestConcurrentSlotAssignment:
     async def test_cross_instance_slot_assignment(
         self,
         distributed_coordinator_instances: list[
-            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, MockEventPublisher]
+            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, AsyncMock]
         ],
         clean_distributed_state: None,
     ) -> None:
@@ -378,7 +382,7 @@ class TestConcurrentSlotAssignment:
         await wait_for_condition(
             batch_slots_available,
             timeout_seconds=3.0,
-            description=f"batch {batch_id} slots to be available for content provisioning"
+            description=f"batch {batch_id} slots to be available for content provisioning",
         )
 
         # Act - Send content events from different instances to different essays
@@ -459,7 +463,7 @@ class TestConcurrentSlotAssignment:
     async def test_batch_completion_coordination(
         self,
         distributed_coordinator_instances: list[
-            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, MockEventPublisher]
+            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, AsyncMock]
         ],
         clean_distributed_state: None,
     ) -> None:
@@ -500,7 +504,7 @@ class TestConcurrentSlotAssignment:
         await wait_for_condition(
             batch_completion_ready,
             timeout_seconds=3.0,
-            description=f"batch {batch_id} completion test setup"
+            description=f"batch {batch_id} completion test setup",
         )
 
         # Act - Fill all slots from different instances
@@ -550,7 +554,7 @@ class TestConcurrentSlotAssignment:
     async def test_high_concurrency_slot_assignment_performance(
         self,
         distributed_coordinator_instances: list[
-            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, MockEventPublisher]
+            tuple[DefaultBatchCoordinationHandler, PostgreSQLEssayRepository, AsyncMock]
         ],
         clean_distributed_state: None,
     ) -> None:
@@ -591,7 +595,7 @@ class TestConcurrentSlotAssignment:
         await wait_for_condition(
             performance_batch_ready,
             timeout_seconds=3.0,
-            description=f"performance test batch {batch_id} readiness"
+            description=f"performance test batch {batch_id} readiness",
         )
 
         # Act - High concurrency content provisioning

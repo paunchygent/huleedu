@@ -34,6 +34,9 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.implementations.batch_phase_coordinator_impl import (
     DefaultBatchPhaseCoordinator,
 )
@@ -46,13 +49,13 @@ from services.essay_lifecycle_service.implementations.cj_assessment_command_hand
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
 from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
     FutureServicesCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
 )
+from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
@@ -78,7 +81,6 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
-    EventPublisher,
     MetricsCollector,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
@@ -239,18 +241,25 @@ class ServiceClientsProvider(Provider):
     """Provider for external service client implementations."""
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for reliable event publishing."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_lifecycle_publisher(
         self,
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
-        redis_client: AtomicRedisClientProtocol,
-        batch_tracker: BatchEssayTracker,
-        outbox_repository: OutboxRepositoryProtocol,
-    ) -> EventPublisher:
-        """Provide event publisher implementation with Redis support, batch tracking, and outbox pattern."""
-        return DefaultEventPublisher(
-            kafka_bus, settings, redis_client, batch_tracker, outbox_repository
-        )
+        outbox_manager: OutboxManager,
+    ) -> BatchLifecyclePublisher:
+        """Provide batch lifecycle publisher for major batch events."""
+        return BatchLifecyclePublisher(kafka_bus, settings, outbox_manager)
+
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:
@@ -276,12 +285,11 @@ class CommandHandlerProvider(Provider):
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher,
         session_factory: async_sessionmaker,
     ) -> SpellcheckCommandHandler:
         """Provide spellcheck command handler implementation."""
         return SpellcheckCommandHandler(
-            repository, request_dispatcher, event_publisher, session_factory
+            repository, request_dispatcher, session_factory
         )
 
     @provide(scope=Scope.APP)
@@ -289,12 +297,11 @@ class CommandHandlerProvider(Provider):
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher,
         session_factory: async_sessionmaker,
     ) -> CJAssessmentCommandHandler:
         """Provide CJ assessment command handler implementation."""
         return CJAssessmentCommandHandler(
-            repository, request_dispatcher, event_publisher, session_factory
+            repository, request_dispatcher, session_factory
         )
 
     @provide(scope=Scope.APP)
@@ -302,12 +309,11 @@ class CommandHandlerProvider(Provider):
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
-        event_publisher: EventPublisher,
         session_factory: async_sessionmaker,
     ) -> FutureServicesCommandHandler:
         """Provide future services command handler implementation."""
         return FutureServicesCommandHandler(
-            repository, request_dispatcher, event_publisher, session_factory
+            repository, request_dispatcher, session_factory
         )
 
     @provide(scope=Scope.APP)
@@ -329,12 +335,12 @@ class BatchCoordinationProvider(Provider):
         self,
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
-        event_publisher: EventPublisher,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
-        """Provide batch coordination handler implementation."""
+        """Provide batch coordination handler implementation with direct publisher injection."""
         return DefaultBatchCoordinationHandler(
-            batch_tracker, repository, event_publisher, session_factory
+            batch_tracker, repository, batch_lifecycle_publisher, session_factory
         )
 
     @provide(scope=Scope.APP)
@@ -401,13 +407,13 @@ class BatchCoordinationProvider(Provider):
     def provide_batch_phase_coordinator(
         self,
         repository: EssayRepositoryProtocol,
-        event_publisher: EventPublisher,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
         batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
     ) -> BatchPhaseCoordinator:
-        """Provide batch phase coordinator implementation."""
+        """Provide batch phase coordinator implementation with direct publisher injection."""
         return DefaultBatchPhaseCoordinator(
-            repository, event_publisher, batch_tracker, session_factory
+            repository, batch_lifecycle_publisher, batch_tracker, session_factory
         )
 
     @provide(scope=Scope.APP)

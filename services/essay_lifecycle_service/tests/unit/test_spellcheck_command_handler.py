@@ -30,7 +30,6 @@ from services.essay_lifecycle_service.implementations.spellcheck_command_handler
 )
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
-    EventPublisher,
     SpecializedServiceRequestDispatcher,
 )
 
@@ -66,10 +65,6 @@ class TestSpellcheckCommandHandler:
         """Mock specialized service request dispatcher protocol using protocol-based mocking."""
         return AsyncMock(spec=SpecializedServiceRequestDispatcher)
 
-    @pytest.fixture
-    def mock_event_publisher(self) -> AsyncMock:
-        """Mock event publisher protocol using protocol-based mocking."""
-        return AsyncMock(spec=EventPublisher)
 
     # Using shared mock_session_factory fixture from test_utils
 
@@ -78,14 +73,12 @@ class TestSpellcheckCommandHandler:
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
-        mock_event_publisher: AsyncMock,
         mock_session_factory: AsyncMock,
     ) -> SpellcheckCommandHandler:
         """Create SpellcheckCommandHandler with mocked dependencies."""
         return SpellcheckCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
-            event_publisher=mock_event_publisher,
             session_factory=mock_session_factory,
         )
 

@@ -35,11 +35,11 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
-)
-from services.essay_lifecycle_service.implementations.event_publisher import (
-    DefaultEventPublisher,
 )
 from services.essay_lifecycle_service.implementations.redis_batch_queries import (
     RedisBatchQueries,
@@ -135,12 +135,12 @@ class TestPendingValidationFailuresIntegration:
         batch_tracker: DefaultBatchEssayTracker,
         test_infrastructure: dict[str, Any],
         settings: Settings,
-    ) -> tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher]:
+    ) -> tuple[DefaultBatchCoordinationHandler, AsyncMock]:
         """Create coordination handler with real Redis infrastructure."""
         from unittest.mock import AsyncMock
 
         # Extract real Redis client from infrastructure
-        redis_client = test_infrastructure["redis_client"]
+        test_infrastructure["redis_client"]
 
         # Mock repository (we're testing coordination logic)
         mock_repository = AsyncMock()
@@ -163,18 +163,14 @@ class TestPendingValidationFailuresIntegration:
         mock_outbox_repository.add_event = AsyncMock(return_value=uuid4())
 
         # Create real event publisher with mocked dependencies
-        event_publisher = DefaultEventPublisher(
-            kafka_bus=mock_kafka_bus,
-            settings=settings,
-            redis_client=redis_client,
-            batch_tracker=batch_tracker,
-            outbox_repository=mock_outbox_repository,
-        )
+        # Create mock BatchLifecyclePublisher with kafka_bus attribute for test assertions
+        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher.kafka_bus = mock_kafka_bus
 
         handler = DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
             repository=mock_repository,
-            event_publisher=event_publisher,
+            batch_lifecycle_publisher=event_publisher,
             session_factory=mock_session_factory_instance,
         )
 
@@ -183,7 +179,7 @@ class TestPendingValidationFailuresIntegration:
     async def test_validation_failure_before_batch_registration_completes_batch(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """
@@ -302,7 +298,7 @@ class TestPendingValidationFailuresIntegration:
     async def test_multiple_pending_failures_all_processed_on_registration(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """Test that multiple pending failures are all processed when batch is registered."""
@@ -408,7 +404,7 @@ class TestPendingValidationFailuresIntegration:
     async def test_mixed_scenario_pending_and_normal_failures(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
         test_infrastructure: dict[str, Any],
     ) -> None:
         """Test scenario with both pending failures (before registration) and normal failures (after)."""

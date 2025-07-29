@@ -14,6 +14,7 @@ import gc
 import time
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -30,6 +31,9 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 )
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
+)
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
 )
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
@@ -53,7 +57,7 @@ from services.essay_lifecycle_service.implementations.redis_slot_operations impo
     RedisSlotOperations,
 )
 
-from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
+from .test_utils import DistributedTestSettings, PerformanceMetrics
 
 
 @pytest.mark.performance
@@ -156,14 +160,14 @@ class TestDistributedPerformance:
             await redis_client.start()
 
             repo = PostgreSQLEssayRepository(performance_settings)
-            
+
             # Create modular Redis components
             redis_script_manager = RedisScriptManager(redis_client)
             batch_state = RedisBatchState(redis_client, redis_script_manager)
             batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
             failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
             slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
-            
+
             batch_tracker_persistence = BatchTrackerPersistence(repo.engine)
             batch_tracker = DefaultBatchEssayTracker(
                 persistence=batch_tracker_persistence,
@@ -173,11 +177,11 @@ class TestDistributedPerformance:
                 slot_operations=slot_operations,
             )
 
-            event_publisher = MockEventPublisher()
+            event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
             coordination_handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
                 repository=repo,
-                event_publisher=event_publisher,
+                batch_lifecycle_publisher=event_publisher,
                 session_factory=repo.get_session_factory(),
             )
 

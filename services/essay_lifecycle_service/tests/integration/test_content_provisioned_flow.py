@@ -37,13 +37,15 @@ from services.essay_lifecycle_service.implementations.batch_coordination_handler
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )
+from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
+    BatchLifecyclePublisher,
+)
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
 
 logger = create_service_logger("test.content_provisioned_flow")
 
@@ -135,18 +137,13 @@ class TestContentProvisionedFlow:
             mock_outbox_repository = AsyncMock()
             mock_outbox_repository.add_event.return_value = None
 
-            event_publisher = DefaultEventPublisher(
-                kafka_bus=mock_kafka_bus,
-                settings=settings,
-                redis_client=redis_client,
-                batch_tracker=batch_tracker,
-                outbox_repository=mock_outbox_repository,
-            )
+            # Create mock BatchLifecyclePublisher
+            event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
 
             handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
                 repository=repository,
-                event_publisher=event_publisher,
+                batch_lifecycle_publisher=event_publisher,
                 session_factory=repository.get_session_factory(),
             )
 
