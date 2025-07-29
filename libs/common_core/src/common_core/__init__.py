@@ -61,6 +61,7 @@ from .events.llm_provider_events import (
     LLMUsageAnalyticsV1,
     TokenUsage,
 )
+from .events.nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
     EntityReference,
@@ -154,6 +155,9 @@ __all__ = [
     # File Service Event Models
     "EssayContentProvisionedV1",
     "EssayValidationFailedV1",
+    # NLP Service Event Models
+    "EssayAuthorMatchSuggestedV1",
+    "StudentMatchSuggestion",
     # LLM Provider Event Models
     "LLMComparisonResultV1",
     "LLMCostAlertV1",
@@ -199,3 +203,5 @@ CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
 CJAssessmentFailedV1.model_rebuild(raise_errors=True)
 LLMComparisonResultV1.model_rebuild(raise_errors=True)
 TokenUsage.model_rebuild(raise_errors=True)
+EssayAuthorMatchSuggestedV1.model_rebuild(raise_errors=True)
+StudentMatchSuggestion.model_rebuild(raise_errors=True)

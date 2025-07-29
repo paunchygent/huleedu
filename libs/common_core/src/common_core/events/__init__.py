@@ -30,6 +30,7 @@ from .file_management_events import (
     StudentParsingCompletedV1,
 )
 from .llm_provider_events import LLMComparisonResultV1, TokenUsage
+from .nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .validation_events import (
     StudentAssociation,
@@ -50,6 +51,7 @@ __all__ = [
     "ClientBatchPipelineRequestV1",
     "ELS_CJAssessmentRequestV1",
     "ELSBatchPhaseOutcomeV1",
+    "EssayAuthorMatchSuggestedV1",
     "EssayContentProvisionedV1",
     "EssaySlotAssignedV1",
     "EssayStudentAssociationUpdatedV1",
@@ -64,6 +66,7 @@ __all__ = [
     "StudentAssociation",
     "StudentAssociationsConfirmedV1",
     "StudentCreatedV1",
+    "StudentMatchSuggestion",
     "StudentParsingCompletedV1",
     "TokenUsage",
     "ValidationTimeoutProcessedV1",

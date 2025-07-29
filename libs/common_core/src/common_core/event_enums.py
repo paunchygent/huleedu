@@ -33,6 +33,7 @@ class ProcessingEvent(str, Enum):
     CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
     CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
     ESSAY_NLP_COMPLETED = "essay.nlp.completed"
+    ESSAY_AUTHOR_MATCH_SUGGESTED = "essay.author.match.suggested"
     ESSAY_AIFEEDBACK_COMPLETED = "essay.aifeedback.completed"
     ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"
     ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"
@@ -77,6 +78,7 @@ _TOPIC_MAPPING = {
         "huleedu.batch.ai_feedback.initiate.command.v1"
     ),
     ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
+    ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED: "huleedu.essay.author.match.suggested.v1",
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",

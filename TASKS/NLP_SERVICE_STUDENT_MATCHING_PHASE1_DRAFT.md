@@ -1,6 +1,7 @@
-# DRAFT: NLP Service - Phase 1 Student Matching Implementation
+# NLP Service - Phase 1 Student Matching Implementation
 
-**STATUS: DRAFT - REQUIRES ARCHITECTURAL REVIEW AND REFINEMENT**
+**STATUS: REFINED - Ready for Implementation**
+**LAST UPDATED: 2025-01-29**
 
 ## Overview
 
@@ -17,19 +18,20 @@ This document outlines the implementation plan for the NLP Service, focusing exc
 - Content Service stores essay text with retrieval API
 
 ### Missing Components
-1. NLP Service implementation
-2. Event contracts for author matching results
-3. Topic mappings in common_core
+1. ~~NLP Service implementation~~ (In Progress)
+2. ~~Event contracts for author matching results~~ (✅ Completed)
+3. ~~Topic mappings in common_core~~ (✅ Completed)
 4. Integration with Essay Lifecycle Service state machine
 
 ## Proposed Architecture
 
 ### Service Pattern
-Following the established **Kafka Worker Service Pattern** similar to `spellchecker_service`:
+Following the established **Kafka Worker Service Pattern** with improvements:
 - Pure worker service consuming Kafka events
 - Clear input/output event contracts
-- Single responsibility analyzer
+- Better separation of concerns than `spellchecker_service`
 - Protocol-based dependency injection
+- Isolated business logic in dedicated modules
 
 ### Event Flow
 ```
@@ -40,42 +42,50 @@ BOS → BATCH_NLP_INITIATE_COMMAND → NLP Service
 
 ## Implementation Plan
 
-### Phase 1: Core Service Structure
+### Phase 1: Improved Service Structure
 
 ```
 services/nlp_service/
 ├── Dockerfile
 ├── README.md
 ├── __init__.py
-├── app.py                        # Quart app with Kafka consumer
+├── worker_main.py                # Entry point with signal handling
+├── kafka_consumer.py             # NlpKafkaConsumer class
+├── event_processor.py            # Clean message processing
 ├── config.py                     # Service configuration
 ├── di.py                         # Dependency injection setup
-├── event_processor.py            # Message processing logic
+├── protocols.py                  # All service protocols
+├── core_logic.py                 # Pure business functions
+├── metrics.py                    # Prometheus metrics
 ├── implementations/
 │   ├── __init__.py
-│   ├── class_roster_client.py   # Class Management Service client
-│   ├── content_client_impl.py   # Content Service client
-│   ├── event_publisher_impl.py  # Kafka event publisher
-│   └── student_matcher_impl.py  # Phase 1 matching logic
-├── kafka_consumer.py             # Kafka consumer lifecycle
-├── metrics.py                    # Prometheus metrics
-├── protocols.py                  # Service protocols
+│   ├── content_client_impl.py   # Content Service HTTP client
+│   ├── roster_client_impl.py    # Class Management Service client
+│   ├── roster_cache_impl.py     # Redis-based roster caching
+│   ├── student_matcher_impl.py  # Student matching orchestration
+│   └── event_publisher_impl.py  # Result event publishing
+├── matching_algorithms/          # Business algorithms (pure)
+│   ├── __init__.py
+│   ├── email_matcher.py          # Email extraction and matching
+│   ├── name_matcher.py           # Name extraction and fuzzy matching
+│   └── composite_matcher.py      # Combines all matching strategies
 ├── pyproject.toml
-├── startup_setup.py              # Service initialization
 └── tests/
-    ├── integration/
+    ├── conftest.py
     ├── unit/
-    └── conftest.py
+    ├── integration/
+    └── contract/
 ```
 
 ### Common Core Additions
 
-#### New Event Model
+#### New Event Model (✅ COMPLETED)
+
 ```python
 # common_core/events/nlp_events.py
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from .base_event_models import BaseEventData
+from .base_event_models import ProcessingUpdate
 
 class StudentMatchSuggestion(BaseModel):
     """Represents a potential student match."""
@@ -84,17 +94,19 @@ class StudentMatchSuggestion(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
     match_reason: str  # "exact_name", "fuzzy_name", "email"
 
-class EssayAuthorMatchSuggestedV1(BaseEventData):
+class EssayAuthorMatchSuggestedV1(ProcessingUpdate):
     """Event published when author matches are suggested."""
     essay_id: str
     suggestions: list[StudentMatchSuggestion]
     match_status: str  # "HIGH_CONFIDENCE", "NEEDS_REVIEW", "NO_MATCH"
 ```
 
-#### Topic Mapping
+#### Topic Mapping (✅ COMPLETED)
+
 ```python
-# common_core/models/message_models.py
-ESSAY_AUTHOR_MATCH_SUGGESTED = "essay.author.match.suggested.v1"
+# common_core/event_enums.py
+ESSAY_AUTHOR_MATCH_SUGGESTED = "essay.author.match.suggested"
+# Mapping: "huleedu.essay.author.match.suggested.v1"
 ```
 
 ### Protocol Definitions
@@ -163,19 +175,19 @@ class ContentClientProtocol(Protocol):
 
 ## Technical Considerations
 
-### Dependency Management
+### Dependency Management (OBS! No version pinning! pdm will handle this)
 ```toml
 [project]
 dependencies = [
-    "quart>=0.19.0",
-    "aiokafka>=0.11.0",
-    "aiohttp>=3.11.11",
-    "redis>=6.0.0",
-    "prometheus-client>=0.21.1",
-    "dishka>=1.4.3",
-    "quart-dishka>=1.1.0",
-    "huleedu-common-core>=0.2.0",
-    "huleedu-service-libs>=0.2.0",
+    "quart",
+    "aiokafka",
+    "aiohttp",
+    "redis",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "huleedu-common-core",
+    "huleedu-service-libs",
 ]
 ```
 
@@ -249,18 +261,32 @@ While implementing Phase 1 only, the architecture should support:
 8. Achieves >90% test coverage
 9. Follows all HuleEdu architectural patterns
 
-## Open Questions for Architectural Review
+## Architectural Decisions
 
-1. Should we use the existing `ESSAY_NLP_COMPLETED` event or create a new specific event?
-2. Is the caching strategy appropriate for the Class Management integration?
-3. Should the service handle roster updates via events or continue with API polling?
-4. What should be the retry strategy for failed roster fetches?
-5. How should we handle essays with no identifiable student information?
+### Q1: Event Design
+**Question**: Should we use the existing `ESSAY_NLP_COMPLETED` event or create a new specific event?
+**Decision**: Created new `ESSAY_AUTHOR_MATCH_SUGGESTED` event for clearer semantic meaning and future extensibility.
+
+### Q2: Caching Strategy
+**Question**: Is the caching strategy appropriate for the Class Management integration?
+**Decision**: 1-hour TTL for class rosters is reasonable. Consider cache invalidation via events in Phase 2.
+
+### Q3: Roster Updates
+**Question**: Should the service handle roster updates via events or continue with API polling?
+**Decision**: API polling is acceptable for Phase 1. Event-driven updates can be added later.
+
+### Q4: Retry Strategy
+**Question**: What should be the retry strategy for failed roster fetches?
+**Decision**: Implement exponential backoff with max 3 retries. Failed essays go to DLQ after retries exhausted.
+
+### Q5: No Match Handling
+**Question**: How should we handle essays with no identifiable student information?
+**Decision**: Publish event with `match_status: "NO_MATCH"` and empty suggestions list. Let ELS handle the workflow.
 
 ## Implementation Priority
 
-1. Define event contracts in common_core
-2. Create service scaffold following spellchecker pattern
+1. ~~Define event contracts in common_core~~ (✅ COMPLETED)
+2. Create improved service scaffold with better separation
 3. Implement protocols and core matching logic
 4. Add API client implementations with caching
 5. Setup Kafka consumer and event processing
@@ -270,6 +296,14 @@ While implementing Phase 1 only, the architecture should support:
 9. Update Essay Lifecycle Service integration
 10. Document API contracts and deployment
 
+## Key Improvements Over Spellchecker Service
+
+1. **Better Separation**: Business logic isolated in `matching_algorithms/` directory
+2. **Cleaner Protocols**: All protocols in single file at service root
+3. **Pure Functions**: `core_logic.py` contains testable pure functions
+4. **Organized Implementations**: Clear subdirectory structure for different concerns
+5. **Explicit Worker Pattern**: `worker_main.py` entry point matches other services
+
 ---
 
-**REMINDER**: This document requires architectural review to ensure compliance with all HuleEdu patterns and standards before implementation begins.
+**STATUS**: Architectural review complete. Ready for implementation with improved structure.
