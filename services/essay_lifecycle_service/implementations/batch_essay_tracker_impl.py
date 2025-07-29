@@ -36,8 +36,13 @@ from services.essay_lifecycle_service.implementations.batch_expectation import B
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
+from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
@@ -52,10 +57,18 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
     """
 
     def __init__(
-        self, persistence: BatchTrackerPersistence, redis_coordinator: RedisBatchCoordinator
+        self,
+        persistence: BatchTrackerPersistence,
+        batch_state: RedisBatchState,
+        batch_queries: RedisBatchQueries,
+        failure_tracker: RedisFailureTracker,
+        slot_operations: RedisSlotOperations,
     ) -> None:
         self._logger = create_service_logger("batch_tracker")
-        self._redis_coordinator = redis_coordinator
+        self._batch_state = batch_state
+        self._batch_queries = batch_queries
+        self._failure_tracker = failure_tracker
+        self._slot_operations = slot_operations
         self._persistence = persistence
         self._event_callbacks: dict[str, Callable[[Any], Awaitable[None]]] = {}
         self._initialized = False
@@ -82,7 +95,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         batch_id = batch_essays_registered.batch_id
 
         # **Idempotency Check: Redis existence first**
-        existing_batch_status = await self._redis_coordinator.get_batch_status(batch_id)
+        existing_batch_status = await self._batch_queries.get_batch_status(batch_id)
 
         if existing_batch_status is not None:
             # Batch already exists in Redis - handle idempotently
@@ -117,7 +130,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         }
 
         # Register batch in Redis coordinator with atomic slot initialization
-        await self._redis_coordinator.register_batch_slots(
+        await self._batch_state.register_batch_slots(
             batch_id=batch_id,
             essay_ids=batch_essays_registered.essay_ids,
             metadata=batch_metadata,
@@ -174,7 +187,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             }
 
             # Use Redis coordinator for atomic slot assignment
-            return await self._redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+            return await self._slot_operations.assign_slot_atomic(batch_id, content_metadata)
 
         except Exception as e:
             self._logger.error(
@@ -201,16 +214,14 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """
         try:
             # Check completion state in Redis using atomic coordinator
-            is_complete = await self._redis_coordinator.check_batch_completion(batch_id)
+            is_complete = await self._batch_state.check_batch_completion(batch_id)
 
             if is_complete:
                 # Atomically mark as completed to prevent double-completion
-                marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(
-                    batch_id
-                )
+                marked_complete = await self._batch_state.mark_batch_completed_atomically(batch_id)
                 if marked_complete:
                     # Get batch metadata from Redis for event creation
-                    redis_status = await self._redis_coordinator.get_batch_status(batch_id)
+                    redis_status = await self._batch_queries.get_batch_status(batch_id)
                     if redis_status:
                         return await self._create_batch_ready_event_from_redis(
                             batch_id, redis_status
@@ -229,7 +240,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Get current status of a batch using Redis coordinator."""
         try:
             # Get status from Redis coordinator
-            redis_status = await self._redis_coordinator.get_batch_status(batch_id)
+            redis_status = await self._batch_queries.get_batch_status(batch_id)
 
             if redis_status:
                 # Convert Redis status to expected format
@@ -242,7 +253,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                         )
 
                 # Get missing slots from Redis
-                missing_slots = await self._redis_coordinator.get_missing_slots(batch_id)
+                missing_slots = await self._batch_queries.get_missing_slots(batch_id)
 
                 return {
                     "batch_id": batch_id,
@@ -268,7 +279,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Get list of currently tracked batch IDs from Redis."""
         try:
             # Use Redis coordinator to scan for active batch metadata keys
-            active_batch_ids = await self._redis_coordinator.list_active_batch_ids()
+            active_batch_ids = await self._batch_queries.list_active_batch_ids()
             return active_batch_ids
 
         except Exception as e:
@@ -304,10 +315,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        await self._redis_coordinator.track_validation_failure(batch_id, failure_data)
+        await self._failure_tracker.track_validation_failure(batch_id, failure_data)
 
         # Check if batch exists before attempting completion check
-        batch_status = await self._redis_coordinator.get_batch_status(batch_id)
+        batch_status = await self._batch_queries.get_batch_status(batch_id)
         if batch_status is None:
             # Batch not registered yet - failure stored as pending
             self._logger.info(
@@ -317,7 +328,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             return None
 
         # Get current failure count
-        failure_count = await self._redis_coordinator.get_validation_failure_count(batch_id)
+        failure_count = await self._failure_tracker.get_validation_failure_count(batch_id)
 
         self._logger.info(
             f"Tracked validation failure for batch {batch_id}: "
@@ -336,19 +347,17 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         that might complete a batch.
         """
         # Check if batch is complete using Redis coordinator
-        batch_status = await self._redis_coordinator.get_batch_status(batch_id)
+        batch_status = await self._batch_queries.get_batch_status(batch_id)
         if not batch_status:
             return None
 
         # Use atomic completion check that considers all scenarios
-        is_complete = await self._redis_coordinator.check_batch_completion(batch_id)
+        is_complete = await self._batch_state.check_batch_completion(batch_id)
         if is_complete:
-            # Atomically mark as completed to prevent double-completion
-            marked_complete = await self._redis_coordinator.mark_batch_completed_atomically(
-                batch_id
-            )
-            if marked_complete:
-                return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
+            # Try to atomically mark as completed, but return event regardless of whether
+            # we marked it or it was already marked (e.g., during pending failure processing)
+            await self._batch_state.mark_batch_completed_atomically(batch_id)
+            return await self._create_batch_ready_event_from_redis(batch_id, batch_status)
 
         return None
 
@@ -356,7 +365,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Look up user_id for a given essay by searching through batch expectations."""
         try:
             # Use Redis coordinator to find the batch containing this essay
-            result = await self._redis_coordinator.find_batch_for_essay(essay_id)
+            result = await self._batch_queries.find_batch_for_essay(essay_id)
 
             if result is not None:
                 _, user_id = result  # Only need user_id, ignore batch_id
@@ -406,11 +415,9 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 }
 
                 # Register in Redis if not already there
-                existing_status = await self._redis_coordinator.get_batch_status(
-                    expectation.batch_id
-                )
+                existing_status = await self._batch_queries.get_batch_status(expectation.batch_id)
                 if not existing_status:
-                    await self._redis_coordinator.register_batch_slots(
+                    await self._batch_state.register_batch_slots(
                         batch_id=expectation.batch_id,
                         essay_ids=list(expectation.expected_essay_ids),
                         metadata=batch_metadata,
@@ -458,7 +465,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 )
 
         # Get validation failures from Redis
-        failure_dicts = await self._redis_coordinator.get_validation_failures(batch_id)
+        failure_dicts = await self._failure_tracker.get_validation_failures(batch_id)
         failures: list[EssayValidationFailedV1] = []
         for failure_dict in failure_dicts:
             try:
@@ -560,6 +567,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         )
 
         # Clean up Redis state
-        await self._redis_coordinator.cleanup_batch(batch_id)
+        await self._batch_state.cleanup_batch(batch_id)
 
         return ready_event, correlation_id

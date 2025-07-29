@@ -263,25 +263,74 @@ class TestAtomicBatchCreationIntegration:
         return BatchTrackerPersistence(postgres_repository.engine)
 
     @pytest.fixture
+    async def redis_script_manager(self, redis_client: AtomicRedisClientProtocol) -> Any:
+        """Create Redis script manager with real Redis client."""
+        from services.essay_lifecycle_service.implementations.redis_script_manager import (
+            RedisScriptManager,
+        )
+
+        return RedisScriptManager(redis_client)
+
+    @pytest.fixture
+    async def batch_state(
+        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
+    ) -> Any:
+        """Create real Redis batch state with actual Redis operations."""
+        from services.essay_lifecycle_service.implementations.redis_batch_state import (
+            RedisBatchState,
+        )
+
+        return RedisBatchState(redis_client, redis_script_manager)
+
+    @pytest.fixture
+    async def batch_queries(
+        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
+    ) -> Any:
+        """Create real Redis batch queries with actual Redis operations."""
+        from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+            RedisBatchQueries,
+        )
+
+        return RedisBatchQueries(redis_client, redis_script_manager)
+
+    @pytest.fixture
+    async def failure_tracker(
+        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
+    ) -> Any:
+        """Create real Redis failure tracker with actual Redis operations."""
+        from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+            RedisFailureTracker,
+        )
+
+        return RedisFailureTracker(redis_client, redis_script_manager)
+
+    @pytest.fixture
+    async def slot_operations(
+        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
+    ) -> Any:
+        """Create real Redis slot operations with actual Redis operations."""
+        from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+            RedisSlotOperations,
+        )
+
+        return RedisSlotOperations(redis_client, redis_script_manager)
+
+    @pytest.fixture
     async def batch_tracker(
         self,
         batch_tracker_persistence: BatchTrackerPersistence,
-        redis_client: AtomicRedisClientProtocol,
+        batch_state: Any,
+        batch_queries: Any,
+        failure_tracker: Any,
+        slot_operations: Any,
     ) -> DefaultBatchEssayTracker:
-        """Create real batch tracker with PostgreSQL persistence and Redis coordinator."""
-        from services.essay_lifecycle_service.config import Settings
-        from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-            RedisBatchCoordinator,
-        )
-
-        # Create settings mock
-        settings = Settings()
-
-        # Create Redis coordinator with real Redis client
-        redis_coordinator = RedisBatchCoordinator(redis_client, settings)
-
+        """Create real batch tracker with PostgreSQL persistence and domain class composition."""
         return DefaultBatchEssayTracker(
-            persistence=batch_tracker_persistence, redis_coordinator=redis_coordinator
+            persistence=batch_tracker_persistence,
+            batch_state=batch_state,
+            batch_queries=batch_queries,
+            failure_tracker=failure_tracker,
+            slot_operations=slot_operations,
         )
 
     @pytest.fixture

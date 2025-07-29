@@ -36,10 +36,23 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+    RedisBatchQueries,
+)
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
+)
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 
+from .test_sync_utils import wait_for_batch_ready, wait_for_condition
 from .test_utils import DistributedTestSettings, MockEventPublisher, PerformanceMetrics
 
 
@@ -135,13 +148,21 @@ class TestConcurrentSlotAssignment:
             # Shared PostgreSQL repository
             repository = PostgreSQLEssayRepository(distributed_settings)
 
-            # Shared Redis coordinator
-            redis_coordinator = RedisBatchCoordinator(redis_client, distributed_settings)
+            # Create modular Redis components
+            redis_script_manager = RedisScriptManager(redis_client)
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
-            # Batch tracker with Redis coordination
+            # Batch tracker with modular DI components
             batch_tracker_persistence = BatchTrackerPersistence(repository.engine)
             batch_tracker = DefaultBatchEssayTracker(
-                persistence=batch_tracker_persistence, redis_coordinator=redis_coordinator
+                persistence=batch_tracker_persistence,
+                batch_state=batch_state,
+                batch_queries=batch_queries,
+                failure_tracker=failure_tracker,
+                slot_operations=slot_operations,
             )
 
             # Event publisher
@@ -162,13 +183,13 @@ class TestConcurrentSlotAssignment:
         finally:
             # Cleanup Redis clients
             for coordination_handler, _, _ in instances:
-                # Access the Redis client through the coordination handler's tracker
+                # Access the Redis client through the modular components
                 try:
                     tracker = coordination_handler.batch_tracker
-                    if hasattr(tracker, "_redis_coordinator") and hasattr(
-                        tracker._redis_coordinator, "_redis"
+                    if hasattr(tracker, "_batch_state") and hasattr(
+                        tracker._batch_state, "_redis_client"
                     ):
-                        await tracker._redis_coordinator._redis.stop()
+                        await tracker._batch_state._redis_client.stop()
                 except Exception:
                     pass  # Best effort cleanup
 
@@ -216,8 +237,18 @@ class TestConcurrentSlotAssignment:
         )
         assert result is True
 
-        # Wait for batch registration to propagate
-        await asyncio.sleep(0.1)
+        # Verify batch is properly registered and available for slot assignment
+        async def batch_is_available() -> bool:
+            # Check that the batch has the expected number of available slots
+            batch_status = await repository.get_batch_status_summary(batch_id)
+            total_essays = sum(batch_status.values())
+            return total_essays == len(essay_ids)
+
+        await wait_for_condition(
+            batch_is_available,
+            timeout_seconds=3.0,
+            description=f"batch {batch_id} to be available with {len(essay_ids)} slots"
+        )
 
         # Act - Send 20 IDENTICAL content events across all instances
         identical_text_storage_id = "identical_content_12345"
@@ -338,7 +369,17 @@ class TestConcurrentSlotAssignment:
         result = await coordination_handler.handle_batch_essays_registered(batch_event, uuid4())
         assert result is True
 
-        await asyncio.sleep(0.1)
+        # Verify batch is available for content provisioning
+        async def batch_slots_available() -> bool:
+            batch_status = await repository.get_batch_status_summary(batch_id)
+            total_essays = sum(batch_status.values())
+            return total_essays == essay_count
+
+        await wait_for_condition(
+            batch_slots_available,
+            timeout_seconds=3.0,
+            description=f"batch {batch_id} slots to be available for content provisioning"
+        )
 
         # Act - Send content events from different instances to different essays
         content_tasks = []
@@ -450,7 +491,17 @@ class TestConcurrentSlotAssignment:
         result = await coordination_handler.handle_batch_essays_registered(batch_event, uuid4())
         assert result is True
 
-        await asyncio.sleep(0.1)
+        # Verify batch completion test setup is ready
+        async def batch_completion_ready() -> bool:
+            batch_status = await repository.get_batch_status_summary(batch_id)
+            total_essays = sum(batch_status.values())
+            return total_essays == essay_count
+
+        await wait_for_condition(
+            batch_completion_ready,
+            timeout_seconds=3.0,
+            description=f"batch {batch_id} completion test setup"
+        )
 
         # Act - Fill all slots from different instances
         for i, essay_id in enumerate(essay_ids):
@@ -470,11 +521,8 @@ class TestConcurrentSlotAssignment:
             result = await coord_handler.handle_essay_content_provisioned(content_event, uuid4())
             assert result is True
 
-            # Small delay to allow processing
-            await asyncio.sleep(0.05)
-
-        # Wait for batch completion processing
-        await asyncio.sleep(0.5)
+        # Wait for batch to reach completion state (all essays ready for processing)
+        await wait_for_batch_ready(repository, batch_id, essay_count, timeout_seconds=10.0)
 
         # Assert - Batch should be marked as ready
         batch_status = await repository.get_batch_status_summary(batch_id)
@@ -534,7 +582,17 @@ class TestConcurrentSlotAssignment:
         result = await coordination_handler.handle_batch_essays_registered(batch_event, uuid4())
         assert result is True
 
-        await asyncio.sleep(0.1)
+        # Verify performance test batch is ready for high concurrency testing
+        async def performance_batch_ready() -> bool:
+            batch_status = await repository.get_batch_status_summary(batch_id)
+            total_essays = sum(batch_status.values())
+            return total_essays == essay_count
+
+        await wait_for_condition(
+            performance_batch_ready,
+            timeout_seconds=3.0,
+            description=f"performance test batch {batch_id} readiness"
+        )
 
         # Act - High concurrency content provisioning
         metrics = PerformanceMetrics()

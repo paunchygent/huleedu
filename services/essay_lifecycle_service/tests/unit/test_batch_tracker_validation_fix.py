@@ -26,8 +26,13 @@ from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl i
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
+from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 
 
@@ -46,20 +51,24 @@ class TestValidationFailureCompletionFix:
         return persistence
 
     @pytest.fixture
-    def mock_redis_coordinator(self) -> AsyncMock:
-        """Mock Redis coordinator with correct completion logic."""
-        redis = AsyncMock(spec=RedisBatchCoordinator)
+    def shared_test_state(self) -> dict[str, Any]:
+        """Shared state for coordinated domain class mocks."""
+        return {
+            "batch_states": {},
+            "failure_counts": {},
+            "failure_data": {},
+            "completed_batches": set(),
+        }
 
-        # Track state
-        batch_states: dict[str, dict[str, Any]] = {}
-        failure_counts: dict[str, int] = {}
-        failure_data: dict[str, list[dict[str, Any]]] = {}
-        completed_batches = set()
+    @pytest.fixture
+    def mock_batch_state(self, shared_test_state: dict[str, Any]) -> AsyncMock:
+        """Mock Redis batch state with domain-specific behavior."""
+        mock = AsyncMock(spec=RedisBatchState)
 
-        async def mock_register_batch_slots(
+        async def register_batch_slots(
             batch_id: str, essay_ids: list[str], metadata: dict[str, Any], timeout_seconds: int
         ) -> None:
-            batch_states[batch_id] = {
+            shared_test_state["batch_states"][batch_id] = {
                 "total_slots": len(essay_ids),
                 "assigned_slots": 0,
                 "available_slots": len(essay_ids),
@@ -68,71 +77,118 @@ class TestValidationFailureCompletionFix:
                 "metadata": metadata,
                 "assignments": {},
             }
-            failure_counts[batch_id] = 0
-            failure_data[batch_id] = []
+            shared_test_state["failure_counts"][batch_id] = 0
+            shared_test_state["failure_data"][batch_id] = []
 
-        async def mock_get_batch_status(batch_id: str) -> dict[str, Any] | None:
-            return batch_states.get(batch_id)
-
-        async def mock_track_validation_failure(batch_id: str, data: dict[str, Any]) -> None:
-            if batch_id in failure_counts:
-                failure_counts[batch_id] += 1
-                failure_data[batch_id].append(data)
-
-        async def mock_get_validation_failure_count(batch_id: str) -> int:
-            return failure_counts.get(batch_id, 0)
-
-        async def mock_get_assigned_count(batch_id: str) -> int:
-            if batch_id in batch_states:
-                return int(batch_states[batch_id]["assigned_slots"])
-            return 0
-
-        async def mock_check_batch_completion(batch_id: str) -> bool:
-            """Real completion logic."""
-            if batch_id not in batch_states:
+        async def check_batch_completion(batch_id: str) -> bool:
+            """Check if batch is complete based on assignments and failures."""
+            if batch_id not in shared_test_state["batch_states"]:
                 return False
 
-            state = batch_states[batch_id]
+            state = shared_test_state["batch_states"][batch_id]
             assigned = state["assigned_slots"]
-            failed = failure_counts.get(batch_id, 0)
+            failed = shared_test_state["failure_counts"].get(batch_id, 0)
             total_processed = assigned + failed
             expected = state["total_slots"]
 
             # Complete if all processed AND not already marked complete
-            return total_processed >= expected and batch_id not in completed_batches
+            return (
+                total_processed >= expected
+                and batch_id not in shared_test_state["completed_batches"]
+            )
 
-        async def mock_mark_batch_completed_atomically(batch_id: str) -> bool:
-            if batch_id not in completed_batches:
-                completed_batches.add(batch_id)
+        async def mark_batch_completed_atomically(batch_id: str) -> bool:
+            if batch_id not in shared_test_state["completed_batches"]:
+                shared_test_state["completed_batches"].add(batch_id)
                 return True
             return False
 
-        async def mock_get_validation_failures(batch_id: str) -> list[dict[str, Any]]:
-            return failure_data.get(batch_id, [])
+        async def cleanup_batch(batch_id: str) -> None:
+            shared_test_state["batch_states"].pop(batch_id, None)
+            shared_test_state["failure_counts"].pop(batch_id, None)
+            shared_test_state["failure_data"].pop(batch_id, None)
 
-        async def mock_cleanup_batch(batch_id: str) -> None:
-            batch_states.pop(batch_id, None)
-            failure_counts.pop(batch_id, None)
-            failure_data.pop(batch_id, None)
+        mock.register_batch_slots.side_effect = register_batch_slots
+        mock.check_batch_completion.side_effect = check_batch_completion
+        mock.mark_batch_completed_atomically.side_effect = mark_batch_completed_atomically
+        mock.cleanup_batch.side_effect = cleanup_batch
+        return mock
 
-        # Wire up mocks
-        redis.register_batch_slots.side_effect = mock_register_batch_slots
-        redis.get_batch_status.side_effect = mock_get_batch_status
-        redis.track_validation_failure.side_effect = mock_track_validation_failure
-        redis.get_validation_failure_count.side_effect = mock_get_validation_failure_count
-        redis.get_assigned_count.side_effect = mock_get_assigned_count
-        redis.check_batch_completion.side_effect = mock_check_batch_completion
-        redis.mark_batch_completed_atomically.side_effect = mock_mark_batch_completed_atomically
-        redis.get_validation_failures.side_effect = mock_get_validation_failures
-        redis.cleanup_batch.side_effect = mock_cleanup_batch
+    @pytest.fixture
+    def mock_batch_queries(self, shared_test_state: dict[str, Any]) -> AsyncMock:
+        """Mock Redis batch queries with domain-specific behavior."""
+        mock = AsyncMock(spec=RedisBatchQueries)
 
-        return redis
+        async def get_batch_status(batch_id: str) -> dict[str, Any] | None:
+            return shared_test_state["batch_states"].get(batch_id)
+
+        async def get_missing_slots(batch_id: str) -> list[str]:
+            # Mock implementation - return empty list for simplicity
+            return []
+
+        async def list_active_batch_ids() -> list[str]:
+            return list(shared_test_state["batch_states"].keys())
+
+        async def find_batch_for_essay(essay_id: str) -> tuple[str, str] | None:
+            # Mock implementation - return None for simplicity
+            return None
+
+        mock.get_batch_status.side_effect = get_batch_status
+        mock.get_missing_slots.side_effect = get_missing_slots
+        mock.list_active_batch_ids.side_effect = list_active_batch_ids
+        mock.find_batch_for_essay.side_effect = find_batch_for_essay
+        return mock
+
+    @pytest.fixture
+    def mock_failure_tracker(self, shared_test_state: dict[str, Any]) -> AsyncMock:
+        """Mock Redis failure tracker with domain-specific behavior."""
+        mock = AsyncMock(spec=RedisFailureTracker)
+
+        async def track_validation_failure(batch_id: str, data: dict[str, Any]) -> None:
+            if batch_id in shared_test_state["failure_counts"]:
+                shared_test_state["failure_counts"][batch_id] += 1
+                shared_test_state["failure_data"][batch_id].append(data)
+
+        async def get_validation_failure_count(batch_id: str) -> int:
+            return shared_test_state["failure_counts"].get(batch_id, 0)
+
+        async def get_validation_failures(batch_id: str) -> list[dict[str, Any]]:
+            return shared_test_state["failure_data"].get(batch_id, [])
+
+        mock.track_validation_failure.side_effect = track_validation_failure
+        mock.get_validation_failure_count.side_effect = get_validation_failure_count
+        mock.get_validation_failures.side_effect = get_validation_failures
+        return mock
+
+    @pytest.fixture
+    def mock_slot_operations(self, shared_test_state: dict[str, Any]) -> AsyncMock:
+        """Mock Redis slot operations with domain-specific behavior."""
+        mock = AsyncMock(spec=RedisSlotOperations)
+
+        async def assign_slot_atomic(batch_id: str, content_metadata: dict[str, Any]) -> str | None:
+            # Default implementation returns None (no slots available)
+            # Individual tests can override this behavior as needed
+            return None
+
+        mock.assign_slot_atomic.side_effect = assign_slot_atomic
+        return mock
 
     async def test_all_failures_triggers_completion(
-        self, mock_persistence: AsyncMock, mock_redis_coordinator: AsyncMock
+        self,
+        mock_persistence: AsyncMock,
+        mock_batch_state: AsyncMock,
+        mock_batch_queries: AsyncMock,
+        mock_failure_tracker: AsyncMock,
+        mock_slot_operations: AsyncMock,
     ) -> None:
         """Test that all validation failures properly trigger batch completion."""
-        tracker = DefaultBatchEssayTracker(mock_persistence, mock_redis_coordinator)
+        tracker = DefaultBatchEssayTracker(
+            mock_persistence,
+            mock_batch_state,
+            mock_batch_queries,
+            mock_failure_tracker,
+            mock_slot_operations,
+        )
 
         # Register batch with 3 essays
         batch_registration = BatchEssaysRegistered(
@@ -207,10 +263,21 @@ class TestValidationFailureCompletionFix:
         assert returned_correlation_id == correlation_id  # Original correlation ID preserved
 
     async def test_mixed_success_and_failure_completion(
-        self, mock_persistence: AsyncMock, mock_redis_coordinator: AsyncMock
+        self,
+        mock_persistence: AsyncMock,
+        mock_batch_state: AsyncMock,
+        mock_batch_queries: AsyncMock,
+        mock_failure_tracker: AsyncMock,
+        mock_slot_operations: AsyncMock,
     ) -> None:
         """Test batch completion with mix of successful assignments and failures."""
-        tracker = DefaultBatchEssayTracker(mock_persistence, mock_redis_coordinator)
+        tracker = DefaultBatchEssayTracker(
+            mock_persistence,
+            mock_batch_state,
+            mock_batch_queries,
+            mock_failure_tracker,
+            mock_slot_operations,
+        )
 
         # Register batch with 4 essays
         batch_registration = BatchEssaysRegistered(
@@ -228,18 +295,23 @@ class TestValidationFailureCompletionFix:
 
         await tracker.register_batch(batch_registration, uuid4())
 
-        # Mock 2 successful slot assignments
+        # Mock 2 successful slot assignments by overriding the fixture behavior
+        assignment_count = 0
+
         async def mock_assign_slot(batch_id: str, content_metadata: dict[str, Any]) -> str | None:
-            if batch_id == "batch_mixed":
-                state = await mock_redis_coordinator.get_batch_status(batch_id)
-                if state["assigned_slots"] < 2:  # Allow 2 assignments
+            nonlocal assignment_count
+            if batch_id == "batch_mixed" and assignment_count < 2:  # Allow 2 assignments
+                assignment_count += 1
+                # Update shared state directly since we have access to the fixture data
+                state = await mock_batch_queries.get_batch_status(batch_id)
+                if state:
                     state["assigned_slots"] += 1
-                    essay_id = f"essay_{state['assigned_slots']:03d}"
+                    essay_id = f"essay_{assignment_count:03d}"
                     state["assignments"][essay_id] = content_metadata
                     return essay_id
             return None
 
-        mock_redis_coordinator.assign_slot_atomic.side_effect = mock_assign_slot
+        mock_slot_operations.assign_slot_atomic.side_effect = mock_assign_slot
 
         # Assign 2 slots
         for i in range(1, 3):
@@ -298,10 +370,21 @@ class TestValidationFailureCompletionFix:
         assert batch_ready_event.total_files_processed == 4
 
     async def test_no_double_completion(
-        self, mock_persistence: AsyncMock, mock_redis_coordinator: AsyncMock
+        self,
+        mock_persistence: AsyncMock,
+        mock_batch_state: AsyncMock,
+        mock_batch_queries: AsyncMock,
+        mock_failure_tracker: AsyncMock,
+        mock_slot_operations: AsyncMock,
     ) -> None:
         """Test that batch completion can only happen once."""
-        tracker = DefaultBatchEssayTracker(mock_persistence, mock_redis_coordinator)
+        tracker = DefaultBatchEssayTracker(
+            mock_persistence,
+            mock_batch_state,
+            mock_batch_queries,
+            mock_failure_tracker,
+            mock_slot_operations,
+        )
 
         # Register batch with 2 essays
         batch_registration = BatchEssaysRegistered(

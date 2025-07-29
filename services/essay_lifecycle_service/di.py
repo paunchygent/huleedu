@@ -53,8 +53,14 @@ from services.essay_lifecycle_service.implementations.future_services_command_ha
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
+from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
@@ -337,18 +343,57 @@ class BatchCoordinationProvider(Provider):
         return BatchTrackerPersistence(engine)
 
     @provide(scope=Scope.APP)
-    def provide_redis_batch_coordinator(
-        self, redis_client: AtomicRedisClientProtocol, settings: Settings
-    ) -> RedisBatchCoordinator:
-        """Provide Redis batch coordinator for distributed slot assignment."""
-        return RedisBatchCoordinator(redis_client, settings)
+    def provide_redis_script_manager(
+        self, redis_client: AtomicRedisClientProtocol
+    ) -> RedisScriptManager:
+        """Provide Redis script manager for Lua script operations."""
+        return RedisScriptManager(redis_client)
+
+    @provide(scope=Scope.APP)
+    def provide_redis_slot_operations(
+        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
+    ) -> RedisSlotOperations:
+        """Provide Redis slot operations for atomic slot assignment."""
+        return RedisSlotOperations(redis_client, script_manager)
+
+    @provide(scope=Scope.APP)
+    def provide_redis_batch_state(
+        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
+    ) -> RedisBatchState:
+        """Provide Redis batch state management."""
+        return RedisBatchState(
+            redis_client,
+            script_manager,
+            default_timeout=86400,  # 24 hours
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_redis_batch_queries(
+        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
+    ) -> RedisBatchQueries:
+        """Provide Redis batch query operations."""
+        return RedisBatchQueries(redis_client, script_manager)
+
+    @provide(scope=Scope.APP)
+    def provide_redis_failure_tracker(
+        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
+    ) -> RedisFailureTracker:
+        """Provide Redis validation failure tracking."""
+        return RedisFailureTracker(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
     async def provide_batch_essay_tracker(
-        self, persistence: BatchTrackerPersistence, redis_coordinator: RedisBatchCoordinator
+        self,
+        persistence: BatchTrackerPersistence,
+        batch_state: RedisBatchState,
+        batch_queries: RedisBatchQueries,
+        failure_tracker: RedisFailureTracker,
+        slot_operations: RedisSlotOperations,
     ) -> BatchEssayTracker:
-        """Provide batch essay tracker implementation with Redis coordinator and database persistence."""
-        tracker = DefaultBatchEssayTracker(persistence, redis_coordinator)
+        """Provide batch essay tracker implementation with direct domain class composition."""
+        tracker = DefaultBatchEssayTracker(
+            persistence, batch_state, batch_queries, failure_tracker, slot_operations
+        )
         await tracker.initialize_from_database()
         return tracker
 

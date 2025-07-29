@@ -10,7 +10,6 @@ Follows Rule 070 patterns with real Redis infrastructure via testcontainers.
 from __future__ import annotations
 
 import asyncio
-import random
 from collections.abc import AsyncGenerator, Coroutine, Generator
 from typing import Any, TypedDict
 from uuid import uuid4
@@ -19,26 +18,39 @@ import pytest
 from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+    RedisBatchQueries,
+)
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
+)
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 
 
 class RedisStateValidator:
     """Validates Redis state consistency and integrity."""
 
-    def __init__(self, redis_coordinator: RedisBatchCoordinator) -> None:
-        self._coordinator = redis_coordinator
-        self._redis = redis_coordinator._redis
+    def __init__(self, redis_script_manager: RedisScriptManager, slot_operations: RedisSlotOperations) -> None:
+        self._script_manager = redis_script_manager
+        self._slot_operations = slot_operations
+        self._redis = redis_script_manager._redis
 
     async def validate_batch_integrity(self, batch_id: str) -> dict[str, Any]:
         """Validate internal consistency of batch state in Redis."""
 
-        # Get all batch keys
-        available_key = self._coordinator._get_available_slots_key(batch_id)
-        assignments_key = self._coordinator._get_assignments_key(batch_id)
-        metadata_key = self._coordinator._get_metadata_key(batch_id)
-        timeout_key = self._coordinator._get_timeout_key(batch_id)
+        # Get all batch keys using script manager
+        available_key = self._script_manager.get_available_slots_key(batch_id)
+        assignments_key = self._script_manager.get_assignments_key(batch_id)
+        metadata_key = self._script_manager.get_metadata_key(batch_id)
+        timeout_key = self._script_manager.get_timeout_key(batch_id)
 
         # Get counts atomically
         available_count = await self._redis.scard(available_key)
@@ -86,7 +98,7 @@ class RedisStateValidator:
                 "file_size_bytes": 1000 + i,
             }
 
-            task = self._coordinator.assign_slot_atomic(batch_id, content_metadata)
+            task = self._slot_operations.assign_slot_atomic(batch_id, content_metadata)
             assignment_tasks.append(task)
 
         # Execute all assignments concurrently
@@ -143,10 +155,10 @@ class TestRedisStateConsistency:
         return settings
 
     @pytest.fixture
-    async def redis_coordinator(
+    async def redis_components(
         self, redis_settings: Settings
-    ) -> AsyncGenerator[RedisBatchCoordinator, None]:
-        """Create Redis coordinator with clean state."""
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Create modular Redis components with clean state."""
         from huleedu_service_libs.redis_client import RedisClient
 
         redis_client = RedisClient(client_id="test-consistency", redis_url=redis_settings.REDIS_URL)
@@ -155,22 +167,39 @@ class TestRedisStateConsistency:
         # Clean state
         await redis_client.client.flushdb()
 
-        coordinator = RedisBatchCoordinator(redis_client, redis_settings)
+        # Create modular components
+        redis_script_manager = RedisScriptManager(redis_client)
+        batch_state = RedisBatchState(redis_client, redis_script_manager)
+        batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+        failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+        slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
+
+        components = {
+            "redis_client": redis_client,
+            "script_manager": redis_script_manager,
+            "batch_state": batch_state,
+            "batch_queries": batch_queries,
+            "failure_tracker": failure_tracker,
+            "slot_operations": slot_operations,
+        }
 
         try:
-            yield coordinator
+            yield components
         finally:
             await redis_client.stop()
 
     @pytest.fixture
     async def redis_validator(
-        self, redis_coordinator: RedisBatchCoordinator
+        self, redis_components: dict[str, Any]
     ) -> RedisStateValidator:
         """Create Redis state validator."""
-        return RedisStateValidator(redis_coordinator)
+        return RedisStateValidator(
+            redis_components["script_manager"],
+            redis_components["slot_operations"]
+        )
 
     async def test_redis_atomic_operations_performance(
-        self, redis_coordinator: RedisBatchCoordinator, redis_validator: RedisStateValidator
+        self, redis_components: dict[str, Any], redis_validator: RedisStateValidator
     ) -> None:
         """Benchmark Redis atomic slot assignment performance."""
 
@@ -185,7 +214,7 @@ class TestRedisStateConsistency:
             "correlation_id": str(uuid4()),
         }
 
-        await redis_coordinator.register_batch_slots(batch_id, essay_ids, metadata)
+        await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
 
         # Act - Perform atomic operations with timing
         operation_count = 100  # More operations than slots to test contention
@@ -211,7 +240,7 @@ class TestRedisStateConsistency:
         )
 
     async def test_redis_state_consistency_under_high_load(
-        self, redis_coordinator: RedisBatchCoordinator, redis_validator: RedisStateValidator
+        self, redis_components: dict[str, Any], redis_validator: RedisStateValidator
     ) -> None:
         """Test Redis state consistency under high concurrent load."""
 
@@ -231,7 +260,7 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_coordinator.register_batch_slots(batch_id, essay_ids, metadata)
+            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
             batches.append(batch_id)
 
         # Act - Concurrent operations across all batches
@@ -245,7 +274,7 @@ class TestRedisStateConsistency:
                     "file_size_bytes": 1500 + i * 10,
                 }
 
-                task = redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                task = redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
                 all_tasks.append((batch_id, task))
 
         # Execute all operations concurrently
@@ -275,7 +304,7 @@ class TestRedisStateConsistency:
             )
 
     async def test_redis_distributed_lock_contention(
-        self, redis_coordinator: RedisBatchCoordinator
+        self, redis_components: dict[str, Any]
     ) -> None:
         """Test distributed lock behavior under high contention."""
 
@@ -290,7 +319,7 @@ class TestRedisStateConsistency:
             "correlation_id": str(uuid4()),
         }
 
-        await redis_coordinator.register_batch_slots(batch_id, essay_ids, metadata)
+        await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
 
         # Act - High contention with many concurrent attempts
         contention_level = 20  # Many more attempts than slots
@@ -303,7 +332,7 @@ class TestRedisStateConsistency:
                 "file_size_bytes": 1200 + i * 5,
             }
 
-            task = redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+            task = redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
             content_tasks.append(task)
 
         # Execute with maximum concurrency
@@ -332,7 +361,7 @@ class TestRedisStateConsistency:
         assert duration < 5.0, f"Potential deadlock detected: {duration}s duration"
 
     async def test_redis_state_recovery_after_connection_failure(
-        self, redis_coordinator: RedisBatchCoordinator, redis_validator: RedisStateValidator
+        self, redis_components: dict[str, Any], redis_validator: RedisStateValidator
     ) -> None:
         """Test Redis state recovery after connection failures."""
 
@@ -347,7 +376,7 @@ class TestRedisStateConsistency:
             "correlation_id": str(uuid4()),
         }
 
-        await redis_coordinator.register_batch_slots(batch_id, essay_ids, metadata)
+        await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
 
         # Assign some slots before "failure"
         pre_failure_assignments = []
@@ -358,7 +387,7 @@ class TestRedisStateConsistency:
                 "file_size_bytes": 1300 + i * 15,
             }
 
-            result = await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+            result = await redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
             assert result is not None
             pre_failure_assignments.append(result)
 
@@ -367,10 +396,10 @@ class TestRedisStateConsistency:
         assert pre_failure_state["assigned_count"] == 3
         assert pre_failure_state["available_count"] == 5
 
-        # Simulate connection recovery by creating new coordinator
+        # Simulate connection recovery by creating new slot operations
         # (In real scenarios, this simulates service restart)
-        new_coordinator = RedisBatchCoordinator(
-            redis_coordinator._redis, redis_coordinator._settings
+        new_slot_operations = RedisSlotOperations(
+            redis_components["redis_client"], redis_components["script_manager"]
         )
 
         # Act - Continue operations after "recovery"
@@ -382,7 +411,7 @@ class TestRedisStateConsistency:
                 "file_size_bytes": 1400 + i * 20,
             }
 
-            result = await new_coordinator.assign_slot_atomic(batch_id, content_metadata)
+            result = await new_slot_operations.assign_slot_atomic(batch_id, content_metadata)
             if result is not None:
                 post_recovery_assignments.append(result)
 
@@ -399,7 +428,7 @@ class TestRedisStateConsistency:
 
     @pytest.mark.performance
     async def test_redis_operation_timing_consistency(
-        self, redis_coordinator: RedisBatchCoordinator
+        self, redis_components: dict[str, Any]
     ) -> None:
         """Test consistency of Redis operation timing under various loads."""
 
@@ -432,7 +461,7 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_coordinator.register_batch_slots(batch_id, essay_ids, metadata)
+            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, metadata)
 
             # Measure operation timings
             operation_times = []
@@ -445,13 +474,12 @@ class TestRedisStateConsistency:
                 }
 
                 start_time = asyncio.get_event_loop().time()
-                await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                await redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
                 duration = asyncio.get_event_loop().time() - start_time
 
                 operation_times.append(duration)
 
-                # Small random delay to vary timing
-                await asyncio.sleep(random.uniform(0.001, 0.005))
+                # No artificial timing delays - we want deterministic performance testing
 
             # Calculate statistics
             successful_times = operation_times
@@ -485,7 +513,7 @@ class TestRedisStateConsistency:
             )
 
     async def test_redis_batch_metadata_consistency(
-        self, redis_coordinator: RedisBatchCoordinator
+        self, redis_components: dict[str, Any]
     ) -> None:
         """Test metadata consistency during concurrent batch operations."""
 
@@ -509,7 +537,7 @@ class TestRedisStateConsistency:
                 "correlation_id": str(uuid4()),
             }
 
-            await redis_coordinator.register_batch_slots(batch_id, essay_ids, complex_metadata)
+            await redis_components["batch_state"].register_batch_slots(batch_id, essay_ids, complex_metadata)
             batches_metadata.append((batch_id, complex_metadata))
 
         # Act - Concurrent metadata retrieval and slot operations
@@ -522,7 +550,7 @@ class TestRedisStateConsistency:
             # Metadata retrieval tasks
             for _ in range(3):
                 metadata_task: Coroutine[Any, Any, dict[str, Any] | None] = (
-                    redis_coordinator.get_batch_metadata(batch_id)
+                    redis_components["batch_queries"].get_batch_metadata(batch_id)
                 )
                 concurrent_tasks.append(("metadata", batch_id, metadata_task))
 
@@ -535,7 +563,7 @@ class TestRedisStateConsistency:
                 }
 
                 assignment_task: Coroutine[Any, Any, str | None] = (
-                    redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                    redis_components["slot_operations"].assign_slot_atomic(batch_id, content_metadata)
                 )
                 concurrent_tasks.append(("assignment", batch_id, assignment_task))
 

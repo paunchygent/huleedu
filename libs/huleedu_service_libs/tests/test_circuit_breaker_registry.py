@@ -9,7 +9,6 @@ patterns with complete coverage and proper type safety.
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -136,11 +135,11 @@ class TestCircuitBreakerRegistration:
         assert registry.get("duplicate_name") is not test_circuit_breaker
 
         # Verify warning was logged
-        mock_logger.warning.assert_called_with("Overwriting existing circuit breaker: duplicate_name")
+        mock_logger.warning.assert_called_with(
+            "Overwriting existing circuit breaker: duplicate_name"
+        )
 
-    def test_register_with_different_configurations(
-        self, registry: CircuitBreakerRegistry
-    ) -> None:
+    def test_register_with_different_configurations(self, registry: CircuitBreakerRegistry) -> None:
         """Test registering circuit breakers with different configurations."""
         # Create circuit breakers with different configurations
         fast_recovery = CircuitBreaker(
@@ -332,7 +331,7 @@ class TestRegistryStateManagement:
         # Verify logging for both breakers (check last few calls)
         all_log_calls = [str(call) for call in mock_logger.info.call_args_list]
         reset_calls = [call for call in all_log_calls if "Reset circuit breaker:" in call]
-        
+
         # Should have logged reset for both breakers
         assert len(reset_calls) >= 2
         assert any("Reset circuit breaker: first" in call for call in reset_calls)
@@ -512,7 +511,7 @@ class TestRegistryIntegrationScenarios:
         # Reset all
         registry.reset_all()
         assert len(registry) == 2  # Breakers still registered
-        
+
         # Verify states after reset
         reset_states = registry.get_all_states()
         assert all(state["failure_count"] == 0 for state in reset_states.values())
@@ -525,7 +524,7 @@ class TestRegistryIntegrationScenarios:
         """Test patterns that might occur with concurrent access."""
         # Register same circuit breaker with multiple names
         names = [f"cb_{i}" for i in range(10)]
-        
+
         for name in names:
             registry.register(name, test_circuit_breaker)
 
@@ -537,7 +536,7 @@ class TestRegistryIntegrationScenarios:
         # Get all states should show same underlying breaker data
         states = registry.get_all_states()
         assert len(states) == 10
-        
+
         # All should have same breaker name since they're the same instance
         breaker_names = {state["name"] for state in states.values()}
         assert len(breaker_names) == 1  # All should be the same

@@ -44,9 +44,6 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
-)
 
 logger = create_service_logger("test.content_provisioned_flow")
 
@@ -83,14 +80,40 @@ class TestContentProvisionedFlow:
             redis_client = RedisClient(client_id="test-els", redis_url=redis_url)
             await redis_client.start()
 
-            redis_coordinator = RedisBatchCoordinator(redis_client, settings)
+            # Create Redis script manager for domain classes
+            from services.essay_lifecycle_service.implementations.redis_script_manager import (
+                RedisScriptManager,
+            )
+
+            redis_script_manager = RedisScriptManager(redis_client)
+
+            # Create real domain classes with actual Redis operations
+            from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+                RedisBatchQueries,
+            )
+            from services.essay_lifecycle_service.implementations.redis_batch_state import (
+                RedisBatchState,
+            )
+            from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+                RedisFailureTracker,
+            )
+            from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+                RedisSlotOperations,
+            )
+
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
             repository = PostgreSQLEssayRepository(settings)
             await repository.initialize_db_schema()
             await repository.run_migrations()
 
             persistence = BatchTrackerPersistence(repository.engine)
-            batch_tracker = DefaultBatchEssayTracker(persistence, redis_coordinator)
+            batch_tracker = DefaultBatchEssayTracker(
+                persistence, batch_state, batch_queries, failure_tracker, slot_operations
+            )
             await batch_tracker.initialize_from_database()
 
             # Mock Kafka bus - we'll spy on the events published
@@ -131,7 +154,7 @@ class TestContentProvisionedFlow:
                 "handler": handler,
                 "repository": repository,
                 "batch_tracker": batch_tracker,
-                "redis_coordinator": redis_coordinator,
+                "slot_operations": slot_operations,
                 "redis_client": redis_client,
                 "event_publisher": event_publisher,
                 "published_events": published_events,
@@ -206,27 +229,29 @@ class TestContentProvisionedFlow:
         assert assigned_essay.storage_references[ContentType.ORIGINAL_ESSAY] == text_storage_id
         assert assigned_essay.current_status == EssayStatus.READY_FOR_PROCESSING
 
-        # In Kafka-first pattern, outbox is only used when Kafka fails
-        # Since mock_kafka_bus is working correctly, no outbox usage expected
-        assert not mock_outbox_repository.add_event.called, (
-            "Should NOT add event to outbox when Kafka succeeds"
+        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
+        # Events are stored in outbox regardless of Kafka state for atomicity
+        assert mock_outbox_repository.add_event.called, (
+            "Should ALWAYS add event to outbox for transactional safety"
         )
 
-        # Verify the event was published directly to Kafka
+        # With true outbox pattern, events are stored in outbox, not published directly to Kafka
+        # The relay worker will publish from outbox asynchronously
         published_events = test_infrastructure["published_events"]
         slot_assigned_events = [
             e
             for e in published_events
             if e["envelope"].event_type == "huleedu.els.essay.slot.assigned.v1"
         ]
-        assert len(slot_assigned_events) == 1, "Should publish EssaySlotAssignedV1 event to Kafka"
+        assert len(slot_assigned_events) == 0, (
+            "Should NOT publish directly to Kafka with outbox pattern"
+        )
 
-        # Verify the event data
-        slot_event = slot_assigned_events[0]["envelope"]
-        assert slot_event.data.essay_id == str(assigned_essay.essay_id)
-        assert slot_event.data.file_upload_id == file_upload_id
-        assert slot_event.data.text_storage_id == text_storage_id
-        assert slot_event.data.batch_id == batch_id
+        # Verify outbox was used instead
+        mock_outbox_repository.add_event.assert_called_once()
+        call_args = mock_outbox_repository.add_event.call_args
+        assert call_args[1]["aggregate_id"] == str(assigned_essay.essay_id)
+        assert call_args[1]["event_type"] == "huleedu.els.essay.slot.assigned.v1"
 
     async def test_concurrent_content_provisioning(
         self, test_infrastructure: dict[str, Any]
@@ -234,7 +259,7 @@ class TestContentProvisionedFlow:
         """Test multiple concurrent content provisioning requests."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
-        redis_coordinator = test_infrastructure["redis_coordinator"]
+        slot_operations = test_infrastructure["slot_operations"]
 
         # Setup: Register batch with 5 essays
         batch_id = str(uuid4())
@@ -316,7 +341,7 @@ class TestContentProvisionedFlow:
         )
 
         # Verify Redis state consistency
-        remaining_slots = await redis_coordinator.get_available_slot_count(batch_id)
+        remaining_slots = await slot_operations.get_available_slot_count(batch_id)
         lost_slots = 5 - len(assigned_essays) - remaining_slots
 
         # Under high concurrency, some slots might be "lost" due to race conditions

@@ -39,8 +39,20 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.implementations.event_publisher import DefaultEventPublisher
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+    RedisBatchQueries,
+)
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
+)
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 
 logger = create_service_logger("test.redis_transaction_db_update")
@@ -78,7 +90,14 @@ class TestRedisTransactionAndDatabaseUpdate:
             redis_client = RedisClient(client_id="test-redis", redis_url=redis_url)
             await redis_client.start()
 
-            redis_coordinator = RedisBatchCoordinator(redis_client, settings)
+            # Create Redis script manager for domain classes
+            redis_script_manager = RedisScriptManager(redis_client)
+
+            # Create real domain classes with actual Redis operations
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
             repository = PostgreSQLEssayRepository(settings)
             await repository.initialize_db_schema()
@@ -86,7 +105,9 @@ class TestRedisTransactionAndDatabaseUpdate:
 
             persistence = BatchTrackerPersistence(repository.engine)
 
-            batch_tracker = DefaultBatchEssayTracker(persistence, redis_coordinator)
+            batch_tracker = DefaultBatchEssayTracker(
+                persistence, batch_state, batch_queries, failure_tracker, slot_operations
+            )
             await batch_tracker.initialize_from_database()
 
             # Create mock kafka bus for this test
@@ -115,7 +136,8 @@ class TestRedisTransactionAndDatabaseUpdate:
                 "handler": handler,
                 "repository": repository,
                 "batch_tracker": batch_tracker,
-                "redis_coordinator": redis_coordinator,
+                "slot_operations": slot_operations,
+                "batch_queries": batch_queries,
                 "redis_client": redis_client,
             }
 
@@ -129,7 +151,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         """Test the exact sequence that was failing: batch registration → slot assignment → content update."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
-        redis_coordinator = test_infrastructure["redis_coordinator"]
+        slot_operations = test_infrastructure["slot_operations"]
 
         # Step 1: Register batch (creates initial essay records)
         batch_id = str(uuid4())
@@ -175,7 +197,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         }
 
         # This should use the fixed Redis transaction pattern
-        assigned_essay_id = await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+        assigned_essay_id = await slot_operations.assign_slot_atomic(batch_id, content_metadata)
         assert assigned_essay_id is not None, "Slot assignment should succeed"
         assert assigned_essay_id in essay_ids, "Should assign one of the registered essay IDs"
 
@@ -232,7 +254,8 @@ class TestRedisTransactionAndDatabaseUpdate:
     async def test_concurrent_slot_assignments(self, test_infrastructure: dict[str, Any]) -> None:
         """Test multiple concurrent slot assignments to verify atomicity."""
         handler = test_infrastructure["handler"]
-        redis_coordinator = test_infrastructure["redis_coordinator"]
+        slot_operations = test_infrastructure["slot_operations"]
+        batch_queries = test_infrastructure["batch_queries"]
 
         # Register batch with 5 essays
         batch_id = str(uuid4())
@@ -268,7 +291,7 @@ class TestRedisTransactionAndDatabaseUpdate:
             }
 
             for attempt in range(max_retries):
-                result = await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+                result = await slot_operations.assign_slot_atomic(batch_id, content_metadata)
                 if result is not None:
                     logger.info(f"Worker {index} assigned slot {result} on attempt {attempt + 1}")
                     return str(result)  # Cast Any to str for type safety
@@ -297,8 +320,8 @@ class TestRedisTransactionAndDatabaseUpdate:
         )
 
         # Verify Redis state consistency
-        assignments = await redis_coordinator.get_batch_assignments(batch_id)
-        remaining_slots = await redis_coordinator.get_available_slot_count(batch_id)
+        assignments = await batch_queries.get_batch_assignments(batch_id)
+        remaining_slots = await slot_operations.get_available_slot_count(batch_id)
 
         # Under high concurrency, some slots may be "lost" due to race conditions
         # where a slot is popped but the assignment fails and the slot isn't returned
@@ -323,7 +346,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         self, test_infrastructure: dict[str, Any]
     ) -> None:
         """Test that Redis transaction properly handles WATCH failures."""
-        redis_coordinator = test_infrastructure["redis_coordinator"]
+        slot_operations = test_infrastructure["slot_operations"]
         redis_client = test_infrastructure["redis_client"]
 
         batch_id = str(uuid4())
@@ -342,7 +365,7 @@ class TestRedisTransactionAndDatabaseUpdate:
 
         # Attempt slot assignment (should retry or handle gracefully)
         content_metadata = {"text_storage_id": "test", "original_file_name": "test.txt"}
-        result = await redis_coordinator.assign_slot_atomic(batch_id, content_metadata)
+        result = await slot_operations.assign_slot_atomic(batch_id, content_metadata)
 
         await interfere_task
 

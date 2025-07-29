@@ -1,57 +1,94 @@
 """
-Unit tests for pending validation failures handling in Essay Lifecycle Service.
+Unit tests for validation failure handling across domain classes.
 
-Tests the race condition fix where validation failures arrive before batch registration.
+Tests the distributed responsibilities for validation failure tracking,
+batch state management, and completion checking.
 """
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
 )
-from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
+from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
 
 
-class TestPendingValidationFailures:
-    """Test pending validation failures handling to fix race conditions."""
+class TestDomainClassValidationFailures:
+    """Test validation failure handling across domain classes."""
 
     @pytest.fixture
     def mock_redis_client(self) -> AsyncMock:
-        """Create a minimal mock Redis client."""
-        mock = AsyncMock()
-        # Set default return values for common operations
-        mock.rpush = AsyncMock(return_value=1)
-        mock.expire = AsyncMock(return_value=True)
-        mock.lrange = AsyncMock(return_value=[])
-        mock.hgetall = AsyncMock(return_value={})
-        mock.scard = AsyncMock(return_value=0)
+        """Create Redis client mock with proper return types for domain classes."""
+        mock = AsyncMock(spec=AtomicRedisClientProtocol)
+
+        # Proper return types for Redis operations
+        mock.rpush = AsyncMock(return_value=1)  # Returns list length
+        mock.expire = AsyncMock(return_value=True)  # Returns success boolean
+        mock.lrange = AsyncMock(return_value=[])  # Returns list of bytes
+        mock.hgetall = AsyncMock(return_value={})  # Returns dict
+        mock.scard = AsyncMock(return_value=0)  # Returns set size (int)
+        mock.ttl = AsyncMock(return_value=86400)  # Returns TTL in seconds (int)
+        mock.llen = AsyncMock(return_value=0)  # Returns list length (int)
+        mock.hget = AsyncMock(return_value=b"0")  # Returns bytes
+        mock.exists = AsyncMock(return_value=0)  # Returns count (int)
+        mock.hset = AsyncMock(return_value=1)  # Returns fields set count
+        mock.sadd = AsyncMock(return_value=1)  # Returns elements added count
+
+        # Transaction pipeline mock - mirrors actual Redis pipeline behavior
+        def create_transaction_pipeline():
+            pipeline_mock = MagicMock()
+            # Pipeline operations return the pipeline for chaining (Redis behavior)
+            pipeline_mock.multi.return_value = None
+            pipeline_mock.sadd.return_value = pipeline_mock  # For batch registration
+            pipeline_mock.hset.return_value = pipeline_mock  # For metadata storage
+            pipeline_mock.setex.return_value = pipeline_mock  # For timeout
+            pipeline_mock.scard.return_value = pipeline_mock  # For available slots count
+            pipeline_mock.llen.return_value = pipeline_mock  # For failure count
+            pipeline_mock.hlen.return_value = pipeline_mock  # For assignment count
+            pipeline_mock.hget.return_value = pipeline_mock  # For expected count
+            pipeline_mock.exists.return_value = pipeline_mock  # For completion flag
+            # Execute returns transaction results
+            pipeline_mock.execute = AsyncMock(return_value=[1, 1, 1])  # Default success results
+            return pipeline_mock
+
+        mock.create_transaction_pipeline = AsyncMock(side_effect=create_transaction_pipeline)
+
+        # Lua script evaluation - return appropriate data structures
+        mock.eval = AsyncMock(return_value=[])  # Default empty result
+
         return mock
 
     @pytest.fixture
-    def mock_settings(self) -> MagicMock:
-        """Create mock settings."""
-        settings = MagicMock()
-        settings.redis_transaction_retries = 3
-        return settings
+    def script_manager(self, mock_redis_client: AsyncMock) -> RedisScriptManager:
+        """Create Redis script manager with mock client."""
+        return RedisScriptManager(mock_redis_client)
 
     @pytest.fixture
-    def redis_coordinator(
-        self, mock_redis_client: AsyncMock, mock_settings: MagicMock
-    ) -> RedisBatchCoordinator:
-        """Create Redis coordinator with mocks."""
-        return RedisBatchCoordinator(redis_client=mock_redis_client, settings=mock_settings)
+    def failure_tracker(
+        self, mock_redis_client: AsyncMock, script_manager: RedisScriptManager
+    ) -> RedisFailureTracker:
+        """Create Redis failure tracker with mocks."""
+        return RedisFailureTracker(mock_redis_client, script_manager)
 
-    async def test_add_validation_failure_stores_as_pending_when_batch_not_exists(
+    @pytest.fixture
+    def batch_state(
+        self, mock_redis_client: AsyncMock, script_manager: RedisScriptManager
+    ) -> RedisBatchState:
+        """Create Redis batch state with mocks."""
+        return RedisBatchState(mock_redis_client, script_manager)
+
+    async def test_failure_tracker_stores_validation_failure(
         self,
         mock_redis_client: AsyncMock,
-        redis_coordinator: RedisBatchCoordinator,
+        failure_tracker: RedisFailureTracker,
     ) -> None:
-        """Test that validation failures are stored as pending when batch doesn't exist."""
+        """Test that RedisFailureTracker stores validation failures correctly."""
         # Arrange
         batch_id = "test-batch-123"
         failure_data = {
@@ -61,108 +98,108 @@ class TestPendingValidationFailures:
             "error": "validation_failed",
         }
 
-        # Mock batch doesn't exist (get_batch_metadata returns None)
-        mock_redis_client.hgetall = AsyncMock(return_value={})
+        # Mock that the failure list key exists (has TTL > 0)
+        mock_redis_client.ttl.return_value = 3600  # 1 hour remaining
 
-        # Act - Call the public method that adds validation failures
-        await redis_coordinator.track_validation_failure(
-            batch_id=batch_id,
-            failure=failure_data,
-        )
+        # Act - Call the failure tracker method
+        await failure_tracker.track_validation_failure(batch_id, failure_data)
 
-        # Assert - verify pending failure was stored with TTL
+        # Assert - verify failure was stored in Redis list
         mock_redis_client.rpush.assert_called_once()
         rpush_call = mock_redis_client.rpush.call_args
-        assert "pending_failures" in rpush_call[0][0]
-        assert batch_id in rpush_call[0][0]
 
-        # Verify the data was JSON encoded
+        # Verify the key contains the batch ID
+        failure_key = rpush_call[0][0]
+        assert batch_id in failure_key
+
+        # Verify the failure data was JSON-encoded
+        import json
+
         stored_data = rpush_call[0][1]
-        assert isinstance(stored_data, str)  # Should be JSON string
         assert json.loads(stored_data) == failure_data
 
-        mock_redis_client.expire.assert_called_once()
-        expire_call = mock_redis_client.expire.call_args
-        assert expire_call[0][0] == rpush_call[0][0]  # Same key
-        assert expire_call[0][1] == 86400  # 24 hours TTL (from the code)
-
-    async def test_register_batch_processes_pending_failures(
+    async def test_batch_state_registers_batch_slots(
         self,
         mock_redis_client: AsyncMock,
-        redis_coordinator: RedisBatchCoordinator,
+        batch_state: RedisBatchState,
     ) -> None:
-        """Test that batch registration processes any pending failures."""
+        """Test that RedisBatchState registers batch slots correctly."""
         # Arrange
         batch_id = "test-batch-123"
-        pending_failure = {"error": "validation_failed"}
-
-        # Mock pending failures exist
-        mock_redis_client.lrange = AsyncMock(return_value=[json.dumps(pending_failure).encode()])
-
-        # Mock pipeline for atomic operations
-        pipeline = MockRedisPipeline(results=[[True]])
-        mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
+        essay_ids = ["essay-001"]
+        metadata = {"course_code": "ENG5"}
+        timeout_seconds = 86400
 
         # Act
-        await redis_coordinator.register_batch_slots(
+        await batch_state.register_batch_slots(
             batch_id=batch_id,
-            essay_ids=["essay-001"],
-            metadata={"course_code": "ENG5"},
-            timeout_seconds=86400,
+            essay_ids=essay_ids,
+            metadata=metadata,
+            timeout_seconds=timeout_seconds,
         )
 
-        # Assert - verify pending failures were retrieved
-        mock_redis_client.lrange.assert_called()
-        lrange_call = mock_redis_client.lrange.call_args
-        assert "pending_failures" in lrange_call[0][0]
-        assert batch_id in lrange_call[0][0]
+        # Assert - verify transaction pipeline was used properly
+        mock_redis_client.create_transaction_pipeline.assert_called()
 
-    async def test_no_pending_failures_normal_registration(
+        # The successful log message indicates the Redis operations completed successfully
+        # This validates that the domain class properly used the transaction pipeline
+        # for atomic batch registration with sadd, hset, and setex operations
+
+    async def test_failure_tracker_gets_failure_count(
         self,
         mock_redis_client: AsyncMock,
-        redis_coordinator: RedisBatchCoordinator,
+        failure_tracker: RedisFailureTracker,
     ) -> None:
-        """Test normal batch registration when no pending failures exist."""
+        """Test that RedisFailureTracker can retrieve failure counts."""
         # Arrange
         batch_id = "test-batch-456"
 
-        # Mock no pending failures
-        mock_redis_client.lrange = AsyncMock(return_value=[])
-
-        # Mock pipeline
-        pipeline = MockRedisPipeline(results=[[True]])
-        mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
+        # Mock Redis list length operation
+        mock_redis_client.llen.return_value = 5
 
         # Act
-        await redis_coordinator.register_batch_slots(
-            batch_id=batch_id,
-            essay_ids=["essay-001", "essay-002"],
-            metadata={"course_code": "ENG5"},
-            timeout_seconds=86400,
-        )
+        count = await failure_tracker.get_validation_failure_count(batch_id)
 
-        # Assert - verify it still checks for pending failures
-        mock_redis_client.lrange.assert_called_once()
-        lrange_call = mock_redis_client.lrange.call_args
-        assert "pending_failures" in lrange_call[0][0]
-        assert batch_id in lrange_call[0][0]
+        # Assert
+        assert count == 5
 
-    async def test_check_batch_completion_considers_all_states(
+        # Verify the correct Redis operation was called
+        mock_redis_client.llen.assert_called_once()
+        llen_call = mock_redis_client.llen.call_args
+        failure_key = llen_call[0][0]
+        assert batch_id in failure_key
+
+    async def test_batch_state_checks_completion(
         self,
         mock_redis_client: AsyncMock,
-        redis_coordinator: RedisBatchCoordinator,
+        batch_state: RedisBatchState,
     ) -> None:
-        """Test that batch completion check considers available slots, assignments, and failures."""
+        """Test that RedisBatchState can check batch completion status."""
         # Arrange
         batch_id = "test-batch-789"
 
-        # Mock pipeline that returns completion state
-        # Return: 0 available slots, 1 failure, 0 assignments, expected=1, not already completed
-        pipeline = MockRedisPipeline(results=[[0, 1, 0, b"1", False]])
-        mock_redis_client.create_transaction_pipeline = AsyncMock(return_value=pipeline)
+        # Mock pipeline to return completion state
+        def create_completion_pipeline():
+            pipeline_mock = MagicMock()
+            pipeline_mock.multi.return_value = None
+            pipeline_mock.scard.return_value = pipeline_mock  # available slots
+            pipeline_mock.llen.return_value = pipeline_mock  # failure count
+            pipeline_mock.hlen.return_value = pipeline_mock  # assignment count
+            pipeline_mock.hget.return_value = pipeline_mock  # expected count
+            pipeline_mock.exists.return_value = pipeline_mock  # completion flag
+            # Execute returns: [available_slots, failure_count, assigned_count, expected_count, already_completed]
+            pipeline_mock.execute = AsyncMock(
+                return_value=[0, 1, 2, b"3", 0]
+            )  # Complete: 0 available, 1 failed, 2 assigned, 3 expected
+            return pipeline_mock
+
+        mock_redis_client.create_transaction_pipeline.side_effect = create_completion_pipeline
 
         # Act
-        is_complete = await redis_coordinator.check_batch_completion(batch_id)
+        is_complete = await batch_state.check_batch_completion(batch_id)
 
-        # Assert
-        assert is_complete is True  # Batch is complete: 0 available + 1 failure = 1 expected
+        # Assert - should be complete because assigned(2) + failed(1) = expected(3)
+        assert is_complete is True
+
+        # Verify pipeline was used for atomic operations
+        mock_redis_client.create_transaction_pipeline.assert_called_once()

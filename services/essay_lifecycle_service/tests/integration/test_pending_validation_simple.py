@@ -1,47 +1,80 @@
 """
-Simple integration test for the pending validation failures fix.
+Real infrastructure integration test for pending validation failures fix.
 
-Focuses on testing the core flow without extensive mocking.
+Tests the core flow where validation failures arrive before batch registration
+using real Redis infrastructure via testcontainers.
+
+Focuses on testing actual behavior with real components, not implementation details.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from typing import Any
 from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
+from huleedu_service_libs.redis_client import RedisClient
+from testcontainers.redis import RedisContainer
 
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
 )
-from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
 
 
 @pytest.mark.integration
-class TestPendingValidationSimple:
-    """Simple tests for the pending validation failures functionality."""
+class TestPendingValidationSimpleReal:
+    """Real infrastructure tests for pending validation failures functionality."""
 
-    async def test_pending_failures_are_stored_when_batch_does_not_exist(self) -> None:
-        """Test that validation failures are stored as pending when batch doesn't exist."""
-        # Mock Redis client
-        mock_redis = AsyncMock()
-        mock_redis.hgetall = AsyncMock(return_value={})  # Batch doesn't exist
-        mock_redis.rpush = AsyncMock(return_value=1)  # Store pending failure
-        mock_redis.expire = AsyncMock(return_value=True)
+    @pytest.fixture
+    async def test_infrastructure(self) -> AsyncIterator[dict[str, Any]]:
+        """Set up real Redis infrastructure with modular components."""
+        # Start Redis container
+        redis_container = RedisContainer("redis:7-alpine")
 
-        # Create coordinator
-        coordinator = RedisBatchCoordinator(
-            redis_client=mock_redis,
-            settings=AsyncMock(redis_transaction_retries=3),
-        )
+        with redis_container as redis:
+            # Connection string
+            redis_url = f"redis://{redis.get_container_host_ip()}:{redis.get_exposed_port(6379)}"
+
+            # Initialize Redis client
+            redis_client = RedisClient(client_id="test-pending-validation", redis_url=redis_url)
+            await redis_client.start()
+
+            # Create real modular components
+            redis_script_manager = RedisScriptManager(redis_client)
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+
+            yield {
+                "redis_client": redis_client,
+                "batch_state": batch_state,
+                "failure_tracker": failure_tracker,
+                "redis_script_manager": redis_script_manager,
+            }
+
+            # Cleanup
+            await redis_client.stop()
+
+    async def test_pending_failures_stored_when_batch_not_registered(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
+        """Test that validation failures are stored as pending when batch doesn't exist yet."""
+        failure_tracker = test_infrastructure["failure_tracker"]
+        redis_client = test_infrastructure["redis_client"]
 
         # Track validation failure for non-existent batch
-        batch_id = "test-batch-123"
+        batch_id = f"test-batch-{uuid4().hex[:8]}"
         failure_data = {
             "batch_id": batch_id,
-            "file_upload_id": "upload-456",
+            "file_upload_id": f"upload-{uuid4().hex[:8]}",
             "original_file_name": "essay.pdf",
             "validation_error_code": "EMPTY_CONTENT",
             "validation_error_detail": {
@@ -54,48 +87,50 @@ class TestPendingValidationSimple:
                 "details": {},
             },
             "file_size_bytes": 0,
-            "raw_file_storage_id": "raw-789",
+            "raw_file_storage_id": f"raw-{uuid4().hex[:8]}",
             "correlation_id": str(uuid4()),
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        await coordinator.track_validation_failure(batch_id, failure_data)
+        # Store validation failure
+        await failure_tracker.track_validation_failure(batch_id, failure_data)
 
-        # Verify pending failure was stored
-        expected_key = f"batch:{batch_id}:pending_failures"
-        mock_redis.rpush.assert_called_once()
-        call_args = mock_redis.rpush.call_args
-        assert call_args[0][0] == expected_key
+        # Verify pending failure was stored in Redis
+        pending_key = f"batch:{batch_id}:pending_failures"
+        pending_failures = await redis_client.lrange(pending_key, 0, -1)
 
-        # Verify TTL was set (24 hours)
-        mock_redis.expire.assert_called_once_with(expected_key, 86400)
+        assert len(pending_failures) == 1, "Should have one pending failure stored"
 
-    async def test_pending_failures_are_processed_on_batch_registration(self) -> None:
+        # Verify TTL was set for cleanup
+        ttl = await redis_client.ttl(pending_key)
+        assert ttl > 0, "Pending failures should have TTL set for cleanup"
+
+    async def test_pending_failures_processed_on_batch_registration(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
         """Test that pending failures are processed when batch is registered."""
-        # Setup mock Redis with pending failures
-        mock_redis = AsyncMock()
-        pending_failures = ['{"file_upload_id": "upload-123", "batch_id": "test-batch"}']
+        batch_state = test_infrastructure["batch_state"]
+        failure_tracker = test_infrastructure["failure_tracker"]
+        redis_client = test_infrastructure["redis_client"]
 
-        # Mock lrange to return pending failures
-        mock_redis.lrange = AsyncMock(return_value=pending_failures)
+        batch_id = f"test-batch-{uuid4().hex[:8]}"
 
-        # Mock pipeline for atomic operations
-        mock_pipeline = MockRedisPipeline(
-            results=[[True, "slot1", True, True]]  # Results for execute()
-        )
+        # Store validation failure BEFORE batch registration
+        failure_data = {
+            "batch_id": batch_id,
+            "file_upload_id": f"upload-{uuid4().hex[:8]}",
+            "original_file_name": "essay.pdf",
+            "validation_error_code": "CORRUPT_FILE",
+        }
+        await failure_tracker.track_validation_failure(batch_id, failure_data)
 
-        # Use AsyncMock for create_transaction_pipeline since it's async in production
-        mock_redis.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
+        # Verify pending failure exists
+        pending_key = f"batch:{batch_id}:pending_failures"
+        pending_before = await redis_client.lrange(pending_key, 0, -1)
+        assert len(pending_before) == 1, "Should have pending failure before registration"
 
-        # Create coordinator
-        coordinator = RedisBatchCoordinator(
-            redis_client=mock_redis,
-            settings=AsyncMock(redis_transaction_retries=3),
-        )
-
-        # Register batch (which should process pending failures)
-        batch_id = "test-batch"
-        await coordinator.register_batch_slots(
+        # Register batch with 1 slot (should process pending failure)
+        await batch_state.register_batch_slots(
             batch_id=batch_id,
             essay_ids=["essay-1"],
             metadata={
@@ -105,59 +140,113 @@ class TestPendingValidationSimple:
             timeout_seconds=86400,
         )
 
-        # Verify pending failures were fetched
-        mock_redis.lrange.assert_called_with(f"batch:{batch_id}:pending_failures", 0, -1)
+        # Verify pending failures were processed and removed
+        pending_after = await redis_client.lrange(pending_key, 0, -1)
+        assert len(pending_after) == 0, "Pending failures should be processed and removed"
 
-        # Verify pending failures were deleted
-        delete_operations = [
-            op
-            for op in mock_pipeline.operations
-            if op[0] == "delete" and f"batch:{batch_id}:pending_failures" in op[1]
-        ]
-        assert len(delete_operations) > 0, "Expected delete operation for pending failures"
+        # Verify failure was moved to regular validation failures
+        failures_key = f"batch:{batch_id}:validation_failures"
+        processed_failures = await redis_client.lrange(failures_key, 0, -1)
+        assert len(processed_failures) == 1, "Should have one processed validation failure"
 
-    async def test_batch_completes_immediately_if_all_pending_failures(self) -> None:
-        """Test that batch completes immediately if pending failures consume all slots."""
-        # Setup mock Redis
-        mock_redis = AsyncMock()
+    async def test_batch_completes_when_all_slots_consumed_by_pending_failures(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
+        """Test that batch completes immediately if pending failures consume all available slots."""
+        batch_state = test_infrastructure["batch_state"]
+        failure_tracker = test_infrastructure["failure_tracker"]
+        redis_client = test_infrastructure["redis_client"]
 
-        # One pending failure for a batch expecting one essay
+        batch_id = f"test-batch-{uuid4().hex[:8]}"
+
+        # Store TWO validation failures before batch registration (for 2-essay batch)
+        for i in range(2):
+            failure_data = {
+                "batch_id": batch_id,
+                "file_upload_id": f"upload-{i}-{uuid4().hex[:8]}",
+                "original_file_name": f"essay{i}.pdf",
+                "validation_error_code": "EMPTY_CONTENT",
+            }
+            await failure_tracker.track_validation_failure(batch_id, failure_data)
+
+        # Register batch with 2 slots (all will be consumed by pending failures)
+        await batch_state.register_batch_slots(
+            batch_id=batch_id,
+            essay_ids=["essay-1", "essay-2"],
+            metadata={
+                "course_code": CourseCode.ENG5.value,
+                "essay_instructions": "Write an essay",
+            },
+            timeout_seconds=86400,
+        )
+
+        # Verify batch is marked as completed (no available slots remain)
+        available_key = f"batch:{batch_id}:available_slots"
+        available_count = await redis_client.scard(available_key)
+        assert available_count == 0, "No slots should remain available"
+
+        # Verify completion flag is set
+        completed_key = f"batch:{batch_id}:completed"
+        is_completed = await redis_client.exists(completed_key)
+        assert is_completed, "Batch should be marked as completed when all slots consumed"
+
+        # Verify all failures were processed
+        failures_key = f"batch:{batch_id}:validation_failures"
+        processed_failures = await redis_client.lrange(failures_key, 0, -1)
+        assert len(processed_failures) == 2, "Both validation failures should be processed"
+
+    async def test_mixed_pending_and_normal_failures(
+        self, test_infrastructure: dict[str, Any]
+    ) -> None:
+        """Test scenario with both pending failures (before registration) and normal failures (after)."""
+        batch_state = test_infrastructure["batch_state"]
+        failure_tracker = test_infrastructure["failure_tracker"]
+        redis_client = test_infrastructure["redis_client"]
+
+        batch_id = f"test-batch-{uuid4().hex[:8]}"
+
+        # Store ONE pending failure before batch registration
         pending_failure = {
-            "file_upload_id": "upload-123",
-            "original_file_name": "essay.pdf",
+            "batch_id": batch_id,
+            "file_upload_id": f"upload-pending-{uuid4().hex[:8]}",
+            "original_file_name": "pending.pdf",
             "validation_error_code": "EMPTY_CONTENT",
         }
-        mock_redis.lrange = AsyncMock(return_value=[str(pending_failure)])
+        await failure_tracker.track_validation_failure(batch_id, pending_failure)
 
-        # Mock pipeline for processing
-        mock_pipeline = MockRedisPipeline(
-            results=[[1, "slot1", 1]]  # All slots consumed
+        # Register batch with 3 slots (1 consumed by pending, 2 remain)
+        await batch_state.register_batch_slots(
+            batch_id=batch_id,
+            essay_ids=["essay-1", "essay-2", "essay-3"],
+            metadata={
+                "course_code": CourseCode.ENG5.value,
+                "essay_instructions": "Write an essay",
+            },
+            timeout_seconds=86400,
         )
 
-        # Use AsyncMock for create_transaction_pipeline since it's async in production
-        mock_redis.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
+        # Add normal failure AFTER registration
+        normal_failure = {
+            "batch_id": batch_id,
+            "file_upload_id": f"upload-normal-{uuid4().hex[:8]}",
+            "original_file_name": "normal.pdf",
+            "validation_error_code": "CORRUPT_FILE",
+        }
+        await failure_tracker.track_validation_failure(batch_id, normal_failure)
 
-        # Create coordinator
-        coordinator = RedisBatchCoordinator(
-            redis_client=mock_redis,
-            settings=AsyncMock(redis_transaction_retries=3),
+        # Verify batch state: 1 slot consumed by pending + 1 by normal = 1 remaining
+        available_key = f"batch:{batch_id}:available_slots"
+        available_count = await redis_client.scard(available_key)
+        assert available_count == 1, "Should have 1 slot remaining after 2 failures"
+
+        # Verify both failures were processed
+        failures_key = f"batch:{batch_id}:validation_failures"
+        processed_failures = await redis_client.lrange(failures_key, 0, -1)
+        assert len(processed_failures) == 2, (
+            "Should have both pending and normal failures processed"
         )
 
-        # Spy on _process_pending_failures
-        with patch.object(
-            coordinator, "_process_pending_failures", wraps=coordinator._process_pending_failures
-        ) as spy:
-            # Register batch with 1 slot
-            batch_id = "test-batch"
-            await coordinator.register_batch_slots(
-                batch_id=batch_id,
-                essay_ids=["essay-1"],
-                metadata={
-                    "course_code": CourseCode.ENG5.value,
-                    "essay_instructions": "Write an essay",
-                },
-                timeout_seconds=86400,
-            )
-
-            # Verify pending failures were processed
-            spy.assert_called_once_with(batch_id, 86400)
+        # Batch should NOT be completed yet (1 slot remains)
+        completed_key = f"batch:{batch_id}:completed"
+        is_completed = await redis_client.exists(completed_key)
+        assert not is_completed, "Batch should not be completed with remaining slots"

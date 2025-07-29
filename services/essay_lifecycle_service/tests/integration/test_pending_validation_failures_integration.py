@@ -1,12 +1,15 @@
 """
-Integration tests for Essay Lifecycle Service race condition fix.
+Real infrastructure integration tests for Essay Lifecycle Service race condition fix.
 
-Tests the scenario where validation failures arrive before batch registration.
-Uses mocked Redis to test the core logic flow.
+Tests the scenario where validation failures arrive before batch registration
+using real Redis infrastructure via testcontainers.
+
+Converted from facade pattern to modular DI with real infrastructure testing.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
@@ -23,6 +26,7 @@ from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from huleedu_service_libs.redis_client import RedisClient
+from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
@@ -37,10 +41,21 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.event_publisher import (
     DefaultEventPublisher,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_coordinator import (
-    RedisBatchCoordinator,
+from services.essay_lifecycle_service.implementations.redis_batch_queries import (
+    RedisBatchQueries,
 )
-from services.essay_lifecycle_service.tests.redis_test_utils import MockRedisPipeline
+from services.essay_lifecycle_service.implementations.redis_batch_state import (
+    RedisBatchState,
+)
+from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
+    RedisFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.redis_script_manager import (
+    RedisScriptManager,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
+)
 from services.essay_lifecycle_service.tests.unit.test_utils import create_mock_session
 
 
@@ -49,253 +64,39 @@ class TestPendingValidationFailuresIntegration:
     """Integration tests for race condition fix where validation failures arrive before batch registration."""
 
     @pytest.fixture
-    async def redis_client(self) -> AsyncMock:
-        """Mock Redis client for testing."""
-        from unittest.mock import AsyncMock
+    async def test_infrastructure(self) -> AsyncIterator[dict[str, Any]]:
+        """Set up real Redis infrastructure with modular components."""
+        # Start Redis container
+        redis_container = RedisContainer("redis:7-alpine")
 
-        # Create a mock that tracks state across calls
-        mock_redis = AsyncMock(spec=RedisClient)
+        with redis_container as redis:
+            # Connection string
+            redis_url = f"redis://{redis.get_container_host_ip()}:{redis.get_exposed_port(6379)}"
 
-        # Storage for our test data
-        mock_redis._data = {
-            "lists": {},  # For lrange, rpush
-            "sets": {},  # For scard, sadd, spop
-            "hashes": {},  # For hgetall, hset
-            "strings": {},  # For set, get, exists
-        }
+            # Initialize Redis client
+            redis_client = RedisClient(
+                client_id="test-pending-validation-failures", redis_url=redis_url
+            )
+            await redis_client.start()
 
-        # Mock lrange for pending failures
-        async def mock_lrange(key: str, start: int, stop: int) -> list[str]:
-            result = mock_redis._data["lists"].get(key, [])
-            return list(result)
+            # Create real modular components
+            redis_script_manager = RedisScriptManager(redis_client)
+            batch_state = RedisBatchState(redis_client, redis_script_manager)
+            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
+            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
-        mock_redis.lrange = AsyncMock(side_effect=mock_lrange)
+            yield {
+                "redis_client": redis_client,
+                "batch_state": batch_state,
+                "batch_queries": batch_queries,
+                "failure_tracker": failure_tracker,
+                "slot_operations": slot_operations,
+                "redis_script_manager": redis_script_manager,
+            }
 
-        # Mock rpush for pending failures
-        async def mock_rpush(key: str, value: str) -> int:
-            if key not in mock_redis._data["lists"]:
-                mock_redis._data["lists"][key] = []
-            mock_redis._data["lists"][key].append(value)
-            return len(mock_redis._data["lists"][key])
-
-        mock_redis.rpush = AsyncMock(side_effect=mock_rpush)
-
-        # Mock scard for available slots
-        async def mock_scard(key: str) -> int:
-            return len(mock_redis._data["sets"].get(key, set()))
-
-        mock_redis.scard = AsyncMock(side_effect=mock_scard)
-
-        # Mock exists for completed check
-        async def mock_exists(key: str) -> bool:
-            return key in mock_redis._data["strings"]
-
-        mock_redis.exists = AsyncMock(side_effect=mock_exists)
-
-        # Mock hgetall for batch metadata
-        async def mock_hgetall(key: str) -> dict[str, str]:
-            result = mock_redis._data["hashes"].get(key, {})
-            return dict(result)
-
-        mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-
-        # Mock hset for batch metadata
-        async def mock_hset(key: str, field: str, value: str) -> int:
-            if key not in mock_redis._data["hashes"]:
-                mock_redis._data["hashes"][key] = {}
-            mock_redis._data["hashes"][key][field] = value
-            return 1
-
-        mock_redis.hset = AsyncMock(side_effect=mock_hset)
-
-        # Mock hlen for hash length
-        async def mock_hlen(key: str) -> int:
-            return len(mock_redis._data["hashes"].get(key, {}))
-
-        mock_redis.hlen = AsyncMock(side_effect=mock_hlen)
-
-        # Mock hget for hash field
-        async def mock_hget(key: str, field: str) -> str | None:
-            hash_data = mock_redis._data["hashes"].get(key, {})
-            value = hash_data.get(field)
-            return str(value) if value is not None else None
-
-        mock_redis.hget = AsyncMock(side_effect=mock_hget)
-
-        # Mock get for string values
-        async def mock_get(key: str) -> str | None:
-            value = mock_redis._data["strings"].get(key)
-            return str(value) if value is not None else None
-
-        mock_redis.get = AsyncMock(side_effect=mock_get)
-
-        # Mock llen for failure count
-        async def mock_llen(key: str) -> int:
-            return len(mock_redis._data["lists"].get(key, []))
-
-        mock_redis.llen = AsyncMock(side_effect=mock_llen)
-
-        # Mock sadd for adding to sets
-        async def mock_sadd(key: str, *values: str) -> int:
-            if key not in mock_redis._data["sets"]:
-                mock_redis._data["sets"][key] = set()
-            added = 0
-            for value in values:
-                if value not in mock_redis._data["sets"][key]:
-                    mock_redis._data["sets"][key].add(value)
-                    added += 1
-            return added
-
-        mock_redis.sadd = AsyncMock(side_effect=mock_sadd)
-
-        # Mock set for string values
-        async def mock_set(key: str, value: str, *args: Any, **kwargs: Any) -> bool:
-            mock_redis._data["strings"][key] = value
-            return True
-
-        mock_redis.set = AsyncMock(side_effect=mock_set)
-
-        # Mock set_if_not_exists for atomic completion flag
-        async def mock_set_if_not_exists(
-            key: str, value: str, ttl_seconds: int | None = None
-        ) -> bool:
-            if key in mock_redis._data["strings"]:
-                return False
-            mock_redis._data["strings"][key] = value
-            return True
-
-        mock_redis.set_if_not_exists = AsyncMock(side_effect=mock_set_if_not_exists)
-
-        # Mock expire
-        mock_redis.expire = AsyncMock(return_value=True)
-
-        # Mock ttl
-        mock_redis.ttl = AsyncMock(return_value=86400)  # Return a default TTL
-
-        # Mock delete
-        async def mock_delete(key: str) -> int:
-            # Remove from appropriate storage
-            deleted = 0
-            for storage in mock_redis._data.values():
-                if key in storage:
-                    del storage[key]
-                    deleted = 1
-            return deleted
-
-        mock_redis.delete = AsyncMock(side_effect=mock_delete)
-
-        # Create custom pipeline factory that uses our MockRedisPipeline but with stateful execution
-        def create_stateful_pipeline() -> MockRedisPipeline:
-            """Create a pipeline that modifies the mock Redis state during execute()."""
-            pipeline = MockRedisPipeline()
-
-            # Override execute to actually modify the mock Redis state
-
-            async def stateful_execute() -> list[Any]:
-                results: list[Any] = []
-                for op in pipeline.operations:
-                    method_name, args, kwargs = op
-
-                    # Skip multi() from results as it's not part of the actual command results
-                    if method_name == "multi":
-                        continue
-
-                    if method_name == "rpush":
-                        key, value = args[0], args[1]
-                        if key not in mock_redis._data["lists"]:
-                            mock_redis._data["lists"][key] = []
-                        mock_redis._data["lists"][key].append(value)
-                        results.append(len(mock_redis._data["lists"][key]))
-                    elif method_name == "spop":
-                        key = args[0]
-                        if key in mock_redis._data["sets"] and mock_redis._data["sets"][key]:
-                            value = mock_redis._data["sets"][key].pop()
-                            results.append(value)
-                        else:
-                            results.append(None)
-                    elif method_name == "delete":
-                        key = args[0]
-                        deleted = 0
-                        for storage in mock_redis._data.values():
-                            if key in storage:
-                                del storage[key]
-                                deleted = 1
-                        results.append(deleted)
-                    elif method_name == "expire":
-                        results.append(True)
-                    elif method_name == "hset":
-                        if len(args) == 3:  # hset(key, field, value)
-                            key, field, value = args
-                        else:  # hset(key, mapping=dict)
-                            key = args[0]
-                            mapping = kwargs.get("mapping", {})
-                            if key not in mock_redis._data["hashes"]:
-                                mock_redis._data["hashes"][key] = {}
-                            mock_redis._data["hashes"][key].update(mapping)
-                            results.append(len(mapping))
-                            continue
-                        if key not in mock_redis._data["hashes"]:
-                            mock_redis._data["hashes"][key] = {}
-                        mock_redis._data["hashes"][key][field] = value
-                        results.append(1)
-                    elif method_name == "hlen":
-                        key = args[0]
-                        results.append(len(mock_redis._data["hashes"].get(key, {})))
-                    elif method_name == "hget":
-                        key, field = args
-                        hash_data = mock_redis._data["hashes"].get(key, {})
-                        results.append(hash_data.get(field))
-                    elif method_name == "sadd":
-                        key = args[0]
-                        values = args[1:]
-                        if key not in mock_redis._data["sets"]:
-                            mock_redis._data["sets"][key] = set()
-                        added = 0
-                        for value in values:
-                            if value not in mock_redis._data["sets"][key]:
-                                mock_redis._data["sets"][key].add(value)
-                                added += 1
-                        results.append(added)
-                    elif method_name == "set":
-                        key, value = args
-                        mock_redis._data["strings"][key] = value
-                        results.append("OK")
-                    elif method_name == "setex":
-                        key, seconds, value = args
-                        mock_redis._data["strings"][key] = value
-                        results.append("OK")
-                    elif method_name == "scard":
-                        key = args[0]
-                        results.append(len(mock_redis._data["sets"].get(key, set())))
-                    elif method_name == "llen":
-                        key = args[0]
-                        results.append(len(mock_redis._data["lists"].get(key, [])))
-                    elif method_name == "lrange":
-                        key, start, stop = args
-                        data = mock_redis._data["lists"].get(key, [])
-                        start_idx = int(start) if isinstance(start, int | str) else 0
-                        stop_idx = int(stop) if isinstance(stop, int | str) else -1
-                        results.append(
-                            data[start_idx : stop_idx + 1] if stop_idx != -1 else data[start_idx:]
-                        )
-                    elif method_name == "exists":
-                        key = args[0]
-                        exists = any(key in storage for storage in mock_redis._data.values())
-                        results.append(1 if exists else 0)
-                    else:
-                        # Default for unknown operations
-                        results.append(True)
-
-                return results
-
-            # Type ignore for assigning to method - this is intentional for testing
-            pipeline.execute = stateful_execute  # type: ignore[method-assign]
-            return pipeline
-
-        # Use AsyncMock for create_transaction_pipeline since it's async in production
-        mock_redis.create_transaction_pipeline = AsyncMock(side_effect=create_stateful_pipeline)
-
-        return mock_redis
+            # Cleanup
+            await redis_client.stop()
 
     @pytest.fixture
     def settings(self) -> Settings:
@@ -304,14 +105,14 @@ class TestPendingValidationFailuresIntegration:
 
     @pytest.fixture
     async def batch_tracker(
-        self, redis_client: AsyncMock, settings: Settings
+        self, test_infrastructure: dict[str, Any], settings: Settings
     ) -> DefaultBatchEssayTracker:
-        """Create batch tracker with mocked Redis."""
-        # Create Redis coordinator with mocked Redis client
-        redis_coordinator = RedisBatchCoordinator(
-            redis_client=redis_client,
-            settings=settings,
-        )
+        """Create batch tracker with modular DI components."""
+        # Extract modular components from infrastructure
+        batch_state = test_infrastructure["batch_state"]
+        batch_queries = test_infrastructure["batch_queries"]
+        failure_tracker = test_infrastructure["failure_tracker"]
+        slot_operations = test_infrastructure["slot_operations"]
 
         # Mock persistence (we're not testing database interactions)
         from unittest.mock import AsyncMock
@@ -322,18 +123,24 @@ class TestPendingValidationFailuresIntegration:
 
         return DefaultBatchEssayTracker(
             persistence=mock_persistence,
-            redis_coordinator=redis_coordinator,
+            batch_state=batch_state,
+            batch_queries=batch_queries,
+            failure_tracker=failure_tracker,
+            slot_operations=slot_operations,
         )
 
     @pytest.fixture
     async def coordination_handler(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        redis_client: AsyncMock,
+        test_infrastructure: dict[str, Any],
         settings: Settings,
     ) -> tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher]:
-        """Create coordination handler with mocked dependencies."""
+        """Create coordination handler with real Redis infrastructure."""
         from unittest.mock import AsyncMock
+
+        # Extract real Redis client from infrastructure
+        redis_client = test_infrastructure["redis_client"]
 
         # Mock repository (we're testing coordination logic)
         mock_repository = AsyncMock()
@@ -354,10 +161,6 @@ class TestPendingValidationFailuresIntegration:
         # Mock outbox repository
         mock_outbox_repository = AsyncMock()
         mock_outbox_repository.add_event = AsyncMock(return_value=uuid4())
-
-        # Add lpush to existing redis_client mock for wake-up notifications
-        if not hasattr(redis_client, "lpush"):
-            redis_client.lpush = AsyncMock(return_value=1)
 
         # Create real event publisher with mocked dependencies
         event_publisher = DefaultEventPublisher(
@@ -380,8 +183,8 @@ class TestPendingValidationFailuresIntegration:
     async def test_validation_failure_before_batch_registration_completes_batch(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
-        redis_client: AsyncMock,
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        test_infrastructure: dict[str, Any],
     ) -> None:
         """
         Test the race condition fix:
@@ -389,6 +192,8 @@ class TestPendingValidationFailuresIntegration:
         2. Batch registration processes pending failure
         3. Batch completes immediately with 0 ready essays and 1 failure
         """
+        # Extract Redis client from infrastructure
+        redis_client = test_infrastructure["redis_client"]
         # Arrange
         batch_id = f"test-batch-{uuid4()}"
         essay_id = f"essay-{uuid4()}"
@@ -461,7 +266,7 @@ class TestPendingValidationFailuresIntegration:
         # Verify batch is marked as completed
         completed_key = f"batch:{batch_id}:completed"
         is_completed = await redis_client.exists(completed_key)
-        assert is_completed is True
+        assert is_completed == 1  # Redis exists returns 1 for True
 
         # Verify BatchEssaysReady event was published via Kafka (Kafka-first pattern)
         # Access the underlying Kafka bus mock from the event publisher
@@ -486,22 +291,24 @@ class TestPendingValidationFailuresIntegration:
             ready_event.validation_failures[0].file_upload_id == validation_failure.file_upload_id
         )
 
-        # Verify batch state in Redis
+        # Verify batch state in Redis - slots should be consumed by failure
         slots_key = f"batch:{batch_id}:available_slots"
         available_slots = await redis_client.scard(slots_key)
         assert available_slots == 0  # All slots consumed by failure
 
-        failures_key = f"batch:{batch_id}:validation_failures"
-        failure_count = await redis_client.llen(failures_key)
-        assert failure_count == 1  # Failure was recorded
+        # Note: validation_failures key is cleaned up after event creation
+        # The actual validation failures are verified in the published event above
 
     async def test_multiple_pending_failures_all_processed_on_registration(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
-        redis_client: AsyncMock,
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        test_infrastructure: dict[str, Any],
     ) -> None:
         """Test that multiple pending failures are all processed when batch is registered."""
+        # Extract Redis client from infrastructure
+        redis_client = test_infrastructure["redis_client"]
+
         # Arrange
         batch_id = f"test-batch-{uuid4()}"
         essay_ids = [f"essay-{i}-{uuid4()}" for i in range(3)]
@@ -601,10 +408,13 @@ class TestPendingValidationFailuresIntegration:
     async def test_mixed_scenario_pending_and_normal_failures(
         self,
         batch_tracker: DefaultBatchEssayTracker,
-        coordination_handler: tuple[DefaultBatchCoordinationHandler, AsyncMock],
-        redis_client: AsyncMock,
+        coordination_handler: tuple[DefaultBatchCoordinationHandler, DefaultEventPublisher],
+        test_infrastructure: dict[str, Any],
     ) -> None:
         """Test scenario with both pending failures (before registration) and normal failures (after)."""
+        # Extract Redis client from infrastructure
+        redis_client = test_infrastructure["redis_client"]
+
         # Arrange
         batch_id = f"test-batch-{uuid4()}"
         essay_ids = [f"essay-{i}-{uuid4()}" for i in range(3)]
@@ -658,7 +468,7 @@ class TestPendingValidationFailuresIntegration:
         # Verify batch is NOT complete yet (1 failure, 2 slots remaining)
         completed_key = f"batch:{batch_id}:completed"
         is_completed = await redis_client.exists(completed_key)
-        assert is_completed is False
+        assert is_completed == 0  # Redis exists returns 0 for False
 
         # Add another failure AFTER registration
         late_failure = EssayValidationFailedV1(
