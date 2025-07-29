@@ -10,17 +10,16 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
+from services.file_service.implementations.outbox_manager import OutboxManager
 
 
 class FakeOutboxRepository:
@@ -120,18 +119,22 @@ def fake_outbox() -> FakeOutboxRepository:
 
 
 @pytest.fixture
+def mock_outbox_manager() -> AsyncMock:
+    """Mock OutboxManager for testing using protocol-based mocking."""
+    return AsyncMock(spec=OutboxManager)
+
+
+@pytest.fixture
 def event_publisher(
-    fake_kafka: Mock,
     test_settings: Settings,
     fake_redis: FakeRedisClient,
-    fake_outbox: FakeOutboxRepository,
+    mock_outbox_manager: AsyncMock,
 ) -> DefaultEventPublisher:
-    """Create event publisher with fake dependencies."""
+    """Create event publisher with mocked dependencies for TRUE OUTBOX PATTERN testing."""
     return DefaultEventPublisher(
-        kafka_bus=fake_kafka,
+        outbox_manager=mock_outbox_manager,
         settings=test_settings,
         redis_client=fake_redis,  # type: ignore
-        outbox_repository=fake_outbox,  # type: ignore
     )
 
 
@@ -147,10 +150,10 @@ class TestDefaultEventPublisher:
     async def test_publish_essay_content_provisioned_success(
         self,
         event_publisher: DefaultEventPublisher,
-        fake_outbox: FakeOutboxRepository,
+        mock_outbox_manager: AsyncMock,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify EssayContentProvisionedV1 event is correctly stored in outbox."""
+        """Verify EssayContentProvisionedV1 event calls OutboxManager with correct parameters."""
         # Given
         event_data = EssayContentProvisionedV1(
             batch_id="batch-001",
@@ -169,31 +172,29 @@ class TestDefaultEventPublisher:
                 event_data, sample_correlation_id
             )
 
-        # Then
-        assert len(fake_outbox.add_event_calls) == 1
-        call = fake_outbox.add_event_calls[0]
+        # Then - Verify OutboxManager.publish_to_outbox was called with correct parameters
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
+        call_args = mock_outbox_manager.publish_to_outbox.call_args
 
-        assert call["aggregate_id"] == "file-123"
-        assert call["aggregate_type"] == "file_upload"
-        assert call["event_type"] == "file.essay.content.provisioned.v1"
-        assert call["topic"] == "file.essay.content.provisioned.v1"
-        assert call["event_key"] == "file-123"
+        assert call_args.kwargs["aggregate_type"] == "file_upload"
+        assert call_args.kwargs["aggregate_id"] == "file-123"
+        assert call_args.kwargs["event_type"] == "file.essay.content.provisioned.v1"
+        assert call_args.kwargs["topic"] == "file.essay.content.provisioned.v1"
 
-        # Verify envelope structure
-        envelope_data = call["event_data"]
-        assert envelope_data["event_type"] == "file.essay.content.provisioned.v1"
-        assert envelope_data["source_service"] == "file-service"
-        assert envelope_data["correlation_id"] == str(sample_correlation_id)
-        assert envelope_data["data"]["file_upload_id"] == "file-123"
-        assert envelope_data["data"]["original_file_name"] == "test_essay.pdf"
+        # Verify envelope structure in event_data parameter
+        envelope = call_args.kwargs["event_data"]
+        assert envelope.event_type == "file.essay.content.provisioned.v1"
+        assert envelope.source_service == "file-service"
+        assert envelope.correlation_id == sample_correlation_id
+        assert envelope.data == event_data
 
     async def test_publish_essay_validation_failed_success(
         self,
         event_publisher: DefaultEventPublisher,
-        fake_outbox: FakeOutboxRepository,
+        mock_outbox_manager: AsyncMock,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify EssayValidationFailedV1 event is correctly stored in outbox."""
+        """Verify EssayValidationFailedV1 event calls OutboxManager with correct parameters."""
         # Given
         from common_core.error_enums import FileValidationErrorCode
         from common_core.models.error_models import ErrorDetail
@@ -223,31 +224,30 @@ class TestDefaultEventPublisher:
         with patch("huleedu_service_libs.observability.inject_trace_context"):
             await event_publisher.publish_essay_validation_failed(event_data, sample_correlation_id)
 
-        # Then
-        assert len(fake_outbox.add_event_calls) == 1
-        call = fake_outbox.add_event_calls[0]
+        # Then - Verify OutboxManager.publish_to_outbox was called with correct parameters
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
+        call_args = mock_outbox_manager.publish_to_outbox.call_args
 
-        assert call["aggregate_id"] == "file-456"
-        assert call["aggregate_type"] == "file_upload"
-        assert call["event_type"] == "file.essay.validation.failed.v1"
-        assert call["topic"] == "file.essay.validation.failed.v1"
-        assert call["event_key"] == "file-456"
+        assert call_args.kwargs["aggregate_type"] == "file_upload"
+        assert call_args.kwargs["aggregate_id"] == "file-456"
+        assert call_args.kwargs["event_type"] == "file.essay.validation.failed.v1"
+        assert call_args.kwargs["topic"] == "file.essay.validation.failed.v1"
 
-        # Verify envelope structure
-        envelope_data = call["event_data"]
-        assert envelope_data["event_type"] == "file.essay.validation.failed.v1"
-        assert envelope_data["source_service"] == "file-service"
-        assert envelope_data["data"]["validation_error_code"] == "CONTENT_TOO_LONG"
-        assert envelope_data["data"]["validation_error_detail"]["details"]["word_count"] == 5500
+        # Verify envelope structure in event_data parameter
+        envelope = call_args.kwargs["event_data"]
+        assert envelope.event_type == "file.essay.validation.failed.v1"
+        assert envelope.source_service == "file-service"
+        assert envelope.correlation_id == sample_correlation_id
+        assert envelope.data == event_data
 
     async def test_publish_batch_file_added_with_redis_notification(
         self,
         event_publisher: DefaultEventPublisher,
-        fake_outbox: FakeOutboxRepository,
+        mock_outbox_manager: AsyncMock,
         fake_redis: FakeRedisClient,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify BatchFileAddedV1 event is stored in outbox and Redis notification is sent."""
+        """Verify BatchFileAddedV1 event calls OutboxManager and sends Redis notification."""
         # Given
         event_data = BatchFileAddedV1(
             batch_id="batch-789",
@@ -261,15 +261,21 @@ class TestDefaultEventPublisher:
         with patch("huleedu_service_libs.observability.inject_trace_context"):
             await event_publisher.publish_batch_file_added_v1(event_data, sample_correlation_id)
 
-        # Then - Verify outbox storage
-        assert len(fake_outbox.add_event_calls) == 1
-        call = fake_outbox.add_event_calls[0]
+        # Then - Verify OutboxManager.publish_to_outbox was called with correct parameters
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
+        call_args = mock_outbox_manager.publish_to_outbox.call_args
 
-        assert call["aggregate_id"] == "batch-789"
-        assert call["aggregate_type"] == "batch"
-        assert call["event_type"] == "file.batch.file.added.v1"
-        assert call["topic"] == "file.batch.file.added.v1"
-        assert call["event_key"] == "batch-789"
+        assert call_args.kwargs["aggregate_type"] == "batch"
+        assert call_args.kwargs["aggregate_id"] == "batch-789"
+        assert call_args.kwargs["event_type"] == "file.batch.file.added.v1"
+        assert call_args.kwargs["topic"] == "file.batch.file.added.v1"
+
+        # Verify envelope structure in event_data parameter
+        envelope = call_args.kwargs["event_data"]
+        assert envelope.event_type == "file.batch.file.added.v1"
+        assert envelope.source_service == "file-service"
+        assert envelope.correlation_id == sample_correlation_id
+        assert envelope.data == event_data
 
         # Verify Redis notification
         assert len(fake_redis.notifications) == 1

@@ -14,5 +14,5 @@ def setup_standard_service_metrics_middleware(*args, **kwargs):
     from huleedu_service_libs.middleware.frameworks.fastapi_metrics_middleware import (
         setup_standard_service_metrics_middleware as _setup_fastapi_metrics,
     )
-    
+
     return _setup_fastapi_metrics(*args, **kwargs)

@@ -25,6 +25,7 @@ from services.file_service.implementations.content_service_client_impl import (
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 from services.file_service.implementations.file_repository_impl import MinimalFileRepository
+from services.file_service.implementations.outbox_manager import OutboxManager
 from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.protocols import (
@@ -168,15 +169,24 @@ class ServiceImplementationsProvider(Provider):
         return MinimalFileRepository(engine)
 
     @provide(scope=Scope.APP)
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for reliable event publishing."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
-        kafka_bus: KafkaPublisherProtocol,
+        outbox_manager: OutboxManager,
         settings: Settings,
         redis_client: AtomicRedisClientProtocol,
-        outbox_repository: OutboxRepositoryProtocol,
     ) -> EventPublisherProtocol:
-        """Provide event publisher implementation with outbox pattern support."""
-        return DefaultEventPublisher(kafka_bus, settings, redis_client, outbox_repository)
+        """Provide event publisher implementation using TRUE OUTBOX PATTERN."""
+        return DefaultEventPublisher(outbox_manager, settings, redis_client)
 
     @provide(scope=Scope.APP)
     def provide_text_extractor(self) -> TextExtractorProtocol:
