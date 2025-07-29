@@ -16,6 +16,8 @@ from uuid import UUID, uuid4
 import pytest
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher

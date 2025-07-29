@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from common_core.models.error_models import ErrorDetail
+from common_core.error_enums import FileValidationErrorCode
 from huleedu_service_libs.outbox import EventRelayWorker
 from huleedu_service_libs.outbox.models import EventOutbox
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from services.file_service.protocols import EventPublisherProtocol
 from services.file_service.tests.integration.conftest import TestFileServiceOutboxPatternIntegration
@@ -28,9 +31,9 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
     async def test_essay_content_provisioned_outbox_write(
         self,
-        test_engine,
-        mock_kafka_publisher,
-        mock_redis_client,
+        test_engine: AsyncEngine,
+        mock_kafka_publisher: AsyncMock,
+        mock_redis_client: AsyncMock,
         db_session: AsyncSession,
         correlation_id: UUID,
         test_file_upload_id: str,
@@ -77,9 +80,9 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
     async def test_batch_file_management_outbox_write(
         self,
-        test_engine,
-        mock_kafka_publisher,
-        mock_redis_client,
+        test_engine: AsyncEngine,
+        mock_kafka_publisher: AsyncMock,
+        mock_redis_client: AsyncMock,
         db_session: AsyncSession,
         correlation_id: UUID,
         test_batch_id: str,
@@ -120,22 +123,21 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                 assert outbox_event.event_type == "file.batch.file.added.v1"
                 assert outbox_event.published_at is None
 
-                # Verify Redis notification was called
-                mock_redis_client.publish_user_notification.assert_called_once_with(
-                    user_id=test_user_id,
-                    event_type="batch_file_added",
-                    data={
-                        "batch_id": test_batch_id,
-                        "file_upload_id": test_file_upload_id,
-                        "filename": "test_file.txt",
-                    },
-                )
+                # Verify Redis notification was called (includes timestamp)
+                call_args = mock_redis_client.publish_user_notification.call_args
+                assert call_args[1]["user_id"] == test_user_id
+                assert call_args[1]["event_type"] == "batch_file_added"
+                data = call_args[1]["data"]
+                assert data["batch_id"] == test_batch_id
+                assert data["file_upload_id"] == test_file_upload_id
+                assert data["filename"] == "test_file.txt"
+                assert "timestamp" in data  # Timestamp is included in actual implementation
 
     async def test_relay_worker_processes_outbox_events(
         self,
-        test_engine,
-        mock_kafka_publisher,
-        mock_redis_client,
+        test_engine: AsyncEngine,
+        mock_kafka_publisher: AsyncMock,
+        mock_redis_client: AsyncMock,
         db_session: AsyncSession,
         correlation_id: UUID,
         test_file_upload_id: str,
@@ -149,17 +151,26 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                 relay_worker = await request_container.get(EventRelayWorker)
 
                 # Store event in outbox
+                error_detail = ErrorDetail(
+                    error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+                    message="Content exceeds limit",
+                    correlation_id=correlation_id,
+                    timestamp=datetime.now(timezone.utc),
+                    service="file-service",
+                    operation="validate_essay_content",
+                    details={
+                        "max_length": 5000,
+                        "actual_length": 7500,
+                    },
+                )
+
                 event_data = EssayValidationFailedV1(
                     batch_id="test-batch-456",
                     file_upload_id=test_file_upload_id,
                     original_file_name="invalid_essay.txt",
                     raw_file_storage_id="raw_storage_789",
-                    validation_error_code="CONTENT_TOO_LONG",
-                    validation_error_detail={
-                        "message": "Content exceeds limit",
-                        "max_length": 5000,
-                        "actual_length": 7500,
-                    },
+                    validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
+                    validation_error_detail=error_detail,
                     file_size_bytes=2048,
                     timestamp=datetime.now(timezone.utc),
                 )
@@ -196,9 +207,9 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
     async def test_outbox_transactional_consistency(
         self,
-        test_engine,
-        mock_kafka_publisher,
-        mock_redis_client,
+        test_engine: AsyncEngine,
+        mock_kafka_publisher: AsyncMock,
+        mock_redis_client: AsyncMock,
         db_session: AsyncSession,
         correlation_id: UUID,
         test_file_upload_id: str,
@@ -242,9 +253,9 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
     async def test_event_envelope_serialization_in_outbox(
         self,
-        test_engine,
-        mock_kafka_publisher,
-        mock_redis_client,
+        test_engine: AsyncEngine,
+        mock_kafka_publisher: AsyncMock,
+        mock_redis_client: AsyncMock,
         db_session: AsyncSession,
         correlation_id: UUID,
         test_file_upload_id: str,

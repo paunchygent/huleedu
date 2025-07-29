@@ -73,13 +73,20 @@ def fake_session() -> MockAsyncSession:
     """Create a mock async session for testing."""
     session = MockAsyncSession()
 
-    async def mock_add(obj: Any) -> None:
+    def mock_add(obj: Any) -> None:
+        # Simulate SQLAlchemy behavior: generate ID when added to session
+        if hasattr(obj, "id") and obj.id is None:
+            obj.id = uuid4()
         session.added_objects.append(obj)
 
     async def mock_commit() -> None:
         session.committed = True
 
     async def mock_flush() -> None:
+        # Ensure all added objects have IDs (simulate SQLAlchemy flush behavior)
+        for obj in session.added_objects:
+            if hasattr(obj, "id") and obj.id is None:
+                obj.id = uuid4()
         session.flushed = True
 
     async def mock_execute(stmt: Any) -> Any:
@@ -224,7 +231,8 @@ class TestPostgreSQLOutboxRepository:
             event.last_error = None
             mock_events.append(event)
 
-        fake_session.execute_results["unpublished_events"] = FakeResult(mock_events)
+        # Configure mock to return events for unpublished query (SELECT with WHERE published_at IS NULL)
+        fake_session.execute_results["published_at IS NULL"] = FakeResult(mock_events)
 
         # When
         events = await repo.get_unpublished_events(limit=10)
@@ -301,8 +309,10 @@ class TestPostgreSQLOutboxRepository:
         mock_event.id = event_id
         mock_event.retry_count = 1
 
-        fake_session.execute_results["event_by_id"] = FakeResult([mock_event])
-        fake_session.execute_results["update"] = FakeResult([], rowcount=1)
+        # Configure mock for SELECT query (WHERE id = ...)
+        fake_session.execute_results["WHERE event_outbox.id ="] = FakeResult([mock_event])
+        # Configure mock for UPDATE query
+        fake_session.execute_results["SET retry_count"] = FakeResult([], rowcount=1)
 
         # When
         await repo.increment_retry_count(event_id, "Retry error")
@@ -336,7 +346,8 @@ class TestPostgreSQLOutboxRepository:
         mock_event.retry_count = 0
         mock_event.last_error = None
 
-        fake_session.execute_results["event_by_id"] = FakeResult([mock_event])
+        # Configure mock for SELECT by ID query
+        fake_session.execute_results["WHERE event_outbox.id ="] = FakeResult([mock_event])
 
         # When
         event = await repo.get_event_by_id(event_id)
@@ -359,7 +370,8 @@ class TestPostgreSQLOutboxRepository:
         repo._session_factory = mock_session_factory
         event_id = uuid4()
 
-        fake_session.execute_results["event_by_id"] = FakeResult([])  # No results
+        # Configure mock for SELECT by ID query with no results
+        fake_session.execute_results["WHERE event_outbox.id ="] = FakeResult([])  # No results
 
         # When
         event = await repo.get_event_by_id(event_id)

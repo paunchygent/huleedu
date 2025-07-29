@@ -14,10 +14,12 @@ import pytest
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+
+from services.file_service.tests.integration.conftest import TestFileServiceOutboxPatternIntegration
 
 
-class TestOutboxRepositoryIntegration:
+class TestOutboxRepositoryIntegration(TestFileServiceOutboxPatternIntegration):
     """Integration tests for PostgreSQL outbox repository."""
 
     @pytest.fixture(autouse=True)
@@ -28,10 +30,9 @@ class TestOutboxRepositoryIntegration:
         await db_session.commit()
 
     @pytest.fixture
-    async def outbox_repository(self, integration_container: tuple) -> PostgreSQLOutboxRepository:
+    async def outbox_repository(self, test_engine: AsyncEngine) -> PostgreSQLOutboxRepository:
         """Create outbox repository for testing."""
-        container, engine, _ = integration_container
-        return PostgreSQLOutboxRepository(engine)
+        return PostgreSQLOutboxRepository(test_engine)
 
     async def test_add_event_stores_in_database(
         self,
