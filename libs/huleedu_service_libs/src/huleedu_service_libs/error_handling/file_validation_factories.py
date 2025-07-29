@@ -131,6 +131,25 @@ def raise_text_extraction_failed(
     raise HuleEduError(error_detail)
 
 
+def raise_encrypted_file_error(
+    service: str,
+    operation: str,
+    file_name: str,
+    correlation_id: UUID,
+    **additional_context: Any,
+) -> NoReturn:
+    """Create and raise an encrypted file error."""
+    error_detail = create_error_detail_with_context(
+        error_code=FileValidationErrorCode.ENCRYPTED_FILE_UNSUPPORTED,
+        message=f"File '{file_name}' is encrypted and cannot be processed.",
+        service=service,
+        operation=operation,
+        correlation_id=correlation_id,
+        details={"file_name": file_name, **additional_context},
+    )
+    raise HuleEduError(error_detail)
+
+
 def raise_unknown_validation_error(
     service: str,
     operation: str,

@@ -22,6 +22,8 @@ dependencies = [
     "sqlalchemy",
     "huleedu-common-core",
     "huleedu-service-libs",
+    "python-docx",
+    "pypdf",
 ]
 
 [project.optional-dependencies]

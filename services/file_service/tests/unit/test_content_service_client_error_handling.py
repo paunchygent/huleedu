@@ -1,7 +1,7 @@
 """
 Unit tests for ContentServiceClient error handling scenarios.
 
-Focuses on HTTP client error paths, response validation, and 
+Focuses on HTTP client error paths, response validation, and
 structured error handling following architectural principles.
 """
 
@@ -21,7 +21,6 @@ from services.file_service.config import Settings
 from services.file_service.implementations.content_service_client_impl import (
     DefaultContentServiceClient,
 )
-
 
 # Removed AsyncContextManagerMock - will use standard mocking pattern
 
@@ -62,7 +61,7 @@ class TestContentServiceClientErrorHandling:
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
         mock_http_session.post.side_effect = ClientConnectionError("Connection refused")
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -88,7 +87,7 @@ class TestContentServiceClientErrorHandling:
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
         mock_http_session.post.side_effect = ServerTimeoutError("Request timeout")
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -114,7 +113,7 @@ class TestContentServiceClientErrorHandling:
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
         mock_http_session.post.side_effect = ClientError("HTTP client error")
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -139,14 +138,14 @@ class TestContentServiceClientErrorHandling:
         """Test that HTTP 400 response raises external service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 400
         mock_response.text.return_value = "Bad request - invalid content"
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -172,14 +171,14 @@ class TestContentServiceClientErrorHandling:
         """Test that HTTP 500 response raises external service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 500
         mock_response.text.return_value = "Internal server error"
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -204,14 +203,14 @@ class TestContentServiceClientErrorHandling:
         """Test that missing storage_id in 201 response raises content service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.return_value = {"success": True}  # Missing storage_id
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -236,14 +235,14 @@ class TestContentServiceClientErrorHandling:
         """Test that None storage_id in 201 response raises content service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.return_value = {"storage_id": None}
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -268,14 +267,14 @@ class TestContentServiceClientErrorHandling:
         """Test that empty storage_id in 201 response raises content service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.return_value = {"storage_id": ""}
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -300,14 +299,14 @@ class TestContentServiceClientErrorHandling:
         """Test that non-string storage_id in 201 response raises content service error."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.return_value = {"storage_id": 12345}  # Integer instead of string
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -333,14 +332,14 @@ class TestContentServiceClientErrorHandling:
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
         expected_storage_id: str = "test-storage-123"
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.return_value = {"storage_id": expected_storage_id}
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -350,7 +349,7 @@ class TestContentServiceClientErrorHandling:
 
         # Then
         assert result == expected_storage_id
-        
+
         # Verify HTTP request was made correctly
         mock_http_session.post.assert_called_once_with(
             test_settings.CONTENT_SERVICE_URL,
@@ -367,15 +366,15 @@ class TestContentServiceClientErrorHandling:
         """Test that HuleEduError exceptions are re-raised without wrapping."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         # Create a mock HuleEduError with error_detail attribute
         class MockHuleEduError(Exception):
-            def __init__(self):
+            def __init__(self) -> None:
                 self.error_detail = Mock()
-        
+
         original_error = MockHuleEduError()
         mock_http_session.post.side_effect = original_error
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )
@@ -396,14 +395,14 @@ class TestContentServiceClientErrorHandling:
         """Test that JSON decode errors are wrapped as HuleEduError."""
         # Given
         content_bytes, content_type, correlation_id = sample_content_data
-        
+
         mock_response: AsyncMock = AsyncMock()
         mock_response.status = 201
         mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "doc", 0)
-        
+
         # Set up async context manager mock following established pattern
         mock_http_session.post.return_value.__aenter__.return_value = mock_response
-        
+
         client: DefaultContentServiceClient = DefaultContentServiceClient(
             http_session=mock_http_session, settings=test_settings
         )

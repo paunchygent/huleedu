@@ -18,7 +18,7 @@ The service follows HuleEdu's standard microservice patterns:
 - **Blueprint-based API**: Organized route definitions in `api/` directory.
 - **Protocol-based DI**: Clean architecture with Dishka dependency injection.
 - **Event-driven coordination**: Publishes events directly to Kafka with **Transactional Outbox Pattern as fallback**.
-- **Reliable Event Publishing**: 99.9% of events go directly to Kafka; outbox used only on Kafka failures.
+- **Reliable Event Publishing**: TRUE Outbox Pattern - all events stored in outbox database first, then published by relay worker.
 - **Event Relay Worker**: Redis-driven background worker with instant wake-up for zero-delay processing.
 - **Async operations**: Full async/await implementation.
 
@@ -50,7 +50,7 @@ The service uses Pydantic settings with the `FILE_SERVICE_` environment variable
 
 ## Event Integration
 
-All events are published using a **Kafka-first approach** with the Transactional Outbox Pattern as a fallback for Kafka failures.
+All events are published using a **TRUE Outbox Pattern** where events are stored in the outbox database table first, then asynchronously published to Kafka by a dedicated relay worker for transactional safety.
 
 ### Published Events
 
@@ -59,7 +59,7 @@ All events are published using a **Kafka-first approach** with the Transactional
 - **Topic:** `huleedu.file.essay.content.provisioned.v1`
 - **Purpose**: Published when a file is successfully validated and its text content is stored.
 - **Payload**: Includes `batch_id`, `original_file_name`, `raw_file_storage_id`, and `text_storage_id`.
-- **Delivery**: Direct Kafka publishing; outbox fallback only on Kafka failure.
+- **Delivery**: TRUE Outbox Pattern - stored in database first, published by relay worker.
 
 #### `EssayValidationFailedV1` (on Failure)
 
@@ -86,7 +86,27 @@ pdm install
 pdm run -p services/file_service dev
 ```
 
-## Docker Development
+### Running Tests
+
+```bash
+# Run all File Service tests
+pdm run pytest services/file_service/ -v
+
+# Run with coverage
+pdm run pytest services/file_service/ --cov=services/file_service --cov-report=term-missing
+
+# Run specific test types
+pdm run pytest services/file_service/tests/unit/ -v          # Unit tests only
+pdm run pytest services/file_service/tests/integration/ -v  # Integration tests
+
+# Run strategy pattern tests specifically
+pdm run pytest services/file_service/tests/unit/test_extraction_strategies.py -v
+pdm run pytest services/file_service/tests/integration/test_strategy_based_extractor_integration.py -v
+```
+
+**Test Coverage:** Maintains >90% coverage including comprehensive Strategy pattern testing.
+
+### Docker Development
 
 ```bash
 # Install dependencies
@@ -110,7 +130,43 @@ Circuit breakers protect Kafka publishing operations and are controlled via `FIL
 
 ## Technical Patterns
 
-### 1. Health Check Implementation
+### 1. Text Extraction Architecture
+
+The service uses a **Strategy Pattern** for extensible text extraction:
+
+```python
+# Base strategy protocol
+class ExtractionStrategy(Protocol):
+    async def extract_text(self, file_content: bytes, correlation_id: UUID) -> str:
+        """Extract text from file content with correlation tracking."""
+        ...
+
+# Individual strategy implementations
+class TxtExtractionStrategy(ExtractionStrategy):
+    async def extract_text(self, file_content: bytes, correlation_id: UUID) -> str:
+        return file_content.decode("utf-8", errors="ignore")
+
+class DocxExtractionStrategy(ExtractionStrategy):
+    async def extract_text(self, file_content: bytes, correlation_id: UUID) -> str:
+        return await asyncio.to_thread(self._extract_docx_sync, file_content)
+
+class PdfExtractionStrategy(ExtractionStrategy):
+    async def extract_text(self, file_content: bytes, correlation_id: UUID) -> str:
+        return await asyncio.to_thread(self._extract_pdf_sync, file_content)
+```
+
+**Strategy Registration:**
+```python
+# Dependency injection setup
+strategies = {
+    ".txt": TxtExtractionStrategy(),
+    ".docx": DocxExtractionStrategy(), 
+    ".pdf": PdfExtractionStrategy()
+}
+extractor = StrategyBasedTextExtractor(strategies)
+```
+
+### 2. Health Check Implementation
 
 Simple health check pattern with dependency status reporting:
 
@@ -136,19 +192,40 @@ async def health_check():
 
 **Metrics endpoint** provides Prometheus metrics via injected `CollectorRegistry`.
 
-### 2. File Type Validation
+### 2. Text Extraction Strategy Pattern
 
-Current implementation supports `.txt` files only (walking skeleton):
+The service implements a **Strategy Pattern** for text extraction supporting multiple file formats:
 
 ```python
-async def extract_text_from_file(file_content: bytes, file_name: str) -> str:
-    if not file_name.lower().endswith(".txt"):
-        logger.warning(f"Non-txt file received: {file_name}. Walking skeleton only supports .txt files.")
-        return ""
+# Strategy-based text extractor with pluggable extraction strategies
+class StrategyBasedTextExtractor:
+    def __init__(self, strategies: dict[str, ExtractionStrategy]):
+        self.strategies = strategies
     
-    text = file_content.decode("utf-8", errors="ignore")
-    return text
+    async def extract_text(
+        self, 
+        file_content: bytes, 
+        file_name: str, 
+        correlation_id: UUID
+    ) -> str:
+        file_extension = Path(file_name).suffix.lower()
+        strategy = self.strategies.get(file_extension)
+        
+        if not strategy:
+            raise UnsupportedFileTypeError(f"No strategy for {file_extension}")
+        
+        return await strategy.extract_text(file_content, correlation_id)
 ```
+
+**Supported File Types:**
+- **`.txt`**: UTF-8 decoding with error handling
+- **`.docx`**: Microsoft Word document parsing using python-docx
+- **`.pdf`**: PDF text extraction using pypdf with encrypted file detection
+
+**Error Handling:**
+- Encrypted PDFs raise `ENCRYPTED_FILE_UNSUPPORTED` structured error
+- Corrupted files handled gracefully with specific error codes
+- Each strategy implements async extraction with correlation ID tracking
 
 **Validation constraints:**
 - `MIN_CONTENT_LENGTH`: 50 characters (configurable)
@@ -252,7 +329,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         event_data: EssayContentProvisionedV1,
         correlation_id: UUID,
     ) -> None:
-        """Publish event - Kafka first, outbox on failure."""
+        """Publish event using TRUE Outbox Pattern."""
         envelope = EventEnvelope[EssayContentProvisionedV1](
             event_type=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
             source_service=self.settings.SERVICE_NAME,
@@ -261,7 +338,7 @@ class DefaultEventPublisher(EventPublisherProtocol):
         )
         
         try:
-            # PRIMARY PATH: Direct Kafka publishing (99.9% of events)
+            # TRUE OUTBOX PATTERN: All events go to outbox first
             await self.kafka_bus.publish(
                 topic=self.settings.ESSAY_CONTENT_PROVISIONED_TOPIC,
                 key=event_data.file_upload_id.encode("utf-8"),

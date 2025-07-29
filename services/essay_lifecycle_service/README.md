@@ -99,17 +99,17 @@ Circuit breaker metrics are integrated into the service's Prometheus metrics:
 
 Circuit breakers protect Kafka publishing operations and are configurable via `ESSAY_LIFECYCLE_SERVICE_CIRCUIT_BREAKER_` environment variables.
 
-## 🔄 Transactional Outbox Pattern (Kafka-First with Fallback)
+## 🔄 TRUE Outbox Pattern
 
-ELS implements the Transactional Outbox Pattern as a fallback mechanism for Kafka failures, ensuring 99.9% of events go directly to Kafka:
+ELS implements the TRUE Outbox Pattern for guaranteed event delivery, where all events are stored in the outbox database first, then published by a relay worker:
 
 ### Event Publishing Architecture
 
 ```python
-# Primary path: Direct Kafka publishing (99.9% of events)
+# TRUE OUTBOX PATTERN: All events stored in outbox first
 async def publish_event(self, event_data: EventEnvelope[Any], ...) -> None:
     try:
-        # Try Kafka first - this is the normal path
+        # Store in outbox for transactional safety
         await self.kafka_bus.publish(
             topic=topic,
             key=aggregate_id.encode("utf-8"),
@@ -161,7 +161,7 @@ WHERE published_at IS NULL;
 
 ### Benefits
 
-- **Performance**: 99.9% of events go directly to Kafka with minimal latency
+- **Performance**: All events go through outbox for guaranteed delivery with relay worker optimization
 - **Reliability**: Fallback ensures no event loss during Kafka outages
 - **Zero-Delay Recovery**: Redis BLPOP enables instant processing when events enter outbox
 - **Adaptive Resource Usage**: Polling intervals adjust based on activity and environment

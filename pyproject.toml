@@ -40,6 +40,8 @@ monorepo-tools = [
     "kafka-python",
     "respx",
     "types-psutil",  # Type stubs for psutil
+    "reportlab",  # For PDF generation in file service integration tests
+    "types-reportlab",  # Type stubs for reportlab
 ]
 
 # Install all services and common_core for unified development

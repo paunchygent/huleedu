@@ -185,3 +185,40 @@ Look at these services for patterns:
 - Document any discoveries or pattern updates in the appropriate `.cursor/rules/` file
 
 Remember: You're implementing improvements to align the WebSocket and API Gateway services with established HuleEdu patterns, not creating new patterns.
+
+Priority 2: Increase WebSocket Service Test Coverage
+Status: ❌ Non-Compliant
+
+This is a significant area of deficiency. While unit tests exist for the happy paths of implementations, critical modules and error paths remain untested. The target of >90% coverage has not been met.
+
+di.py and main.py Coverage: There are no dedicated test files (test_di.py, test_main.py). This means the DI container setup, provider lifecycles, and application startup logic (like middleware and error handler registration) are not directly tested.
+
+Error Path Testing: Key error-handling logic is not verified by tests.
+
+The test for connection limits (test_websocket_connection_limit_per_user) is incorrect. It doesn't verify that the WebSocket is closed with the specified error code (4000) when the limit is exceeded.
+
+The Redis connection error test (test_websocket_redis_connection_error_handling) does not adequately simulate a failure within the listener's lifecycle or assert that the connection is terminated correctly.
+
+Recommendation:
+Create tests/test_main.py and tests/test_di.py. More importantly, add specific tests in tests/test_websocket_routes.py that assert the correct WebSocket close codes and reasons for authentication failures, connection limits, and other HuleEduError exceptions.
+
+Priority 3: Update API Gateway Documentation
+Status: N/A
+
+This priority was specific to the api_gateway_service and is not applicable to this compliance review.
+
+Priority 4: Add OpenTelemetry Span Creation
+Status: ❌ Non-Compliant
+
+The service completely lacks the required custom OpenTelemetry spans for business operations.
+
+trace_operation Usage: The trace_operation context manager is not used anywhere in the codebase. Key operations like token validation, connection management, and message forwarding in websocket_routes.py and message_listener.py are not wrapped in spans.
+
+Tracing Setup: The startup_setup.py file implements a manual OpenTelemetry configuration. While functional, it does not use the prescribed init_tracing and setup_tracing_middleware helpers from huleedu_service_libs, leading to duplicated effort and potential inconsistencies with other services.
+
+Recommendation:
+
+Refactor startup_setup.py to use the shared library helpers for initializing tracing.
+
+Import trace_operation in routers/websocket_routes.py and implementations/message_listener.py and wrap the specified operations in with trace_operation(...) blocks, adding relevant business attributes as shown in the task document.
+

@@ -231,7 +231,8 @@ class TestPostgreSQLOutboxRepository:
             event.last_error = None
             mock_events.append(event)
 
-        # Configure mock to return events for unpublished query (SELECT with WHERE published_at IS NULL)
+        # Configure mock to return events for unpublished query
+        # (SELECT with WHERE published_at IS NULL)
         fake_session.execute_results["published_at IS NULL"] = FakeResult(mock_events)
 
         # When

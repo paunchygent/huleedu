@@ -7,16 +7,14 @@ and reliability guarantees. Uses testcontainer-based architecture for isolation.
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 from uuid import UUID
 
-import pytest
+from common_core.error_enums import FileValidationErrorCode
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from common_core.models.error_models import ErrorDetail
-from common_core.error_enums import FileValidationErrorCode
 from huleedu_service_libs.outbox import EventRelayWorker
 from huleedu_service_libs.outbox.models import EventOutbox
 from sqlalchemy import select

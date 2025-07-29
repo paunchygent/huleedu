@@ -26,7 +26,7 @@ from services.file_service.implementations.content_service_client_impl import (
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 from services.file_service.implementations.file_repository_impl import MinimalFileRepository
 from services.file_service.implementations.outbox_manager import OutboxManager
-from services.file_service.implementations.text_extractor_impl import DefaultTextExtractor
+from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.protocols import (
     BatchStateValidatorProtocol,
@@ -190,8 +190,8 @@ class ServiceImplementationsProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_text_extractor(self) -> TextExtractorProtocol:
-        """Provide text extractor implementation."""
-        return DefaultTextExtractor()
+        """Provide strategy-based text extractor implementation."""
+        return StrategyBasedTextExtractor()
 
     @provide(scope=Scope.APP)
     def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:

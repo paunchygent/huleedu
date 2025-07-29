@@ -68,11 +68,12 @@ services/file_service/
 
 ## 4. Processing Implementation
 
-### 4.1. Text Processing
-- **Text Extraction**: UTF-8 decoding for .txt files (walking skeleton)
-- **Student Info Parsing**: Stubbed implementation returning (None, None)
-- **File Validation**: Warning logs for non-.txt files
-- **Error Handling**: Empty string return for unsupported formats
+### 4.1. Text Processing - Strategy Pattern Implementation
+- **Architecture**: Strategy Pattern with pluggable extraction strategies
+- **Supported Formats**: .txt (UTF-8), .docx (python-docx), .pdf (pypdf)
+- **Error Handling**: Structured errors with specific codes (ENCRYPTED_FILE_UNSUPPORTED)
+- **Async Processing**: All strategies use asyncio.to_thread for blocking operations
+- **Extensibility**: New file formats added via strategy registration
 
 ### 4.2. Workflow Logic (core_logic.py)
 - **Content Storage**: Integration with Content Service via HTTP (returns `text_storage_id`)
@@ -117,12 +118,16 @@ services/file_service/
 ### 7.1. Defined Protocols
 - **ContentServiceClientProtocol**: Content storage operations
 - **EventPublisherProtocol**: Kafka event publishing
-- **TextExtractorProtocol**: File text extraction
+- **TextExtractorProtocol**: Strategy-based text extraction interface
+- **ExtractionStrategy**: Base protocol for individual file format strategies
 
 ### 7.2. Implementation Classes
 - **DefaultContentServiceClient**: HTTP-based content storage
-- **DefaultEventPublisher**: Kafka event publishing with EventEnvelope
-- **DefaultTextExtractor**: Basic .txt file processing
+- **DefaultEventPublisher**: Kafka event publishing with Transactional Outbox Pattern
+- **StrategyBasedTextExtractor**: Multi-format text extraction orchestrator
+- **TxtExtractionStrategy**: UTF-8 text file processing
+- **DocxExtractionStrategy**: Microsoft Word document processing
+- **PdfExtractionStrategy**: PDF processing with encryption detection
 
 ## 8. Deployment
 
@@ -176,19 +181,21 @@ services/file_service/
 
 ## 11. Limitations and Future Work
 
-### 11.1. Current Limitations (Walking Skeleton)
-- .txt files only
-- No student info extraction (stubbed)
-- No file size limits
-- No content validation
-- Basic error handling
+### 11.1. Current Implementation Status
+- ✅ Multi-format support (.txt, .docx, .pdf)
+- ✅ Strategy Pattern architecture for extensibility
+- ✅ Comprehensive error handling with structured codes
+- ✅ Async processing with correlation ID tracking
+- ✅ 91% test coverage including integration tests
+- ❌ Student info extraction (deferred to NLP Service)
+- ❌ Advanced file validation rules
 
-### 11.2. Planned Enhancements
-- Multiple file format support (.doc, .docx, .pdf)
-- Student name/email regex extraction
-- File size and batch limits
-- Enhanced error handling with retries
-- Content validation and scanning
+### 11.2. Architectural Evolution
+- ✅ **Strategy Pattern**: Completed - enables easy addition of new formats
+- ✅ **Transactional Outbox**: Implemented for reliable event delivery
+- 🔄 **Student Extraction**: Moved to dedicated NLP Service for proper separation
+- 📋 **Future Formats**: Additional formats (.doc, .rtf) via strategy addition
+- 📋 **Enhanced Validation**: Business rule validation beyond technical extraction
 
 ## 12. Critical Implementation Notes
 

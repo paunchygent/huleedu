@@ -1,49 +1,38 @@
-# IMPLEMENTATION PLAN
+# File Service - File Support Extension
 
-## \#\#\# 1. Update Shared Libraries (`common_core` and `huleedu_service_libs`)
+## Overview
 
-These changes introduce the new, specific error type into our platform's shared vocabulary.
+Implementation plan for extending file support with strategy pattern for text extraction and encrypted file handling.
 
-#### **`common_core/src/common_core/error_enums.py`**
+## 1. Update Shared Libraries
 
-Add the `ENCRYPTED_FILE_UNSUPPORTED` error code to the `FileValidationErrorCode` enum.
+### 1.1 Add Error Code to Common Core
+
+**File:** `common_core/src/common_core/error_enums.py`
 
 ```python
 from enum import Enum
 
 class FileValidationErrorCode(str, Enum):
+    """Error codes for file validation scenarios."""
     # ... existing codes ...
     RAW_STORAGE_FAILED = "RAW_STORAGE_FAILED"
     TEXT_EXTRACTION_FAILED = "TEXT_EXTRACTION_FAILED"
-    ENCRYPTED_FILE_UNSUPPORTED = "ENCRYPTED_FILE_UNSUPPORTED"  # ✅ ADD THIS
+    ENCRYPTED_FILE_UNSUPPORTED = "ENCRYPTED_FILE_UNSUPPORTED" # ADD THIS
     UNKNOWN_VALIDATION_ERROR = "UNKNOWN_VALIDATION_ERROR"
 ```
 
-\<br/\>
+### 1.2 Add Error Factory Method
 
-#### **`libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/file_validation_factories.py`**
-
-Add the new factory function to create and raise the specific error for encrypted files.
+**File:** `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/file_validation_factories.py`
 
 ```python
 from typing import Any, NoReturn
 from uuid import UUID
-
 from common_core.error_enums import FileValidationErrorCode
-
 from .error_detail_factory import create_error_detail_with_context
 from .huleedu_error import HuleEduError
 
-# ... existing factory functions ...
-
-def raise_text_extraction_failed(
-    # ...
-) -> NoReturn:
-    # ...
-    raise HuleEduError(error_detail)
-
-
-# ✅ ADD THIS NEW FACTORY FUNCTION
 def raise_encrypted_file_error(
     service: str,
     operation: str,
@@ -51,7 +40,16 @@ def raise_encrypted_file_error(
     correlation_id: UUID,
     **additional_context: Any,
 ) -> NoReturn:
-    """Creates and raises an error for encrypted, unsupported files."""
+    """
+    Creates and raises an error for encrypted files.
+    
+    Args:
+        service: Service name where error occurred
+        operation: Operation being performed
+        file_name: Name of the encrypted file
+        correlation_id: Correlation ID for tracing
+        **additional_context: Additional error details
+    """
     error_detail = create_error_detail_with_context(
         error_code=FileValidationErrorCode.ENCRYPTED_FILE_UNSUPPORTED,
         message=f"File '{file_name}' is encrypted and cannot be processed.",
@@ -61,31 +59,20 @@ def raise_encrypted_file_error(
         details={"file_name": file_name, **additional_context},
     )
     raise HuleEduError(error_detail)
-
-
-def raise_unknown_validation_error(
-    # ...
-) -> NoReturn:
-    # ...
-    raise HuleEduError(error_detail)
 ```
 
------
+## 2. File Service Updates
 
-## \#\#\# 2. Update File Service Dependencies and Implementation
+### 2.1 Update Dependencies
 
-These changes implement the new strategy pattern within the File Service itself.
-
-#### **`services/file_service/pyproject.toml`**
-
-Add `python-docx` and `pypdf` as dependencies with pinned versions.
+**File:** `services/file_service/pyproject.toml`
 
 ```toml
 [project]
 name = "huleedu-file-service"
-# ...
 requires-python = ">=3.11"
 dependencies = [
+    # Core dependencies
     "quart",
     "hypercorn",
     "aiokafka",
@@ -101,57 +88,92 @@ dependencies = [
     "sqlalchemy",
     "huleedu-common-core",
     "huleedu-service-libs",
-    "python-docx==1.1.2",
-    "pypdf==4.2.0",
+    
+    # File processing dependencies (OBS! No version pinning! pdm will handle this)
+    "python-docx",  # For .docx files
+    "pypdf",       # For PDF files
 ]
 ```
 
-*Note: I've updated `pypdf` to a more recent stable version.*
+### 2.2 Implement Extraction Strategies
 
-\<br/\>
-
-#### **`services/file_service/implementations/extraction_strategies.py` (New File)**
-
-Create this new file to house the individual extraction strategies.
+**File:** `services/file_service/implementations/extraction_strategies.py`
 
 ```python
-"""Concrete implementations of text extraction strategies for different file types."""
+"""
+Text extraction strategies for different file types.
+
+Implements the Strategy pattern for file type-specific text extraction.
+"""
 
 from __future__ import annotations
-
 import asyncio
 import io
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 import docx
+from pypdf import PdfReader
 from huleedu_service_libs.error_handling.file_validation_factories import (
     raise_encrypted_file_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
-from pypdf import PdfReader
 
 logger = create_service_logger("file_service.extraction_strategies")
 
-
+# Protocol Definition
 @runtime_checkable
 class ExtractionStrategy(Protocol):
-    """Protocol for file type extraction strategies."""
+    """
+    Protocol defining the interface for text extraction strategies.
+    
+    All concrete strategies must implement the extract method with this signature.
+    """
 
     async def extract(
-        self, file_content: bytes, file_name: str, correlation_id: UUID
+        self, 
+        file_content: bytes, 
+        file_name: str, 
+        correlation_id: UUID
     ) -> str:
-        """Extracts text from the given file content."""
+        """
+        Extract text from file content.
+        
+        Args:
+            file_content: Binary content of the file
+            file_name: Name of the file being processed
+            correlation_id: UUID for request correlation
+            
+        Returns:
+            Extracted text as a string
+            
+        Raises:
+            HuleEduError: If extraction fails or file is encrypted
+        """
         ...
 
+# Concrete Strategy Implementations
 
 class TxtExtractionStrategy(ExtractionStrategy):
-    """Strategy for extracting text from .txt files."""
+    """Extracts text from plain text (.txt) files."""
 
     async def extract(
-        self, file_content: bytes, file_name: str, correlation_id: UUID
+        self, 
+        file_content: bytes, 
+        file_name: str, 
+        correlation_id: UUID
     ) -> str:
-        """Performs direct UTF-8 decoding."""
+        """
+        Extract text using UTF-8 decoding.
+        
+        Args:
+            file_content: Binary content of the text file
+            file_name: Name of the file being processed
+            correlation_id: UUID for request correlation
+            
+        Returns:
+            Decoded text content
+        """
         text = file_content.decode("utf-8", errors="ignore")
         logger.info(
             f"Extracted {len(text)} characters from {file_name}",
@@ -161,13 +183,19 @@ class TxtExtractionStrategy(ExtractionStrategy):
 
 
 class DocxExtractionStrategy(ExtractionStrategy):
-    """Strategy for extracting text from .docx files."""
+    """Extracts text from Microsoft Word (.docx) files."""
 
     async def extract(
-        self, file_content: bytes, file_name: str, correlation_id: UUID
+        self, 
+        file_content: bytes, 
+        file_name: str, 
+        correlation_id: UUID
     ) -> str:
-        """Extracts text from Word documents using a thread pool."""
-
+        """
+        Extract text from .docx files using python-docx.
+        
+        Uses a thread pool to avoid blocking the event loop.
+        """
         def _extract_docx_sync() -> str:
             """Synchronous helper for docx parsing."""
             document = docx.Document(io.BytesIO(file_content))
@@ -183,13 +211,20 @@ class DocxExtractionStrategy(ExtractionStrategy):
 
 
 class PdfExtractionStrategy(ExtractionStrategy):
-    """Strategy for extracting text from .pdf files."""
+    """Extracts text from PDF files with encryption detection."""
 
     async def extract(
-        self, file_content: bytes, file_name: str, correlation_id: UUID
+        self, 
+        file_content: bytes, 
+        file_name: str, 
+        correlation_id: UUID
     ) -> str:
-        """Extracts text from PDF documents using a thread pool."""
-
+        """
+        Extract text from PDF files using pypdf.
+        
+        Detects and rejects encrypted PDFs.
+        Uses a thread pool for CPU-bound operations.
+        """
         def _extract_pdf_sync() -> str:
             """Synchronous helper for PDF parsing."""
             reader = PdfReader(io.BytesIO(file_content))
@@ -213,11 +248,11 @@ class PdfExtractionStrategy(ExtractionStrategy):
         return await asyncio.to_thread(_extract_pdf_sync)
 ```
 
-\<br/\>
+### 2.3 Implement Strategy-Based Text Extractor
 
-#### **`services/file_service/implementations/text_extractor_impl.py` (Full Replacement)**
+**File:** `services/file_service/implementations/text_extractor_impl.py`
 
-Replace the entire contents of this file with the new `StrategyBasedTextExtractor`.
+This file contains the main `StrategyBasedTextExtractor` that coordinates between different extraction strategies.
 
 ```python
 """Text extractor implementation using the Strategy pattern."""
@@ -302,11 +337,11 @@ class StrategyBasedTextExtractor(TextExtractorProtocol):
             )
 ```
 
-\<br/\>
+### 2.4 Update Dependency Injection
 
-#### **`services/file_service/di.py` (Modified)**
+**File:** `services/file_service/di.py`
 
-Update the DI provider to inject the new `StrategyBasedTextExtractor`.
+Update the dependency injection container to provide the new `StrategyBasedTextExtractor`.
 
 ```python
 # ... other imports ...
@@ -324,14 +359,36 @@ class ServiceImplementationsProvider(Provider):
     def provide_text_extractor(self) -> TextExtractorProtocol:
         """Provide the strategy-based text extractor implementation."""
         return StrategyBasedTextExtractor()
+
+
+### 3. Final Steps
+
+#### 3.1 Remove Obsolete Files
+
+Remove the now-obsolete placeholder file:
+
+```bash
+rm services/file_service/text_processing.py
 ```
 
------
+### Summary of Changes
 
-## \#\#\# 3. Final Cleanup
+1. **Updated Shared Libraries**
+   - Added `ENCRYPTED_FILE_UNSUPPORTED` error code
+   - Implemented error factory for encrypted files
 
-The last step is to remove the now-obsolete placeholder file.
+2. **Enhanced File Service**
+   - Added new dependencies for file processing
+   - Implemented strategy pattern for text extraction
+   - Added support for multiple file types (TXT, DOCX, PDF)
+   - Added proper error handling for encrypted files
+   - Updated dependency injection configuration
 
-  * **Delete the file `services/file_service/text_processing.py`**.
+3. **Code Quality**
+   - Improved type hints and documentation
+   - Added comprehensive error handling
+   - Followed architectural patterns and coding standards
 
-This completes the refactor. The system is now extensible, robust, and fully compliant with our architectural standards.
+The system is now more maintainable, extensible, and robust, with clear separation of concerns through the Strategy pattern.
+
+!
