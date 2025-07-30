@@ -64,7 +64,8 @@ class BatchPipelineStateManager:
                     return False
 
                 # Convert ProcessingPipelineState to dict for JSON storage
-                pipeline_state_dict = pipeline_state.model_dump()
+                # Use mode="json" to properly serialize datetime fields to ISO strings
+                pipeline_state_dict = pipeline_state.model_dump(mode="json")
 
                 # Update pipeline configuration and increment version for optimistic locking
                 stmt = (
@@ -174,7 +175,8 @@ class BatchPipelineStateManager:
                     setattr(current_pipeline_state, phase_name.value.lower().replace("-", "_"), new_detail)
 
                 current_pipeline_state.last_updated = datetime.now(UTC)
-                updated_pipeline_dict = current_pipeline_state.model_dump()
+                # Use mode="json" to properly serialize datetime fields to ISO strings
+                updated_pipeline_dict = current_pipeline_state.model_dump(mode="json")
 
                 # Use optimistic locking with version field
                 stmt = (
