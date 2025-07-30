@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
 from common_core.status_enums import BatchStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -22,8 +22,8 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         """Initialize the mock repository with internal storage."""
         # Storage for batch contexts (course_code, user_id, etc.)
         self.batch_contexts: dict[str, BatchRegistrationRequestV1] = {}
-        # Storage for pipeline states
-        self.pipeline_states: dict[str, dict] = {}
+        # Storage for pipeline states (always ProcessingPipelineState objects)
+        self.pipeline_states: dict[str, ProcessingPipelineState] = {}
         # Storage for essay data from BatchEssaysReady events
         self.batch_essays: dict[str, list] = {}
         # Simulate database-level locks for atomic operations
@@ -49,13 +49,16 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         """Mock implementation - always succeeds."""
         return True
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
         """Mock implementation - stores pipeline state in memory with lock simulation."""
+        if not isinstance(pipeline_state, ProcessingPipelineState):
+            raise ValueError(f"Expected ProcessingPipelineState, got {type(pipeline_state)}")
+        
         async with self._get_lock(batch_id):
             self.pipeline_states[batch_id] = pipeline_state
             return True
 
-    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
+    async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Mock implementation - retrieves pipeline state from memory."""
         return self.pipeline_states.get(batch_id)
 
@@ -87,19 +90,38 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
 
         Simulates production database compare-and-set behavior to prevent race conditions.
         """
+        from datetime import datetime, UTC
+        
         async with self._get_lock(batch_id):
-            current_state = self.pipeline_states.get(batch_id, {})
-            current_status = current_state.get(f"{phase_name.value}_status")
+            current_state = self.pipeline_states.get(batch_id)
+            if not current_state:
+                # No state exists yet - create a new one
+                current_state = ProcessingPipelineState(
+                    batch_id=batch_id,
+                    requested_pipelines=[]
+                )
+                self.pipeline_states[batch_id] = current_state
+
+            # Get the pipeline detail for this phase
+            pipeline_detail = current_state.get_pipeline(phase_name.value)
+            current_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
 
             # Simulate atomic compare-and-set operation
-            if current_status == expected_status.value:
+            if current_status == expected_status:
                 # Update status atomically
-                updated_state = current_state.copy()
-                updated_state[f"{phase_name.value}_status"] = new_status.value
-                if completion_timestamp:
-                    updated_state[f"{phase_name.value}_completed_at"] = completion_timestamp
+                if pipeline_detail:
+                    pipeline_detail.status = new_status
+                    if completion_timestamp:
+                        pipeline_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                else:
+                    # Create new pipeline detail if it doesn't exist
+                    from common_core.pipeline_models import PipelineStateDetail
+                    new_detail = PipelineStateDetail(status=new_status)
+                    if completion_timestamp:
+                        new_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                    setattr(current_state, phase_name.value.lower().replace("-", "_"), new_detail)
 
-                self.pipeline_states[batch_id] = updated_state
+                current_state.last_updated = datetime.now(UTC)
                 return True
             else:
                 # Status already changed by another process - operation failed

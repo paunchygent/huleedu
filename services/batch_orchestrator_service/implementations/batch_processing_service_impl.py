@@ -125,7 +125,7 @@ class BatchProcessingServiceImpl:
         )
         await self.batch_repo.save_processing_pipeline_state(
             batch_id,
-            initial_pipeline_state.model_dump(mode="json"),
+            initial_pipeline_state,
         )
 
         # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from common_core.metadata_models import EssayProcessingInputRefV1
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, select
@@ -72,7 +72,7 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         return result
 
     # Pipeline state operations - delegated to pipeline_manager
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
         """Save pipeline processing state for a batch."""
         result: bool = await self.pipeline_manager.save_processing_pipeline_state(
             batch_id,
@@ -80,9 +80,9 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         )
         return result
 
-    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
+    async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Retrieve pipeline processing state for a batch."""
-        result: dict | None = await self.pipeline_manager.get_processing_pipeline_state(batch_id)
+        result: ProcessingPipelineState | None = await self.pipeline_manager.get_processing_pipeline_state(batch_id)
         return result
 
     async def update_phase_status_atomically(

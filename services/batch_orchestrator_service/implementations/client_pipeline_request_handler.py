@@ -12,7 +12,7 @@ from typing import Any
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
-from common_core.pipeline_models import PhaseName
+from common_core.pipeline_models import PhaseName, ProcessingPipelineState
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.batch_orchestrator_service.protocols import (
@@ -271,16 +271,13 @@ class ClientPipelineRequestHandler:
             logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def _has_active_pipeline(self, pipeline_state: dict) -> bool:
+    def _has_active_pipeline(self, pipeline_state: ProcessingPipelineState) -> bool:
         """Check if batch has an active pipeline in progress."""
         from common_core.pipeline_models import PipelineExecutionStatus, ProcessingPipelineState
 
         try:
-            # Convert to Pydantic model for type-safe checking
-            if isinstance(pipeline_state, dict):
-                state_obj = ProcessingPipelineState.model_validate(pipeline_state)
-            else:
-                state_obj = pipeline_state
+            # Direct Pydantic model access - no conversion needed
+            state_obj = pipeline_state
 
             # Check if any phase is currently in progress
             active_statuses = {
@@ -355,10 +352,10 @@ class ClientPipelineRequestHandler:
             nlp_metrics=nlp_metrics_detail,
         )
 
-        # Save updated state
+        # Save updated state - direct Pydantic model
         await self.batch_repo.save_processing_pipeline_state(
             batch_id,
-            updated_pipeline_state.model_dump(mode="json"),
+            updated_pipeline_state,
         )
 
         logger.info(

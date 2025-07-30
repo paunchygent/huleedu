@@ -166,11 +166,8 @@ class DefaultPipelinePhaseCoordinator:
                 logger.error(f"No pipeline state found for batch {batch_id}")
                 return
 
-            # Handle both dict and ProcessingPipelineState object cases for backwards compatibility
-            if hasattr(current_pipeline_state, "requested_pipelines"):  # Pydantic object
-                requested_pipelines = current_pipeline_state.requested_pipelines
-            else:  # Dictionary
-                requested_pipelines = current_pipeline_state.get("requested_pipelines")
+            # Direct access to Pydantic model - no backwards compatibility needed
+            requested_pipelines = current_pipeline_state.requested_pipelines
 
             if not requested_pipelines:
                 raise_validation_error(
@@ -217,36 +214,20 @@ class DefaultPipelinePhaseCoordinator:
                 extra={"correlation_id": correlation_id},
             )
 
-            # Generic idempotency check
-            if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
-                pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
-                if pipeline_detail and pipeline_detail.status in [
-                    PipelineExecutionStatus.DISPATCH_INITIATED,
-                    PipelineExecutionStatus.IN_PROGRESS,
-                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
-                    PipelineExecutionStatus.FAILED,
-                ]:
-                    logger.info(
-                        f"Phase {next_phase_name.value} already initiated for batch {batch_id}, "
-                        "skipping",
-                        extra={"current_status": pipeline_detail.status.value},
-                    )
-                    return
-            else:  # Dictionary - backwards compatibility
-                phase_status_key = f"{next_phase_name.value}_status"
-                phase_status = current_pipeline_state.get(phase_status_key)
-                if phase_status in [
-                    PipelineExecutionStatus.DISPATCH_INITIATED.value,
-                    PipelineExecutionStatus.IN_PROGRESS.value,
-                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value,
-                    PipelineExecutionStatus.FAILED.value,
-                ]:
-                    logger.info(
-                        f"Phase {next_phase_name.value} already initiated for batch {batch_id}, "
-                        "skipping",
-                        extra={"current_status": phase_status},
-                    )
-                    return
+            # Idempotency check - direct Pydantic access
+            pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
+            if pipeline_detail and pipeline_detail.status in [
+                PipelineExecutionStatus.DISPATCH_INITIATED,
+                PipelineExecutionStatus.IN_PROGRESS,
+                PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
+                PipelineExecutionStatus.FAILED,
+            ]:
+                logger.info(
+                    f"Phase {next_phase_name.value} already initiated for batch {batch_id}, "
+                    "skipping",
+                    extra={"current_status": pipeline_detail.status.value},
+                )
+                return
 
             # Retrieve and use generic initiator
             initiator = self.phase_initiators_map.get(next_phase_name)
@@ -293,55 +274,27 @@ class DefaultPipelinePhaseCoordinator:
                     correlation_id=str(correlation_id),
                 )
 
-                # Mark phase as FAILED in pipeline state
-                if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
-                    pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
-                    if pipeline_detail:
-                        pipeline_detail.status = PipelineExecutionStatus.FAILED
-                        pipeline_detail.error_info = e.error_detail.model_dump()
-                        await self.batch_repo.save_processing_pipeline_state(
-                            batch_id,
-                            current_pipeline_state,
-                        )
-                else:  # Dictionary - backwards compatibility
-                    updated_pipeline_state = current_pipeline_state.copy()
-                    updated_pipeline_state.update(
-                        {
-                            f"{next_phase_name.value}_status": PipelineExecutionStatus.FAILED.value,
-                            f"{next_phase_name.value}_error_detail": e.error_detail.model_dump(),
-                            f"{next_phase_name.value}_failed_at": datetime.now(UTC).isoformat(),
-                        },
-                    )
-                    await self.batch_repo.save_processing_pipeline_state(
-                        batch_id,
-                        updated_pipeline_state,
-                    )
-
-                raise
-
-            # Generic state update - mark phase as DISPATCH_INITIATED
-            if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
+                # Mark phase as FAILED in pipeline state - direct Pydantic access
                 pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
                 if pipeline_detail:
-                    pipeline_detail.status = PipelineExecutionStatus.DISPATCH_INITIATED
-                    pipeline_detail.started_at = datetime.now(UTC)
+                    pipeline_detail.status = PipelineExecutionStatus.FAILED
+                    pipeline_detail.error_info = e.error_detail.model_dump()
+                    pipeline_detail.completed_at = datetime.now(UTC)
                     await self.batch_repo.save_processing_pipeline_state(
                         batch_id,
                         current_pipeline_state,
                     )
-            else:  # Dictionary - backwards compatibility
-                updated_pipeline_state = current_pipeline_state.copy()
-                updated_pipeline_state.update(
-                    {
-                        f"{next_phase_name.value}_status": (
-                            PipelineExecutionStatus.DISPATCH_INITIATED.value
-                        ),
-                        f"{next_phase_name.value}_initiated_at": (datetime.now(UTC).isoformat()),
-                    },
-                )
+
+                raise
+
+            # State update - mark phase as DISPATCH_INITIATED
+            pipeline_detail = current_pipeline_state.get_pipeline(next_phase_name.value)
+            if pipeline_detail:
+                pipeline_detail.status = PipelineExecutionStatus.DISPATCH_INITIATED
+                pipeline_detail.started_at = datetime.now(UTC)
                 await self.batch_repo.save_processing_pipeline_state(
                     batch_id,
-                    updated_pipeline_state,
+                    current_pipeline_state,
                 )
 
             logger.info(
@@ -388,32 +341,18 @@ class DefaultPipelinePhaseCoordinator:
         # Check idempotency - don't re-initiate if already started
         current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
         if current_pipeline_state:
-            if hasattr(current_pipeline_state, "get_pipeline"):  # Pydantic object
-                pipeline_detail = current_pipeline_state.get_pipeline(first_phase_name.value)
-                if pipeline_detail and pipeline_detail.status in [
-                    PipelineExecutionStatus.DISPATCH_INITIATED,
-                    PipelineExecutionStatus.IN_PROGRESS,
-                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
-                ]:
-                    logger.info(
-                        f"First phase {first_phase_name.value} already initiated for "
-                        f"batch {batch_id}, skipping",
-                        extra={"current_status": pipeline_detail.status.value},
-                    )
-                    return
-            else:  # Dictionary - backwards compatibility
-                phase_status_key = f"{first_phase_name.value}_status"
-                phase_status = current_pipeline_state.get(phase_status_key)
-                if phase_status in [
-                    PipelineExecutionStatus.DISPATCH_INITIATED.value,
-                    PipelineExecutionStatus.IN_PROGRESS.value,
-                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value,
-                ]:
-                    logger.info(
-                        f"First phase {first_phase_name.value} already initiated, skipping",
-                        extra={"batch_id": batch_id, "current_status": phase_status},
-                    )
-                    return
+            pipeline_detail = current_pipeline_state.get_pipeline(first_phase_name.value)
+            if pipeline_detail and pipeline_detail.status in [
+                PipelineExecutionStatus.DISPATCH_INITIATED,
+                PipelineExecutionStatus.IN_PROGRESS,
+                PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
+            ]:
+                logger.info(
+                    f"First phase {first_phase_name.value} already initiated for "
+                    f"batch {batch_id}, skipping",
+                    extra={"current_status": pipeline_detail.status.value},
+                )
+                return
 
         # Get phase initiator
         initiator = self.phase_initiators_map.get(first_phase_name)
@@ -504,20 +443,13 @@ class DefaultPipelinePhaseCoordinator:
             logger.error(f"No pipeline state found for batch {batch_id}")
             return
 
-        # Determine current status
-        if hasattr(current_state, "get_pipeline"):
-            pipeline_detail = current_state.get_pipeline(phase.value)
-            current_status = (
-                pipeline_detail.status
-                if pipeline_detail
-                else PipelineExecutionStatus.PENDING_DEPENDENCIES
-            )
-        else:
-            phase_status_key = f"{phase.value}_status"
-            current_status_str = current_state.get(
-                phase_status_key, PipelineExecutionStatus.PENDING_DEPENDENCIES.value
-            )
-            current_status = PipelineExecutionStatus(current_status_str)
+        # Determine current status - direct Pydantic access
+        pipeline_detail = current_state.get_pipeline(phase.value)
+        current_status = (
+            pipeline_detail.status
+            if pipeline_detail
+            else PipelineExecutionStatus.PENDING_DEPENDENCIES
+        )
 
         # Update the phase status in the pipeline state
         await self.state_manager.update_phase_status_atomically(

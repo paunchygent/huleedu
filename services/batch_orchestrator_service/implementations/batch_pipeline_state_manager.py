@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
@@ -47,8 +47,11 @@ class BatchPipelineStateManager:
         }
         return mapping.get(status, PhaseStatusEnum.FAILED)
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
         """Save pipeline processing state for a batch."""
+        if not isinstance(pipeline_state, ProcessingPipelineState):
+            raise ValueError(f"Expected ProcessingPipelineState, got {type(pipeline_state)}")
+
         async with self.db.session() as session:
             try:
                 # Check if batch exists
@@ -60,12 +63,15 @@ class BatchPipelineStateManager:
                     self.logger.error(f"Batch {batch_id} not found for pipeline state save")
                     return False
 
+                # Convert ProcessingPipelineState to dict for JSON storage
+                pipeline_state_dict = pipeline_state.model_dump()
+
                 # Update pipeline configuration and increment version for optimistic locking
                 stmt = (
                     update(Batch)
                     .where(Batch.id == batch_id)
                     .values(
-                        pipeline_configuration=pipeline_state,
+                        pipeline_configuration=pipeline_state_dict,
                         version=Batch.version + 1,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
@@ -81,17 +87,26 @@ class BatchPipelineStateManager:
                 self.logger.error(f"Failed to save pipeline state for batch {batch_id}: {e}")
                 return False
 
-    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
+    async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Retrieve pipeline processing state for a batch."""
         async with self.db.session() as session:
             stmt = select(Batch.pipeline_configuration).where(Batch.id == batch_id)
             result = await session.execute(stmt)
             pipeline_config = result.scalars().first()
 
-            # Ensure we return a dict or None, not Any
             if pipeline_config is None:
                 return None
-            return dict(pipeline_config) if pipeline_config else None
+            
+            # Convert dict from database back to ProcessingPipelineState
+            try:
+                if isinstance(pipeline_config, dict):
+                    return ProcessingPipelineState.model_validate(pipeline_config)
+                else:
+                    self.logger.warning(f"Invalid pipeline configuration type for batch {batch_id}: {type(pipeline_config)}")
+                    return None
+            except Exception as e:
+                self.logger.error(f"Failed to deserialize pipeline state for batch {batch_id}: {e}")
+                return None
 
     async def update_phase_status_atomically(
         self,
@@ -118,33 +133,55 @@ class BatchPipelineStateManager:
                     self.logger.error(f"Batch {batch_id} not found for atomic phase update")
                     return False
 
-                # Check current pipeline state
-                current_pipeline_state = batch.pipeline_configuration or {}
-                current_phase_status = current_pipeline_state.get(f"{phase_name.value}_status")
+                # Check current pipeline state - convert from dict to ProcessingPipelineState if needed
+                current_pipeline_dict = batch.pipeline_configuration or {}
+                if current_pipeline_dict:
+                    try:
+                        current_pipeline_state = ProcessingPipelineState.model_validate(current_pipeline_dict)
+                    except Exception as e:
+                        self.logger.error(f"Failed to deserialize pipeline state for batch {batch_id}: {e}")
+                        return False
+                else:
+                    # Create new pipeline state if none exists
+                    current_pipeline_state = ProcessingPipelineState(
+                        batch_id=batch_id,
+                        requested_pipelines=[]
+                    )
+
+                # Get current phase status
+                pipeline_detail = current_pipeline_state.get_pipeline(phase_name.value)
+                current_phase_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
 
                 # Atomic compare-and-set operation
-                if current_phase_status != expected_status.value:
+                if current_phase_status != expected_status:
                     self.logger.warning(
                         f"Phase {phase_name} status mismatch for batch {batch_id}: "
-                        f"expected {expected_status.value}, got {current_phase_status}",
+                        f"expected {expected_status.value}, got {current_phase_status.value}",
                     )
                     return False
 
                 # Update pipeline state atomically
-                updated_pipeline_state = current_pipeline_state.copy()
-                updated_pipeline_state[f"{phase_name.value}_status"] = new_status.value
+                if pipeline_detail:
+                    pipeline_detail.status = new_status
+                    if completion_timestamp:
+                        pipeline_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                else:
+                    # Create new pipeline detail if it doesn't exist
+                    from common_core.pipeline_models import PipelineStateDetail
+                    new_detail = PipelineStateDetail(status=new_status)
+                    if completion_timestamp:
+                        new_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                    setattr(current_pipeline_state, phase_name.value.lower().replace("-", "_"), new_detail)
 
-                if completion_timestamp:
-                    updated_pipeline_state[f"{phase_name.value}_completed_at"] = (
-                        completion_timestamp
-                    )
+                current_pipeline_state.last_updated = datetime.now(UTC)
+                updated_pipeline_dict = current_pipeline_state.model_dump()
 
                 # Use optimistic locking with version field
                 stmt = (
                     update(Batch)
                     .where(Batch.id == batch_id, Batch.version == batch.version)
                     .values(
-                        pipeline_configuration=updated_pipeline_state,
+                        pipeline_configuration=updated_pipeline_dict,
                         version=Batch.version + 1,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )

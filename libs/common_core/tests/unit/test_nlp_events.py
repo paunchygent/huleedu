@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pytest
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from common_core.status_enums import EssayStatus, ProcessingStage
+from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult, StudentMatchSuggestion
+from common_core.metadata_models import EntityReference
 
 
 class TestStudentMatchSuggestion:
@@ -56,68 +53,77 @@ class TestStudentMatchSuggestion:
             )
 
 
-class TestEssayAuthorMatchSuggestedV1:
-    """Test EssayAuthorMatchSuggestedV1 event model."""
+class TestBatchAuthorMatchesSuggestedV1:
+    """Test BatchAuthorMatchesSuggestedV1 event model."""
 
     def test_valid_event_creation(self) -> None:
-        """Test creating a valid EssayAuthorMatchSuggestedV1 event."""
+        """Test creating a valid BatchAuthorMatchesSuggestedV1 event."""
         suggestions = [
             StudentMatchSuggestion(
                 student_id="student-123",
                 student_name="John Doe",
                 confidence_score=0.95,
-                match_reason="exact_name",
+                match_reasons=["exact_name"],
             ),
             StudentMatchSuggestion(
                 student_id="student-456",
                 student_name="Jane Doe",
                 confidence_score=0.75,
-                match_reason="fuzzy_name",
+                match_reasons=["fuzzy_name"],
             ),
         ]
 
-        event = EssayAuthorMatchSuggestedV1(
-            event_name=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED,
-            entity_ref=EntityReference(entity_type="essay", entity_id="essay-789"),
-            timestamp=datetime.now(UTC),
-            status=EssayStatus.NLP_SUCCESS,
-            system_metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_type="essay", entity_id="essay-789"),
-                event=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED.value,
-                processing_stage=ProcessingStage.COMPLETED,
-            ),
-            essay_id="essay-789",
-            suggestions=suggestions,
-            match_status="HIGH_CONFIDENCE",
+        match_results = [
+            EssayMatchResult(
+                essay_id="essay-789",
+                text_storage_id="storage-123",
+                filename="essay.txt",
+                suggestions=suggestions,
+            )
+        ]
+
+        event = BatchAuthorMatchesSuggestedV1(
+            event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
+            entity_ref=EntityReference(entity_type="batch", entity_id="batch-123"),
+            batch_id="batch-123",
+            class_id="class-456",
+            match_results=match_results,
+            processing_summary={"total_essays": 1, "matched": 1, "no_match": 0, "errors": 0},
         )
 
-        assert event.essay_id == "essay-789"
-        assert len(event.suggestions) == 2
-        assert event.match_status == "HIGH_CONFIDENCE"
-        assert event.event_name == ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED
+        assert event.batch_id == "batch-123"
+        assert event.class_id == "class-456"
+        assert len(event.match_results) == 1
+        assert len(event.match_results[0].suggestions) == 2
+        assert event.event_name == ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
 
     def test_empty_suggestions(self) -> None:
-        """Test event with no suggestions (no match found)."""
-        event = EssayAuthorMatchSuggestedV1(
-            event_name=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED,
-            entity_ref=EntityReference(entity_type="essay", entity_id="essay-no-match"),
-            timestamp=datetime.now(UTC),
-            status=EssayStatus.NLP_SUCCESS,
-            system_metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_type="essay", entity_id="essay-789"),
-                event=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED.value,
-                processing_stage=ProcessingStage.COMPLETED,
-            ),
-            essay_id="essay-no-match",
-            suggestions=[],
-            match_status="NO_MATCH",
+        """Test batch event with no matches found."""
+        match_results = [
+            EssayMatchResult(
+                essay_id="essay-no-match",
+                text_storage_id="storage-456",
+                filename="essay2.txt",
+                suggestions=[],
+                no_match_reason="No identifiers found in text",
+            )
+        ]
+
+        event = BatchAuthorMatchesSuggestedV1(
+            event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
+            entity_ref=EntityReference(entity_type="batch", entity_id="batch-no-match"),
+            batch_id="batch-no-match",
+            class_id="class-789",
+            match_results=match_results,
+            processing_summary={"total_essays": 1, "matched": 0, "no_match": 1, "errors": 0},
         )
 
-        assert event.essay_id == "essay-no-match"
-        assert len(event.suggestions) == 0
-        assert event.match_status == "NO_MATCH"
+        assert event.batch_id == "batch-no-match"
+        assert len(event.match_results) == 1
+        assert len(event.match_results[0].suggestions) == 0
+        assert event.match_results[0].no_match_reason == "No identifiers found in text"
 
     def test_topic_mapping(self) -> None:
-        """Test that ESSAY_AUTHOR_MATCH_SUGGESTED has correct topic mapping."""
-        topic = topic_name(ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED)
-        assert topic == "huleedu.essay.author.match.suggested.v1"
+        """Test that BATCH_AUTHOR_MATCHES_SUGGESTED has correct topic mapping."""
+        topic = topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        assert topic == "huleedu.batch.author.matches.suggested.v1"

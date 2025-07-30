@@ -9,7 +9,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState, PipelineStateDetail
 
 from services.batch_orchestrator_service.implementations.batch_processing_service_impl import (
     BatchProcessingServiceImpl,
@@ -100,10 +100,15 @@ class TestBatchRepositoryUnitTests:
         batch_id = "test-batch-123"
         phase_name = PhaseName.SPELLCHECK
 
-        # Set initial state
+        # Set initial state - create ProcessingPipelineState object
+        initial_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[phase_name.value],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        )
         await in_memory_batch_repository.save_processing_pipeline_state(
             batch_id,
-            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
+            initial_state,
         )
 
         # Act - Test atomic compare-and-set
@@ -120,7 +125,9 @@ class TestBatchRepositoryUnitTests:
         # Verify the state was updated
         state = await in_memory_batch_repository.get_processing_pipeline_state(batch_id)
         assert state is not None
-        assert state[f"{phase_name.value}_status"] == PipelineExecutionStatus.IN_PROGRESS.value
+        pipeline_detail = state.get_pipeline(phase_name.value)
+        assert pipeline_detail is not None
+        assert pipeline_detail.status == PipelineExecutionStatus.IN_PROGRESS
 
     @pytest.mark.asyncio
     async def test_mock_repository_atomic_operation_race_condition(
@@ -132,10 +139,15 @@ class TestBatchRepositoryUnitTests:
         batch_id = "test-batch-456"
         phase_name = PhaseName.SPELLCHECK
 
-        # Set initial state
+        # Set initial state - create ProcessingPipelineState object
+        initial_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[phase_name.value],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        )
         await in_memory_batch_repository.save_processing_pipeline_state(
             batch_id,
-            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
+            initial_state,
         )
 
         # Act - First update (should succeed)
@@ -161,7 +173,9 @@ class TestBatchRepositoryUnitTests:
         # Verify state is still "in_progress", not "completed"
         state = await in_memory_batch_repository.get_processing_pipeline_state(batch_id)
         assert state is not None
-        assert state[f"{phase_name.value}_status"] == PipelineExecutionStatus.IN_PROGRESS.value
+        pipeline_detail = state.get_pipeline(phase_name.value)
+        assert pipeline_detail is not None
+        assert pipeline_detail.status == PipelineExecutionStatus.IN_PROGRESS
 
 
 class TestRepositoryImplementationComparison:

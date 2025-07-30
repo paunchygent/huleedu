@@ -31,8 +31,8 @@ from .file_management_events import (
 )
 from .llm_provider_events import LLMComparisonResultV1, TokenUsage
 from .nlp_events import (
-    EssayAuthorMatchSuggestedV1,
-    EssayStudentMatchingRequestedV1,
+    BatchAuthorMatchesSuggestedV1,
+    EssayMatchResult,
     StudentMatchSuggestion,
 )
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1

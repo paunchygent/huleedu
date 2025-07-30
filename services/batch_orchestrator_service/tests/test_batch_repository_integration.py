@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState, PipelineStateDetail
 from common_core.status_enums import BatchStatus
 from testcontainers.postgres import PostgresContainer
 
@@ -165,11 +165,12 @@ class TestPostgreSQLBatchRepositoryIntegration:
         """Test saving and retrieving pipeline state."""
         # Arrange
         batch_id = "test-pipeline-batch"
-        pipeline_state = {
-            f"{PhaseName.SPELLCHECK.value}_status": "pending",
-            f"{PhaseName.AI_FEEDBACK.value}_status": "not_started",
-            "processing_metadata": {"started_at": "2025-01-30T10:00:00Z"},
-        }
+        pipeline_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[PhaseName.SPELLCHECK.value, PhaseName.AI_FEEDBACK.value],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+            ai_feedback=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        )
 
         # Create batch first
         await postgres_repository.create_batch(
@@ -192,9 +193,16 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Assert
         assert save_success is True
         assert retrieved_state is not None
-        assert retrieved_state[f"{PhaseName.SPELLCHECK.value}_status"] == "pending"
-        assert retrieved_state[f"{PhaseName.AI_FEEDBACK.value}_status"] == "not_started"
-        assert retrieved_state["processing_metadata"]["started_at"] == "2025-01-30T10:00:00Z"
+        
+        # Verify spellcheck phase state
+        spellcheck_detail = retrieved_state.get_pipeline(PhaseName.SPELLCHECK.value)
+        assert spellcheck_detail is not None
+        assert spellcheck_detail.status == PipelineExecutionStatus.PENDING_DEPENDENCIES
+        
+        # Verify AI feedback phase state  
+        ai_feedback_detail = retrieved_state.get_pipeline(PhaseName.AI_FEEDBACK.value)
+        assert ai_feedback_detail is not None
+        assert ai_feedback_detail.status == PipelineExecutionStatus.PENDING_DEPENDENCIES
 
     @pytest.mark.asyncio
     async def test_atomic_phase_status_update(
@@ -215,10 +223,13 @@ class TestPostgreSQLBatchRepositoryIntegration:
             },
         )
 
-        await postgres_repository.save_processing_pipeline_state(
-            batch_id,
-            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
+        # Create proper ProcessingPipelineState object for atomic testing
+        initial_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[phase_name.value], 
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
         )
+        await postgres_repository.save_processing_pipeline_state(batch_id, initial_state)
 
         # Act - First atomic update (should succeed)
         success1 = await postgres_repository.update_phase_status_atomically(
@@ -255,11 +266,10 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Verify final state
         final_state = await postgres_repository.get_processing_pipeline_state(batch_id)
         assert final_state is not None
-        assert (
-            final_state[f"{phase_name.value}_status"]
-            == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY.value
-        )
-        assert final_state[f"{phase_name.value}_completed_at"] == "2025-01-30T11:00:00Z"
+        pipeline_detail = final_state.get_pipeline(phase_name.value)
+        assert pipeline_detail is not None
+        assert pipeline_detail.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
+        assert pipeline_detail.completed_at is not None
 
     @pytest.mark.asyncio
     async def test_concurrent_atomic_operations(
@@ -280,10 +290,13 @@ class TestPostgreSQLBatchRepositoryIntegration:
             },
         )
 
-        await postgres_repository.save_processing_pipeline_state(
-            batch_id,
-            {f"{phase_name.value}_status": PipelineExecutionStatus.PENDING_DEPENDENCIES.value},
+        # Create proper ProcessingPipelineState object for concurrent testing
+        initial_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=[phase_name.value],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
         )
+        await postgres_repository.save_processing_pipeline_state(batch_id, initial_state)
 
         # Act - Run concurrent atomic updates
         async def attempt_update(
@@ -320,8 +333,9 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Verify the final state is one of the attempted states
         final_state = await postgres_repository.get_processing_pipeline_state(batch_id)
         assert final_state is not None
-        final_status = final_state[f"{phase_name.value}_status"]
-        assert final_status in ["in_progress", "failed"]
+        pipeline_detail = final_state.get_pipeline(phase_name.value)
+        assert pipeline_detail is not None
+        assert pipeline_detail.status.value in ["in_progress", "failed"]
 
     @pytest.mark.asyncio
     async def test_batch_status_update(
@@ -383,8 +397,12 @@ class TestPostgreSQLBatchRepositoryIntegration:
         assert status_update is False
 
         # Test pipeline state save (should fail)
+        test_state = ProcessingPipelineState(
+            batch_id=nonexistent_id,
+            requested_pipelines=["test"],
+        )
         pipeline_save = await postgres_repository.save_processing_pipeline_state(
             nonexistent_id,
-            {"test": "data"},
+            test_state,
         )
         assert pipeline_save is False

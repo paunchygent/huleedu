@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
-from common_core.status_enums import EssayStatus, ProcessingStage
+from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult
+from common_core.metadata_models import EntityReference
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -40,21 +38,23 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         self.source_service_name = source_service_name
         self.output_topic = output_topic
 
-    async def publish_author_match_result(
+    async def publish_batch_author_match_results(
         self,
         kafka_bus: KafkaPublisherProtocol,
-        essay_id: str,
-        suggestions: list[StudentMatchSuggestion],
-        match_status: str,
+        batch_id: str,
+        class_id: str,
+        match_results: list[EssayMatchResult],
+        processing_summary: dict[str, int],
         correlation_id: UUID,
     ) -> None:
-        """Publish author match results to Kafka via outbox pattern.
+        """Publish batch author match results to Kafka via outbox pattern.
 
         Args:
             kafka_bus: Kafka publisher (not used directly due to outbox pattern)
-            essay_id: ID of the essay that was analyzed
-            suggestions: List of student match suggestions
-            match_status: Overall match status (HIGH_CONFIDENCE, NEEDS_REVIEW, NO_MATCH)
+            batch_id: ID of the batch that was processed
+            class_id: Class ID for which matching was performed
+            match_results: List of match results for all essays in batch
+            processing_summary: Summary statistics
             correlation_id: Request correlation ID for tracing
 
         Note:
@@ -62,50 +62,34 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             not used directly. Publishing happens via the outbox pattern.
         """
         logger.debug(
-            f"Publishing author match result for essay {essay_id} via outbox",
+            f"Publishing batch author match results for batch {batch_id} via outbox",
             extra={
                 "correlation_id": str(correlation_id),
-                "essay_id": essay_id,
-                "match_status": match_status,
-                "suggestion_count": len(suggestions),
+                "batch_id": batch_id,
+                "class_id": class_id,
+                "total_essays": processing_summary.get('total_essays', 0),
             },
         )
 
-        # Create entity reference for the essay
+        # Create entity reference for the batch
         entity_ref = EntityReference(
-            entity_id=essay_id,
-            entity_type="essay",
+            entity_id=batch_id,
+            entity_type="batch",
         )
 
-        # Determine essay status based on match result
-        # All match results indicate successful NLP processing
-        essay_status = EssayStatus.NLP_SUCCESS
-
-        # Create system metadata
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
-            timestamp=datetime.now(UTC),
-            processing_stage=ProcessingStage.COMPLETED,
-            event=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED.value,
-            started_at=datetime.now(UTC),  # Would be tracked from processing start
-            completed_at=datetime.now(UTC),
-        )
-
-        # Create the event data
-        event_data = EssayAuthorMatchSuggestedV1(
-            event_name=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED,
+        # Create the batch event data
+        event_data = BatchAuthorMatchesSuggestedV1(
+            event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             entity_ref=entity_ref,
-            timestamp=datetime.now(UTC),
-            status=essay_status,
-            system_metadata=system_metadata,
-            essay_id=essay_id,
-            suggestions=suggestions,
-            match_status=match_status,
+            batch_id=batch_id,
+            class_id=class_id,
+            match_results=match_results,
+            processing_summary=processing_summary,
         )
 
         # Create event envelope
-        event_envelope = EventEnvelope[EssayAuthorMatchSuggestedV1](
-            event_type="essay.author.match.suggested.v1",
+        event_envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
+            event_type="batch.author.matches.suggested.v1",
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=event_data,
@@ -113,35 +97,36 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         )
 
         # Inject trace context if available
-        inject_trace_context(event_envelope.metadata)
+        if event_envelope.metadata is not None:
+            inject_trace_context(event_envelope.metadata)
 
         try:
             # Publish via outbox pattern
             await self.outbox_manager.publish_to_outbox(
-                aggregate_type="essay",
-                aggregate_id=essay_id,
-                event_type="essay.author.match.suggested.v1",
+                aggregate_type="batch",
+                aggregate_id=batch_id,
+                event_type="batch.author.matches.suggested.v1",
                 event_data=event_envelope,
                 topic=self.output_topic,
             )
 
             logger.info(
-                f"Successfully stored author match result in outbox for essay {essay_id}",
+                f"Successfully stored batch author match results in outbox for batch {batch_id}",
                 extra={
                     "correlation_id": str(correlation_id),
-                    "essay_id": essay_id,
-                    "match_status": match_status,
+                    "batch_id": batch_id,
+                    "class_id": class_id,
                     "topic": self.output_topic,
                 },
             )
 
         except Exception as e:
             logger.error(
-                f"Failed to publish author match result for essay {essay_id}: {e}",
+                f"Failed to publish batch author match results for batch {batch_id}: {e}",
                 exc_info=True,
                 extra={
                     "correlation_id": str(correlation_id),
-                    "essay_id": essay_id,
+                    "batch_id": batch_id,
                     "topic": self.output_topic,
                 },
             )

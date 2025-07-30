@@ -11,7 +11,7 @@ from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.observability_enums import OperationType
 
 # Import common_core models for standardized interfaces
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
 from common_core.status_enums import BatchStatus, EssayStatus, OperationStatus, ValidationStatus
 
 # Import the new API model for batch context storage
@@ -93,11 +93,11 @@ class BatchRepositoryProtocol(Protocol):
         """Update the status of an existing batch."""
         pass
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: dict) -> bool:
+    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
         """Save pipeline processing state for a batch."""
         pass
 
-    async def get_processing_pipeline_state(self, batch_id: str) -> dict | None:
+    async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Retrieve pipeline processing state for a batch."""
         pass
 

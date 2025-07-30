@@ -61,7 +61,7 @@ from .events.llm_provider_events import (
     LLMUsageAnalyticsV1,
     TokenUsage,
 )
-from .events.nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
+from .events.nlp_events import BatchAuthorMatchesSuggestedV1, StudentMatchSuggestion
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
     EntityReference,
@@ -203,5 +203,5 @@ CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
 CJAssessmentFailedV1.model_rebuild(raise_errors=True)
 LLMComparisonResultV1.model_rebuild(raise_errors=True)
 TokenUsage.model_rebuild(raise_errors=True)
-EssayAuthorMatchSuggestedV1.model_rebuild(raise_errors=True)
+BatchAuthorMatchesSuggestedV1.model_rebuild(raise_errors=True)
 StudentMatchSuggestion.model_rebuild(raise_errors=True)
