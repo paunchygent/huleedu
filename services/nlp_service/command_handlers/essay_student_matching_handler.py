@@ -103,7 +103,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
         try:
             # Parse the command data
             command_data = EssayStudentMatchingRequestedV1.model_validate(envelope.data)
-            
+
             logger.info(
                 f"Processing Phase 1 student matching for essay {command_data.essay_id}",
                 extra={

@@ -19,6 +19,9 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )
@@ -48,6 +51,11 @@ class TestBatchKafkaConsumerBusinessLogic:
         return AsyncMock(spec=ClientPipelineRequestHandler)
 
     @pytest.fixture
+    def mock_batch_validation_errors_handler(self) -> AsyncMock:
+        """Mock the BatchValidationErrorsHandler external boundary."""
+        return AsyncMock(spec=BatchValidationErrorsHandler)
+
+    @pytest.fixture
     def mock_redis_client(self) -> AsyncMock:
         """Mock Redis client for idempotency support."""
         return AsyncMock(spec=RedisClientProtocol)
@@ -56,6 +64,7 @@ class TestBatchKafkaConsumerBusinessLogic:
     def kafka_consumer(
         self,
         mock_batch_essays_ready_handler: AsyncMock,
+        mock_batch_validation_errors_handler: AsyncMock,
         mock_els_batch_phase_outcome_handler: AsyncMock,
         mock_client_pipeline_request_handler: AsyncMock,
         mock_redis_client: AsyncMock,
@@ -65,6 +74,7 @@ class TestBatchKafkaConsumerBusinessLogic:
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
+            batch_validation_errors_handler=mock_batch_validation_errors_handler,
             els_batch_phase_outcome_handler=mock_els_batch_phase_outcome_handler,
             client_pipeline_request_handler=mock_client_pipeline_request_handler,
             redis_client=mock_redis_client,

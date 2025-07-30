@@ -11,7 +11,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState, PipelineStateDetail
+from common_core.pipeline_models import (
+    PhaseName,
+    PipelineExecutionStatus,
+    PipelineStateDetail,
+    ProcessingPipelineState,
+)
 from common_core.status_enums import BatchStatus
 from testcontainers.postgres import PostgresContainer
 
@@ -193,13 +198,13 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Assert
         assert save_success is True
         assert retrieved_state is not None
-        
+
         # Verify spellcheck phase state
         spellcheck_detail = retrieved_state.get_pipeline(PhaseName.SPELLCHECK.value)
         assert spellcheck_detail is not None
         assert spellcheck_detail.status == PipelineExecutionStatus.PENDING_DEPENDENCIES
-        
-        # Verify AI feedback phase state  
+
+        # Verify AI feedback phase state
         ai_feedback_detail = retrieved_state.get_pipeline(PhaseName.AI_FEEDBACK.value)
         assert ai_feedback_detail is not None
         assert ai_feedback_detail.status == PipelineExecutionStatus.PENDING_DEPENDENCIES
@@ -226,7 +231,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         # Create proper ProcessingPipelineState object for atomic testing
         initial_state = ProcessingPipelineState(
             batch_id=batch_id,
-            requested_pipelines=[phase_name.value], 
+            requested_pipelines=[phase_name.value],
             spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
         )
         await postgres_repository.save_processing_pipeline_state(batch_id, initial_state)

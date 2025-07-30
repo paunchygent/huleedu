@@ -67,7 +67,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                 "correlation_id": str(correlation_id),
                 "batch_id": batch_id,
                 "class_id": class_id,
-                "total_essays": processing_summary.get('total_essays', 0),
+                "total_essays": processing_summary.get("total_essays", 0),
             },
         )
 

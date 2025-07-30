@@ -30,6 +30,9 @@ class ProcessingEvent(str, Enum):
     BATCH_NLP_INITIATE_COMMAND = "batch.nlp.initiate.command"
     # -------------  ELS-BOS communication events  -------------#
     ELS_BATCH_PHASE_OUTCOME = "els.batch.phase.outcome"
+    BATCH_VALIDATION_ERRORS = "batch.validation.errors"
+    # -------------  Client commands  -------------#
+    CLIENT_BATCH_PIPELINE_REQUEST = "client.batch.pipeline.request"
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_COMPLETED = "essay.spellcheck.completed"
     ESSAY_SPELLCHECK_REQUESTED = "essay.spellcheck.requested"
@@ -111,6 +114,9 @@ _TOPIC_MAPPING = {
     ProcessingEvent.LLM_COST_ALERT: "huleedu.llm_provider.cost_alert.v1",
     ProcessingEvent.LLM_COST_TRACKING: "huleedu.llm_provider.cost_tracking.v1",
     ProcessingEvent.LLM_COMPARISON_RESULT: "huleedu.llm_provider.comparison_result.v1",
+    # New dual-event architecture topics
+    ProcessingEvent.BATCH_VALIDATION_ERRORS: "huleedu.els.batch.validation.errors.v1",
+    ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST: "huleedu.commands.batch.pipeline.v1",
 }
 
 

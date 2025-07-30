@@ -273,7 +273,7 @@ class ClientPipelineRequestHandler:
 
     def _has_active_pipeline(self, pipeline_state: ProcessingPipelineState) -> bool:
         """Check if batch has an active pipeline in progress."""
-        from common_core.pipeline_models import PipelineExecutionStatus, ProcessingPipelineState
+        from common_core.pipeline_models import PipelineExecutionStatus
 
         try:
             # Direct Pydantic model access - no conversion needed

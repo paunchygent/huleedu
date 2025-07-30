@@ -24,6 +24,9 @@ from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirma
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )
@@ -120,7 +123,6 @@ def sample_batch_essays_ready_event() -> dict:
                 {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
             "batch_entity": {"entity_type": "batch", "entity_id": batch_id},
-            "validation_failures": [],
             "metadata": {
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -160,7 +162,9 @@ def sample_els_phase_outcome_event() -> dict:
 
 
 @pytest.fixture
-def mock_handlers() -> tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler]:
+def mock_handlers() -> tuple[
+    BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+]:
     """Create real handler instances with mocked dependencies (boundary mocking)."""
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
@@ -171,10 +175,14 @@ def mock_handlers() -> tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
     )
+    batch_validation_errors_handler = BatchValidationErrorsHandler(
+        event_publisher=mock_event_publisher,
+        batch_repo=mock_batch_repo,
+    )
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
         phase_coordinator=mock_phase_coordinator,
     )
-    return batch_essays_ready_handler, els_phase_outcome_handler
+    return batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler
 
 
 @pytest.fixture
@@ -194,14 +202,18 @@ class TestBOSIdempotencyBasic:
     async def test_first_time_batch_essays_ready_processing_success(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time BatchEssaysReady events are processed successfully."""
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
@@ -214,6 +226,7 @@ class TestBOSIdempotencyBasic:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
@@ -250,7 +263,9 @@ class TestBOSIdempotencyBasic:
     async def test_duplicate_batch_essays_ready_detection_and_skipping(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that duplicate BatchEssaysReady events are skipped."""
@@ -258,7 +273,9 @@ class TestBOSIdempotencyBasic:
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
         deterministic_id = generate_deterministic_event_id(kafka_msg.value)
 
@@ -279,6 +296,7 @@ class TestBOSIdempotencyBasic:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
@@ -300,14 +318,18 @@ class TestBOSIdempotencyBasic:
     async def test_first_time_els_phase_outcome_processing_success(
         self,
         sample_els_phase_outcome_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that first-time ELSBatchPhaseOutcome events are processed successfully."""
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_els_phase_outcome_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
@@ -320,6 +342,7 @@ class TestBOSIdempotencyBasic:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
@@ -339,14 +362,18 @@ class TestBOSIdempotencyBasic:
     async def test_async_confirmation_pattern(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that processing and confirmation happen at separate times (async pattern)."""
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
         helper = AsyncConfirmationTestHelper()
 
@@ -360,6 +387,7 @@ class TestBOSIdempotencyBasic:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
@@ -398,14 +426,18 @@ class TestBOSIdempotencyBasic:
     async def test_crash_before_confirmation(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that a crash before confirmation leaves processing state intact."""
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
         helper = AsyncConfirmationTestHelper()
 
@@ -419,6 +451,7 @@ class TestBOSIdempotencyBasic:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,

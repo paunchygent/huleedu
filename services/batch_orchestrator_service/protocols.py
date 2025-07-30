@@ -93,7 +93,9 @@ class BatchRepositoryProtocol(Protocol):
         """Update the status of an existing batch."""
         pass
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
+    async def save_processing_pipeline_state(
+        self, batch_id: str, pipeline_state: ProcessingPipelineState
+    ) -> bool:
         """Save pipeline processing state for a batch."""
         pass
 

@@ -47,7 +47,9 @@ class BatchPipelineStateManager:
         }
         return mapping.get(status, PhaseStatusEnum.FAILED)
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
+    async def save_processing_pipeline_state(
+        self, batch_id: str, pipeline_state: ProcessingPipelineState
+    ) -> bool:
         """Save pipeline processing state for a batch."""
         if not isinstance(pipeline_state, ProcessingPipelineState):
             raise ValueError(f"Expected ProcessingPipelineState, got {type(pipeline_state)}")
@@ -97,13 +99,15 @@ class BatchPipelineStateManager:
 
             if pipeline_config is None:
                 return None
-            
+
             # Convert dict from database back to ProcessingPipelineState
             try:
                 if isinstance(pipeline_config, dict):
                     return ProcessingPipelineState.model_validate(pipeline_config)
                 else:
-                    self.logger.warning(f"Invalid pipeline configuration type for batch {batch_id}: {type(pipeline_config)}")
+                    self.logger.warning(
+                        f"Invalid pipeline configuration type for batch {batch_id}: {type(pipeline_config)}"
+                    )
                     return None
             except Exception as e:
                 self.logger.error(f"Failed to deserialize pipeline state for batch {batch_id}: {e}")
@@ -138,20 +142,27 @@ class BatchPipelineStateManager:
                 current_pipeline_dict = batch.pipeline_configuration or {}
                 if current_pipeline_dict:
                     try:
-                        current_pipeline_state = ProcessingPipelineState.model_validate(current_pipeline_dict)
+                        current_pipeline_state = ProcessingPipelineState.model_validate(
+                            current_pipeline_dict
+                        )
                     except Exception as e:
-                        self.logger.error(f"Failed to deserialize pipeline state for batch {batch_id}: {e}")
+                        self.logger.error(
+                            f"Failed to deserialize pipeline state for batch {batch_id}: {e}"
+                        )
                         return False
                 else:
                     # Create new pipeline state if none exists
                     current_pipeline_state = ProcessingPipelineState(
-                        batch_id=batch_id,
-                        requested_pipelines=[]
+                        batch_id=batch_id, requested_pipelines=[]
                     )
 
                 # Get current phase status
                 pipeline_detail = current_pipeline_state.get_pipeline(phase_name.value)
-                current_phase_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
+                current_phase_status = (
+                    pipeline_detail.status
+                    if pipeline_detail
+                    else PipelineExecutionStatus.PENDING_DEPENDENCIES
+                )
 
                 # Atomic compare-and-set operation
                 if current_phase_status != expected_status:
@@ -165,14 +176,23 @@ class BatchPipelineStateManager:
                 if pipeline_detail:
                     pipeline_detail.status = new_status
                     if completion_timestamp:
-                        pipeline_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                        pipeline_detail.completed_at = datetime.fromisoformat(
+                            completion_timestamp.replace("Z", "+00:00")
+                        )
                 else:
                     # Create new pipeline detail if it doesn't exist
                     from common_core.pipeline_models import PipelineStateDetail
+
                     new_detail = PipelineStateDetail(status=new_status)
                     if completion_timestamp:
-                        new_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
-                    setattr(current_pipeline_state, phase_name.value.lower().replace("-", "_"), new_detail)
+                        new_detail.completed_at = datetime.fromisoformat(
+                            completion_timestamp.replace("Z", "+00:00")
+                        )
+                    setattr(
+                        current_pipeline_state,
+                        phase_name.value.lower().replace("-", "_"),
+                        new_detail,
+                    )
 
                 current_pipeline_state.last_updated = datetime.now(UTC)
                 # Use mode="json" to properly serialize datetime fields to ISO strings

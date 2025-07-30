@@ -47,6 +47,7 @@ class OutboxManager:
         event_type: str,
         event_data: Any,  # EventEnvelope[Any]
         topic: str,
+        session: Any | None = None,  # AsyncSession | None
     ) -> None:
         """
         Store event in outbox for reliable delivery.
@@ -61,6 +62,7 @@ class OutboxManager:
             event_type: Type of event being published
             event_data: Complete event envelope to publish
             topic: Kafka topic to publish to
+            session: Optional database session for transactional atomicity
 
         Raises:
             HuleEduError: If outbox repository is not configured or storage fails
@@ -105,6 +107,7 @@ class OutboxManager:
                 event_data=serialized_data,
                 topic=topic,
                 event_key=event_key,
+                session=session,  # Pass through session for transactional atomicity
             )
 
             logger.debug(

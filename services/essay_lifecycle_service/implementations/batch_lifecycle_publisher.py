@@ -98,6 +98,7 @@ class BatchLifecyclePublisher:
             event_type="huleedu.els.excess.content.provisioned.v1",
             event_data=envelope,
             topic=topic,
+            session=session,  # Pass session for transactional atomicity
         )
 
         logger.info(
@@ -157,6 +158,7 @@ class BatchLifecyclePublisher:
             event_type="huleedu.els.batch.essays.ready.v1",
             event_data=envelope,
             topic=topic,
+            session=session,  # Pass session for transactional atomicity
         )
 
         logger.info(
@@ -164,6 +166,73 @@ class BatchLifecyclePublisher:
             extra={
                 "batch_id": batch_id,
                 "ready_count": len(getattr(event_data, "ready_essays", [])),
+                "correlation_id": str(correlation_id),
+                "topic": topic,
+            },
+        )
+
+    async def publish_batch_validation_errors(
+        self,
+        event_data: Any,  # BatchValidationErrorsV1
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """
+        Publish BatchValidationErrorsV1 event for structured error handling.
+
+        This method implements the new dual-event publishing pattern where validation
+        errors are published separately from success events, following HuleEdu
+        structured error handling principles.
+
+        Args:
+            event_data: The batch validation errors event data
+            correlation_id: Correlation ID for event tracking
+            session: Optional database session (unused in this implementation)
+
+        Raises:
+            HuleEduError: If publishing fails to both Kafka and outbox would be needed
+        """
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope for validation errors
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.batch.validation.errors.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
+        # TRUE OUTBOX PATTERN: Store validation error event in outbox
+        from common_core.event_enums import ProcessingEvent, topic_name
+
+        topic = topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)  # New topic for error events
+        batch_id = getattr(event_data, "batch_id", "unknown")
+
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id=batch_id,
+            event_type="huleedu.els.batch.validation.errors.v1",
+            event_data=envelope,
+            topic=topic,
+            session=session,  # Pass session for transactional atomicity
+        )
+
+        logger.info(
+            "BatchValidationErrors event stored in outbox for reliable delivery",
+            extra={
+                "batch_id": batch_id,
+                "error_count": len(getattr(event_data, "failed_essays", [])),
+                "critical_failure": getattr(event_data.error_summary, "critical_failure", False)
+                if hasattr(event_data, "error_summary")
+                else False,
                 "correlation_id": str(correlation_id),
                 "topic": topic,
             },
@@ -215,6 +284,7 @@ class BatchLifecyclePublisher:
             event_type="huleedu.els.essay.slot.assigned.v1",
             event_data=envelope,
             topic=topic,
+            session=session,  # Pass session for transactional atomicity
         )
 
         logger.info(
@@ -276,6 +346,7 @@ class BatchLifecyclePublisher:
             event_type="huleedu.els.batch.phase.outcome.v1",
             event_data=envelope,
             topic=topic,
+            session=session,  # Pass session for transactional atomicity
         )
 
         logger.info(

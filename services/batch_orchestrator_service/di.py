@@ -45,6 +45,9 @@ from services.batch_orchestrator_service.implementations.batch_repository_impl i
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
     PostgreSQLBatchRepositoryImpl,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.cj_assessment_initiator_impl import (
     DefaultCJAssessmentInitiator,
 )
@@ -427,10 +430,20 @@ class EventHandlingProvider(Provider):
         return ClientPipelineRequestHandler(bcs_client, batch_repo, phase_coordinator)
 
     @provide(scope=Scope.APP)
+    def provide_batch_validation_errors_handler(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> BatchValidationErrorsHandler:
+        """Provide BatchValidationErrors message handler for dual-event architecture."""
+        return BatchValidationErrorsHandler(event_publisher, batch_repo)
+
+    @provide(scope=Scope.APP)
     def provide_batch_kafka_consumer(
         self,
         settings: Settings,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
+        batch_validation_errors_handler: BatchValidationErrorsHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
         client_pipeline_request_handler: ClientPipelineRequestHandler,
         redis_client: AtomicRedisClientProtocol,
@@ -440,6 +453,7 @@ class EventHandlingProvider(Provider):
             kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             consumer_group=settings.KAFKA_CONSUMER_GROUP_ID,
             batch_essays_ready_handler=batch_essays_ready_handler,
+            batch_validation_errors_handler=batch_validation_errors_handler,
             els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
             client_pipeline_request_handler=client_pipeline_request_handler,
             redis_client=redis_client,

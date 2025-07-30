@@ -34,9 +34,6 @@ from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
-from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
-    BatchLifecyclePublisher,
-)
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
 )
@@ -130,6 +127,18 @@ def failing_kafka_bus() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_session_factory() -> AsyncMock:
+    """Mock session factory for database operations."""
+    factory = AsyncMock()
+    # Configure the factory to return an async context manager
+    session = AsyncMock()
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+    factory.return_value = session
+    return factory
+
+
+@pytest.fixture
 def business_context() -> BusinessWorkflowContext:
     """Business workflow tracking context."""
     return BusinessWorkflowContext(
@@ -163,7 +172,7 @@ class TestBatchCoordinationBusinessImpact:
         # Make outbox fail specifically for batch ready events
         mock_outbox_repository.add_event.side_effect = Exception("Database connection lost")
         # Create mock BatchLifecyclePublisher
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -208,7 +217,6 @@ class TestBatchCoordinationBusinessImpact:
             essay_instructions=batch_registered_event.essay_instructions,
             class_type="GUEST",
             user_id="test_user_123",
-            validation_failures=[],  # Add some failures if needed
         )
 
         # Mock check_batch_completion to return the ready event during registration
@@ -271,7 +279,7 @@ class TestBatchCoordinationBusinessImpact:
         ]
 
         # Create mock BatchLifecyclePublisher
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -561,7 +569,7 @@ class TestDualChannelPublishingBusinessImpact:
         failing_redis_client.publish_user_notification.side_effect = Exception("Redis failure")
 
         # Create mock event publisher that simulates dual-channel publishing behavior
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
 
         # Configure the mock to simulate Redis failure after Kafka success
         def simulate_redis_failure(*args: Any, **kwargs: Any) -> None:
@@ -645,7 +653,7 @@ class TestDualChannelPublishingBusinessImpact:
         working_redis_client.publish_user_notification.return_value = None  # Success
 
         # Create mock event publisher that simulates outbox storage failure
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
 
         # Configure the mock to simulate outbox failure after Kafka failure
         def simulate_outbox_failure(*args: Any, **kwargs: Any) -> None:
@@ -738,7 +746,7 @@ class TestBusinessWorkflowRecoveryScenarios:
         kafka_bus.publish.side_effect = kafka_side_effect
 
         # Create mock event publisher that simulates recovery behavior
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
         # Configure the mock to succeed for all calls (simulating successful recovery)
         event_publisher.publish_status_update.return_value = None
 
@@ -839,7 +847,7 @@ class TestBusinessImpactIntegrationScenarios:
         mock_outbox_repository.add_event.return_value = uuid4()
 
         # Create mock BatchLifecyclePublisher
-        event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+        event_publisher = AsyncMock()
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,

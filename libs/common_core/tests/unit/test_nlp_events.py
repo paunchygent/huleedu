@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult, StudentMatchSuggestion
+from common_core.events.nlp_events import (
+    BatchAuthorMatchesSuggestedV1,
+    EssayMatchResult,
+    StudentMatchSuggestion,
+)
 from common_core.metadata_models import EntityReference
 
 

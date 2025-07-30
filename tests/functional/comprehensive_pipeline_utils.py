@@ -285,15 +285,10 @@ async def watch_pipeline_progression_with_consumer(
                                 print(f"❌ Validation failed: {essay_file} ({reason})")
                             elif message.topic == PIPELINE_TOPICS["batch_ready"]:
                                 ready_essays = event_data.get("ready_essays", [])
-                                validation_failures = event_data.get("validation_failures", [])
                                 ready_count = len(ready_essays) if ready_essays else 0
-                                failed_count = (
-                                    len(validation_failures) if validation_failures else 0
-                                )
-                                total_processed = ready_count + failed_count
+                                # Note: validation failures are now sent as separate BatchValidationErrorsV1 events
                                 print(
-                                    f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready, "
-                                    f"{failed_count} failed ({total_processed} total)",
+                                    f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready",
                                 )
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
                                 essays_to_process = event_data.get("essays_to_process", [])

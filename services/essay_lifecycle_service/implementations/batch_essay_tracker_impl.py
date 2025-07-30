@@ -13,7 +13,6 @@ from typing import Any
 from uuid import UUID
 
 from common_core.domain_enums import get_course_language
-from common_core.error_enums import ErrorCode, FileValidationErrorCode
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
     BatchEssaysRegistered,
@@ -23,11 +22,6 @@ from common_core.metadata_models import (
     EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
-)
-from common_core.models.error_models import ErrorDetail
-from huleedu_service_libs.error_handling import HuleEduError
-from huleedu_service_libs.error_handling.error_detail_factory import (
-    create_error_detail_with_context,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -464,68 +458,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     )
                 )
 
-        # Get validation failures from Redis
-        failure_dicts = await self._failure_tracker.get_validation_failures(batch_id)
-        failures: list[EssayValidationFailedV1] = []
-        for failure_dict in failure_dicts:
-            try:
-                # Convert string error code back to enum
-                error_code_str = failure_dict["validation_error_code"]
-                try:
-                    error_code = FileValidationErrorCode(error_code_str)
-                except ValueError:
-                    # If the error code is not recognized, use a default
-                    self._logger.warning(
-                        f"Unknown validation error code '{error_code_str}' for batch {batch_id}, "
-                        f"using UNKNOWN_VALIDATION_ERROR"
-                    )
-                    error_code = FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR
+        # NOTE: Validation failures are now handled via separate BatchValidationErrorsV1 events
+        # following structured error handling principles. Legacy validation_failures field removed.
 
-                failures.append(
-                    EssayValidationFailedV1(
-                        batch_id=failure_dict["batch_id"],
-                        file_upload_id=failure_dict["file_upload_id"],
-                        original_file_name=failure_dict["original_file_name"],
-                        validation_error_code=error_code,
-                        validation_error_detail=ErrorDetail.model_validate(
-                            failure_dict["validation_error_detail"]
-                        ),
-                        file_size_bytes=failure_dict["file_size_bytes"],
-                        raw_file_storage_id=failure_dict["raw_file_storage_id"],
-                        correlation_id=UUID(failure_dict["correlation_id"])
-                        if failure_dict.get("correlation_id")
-                        else None,
-                    )
-                )
-            except KeyError as e:
-                error_detail = create_error_detail_with_context(
-                    error_code=ErrorCode.PROCESSING_ERROR,
-                    message=f"Invalid validation failure data in Redis for batch {batch_id}",
-                    service="essay_lifecycle_service",
-                    operation="_create_batch_ready_event_from_redis",
-                    details={
-                        "batch_id": batch_id,
-                        "missing_field": str(e),
-                        "failure_dict": failure_dict,
-                    },
-                )
-                raise HuleEduError(error_detail) from e
-            except Exception as e:
-                error_detail = create_error_detail_with_context(
-                    error_code=ErrorCode.PROCESSING_ERROR,
-                    message=f"Failed to reconstruct validation failure event for batch {batch_id}",
-                    service="essay_lifecycle_service",
-                    operation="_create_batch_ready_event_from_redis",
-                    details={
-                        "batch_id": batch_id,
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "failure_dict": failure_dict,
-                    },
-                )
-                raise HuleEduError(error_detail) from e
-
-        # Create BatchEssaysReady event
+        # Create clean BatchEssaysReady event with NO legacy validation fields
         ready_event = BatchEssaysReady(
             batch_id=batch_id,
             ready_essays=ready_essays,
@@ -541,9 +477,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             class_type="GUEST",  # Placeholder
             teacher_first_name=None,
             teacher_last_name=None,
-            user_id=metadata.get("user_id", ""),  # Get user_id from metadata
-            validation_failures=failures if failures else None,
-            total_files_processed=len(ready_essays) + len(failures),
         )
 
         # Extract correlation ID from metadata
@@ -563,7 +496,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         self._logger.info(
             f"Batch {batch_id} completed via Redis coordinator: "
-            f"{len(ready_essays)} successful, {len(failures)} failed"
+            f"{len(ready_essays)} essays ready for processing"
         )
 
         # Clean up Redis state

@@ -21,6 +21,9 @@ from common_core.domain_enums import CourseCode
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )
@@ -115,7 +118,6 @@ def sample_batch_essays_ready_event() -> dict:
                 {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
             "batch_entity": {"entity_type": "batch", "entity_id": batch_id},
-            "validation_failures": [],
             "metadata": {
                 "entity": {"entity_type": "batch", "entity_id": batch_id},
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -132,7 +134,9 @@ def sample_batch_essays_ready_event() -> dict:
 
 
 @pytest.fixture
-def mock_handlers() -> tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler]:
+def mock_handlers() -> tuple[
+    BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+]:
     """Create real handler instances with mocked dependencies (boundary mocking)."""
     mock_event_publisher = AsyncMock()
     mock_batch_repo = AsyncMock()
@@ -143,10 +147,14 @@ def mock_handlers() -> tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandle
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
     )
+    batch_validation_errors_handler = BatchValidationErrorsHandler(
+        event_publisher=mock_event_publisher,
+        batch_repo=mock_batch_repo,
+    )
     els_phase_outcome_handler = ELSBatchPhaseOutcomeHandler(
         phase_coordinator=mock_phase_coordinator,
     )
-    return batch_essays_ready_handler, els_phase_outcome_handler
+    return batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler
 
 
 @pytest.fixture
@@ -166,14 +174,18 @@ class TestBOSIdempotencyOutage:
     async def test_business_logic_failure_releases_redis_lock(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that business logic failures release the lock for retry."""
         from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
         redis_client = MockRedisClient()
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         batch_repo_mock = cast(AsyncMock, batch_essays_ready_handler.batch_repo)
         batch_repo_mock.store_batch_essays.side_effect = Exception(
             "Business logic failure",
@@ -190,6 +202,7 @@ class TestBOSIdempotencyOutage:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,
@@ -237,7 +250,9 @@ class TestBOSIdempotencyOutage:
     async def test_redis_failure_fallback_continues_processing(
         self,
         sample_batch_essays_ready_event: dict,
-        mock_handlers: tuple[BatchEssaysReadyHandler, ELSBatchPhaseOutcomeHandler],
+        mock_handlers: tuple[
+            BatchEssaysReadyHandler, BatchValidationErrorsHandler, ELSBatchPhaseOutcomeHandler
+        ],
         mock_client_pipeline_request_handler: AsyncMock,
     ) -> None:
         """Test that Redis failures fall back to processing without idempotency."""
@@ -245,7 +260,9 @@ class TestBOSIdempotencyOutage:
 
         redis_client = MockRedisClient()
         redis_client.should_fail_set = True
-        batch_essays_ready_handler, els_phase_outcome_handler = mock_handlers
+        batch_essays_ready_handler, batch_validation_errors_handler, els_phase_outcome_handler = (
+            mock_handlers
+        )
         kafka_msg = create_mock_kafka_message(sample_batch_essays_ready_event)
 
         config = IdempotencyConfig(service_name="batch-service", enable_debug_logging=True)
@@ -258,6 +275,7 @@ class TestBOSIdempotencyOutage:
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
                 redis_client=redis_client,

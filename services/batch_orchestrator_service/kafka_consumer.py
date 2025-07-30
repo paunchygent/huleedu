@@ -18,6 +18,9 @@ from huleedu_service_libs.protocols import RedisClientProtocol
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
 )
@@ -38,6 +41,7 @@ class BatchKafkaConsumer:
         kafka_bootstrap_servers: str,
         consumer_group: str,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
+        batch_validation_errors_handler: BatchValidationErrorsHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
         client_pipeline_request_handler: ClientPipelineRequestHandler,
         redis_client: RedisClientProtocol,
@@ -45,6 +49,7 @@ class BatchKafkaConsumer:
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.batch_essays_ready_handler = batch_essays_ready_handler
+        self.batch_validation_errors_handler = batch_validation_errors_handler
         self.els_batch_phase_outcome_handler = els_batch_phase_outcome_handler
         self.client_pipeline_request_handler = client_pipeline_request_handler
         self.redis_client = redis_client
@@ -56,8 +61,15 @@ class BatchKafkaConsumer:
         # Subscribe to all relevant topics
         topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
-            "huleedu.els.batch.phase.outcome.v1",  # ELSBatchPhaseOutcomeV1 events from ELS
-            "huleedu.commands.batch.pipeline.v1",  # ClientBatchPipelineRequestV1 from API Gateway
+            topic_name(
+                ProcessingEvent.ELS_BATCH_PHASE_OUTCOME
+            ),  # ELSBatchPhaseOutcomeV1 events from ELS
+            topic_name(
+                ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST
+            ),  # ClientBatchPipelineRequestV1 from API Gateway
+            topic_name(
+                ProcessingEvent.BATCH_VALIDATION_ERRORS
+            ),  # BatchValidationErrorsV1 events from ELS
         ]
 
         # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
@@ -201,7 +213,7 @@ class BatchKafkaConsumer:
                     pass
                 await self.batch_essays_ready_handler.handle_batch_essays_ready(msg)
 
-            elif msg.topic == "huleedu.els.batch.phase.outcome.v1":
+            elif msg.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
                 # Track phase transitions with timing context manager
                 if phase_transition_metric:
                     # The handler will use the metric for phase transition timing
@@ -212,8 +224,11 @@ class BatchKafkaConsumer:
                     self.els_batch_phase_outcome_handler._commands_metric = commands_metric
                 await self.els_batch_phase_outcome_handler.handle_els_batch_phase_outcome(msg)
 
-            elif msg.topic == "huleedu.commands.batch.pipeline.v1":
+            elif msg.topic == topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST):
                 await self.client_pipeline_request_handler.handle_client_pipeline_request(msg)
+
+            elif msg.topic == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS):
+                await self.batch_validation_errors_handler.handle_batch_validation_errors(msg)
             else:
                 logger.warning(f"Received message from unknown topic: {msg.topic}")
 

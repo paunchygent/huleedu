@@ -114,6 +114,25 @@ class BatchEssaysReadyHandler:
                         batch_id, essays_data
                     )
 
+                    # Log educational context for debugging and observability
+                    # This context is already stored during batch registration
+                    # and will be retrieved when the pipeline is triggered
+                    self.logger.info(
+                        "Batch educational context from ELS",
+                        extra={
+                            "batch_id": batch_id,
+                            "course_code": str(batch_essays_ready_data.course_code),
+                            "course_language": batch_essays_ready_data.course_language,
+                            "class_type": batch_essays_ready_data.class_type,
+                            "teacher_first_name": getattr(
+                                batch_essays_ready_data, "teacher_first_name", None
+                            ),
+                            "teacher_last_name": getattr(
+                                batch_essays_ready_data, "teacher_last_name", None
+                            ),
+                        },
+                    )
+
                     if storage_success:
                         self.logger.info(
                             f"Successfully stored {len(essays_data)} essays for batch {batch_id}",

@@ -33,6 +33,9 @@ from pydantic import ValidationError
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
+from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
+    BatchValidationErrorsHandler,
+)
 from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
     ELSBatchPhaseOutcomeHandler,
 )
@@ -108,6 +111,11 @@ class TestBosElsPhaseCoordination:
         return ELSBatchPhaseOutcomeHandler(phase_coordinator=mock_phase_coordinator)
 
     @pytest.fixture
+    def mock_batch_validation_errors_handler(self):
+        """Mock the BatchValidationErrorsHandler external boundary."""
+        return AsyncMock(spec=BatchValidationErrorsHandler)
+
+    @pytest.fixture
     def mock_client_pipeline_request_handler(self):
         """Mock the ClientPipelineRequestHandler external boundary."""
         from services.batch_orchestrator_service.implementations import (
@@ -122,6 +130,7 @@ class TestBosElsPhaseCoordination:
     def kafka_consumer(
         self,
         mock_batch_essays_ready_handler,
+        mock_batch_validation_errors_handler,
         real_els_outcome_handler,
         mock_client_pipeline_request_handler,
     ):
@@ -131,6 +140,7 @@ class TestBosElsPhaseCoordination:
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
+            batch_validation_errors_handler=mock_batch_validation_errors_handler,
             els_batch_phase_outcome_handler=real_els_outcome_handler,
             client_pipeline_request_handler=mock_client_pipeline_request_handler,
             redis_client=redis_client,

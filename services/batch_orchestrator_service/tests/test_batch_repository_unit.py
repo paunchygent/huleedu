@@ -9,7 +9,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState, PipelineStateDetail
+from common_core.pipeline_models import (
+    PhaseName,
+    PipelineExecutionStatus,
+    PipelineStateDetail,
+    ProcessingPipelineState,
+)
 
 from services.batch_orchestrator_service.implementations.batch_processing_service_impl import (
     BatchProcessingServiceImpl,

@@ -72,7 +72,9 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
         return result
 
     # Pipeline state operations - delegated to pipeline_manager
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
+    async def save_processing_pipeline_state(
+        self, batch_id: str, pipeline_state: ProcessingPipelineState
+    ) -> bool:
         """Save pipeline processing state for a batch."""
         result: bool = await self.pipeline_manager.save_processing_pipeline_state(
             batch_id,
@@ -82,7 +84,9 @@ class PostgreSQLBatchRepositoryImpl(BatchRepositoryProtocol):
 
     async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Retrieve pipeline processing state for a batch."""
-        result: ProcessingPipelineState | None = await self.pipeline_manager.get_processing_pipeline_state(batch_id)
+        result: (
+            ProcessingPipelineState | None
+        ) = await self.pipeline_manager.get_processing_pipeline_state(batch_id)
         return result
 
     async def update_phase_status_atomically(

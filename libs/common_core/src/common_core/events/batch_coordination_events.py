@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .file_events import EssayValidationFailedV1
+    pass
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -24,6 +24,10 @@ from ..metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
+
+# Import for structured error handling (forward reference resolution)
+if TYPE_CHECKING:
+    from ..models.error_models import ErrorDetail
 
 
 class BatchEssaysRegistered(BaseModel):
@@ -46,19 +50,26 @@ class BatchEssaysRegistered(BaseModel):
     user_id: str = Field(description="User who owns this batch")
 
 
+# LEGACY EVENT COMPLETELY REPLACED - NO BACKWARDS COMPATIBILITY
+# Old BatchEssaysReady with validation_failures anti-pattern has been eliminated
+# Replaced with clean BatchEssaysReady following structured error handling principles
+
+
 class BatchEssaysReady(BaseModel):
     """
-    Event sent by ELS to BOS when all essays in a batch are ready for processing.
+    Clean event for successful batch readiness - follows structured error handling principles.
 
-    Enhanced for lean registration: includes educational context from Class Management Service
-    that was deferred from the initial batch registration. Processing services receive complete
-    context at the right time rather than prematurely during upload.
+    ARCHITECTURAL CHANGE: This event has been completely rewritten to eliminate the
+    validation_failures anti-pattern. Error handling now uses separate BatchValidationErrorsV1 events
+    following HuleEdu structured error handling standards.
+
+    NO BACKWARDS COMPATIBILITY - This is a clean break from the legacy mixed success/error pattern.
     """
 
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
     batch_id: str = Field(description="Batch identifier")
     ready_essays: list[EssayProcessingInputRefV1] = Field(
-        description="List of essays ready for processing with their content references",
+        description="List of essays ready for processing with their content references"
     )
     batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
@@ -77,15 +88,8 @@ class BatchEssaysReady(BaseModel):
         default=None, description="Teacher last name from Class Management Service (REGULAR only)"
     )
 
-    # Legacy validation failure support
-    validation_failures: list[EssayValidationFailedV1] | None = Field(
-        default=None,
-        description="List of essays that failed validation (EssayValidationFailedV1 events)",
-    )
-    total_files_processed: int | None = Field(
-        default=None,
-        description="Total number of files processed (successful + failed)",
-    )
+    # CLEAN ARCHITECTURE: Legacy validation_failures and total_files_processed fields REMOVED
+    # Errors now handled via separate BatchValidationErrorsV1 events following structured error handling
 
 
 class BatchReadinessTimeout(BaseModel):
@@ -124,11 +128,13 @@ class ExcessContentProvisionedV1(BaseModel):
 class BatchContentProvisioningCompletedV1(BaseModel):
     """
     Event sent by ELS to BOS when all expected content has been provisioned.
-    
+
     This signals BOS to initiate Phase 1 student matching before batch readiness.
     """
-    
-    event: str = Field(default="batch.content.provisioning.completed", description="Event type identifier")
+
+    event: str = Field(
+        default="batch.content.provisioning.completed", description="Event type identifier"
+    )
     batch_id: str = Field(description="Batch identifier")
     provisioned_count: int = Field(description="Number of essays successfully provisioned")
     expected_count: int = Field(description="Originally expected essay count")
@@ -139,11 +145,66 @@ class BatchContentProvisioningCompletedV1(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+# NEW CLEAN EVENT MODELS - Modern structured error handling replacement for legacy validation_failures pattern
+
+
+class EssayValidationError(BaseModel):
+    """Structured validation error for an essay following HuleEdu error standards."""
+
+    essay_id: str = Field(description="Essay ID that failed validation")
+    file_name: str = Field(description="Original file name that failed")
+    error_detail: "ErrorDetail" = Field(
+        description="Structured error detail using HuleEdu error handling"
+    )
+    failed_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="When the validation failure occurred",
+    )
+
+
+class BatchErrorSummary(BaseModel):
+    """Summary of batch processing errors for observability and metrics."""
+
+    total_errors: int = Field(description="Total number of errors in batch")
+    error_categories: dict[str, int] = Field(
+        description="Error categories e.g., {'validation': 3, 'extraction': 2}"
+    )
+    critical_failure: bool = Field(
+        default=False, description="True if no essays succeeded in batch (complete failure)"
+    )
+
+
+class BatchValidationErrorsV1(BaseModel):
+    """
+    Event for batch validation failures - replaces legacy inline error pattern.
+
+    This event follows structured error handling principles with clean separation
+    from success events. Replaces the anti-pattern of embedding validation_failures
+    in BatchEssaysReady success events.
+    """
+
+    event: str = Field(default="batch.validation.errors.v1", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier")
+    failed_essays: list[EssayValidationError] = Field(
+        description="List of essays that failed validation with structured error details"
+    )
+    error_summary: BatchErrorSummary = Field(
+        description="Summary of errors for observability and metrics"
+    )
+    correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
+    metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+
+
+# BatchEssaysReadyV2 REMOVED - No need for V2 when following no-backwards-compatibility
+# The main BatchEssaysReady event above has been completely rewritten instead
+
+
 # Event envelope integration for batch coordination events
 class BatchCoordinationEventData(BaseModel):
     """Union type for all batch coordination event data types."""
 
     batch_essays_registered: BatchEssaysRegistered | None = None
-    batch_essays_ready: BatchEssaysReady | None = None
+    batch_essays_ready: BatchEssaysReady | None = None  # Clean event (legacy anti-pattern removed)
+    batch_validation_errors: BatchValidationErrorsV1 | None = None  # New structured error event
     batch_readiness_timeout: BatchReadinessTimeout | None = None
     excess_content_provisioned: ExcessContentProvisionedV1 | None = None

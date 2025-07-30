@@ -49,11 +49,13 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         """Mock implementation - always succeeds."""
         return True
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:
+    async def save_processing_pipeline_state(
+        self, batch_id: str, pipeline_state: ProcessingPipelineState
+    ) -> bool:
         """Mock implementation - stores pipeline state in memory with lock simulation."""
         if not isinstance(pipeline_state, ProcessingPipelineState):
             raise ValueError(f"Expected ProcessingPipelineState, got {type(pipeline_state)}")
-        
+
         async with self._get_lock(batch_id):
             self.pipeline_states[batch_id] = pipeline_state
             return True
@@ -90,21 +92,22 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
 
         Simulates production database compare-and-set behavior to prevent race conditions.
         """
-        from datetime import datetime, UTC
-        
+        from datetime import UTC, datetime
+
         async with self._get_lock(batch_id):
             current_state = self.pipeline_states.get(batch_id)
             if not current_state:
                 # No state exists yet - create a new one
-                current_state = ProcessingPipelineState(
-                    batch_id=batch_id,
-                    requested_pipelines=[]
-                )
+                current_state = ProcessingPipelineState(batch_id=batch_id, requested_pipelines=[])
                 self.pipeline_states[batch_id] = current_state
 
             # Get the pipeline detail for this phase
             pipeline_detail = current_state.get_pipeline(phase_name.value)
-            current_status = pipeline_detail.status if pipeline_detail else PipelineExecutionStatus.PENDING_DEPENDENCIES
+            current_status = (
+                pipeline_detail.status
+                if pipeline_detail
+                else PipelineExecutionStatus.PENDING_DEPENDENCIES
+            )
 
             # Simulate atomic compare-and-set operation
             if current_status == expected_status:
@@ -112,13 +115,18 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
                 if pipeline_detail:
                     pipeline_detail.status = new_status
                     if completion_timestamp:
-                        pipeline_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                        pipeline_detail.completed_at = datetime.fromisoformat(
+                            completion_timestamp.replace("Z", "+00:00")
+                        )
                 else:
                     # Create new pipeline detail if it doesn't exist
                     from common_core.pipeline_models import PipelineStateDetail
+
                     new_detail = PipelineStateDetail(status=new_status)
                     if completion_timestamp:
-                        new_detail.completed_at = datetime.fromisoformat(completion_timestamp.replace('Z', '+00:00'))
+                        new_detail.completed_at = datetime.fromisoformat(
+                            completion_timestamp.replace("Z", "+00:00")
+                        )
                     setattr(current_state, phase_name.value.lower().replace("-", "_"), new_detail)
 
                 current_state.last_updated = datetime.now(UTC)

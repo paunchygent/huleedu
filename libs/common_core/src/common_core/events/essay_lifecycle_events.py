@@ -38,11 +38,11 @@ class EssaySlotAssignedV1(BaseModel):
 class BatchStudentMatchingRequestedV1(BaseEventData):
     """
     Batch-level request from ELS to NLP Service for Phase 1 student matching.
-    
+
     Sent when ELS receives BATCH_STUDENT_MATCHING_INITIATE_COMMAND from BOS.
     Contains all essays in the batch that need student matching.
     """
-    
+
     event_name: ProcessingEvent = ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
     entity_ref: EntityReference  # Batch reference
     batch_id: str = Field(description="Batch identifier")

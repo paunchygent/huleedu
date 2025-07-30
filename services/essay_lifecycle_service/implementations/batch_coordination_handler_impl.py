@@ -112,13 +112,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         publish_correlation_id = original_correlation_id or correlation_id
 
                         logger.info(
-                            "Batch is immediately complete due to pending failures, publishing BatchEssaysReady event",
+                            "Batch is immediately complete, publishing clean BatchEssaysReady event",
                             extra={
                                 "batch_id": batch_ready_event.batch_id,
                                 "ready_count": len(batch_ready_event.ready_essays),
-                                "validation_failures": len(
-                                    batch_ready_event.validation_failures or []
-                                ),
                                 "correlation_id": str(publish_correlation_id),
                             },
                         )
@@ -391,11 +388,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 publish_correlation_id = original_correlation_id or correlation_id
 
                 logger.info(
-                    "Batch is complete after validation failure, publishing BatchEssaysReady event",
+                    "Batch is complete after validation failure, publishing clean BatchEssaysReady event",
                     extra={
                         "batch_id": batch_ready_event.batch_id,
                         "ready_count": len(batch_ready_event.ready_essays),
-                        "validation_failures": len(batch_ready_event.validation_failures or []),
                         "original_correlation_id": original_correlation_id,
                         "using_correlation_id": str(publish_correlation_id),
                     },
