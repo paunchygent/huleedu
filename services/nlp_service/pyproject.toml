@@ -49,6 +49,7 @@ dev = [
 ]
 
 [tool.pdm.scripts]
+start = "python worker_main.py"
 start-worker = "python worker_main.py"
 
 # Alembic database migration commands

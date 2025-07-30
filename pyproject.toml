@@ -124,6 +124,7 @@ module = [
     "services.result_aggregator_service.*",
     "services.llm_provider_service.*",
     "services.websocket_service.*",
+    "services.nlp_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -244,7 +245,8 @@ testpaths = [
     "services/class_management_service/tests",
     "services/result_aggregator_service/tests",
     "services/llm_provider_service/tests",
-    "services/websocket_service/tests"
+    "services/websocket_service/tests",
+    "services/nlp_service/tests"
 ]
 pythonpath = [
     "."
@@ -367,6 +369,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/result_aggregator_service",
     "-e file:///${PROJECT_ROOT}/services/llm_provider_service",
     "-e file:///${PROJECT_ROOT}/services/websocket_service",
+    "-e file:///${PROJECT_ROOT}/services/nlp_service",
 ]
 [build-system]
 requires = ["pdm-backend"]

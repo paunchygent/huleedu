@@ -213,3 +213,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # PostgreSQL database for NLP Service
+  nlp_db:
+    image: postgres:15
+    container_name: huleedu_nlp_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5440:5432"
+    environment:
+      - POSTGRES_DB=nlp_service
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - nlp_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d nlp_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
