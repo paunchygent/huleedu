@@ -14,9 +14,41 @@ from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from services.nlp_service.config import Settings, settings
+from services.nlp_service.implementations.content_client_impl import DefaultContentClient
+from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
 from services.nlp_service.implementations.outbox_manager import OutboxManager
+from services.nlp_service.implementations.roster_cache_impl import RedisRosterCache
+from services.nlp_service.implementations.roster_client_impl import DefaultClassManagementClient
+from services.nlp_service.implementations.student_matcher_impl import DefaultStudentMatcher
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
+from services.nlp_service.matching_algorithms.extraction.base_extractor import BaseExtractor
+from services.nlp_service.matching_algorithms.extraction.email_anchor_extractor import (
+    EmailAnchorExtractor,
+)
+from services.nlp_service.matching_algorithms.extraction.examnet_extractor import (
+    ExamnetExtractor,
+)
+from services.nlp_service.matching_algorithms.extraction.extraction_pipeline import (
+    ExtractionPipeline,
+)
+from services.nlp_service.matching_algorithms.extraction.header_extractor import HeaderExtractor
+from services.nlp_service.matching_algorithms.matching.confidence_calculator import (
+    ConfidenceCalculator,
+)
+from services.nlp_service.matching_algorithms.matching.email_matcher import EmailMatcher
+from services.nlp_service.matching_algorithms.matching.name_matcher import NameMatcher
+from services.nlp_service.matching_algorithms.matching.roster_matcher import RosterMatcher
+from services.nlp_service.matching_algorithms.matching.swedish_name_parser import (
+    SwedishNameParser,
+)
 from services.nlp_service.metrics import get_business_metrics
+from services.nlp_service.protocols import (
+    ClassManagementClientProtocol,
+    ContentClientProtocol,
+    NlpEventPublisherProtocol,
+    RosterCacheProtocol,
+    StudentMatcherProtocol,
+)
 from services.nlp_service.repositories.nlp_repository import NlpRepository
 
 
@@ -77,6 +109,12 @@ class NlpServiceProvider(Provider):
         settings: Settings,
         kafka_bus: KafkaPublisherProtocol,
         redis_client: AtomicRedisClientProtocol,
+        content_client: ContentClientProtocol,
+        class_management_client: ClassManagementClientProtocol,
+        roster_cache: RosterCacheProtocol,
+        student_matcher: StudentMatcherProtocol,
+        event_publisher: NlpEventPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
         tracer: Tracer,
     ) -> NlpKafkaConsumer:
         """Provide Kafka consumer instance."""
@@ -86,6 +124,12 @@ class NlpServiceProvider(Provider):
             consumer_client_id=settings.CONSUMER_CLIENT_ID,
             kafka_bus=kafka_bus,
             redis_client=redis_client,
+            content_client=content_client,
+            class_management_client=class_management_client,
+            roster_cache=roster_cache,
+            student_matcher=student_matcher,
+            event_publisher=event_publisher,
+            outbox_repository=outbox_repository,
             tracer=tracer,
         )
 
@@ -113,3 +157,117 @@ class NlpServiceProvider(Provider):
     def provide_nlp_repository(self, engine: AsyncEngine) -> NlpRepository:
         """Provide NLP repository for database access."""
         return NlpRepository(engine)
+
+    # Content and Class Management clients
+    @provide(scope=Scope.APP)
+    def provide_content_client(self, settings: Settings) -> ContentClientProtocol:
+        """Provide content client for fetching essay text."""
+        return DefaultContentClient(content_service_url=settings.CONTENT_SERVICE_URL)
+
+    @provide(scope=Scope.APP)
+    def provide_class_management_client(self, settings: Settings) -> ClassManagementClientProtocol:
+        """Provide class management client for fetching rosters."""
+        return DefaultClassManagementClient(
+            class_management_url=settings.CLASS_MANAGEMENT_SERVICE_URL
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_roster_cache(
+        self, redis_client: AtomicRedisClientProtocol
+    ) -> RosterCacheProtocol:
+        """Provide roster cache for caching class rosters."""
+        return RedisRosterCache(redis_client=redis_client, default_ttl_seconds=3600)
+
+    # Extraction components
+    @provide(scope=Scope.APP)
+    def provide_examnet_extractor(self, settings: Settings) -> ExamnetExtractor:
+        """Provide exam.net format extractor."""
+        return ExamnetExtractor(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_header_extractor(self, settings: Settings) -> HeaderExtractor:
+        """Provide header pattern extractor."""
+        return HeaderExtractor(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_email_anchor_extractor(self, settings: Settings) -> EmailAnchorExtractor:
+        """Provide email anchor extractor."""
+        return EmailAnchorExtractor(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_extraction_strategies(
+        self,
+        examnet_extractor: ExamnetExtractor,
+        header_extractor: HeaderExtractor,
+        email_anchor_extractor: EmailAnchorExtractor,
+    ) -> list[BaseExtractor]:
+        """Provide extraction strategies in priority order."""
+        return [examnet_extractor, header_extractor, email_anchor_extractor]
+
+    @provide(scope=Scope.APP)
+    def provide_extraction_pipeline(
+        self, strategies: list[BaseExtractor], settings: Settings
+    ) -> ExtractionPipeline:
+        """Provide extraction pipeline with configured strategies."""
+        return ExtractionPipeline(strategies=strategies, settings=settings)
+
+    # Matching components
+    @provide(scope=Scope.APP)
+    def provide_swedish_name_parser(self) -> SwedishNameParser:
+        """Provide Swedish name parser."""
+        return SwedishNameParser()
+
+    @provide(scope=Scope.APP)
+    def provide_name_matcher(
+        self, name_parser: SwedishNameParser, settings: Settings
+    ) -> NameMatcher:
+        """Provide name matcher with Swedish support."""
+        return NameMatcher(name_parser=name_parser, settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_email_matcher(self, settings: Settings) -> EmailMatcher:
+        """Provide email matcher."""
+        return EmailMatcher(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_confidence_calculator(self, settings: Settings) -> ConfidenceCalculator:
+        """Provide confidence calculator."""
+        return ConfidenceCalculator(settings=settings)
+
+    @provide(scope=Scope.APP)
+    def provide_roster_matcher(
+        self,
+        name_matcher: NameMatcher,
+        email_matcher: EmailMatcher,
+        confidence_calculator: ConfidenceCalculator,
+        settings: Settings,
+    ) -> RosterMatcher:
+        """Provide roster matcher orchestrator."""
+        return RosterMatcher(
+            name_matcher=name_matcher,
+            email_matcher=email_matcher,
+            confidence_calculator=confidence_calculator,
+            settings=settings,
+        )
+
+    # Main student matcher
+    @provide(scope=Scope.APP)
+    def provide_student_matcher(
+        self, extraction_pipeline: ExtractionPipeline, roster_matcher: RosterMatcher
+    ) -> StudentMatcherProtocol:
+        """Provide student matcher orchestrating extraction and matching."""
+        return DefaultStudentMatcher(
+            extraction_pipeline=extraction_pipeline, roster_matcher=roster_matcher
+        )
+
+    # Event publisher
+    @provide(scope=Scope.APP)
+    def provide_event_publisher(
+        self, outbox_manager: OutboxManager, settings: Settings
+    ) -> NlpEventPublisherProtocol:
+        """Provide event publisher using outbox pattern."""
+        return DefaultNlpEventPublisher(
+            outbox_manager=outbox_manager,
+            source_service_name=settings.SERVICE_NAME,
+            output_topic=settings.ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC,
+        )

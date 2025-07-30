@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     CONSUMER_GROUP: str = "nlp-service-consumer-group"
     CONSUMER_CLIENT_ID: str = "nlp-service-consumer"
     PRODUCER_CLIENT_ID: str = "nlp-service-producer"
+    
+    # Kafka Topics
+    ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC: str = "essay.author.match.suggested.v1"
 
     # External Service URLs
     CONTENT_SERVICE_URL: str = "http://content-service:8003"
@@ -40,6 +43,72 @@ class Settings(BaseSettings):
     # Outbox Pattern Configuration
     OUTBOX_POLLING_INTERVAL: int = Field(default=5, description="Seconds between outbox polls")
     OUTBOX_BATCH_SIZE: int = Field(default=100, description="Max events per relay batch")
+
+    # Student Matching Configuration
+    EXTRACTION_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.7,
+        description="Confidence to exit extraction pipeline early"
+    )
+    EXTRACTION_MAX_STRATEGIES: int = Field(
+        default=3,
+        description="Max strategies to try before giving up"
+    )
+
+    # Roster Matching Thresholds
+    MATCH_NAME_FUZZY_THRESHOLD: float = Field(
+        default=0.7,
+        description="Minimum similarity for fuzzy name match"
+    )
+    MATCH_EMAIL_FUZZY_THRESHOLD: float = Field(
+        default=0.9,
+        description="Minimum similarity for fuzzy email match"
+    )
+    MATCH_NAME_EXACT_CONFIDENCE: float = Field(
+        default=0.95,
+        description="Confidence score for exact name matches"
+    )
+    MATCH_EMAIL_EXACT_CONFIDENCE: float = Field(
+        default=0.98,
+        description="Confidence score for exact email matches"
+    )
+    MATCH_NAME_PARTIAL_CONFIDENCE: float = Field(
+        default=0.85,
+        description="Confidence score for partial name matches (first+last only)"
+    )
+    MATCH_NAME_FUZZY_CONFIDENCE: float = Field(
+        default=0.75,
+        description="Confidence score for fuzzy name matches"
+    )
+    MATCH_EMAIL_FUZZY_CONFIDENCE: float = Field(
+        default=0.88,
+        description="Confidence score for fuzzy email matches"
+    )
+
+    # Extraction Patterns (configurable)
+    HEADER_PATTERNS: list[str] = Field(
+        default=[
+            r"Name:\s*(.+)",
+            r"Student:\s*(.+)",
+            r"Author:\s*(.+)",
+            r"By:\s*(.+)",
+            r"Submitted by:\s*(.+)",
+            r"Written by:\s*(.+)",
+            r"Namn:\s*(.+)",  # Swedish
+            r"Elev:\s*(.+)",  # Swedish for "Student"
+        ],
+        description="Regex patterns for extracting names from headers"
+    )
+
+    EMAIL_CONTEXT_WINDOW: int = Field(
+        default=50,
+        description="Characters to search around email for name"
+    )
+
+    # Roster Cache Configuration
+    ROSTER_CACHE_TTL: int = Field(
+        default=3600,
+        description="Seconds to cache class rosters (1 hour)"
+    )
 
     @property
     def database_url(self) -> str:

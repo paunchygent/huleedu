@@ -13,6 +13,7 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
+import aiohttp
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.errors import KafkaConnectionError
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -22,9 +23,17 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
 from services.nlp_service.event_processor import process_single_message
+from services.nlp_service.protocols import (
+    ClassManagementClientProtocol,
+    ContentClientProtocol,
+    NlpEventPublisherProtocol,
+    RosterCacheProtocol,
+    StudentMatcherProtocol,
+)
 
 logger = create_service_logger("nlp_service.kafka.consumer")
 
@@ -39,6 +48,12 @@ class NlpKafkaConsumer:
         consumer_client_id: str,
         kafka_bus: KafkaPublisherProtocol,
         redis_client: AtomicRedisClientProtocol,
+        content_client: ContentClientProtocol,
+        class_management_client: ClassManagementClientProtocol,
+        roster_cache: RosterCacheProtocol,
+        student_matcher: StudentMatcherProtocol,
+        event_publisher: NlpEventPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
         tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with injected dependencies."""
@@ -47,9 +62,16 @@ class NlpKafkaConsumer:
         self.consumer_client_id = consumer_client_id
         self.kafka_bus = kafka_bus
         self.redis_client = redis_client
+        self.content_client = content_client
+        self.class_management_client = class_management_client
+        self.roster_cache = roster_cache
+        self.student_matcher = student_matcher
+        self.event_publisher = event_publisher
+        self.outbox_repository = outbox_repository
         self.tracer = tracer
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
+        self.http_session: aiohttp.ClientSession | None = None
 
         # Create idempotency configuration for NLP service
         idempotency_config = IdempotencyConfig(
@@ -62,8 +84,20 @@ class NlpKafkaConsumer:
         async def process_message_idempotently(
             msg: object, *, confirm_idempotency: Callable[[], Awaitable[None]]
         ) -> bool | None:
+            # Ensure HTTP session exists
+            if not self.http_session:
+                self.http_session = aiohttp.ClientSession()
+                
             result = await process_single_message(
                 msg=msg,
+                http_session=self.http_session,
+                content_client=self.content_client,
+                class_management_client=self.class_management_client,
+                roster_cache=self.roster_cache,
+                student_matcher=self.student_matcher,
+                event_publisher=self.event_publisher,
+                outbox_repository=self.outbox_repository,
+                kafka_bus=self.kafka_bus,
                 tracer=self.tracer,
             )
             await confirm_idempotency()  # Confirm after successful processing
@@ -85,6 +119,9 @@ class NlpKafkaConsumer:
         )
 
         try:
+            # Create HTTP session for external API calls
+            self.http_session = aiohttp.ClientSession()
+            
             await self.consumer.start()
             logger.info(
                 "NLP Kafka consumer started",
@@ -128,6 +165,17 @@ class NlpKafkaConsumer:
     async def stop_consumer(self) -> None:
         """Stop the Kafka consumer gracefully."""
         self.should_stop = True
+        
+        # Close HTTP session if exists
+        if self.http_session:
+            try:
+                await self.http_session.close()
+                logger.debug("HTTP session closed")
+            except Exception as e:
+                logger.error(f"Error closing HTTP session: {e}", exc_info=True)
+            finally:
+                self.http_session = None
+                
         if self.consumer:
             try:
                 await self.consumer.stop()
