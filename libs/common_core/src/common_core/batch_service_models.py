@@ -31,7 +31,6 @@ class BatchServiceStudentMatchingInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate Phase 1 student matching."""
 
     essays_to_process: list[EssayProcessingInputRefV1]
-    language: str  # inferred from course_code
     class_id: str  # Class ID for roster lookup
 
 

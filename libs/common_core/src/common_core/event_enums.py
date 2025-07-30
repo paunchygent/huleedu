@@ -22,7 +22,7 @@ class ProcessingEvent(str, Enum):
     # -------------  Phase 1 content and matching coordination  -------------#
     BATCH_CONTENT_PROVISIONING_COMPLETED = "batch.content.provisioning.completed"
     BATCH_STUDENT_MATCHING_INITIATE_COMMAND = "batch.student.matching.initiate.command"
-    ESSAY_STUDENT_MATCHING_REQUESTED = "essay.student.matching.requested"
+    BATCH_STUDENT_MATCHING_REQUESTED = "batch.student.matching.requested"
     # -------------  Specialized service commands  -------------#
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
     BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
@@ -37,7 +37,7 @@ class ProcessingEvent(str, Enum):
     CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
     CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
     ESSAY_NLP_COMPLETED = "essay.nlp.completed"
-    ESSAY_AUTHOR_MATCH_SUGGESTED = "essay.author.match.suggested"
+    BATCH_AUTHOR_MATCHES_SUGGESTED = "batch.author.matches.suggested"
     ESSAY_AIFEEDBACK_COMPLETED = "essay.aifeedback.completed"
     ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"
     ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"
@@ -87,8 +87,8 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND: (
         "huleedu.batch.student.matching.initiate.command.v1"
     ),
-    ProcessingEvent.ESSAY_STUDENT_MATCHING_REQUESTED: "huleedu.essay.student.matching.requested.v1",
-    ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED: "huleedu.essay.author.match.suggested.v1",
+    ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED: "huleedu.batch.student.matching.requested.v1",
+    ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED: "huleedu.batch.author.matches.suggested.v1",
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",

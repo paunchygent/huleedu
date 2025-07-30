@@ -12,6 +12,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from common_core.event_enums import ProcessingEvent
+from common_core.events.base_event_models import BaseEventData
+from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+
 
 class EssaySlotAssignedV1(BaseModel):
     """
@@ -29,3 +33,20 @@ class EssaySlotAssignedV1(BaseModel):
     text_storage_id: str = Field(description="Storage ID of assigned content")
     correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class BatchStudentMatchingRequestedV1(BaseEventData):
+    """
+    Batch-level request from ELS to NLP Service for Phase 1 student matching.
+    
+    Sent when ELS receives BATCH_STUDENT_MATCHING_INITIATE_COMMAND from BOS.
+    Contains all essays in the batch that need student matching.
+    """
+    
+    event_name: ProcessingEvent = ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
+    entity_ref: EntityReference  # Batch reference
+    batch_id: str = Field(description="Batch identifier")
+    essays_to_process: list[EssayProcessingInputRefV1] = Field(
+        description="All essays in batch requiring student matching"
+    )
+    class_id: str = Field(description="Class ID for roster lookup")

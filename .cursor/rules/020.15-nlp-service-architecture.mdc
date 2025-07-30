@@ -1,0 +1,105 @@
+---
+description: Defines the NLP Service architecture, a dual-phase worker service for student matching (Phase 1) and text analysis (Phase 2). Processes batches of essays with parallel execution and partial failure handling.
+globs: 
+alwaysApply: false
+---
+# 020.15: NLP Service Architecture
+
+## 1. Service Identity
+- **Package**: `huleedu-nlp-service`
+- **Type**: Kafka worker service (no HTTP API)
+- **Stack**: Python 3.11, aiokafka, aiohttp, Dishka, thefuzz
+- **Purpose**: Phase 1 student matching and Phase 2 text analysis for essay batches
+
+## 2. Core Architecture
+
+### 2.1. Service Structure
+```
+services/nlp_service/
+├── worker_main.py                          # Kafka consumer lifecycle
+├── event_processor.py                      # Event routing and processing
+├── matching_algorithms/                    # Student matching algorithms
+│   ├── extraction/                         # Text extraction strategies
+│   │   ├── base_extractor.py             # Protocol definition
+│   │   ├── examnet_extractor.py          # Exam.net format handler
+│   │   ├── header_extractor.py           # Pattern-based extraction
+│   │   └── extraction_pipeline.py        # Strategy orchestrator
+│   └── matching/                          # Roster matching logic
+│       ├── base_matcher.py               # Protocol definition
+│       ├── name_matcher.py               # Fuzzy name matching
+│       └── roster_matcher.py             # Main matching orchestrator
+├── implementations/                        # Service implementations
+│   ├── batch_student_matching_handler.py  # Phase 1 batch handler
+│   ├── batch_nlp_analysis_handler.py     # Phase 2 batch handler
+│   ├── content_client_impl.py            # File Service integration
+│   ├── roster_client_impl.py             # Class Management integration
+│   └── event_publisher_impl.py           # Outbox-based publishing
+├── protocols.py                           # Service protocols
+├── di.py                                  # Dishka configuration
+└── config.py                              # Service settings
+```
+
+### 2.2. Dual-Phase Responsibilities
+
+**Phase 1: Student Matching (Pre-readiness)**
+- Receives `BATCH_STUDENT_MATCHING_REQUESTED` from ELS
+- Extracts student identifiers from essay text
+- Matches against class roster
+- Returns `BATCH_AUTHOR_MATCHES_SUGGESTED` to Class Management
+
+**Phase 2: Text Analysis (Post-readiness)**
+- Receives `BATCH_NLP_INITIATE_COMMAND` from ELS
+- Performs linguistic analysis on essays
+- Returns analysis results per essay
+
+## 3. Critical Design Decisions
+
+### 3.1. Batch-Level Processing
+- **ALL** operations are batch-level (no individual essay events)
+- Internal parallel processing with asyncio.Semaphore(10)
+- Single batch response even with partial failures
+- Idempotency key: batch_id
+
+### 3.2. Language Handling
+- **NO** language field in Phase 1 events (YAGNI principle)
+- Language inferred from course_code when needed
+- Swedish name patterns built into extractors
+
+### 3.3. Extraction Pipeline Pattern
+```python
+# Multiple strategies tried in order until confidence threshold met
+pipeline = ExtractionPipeline(strategies=[
+    ExamnetExtractor(),      # 4-paragraph format
+    HeaderExtractor(),       # Pattern-based headers
+    EmailAnchorExtractor(),  # Name near email
+])
+```
+
+### 3.4. Partial Failure Handling
+- Failed essays included in batch response with error markers
+- Processing continues for remaining essays
+- Summary: `{"matched": 8, "no_match": 1, "errors": 1}`
+
+## 4. Integration Points
+
+### 4.1. Upstream Services
+- **Essay Lifecycle Service**: Batch commands via Kafka
+- **File Service**: Essay content via HTTP (with caching)
+- **Class Management**: Roster data via HTTP (with caching)
+
+### 4.2. Downstream Services
+- **Class Management**: Match suggestions via Kafka
+- **Result Aggregator**: Analysis results via Kafka (Phase 2)
+
+## 5. Performance Requirements
+- Batch processing < 100ms per essay (parallel)
+- Total batch < 10s for 30 essays
+- Max batch size: 100 essays
+- Roster cache TTL: 5 minutes
+
+## 6. Production Patterns
+- **MUST** use outbox pattern for event publishing
+- **MUST** implement graceful shutdown with Kafka cleanup
+- **MUST** use structured error handling from huleedu_service_libs
+- **MUST** handle roster fetch failures gracefully (empty matches)
+- **MUST** validate batch size limits before processing
