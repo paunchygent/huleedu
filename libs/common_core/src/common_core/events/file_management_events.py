@@ -1,7 +1,7 @@
 """
 File management event models for enhanced file operations.
 
-These events support file addition/removal operations and student parsing
+These events support file addition/removal operations
 following the thin event principle with focused, essential data.
 """
 
@@ -11,24 +11,6 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-
-
-class StudentParsingCompletedV1(BaseModel):
-    """Event published when File Service completes student parsing for a batch."""
-
-    event: str = Field(default="student.parsing.completed")
-    batch_id: str = Field(description="Batch identifier")
-    # Direct data - parsing results populate Class Management Service DB
-    parsing_results: list[dict] = Field(
-        description=(
-            "List of parsing results: [{essay_id, filename, first_name, last_name, "
-            "student_email, confidence}]"
-        )
-    )
-    parsed_count: int = Field(description="Number of essays with parsed student info")
-    total_count: int = Field(description="Total number of essays processed")
-    correlation_id: UUID = Field(default_factory=uuid4)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BatchFileAddedV1(BaseModel):

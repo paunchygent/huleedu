@@ -121,6 +121,24 @@ class ExcessContentProvisionedV1(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class BatchContentProvisioningCompletedV1(BaseModel):
+    """
+    Event sent by ELS to BOS when all expected content has been provisioned.
+    
+    This signals BOS to initiate Phase 1 student matching before batch readiness.
+    """
+    
+    event: str = Field(default="batch.content.provisioning.completed", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier")
+    provisioned_count: int = Field(description="Number of essays successfully provisioned")
+    expected_count: int = Field(description="Originally expected essay count")
+    class_id: str = Field(description="Class ID for student matching")
+    course_code: CourseCode = Field(description="Course code for language detection")
+    user_id: str = Field(description="User who owns this batch")
+    correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 # Event envelope integration for batch coordination events
 class BatchCoordinationEventData(BaseModel):
     """Union type for all batch coordination event data types."""

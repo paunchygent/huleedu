@@ -26,11 +26,11 @@ class BaseMatcher(ABC):
         roster: list[StudentInfo],
     ) -> list[MatchingResult]:
         """Match an identifier against the student roster.
-        
+
         Args:
             identifier: The extracted identifier (name or email) to match
             roster: List of students to match against
-            
+
         Returns:
             List of matching results with confidence scores
         """

@@ -19,7 +19,7 @@ class DefaultContentClient(ContentClientProtocol):
 
     def __init__(self, content_service_url: str) -> None:
         """Initialize content client.
-        
+
         Args:
             content_service_url: Base URL for Content Service
         """
@@ -63,8 +63,7 @@ class DefaultContentClient(ContentClientProtocol):
                 # Parse response - only reached on successful 2xx response
                 content = await response.text()
                 logger.debug(
-                    f"Successfully fetched content from {storage_id} "
-                    f"(length: {len(content)})",
+                    f"Successfully fetched content from {storage_id} (length: {len(content)})",
                     extra={"correlation_id": str(correlation_id), "storage_id": storage_id},
                 )
                 return content
@@ -96,7 +95,7 @@ class DefaultContentClient(ContentClientProtocol):
 
         except asyncio.TimeoutError:
             logger.error(
-                f"HTTP request timed out after 10 seconds",
+                "HTTP request timed out after 10 seconds",
                 extra={"correlation_id": str(correlation_id)},
             )
             raise_content_service_error(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
@@ -9,8 +10,6 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
 from common_core.metadata_models import EntityReference, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
-from datetime import UTC, datetime
-
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -31,7 +30,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         output_topic: str,
     ) -> None:
         """Initialize NLP event publisher.
-        
+
         Args:
             outbox_manager: Outbox manager for reliable event storage
             source_service_name: Name of this service for event metadata
@@ -50,14 +49,14 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         correlation_id: UUID,
     ) -> None:
         """Publish author match results to Kafka via outbox pattern.
-        
+
         Args:
             kafka_bus: Kafka publisher (not used directly due to outbox pattern)
             essay_id: ID of the essay that was analyzed
             suggestions: List of student match suggestions
             match_status: Overall match status (HIGH_CONFIDENCE, NEEDS_REVIEW, NO_MATCH)
             correlation_id: Request correlation ID for tracing
-            
+
         Note:
             The kafka_bus parameter is maintained for interface compatibility but
             not used directly. Publishing happens via the outbox pattern.
@@ -71,21 +70,17 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                 "suggestion_count": len(suggestions),
             },
         )
-        
+
         # Create entity reference for the essay
         entity_ref = EntityReference(
             entity_id=essay_id,
             entity_type="essay",
         )
-        
+
         # Determine essay status based on match result
-        if match_status == "HIGH_CONFIDENCE":
-            essay_status = EssayStatus.NLP_AUTHOR_MATCHED
-        elif match_status == "NEEDS_REVIEW":
-            essay_status = EssayStatus.NLP_AUTHOR_REVIEW_NEEDED
-        else:  # NO_MATCH
-            essay_status = EssayStatus.NLP_AUTHOR_NOT_FOUND
-        
+        # All match results indicate successful NLP processing
+        essay_status = EssayStatus.NLP_SUCCESS
+
         # Create system metadata
         system_metadata = SystemProcessingMetadata(
             entity=entity_ref,
@@ -95,7 +90,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             started_at=datetime.now(UTC),  # Would be tracked from processing start
             completed_at=datetime.now(UTC),
         )
-        
+
         # Create the event data
         event_data = EssayAuthorMatchSuggestedV1(
             event_name=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED,
@@ -107,7 +102,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             suggestions=suggestions,
             match_status=match_status,
         )
-        
+
         # Create event envelope
         event_envelope = EventEnvelope[EssayAuthorMatchSuggestedV1](
             event_type="essay.author.match.suggested.v1",
@@ -116,10 +111,10 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             data=event_data,
             metadata={},
         )
-        
+
         # Inject trace context if available
         inject_trace_context(event_envelope.metadata)
-        
+
         try:
             # Publish via outbox pattern
             await self.outbox_manager.publish_to_outbox(
@@ -129,7 +124,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                 event_data=event_envelope,
                 topic=self.output_topic,
             )
-            
+
             logger.info(
                 f"Successfully stored author match result in outbox for essay {essay_id}",
                 extra={
@@ -139,7 +134,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                     "topic": self.output_topic,
                 },
             )
-            
+
         except Exception as e:
             logger.error(
                 f"Failed to publish author match result for essay {essay_id}: {e}",

@@ -18,10 +18,10 @@ class CommandHandlerProtocol(Protocol):
 
     async def can_handle(self, event_type: str) -> bool:
         """Check if this handler can process the given event type.
-        
+
         Args:
             event_type: The event type string to check
-            
+
         Returns:
             True if this handler can process the event type, False otherwise
         """
@@ -36,14 +36,14 @@ class CommandHandlerProtocol(Protocol):
         span: "Span | None" = None,
     ) -> bool:
         """Process the command and return success status.
-        
+
         Args:
             msg: The Kafka message to process
             envelope: Already parsed event envelope
             http_session: HTTP session for external service calls
             correlation_id: Correlation ID for tracking
             span: Optional span for tracing
-            
+
         Returns:
             True if processing succeeded, False otherwise
         """

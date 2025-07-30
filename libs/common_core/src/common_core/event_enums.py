@@ -19,6 +19,10 @@ class ProcessingEvent(str, Enum):
     ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"
     EXCESS_CONTENT_PROVISIONED = "excess.content.provisioned"
     ESSAY_VALIDATION_FAILED = "essay.validation.failed"
+    # -------------  Phase 1 content and matching coordination  -------------#
+    BATCH_CONTENT_PROVISIONING_COMPLETED = "batch.content.provisioning.completed"
+    BATCH_STUDENT_MATCHING_INITIATE_COMMAND = "batch.student.matching.initiate.command"
+    ESSAY_STUDENT_MATCHING_REQUESTED = "essay.student.matching.requested"
     # -------------  Specialized service commands  -------------#
     BATCH_SPELLCHECK_INITIATE_COMMAND = "batch.spellcheck.initiate.command"
     BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
@@ -38,7 +42,6 @@ class ProcessingEvent(str, Enum):
     ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"
     ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"
     # -------------  Enhanced file and class management events  -------------#
-    STUDENT_PARSING_COMPLETED = "student.parsing.completed"
     ESSAY_STUDENT_ASSOCIATION_UPDATED = "essay.student.association.updated"
     BATCH_FILE_ADDED = "batch.file.added"
     BATCH_FILE_REMOVED = "batch.file.removed"
@@ -78,12 +81,18 @@ _TOPIC_MAPPING = {
         "huleedu.batch.ai_feedback.initiate.command.v1"
     ),
     ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
+    ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED: (
+        "huleedu.batch.content.provisioning.completed.v1"
+    ),
+    ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND: (
+        "huleedu.batch.student.matching.initiate.command.v1"
+    ),
+    ProcessingEvent.ESSAY_STUDENT_MATCHING_REQUESTED: "huleedu.essay.student.matching.requested.v1",
     ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED: "huleedu.essay.author.match.suggested.v1",
     ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED: "huleedu.els.cj_assessment.requested.v1",
     ProcessingEvent.CJ_ASSESSMENT_COMPLETED: "huleedu.cj_assessment.completed.v1",
     ProcessingEvent.CJ_ASSESSMENT_FAILED: "huleedu.cj_assessment.failed.v1",
     ProcessingEvent.ELS_BATCH_PHASE_OUTCOME: "huleedu.els.batch.phase.outcome.v1",
-    ProcessingEvent.STUDENT_PARSING_COMPLETED: "huleedu.file.student.parsing.completed.v1",
     ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED: "huleedu.class.essay.association.updated.v1",
     ProcessingEvent.BATCH_FILE_ADDED: "huleedu.file.batch.file.added.v1",
     ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",

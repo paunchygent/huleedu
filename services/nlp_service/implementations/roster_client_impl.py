@@ -9,7 +9,6 @@ import aiohttp
 from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.nlp_service.matching_algorithms.models import StudentInfo
 from services.nlp_service.protocols import ClassManagementClientProtocol
 
 logger = create_service_logger("nlp_service.roster_client_impl")
@@ -20,7 +19,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
 
     def __init__(self, class_management_url: str) -> None:
         """Initialize class management client.
-        
+
         Args:
             class_management_url: Base URL for Class Management Service
         """
@@ -33,38 +32,38 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
         correlation_id: UUID,
     ) -> list[dict]:
         """Fetch student roster from Class Management Service.
-        
+
         Args:
             class_id: ID of the class to fetch roster for
             http_session: HTTP client session
             correlation_id: Request correlation ID for tracing
-            
+
         Returns:
             List of student dictionaries with fields matching StudentInfo model
-            
+
         Raises:
             HuleEduError: On any failure to fetch roster
         """
         url = f"{self.class_management_url}/classes/{class_id}/roster"
-        
+
         logger.debug(
             f"Fetching class roster from URL: {url}",
             extra={"correlation_id": str(correlation_id), "class_id": class_id},
         )
-        
+
         try:
             timeout = aiohttp.ClientTimeout(total=10)
             headers = {
                 "X-Correlation-ID": str(correlation_id),
                 "Accept": "application/json",
             }
-            
+
             async with http_session.get(url, timeout=timeout, headers=headers) as response:
                 response.raise_for_status()
-                
+
                 # Parse JSON response
                 data = await response.json()
-                
+
                 # Validate response structure
                 if not isinstance(data, dict) or "students" not in data:
                     raise_external_service_error(
@@ -76,7 +75,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                         url=url,
                         response_data=str(data)[:200],
                     )
-                
+
                 students = data["students"]
                 if not isinstance(students, list):
                     raise_external_service_error(
@@ -88,7 +87,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                         url=url,
                         response_data=str(students)[:200],
                     )
-                
+
                 # Validate each student record has required fields
                 validated_students = []
                 for idx, student in enumerate(students):
@@ -98,26 +97,28 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                             extra={"correlation_id": str(correlation_id)},
                         )
                         continue
-                    
+
                     # Check required fields match StudentInfo model
                     required_fields = {"student_id", "first_name", "last_name", "full_legal_name"}
                     if not all(field in student for field in required_fields):
                         missing_fields = required_fields - set(student.keys())
                         logger.warning(
-                            f"Skipping student record at index {idx}: missing fields {missing_fields}",
+                            f"Skipping student record at index {idx}: "
+                            f"missing fields {missing_fields}",
                             extra={"correlation_id": str(correlation_id)},
                         )
                         continue
-                    
+
                     validated_students.append(student)
-                
+
                 logger.info(
-                    f"Successfully fetched roster for class {class_id} with {len(validated_students)} students",
+                    f"Successfully fetched roster for class {class_id} with "
+                    f"{len(validated_students)} students",
                     extra={"correlation_id": str(correlation_id), "class_id": class_id},
                 )
-                
+
                 return validated_students
-                
+
         except aiohttp.ClientResponseError as e:
             if e.status == 404:
                 raise_external_service_error(
@@ -141,10 +142,10 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                     status_code=e.status,
                     class_id=class_id,
                 )
-                
+
         except asyncio.TimeoutError:
             logger.error(
-                f"Request to Class Management Service timed out after 10 seconds",
+                "Request to Class Management Service timed out after 10 seconds",
                 extra={"correlation_id": str(correlation_id)},
             )
             raise_external_service_error(
@@ -156,7 +157,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                 url=url,
                 class_id=class_id,
             )
-            
+
         except aiohttp.ClientError as e:
             logger.error(
                 f"HTTP client error: {e}",
@@ -173,7 +174,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
                 class_id=class_id,
                 error_type=type(e).__name__,
             )
-            
+
         except Exception as e:
             logger.error(
                 f"Unexpected error fetching class roster: {e}",

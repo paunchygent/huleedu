@@ -23,17 +23,10 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.nlp_service.event_processor import process_single_message
-from services.nlp_service.protocols import (
-    ClassManagementClientProtocol,
-    ContentClientProtocol,
-    NlpEventPublisherProtocol,
-    RosterCacheProtocol,
-    StudentMatcherProtocol,
-)
+from services.nlp_service.protocols import CommandHandlerProtocol
 
 logger = create_service_logger("nlp_service.kafka.consumer")
 
@@ -46,28 +39,16 @@ class NlpKafkaConsumer:
         kafka_bootstrap_servers: str,
         consumer_group: str,
         consumer_client_id: str,
-        kafka_bus: KafkaPublisherProtocol,
         redis_client: AtomicRedisClientProtocol,
-        content_client: ContentClientProtocol,
-        class_management_client: ClassManagementClientProtocol,
-        roster_cache: RosterCacheProtocol,
-        student_matcher: StudentMatcherProtocol,
-        event_publisher: NlpEventPublisherProtocol,
-        outbox_repository: OutboxRepositoryProtocol,
+        command_handlers: dict[str, CommandHandlerProtocol],
         tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with injected dependencies."""
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.consumer_client_id = consumer_client_id
-        self.kafka_bus = kafka_bus
         self.redis_client = redis_client
-        self.content_client = content_client
-        self.class_management_client = class_management_client
-        self.roster_cache = roster_cache
-        self.student_matcher = student_matcher
-        self.event_publisher = event_publisher
-        self.outbox_repository = outbox_repository
+        self.command_handlers = command_handlers
         self.tracer = tracer
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
@@ -87,17 +68,11 @@ class NlpKafkaConsumer:
             # Ensure HTTP session exists
             if not self.http_session:
                 self.http_session = aiohttp.ClientSession()
-                
+
             result = await process_single_message(
                 msg=msg,
+                command_handlers=self.command_handlers,
                 http_session=self.http_session,
-                content_client=self.content_client,
-                class_management_client=self.class_management_client,
-                roster_cache=self.roster_cache,
-                student_matcher=self.student_matcher,
-                event_publisher=self.event_publisher,
-                outbox_repository=self.outbox_repository,
-                kafka_bus=self.kafka_bus,
                 tracer=self.tracer,
             )
             await confirm_idempotency()  # Confirm after successful processing
@@ -107,10 +82,13 @@ class NlpKafkaConsumer:
 
     async def start_consumer(self) -> None:
         """Start the Kafka consumer and begin processing messages."""
-        input_topic = topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
+        # Listen for both Phase 1 student matching and Phase 2 NLP commands
+        phase1_topic = topic_name(ProcessingEvent.ESSAY_STUDENT_MATCHING_REQUESTED)
+        phase2_topic = topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
 
         self.consumer = AIOKafkaConsumer(
-            input_topic,
+            phase1_topic,
+            phase2_topic,
             bootstrap_servers=self.kafka_bootstrap_servers,
             group_id=self.consumer_group,
             client_id=self.consumer_client_id,
@@ -121,13 +99,13 @@ class NlpKafkaConsumer:
         try:
             # Create HTTP session for external API calls
             self.http_session = aiohttp.ClientSession()
-            
+
             await self.consumer.start()
             logger.info(
                 "NLP Kafka consumer started",
                 extra={
                     "group_id": self.consumer_group,
-                    "topic": input_topic,
+                    "topics": [phase1_topic, phase2_topic],
                 },
             )
 
@@ -146,7 +124,7 @@ class NlpKafkaConsumer:
                 message=f"Failed to connect to Kafka: {str(kce)}",
                 correlation_id=uuid4(),
                 consumer_group=self.consumer_group,
-                topic=input_topic,
+                topics=[phase1_topic, phase2_topic],
             )
         except Exception as e:
             logger.error(f"Error in NLP Kafka consumer: {e}", exc_info=True)
@@ -157,7 +135,7 @@ class NlpKafkaConsumer:
                 message=f"Failed to initialize Kafka consumer: {str(e)}",
                 correlation_id=uuid4(),
                 consumer_group=self.consumer_group,
-                topic=input_topic,
+                topics=[phase1_topic, phase2_topic],
             )
         finally:
             await self.stop_consumer()
@@ -165,7 +143,7 @@ class NlpKafkaConsumer:
     async def stop_consumer(self) -> None:
         """Stop the Kafka consumer gracefully."""
         self.should_stop = True
-        
+
         # Close HTTP session if exists
         if self.http_session:
             try:
@@ -175,7 +153,7 @@ class NlpKafkaConsumer:
                 logger.error(f"Error closing HTTP session: {e}", exc_info=True)
             finally:
                 self.http_session = None
-                
+
         if self.consumer:
             try:
                 await self.consumer.stop()

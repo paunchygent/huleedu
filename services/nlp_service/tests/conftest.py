@@ -60,11 +60,7 @@ def sample_batch_id() -> str:
 @pytest.fixture
 def entity_reference(sample_batch_id: str) -> EntityReference:
     """Provide a sample EntityReference for testing."""
-    return EntityReference(
-        entity_id=sample_batch_id,
-        entity_type="batch",
-        parent_id=str(uuid4())
-    )
+    return EntityReference(entity_id=sample_batch_id, entity_type="batch", parent_id=str(uuid4()))
 
 
 @pytest.fixture

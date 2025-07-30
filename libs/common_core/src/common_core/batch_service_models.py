@@ -16,6 +16,7 @@ __all__ = [
     "BatchServiceCJAssessmentInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
     "BatchServiceSpellcheckInitiateCommandDataV1",
+    "BatchServiceStudentMatchingInitiateCommandDataV1",
 ]
 
 
@@ -26,11 +27,19 @@ class BatchServiceSpellcheckInitiateCommandDataV1(BaseEventData):
     language: str  # infered from course_code
 
 
+class BatchServiceStudentMatchingInitiateCommandDataV1(BaseEventData):
+    """Command data for Batch Orchestrator Service to initiate Phase 1 student matching."""
+
+    essays_to_process: list[EssayProcessingInputRefV1]
+    language: str  # inferred from course_code
+    class_id: str  # Class ID for roster lookup
+
+
 class BatchServiceNLPInitiateCommandDataV1(BaseEventData):
     """Command data for Batch Orchestrator Service to initiate NLP phase for a batch."""
 
     essays_to_process: list[EssayProcessingInputRefV1]
-    language: str  # infered from course_code
+    language: str  # inferred from course_code
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):

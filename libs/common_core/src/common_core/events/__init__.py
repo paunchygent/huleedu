@@ -4,6 +4,7 @@ Event models for HuleEdu microservices.
 
 from .base_event_models import BaseEventData, EventTracker, ProcessingUpdate
 from .batch_coordination_events import (
+    BatchContentProvisioningCompletedV1,
     BatchEssaysReady,
     BatchEssaysRegistered,
     BatchReadinessTimeout,
@@ -27,10 +28,13 @@ from .file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from .file_management_events import (
     BatchFileAddedV1,
     BatchFileRemovedV1,
-    StudentParsingCompletedV1,
 )
 from .llm_provider_events import LLMComparisonResultV1, TokenUsage
-from .nlp_events import EssayAuthorMatchSuggestedV1, StudentMatchSuggestion
+from .nlp_events import (
+    EssayAuthorMatchSuggestedV1,
+    EssayStudentMatchingRequestedV1,
+    StudentMatchSuggestion,
+)
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .validation_events import (
     StudentAssociation,
@@ -40,6 +44,7 @@ from .validation_events import (
 
 __all__ = [
     "BaseEventData",
+    "BatchContentProvisioningCompletedV1",
     "BatchEssaysRegistered",
     "BatchEssaysReady",
     "BatchFileAddedV1",
@@ -55,6 +60,7 @@ __all__ = [
     "EssayContentProvisionedV1",
     "EssaySlotAssignedV1",
     "EssayStudentAssociationUpdatedV1",
+    "EssayStudentMatchingRequestedV1",
     "EssayValidationFailedV1",
     "EventEnvelope",
     "EventTracker",
@@ -67,7 +73,6 @@ __all__ = [
     "StudentAssociationsConfirmedV1",
     "StudentCreatedV1",
     "StudentMatchSuggestion",
-    "StudentParsingCompletedV1",
     "TokenUsage",
     "ValidationTimeoutProcessedV1",
 ]

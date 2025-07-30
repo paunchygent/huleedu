@@ -13,9 +13,7 @@ class ExtractedIdentifier(BaseModel):
 
     value: str = Field(description="The extracted string (e.g., a name or email)")
     source_strategy: str = Field(description="The strategy that extracted this value")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Extraction confidence (0.0 to 1.0)"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Extraction confidence (0.0 to 1.0)")
     location_hint: str = Field(default="", description="Where in text it was found")
 
 
@@ -54,7 +52,7 @@ class NameComponents(BaseModel):
     @classmethod
     def from_full_name(cls, full_name: str) -> NameComponents:
         """Parse a full name into components (Swedish-aware).
-        
+
         This is a placeholder - actual implementation will be in swedish_name_parser.py
         """
         # Simple placeholder logic - will be replaced by swedish_name_parser
@@ -88,7 +86,7 @@ class MatchReason(str, Enum):
 
 class StudentInfo(BaseModel):
     """Student information from class roster.
-    
+
     This matches the structure expected from Class Management Service.
     """
 

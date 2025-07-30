@@ -20,7 +20,7 @@ class TestStudentMatchSuggestion:
             student_id="student-123",
             student_name="John Doe",
             confidence_score=0.95,
-            match_reason="exact_name"
+            match_reason="exact_name",
         )
 
         assert suggestion.student_id == "student-123"
@@ -32,16 +32,10 @@ class TestStudentMatchSuggestion:
         """Test confidence score must be between 0 and 1."""
         # Valid scores
         StudentMatchSuggestion(
-            student_id="123",
-            student_name="Test",
-            confidence_score=0.0,
-            match_reason="fuzzy_name"
+            student_id="123", student_name="Test", confidence_score=0.0, match_reason="fuzzy_name"
         )
         StudentMatchSuggestion(
-            student_id="123",
-            student_name="Test",
-            confidence_score=1.0,
-            match_reason="email"
+            student_id="123", student_name="Test", confidence_score=1.0, match_reason="email"
         )
 
         # Invalid scores
@@ -50,7 +44,7 @@ class TestStudentMatchSuggestion:
                 student_id="123",
                 student_name="Test",
                 confidence_score=1.1,
-                match_reason="exact_name"
+                match_reason="exact_name",
             )
 
         with pytest.raises(ValueError):
@@ -58,7 +52,7 @@ class TestStudentMatchSuggestion:
                 student_id="123",
                 student_name="Test",
                 confidence_score=-0.1,
-                match_reason="exact_name"
+                match_reason="exact_name",
             )
 
 
@@ -72,14 +66,14 @@ class TestEssayAuthorMatchSuggestedV1:
                 student_id="student-123",
                 student_name="John Doe",
                 confidence_score=0.95,
-                match_reason="exact_name"
+                match_reason="exact_name",
             ),
             StudentMatchSuggestion(
                 student_id="student-456",
                 student_name="Jane Doe",
                 confidence_score=0.75,
-                match_reason="fuzzy_name"
-            )
+                match_reason="fuzzy_name",
+            ),
         ]
 
         event = EssayAuthorMatchSuggestedV1(
@@ -90,11 +84,11 @@ class TestEssayAuthorMatchSuggestedV1:
             system_metadata=SystemProcessingMetadata(
                 entity=EntityReference(entity_type="essay", entity_id="essay-789"),
                 event=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED.value,
-                processing_stage=ProcessingStage.COMPLETED
+                processing_stage=ProcessingStage.COMPLETED,
             ),
             essay_id="essay-789",
             suggestions=suggestions,
-            match_status="HIGH_CONFIDENCE"
+            match_status="HIGH_CONFIDENCE",
         )
 
         assert event.essay_id == "essay-789"
@@ -112,11 +106,11 @@ class TestEssayAuthorMatchSuggestedV1:
             system_metadata=SystemProcessingMetadata(
                 entity=EntityReference(entity_type="essay", entity_id="essay-789"),
                 event=ProcessingEvent.ESSAY_AUTHOR_MATCH_SUGGESTED.value,
-                processing_stage=ProcessingStage.COMPLETED
+                processing_stage=ProcessingStage.COMPLETED,
             ),
             essay_id="essay-no-match",
             suggestions=[],
-            match_status="NO_MATCH"
+            match_status="NO_MATCH",
         )
 
         assert event.essay_id == "essay-no-match"

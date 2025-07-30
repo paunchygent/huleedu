@@ -13,7 +13,33 @@ from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from services.nlp_service.command_handlers.essay_student_matching_handler import (
+    EssayStudentMatchingHandler,
+)
+from services.nlp_service.command_handlers.student_matching_handler import StudentMatchingHandler
 from services.nlp_service.config import Settings, settings
+from services.nlp_service.features.student_matching.extraction.base_extractor import BaseExtractor
+from services.nlp_service.features.student_matching.extraction.email_anchor_extractor import (
+    EmailAnchorExtractor,
+)
+from services.nlp_service.features.student_matching.extraction.examnet_extractor import (
+    ExamnetExtractor,
+)
+from services.nlp_service.features.student_matching.extraction.extraction_pipeline import (
+    ExtractionPipeline,
+)
+from services.nlp_service.features.student_matching.extraction.header_extractor import (
+    HeaderExtractor,
+)
+from services.nlp_service.features.student_matching.matching.confidence_calculator import (
+    ConfidenceCalculator,
+)
+from services.nlp_service.features.student_matching.matching.email_matcher import EmailMatcher
+from services.nlp_service.features.student_matching.matching.name_matcher import NameMatcher
+from services.nlp_service.features.student_matching.matching.roster_matcher import RosterMatcher
+from services.nlp_service.features.student_matching.matching.swedish_name_parser import (
+    SwedishNameParser,
+)
 from services.nlp_service.implementations.content_client_impl import DefaultContentClient
 from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
 from services.nlp_service.implementations.outbox_manager import OutboxManager
@@ -21,29 +47,10 @@ from services.nlp_service.implementations.roster_cache_impl import RedisRosterCa
 from services.nlp_service.implementations.roster_client_impl import DefaultClassManagementClient
 from services.nlp_service.implementations.student_matcher_impl import DefaultStudentMatcher
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
-from services.nlp_service.matching_algorithms.extraction.base_extractor import BaseExtractor
-from services.nlp_service.matching_algorithms.extraction.email_anchor_extractor import (
-    EmailAnchorExtractor,
-)
-from services.nlp_service.matching_algorithms.extraction.examnet_extractor import (
-    ExamnetExtractor,
-)
-from services.nlp_service.matching_algorithms.extraction.extraction_pipeline import (
-    ExtractionPipeline,
-)
-from services.nlp_service.matching_algorithms.extraction.header_extractor import HeaderExtractor
-from services.nlp_service.matching_algorithms.matching.confidence_calculator import (
-    ConfidenceCalculator,
-)
-from services.nlp_service.matching_algorithms.matching.email_matcher import EmailMatcher
-from services.nlp_service.matching_algorithms.matching.name_matcher import NameMatcher
-from services.nlp_service.matching_algorithms.matching.roster_matcher import RosterMatcher
-from services.nlp_service.matching_algorithms.matching.swedish_name_parser import (
-    SwedishNameParser,
-)
 from services.nlp_service.metrics import get_business_metrics
 from services.nlp_service.protocols import (
     ClassManagementClientProtocol,
+    CommandHandlerProtocol,
     ContentClientProtocol,
     NlpEventPublisherProtocol,
     RosterCacheProtocol,
@@ -74,12 +81,14 @@ class NlpServiceProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         from prometheus_client import REGISTRY
+
         return REGISTRY
 
     @provide(scope=Scope.APP)
     def provide_tracer(self) -> Tracer:
         """Provide OpenTelemetry tracer."""
         from opentelemetry import trace
+
         return trace.get_tracer("nlp_service")
 
     @provide(scope=Scope.APP)
@@ -102,19 +111,12 @@ class NlpServiceProvider(Provider):
         await redis_client.start()
         return redis_client
 
-
     @provide(scope=Scope.REQUEST)
     def provide_kafka_consumer(
         self,
         settings: Settings,
-        kafka_bus: KafkaPublisherProtocol,
         redis_client: AtomicRedisClientProtocol,
-        content_client: ContentClientProtocol,
-        class_management_client: ClassManagementClientProtocol,
-        roster_cache: RosterCacheProtocol,
-        student_matcher: StudentMatcherProtocol,
-        event_publisher: NlpEventPublisherProtocol,
-        outbox_repository: OutboxRepositoryProtocol,
+        command_handlers: dict[str, CommandHandlerProtocol],
         tracer: Tracer,
     ) -> NlpKafkaConsumer:
         """Provide Kafka consumer instance."""
@@ -122,14 +124,8 @@ class NlpServiceProvider(Provider):
             kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             consumer_group=settings.CONSUMER_GROUP,
             consumer_client_id=settings.CONSUMER_CLIENT_ID,
-            kafka_bus=kafka_bus,
             redis_client=redis_client,
-            content_client=content_client,
-            class_management_client=class_management_client,
-            roster_cache=roster_cache,
-            student_matcher=student_matcher,
-            event_publisher=event_publisher,
-            outbox_repository=outbox_repository,
+            command_handlers=command_handlers,
             tracer=tracer,
         )
 
@@ -172,9 +168,7 @@ class NlpServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_roster_cache(
-        self, redis_client: AtomicRedisClientProtocol
-    ) -> RosterCacheProtocol:
+    def provide_roster_cache(self, redis_client: AtomicRedisClientProtocol) -> RosterCacheProtocol:
         """Provide roster cache for caching class rosters."""
         return RedisRosterCache(redis_client=redis_client, default_ttl_seconds=3600)
 
@@ -271,3 +265,64 @@ class NlpServiceProvider(Provider):
             source_service_name=settings.SERVICE_NAME,
             output_topic=settings.ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC,
         )
+
+    # Command handlers
+    @provide(scope=Scope.APP)
+    def provide_essay_student_matching_handler(
+        self,
+        content_client: ContentClientProtocol,
+        class_management_client: ClassManagementClientProtocol,
+        roster_cache: RosterCacheProtocol,
+        student_matcher: StudentMatcherProtocol,
+        event_publisher: NlpEventPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
+        kafka_bus: KafkaPublisherProtocol,
+        tracer: Tracer,
+    ) -> EssayStudentMatchingHandler:
+        """Provide Phase 1 essay student matching command handler."""
+        return EssayStudentMatchingHandler(
+            content_client=content_client,
+            class_management_client=class_management_client,
+            roster_cache=roster_cache,
+            student_matcher=student_matcher,
+            event_publisher=event_publisher,
+            outbox_repository=outbox_repository,
+            kafka_bus=kafka_bus,
+            tracer=tracer,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_batch_nlp_handler(
+        self,
+        content_client: ContentClientProtocol,
+        class_management_client: ClassManagementClientProtocol,
+        roster_cache: RosterCacheProtocol,
+        student_matcher: StudentMatcherProtocol,
+        event_publisher: NlpEventPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
+        kafka_bus: KafkaPublisherProtocol,
+        tracer: Tracer,
+    ) -> StudentMatchingHandler:
+        """Provide Phase 2 batch NLP command handler."""
+        return StudentMatchingHandler(
+            content_client=content_client,
+            class_management_client=class_management_client,
+            roster_cache=roster_cache,
+            student_matcher=student_matcher,
+            event_publisher=event_publisher,
+            outbox_repository=outbox_repository,
+            kafka_bus=kafka_bus,
+            tracer=tracer,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_command_handlers(
+        self,
+        essay_student_matching_handler: EssayStudentMatchingHandler,
+        batch_nlp_handler: StudentMatchingHandler,
+    ) -> dict[str, CommandHandlerProtocol]:
+        """Provide dictionary of command handlers."""
+        return {
+            "phase1_student_matching": essay_student_matching_handler,
+            "phase2_batch_nlp": batch_nlp_handler,
+        }

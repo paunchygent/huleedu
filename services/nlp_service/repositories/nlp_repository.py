@@ -68,7 +68,7 @@ class NlpRepository:
                     operation="database_session",
                     target="postgresql",
                     message=f"Session error: {str(e)}",
-                    correlation_id=uuid4()
+                    correlation_id=uuid4(),
                 )
 
     async def initialize_db_schema(self) -> None:
@@ -84,7 +84,7 @@ class NlpRepository:
                 operation="schema_initialization",
                 target="postgresql",
                 message=f"Schema initialization failed: {str(e)}",
-                correlation_id=uuid4()
+                correlation_id=uuid4(),
             )
 
     async def create_nlp_job(
@@ -124,7 +124,7 @@ class NlpRepository:
                 operation="create_nlp_job",
                 message=f"Failed to create job: {str(e)}",
                 correlation_id=uuid4(),
-                reason="nlp_job_creation_failed"
+                reason="nlp_job_creation_failed",
             )
 
     async def get_nlp_job_by_batch(self, batch_id: str) -> NlpAnalysisJob | None:
@@ -157,7 +157,7 @@ class NlpRepository:
                 operation="nlp_job_retrieval",
                 target="postgresql",
                 message=f"Failed to get job: {str(e)}",
-                correlation_id=uuid4()
+                correlation_id=uuid4(),
             )
 
     async def update_job_status(
@@ -185,7 +185,7 @@ class NlpRepository:
                         operation="update_job_status",
                         message=f"Job {job_id} not found",
                         correlation_id=uuid4(),
-                        reason="nlp_job_not_found"
+                        reason="nlp_job_not_found",
                     )
 
                 job.status = status
@@ -202,5 +202,5 @@ class NlpRepository:
                     operation="update_job_status",
                     message=f"Failed to update status: {str(e)}",
                     correlation_id=uuid4(),
-                    reason="status_update_failed"
+                    reason="status_update_failed",
                 )
