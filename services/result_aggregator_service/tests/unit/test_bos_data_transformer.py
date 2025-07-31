@@ -250,7 +250,7 @@ class TestBOSDataTransformer:
         transformer = BOSDataTransformer()
         pipeline_states_with_names = [
             ("spellcheck", {"status": "COMPLETED_SUCCESSFULLY"}),
-            ("nlp_metrics", {"status": "IN_PROGRESS"}),
+            ("nlp", {"status": "IN_PROGRESS"}),
             ("ai_feedback", {"status": "PENDING_DEPENDENCIES"}),
         ]
 
@@ -258,7 +258,7 @@ class TestBOSDataTransformer:
         result = transformer._derive_current_phase(pipeline_states_with_names)
 
         # Assert
-        assert result == "NLP_METRICS"  # Should map nlp_metrics to NLP_METRICS
+        assert result == "NLP"  # Should map nlp to NLP
 
     def test_derive_current_phase_no_active_pipelines(self) -> None:
         """Test current phase derivation when no pipelines are active."""
@@ -324,7 +324,7 @@ class TestBOSDataTransformer:
         transformer = BOSDataTransformer()
         bos_data = {
             "spellcheck": {"status": "COMPLETED"},  # Valid
-            "nlp_metrics": None,  # Invalid - None
+            "nlp": None,  # Invalid - None
             "ai_feedback": {"status": "IN_PROGRESS"},  # Valid
             "cj_assessment": {"status": "PENDING"},  # Valid
             "unknown_pipeline": {"status": "COMPLETED"},  # Not in expected list

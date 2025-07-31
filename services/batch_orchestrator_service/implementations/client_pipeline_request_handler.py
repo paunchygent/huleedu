@@ -332,7 +332,7 @@ class ClientPipelineRequestHandler:
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
-        nlp_metrics_detail = PipelineStateDetail(
+        nlp_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
                 if PhaseName.NLP in resolved_pipeline
@@ -349,7 +349,7 @@ class ClientPipelineRequestHandler:
             spellcheck=spellcheck_detail,
             cj_assessment=cj_assessment_detail,
             ai_feedback=ai_feedback_detail,
-            nlp_metrics=nlp_metrics_detail,
+            nlp=nlp_detail,
         )
 
         # Save updated state - direct Pydantic model

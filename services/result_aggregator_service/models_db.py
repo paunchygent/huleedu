@@ -138,7 +138,7 @@ class EssayResult(Base):
     # nlp_lexical_diversity_score: Mapped[Optional[float]] = mapped_column(Float)
     # nlp_cohesion_score: Mapped[Optional[float]] = mapped_column(Float)
     # nlp_grammatical_error_rate: Mapped[Optional[float]] = mapped_column(Float)
-    # nlp_metrics_storage_id: Mapped[Optional[str]] = mapped_column(String(255))
+    # nlp_storage_id: Mapped[Optional[str]] = mapped_column(String(255))
     # nlp_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # nlp_error: Mapped[Optional[str]] = mapped_column(String(500))
 

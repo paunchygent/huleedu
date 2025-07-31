@@ -59,7 +59,7 @@ class ProcessingPipelineState(BaseModel):
     batch_id: str
     requested_pipelines: list[str]
     spellcheck: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
-    nlp_metrics: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
+    nlp: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     ai_feedback: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     cj_assessment: PipelineStateDetail | None = Field(default_factory=PipelineStateDetail)
     last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))

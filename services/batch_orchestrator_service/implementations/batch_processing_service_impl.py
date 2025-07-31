@@ -79,8 +79,6 @@ class BatchProcessingServiceImpl:
         # Future pipeline support
         if getattr(registration_data, "enable_ai_feedback", False):
             requested_pipelines.append("ai_feedback")
-        if getattr(registration_data, "enable_nlp_metrics", False):
-            requested_pipelines.append("nlp_metrics")
 
         # 3. Initialize pipeline state with proper PipelineStateDetail objects (Task 3.1)
         from common_core.pipeline_models import PipelineExecutionStatus, PipelineStateDetail
@@ -107,10 +105,10 @@ class BatchProcessingServiceImpl:
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
-        nlp_metrics_detail = PipelineStateDetail(
+        nlp_detail = PipelineStateDetail(
             status=(
                 PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if "nlp_metrics" in requested_pipelines
+                if "nlp" in requested_pipelines
                 else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
             ),
         )
@@ -121,7 +119,7 @@ class BatchProcessingServiceImpl:
             spellcheck=spellcheck_detail,
             cj_assessment=cj_assessment_detail,
             ai_feedback=ai_feedback_detail,
-            nlp_metrics=nlp_metrics_detail,
+            nlp=nlp_detail,
         )
         await self.batch_repo.save_processing_pipeline_state(
             batch_id,

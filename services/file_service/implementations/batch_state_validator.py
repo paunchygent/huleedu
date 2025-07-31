@@ -172,7 +172,7 @@ class BOSBatchStateValidator:
             ("spellcheck", pipeline_state.spellcheck),
             ("ai_feedback", pipeline_state.ai_feedback),
             ("cj_assessment", pipeline_state.cj_assessment),
-            ("nlp_metrics", pipeline_state.nlp_metrics),
+            ("nlp", pipeline_state.nlp),
         ]
 
         for phase_name, phase_detail in phases_to_check:
@@ -244,7 +244,7 @@ class BOSBatchStateValidator:
             ("spellcheck", pipeline_state.spellcheck),
             ("ai_feedback", pipeline_state.ai_feedback),
             ("cj_assessment", pipeline_state.cj_assessment),
-            ("nlp_metrics", pipeline_state.nlp_metrics),
+            ("nlp", pipeline_state.nlp),
         ]
 
         for phase_name, phase_detail in phases_to_check:

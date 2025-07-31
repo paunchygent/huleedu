@@ -94,7 +94,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -164,7 +164,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -237,7 +237,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -310,7 +310,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -383,7 +383,7 @@ class TestBOSBatchStateValidator:
                     "error_info": {"failed_essays": ["essay-4", "essay-5"]},
                     "progress_percentage": 100.0,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -456,7 +456,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -588,7 +588,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,
@@ -660,7 +660,7 @@ class TestBOSBatchStateValidator:
                     "error_info": None,
                     "progress_percentage": None,
                 },
-                "nlp_metrics": {
+                "nlp": {
                     "status": PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG.value,
                     "essay_counts": {
                         "total": 0,

@@ -101,7 +101,7 @@ class BOSDataTransformer:
         # Use PhaseName enum values for type safety
         pipeline_names = [
             PhaseName.SPELLCHECK.value,
-            "nlp_metrics",  # BOS uses different naming
+            PhaseName.NLP.value,
             PhaseName.AI_FEEDBACK.value,
             PhaseName.CJ_ASSESSMENT.value,
         ]
@@ -161,7 +161,7 @@ class BOSDataTransformer:
         # Map pipeline names to display names
         phase_name_mapping = {
             PhaseName.SPELLCHECK.value: PhaseName.SPELLCHECK.value.upper(),
-            "nlp_metrics": "NLP_METRICS",
+            PhaseName.NLP.value: "NLP",
             PhaseName.AI_FEEDBACK.value: PhaseName.AI_FEEDBACK.value.upper(),
             PhaseName.CJ_ASSESSMENT.value: PhaseName.CJ_ASSESSMENT.value.upper(),
         }
