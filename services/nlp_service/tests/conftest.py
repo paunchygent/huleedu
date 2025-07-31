@@ -15,7 +15,6 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
-from prometheus_client import REGISTRY
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent
 
@@ -40,6 +39,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from prometheus_client import REGISTRY
 
 # NOW rebuild models with all types available - use raise_errors=True to make failures visible
 BaseEventData.model_rebuild(raise_errors=True)

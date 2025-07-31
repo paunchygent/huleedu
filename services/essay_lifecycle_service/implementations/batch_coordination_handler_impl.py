@@ -181,7 +181,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             if assigned_essay_id is None:
                 # Check if batch exists before deciding on pending vs excess
                 batch_status = await self.batch_tracker.get_batch_status(event_data.batch_id)
-                
+
                 if batch_status is None:
                     # ALWAYS store as pending content when batch not registered
                     logger.info(
@@ -190,9 +190,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             "batch_id": event_data.batch_id,
                             "text_storage_id": event_data.text_storage_id,
                             "correlation_id": str(correlation_id),
-                        }
+                        },
                     )
-                    
+
                     # Store as pending
                     content_metadata = {
                         "original_file_name": event_data.original_file_name,
@@ -202,16 +202,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         "content_md5_hash": event_data.content_md5_hash,
                         "correlation_id": str(event_data.correlation_id),
                     }
-                    
+
                     await self.pending_content_ops.store_pending_content(
-                        event_data.batch_id,
-                        event_data.text_storage_id,
-                        content_metadata
+                        event_data.batch_id, event_data.text_storage_id, content_metadata
                     )
-                    
+
                     # Successfully handled as pending - NO EXCESS CONTENT EVENT
                     return True
-                
+
                 # Batch exists but no slots - this is true excess content
                 logger.warning(
                     "No available slots for content, publishing excess content event",

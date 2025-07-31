@@ -35,11 +35,11 @@ from services.essay_lifecycle_service.implementations.redis_batch_state import R
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
     RedisFailureTracker,
 )
-from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-    RedisSlotOperations,
-)
 from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
     RedisPendingContentOperations,
+)
+from services.essay_lifecycle_service.implementations.redis_slot_operations import (
+    RedisSlotOperations,
 )
 from services.essay_lifecycle_service.protocols import BatchEssayTracker
 
@@ -162,15 +162,15 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         # Process any pending content for this batch
         pending_count = await self.process_pending_content_for_batch(batch_id)
-        
+
         if pending_count > 0:
             self._logger.info(
                 f"Processed {pending_count} pending content items for batch {batch_id}",
                 extra={
                     "batch_id": batch_id,
                     "pending_count": pending_count,
-                    "correlation_id": str(correlation_id)
-                }
+                    "correlation_id": str(correlation_id),
+                },
             )
 
     async def assign_slot_to_content(
@@ -410,56 +410,51 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         """Process any pending content for a newly registered batch."""
         # Get all pending content
         pending_content = await self._pending_content_ops.get_pending_content(batch_id)
-        
+
         if not pending_content:
             return 0
-        
+
         processed_count = 0
-        
+
         for content_metadata in pending_content:
             text_storage_id = content_metadata["text_storage_id"]
-            
+
             # Try to assign to available slot
             assigned_essay_id = await self._slot_operations.assign_slot_atomic(
                 batch_id, content_metadata
             )
-            
+
             if assigned_essay_id:
                 # Successfully assigned - remove from pending
-                await self._pending_content_ops.remove_pending_content(
-                    batch_id, text_storage_id
-                )
-                
+                await self._pending_content_ops.remove_pending_content(batch_id, text_storage_id)
+
                 # Mark slot as fulfilled (will check batch completion)
                 completion_result = await self.mark_slot_fulfilled(
                     batch_id, assigned_essay_id, text_storage_id
                 )
-                
+
                 if completion_result:
                     # Batch is complete - completion event will be published
                     # by the caller (batch_coordination_handler)
                     pass
-                
+
                 processed_count += 1
-                
+
                 self._logger.info(
                     f"Reconciled pending content: {text_storage_id} -> {assigned_essay_id}",
                     extra={
                         "batch_id": batch_id,
                         "text_storage_id": text_storage_id,
-                        "assigned_essay_id": assigned_essay_id
-                    }
+                        "assigned_essay_id": assigned_essay_id,
+                    },
                 )
             else:
                 # No slots available - content remains as excess
                 self._logger.warning(
                     f"No slots for pending content {text_storage_id} in batch {batch_id}",
-                    extra={
-                        "batch_id": batch_id,
-                        "text_storage_id": text_storage_id
-                    }
+                    extra={"batch_id": batch_id, "text_storage_id": text_storage_id},
                 )
-        
+
         return processed_count
 
     async def initialize_from_database(self) -> None:

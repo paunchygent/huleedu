@@ -18,7 +18,7 @@ import pytest
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
 from common_core.events.nlp_events import StudentMatchSuggestion
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from testcontainers.postgres import PostgresContainer
@@ -30,11 +30,7 @@ from services.nlp_service.command_handlers.essay_student_matching_handler import
 from services.nlp_service.config import Settings
 from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.protocols import (
-    ClassManagementClientProtocol,
-    ContentClientProtocol,
     NlpEventPublisherProtocol,
-    RosterCacheProtocol,
-    StudentMatcherProtocol,
 )
 
 
@@ -69,7 +65,7 @@ class MockClassManagementClient:
                 "phone": "+1234567890",
             },
             {
-                "student_id": "student-2", 
+                "student_id": "student-2",
                 "student_name": "Another Student",
                 "email": "another@student.edu",
                 "phone": "+0987654321",
@@ -198,11 +194,11 @@ class TestCommandHandlerOutboxIntegration:
         from sqlalchemy.ext.asyncio import create_async_engine
 
         engine = create_async_engine(test_settings.database_url)
-        
+
         # Initialize schema for outbox
         from huleedu_service_libs.outbox.models import EventOutbox
         from sqlalchemy import MetaData
-        
+
         async with engine.begin() as conn:
             metadata = MetaData()
             await conn.run_sync(metadata.reflect, bind=engine.sync_engine)
@@ -211,7 +207,7 @@ class TestCommandHandlerOutboxIntegration:
 
         repository = PostgreSQLOutboxRepository(engine)
         yield repository
-        
+
         # Cleanup
         await engine.dispose()
 
@@ -232,8 +228,10 @@ class TestCommandHandlerOutboxIntegration:
     @pytest.fixture
     def mock_event_publisher(self, outbox_manager: OutboxManager) -> AsyncMock:
         """Create mock event publisher that uses real outbox manager."""
-        from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
-        
+        from services.nlp_service.implementations.event_publisher_impl import (
+            DefaultNlpEventPublisher,
+        )
+
         publisher = DefaultNlpEventPublisher(
             outbox_manager=outbox_manager,
             source_service_name="nlp-service",
@@ -249,7 +247,7 @@ class TestCommandHandlerOutboxIntegration:
     ) -> EssayStudentMatchingHandler:
         """Create essay student matching handler with real dependencies."""
         mock_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
-        
+
         return EssayStudentMatchingHandler(
             content_client=MockContentClient(),
             class_management_client=MockClassManagementClient(),
@@ -269,13 +267,13 @@ class TestCommandHandlerOutboxIntegration:
         """Test that essay student matching handler uses TRUE OUTBOX PATTERN."""
         # Arrange
         correlation_id = uuid4()
-        
+
         # Create mock Kafka message and envelope
         mock_msg = Mock()
         mock_msg.topic = "test.topic"
         mock_msg.partition = 0
         mock_msg.offset = 123
-        
+
         event_data = BatchStudentMatchingRequestedV1(
             batch_id="test-batch-123",
             essays_to_process=[
@@ -287,7 +285,7 @@ class TestCommandHandlerOutboxIntegration:
             ],
             class_id="test-class-456",
         )
-        
+
         envelope = EventEnvelope(
             event_type="huleedu.essay.student.matching.requested.v1",
             source_service="essay-lifecycle-service",
@@ -315,16 +313,16 @@ class TestCommandHandlerOutboxIntegration:
             unpublished_events = await outbox_repository.get_unpublished_events(
                 session=session, limit=10
             )
-            
+
             # Should have at least one event in outbox
             assert len(unpublished_events) >= 1
-            
+
             # Verify event structure
             event = unpublished_events[0]
             assert event.aggregate_type == "essay"
             assert event.event_type == "batch.author.matches.suggested.v1"
             assert event.topic == "huleedu.nlp.batch.author.matches.suggested.v1"
-            
+
             # Verify event data contains expected structure
             event_data_dict = event.event_data
             assert "event_type" in event_data_dict
@@ -332,7 +330,7 @@ class TestCommandHandlerOutboxIntegration:
             assert "correlation_id" in event_data_dict
             assert "data" in event_data_dict
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_command_handler_never_uses_direct_kafka(
         self,
         essay_student_matching_handler: EssayStudentMatchingHandler,
@@ -340,10 +338,10 @@ class TestCommandHandlerOutboxIntegration:
         """Test that command handler never calls Kafka directly."""
         # Arrange
         correlation_id = uuid4()
-        
+
         mock_msg = Mock()
         event_data = BatchStudentMatchingRequestedV1(
-            batch_id="test-batch-789", 
+            batch_id="test-batch-789",
             essays_to_process=[
                 EssayProcessingInputRefV1(
                     essay_id="essay-2",
@@ -353,10 +351,10 @@ class TestCommandHandlerOutboxIntegration:
             ],
             class_id="test-class-999",
         )
-        
+
         envelope = EventEnvelope(
             event_type="huleedu.essay.student.matching.requested.v1",
-            source_service="essay-lifecycle-service", 
+            source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
         )
@@ -386,7 +384,7 @@ class TestCommandHandlerOutboxIntegration:
         """Test that outbox operations are atomic with business logic failures."""
         # Arrange
         correlation_id = uuid4()
-        
+
         # Mock the student matcher to fail
         essay_student_matching_handler.student_matcher.find_matches = AsyncMock(
             side_effect=Exception("Student matching failed")
@@ -404,7 +402,7 @@ class TestCommandHandlerOutboxIntegration:
             ],
             class_id="test-class-fail",
         )
-        
+
         envelope = EventEnvelope(
             event_type="huleedu.essay.student.matching.requested.v1",
             source_service="essay-lifecycle-service",
@@ -428,12 +426,13 @@ class TestCommandHandlerOutboxIntegration:
             unpublished_events = await outbox_repository.get_unpublished_events(
                 session=session, limit=10
             )
-            
+
             # Filter for events from this specific test
             test_events = [
-                event for event in unpublished_events
+                event
+                for event in unpublished_events
                 if "test-batch-failure" in str(event.event_data)
             ]
-            
+
             # Should have no events from failed operation
             assert len(test_events) == 0

@@ -318,7 +318,7 @@ class TestOutboxPatternIntegration:
                         lambda: len(mock_kafka_publisher.published_events) >= 15, timeout=2.0
                     )
                     assert len(mock_kafka_publisher.published_events) == 15
-                    
+
                     # Verify all events were published with correct data
                     published_event_ids = {
                         event["envelope"].data["entity_ref"]["entity_id"]

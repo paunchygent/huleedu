@@ -12,7 +12,7 @@ from typing import Any
 
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import REGISTRY, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = create_service_logger("essay_lifecycle_service.metrics")
@@ -109,6 +109,37 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             "Kafka message queue latency",
             buckets=[0.1, 0.5, 1, 5, 10, 30],  # 100ms to 30s
             labelnames=["topic", "service"],
+            registry=registry,
+        ),
+        # Consumer Health Monitoring Metrics
+        "kafka_consumer_last_message_time": Gauge(
+            "kafka_consumer_last_message_timestamp",
+            "Timestamp of last processed Kafka message",
+            ["consumer_group", "topic"],
+            registry=registry,
+        ),
+        "kafka_consumer_messages_processed": Counter(
+            "kafka_consumer_messages_processed_total",
+            "Total messages processed by Kafka consumer",
+            ["consumer_group", "topic", "status"],
+            registry=registry,
+        ),
+        "kafka_consumer_health_status": Gauge(
+            "kafka_consumer_health_status",
+            "Current health status of Kafka consumer (1=healthy, 0=unhealthy)",
+            ["consumer_group", "topic"],
+            registry=registry,
+        ),
+        "kafka_consumer_consecutive_failures": Gauge(
+            "kafka_consumer_consecutive_failures",
+            "Number of consecutive processing failures",
+            ["consumer_group", "topic"],
+            registry=registry,
+        ),
+        "kafka_consumer_idle_seconds": Gauge(
+            "kafka_consumer_idle_seconds",
+            "Seconds since last message was processed",
+            ["consumer_group", "topic"],
             registry=registry,
         ),
     }

@@ -9,7 +9,6 @@ Tests verify that NLP Service follows the TRUE OUTBOX PATTERN correctly:
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -20,7 +19,6 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
-from common_core.metadata_models import EntityReference
 
 from services.nlp_service.config import Settings
 from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
@@ -76,7 +74,7 @@ class TestTrueOutboxPatternCompliance:
                 extracted_identifiers={"email": "test@example.com"},
             )
         ]
-        
+
         # Create mock Kafka bus to verify it's NEVER called
         mock_kafka_bus = AsyncMock()
 
@@ -97,7 +95,9 @@ class TestTrueOutboxPatternCompliance:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == essay_id
-        assert call_args.kwargs["event_type"] == ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value
+        assert (
+            call_args.kwargs["event_type"] == ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value
+        )
         assert call_args.kwargs["topic"] == "huleedu.nlp.batch.author.matches.suggested.v1"
 
         # Verify original Pydantic envelope is passed (not reconstructed dict)
@@ -135,7 +135,7 @@ class TestTrueOutboxPatternCompliance:
                 extraction_metadata={"strategy": "examnet"},
             ),
             EssayMatchResult(
-                essay_id="essay-2", 
+                essay_id="essay-2",
                 text_storage_id="storage-2",
                 filename="essay2.pdf",
                 suggestions=[],
@@ -144,7 +144,7 @@ class TestTrueOutboxPatternCompliance:
             ),
         ]
         processing_summary = {"total_essays": 2, "matched": 1, "no_match": 1}
-        
+
         # Create mock Kafka bus to verify it's NEVER called
         mock_kafka_bus = AsyncMock()
 
@@ -174,7 +174,7 @@ class TestTrueOutboxPatternCompliance:
         assert hasattr(envelope, "model_dump")  # ✅ Original Pydantic envelope
         assert envelope.source_service == "nlp-service"
         assert envelope.correlation_id == correlation_id
-        
+
         # Verify event data structure
         event_data = envelope.data
         assert isinstance(event_data, BatchAuthorMatchesSuggestedV1)
@@ -221,14 +221,14 @@ class TestTrueOutboxPatternCompliance:
             kafka_bus=mock_kafka_bus,
             essay_id="test-essay",
             suggestions=[],
-            match_status="NO_MATCH", 
+            match_status="NO_MATCH",
             correlation_id=correlation_id,
         )
 
         # Assert - Verify metadata was injected
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         envelope = call_args.kwargs["event_data"]
-        
+
         # Metadata should be injected (not empty)
         assert envelope.metadata is not None
         assert isinstance(envelope.metadata, dict)
@@ -273,7 +273,7 @@ class TestAntiPatternPrevention:
         #     return  # Success - no outbox needed
         # except Exception:
         #     await outbox_manager.publish(...) # Only fallback
-        
+
         mock_kafka_bus = AsyncMock()
         correlation_id = uuid4()
 
@@ -302,7 +302,7 @@ class TestAntiPatternPrevention:
         """Verify that events are never passed through exception details."""
         # This test ensures we never use exceptions to transport event data
         # which would be an anti-pattern for the outbox implementation
-        
+
         mock_kafka_bus = AsyncMock()
         suggestions = [
             StudentMatchSuggestion(
@@ -313,7 +313,7 @@ class TestAntiPatternPrevention:
                 extracted_identifiers={"email": "test@example.com"},
             )
         ]
-        
+
         # Act
         await nlp_event_publisher.publish_author_match_result(
             kafka_bus=mock_kafka_bus,
@@ -326,7 +326,7 @@ class TestAntiPatternPrevention:
         # Assert - Event data is passed directly to outbox, not through exceptions
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         envelope = call_args.kwargs["event_data"]
-        
+
         # Verify complete event data is intact
         assert envelope.data.match_results[0].suggestions == suggestions
         assert envelope.data.processing_summary["matched"] == 1
@@ -335,17 +335,17 @@ class TestAntiPatternPrevention:
         """Verify that publisher only accepts Pydantic models, not dicts."""
         # NLP event publisher should only work with proper Pydantic models
         # No dual-mode interfaces that accept both dict and Pydantic
-        
+
         publisher = DefaultNlpEventPublisher(
             outbox_manager=mock_outbox_manager,
             source_service_name="nlp-service",
             output_topic="test.topic",
         )
-        
+
         # The publisher should only have methods that accept Pydantic models
         # and pass them to outbox as-is, not convert from dicts
         assert hasattr(publisher, "publish_author_match_result")
         assert hasattr(publisher, "publish_batch_author_match_results")
-        
+
         # Methods should require structured parameters, not accept raw dicts
         # This is enforced by type hints and implementation

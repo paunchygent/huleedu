@@ -41,6 +41,8 @@ from services.essay_lifecycle_service.di import (
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
+    ConsumerRecoveryManager,
+    KafkaConsumerHealthMonitor,
     ServiceResultHandler,
 )
 
@@ -102,6 +104,8 @@ async def run_consumer_loop(
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
     redis_client: AtomicRedisClientProtocol,
+    health_monitor: KafkaConsumerHealthMonitor,
+    recovery_manager: ConsumerRecoveryManager,
     tracer: Tracer | None = None,
 ) -> None:
     """Main message processing loop with idempotency support."""
@@ -155,6 +159,35 @@ async def run_consumer_loop(
                 logger.info("Shutdown requested, stopping message processing")
                 break
 
+            # Check consumer health periodically and attempt recovery if needed
+            if health_monitor.should_check_health():
+                if not health_monitor.is_healthy():
+                    logger.warning(
+                        "Consumer health check failed, attempting recovery",
+                        extra=health_monitor.get_health_metrics(),
+                    )
+                    
+                    # Only attempt recovery if not already in progress
+                    if not recovery_manager.is_recovery_in_progress():
+                        try:
+                            recovery_success = await recovery_manager.initiate_recovery(consumer)
+                            if recovery_success:
+                                logger.info("Consumer recovery completed successfully")
+                            else:
+                                logger.error(
+                                    "Consumer recovery failed - soft recovery unsuccessful, "
+                                    "hard recovery (consumer recreation) may be needed"
+                                )
+                                # Note: Hard recovery (consumer recreation) would be handled
+                                # by service orchestration layer, not within this loop
+                        except Exception as recovery_error:
+                            logger.error(
+                                f"Recovery attempt failed with exception: {recovery_error}",
+                                exc_info=True
+                            )
+                    else:
+                        logger.debug("Recovery already in progress, skipping duplicate attempt")
+
             try:
                 result = await handle_message_idempotently(msg)
 
@@ -171,6 +204,8 @@ async def run_consumer_loop(
                             "offset": msg.offset,
                         },
                     )
+                    # Record successful processing for health monitoring
+                    await health_monitor.record_message_processed()
                 elif result is True:
                     # Success - commit specific offset after processing
                     tp = TopicPartition(msg.topic, msg.partition)
@@ -183,6 +218,8 @@ async def run_consumer_loop(
                             "offset": msg.offset,
                         },
                     )
+                    # Record successful processing for health monitoring
+                    await health_monitor.record_message_processed()
                 else:  # result is False
                     logger.error(
                         "Message processing failed - offset not committed",
@@ -192,6 +229,8 @@ async def run_consumer_loop(
                             "offset": msg.offset,
                         },
                     )
+                    # Record processing failure for health monitoring
+                    await health_monitor.record_processing_failure()
 
             except Exception as e:
                 logger.error(
@@ -204,6 +243,8 @@ async def run_consumer_loop(
                         "offset": msg.offset,
                     },
                 )
+                # Record processing failure for health monitoring
+                await health_monitor.record_processing_failure()
 
     except Exception as e:
         logger.error(f"Error in message processing loop: {e}")
@@ -247,6 +288,8 @@ async def main() -> None:
             redis_client = await request_container.get(AtomicRedisClientProtocol)
             tracer = await request_container.get(Tracer)
             event_relay_worker = await request_container.get(EventRelayWorker)
+            health_monitor = await request_container.get(KafkaConsumerHealthMonitor)
+            recovery_manager = await request_container.get(ConsumerRecoveryManager)
 
             logger.info("Dependencies injected successfully")
 
@@ -264,6 +307,8 @@ async def main() -> None:
                 batch_command_handler=batch_command_handler,
                 service_result_handler=service_result_handler,
                 redis_client=redis_client,
+                health_monitor=health_monitor,
+                recovery_manager=recovery_manager,
                 tracer=tracer,
             )
 

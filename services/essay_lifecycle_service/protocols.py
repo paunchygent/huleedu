@@ -454,7 +454,7 @@ class BatchEssayTracker(Protocol):
     async def process_pending_content_for_batch(self, batch_id: str) -> int:
         """
         Process any pending content for a newly registered batch.
-        
+
         Returns:
             Number of pending content items processed
         """
@@ -474,4 +474,59 @@ class MetricsCollector(Protocol):
 
     def increment_counter(self, metric_name: str, labels: dict[str, str] | None = None) -> None:
         """Increment a counter metric."""
+        ...
+
+
+class KafkaConsumerHealthMonitor(Protocol):
+    """Protocol for monitoring Kafka consumer health and self-healing."""
+
+    async def record_message_processed(self) -> None:
+        """Record successful message processing."""
+        ...
+
+    async def record_processing_failure(self) -> None:
+        """Record message processing failure."""
+        ...
+
+    def is_healthy(self) -> bool:
+        """Check if consumer is healthy based on recent activity and failure rate."""
+        ...
+
+    def should_check_health(self) -> bool:
+        """Check if it's time to perform a health check."""
+        ...
+
+    def get_health_metrics(self) -> dict[str, Any]:
+        """Get current health metrics for observability."""
+        ...
+
+
+class ConsumerRecoveryManager(Protocol):
+    """Protocol for managing Kafka consumer recovery and self-healing."""
+
+    async def initiate_recovery(self, consumer: Any) -> bool:  # AIOKafkaConsumer
+        """
+        Initiate graduated recovery process for unhealthy consumer.
+
+        First attempts soft recovery (seek operations), then hard recovery
+        (consumer recreation) if soft recovery fails.
+
+        Args:
+            consumer: The Kafka consumer to recover
+
+        Returns:
+            True if recovery was successful, False otherwise
+        """
+        ...
+
+    def is_recovery_in_progress(self) -> bool:
+        """Check if a recovery operation is currently in progress."""
+        ...
+
+    def get_recovery_status(self) -> dict[str, Any]:
+        """Get current recovery status and metrics for observability."""
+        ...
+
+    async def record_recovery_attempt(self, recovery_type: str, success: bool) -> None:
+        """Record recovery attempt for metrics and circuit breaker management."""
         ...

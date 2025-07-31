@@ -74,7 +74,7 @@ class DistributedStateManager:
                         idle_services.append(service_name)
 
             if len(idle_services) == len(self.service_health_endpoints):
-                logger.info(f"✅ All services are idle, proceeding with cleanup")
+                logger.info("✅ All services are idle, proceeding with cleanup")
                 return True
 
             # Brief delay before rechecking (much shorter than sleep anti-pattern)
@@ -87,7 +87,7 @@ class DistributedStateManager:
     async def _atomic_redis_cleanup(self) -> int:
         """
         Perform atomic Redis cleanup using transactions to handle concurrent modifications.
-        
+
         Cleans up both idempotency keys and pending content keys.
 
         Returns number of keys cleared.
@@ -137,7 +137,9 @@ class DistributedStateManager:
             cleared_count = int(result.stdout.strip())
 
             if cleared_count > 0:
-                logger.info(f"🗑️ Atomically cleared {cleared_count} Redis keys (idempotency + pending content)")
+                logger.info(
+                    f"🗑️ Atomically cleared {cleared_count} Redis keys (idempotency + pending content)"
+                )
             else:
                 logger.info("✅ No Redis keys to clear (idempotency or pending content)")
 

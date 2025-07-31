@@ -46,6 +46,12 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
 )
+from services.essay_lifecycle_service.implementations.consumer_health_monitor_impl import (
+    ConsumerHealthMonitorImpl,
+)
+from services.essay_lifecycle_service.implementations.consumer_recovery_manager_impl import (
+    ConsumerRecoveryManagerImpl,
+)
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
@@ -61,12 +67,12 @@ from services.essay_lifecycle_service.implementations.redis_batch_state import R
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
     RedisFailureTracker,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
-)
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
@@ -83,7 +89,9 @@ from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
     BatchPhaseCoordinator,
+    ConsumerRecoveryManager,
     EssayRepositoryProtocol,
+    KafkaConsumerHealthMonitor,
     MetricsCollector,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
@@ -277,6 +285,35 @@ class ServiceClientsProvider(Provider):
         """Provide specialized service request dispatcher implementation with outbox support."""
         return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
 
+    @provide(scope=Scope.APP)
+    def provide_kafka_consumer_health_monitor(
+        self, settings: Settings
+    ) -> KafkaConsumerHealthMonitor:
+        """Provide Kafka consumer health monitor for self-healing mechanism."""
+        return ConsumerHealthMonitorImpl(
+            health_check_interval=getattr(settings, "KAFKA_HEALTH_CHECK_INTERVAL", 30),
+            max_idle_seconds=getattr(settings, "KAFKA_MAX_IDLE_SECONDS", 60),
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_consumer_recovery_manager(
+        self, health_monitor: KafkaConsumerHealthMonitor
+    ) -> ConsumerRecoveryManager:
+        """Provide consumer recovery manager for self-healing with circuit breaker."""
+        # Create circuit breaker for recovery attempts
+        recovery_circuit_breaker = CircuitBreaker(
+            failure_threshold=3,  # Allow 3 recovery failures before opening
+            recovery_timeout=timedelta(minutes=2),  # Wait 2 minutes before retry
+            success_threshold=1,  # Single success closes circuit
+            expected_exception=Exception,
+            name="consumer_recovery",
+        )
+        
+        return ConsumerRecoveryManagerImpl(
+            health_monitor=health_monitor,
+            circuit_breaker=recovery_circuit_breaker,
+        )
+
 
 class CommandHandlerProvider(Provider):
     """Provider for command handler implementations."""
@@ -336,7 +373,11 @@ class BatchCoordinationProvider(Provider):
     ) -> BatchCoordinationHandler:
         """Provide batch coordination handler implementation with direct publisher injection."""
         return DefaultBatchCoordinationHandler(
-            batch_tracker, repository, batch_lifecycle_publisher, pending_content_ops, session_factory
+            batch_tracker,
+            repository,
+            batch_lifecycle_publisher,
+            pending_content_ops,
+            session_factory,
         )
 
     @provide(scope=Scope.APP)
@@ -402,7 +443,12 @@ class BatchCoordinationProvider(Provider):
     ) -> BatchEssayTracker:
         """Provide batch essay tracker implementation with direct domain class composition."""
         tracker = DefaultBatchEssayTracker(
-            persistence, batch_state, batch_queries, failure_tracker, slot_operations, pending_content_ops
+            persistence,
+            batch_state,
+            batch_queries,
+            failure_tracker,
+            slot_operations,
+            pending_content_ops,
         )
         await tracker.initialize_from_database()
         return tracker
