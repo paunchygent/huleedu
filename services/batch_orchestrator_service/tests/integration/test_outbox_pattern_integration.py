@@ -80,7 +80,7 @@ class OutboxTestProvider(Provider):
     def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
         """Provide outbox repository."""
         return PostgreSQLOutboxRepository(engine)
-    
+
     @provide(scope=Scope.APP)
     def provide_outbox_settings(self) -> OutboxSettings:
         """Provide outbox settings."""
@@ -90,7 +90,7 @@ class OutboxTestProvider(Provider):
             max_retries=self._settings.OUTBOX_MAX_RETRIES,
             processing_timeout=self._settings.OUTBOX_PROCESSING_TIMEOUT,
         )
-    
+
     @provide(scope=Scope.APP)
     def provide_service_name(self) -> str:
         """Provide service name for outbox metadata."""

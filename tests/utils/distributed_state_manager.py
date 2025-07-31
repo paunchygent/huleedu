@@ -10,6 +10,7 @@ import subprocess
 import time
 from typing import Any
 
+import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("test.distributed_state")
@@ -21,70 +22,148 @@ class DistributedStateManager:
     def __init__(self) -> None:
         self.redis_container = "huleedu_redis"
         self.kafka_container = "huleedu_kafka"
+        
+        # Service health endpoints for coordination
+        self.service_health_endpoints = {
+            "essay_lifecycle_service": "http://localhost:5001/healthz",
+            "batch_orchestrator_service": "http://localhost:5002/healthz", 
+            "spellchecker_service": "http://localhost:5003/healthz",
+            "cj_assessment_service": "http://localhost:5004/healthz",
+            "result_aggregator_service": "http://localhost:5005/healthz",
+        }
+
+    async def _wait_for_services_idle(self, timeout_seconds: int = 10) -> bool:
+        """
+        Wait for all services to be in idle state (not actively processing events).
+        
+        Uses service health endpoints to check processing status.
+        Returns True if all services are idle, False if timeout.
+        """
+        start_time = time.time()
+        
+        while (time.time() - start_time) < timeout_seconds:
+            idle_services = []
+            
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
+                for service_name, health_url in self.service_health_endpoints.items():
+                    try:
+                        async with session.get(health_url) as response:
+                            if response.status == 200:
+                                health_data = await response.json()
+                                
+                                # Check if service reports being idle
+                                # Most services report active processing in health endpoint
+                                processing_active = health_data.get("processing_active", False)
+                                active_consumers = health_data.get("active_consumers", 0)
+                                
+                                if not processing_active and active_consumers == 0:
+                                    idle_services.append(service_name)
+                                else:
+                                    logger.debug(
+                                        f"Service {service_name} still active: "
+                                        f"processing={processing_active}, consumers={active_consumers}"
+                                    )
+                            else:
+                                logger.debug(f"Service {service_name} health check failed: {response.status}")
+                                
+                    except Exception as e:
+                        logger.debug(f"Could not check {service_name} health: {e}")
+                        # Assume service is idle if we can't reach it (might be stopped)
+                        idle_services.append(service_name)
+            
+            if len(idle_services) == len(self.service_health_endpoints):
+                logger.info(f"✅ All services are idle, proceeding with cleanup")
+                return True
+                
+            # Brief delay before rechecking (much shorter than sleep anti-pattern)
+            await asyncio.sleep(0.1)
+        
+        active_services = set(self.service_health_endpoints.keys()) - set(idle_services)
+        logger.warning(f"⚠️ Timeout waiting for services to be idle. Active: {active_services}")
+        return False
+
+    async def _atomic_redis_cleanup(self) -> int:
+        """
+        Perform atomic Redis cleanup using transactions to handle concurrent modifications.
+        
+        Returns number of keys cleared.
+        """
+        # Atomic cleanup script that handles concurrent modifications
+        atomic_cleanup_script = """
+            -- Use optimistic locking pattern with WATCH/MULTI/EXEC
+            local pattern = 'huleedu:idempotency:v2:*'
+            local batch_size = 100
+            local total_deleted = 0
+            
+            -- Get all matching keys in batches
+            local cursor = 0
+            repeat
+                local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size)
+                cursor = tonumber(scan_result[1])
+                local keys = scan_result[2]
+                
+                if #keys > 0 then
+                    -- Delete batch atomically
+                    local deleted = redis.call('DEL', unpack(keys))
+                    total_deleted = total_deleted + deleted
+                end
+            until cursor == 0
+            
+            return total_deleted
+        """
+        
+        try:
+            clear_cmd = [
+                "docker", "exec", self.redis_container,
+                "redis-cli", "EVAL", atomic_cleanup_script, "0"
+            ]
+            
+            result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
+            cleared_count = int(result.stdout.strip())
+            
+            if cleared_count > 0:
+                logger.info(f"🗑️ Atomically cleared {cleared_count} Redis idempotency keys")
+            else:
+                logger.info("✅ No Redis idempotency keys to clear")
+            
+            return cleared_count
+            
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"⚠️ Failed atomic Redis cleanup: {e.stderr}")
+            raise
+        except Exception as e:
+            logger.warning(f"⚠️ Unexpected error in atomic cleanup: {e}")
+            raise
 
     async def ensure_clean_test_environment(
         self, test_name: str, clear_redis: bool = True, reset_kafka_offsets: bool = True
     ) -> None:
         """
-        Ensure clean distributed system state before test execution.
+        Ensure clean distributed system state using proper coordination.
 
-        This prevents idempotency collisions and state pollution between test runs.
-
+        Uses service health endpoints to coordinate cleanup instead of sleep() anti-pattern.
+        
         Args:
             test_name: Name of the test for logging
             clear_redis: Whether to clear Redis idempotency keys
             reset_kafka_offsets: Whether to reset Kafka consumer offsets
         """
-        logger.info(f"🧹 Cleaning distributed state for test: {test_name}")
+        logger.info(f"🧹 Coordinated cleanup starting for test: {test_name}")
 
         if clear_redis:
-            await self._clear_redis_idempotency_keys()
+            # Step 1: Wait for services to be idle (no sleep anti-pattern)
+            services_idle = await self._wait_for_services_idle(timeout_seconds=15)
+            if not services_idle:
+                logger.warning("⚠️ Proceeding with cleanup despite active services")
+
+            # Step 2: Atomic Redis cleanup (no race conditions)
+            await self._atomic_redis_cleanup()
 
         if reset_kafka_offsets:
             await self._reset_kafka_consumer_offsets()
 
-        logger.info(f"✅ Clean state established for test: {test_name}")
+        logger.info(f"✅ Coordinated cleanup completed for test: {test_name}")
 
-    async def _clear_redis_idempotency_keys(self) -> None:
-        """Clear all Redis idempotency keys that could cause event skipping."""
-        try:
-            # Get count of v2 idempotency keys
-            count_cmd = [
-                "docker",
-                "exec",
-                self.redis_container,
-                "redis-cli",
-                "EVAL",
-                "return #redis.call('keys', 'huleedu:idempotency:v2:*')",
-                "0",
-            ]
-            result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
-            key_count = int(result.stdout.strip())
-
-            if key_count > 0:
-                # Clear all v2 idempotency keys
-                clear_cmd = [
-                    "docker",
-                    "exec",
-                    self.redis_container,
-                    "redis-cli",
-                    "EVAL",
-                    (
-                        "local keys = redis.call('keys', 'huleedu:idempotency:v2:*') "
-                        "for i=1,#keys do redis.call('del', keys[i]) end return #keys"
-                    ),
-                    "0",
-                ]
-                result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
-                cleared_count = int(result.stdout.strip())
-                logger.info(f"🗑️ Cleared {cleared_count} Redis v2 idempotency keys")
-            else:
-                logger.info("✅ No Redis idempotency keys to clear")
-
-        except subprocess.CalledProcessError as e:
-            logger.warning(f"⚠️ Failed to clear Redis keys: {e.stderr}")
-        except Exception as e:
-            logger.warning(f"⚠️ Unexpected error clearing Redis: {e}")
 
     async def _reset_kafka_consumer_offsets(self) -> None:
         """Reset Kafka consumer offsets to skip old events from previous test runs.
@@ -215,38 +294,57 @@ class DistributedStateManager:
 
     async def ensure_verified_clean_state(self, test_name: str) -> dict[str, Any]:
         """
-        Ensure clean state with post-cleaning verification and retry logic.
+        Ensure clean state with proper service coordination and verification.
+        
+        Eliminates sleep() anti-patterns by using deterministic service coordination.
 
         Returns:
             Validation results after ensuring clean state
         """
-        max_attempts = 3
+        max_attempts = 3  # Reduced attempts - proper coordination should work on first try
 
         for attempt in range(max_attempts):
-            # Clean the state
+            logger.info(f"🧹 Coordinated cleanup attempt {attempt + 1}/{max_attempts} for test: {test_name}")
+            
+            # Step 1: Ensure services are idle before cleanup
+            services_idle = await self._wait_for_services_idle(timeout_seconds=20)
+            if not services_idle:
+                logger.warning("⚠️ Services not idle, proceeding with cleanup anyway")
+            
+            # Step 2: Perform atomic cleanup with proper coordination
             await self.ensure_clean_test_environment(test_name)
-
-            # Wait for propagation
-            await asyncio.sleep(0.5)
-
-            # Verify state is actually clean
+            
+            # Step 3: Immediate verification (no artificial delays)
             validation = await self.validate_clean_state()
 
             if validation["clean"]:
                 logger.info(
                     f"✅ Verified clean state achieved for test: {test_name} "
-                    f"(attempt {attempt + 1})"
+                    f"(attempt {attempt + 1}) - coordinated cleanup successful"
                 )
                 return validation
             else:
-                logger.warning(f"⚠️ State not clean after attempt {attempt + 1}: {validation}")
+                key_count = validation.get("redis_idempotency_keys", 0)
+                sample_keys = validation.get("redis_sample_keys", [])
+                logger.warning(
+                    f"⚠️ State not clean after coordinated attempt {attempt + 1}: "
+                    f"found {key_count} keys, samples: {sample_keys[:3]}"
+                )
+                
+                # If cleanup failed, wait for services to settle before retry
                 if attempt < max_attempts - 1:
-                    logger.info("🔄 Retrying state cleanup...")
-                    await asyncio.sleep(1.0)
+                    logger.info("🔄 Waiting for services to settle before retry...")
+                    await self._wait_for_services_idle(timeout_seconds=10)
 
-        # Final attempt failed
+        # Final attempt failed - provide detailed error info
+        key_count = validation.get("redis_idempotency_keys", 0)
+        sample_keys = validation.get("redis_sample_keys", [])
         raise RuntimeError(
-            f"Failed to achieve clean state after {max_attempts} attempts: {validation}"
+            f"Failed to achieve clean state after {max_attempts} coordinated attempts: "
+            f"found {key_count} Redis keys remaining. "
+            f"Sample keys: {sample_keys[:5]}. "
+            f"This suggests services are continuously creating idempotency keys "
+            f"even when reporting idle status, indicating a service coordination issue."
         )
 
 

@@ -33,7 +33,10 @@ class TestStudentMatchSuggestion:
         """Test confidence score must be between 0 and 1."""
         # Valid scores
         StudentMatchSuggestion(
-            student_id="123", student_name="Test", confidence_score=0.0, match_reasons=["fuzzy_name"]
+            student_id="123",
+            student_name="Test",
+            confidence_score=0.0,
+            match_reasons=["fuzzy_name"],
         )
         StudentMatchSuggestion(
             student_id="123", student_name="Test", confidence_score=1.0, match_reasons=["email"]

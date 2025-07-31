@@ -11,7 +11,12 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName, PipelineStateDetail, PipelineExecutionStatus, ProcessingPipelineState
+from common_core.pipeline_models import (
+    PhaseName,
+    PipelineExecutionStatus,
+    PipelineStateDetail,
+    ProcessingPipelineState,
+)
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
@@ -117,7 +122,9 @@ class TestPipelineEdgeCases:
             batch_id=batch_id,
             requested_pipelines=["spellcheck", "cj_assessment"],
             spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
-            cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),  # Already initiated
+            cj_assessment=PipelineStateDetail(
+                status=PipelineExecutionStatus.DISPATCH_INITIATED
+            ),  # Already initiated
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 

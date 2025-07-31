@@ -224,7 +224,9 @@ async def test_kafka_consumer_with_idempotency_duplicate_detection(
     assert result2 is None  # Duplicate should return None
 
     # Verify Redis calls
-    assert len(redis_client.set_calls) == 1  # Only one SETNX attempt (the idempotency key was already set)
+    assert (
+        len(redis_client.set_calls) == 1
+    )  # Only one SETNX attempt (the idempotency key was already set)
 
     # Verify business logic was only called once
     assert content_client.fetch_content.call_count == 1

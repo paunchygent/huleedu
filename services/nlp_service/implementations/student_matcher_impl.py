@@ -125,9 +125,11 @@ class DefaultStudentMatcher(StudentMatcherProtocol):
             api_suggestion = StudentMatchSuggestion(
                 student_id=suggestion.student_id,
                 student_name=suggestion.student_name,
-                student_email=getattr(suggestion, 'student_email', None),
+                student_email=getattr(suggestion, "student_email", None),
                 confidence_score=suggestion.confidence_score,
-                match_reasons=[suggestion.match_reasons.value] if hasattr(suggestion, 'match_reasons') else [],
+                match_reasons=[suggestion.match_reasons.value]
+                if hasattr(suggestion, "match_reasons")
+                else [],
                 extraction_metadata={},
             )
             api_suggestions.append(api_suggestion)

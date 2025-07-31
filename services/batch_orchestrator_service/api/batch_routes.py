@@ -129,7 +129,7 @@ async def get_batch_status(
                 "enable_cj_assessment": batch_context.enable_cj_assessment,
                 "user_id": batch_context.user_id,
             },
-            "pipeline_state": pipeline_state or {},
+            "pipeline_state": pipeline_state.model_dump(mode="json") if pipeline_state else {},
         }
 
         return jsonify(response_data), 200
@@ -176,7 +176,7 @@ async def get_internal_pipeline_state(
         # Build response with pipeline state and user_id for ownership enforcement
         response_data = {
             "batch_id": batch_id,
-            "pipeline_state": pipeline_state.model_dump(mode='json') if pipeline_state else None,
+            "pipeline_state": pipeline_state.model_dump(mode="json") if pipeline_state else None,
             "user_id": user_id,  # Essential for Result Aggregator ownership checks
         }
 

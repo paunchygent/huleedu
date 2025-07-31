@@ -84,25 +84,25 @@ async def validate_bcs_integration_occurred(
                 batch_data = await response.json()
                 # Extract resolved pipeline from pipeline_state
                 pipeline_state = batch_data.get("pipeline_state", {})
-                
-                # Handle different possible pipeline_state structures
+
+                # Handle ProcessingPipelineState structure correctly
                 resolved_pipeline = []
                 if isinstance(pipeline_state, dict):
-                    # Look for resolved pipeline in various possible fields
-                    resolved_pipeline = (
-                        pipeline_state.get("resolved_pipeline", [])
-                        or pipeline_state.get("requested_pipelines", [])
-                        or []
-                    )
+                    # The BCS-resolved pipeline is stored in 'requested_pipelines'
+                    # This field contains the actual phases resolved by BCS
+                    resolved_pipeline = pipeline_state.get("requested_pipelines", [])
                     
-                    # If no resolved pipeline found but pipeline_state has phase data,
-                    # extract phases that have been configured
+                    # If requested_pipelines is empty, check for configured phases
+                    # as fallback (for backwards compatibility with manual tests)
                     if not resolved_pipeline:
                         configured_phases = []
                         for phase_name in ["spellcheck", "ai_feedback", "cj_assessment", "nlp"]:
                             phase_data = pipeline_state.get(phase_name)
                             if phase_data and isinstance(phase_data, dict):
-                                configured_phases.append(phase_name)
+                                # Check if the phase is actually configured (not SKIPPED)
+                                phase_status = phase_data.get("status", "")
+                                if phase_status and "SKIPPED" not in phase_status:
+                                    configured_phases.append(phase_name)
                         resolved_pipeline = configured_phases
                 else:
                     print(f"⚠️ Unexpected pipeline_state type: {type(pipeline_state)}")

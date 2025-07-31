@@ -23,7 +23,6 @@ from services.essay_lifecycle_service.protocols import (
     BatchPhaseCoordinator,
     EssayRepositoryProtocol,
 )
-from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestDefaultServiceResultHandler:

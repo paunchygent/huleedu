@@ -6,7 +6,11 @@ from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult, StudentMatchSuggestion
+from common_core.events.nlp_events import (
+    BatchAuthorMatchesSuggestedV1,
+    EssayMatchResult,
+    StudentMatchSuggestion,
+)
 from common_core.metadata_models import EntityReference
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
@@ -47,7 +51,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         correlation_id: UUID,
     ) -> None:
         """Publish individual essay author match results to Kafka.
-        
+
         This is a compatibility method for the essay-level handler.
         """
         # Convert to batch format with single essay
@@ -59,7 +63,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             no_match_reason=None if suggestions else "No matches found",
             extraction_metadata={},
         )
-        
+
         # Create a batch event with single essay
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
@@ -69,7 +73,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             match_results=[match_result],
             processing_summary={"total_essays": 1, "matched": 1 if suggestions else 0},
         )
-        
+
         # Create event envelope
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
             event_type=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
@@ -78,7 +82,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             data=batch_event,
             metadata=inject_trace_context({}),
         )
-        
+
         # Store in outbox
         await self.outbox_manager.store_event(
             aggregate_id=essay_id,

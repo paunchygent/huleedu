@@ -128,15 +128,17 @@ class TestClientPipelineResolutionWorkflow:
                     # Handle case where it might not be a dictionary
                     print(f"⚠️ Unexpected cj_assessment data type: {type(cj_assessment_data)}")
                     cj_assessment_status = "unknown"
-            
+
             print(f"📋 CJ Assessment status: {cj_assessment_status}")
             print(f"📊 Full pipeline state: {pipeline_state}")
 
             # With our new simplified architecture, pipelines should be pending_dependencies
             # (waiting for client trigger) or not yet initialized if batch is very new
             if cj_assessment_status not in ["pending_dependencies", "not_initialized", "not_found"]:
-                print(f"⚠️ Unexpected status {cj_assessment_status}, continuing test to see actual behavior")
-            
+                print(
+                    f"⚠️ Unexpected status {cj_assessment_status}, continuing test to see actual behavior"
+                )
+
             # Verify the system is correctly waiting for client trigger (not auto-starting)
             # Accept both pending_dependencies (ideal) and not_initialized (batch very new)
             expected_statuses = ["pending_dependencies", "not_initialized", "not_found"]

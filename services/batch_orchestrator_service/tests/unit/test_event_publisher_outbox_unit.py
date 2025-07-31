@@ -99,6 +99,7 @@ def fake_outbox() -> FakeOutboxRepository:
 def fake_redis() -> Mock:
     """Fake Redis client for testing."""
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+
     return Mock(spec=AtomicRedisClientProtocol)
 
 
@@ -131,7 +132,7 @@ class TestDefaultBatchEventPublisherImpl:
         """Test that constructor properly initializes all dependencies."""
         # Given
         from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-        
+
         kafka_bus = Mock(spec=KafkaPublisherProtocol)
         outbox_repo = FakeOutboxRepository()
         redis_client = Mock(spec=AtomicRedisClientProtocol)

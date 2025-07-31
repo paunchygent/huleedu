@@ -133,14 +133,14 @@ def mock_session_factory() -> Mock:
     session = AsyncMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=None)
-    
+
     # Configure session.begin() to return a context manager
     transaction = AsyncMock()
     transaction.__aenter__ = AsyncMock(return_value=transaction)
     transaction.__aexit__ = AsyncMock(return_value=None)
     # Make begin() a regular Mock that returns the transaction (not AsyncMock)
     session.begin = Mock(return_value=transaction)
-    
+
     # Factory should be a regular Mock that returns the session context manager
     factory = Mock(return_value=session)
     return factory
@@ -181,9 +181,10 @@ class TestBatchCoordinationBusinessImpact:
         event_publisher = AsyncMock()
         # Make publisher fail when trying to publish BatchEssaysReady
         # Since the outbox_manager raises EXTERNAL_SERVICE_ERROR, we simulate that
-        from huleedu_service_libs.error_handling import raise_external_service_error
         from uuid import uuid4 as test_uuid4
-        
+
+        from huleedu_service_libs.error_handling import raise_external_service_error
+
         async def fail_with_external_error(event_data=None, correlation_id=None, session=None):
             raise_external_service_error(
                 service="essay_lifecycle_service",
@@ -192,7 +193,7 @@ class TestBatchCoordinationBusinessImpact:
                 message="Database connection lost",
                 correlation_id=correlation_id or test_uuid4(),
             )
-        
+
         event_publisher.publish_batch_essays_ready.side_effect = fail_with_external_error
 
         coordination_handler = DefaultBatchCoordinationHandler(
@@ -257,7 +258,7 @@ class TestBatchCoordinationBusinessImpact:
         # Assert: With TRUE OUTBOX PATTERN, no direct Kafka calls should be made
         # The publisher always uses outbox for transactional safety
         failing_kafka_bus.publish.assert_not_called()  # No direct Kafka - that's the point!
-        
+
         # The error came from the publisher trying to use outbox (simulated by our mock)
 
         business_context.essays_ready_published = False
@@ -295,11 +296,12 @@ class TestBatchCoordinationBusinessImpact:
         """
         # Create mock BatchLifecyclePublisher
         event_publisher = AsyncMock()
-        
+
         # Set up event publisher to succeed for slot assignment but fail for batch ready
         # The handler publishes EssaySlotAssignedV1 first, then BatchEssaysReady
         async def fail_on_batch_ready(event_data=None, correlation_id=None, session=None):
             from huleedu_service_libs.error_handling import raise_external_service_error
+
             raise_external_service_error(
                 service="essay_lifecycle_service",
                 operation="publish_batch_essays_ready",
@@ -307,7 +309,7 @@ class TestBatchCoordinationBusinessImpact:
                 message="Database write failed",
                 correlation_id=correlation_id,
             )
-        
+
         # Make only the batch ready publishing fail
         event_publisher.publish_batch_essays_ready.side_effect = fail_on_batch_ready
 
@@ -398,7 +400,7 @@ class TestBatchCoordinationBusinessImpact:
         # With TRUE OUTBOX PATTERN, no direct Kafka calls or outbox repository calls
         # The event publisher handles everything internally
         failing_kafka_bus.publish.assert_not_called()  # No direct Kafka
-        
+
         # The event publisher methods would have been called
         event_publisher.publish_essay_slot_assigned.assert_called_once()
         event_publisher.publish_batch_essays_ready.assert_called_once()  # This one failed

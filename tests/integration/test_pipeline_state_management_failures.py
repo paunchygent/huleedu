@@ -11,7 +11,12 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName, PipelineStateDetail, PipelineExecutionStatus, ProcessingPipelineState
+from common_core.pipeline_models import (
+    PhaseName,
+    PipelineExecutionStatus,
+    PipelineStateDetail,
+    ProcessingPipelineState,
+)
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
@@ -187,7 +192,9 @@ class TestPipelineFailureHandling:
         # Verify pipeline state was updated to reflect partial completion
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY  # Updated status
+        assert (
+            updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
+        )  # Updated status
 
         # CRITICAL: Verify CJ assessment WAS initiated (should proceed with successful essays)
         # This is the behavior we want after the fix
@@ -251,7 +258,9 @@ class TestPipelineFailureHandling:
         # Verify pipeline state was updated to reflect partial completion
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY  # Updated status
+        assert (
+            updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
+        )  # Updated status
 
         # CRITICAL: Verify CJ assessment WAS initiated (should proceed with successful essays)
         # This is the behavior we want after the fix

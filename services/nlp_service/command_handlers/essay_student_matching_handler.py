@@ -160,9 +160,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                             topic=event_data["topic"],
                             envelope=event_data["envelope"],
                         )
-                        await self.outbox_repository.mark_event_published(
-                            event_id=event_id
-                        )
+                        await self.outbox_repository.mark_event_published(event_id=event_id)
                     except Exception as e:
                         logger.error(
                             f"Failed to publish outbox event {event_id}: {e}",
