@@ -65,6 +65,9 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
 )
@@ -328,11 +331,12 @@ class BatchCoordinationProvider(Provider):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
+        pending_content_ops: RedisPendingContentOperations,
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
         """Provide batch coordination handler implementation with direct publisher injection."""
         return DefaultBatchCoordinationHandler(
-            batch_tracker, repository, batch_lifecycle_publisher, session_factory
+            batch_tracker, repository, batch_lifecycle_publisher, pending_content_ops, session_factory
         )
 
     @provide(scope=Scope.APP)
@@ -380,6 +384,13 @@ class BatchCoordinationProvider(Provider):
         return RedisFailureTracker(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
+    def provide_redis_pending_content_ops(
+        self, redis_client: AtomicRedisClientProtocol
+    ) -> RedisPendingContentOperations:
+        """Provide Redis pending content operations."""
+        return RedisPendingContentOperations(redis_client)
+
+    @provide(scope=Scope.APP)
     async def provide_batch_essay_tracker(
         self,
         persistence: BatchTrackerPersistence,
@@ -387,10 +398,11 @@ class BatchCoordinationProvider(Provider):
         batch_queries: RedisBatchQueries,
         failure_tracker: RedisFailureTracker,
         slot_operations: RedisSlotOperations,
+        pending_content_ops: RedisPendingContentOperations,
     ) -> BatchEssayTracker:
         """Provide batch essay tracker implementation with direct domain class composition."""
         tracker = DefaultBatchEssayTracker(
-            persistence, batch_state, batch_queries, failure_tracker, slot_operations
+            persistence, batch_state, batch_queries, failure_tracker, slot_operations, pending_content_ops
         )
         await tracker.initialize_from_database()
         return tracker

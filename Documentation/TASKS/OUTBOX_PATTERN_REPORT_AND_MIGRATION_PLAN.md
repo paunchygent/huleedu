@@ -91,6 +91,7 @@ Both approaches correctly implement TRUE OUTBOX PATTERN within their respective 
 #### Batch Orchestrator Service: Primary Consumer ✅
 
 **Usage Locations:**
+
 - `nlp_initiator_impl.py:114` - NLP phase initiation
 - `ai_feedback_initiator_impl.py:124` - AI feedback phase initiation
 - `spellchecker_initiator_impl.py:111` - Spellcheck phase initiation
@@ -259,7 +260,7 @@ await self.outbox_manager.publish_to_outbox(
 
 ### LOW RISK: Operational Impacts
 
-#### Class Management Service 
+#### Class Management Service
 
 - **Issue**: Class management events may be lost
 - **Risk**: UI state inconsistencies
@@ -270,11 +271,13 @@ await self.outbox_manager.publish_to_outbox(
 ### Phase 1: Critical Data Protection (Sprint 1-2)
 
 #### 1. NLP Service Migration
+
 - **Impact**: High - Student matching critical
 - **Effort**: Low - Infrastructure exists
 - **Timeline**: Sprint 1
 
 #### 2. Assessment Services (CJ & LLM)
+
 - **Impact**: High - Assessment results critical
 - **Effort**: Medium - New infrastructure needed
 - **Timeline**: Sprint 2
@@ -282,11 +285,13 @@ await self.outbox_manager.publish_to_outbox(
 ### Phase 2: Processing Reliability (Sprint 3-4)
 
 #### 1. Spellchecker Service
+
 - **Impact**: High - Core processing service
 - **Effort**: Medium - New infrastructure needed
 - **Timeline**: Sprint 3
 
 #### 2. Class Management Service
+
 - **Impact**: Medium - UI consistency
 - **Effort**: Medium - Dual Redis/Kafka publishing
 - **Timeline**: Sprint 4
@@ -324,6 +329,7 @@ def get_providers():
 ```
 
 ### Event Publishing Template
+
 ```python
 # services/your_service/src/your_service/domain/services/your_service.py
 from typing import Optional
@@ -335,6 +341,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 ```
 
 ### 1. Code Review Checklist
+
 1. **Create Outbox Migration Template**: Standardized implementation pattern
 2. **Update Architectural Documentation**: Clarify TRUE OUTBOX PATTERN requirements
 3. **Add Integration Tests**: Verify transactional atomicity across services

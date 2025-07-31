@@ -451,6 +451,15 @@ class BatchEssayTracker(Protocol):
         """Remove completed batch from database."""
         ...
 
+    async def process_pending_content_for_batch(self, batch_id: str) -> int:
+        """
+        Process any pending content for a newly registered batch.
+        
+        Returns:
+            Number of pending content items processed
+        """
+        ...
+
 
 class MetricsCollector(Protocol):
     """Protocol for collecting service metrics."""

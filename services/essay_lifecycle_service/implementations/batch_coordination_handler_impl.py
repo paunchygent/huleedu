@@ -24,6 +24,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
     BatchLifecyclePublisher,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
     BatchEssayTracker,
@@ -41,11 +44,13 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
+        pending_content_ops: RedisPendingContentOperations,
         session_factory: async_sessionmaker | Callable[[], Any],
     ) -> None:
         self.batch_tracker = batch_tracker
         self.repository = repository
         self.batch_lifecycle_publisher = batch_lifecycle_publisher
+        self.pending_content_ops = pending_content_ops
         self.session_factory = session_factory
 
     async def handle_batch_essays_registered(
@@ -174,7 +179,40 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             )
 
             if assigned_essay_id is None:
-                # No slots available - publish ExcessContentProvisionedV1 event
+                # Check if batch exists before deciding on pending vs excess
+                batch_status = await self.batch_tracker.get_batch_status(event_data.batch_id)
+                
+                if batch_status is None:
+                    # ALWAYS store as pending content when batch not registered
+                    logger.info(
+                        "Batch not registered yet, storing content as pending",
+                        extra={
+                            "batch_id": event_data.batch_id,
+                            "text_storage_id": event_data.text_storage_id,
+                            "correlation_id": str(correlation_id),
+                        }
+                    )
+                    
+                    # Store as pending
+                    content_metadata = {
+                        "original_file_name": event_data.original_file_name,
+                        "file_upload_id": event_data.file_upload_id,
+                        "raw_file_storage_id": event_data.raw_file_storage_id,
+                        "file_size_bytes": event_data.file_size_bytes,
+                        "content_md5_hash": event_data.content_md5_hash,
+                        "correlation_id": str(event_data.correlation_id),
+                    }
+                    
+                    await self.pending_content_ops.store_pending_content(
+                        event_data.batch_id,
+                        event_data.text_storage_id,
+                        content_metadata
+                    )
+                    
+                    # Successfully handled as pending - NO EXCESS CONTENT EVENT
+                    return True
+                
+                # Batch exists but no slots - this is true excess content
                 logger.warning(
                     "No available slots for content, publishing excess content event",
                     extra={

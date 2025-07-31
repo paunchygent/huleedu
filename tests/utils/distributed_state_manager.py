@@ -87,29 +87,37 @@ class DistributedStateManager:
     async def _atomic_redis_cleanup(self) -> int:
         """
         Perform atomic Redis cleanup using transactions to handle concurrent modifications.
+        
+        Cleans up both idempotency keys and pending content keys.
 
         Returns number of keys cleared.
         """
         # Atomic cleanup script that handles concurrent modifications
         atomic_cleanup_script = """
             -- Use optimistic locking pattern with WATCH/MULTI/EXEC
-            local pattern = 'huleedu:idempotency:v2:*'
+            local patterns = {'huleedu:idempotency:v2:*', 'pending_content:*'}
             local batch_size = 100
             local total_deleted = 0
             
-            -- Get all matching keys in batches
-            local cursor = 0
-            repeat
-                local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size)
-                cursor = tonumber(scan_result[1])
-                local keys = scan_result[2]
-                
-                if #keys > 0 then
-                    -- Delete batch atomically
-                    local deleted = redis.call('DEL', unpack(keys))
-                    total_deleted = total_deleted + deleted
-                end
-            until cursor == 0
+            -- Clean up keys matching each pattern
+            for _, pattern in ipairs(patterns) do
+                local cursor = 0
+                repeat
+                    local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size)
+                    cursor = tonumber(scan_result[1])
+                    local keys = scan_result[2]
+                    
+                    if #keys > 0 then
+                        -- Delete batch atomically
+                        local deleted = redis.call('DEL', unpack(keys))
+                        total_deleted = total_deleted + deleted
+                    end
+                until cursor == 0
+            end
+            
+            -- Also clean up the pending content index key
+            local index_deleted = redis.call('DEL', 'pending_content:index')
+            total_deleted = total_deleted + index_deleted
             
             return total_deleted
         """
@@ -129,9 +137,9 @@ class DistributedStateManager:
             cleared_count = int(result.stdout.strip())
 
             if cleared_count > 0:
-                logger.info(f"🗑️ Atomically cleared {cleared_count} Redis idempotency keys")
+                logger.info(f"🗑️ Atomically cleared {cleared_count} Redis keys (idempotency + pending content)")
             else:
-                logger.info("✅ No Redis idempotency keys to clear")
+                logger.info("✅ No Redis keys to clear (idempotency or pending content)")
 
             return cleared_count
 

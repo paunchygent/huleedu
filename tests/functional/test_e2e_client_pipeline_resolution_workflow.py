@@ -38,6 +38,7 @@ from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 
 
+@pytest.mark.usefixtures("clean_distributed_state")
 class TestClientPipelineResolutionWorkflow:
     """End-to-end tests for complete client pipeline resolution workflow."""
 
