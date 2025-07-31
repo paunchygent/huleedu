@@ -15,6 +15,7 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
+from prometheus_client import REGISTRY
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent
 
@@ -49,6 +50,28 @@ SystemProcessingMetadata.model_rebuild(raise_errors=True)
 EntityReference.model_rebuild(raise_errors=True)
 EssayProcessingInputRefV1.model_rebuild(raise_errors=True)
 BatchServiceNLPInitiateCommandDataV1.model_rebuild(raise_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def _clear_prometheus_registry() -> Generator[None, None, None]:
+    """Clear the global Prometheus registry before each test.
+
+    This fixture prevents `ValueError: Duplicated timeseries` errors when running
+    multiple tests that define the same metrics in the same process. This is the
+    standard pattern mandated by rule 070-testing-and-quality-assurance.mdc.
+
+    It is marked with `autouse=True` to be automatically applied to every
+    test function within its scope without needing to be explicitly requested.
+
+    Yields:
+        None: Yields control back to the test function.
+    """
+    # Get a list of all collector names currently in the registry
+    collectors = list(REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        # Unregister each collector to ensure a clean state
+        REGISTRY.unregister(collector)
+    yield
 
 
 @pytest.fixture

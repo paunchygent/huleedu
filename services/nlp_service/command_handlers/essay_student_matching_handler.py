@@ -149,26 +149,12 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                 correlation_id=correlation_id,
             )
 
-            # Process and publish any pending outbox events
-            async with self.outbox_repository.get_connection() as session:
-                pending_events = await self.outbox_repository.get_pending_events(
-                    session=session, limit=10
-                )
-                for event_id, event_data in pending_events:
-                    try:
-                        await self.kafka_bus.publish(
-                            topic=event_data["topic"],
-                            envelope=event_data["envelope"],
-                        )
-                        await self.outbox_repository.mark_event_published(event_id=event_id)
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to publish outbox event {event_id}: {e}",
-                            extra={"event_id": event_id},
-                        )
+            # TRUE OUTBOX PATTERN: No manual outbox processing needed
+            # The relay worker handles all outbox event publishing asynchronously
 
             logger.info(
-                f"Successfully processed Phase 1 student matching for essay {command_data.essay_id}",
+                "Successfully processed Phase 1 student matching for essay %s",
+                command_data.essay_id,
                 extra={
                     "essay_id": command_data.essay_id,
                     "match_status": match_status,

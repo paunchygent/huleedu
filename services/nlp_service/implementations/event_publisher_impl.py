@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
@@ -74,23 +75,24 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             processing_summary={"total_essays": 1, "matched": 1 if suggestions else 0},
         )
 
-        # Create event envelope
+        # Create event envelope with proper metadata handling
+        metadata: dict[str, Any] = {}
+        inject_trace_context(metadata)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
             event_type=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=batch_event,
-            metadata=inject_trace_context({}),
+            metadata=metadata,
         )
 
-        # Store in outbox
-        await self.outbox_manager.store_event(
+        # Store in outbox using TRUE OUTBOX PATTERN
+        await self.outbox_manager.publish_to_outbox(
             aggregate_id=essay_id,
             aggregate_type="essay",
             event_type=envelope.event_type,
-            event_data=envelope.model_dump(mode="json"),
+            event_data=envelope,  # Pass original Pydantic envelope
             topic=self.output_topic,
-            event_key=essay_id,
         )
 
     async def publish_batch_author_match_results(
