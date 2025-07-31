@@ -29,7 +29,7 @@ from common_core.error_enums import ErrorCode
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
@@ -192,16 +192,21 @@ class TestRealBusinessLogicWithBoundaryMocks:
 
     def create_valid_kafka_message(self, correlation_id: UUID) -> ConsumerRecord:
         """Create a valid Kafka message for testing."""
-        entity_ref = EntityReference(entity_id=str(uuid4()), entity_type="essay")
+        essay_id = str(uuid4())
+        parent_id = str(uuid4())
         system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=parent_id,
             event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             processing_stage=ProcessingStage.PENDING,
         )
 
         request_data = EssayLifecycleSpellcheckRequestV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=parent_id,
             status=EssayStatus.AWAITING_SPELLCHECK,
             system_metadata=system_metadata,
             text_storage_id=str(uuid4()),
@@ -298,16 +303,21 @@ class TestRealBusinessLogicWithBoundaryMocks:
     ) -> None:
         """Test that Pydantic model validation correctly handles null correlation_id."""
         # Create message with null correlation_id to test Pydantic validation barrier
-        entity_ref = EntityReference(entity_id=str(uuid4()), entity_type="essay")
+        essay_id = str(uuid4())
+        parent_id = str(uuid4())
         system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=parent_id,
             event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             processing_stage=ProcessingStage.PENDING,
         )
 
         request_data = EssayLifecycleSpellcheckRequestV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=parent_id,
             status=EssayStatus.AWAITING_SPELLCHECK,
             system_metadata=system_metadata,
             text_storage_id=str(uuid4()),

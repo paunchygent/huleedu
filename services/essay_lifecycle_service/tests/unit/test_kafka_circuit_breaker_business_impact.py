@@ -12,7 +12,9 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import pytest
 from aiokafka.errors import KafkaError
@@ -20,7 +22,6 @@ from common_core.domain_enums import CourseCode, Language
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -195,7 +196,11 @@ class TestBatchCoordinationBusinessImpact:
 
         from huleedu_service_libs.error_handling import raise_external_service_error
 
-        async def fail_with_external_error(event_data=None, correlation_id=None, session=None):
+        async def fail_with_external_error(
+            event_data: Any | None = None,
+            correlation_id: UUID | None = None, 
+            session: AsyncSession | None = None
+        ) -> None:
             raise_external_service_error(
                 service="essay_lifecycle_service",
                 operation="publish_batch_essays_ready",
@@ -220,10 +225,8 @@ class TestBatchCoordinationBusinessImpact:
             expected_essay_count=business_context.essay_count,
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_type="batch",
-                    entity_id=business_context.batch_id,
-                ),
+                entity_id=business_context.batch_id,
+                entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
             essay_instructions="Test essay instructions",
@@ -235,15 +238,9 @@ class TestBatchCoordinationBusinessImpact:
         batch_ready_event = BatchEssaysReady(
             batch_id=business_context.batch_id,
             ready_essays=ready_essays,
-            batch_entity=EntityReference(
-                entity_type="batch",
-                entity_id=business_context.batch_id,
-            ),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_type="batch",
-                    entity_id=business_context.batch_id,
-                ),
+                entity_id=business_context.batch_id,
+                entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
             course_language="English",
@@ -311,7 +308,11 @@ class TestBatchCoordinationBusinessImpact:
 
         # Set up event publisher to succeed for slot assignment but fail for batch ready
         # The handler publishes EssaySlotAssignedV1 first, then BatchEssaysReady
-        async def fail_on_batch_ready(event_data=None, correlation_id=None, session=None):
+        async def fail_on_batch_ready(
+            event_data: Any | None = None,
+            correlation_id: UUID | None = None,
+            session: AsyncSession | None = None
+        ) -> None:
             from huleedu_service_libs.error_handling import raise_external_service_error
 
             raise_external_service_error(
@@ -319,7 +320,7 @@ class TestBatchCoordinationBusinessImpact:
                 operation="publish_batch_essays_ready",
                 external_service="database",
                 message="Database write failed",
-                correlation_id=correlation_id,
+                correlation_id=correlation_id or uuid4(),
             )
 
         # Make only the batch ready publishing fail
@@ -355,15 +356,9 @@ class TestBatchCoordinationBusinessImpact:
         batch_ready_event = BatchEssaysReady(
             batch_id=business_context.batch_id,
             ready_essays=ready_essays,
-            batch_entity=EntityReference(
-                entity_type="batch",
-                entity_id=business_context.batch_id,
-            ),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_type="batch",
-                    entity_id=business_context.batch_id,
-                ),
+                entity_id=business_context.batch_id,
+                entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
             course_language="English",
@@ -622,11 +617,9 @@ class TestDualChannelPublishingBusinessImpact:
 
         event_publisher.publish_status_update.side_effect = simulate_redis_failure
 
-        essay_ref = EntityReference(
-            entity_id="essay_123",
-            entity_type="essay",
-            parent_id=business_context.batch_id,
-        )
+        essay_id = "essay_123"
+        batch_id = business_context.batch_id
+        entity_type = "essay"
 
         # Act: Publish status update
         correlation_id = uuid4()
@@ -634,7 +627,9 @@ class TestDualChannelPublishingBusinessImpact:
         # Act: Try to publish - Kafka succeeds but Redis fails
         with pytest.raises(HuleEduError) as exc_info:
             await event_publisher.publish_status_update(
-                essay_ref=essay_ref,
+                essay_id=essay_id,
+                batch_id=batch_id,
+                entity_type=entity_type,
                 status=EssayStatus.SPELLCHECKED_SUCCESS,
                 correlation_id=correlation_id,
             )
@@ -647,7 +642,9 @@ class TestDualChannelPublishingBusinessImpact:
 
         # Verify the event publisher was called with the correct parameters
         event_publisher.publish_status_update.assert_called_once_with(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             correlation_id=correlation_id,
         )
@@ -706,18 +703,18 @@ class TestDualChannelPublishingBusinessImpact:
 
         event_publisher.publish_status_update.side_effect = simulate_outbox_failure
 
-        essay_ref = EntityReference(
-            entity_id="essay_456",
-            entity_type="essay",
-            parent_id=business_context.batch_id,
-        )
+        essay_id = "essay_456"
+        batch_id = business_context.batch_id
+        entity_type = "essay"
 
         # Act: Attempt status update
         correlation_id = uuid4()
 
         with pytest.raises(HuleEduError) as exc_info:  # Should raise due to outbox failure
             await event_publisher.publish_status_update(
-                essay_ref=essay_ref,
+                essay_id=essay_id,
+                batch_id=batch_id,
+                entity_type=entity_type,
                 status=EssayStatus.CJ_ASSESSMENT_SUCCESS,
                 correlation_id=correlation_id,
             )
@@ -731,7 +728,9 @@ class TestDualChannelPublishingBusinessImpact:
 
         # Verify the event publisher was called with the correct parameters
         event_publisher.publish_status_update.assert_called_once_with(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.CJ_ASSESSMENT_SUCCESS,
             correlation_id=correlation_id,
         )
@@ -789,32 +788,37 @@ class TestBusinessWorkflowRecoveryScenarios:
         # Configure the mock to succeed for all calls (simulating successful recovery)
         event_publisher.publish_status_update.return_value = None
 
-        essay_ref = EntityReference(
-            entity_id="recovery_essay_123",
-            entity_type="essay",
-            parent_id=business_context.batch_id,
-        )
+        # EntityReference removed - using primitive parameters
+        essay_id = "recovery_essay_123"
+        entity_type = "essay"
+        batch_id = business_context.batch_id
 
         # Act: Multiple status updates during outbox failure and recovery
         correlation_id = uuid4()
 
         # First update: Kafka fails, falls back to outbox (succeeds)
         await event_publisher.publish_status_update(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.AWAITING_SPELLCHECK,
             correlation_id=correlation_id,
         )
 
         # Second update: Kafka still fails, falls back to outbox (succeeds)
         await event_publisher.publish_status_update(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.SPELLCHECKING_IN_PROGRESS,
             correlation_id=correlation_id,
         )
 
         # Third update: Kafka recovered, goes directly via Kafka
         await event_publisher.publish_status_update(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             correlation_id=correlation_id,
         )
@@ -832,7 +836,9 @@ class TestBusinessWorkflowRecoveryScenarios:
         ]
 
         for i, call in enumerate(event_publisher.publish_status_update.call_args_list):
-            assert call.kwargs["essay_ref"] == essay_ref
+            assert call.kwargs["essay_id"] == essay_id
+            assert call.kwargs["entity_type"] == entity_type
+            assert call.kwargs["batch_id"] == batch_id
             assert call.kwargs["status"] == expected_statuses[i]
             assert call.kwargs["correlation_id"] == correlation_id
 
@@ -914,10 +920,8 @@ class TestBusinessImpactIntegrationScenarios:
             expected_essay_count=3,
             user_id="integration_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_type="batch",
-                    entity_id=business_context.batch_id,
-                ),
+                entity_id=business_context.batch_id,
+                entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
             essay_instructions="Integration test essay instructions",
@@ -939,25 +943,28 @@ class TestBusinessImpactIntegrationScenarios:
         )  # No events published during registration
 
         # Step 2: Status update (should fail - first outbox call)
-        essay_ref = EntityReference(
-            entity_id="essay_1",
-            entity_type="essay",
-            parent_id=business_context.batch_id,
-        )
+        # EntityReference removed - using primitive parameters
+        essay_id = "essay_1"
+        entity_type = "essay"
+        batch_id = business_context.batch_id
 
         # Ensure the batch tracker returns a user_id for the essay
         mock_batch_tracker.get_user_id_for_essay.return_value = "integration_user"
 
         # This call: Simulated status update (succeeds)
         await event_publisher.publish_status_update(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.READY_FOR_PROCESSING,
             correlation_id=correlation_id,
         )
 
         # Step 3: Another status update (also succeeds)
         await event_publisher.publish_status_update(
-            essay_ref=essay_ref,
+            essay_id=essay_id,
+            batch_id=batch_id,
+            entity_type=entity_type,
             status=EssayStatus.AWAITING_SPELLCHECK,
             correlation_id=correlation_id,
         )

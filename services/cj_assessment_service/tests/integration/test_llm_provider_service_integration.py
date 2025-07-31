@@ -21,7 +21,6 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -128,15 +127,13 @@ class TestLLMProviderServiceIntegration:
 
         # Create test event
         event_data = ELS_CJAssessmentRequestV1(
-            entity_ref=EntityReference(
-                entity_type="batch",
-                entity_id="test-batch-123",
-            ),
+            entity_id="test-batch-123",
+            entity_type="batch",
+            parent_id=None,
             system_metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_type="batch",
-                    entity_id="test-batch-123",
-                )
+                entity_id="test-batch-123",
+                entity_type="batch",
+                parent_id=None,
             ),
             essays_for_cj=[
                 EssayProcessingInputRefV1(

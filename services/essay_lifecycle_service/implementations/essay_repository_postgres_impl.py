@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.error_handling import (
@@ -338,11 +339,13 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
     async def create_essay_record(
         self,
-        essay_ref: EntityReference,
+        essay_id: str,
+        batch_id: str | None = None,
+        entity_type: str = "essay",
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> ConcreteEssayState:
-        """Create new essay record from entity reference."""
+        """Create new essay record from primitive parameters."""
         # Generate correlation_id if not provided for error handling
         if correlation_id is None:
             from uuid import uuid4
@@ -351,17 +354,17 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         if session is None:
             async with self.session() as session:
-                return await self.create_essay_record(essay_ref, session, correlation_id)
+                return await self.create_essay_record(
+                    essay_id, batch_id, entity_type, session, correlation_id
+                )
 
         try:
             # Debug logging to trace batch_id issue
-            self.logger.info(
-                f"Creating essay {essay_ref.entity_id} with batch_id: {essay_ref.parent_id}"
-            )
+            self.logger.info(f"Creating essay {essay_id} with batch_id: {batch_id}")
 
             essay_state = ConcreteEssayState(
-                essay_id=essay_ref.entity_id,
-                batch_id=essay_ref.parent_id,
+                essay_id=essay_id,
+                batch_id=batch_id,
                 current_status=EssayStatus.UPLOADED,
                 timeline={EssayStatus.UPLOADED.value: datetime.now(UTC)},
             )
@@ -370,7 +373,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             db_essay = EssayStateDB(**db_data)
             session.add(db_essay)
 
-            self.logger.info(f"Created essay record {essay_ref.entity_id}")
+            self.logger.info(f"Created essay record {essay_id}")
             return essay_state
 
         except Exception as e:
@@ -383,19 +386,23 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     operation="create_essay_record",
                     message=f"Database error during essay creation: {e.__class__.__name__}",
                     correlation_id=correlation_id,
-                    essay_id=essay_ref.entity_id,
-                    batch_id=essay_ref.parent_id,
+                    essay_id=essay_id,
+                    batch_id=batch_id,
                     error_type=e.__class__.__name__,
                     error_details=str(e),
                 )
 
     async def create_essay_records_batch(
         self,
-        essay_refs: list[EntityReference],
+        essay_data: list[dict[str, str | None]],
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> list[EssayState]:
-        """Create multiple essay records in single atomic transaction."""
+        """Create multiple essay records in single atomic transaction.
+
+        Args:
+            essay_data: List of dicts with keys: essay_id, batch_id, entity_type
+        """
         # Generate correlation_id if not provided for error handling
         if correlation_id is None:
             from uuid import uuid4
@@ -404,25 +411,25 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         if session is None:
             async with self.session() as session:
-                return await self.create_essay_records_batch(essay_refs, session, correlation_id)
+                return await self.create_essay_records_batch(essay_data, session, correlation_id)
 
-        if not essay_refs:
+        if not essay_data:
             return []
 
         try:
             # Log batch creation start
-            batch_id = essay_refs[0].parent_id if essay_refs else "unknown"
-            essay_ids = [ref.entity_id for ref in essay_refs]
+            batch_id = essay_data[0].get("batch_id", "unknown") if essay_data else "unknown"
+            essay_ids = [data.get("essay_id", "unknown") for data in essay_data]
             self.logger.info(
-                f"Creating batch of {len(essay_refs)} essay records for batch {batch_id}: {essay_ids}"
+                f"Creating batch of {len(essay_data)} essay records for batch {batch_id}: {essay_ids}"
             )
 
             # Create essay states for all references
             essay_states: list[EssayState] = []
-            for essay_ref in essay_refs:
+            for data in essay_data:
                 essay_state: EssayState = ConcreteEssayState(
-                    essay_id=essay_ref.entity_id,
-                    batch_id=essay_ref.parent_id,
+                    essay_id=data["essay_id"],
+                    batch_id=data.get("batch_id"),
                     current_status=EssayStatus.UPLOADED,
                     timeline={EssayStatus.UPLOADED.value: datetime.now(UTC)},
                 )
@@ -445,14 +452,14 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             if hasattr(e, "error_detail"):
                 raise
             else:
-                batch_id = essay_refs[0].parent_id if essay_refs else "unknown"
+                batch_id = essay_data[0].get("batch_id", "unknown") if essay_data else "unknown"
                 raise_processing_error(
                     service="essay_lifecycle_service",
                     operation="create_essay_records_batch",
                     message=f"Database error during batch essay creation: {e.__class__.__name__}",
                     correlation_id=correlation_id,
                     batch_id=batch_id,
-                    essay_count=len(essay_refs),
+                    essay_count=len(essay_data),
                     error_type=e.__class__.__name__,
                     error_details=str(e),
                 )

@@ -9,6 +9,8 @@ Preserves all spellcheck business logic: pipeline validation,
 correction counting, content verification.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import UTC
 from typing import Any
@@ -17,7 +19,7 @@ import pytest
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
 
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
@@ -115,7 +117,7 @@ class TestE2ESpellcheckWorkflows:
                 """Filter for spellcheck results from our specific essay."""
                 return (
                     "data" in event_data
-                    and event_data["data"].get("entity_ref", {}).get("entity_id") == essay_id
+                    and event_data["data"].get("entity_id") == essay_id
                     and event_data.get("correlation_id") == correlation_id
                 )
 
@@ -224,7 +226,7 @@ class TestE2ESpellcheckWorkflows:
                 """Filter for spellcheck results from our specific essay."""
                 return (
                     "data" in event_data
-                    and event_data["data"].get("entity_ref", {}).get("entity_id") == essay_id
+                    and event_data["data"].get("entity_id") == essay_id
                     and event_data.get("correlation_id") == correlation_id
                 )
 
@@ -262,12 +264,10 @@ class TestE2ESpellcheckWorkflows:
         """
         from datetime import datetime
 
-        # Create entity reference for the essay
-        essay_entity_ref = EntityReference(entity_id=essay_id, entity_type="essay")
-
         # Create system metadata (match original working implementation)
         system_metadata = SystemProcessingMetadata(
-            entity=essay_entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
             timestamp=datetime.now(UTC),
             started_at=datetime.now(UTC),
             processing_stage=ProcessingStage.PROCESSING,
@@ -277,7 +277,8 @@ class TestE2ESpellcheckWorkflows:
         # Create the request data (match original working implementation)
         spellcheck_request_data = EssayLifecycleSpellcheckRequestV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-            entity_ref=essay_entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
             timestamp=datetime.now(UTC),
             status=EssayStatus.AWAITING_SPELLCHECK,
             text_storage_id=text_storage_id,

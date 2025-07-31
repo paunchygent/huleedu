@@ -21,7 +21,6 @@ from common_core.events.batch_coordination_events import (
     EssayValidationError,
 )
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -92,12 +91,9 @@ class TestDualEventPublishing:
         event_data = BatchEssaysReady(
             batch_id=batch_id,
             ready_essays=ready_essays,
-            batch_entity=EntityReference(
+            metadata=SystemProcessingMetadata(
                 entity_id=batch_id,
                 entity_type="batch",
-            ),
-            metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
                 timestamp=datetime.now(UTC),
             ),
             course_code=CourseCode.ENG5,
@@ -176,7 +172,8 @@ class TestDualEventPublishing:
             ),
             correlation_id=correlation_id,
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -221,9 +218,9 @@ class TestDualEventPublishing:
                     text_storage_id="storage-5",
                 )
             ],
-            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
             course_code=CourseCode.ENG5,
@@ -256,7 +253,8 @@ class TestDualEventPublishing:
             ),
             correlation_id=correlation_id,
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -319,7 +317,8 @@ class TestDualEventPublishing:
             ),
             correlation_id=correlation_id,
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -361,7 +360,8 @@ class TestDualEventPublishing:
             ),
             correlation_id=uuid4(),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-batch", entity_type="batch"),
+                entity_id="test-batch",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )

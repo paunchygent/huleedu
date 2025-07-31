@@ -19,7 +19,7 @@ import pytest
 from common_core.domain_enums import ContentType, CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
@@ -233,11 +233,9 @@ class TestConcurrentSlotAssignment:
             essay_instructions="Race condition test",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 
@@ -369,11 +367,9 @@ class TestConcurrentSlotAssignment:
             essay_instructions="Cross-instance coordination test",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 
@@ -491,11 +487,9 @@ class TestConcurrentSlotAssignment:
             essay_instructions="Completion test",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 
@@ -572,11 +566,9 @@ class TestConcurrentSlotAssignment:
             essay_instructions="Performance test",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 

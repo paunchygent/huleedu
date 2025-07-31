@@ -173,7 +173,7 @@ async def _process_cj_assessment_impl(
         log_extra = {
             "correlation_id": str(correlation_id),
             "event_id": str(envelope.event_id),
-            "bos_batch_id": str(request_event_data.entity_ref.entity_id),
+            "bos_batch_id": str(request_event_data.entity_id),
             "essay_count": len(request_event_data.essays_for_cj),
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
@@ -196,7 +196,7 @@ async def _process_cj_assessment_impl(
             )
 
         converted_request_data = {
-            "bos_batch_id": str(request_event_data.entity_ref.entity_id),
+            "bos_batch_id": str(request_event_data.entity_id),
             "essays_to_process": essays_to_process,
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
@@ -260,10 +260,14 @@ async def _process_cj_assessment_impl(
         # Construct and publish CJAssessmentCompletedV1 event
         completed_event_data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-            entity_ref=request_event_data.entity_ref,  # Propagate original batch reference
+            entity_id=request_event_data.entity_id,
+            entity_type=request_event_data.entity_type,
+            parent_id=request_event_data.parent_id,
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(  # New metadata for *this* completion event
-                entity=request_event_data.entity_ref,
+                entity_id=request_event_data.entity_id,
+                entity_type=request_event_data.entity_type,
+                parent_id=request_event_data.parent_id,
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.COMPLETED,
                 event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
@@ -338,7 +342,9 @@ async def _process_cj_assessment_impl(
                     "error_code": error_detail.error_code.value,
                     "correlation_id": str(correlation_id),
                     "error_type": error_detail.details.get("exception_type"),
-                    "entity_ref": request_event_data.entity_ref,
+                    "entity_id": request_event_data.entity_id,
+                    "entity_type": request_event_data.entity_type,
+                    "parent_id": request_event_data.parent_id,
                 },
                 exc_info=True,
             )
@@ -355,10 +361,14 @@ async def _process_cj_assessment_impl(
 
             failed_event_data = CJAssessmentFailedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
-                entity_ref=request_event_data.entity_ref,
+                entity_id=request_event_data.entity_id,
+                entity_type=request_event_data.entity_type,
+                parent_id=request_event_data.parent_id,
                 status=BatchStatus.FAILED_CRITICALLY,
                 system_metadata=SystemProcessingMetadata(
-                    entity=request_event_data.entity_ref,
+                    entity_id=request_event_data.entity_id,
+                    entity_type=request_event_data.entity_type,
+                    parent_id=request_event_data.parent_id,
                     timestamp=datetime.now(UTC),
                     processing_stage=ProcessingStage.FAILED,
                     event=ProcessingEvent.CJ_ASSESSMENT_FAILED.value,

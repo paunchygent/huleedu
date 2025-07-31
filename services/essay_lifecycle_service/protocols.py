@@ -12,7 +12,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from common_core.domain_enums import ContentType, CourseCode, Language
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,20 +70,26 @@ class EssayRepositoryProtocol(Protocol):
 
     async def create_essay_record(
         self,
-        essay_ref: EntityReference,
+        essay_id: str,
+        batch_id: str | None = None,
+        entity_type: str = "essay",
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> EssayState:
-        """Create new essay record from entity reference."""
+        """Create new essay record from primitive parameters."""
         ...
 
     async def create_essay_records_batch(
         self,
-        essay_refs: list[EntityReference],
+        essay_data: list[dict[str, str | None]],
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> list[EssayState]:
-        """Create multiple essay records in single atomic transaction."""
+        """Create multiple essay records in single atomic transaction.
+
+        Args:
+            essay_data: List of dicts with keys: essay_id, batch_id, entity_type
+        """
         ...
 
     async def list_essays_by_batch(self, batch_id: str) -> list[EssayState]:
@@ -154,7 +160,7 @@ class EventPublisher(Protocol):
     """Protocol for publishing events to Kafka."""
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
+        self, essay_id: str, batch_id: str | None, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """Publish essay status update event."""
         ...

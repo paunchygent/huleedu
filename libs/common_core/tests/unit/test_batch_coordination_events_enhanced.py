@@ -11,7 +11,6 @@ from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
 )
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -24,14 +23,10 @@ class TestEnhancedBatchEssaysReadyLean:
     def sample_metadata(self) -> SystemProcessingMetadata:
         """Fixture providing sample processing metadata."""
         return SystemProcessingMetadata(
-            entity=EntityReference(entity_id="test_entity", entity_type="batch"),
+            entity_id="test_entity",
+            entity_type="batch",
             timestamp=datetime.now(UTC),
         )
-
-    @pytest.fixture
-    def sample_batch_entity(self) -> EntityReference:
-        """Fixture providing sample batch entity reference."""
-        return EntityReference(entity_id="batch_123", entity_type="batch")
 
     @pytest.fixture
     def sample_ready_essays(self) -> list[EssayProcessingInputRefV1]:
@@ -45,14 +40,12 @@ class TestEnhancedBatchEssaysReadyLean:
     def test_lean_batch_ready_regular_class(
         self,
         sample_ready_essays: list[EssayProcessingInputRefV1],
-        sample_batch_entity: EntityReference,
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady with REGULAR class type and teacher names."""
         event = BatchEssaysReady(
             batch_id="batch_regular",
             ready_essays=sample_ready_essays,
-            batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             # Lean registration fields from BOS
             course_code=CourseCode.ENG5,
@@ -75,14 +68,12 @@ class TestEnhancedBatchEssaysReadyLean:
     def test_lean_batch_ready_guest_class(
         self,
         sample_ready_essays: list[EssayProcessingInputRefV1],
-        sample_batch_entity: EntityReference,
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady with GUEST class type (no teacher names)."""
         event = BatchEssaysReady(
             batch_id="batch_guest",
             ready_essays=sample_ready_essays,
-            batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             # Lean registration fields from BOS
             course_code=CourseCode.SV1,
@@ -104,14 +95,12 @@ class TestEnhancedBatchEssaysReadyLean:
     def test_lean_batch_ready_serialization_roundtrip(
         self,
         sample_ready_essays: list[EssayProcessingInputRefV1],
-        sample_batch_entity: EntityReference,
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady serialization and deserialization with lean registration fields."""
         event = BatchEssaysReady(
             batch_id="batch_serialization",
             ready_essays=sample_ready_essays,
-            batch_entity=sample_batch_entity,
             metadata=sample_metadata,
             # Lean registration fields from BOS
             course_code=CourseCode.ENG6,

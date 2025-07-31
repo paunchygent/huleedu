@@ -34,7 +34,6 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -56,7 +55,6 @@ CJAssessmentCompletedV1.model_rebuild(raise_errors=True)
 CJAssessmentFailedV1.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
-EntityReference.model_rebuild(raise_errors=True)
 EssayProcessingInputRefV1.model_rebuild(raise_errors=True)
 
 
@@ -102,16 +100,18 @@ def llm_config_overrides_minimal() -> LLMConfigOverrides:
 
 
 @pytest.fixture
-def entity_reference(sample_batch_id: str) -> EntityReference:
-    """Provide a sample EntityReference for batch."""
-    return EntityReference(entity_id=sample_batch_id, entity_type="batch", parent_id=None)
+def sample_parent_id() -> str | None:
+    """Provide a sample parent ID for testing."""
+    return None
 
 
 @pytest.fixture
-def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetadata:
+def system_metadata(sample_batch_id: str, sample_parent_id: str | None) -> SystemProcessingMetadata:
     """Provide sample SystemProcessingMetadata."""
     return SystemProcessingMetadata(
-        entity=entity_reference,
+        entity_id=sample_batch_id,
+        entity_type="batch",
+        parent_id=sample_parent_id,
         event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         processing_stage=ProcessingStage.PENDING,
     )
@@ -125,7 +125,8 @@ def essay_processing_ref(sample_essay_id: str, sample_storage_id: str) -> EssayP
 
 @pytest.fixture
 def cj_assessment_request_data_with_overrides(
-    entity_reference: EntityReference,
+    sample_batch_id: str,
+    sample_parent_id: str | None,
     system_metadata: SystemProcessingMetadata,
     essay_processing_ref: EssayProcessingInputRefV1,
     llm_config_overrides: LLMConfigOverrides,
@@ -133,7 +134,9 @@ def cj_assessment_request_data_with_overrides(
     """Provide ELS_CJAssessmentRequestV1 with LLM config overrides."""
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
-        entity_ref=entity_reference,
+        entity_id=sample_batch_id,
+        entity_type="batch",
+        parent_id=sample_parent_id,
         system_metadata=system_metadata,
         essays_for_cj=[essay_processing_ref],
         language="en",
@@ -145,14 +148,17 @@ def cj_assessment_request_data_with_overrides(
 
 @pytest.fixture
 def cj_assessment_request_data_no_overrides(
-    entity_reference: EntityReference,
+    sample_batch_id: str,
+    sample_parent_id: str | None,
     system_metadata: SystemProcessingMetadata,
     essay_processing_ref: EssayProcessingInputRefV1,
 ) -> ELS_CJAssessmentRequestV1:
     """Provide ELS_CJAssessmentRequestV1 without LLM config overrides."""
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
-        entity_ref=entity_reference,
+        entity_id=sample_batch_id,
+        entity_type="batch",
+        parent_id=sample_parent_id,
         system_metadata=system_metadata,
         essays_for_cj=[essay_processing_ref],
         language="en",

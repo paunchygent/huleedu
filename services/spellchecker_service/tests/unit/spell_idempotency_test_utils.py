@@ -51,6 +51,14 @@ class MockRedisClient:
             return 1
         return 0
 
+    async def delete(self, *keys: str) -> int:
+        """Mock multi-key DELETE operation required by RedisClientProtocol."""
+        total_deleted = 0
+        for key in keys:
+            deleted_count = await self.delete_key(key)
+            total_deleted += deleted_count
+        return total_deleted
+
     async def get(self, key: str) -> str | None:
         """Mock GET operation that retrieves values."""
         if self.should_fail_set:  # Simulate full Redis outage
@@ -98,10 +106,14 @@ def sample_spellcheck_request_event() -> dict:
         "correlation_id": correlation_id,
         "data": {
             "event_name": "essay.spellcheck.requested",
-            "entity_ref": {"entity_id": essay_id, "entity_type": "essay"},
+            "entity_id": essay_id,
+            "entity_type": "essay",
+            "parent_id": str(uuid.uuid4()),
             "status": EssayStatus.AWAITING_SPELLCHECK.value,
             "system_metadata": {
-                "entity": {"entity_id": essay_id, "entity_type": "essay"},
+                "entity_id": essay_id,
+                "entity_type": "essay",
+                "parent_id": str(uuid.uuid4()),
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "essay.spellcheck.requested",

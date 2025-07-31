@@ -64,7 +64,6 @@ from .events.llm_provider_events import (
 from .events.nlp_events import BatchAuthorMatchesSuggestedV1, StudentMatchSuggestion
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
@@ -125,7 +124,6 @@ __all__ = [
     "Environment",
     "LLMProviderType",
     # Metadata Models
-    "EntityReference",
     "SystemProcessingMetadata",
     "StorageReferenceMetadata",
     "EssayProcessingInputRefV1",

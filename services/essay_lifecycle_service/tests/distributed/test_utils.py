@@ -16,7 +16,8 @@ from typing import Any
 from uuid import UUID
 
 import psutil
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,11 +37,13 @@ class MockEventPublisher(EventPublisher):
         self.lock = asyncio.Lock()
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
+        self, essay_id: str, batch_id: str | None, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """Record status update events."""
         async with self.lock:
-            self.published_events.append(("status_update", (essay_ref, status), correlation_id))
+            self.published_events.append(
+                ("status_update", (essay_id, batch_id, status), correlation_id)
+            )
 
     async def publish_batch_phase_progress(
         self,

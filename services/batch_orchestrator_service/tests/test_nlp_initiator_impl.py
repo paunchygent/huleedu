@@ -112,8 +112,8 @@ class TestNLPInitiatorImpl:
 
         # Verify command data
         command_data = published_envelope.data
-        assert command_data.entity_ref.entity_id == batch_id
-        assert command_data.entity_ref.entity_type == "batch"
+        assert command_data.entity_id == batch_id
+        assert command_data.entity_type == "batch"
         assert command_data.essays_to_process == sample_essay_refs
         assert command_data.language == "en"  # Inferred from ENG5
         assert command_data.event_name == ProcessingEvent.BATCH_NLP_INITIATE_COMMAND

@@ -94,7 +94,7 @@ class ConsumerRecoveryManagerImpl(ConsumerRecoveryManager):
 
         try:
             # Use circuit breaker to control recovery attempts
-            result = await self.circuit_breaker.call(self._execute_recovery, consumer)
+            result: bool = await self.circuit_breaker.call(self._execute_recovery, consumer)
             await self.record_recovery_attempt("graduated", True)
             return result
 

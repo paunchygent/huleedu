@@ -71,9 +71,9 @@ class TestDefaultServiceResultHandler:
     def mock_spellcheck_result_success(self) -> MagicMock:
         """Create successful spellcheck result data."""
         result = MagicMock()
-        entity_ref = MagicMock()
-        entity_ref.entity_id = "test-essay-1"
-        result.entity_ref = entity_ref
+        result.entity_id = "test-essay-1"
+        result.entity_type = "essay"
+        result.parent_id = None
         result.status = EssayStatus.SPELLCHECKED_SUCCESS
         result.original_text_storage_id = "original-123"
 
@@ -92,9 +92,9 @@ class TestDefaultServiceResultHandler:
     def mock_spellcheck_result_failure(self) -> MagicMock:
         """Create failed spellcheck result data."""
         result = MagicMock()
-        entity_ref = MagicMock()
-        entity_ref.entity_id = "test-essay-1"
-        result.entity_ref = entity_ref
+        result.entity_id = "test-essay-1"
+        result.entity_type = "essay"
+        result.parent_id = None
         result.status = EssayStatus.SPELLCHECK_FAILED
         result.original_text_storage_id = "original-123"
         result.storage_metadata = {}
@@ -242,9 +242,9 @@ class TestDefaultServiceResultHandler:
     def mock_cj_assessment_completed(self) -> MagicMock:
         """Create CJ assessment completed result data."""
         result = MagicMock()
-        entity_ref = MagicMock()
-        entity_ref.entity_id = "test-batch-1"
-        result.entity_ref = entity_ref
+        result.entity_id = "test-batch-1"
+        result.entity_type = "batch"
+        result.parent_id = None
         result.cj_assessment_job_id = "job-123"
         result.rankings = [
             {"els_essay_id": "essay-1", "rank": 1, "score": 0.85},
@@ -256,9 +256,9 @@ class TestDefaultServiceResultHandler:
     def mock_cj_assessment_failed(self) -> MagicMock:
         """Create CJ assessment failed result data."""
         result = MagicMock()
-        entity_ref = MagicMock()
-        entity_ref.entity_id = "test-batch-1"
-        result.entity_ref = entity_ref
+        result.entity_id = "test-batch-1"
+        result.entity_type = "batch"
+        result.parent_id = None
         result.cj_assessment_job_id = "job-123"
         result.error_message = "CJ service unavailable"
         result.affected_essay_ids = ["essay-1", "essay-2"]

@@ -216,13 +216,16 @@ class BCSKafkaConsumer:
             envelope = EventEnvelope[SpellcheckResultDataV1](**message_data)
 
             spellcheck_data = envelope.data
-            essay_id = spellcheck_data.entity_ref.entity_id
+            essay_id = spellcheck_data.entity_id
+            if essay_id is None:
+                logger.error("Cannot process spellcheck result: entity_id (essay_id) is None")
+                return
 
-            # Extract batch_id from entity_ref.parent_id or system_metadata
-            batch_id = spellcheck_data.entity_ref.parent_id
+            # Extract batch_id from parent_id or system_metadata
+            batch_id = spellcheck_data.parent_id
             if not batch_id:
                 # Fallback: try to get batch_id from system_metadata
-                batch_id = spellcheck_data.system_metadata.entity.parent_id
+                batch_id = spellcheck_data.system_metadata.parent_id
 
             if not batch_id:
                 logger.error(
@@ -265,7 +268,10 @@ class BCSKafkaConsumer:
             envelope = EventEnvelope[CJAssessmentCompletedV1](**message_data)
 
             cj_data = envelope.data
-            batch_id = cj_data.entity_ref.entity_id  # CJ assessment is batch-level
+            batch_id = cj_data.entity_id  # CJ assessment is batch-level
+            if batch_id is None:
+                logger.error("Cannot process CJ assessment result: entity_id (batch_id) is None")
+                return
 
             # CJ assessment results contain ranking for multiple essays
             for ranking in cj_data.rankings:

@@ -33,7 +33,7 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
@@ -65,6 +65,14 @@ class MockRedisClient:
             del self.keys[key]
             return 1
         return 0
+
+    async def delete(self, *keys: str) -> int:
+        """Mock multi-key DELETE operation required by RedisClientProtocol."""
+        total_deleted = 0
+        for key in keys:
+            deleted_count = await self.delete_key(key)
+            total_deleted += deleted_count
+        return total_deleted
 
     async def get(self, key: str) -> str | None:
         """Mock GET operation."""
@@ -149,14 +157,10 @@ def create_spellcheck_completion_event(
     essay_id: str, batch_id: str, status: EssayStatus = EssayStatus.SPELLCHECKED_SUCCESS
 ) -> EventEnvelope[SpellcheckResultDataV1]:
     """Create a spellcheck completion event envelope."""
-    entity_ref = EntityReference(
+    system_metadata = SystemProcessingMetadata(
         entity_id=essay_id,
         entity_type="essay",
         parent_id=batch_id,
-    )
-
-    system_metadata = SystemProcessingMetadata(
-        entity=entity_ref,
         timestamp=datetime.now(UTC),
         processing_stage=ProcessingStage.COMPLETED,
         event="essay.spellcheck.completed",
@@ -164,7 +168,9 @@ def create_spellcheck_completion_event(
 
     spellcheck_data = SpellcheckResultDataV1(
         event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-        entity_ref=entity_ref,
+        entity_id=essay_id,
+        entity_type="essay",
+        parent_id=batch_id,
         status=status,
         system_metadata=system_metadata,
         original_text_storage_id=f"storage-{essay_id}",
@@ -185,13 +191,10 @@ def create_cj_assessment_completion_event(
     batch_id: str, essay_ids: list[str]
 ) -> EventEnvelope[CJAssessmentCompletedV1]:
     """Create a CJ assessment completion event envelope."""
-    entity_ref = EntityReference(
+    system_metadata = SystemProcessingMetadata(
         entity_id=batch_id,
         entity_type="batch",
-    )
-
-    system_metadata = SystemProcessingMetadata(
-        entity=entity_ref,
+        parent_id=None,
         timestamp=datetime.now(UTC),
         processing_stage=ProcessingStage.COMPLETED,
         event="cj_assessment.completed",
@@ -210,7 +213,9 @@ def create_cj_assessment_completion_event(
 
     cj_data = CJAssessmentCompletedV1(
         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-        entity_ref=entity_ref,
+        entity_id=batch_id,
+        entity_type="batch",
+        parent_id=None,
         status=EssayStatus.CJ_ASSESSMENT_SUCCESS,
         system_metadata=system_metadata,
         cj_assessment_job_id=f"cj-job-{batch_id}",
@@ -685,15 +690,11 @@ async def test_deterministic_event_id_generation_consistency(
     shared_correlation_id = uuid.uuid4()
     shared_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-    # Create entity ref and metadata
-    entity_ref = EntityReference(
+    # Create system metadata
+    system_metadata = SystemProcessingMetadata(
         entity_id=essay_id,
         entity_type="essay",
         parent_id=batch_id,
-    )
-
-    system_metadata = SystemProcessingMetadata(
-        entity=entity_ref,
         timestamp=shared_timestamp,
         processing_stage=ProcessingStage.COMPLETED,
         event="essay.spellcheck.completed",
@@ -701,7 +702,9 @@ async def test_deterministic_event_id_generation_consistency(
 
     spellcheck_data = SpellcheckResultDataV1(
         event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-        entity_ref=entity_ref,
+        entity_id=essay_id,
+        entity_type="essay",
+        parent_id=batch_id,
         status=EssayStatus.SPELLCHECKED_SUCCESS,
         system_metadata=system_metadata,
         original_text_storage_id=f"storage-{essay_id}",

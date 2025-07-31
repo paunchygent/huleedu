@@ -247,7 +247,7 @@ async def _route_event(
             # Record command processing
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="spellcheck_command", batch_id=str(command_data.entity_ref.entity_id)
+                    event_type="spellcheck_command", batch_id=str(command_data.entity_id)
                 ).inc()
 
             # Maintain trace context when calling the handler
@@ -274,7 +274,7 @@ async def _route_event(
             # Record CJ command processing
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="cj_command", batch_id=str(cj_command_data.entity_ref.entity_id)
+                    event_type="cj_command", batch_id=str(cj_command_data.entity_id)
                 ).inc()
 
             # Maintain trace context when calling the handler
@@ -299,7 +299,7 @@ async def _route_event(
             if coordination_events_metric:
                 coordination_events_metric.labels(
                     event_type="spellcheck_completed",
-                    batch_id=str(result_data.entity_ref.entity_id),
+                    batch_id=str(result_data.parent_id),
                 ).inc()
 
             spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
@@ -317,7 +317,7 @@ async def _route_event(
             # Record CJ assessment completion
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="cj_completed", batch_id=str(cj_result_data.entity_ref.entity_id)
+                    event_type="cj_completed", batch_id=str(cj_result_data.entity_id)
                 ).inc()
 
             cj_result: bool = await service_result_handler.handle_cj_assessment_completed(

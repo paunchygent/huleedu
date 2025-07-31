@@ -18,7 +18,7 @@ import pytest
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -56,13 +56,15 @@ class MockEventPublisher(EventPublisher):
 
     async def publish_status_update(
         self,
-        essay_ref: EntityReference,
+        essay_id: str,
+        batch_id: str | None,
         status: EssayStatus,
         correlation_id: UUID,
-        session: AsyncSession | None = None,
     ) -> None:
         """Record status update events for verification."""
-        self.published_events.append(("status_update", (essay_ref, status), correlation_id))
+        self.published_events.append(
+            ("status_update", (essay_id, batch_id, status), correlation_id)
+        )
 
     async def publish_batch_phase_progress(
         self,
@@ -360,11 +362,9 @@ class TestAtomicBatchCreationIntegration:
             essay_instructions="Write a test essay",
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id="integration-test-batch",
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id="integration-test-batch",
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 
@@ -463,17 +463,15 @@ class TestAtomicBatchCreationIntegration:
             await session.commit()
 
         # Now create one essay manually to cause constraint violation
-        from common_core.metadata_models import EntityReference
+        essay_id = "essay_001"  # Same as first essay in batch
+        batch_id = sample_batch_event.batch_id
 
-        existing_ref = EntityReference(
-            entity_id="essay_001",  # Same as first essay in batch
-            entity_type="essay",
-            parent_id=sample_batch_event.batch_id,
-        )
         # Create essay using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                await postgres_repository.create_essay_record(existing_ref, session=session)
+                await postgres_repository.create_essay_record(
+                    essay_id=essay_id, batch_id=batch_id, session=session
+                )
 
         correlation_id = uuid4()
 
@@ -522,11 +520,9 @@ class TestAtomicBatchCreationIntegration:
             essay_instructions="Test empty batch",
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id="empty-batch",
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id="empty-batch",
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 

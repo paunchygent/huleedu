@@ -22,7 +22,9 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+
+# EntityReference removed - using primitive parameters
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.error_handling import (
@@ -270,8 +272,8 @@ async def _process_single_message_impl(
                 )
 
         # Set a more meaningful ID for logging if available
-        if request_data.entity_ref and request_data.entity_ref.entity_id:
-            essay_id_for_logging = request_data.entity_ref.entity_id
+        if request_data.entity_id:
+            essay_id_for_logging = request_data.entity_id
 
         # Log about the event we received
         log_event_processing(
@@ -527,16 +529,14 @@ async def _publish_structured_error_event(
 ) -> None:
     """Publish a structured error event with proper error information."""
     try:
-        # Preserve entity reference from incoming request to maintain parent_id (batch_id)
-        if request_envelope.data and request_envelope.data.entity_ref:
-            error_entity_ref = request_envelope.data.entity_ref.model_copy(
-                update={"entity_id": essay_id_for_logging}
-            )
-        else:
-            error_entity_ref = EntityReference(
-                entity_id=essay_id_for_logging,
-                entity_type="essay",
-            )
+        # Extract primitive parameters from incoming request
+        entity_id = essay_id_for_logging
+        entity_type = "essay"
+        batch_id = None
+        if request_envelope.data:
+            entity_id = request_envelope.data.entity_id or essay_id_for_logging
+            entity_type = request_envelope.data.entity_type or "essay"
+            batch_id = request_envelope.data.parent_id
 
         # Create structured error info from ErrorDetail
         structured_error_info = {
@@ -561,7 +561,9 @@ async def _publish_structured_error_event(
             )
         else:  # Create minimal if no incoming
             final_error_sys_meta = SystemProcessingMetadata(
-                entity=error_entity_ref,
+                entity_id=entity_id,
+                entity_type=entity_type,
+                parent_id=batch_id,
                 timestamp=processing_started_at,
                 started_at=processing_started_at,
                 processing_stage=ProcessingStage.FAILED,
@@ -577,7 +579,9 @@ async def _publish_structured_error_event(
             storage_metadata=None,
             corrections_made=None,
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=error_entity_ref,
+            entity_id=entity_id,
+            entity_type=entity_type,
+            parent_id=batch_id,
             timestamp=datetime.now(UTC),
             status=EssayStatus.SPELLCHECK_FAILED,
             system_metadata=final_error_sys_meta,

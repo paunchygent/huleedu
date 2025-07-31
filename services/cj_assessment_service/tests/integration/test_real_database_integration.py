@@ -21,7 +21,6 @@ from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -58,14 +57,10 @@ class TestRealDatabaseIntegration:
                 )
             )
 
-        entity_ref = EntityReference(
+        system_metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
             parent_id=None,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             timestamp=datetime.now(UTC),
             processing_stage=ProcessingStage.PENDING,
             event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
@@ -73,7 +68,9 @@ class TestRealDatabaseIntegration:
 
         request_data = ELS_CJAssessmentRequestV1(
             event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             system_metadata=system_metadata,
             essays_for_cj=essays,
             language="en",

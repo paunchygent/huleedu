@@ -12,7 +12,7 @@ from common_core.batch_service_models import BatchServiceCJAssessmentInitiateCom
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
 
@@ -80,10 +80,8 @@ class TestBatchServiceCommandContracts:
         # Create command
         original_command = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(
-                entity_id=batch_id,
-                entity_type="batch",
-            ),
+            entity_id=batch_id,
+            entity_type="batch",
             essays_to_process=essays,
             language="sv",
             course_code=CourseCode.SV1,
@@ -103,7 +101,7 @@ class TestBatchServiceCommandContracts:
         )
 
         # Verify all fields match
-        assert deserialized_command.entity_ref.entity_id == original_command.entity_ref.entity_id
+        assert deserialized_command.entity_id == original_command.entity_id
         assert deserialized_command.course_code == original_command.course_code
         assert deserialized_command.class_type == original_command.class_type
         assert deserialized_command.essay_instructions == original_command.essay_instructions

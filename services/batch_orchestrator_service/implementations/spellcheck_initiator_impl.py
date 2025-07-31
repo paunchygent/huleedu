@@ -7,7 +7,7 @@ from uuid import UUID
 from common_core.batch_service_models import BatchServiceSpellcheckInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import (
     raise_validation_error,
@@ -82,12 +82,14 @@ class SpellcheckInitiatorImpl(SpellcheckInitiatorProtocol):
             # Get language from course code
             language = _infer_language_from_course_code(batch_context.course_code).value
 
-            # Construct spellcheck command
-            batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
+            # Construct spellcheck command with primitive parameters
+            # EntityReference removed - using primitive parameters
 
             spellcheck_command = BatchServiceSpellcheckInitiateCommandDataV1(
                 event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-                entity_ref=batch_entity_ref,
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 essays_to_process=essays_for_processing,
                 language=language,
             )

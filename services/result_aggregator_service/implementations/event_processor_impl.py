@@ -196,23 +196,22 @@ class EventProcessorImpl(EventProcessorProtocol):
     ) -> None:
         """Process spellcheck completion event."""
         try:
-            # Extract entity reference from system metadata
-            entity_ref = data.system_metadata.entity if data.system_metadata else None
-            if not entity_ref:
-                logger.error("Missing entity reference in spellcheck result")
-                raise ValueError("Missing entity reference")
+            # Extract entity information from system metadata using primitive fields
+            if not data.system_metadata or not data.system_metadata.entity_id:
+                logger.error("Missing entity information in spellcheck result")
+                raise ValueError("Missing entity information")
 
             logger.info(
                 "Processing spellcheck completed",
-                entity_id=entity_ref.entity_id,
-                entity_type=entity_ref.entity_type,
-                parent_id=entity_ref.parent_id,
+                entity_id=data.system_metadata.entity_id,
+                entity_type=data.system_metadata.entity_type,
+                parent_id=data.system_metadata.parent_id,
                 status=data.status,
             )
 
-            # Extract essay_id and batch_id from entity reference
-            essay_id = entity_ref.entity_id
-            batch_id = entity_ref.parent_id
+            # Extract essay_id and batch_id from system metadata
+            essay_id = data.system_metadata.entity_id
+            batch_id = data.system_metadata.parent_id
 
             if not batch_id:
                 logger.error("Missing batch_id in entity reference")
@@ -293,13 +292,19 @@ class EventProcessorImpl(EventProcessorProtocol):
         try:
             logger.info(
                 "Processing CJ assessment completed",
-                entity_id=data.entity_ref.entity_id,
-                entity_type=data.entity_ref.entity_type,
+                entity_id=data.entity_id,
+                entity_type=data.entity_type,
                 job_id=data.cj_assessment_job_id,
             )
 
-            # entity_ref.entity_id is the batch_id for CJ assessment events
-            batch_id = data.entity_ref.entity_id
+            # entity_id is the batch_id for CJ assessment events
+            batch_id = data.entity_id
+            if batch_id is None:
+                logger.error(
+                    "Cannot process CJ assessment: entity_id (batch_id) is None",
+                    job_id=data.cj_assessment_job_id,
+                )
+                return
 
             # Process each ranking result
             for ranking in data.rankings:
@@ -334,7 +339,8 @@ class EventProcessorImpl(EventProcessorProtocol):
         except Exception as e:
             logger.error(
                 "Failed to process CJ assessment completed",
-                entity_ref=data.entity_ref,
+                entity_id=data.entity_id,
+                entity_type=data.entity_type,
                 error=str(e),
                 exc_info=True,
             )

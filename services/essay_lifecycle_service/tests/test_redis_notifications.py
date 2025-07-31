@@ -14,7 +14,8 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -124,9 +125,7 @@ class TestRedisNotifications:
             file_upload_id="upload_456",
             slot_assignment_id="slot_789",
             text_storage_id="storage_abc",
-            metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="essay_123", entity_type="essay")
-            ),
+            metadata=SystemProcessingMetadata(entity_id="essay_123", entity_type="essay"),
         )
         correlation_id = uuid4()
 

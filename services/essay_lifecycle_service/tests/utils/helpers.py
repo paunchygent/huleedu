@@ -82,8 +82,8 @@ class TimeAdvancer:
             start_time: Optional starting time, defaults to current time
         """
         self.start_time = start_time or datetime.now(UTC)
-        self._frozen_time = None
-        self._context = None
+        self._frozen_time: Any = None  # freeze_time context manager
+        self._context: Any = None
 
     def __enter__(self) -> TimeAdvancer:
         """Enter context and freeze time."""
@@ -183,7 +183,7 @@ class HealthMonitorTestHelper:
         """
         import asyncio
 
-        async def record_failures():
+        async def record_failures() -> None:
             for _ in range(failure_count):
                 await monitor.record_processing_failure()
 

@@ -18,7 +18,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
 if TYPE_CHECKING:
-    from common_core.metadata_models import EntityReference
     from common_core.status_enums import EssayStatus
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 
@@ -49,13 +48,14 @@ class EssayStatusPublisher:
         self.batch_tracker = batch_tracker
 
     async def publish_status_update(
-        self, essay_ref: EntityReference, status: EssayStatus, correlation_id: UUID
+        self, essay_id: str, batch_id: str | None, status: EssayStatus, correlation_id: UUID
     ) -> None:
         """
         Publish essay status update event to both Kafka and Redis.
 
         Args:
-            essay_ref: Reference to the essay entity
+            essay_id: Essay identifier
+            batch_id: Batch identifier (if applicable)
             status: New essay status
             correlation_id: Correlation ID for event tracking
 
@@ -70,10 +70,14 @@ class EssayStatusPublisher:
         # Create status update event data as a dict that's JSON serializable
         event_data = {
             "event_name": "essay.status.updated.v1",
-            "entity_ref": essay_ref.model_dump(),
+            "entity_id": essay_id,
+            "entity_type": "essay",
+            "parent_id": batch_id,
             "status": status.value,
             "system_metadata": SystemProcessingMetadata(
-                entity=essay_ref,
+                entity_id=essay_id,
+                entity_type="essay",
+                parent_id=batch_id,
                 timestamp=datetime.now(UTC),
             ).model_dump(),
         }
@@ -96,7 +100,7 @@ class EssayStatusPublisher:
 
         # Try immediate Kafka publishing first
         topic = "essay.status.events"
-        key = str(essay_ref.entity_id)
+        key = str(essay_id)
 
         try:
             await self.kafka_bus.publish(
@@ -107,7 +111,7 @@ class EssayStatusPublisher:
             logger.info(
                 "Essay status update published directly to Kafka",
                 extra={
-                    "essay_id": essay_ref.entity_id,
+                    "essay_id": essay_id,
                     "status": status.value,
                     "correlation_id": str(correlation_id),
                 },
@@ -120,7 +124,7 @@ class EssayStatusPublisher:
             logger.warning(
                 "Kafka publish failed, will need outbox fallback",
                 extra={
-                    "essay_id": essay_ref.entity_id,
+                    "essay_id": essay_id,
                     "status": status.value,
                     "error": str(kafka_error),
                 },
@@ -132,22 +136,23 @@ class EssayStatusPublisher:
                 operation="publish_status_update",
                 message=f"Kafka publish failed: {kafka_error.__class__.__name__}",
                 correlation_id=correlation_id,
-                aggregate_id=str(essay_ref.entity_id),
+                aggregate_id=str(essay_id),
                 aggregate_type="essay",
                 event_type="essay.status.updated.v1",
                 topic=topic,
-                essay_id=essay_ref.entity_id,
+                essay_id=essay_id,
                 status=status.value,
                 error_type=kafka_error.__class__.__name__,
                 error_details=str(kafka_error),
             )
 
         # Publish to Redis for real-time updates (independent of Kafka)
-        await self._publish_essay_status_to_redis(essay_ref, status, correlation_id)
+        await self._publish_essay_status_to_redis(essay_id, batch_id, status, correlation_id)
 
     async def _publish_essay_status_to_redis(
         self,
-        essay_ref: EntityReference,
+        essay_id: str,
+        batch_id: str | None,
         status: EssayStatus,
         correlation_id: UUID,
     ) -> None:
@@ -155,7 +160,8 @@ class EssayStatusPublisher:
         Publish essay status update to Redis for real-time UI notifications.
 
         Args:
-            essay_ref: Reference to the essay entity
+            essay_id: Essay identifier
+            batch_id: Batch identifier (if applicable)
             status: New essay status
             correlation_id: Correlation ID for event tracking
 
@@ -166,7 +172,7 @@ class EssayStatusPublisher:
             from datetime import UTC, datetime
 
             # Look up the user_id for this essay from batch context
-            user_id = await self.batch_tracker.get_user_id_for_essay(essay_ref.entity_id)
+            user_id = await self.batch_tracker.get_user_id_for_essay(essay_id)
 
             if user_id:
                 # Publish real-time notification to user-specific Redis channel
@@ -174,7 +180,7 @@ class EssayStatusPublisher:
                     user_id=user_id,
                     event_type="essay_status_updated",
                     data={
-                        "essay_id": essay_ref.entity_id,
+                        "essay_id": essay_id,
                         "status": status.value,
                         "timestamp": datetime.now(UTC).isoformat(),
                         "correlation_id": str(correlation_id),
@@ -184,7 +190,7 @@ class EssayStatusPublisher:
                 logger.info(
                     f"Published real-time essay status notification to Redis for user {user_id}",
                     extra={
-                        "essay_id": essay_ref.entity_id,
+                        "essay_id": essay_id,
                         "user_id": user_id,
                         "status": status.value,
                         "correlation_id": str(correlation_id),
@@ -194,7 +200,7 @@ class EssayStatusPublisher:
                 logger.warning(
                     "Cannot publish Redis notification: user_id not found for essay",
                     extra={
-                        "essay_id": essay_ref.entity_id,
+                        "essay_id": essay_id,
                         "status": status.value,
                         "correlation_id": str(correlation_id),
                     },
@@ -211,7 +217,7 @@ class EssayStatusPublisher:
                     external_service="Redis",
                     message=f"Failed to publish essay status to Redis: {e.__class__.__name__}",
                     correlation_id=correlation_id,
-                    essay_id=essay_ref.entity_id,
+                    essay_id=essay_id,
                     user_id=user_id if "user_id" in locals() else None,
                     status=status.value,
                     error_type=e.__class__.__name__,

@@ -27,7 +27,7 @@ from common_core.batch_service_models import (
 )
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.models import EventOutbox
@@ -287,7 +287,8 @@ class TestOutboxPatternIntegration:
                 for i in range(15):
                     command_data = BatchServiceSpellcheckInitiateCommandDataV1(
                         event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-                        entity_ref=EntityReference(entity_id=f"batch-{i}", entity_type="batch"),
+                        entity_id=f"batch-{i}",
+                        entity_type="batch",
                         essays_to_process=[
                             EssayProcessingInputRefV1(
                                 essay_id=f"essay{i}", text_storage_id=f"storage{i}"
@@ -321,7 +322,7 @@ class TestOutboxPatternIntegration:
 
                     # Verify all events were published with correct data
                     published_event_ids = {
-                        event["envelope"].data["entity_ref"]["entity_id"]
+                        event["envelope"].data["entity_id"]
                         for event in mock_kafka_publisher.published_events
                     }
                     expected_event_ids = {f"batch-{i}" for i in range(15)}
@@ -405,9 +406,8 @@ class TestOutboxPatternIntegration:
                 for i in range(5):
                     command_data = BatchServiceNLPInitiateCommandDataV1(
                         event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
-                        entity_ref=EntityReference(
-                            entity_id=f"concurrent-{i}", entity_type="batch"
-                        ),
+                        entity_id=f"concurrent-{i}",
+                        entity_type="batch",
                         essays_to_process=[
                             EssayProcessingInputRefV1(
                                 essay_id=f"essay{i}", text_storage_id=f"storage{i}"

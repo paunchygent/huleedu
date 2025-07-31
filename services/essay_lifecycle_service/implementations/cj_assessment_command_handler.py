@@ -52,7 +52,7 @@ class CJAssessmentCommandHandler:
         logger.info(
             "Processing CJ assessment initiation command from BOS",
             extra={
-                "batch_id": command_data.entity_ref.entity_id,
+                "batch_id": command_data.entity_id,
                 "essays_count": len(command_data.essays_to_process),
                 "language": command_data.language,
                 "correlation_id": str(correlation_id),
@@ -75,7 +75,7 @@ class CJAssessmentCommandHandler:
                             logger.warning(
                                 f"Essay {essay_id} not found for CJ assessment command",
                                 extra={
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -93,7 +93,7 @@ class CJAssessmentCommandHandler:
                                 "essay_id": essay_id,
                                 "current_status": essay_state_model.current_status.value,
                                 "valid_triggers": essay_machine.get_valid_triggers(),
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "correlation_id": str(correlation_id),
                             },
                         )
@@ -127,7 +127,7 @@ class CJAssessmentCommandHandler:
                                     "essay_id": essay_id,
                                     "previous_status": essay_state_model.current_status.value,
                                     "new_status": essay_machine.current_status.value,
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -140,7 +140,7 @@ class CJAssessmentCommandHandler:
                                 f"for essay {essay_id} from status "
                                 f"{essay_state_model.current_status.value}.",
                                 extra={
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -149,13 +149,21 @@ class CJAssessmentCommandHandler:
                             f"Failed to process essay {essay_id} with state machine",
                             extra={
                                 "error": str(e),
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "correlation_id": str(correlation_id),
                             },
                         )
 
                 # Dispatch requests to CJ Assessment Service AFTER successful state transitions
                 if successfully_transitioned_essays:
+                    # Validate that batch_id (entity_id) is not None
+                    if command_data.entity_id is None:
+                        logger.error(
+                            "Cannot dispatch CJ assessment requests: entity_id is None",
+                            extra={"correlation_id": str(correlation_id)},
+                        )
+                        return
+                    
                     try:
                         # Convert string language to Language enum at boundary
                         language_enum = Language(command_data.language)
@@ -165,7 +173,7 @@ class CJAssessmentCommandHandler:
                             language=language_enum,
                             course_code=command_data.course_code,
                             essay_instructions=command_data.essay_instructions,
-                            batch_id=command_data.entity_ref.entity_id,
+                            batch_id=command_data.entity_id,
                             correlation_id=correlation_id,
                             session=session,
                         )
@@ -173,7 +181,7 @@ class CJAssessmentCommandHandler:
                         logger.info(
                             "Successfully dispatched CJ assessment requests for transitioned essays",
                             extra={
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "transitioned_essays_count": len(successfully_transitioned_essays),
                                 "correlation_id": str(correlation_id),
                             },
@@ -196,7 +204,7 @@ class CJAssessmentCommandHandler:
                                         extra={
                                             "essay_id": essay_ref.essay_id,
                                             "current_status": essay_state_model.current_status.value,
-                                            "batch_id": command_data.entity_ref.entity_id,
+                                            "batch_id": command_data.entity_id,
                                             "correlation_id": str(correlation_id),
                                         },
                                     )
@@ -219,7 +227,7 @@ class CJAssessmentCommandHandler:
                                                 "essay_id": essay_ref.essay_id,
                                                 "previous_status": essay_state_model.current_status.value,
                                                 "new_status": essay_machine.current_status.value,
-                                                "batch_id": command_data.entity_ref.entity_id,
+                                                "batch_id": command_data.entity_id,
                                                 "correlation_id": str(correlation_id),
                                             },
                                         )
@@ -247,14 +255,14 @@ class CJAssessmentCommandHandler:
                             "Failed to dispatch CJ assessment requests",
                             extra={
                                 "error": str(e),
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "correlation_id": str(correlation_id),
                             },
                         )
                 else:
                     logger.warning(
                         f"No essays successfully transitioned to AWAITING_CJ_ASSESSMENT "
-                        f"for batch {command_data.entity_ref.entity_id}. Skipping dispatch.",
+                        f"for batch {command_data.entity_id}. Skipping dispatch.",
                         extra={"correlation_id": str(correlation_id)},
                     )
                 # Transaction commits here

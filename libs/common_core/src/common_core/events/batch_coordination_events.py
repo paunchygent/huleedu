@@ -20,7 +20,6 @@ from pydantic import BaseModel, Field
 
 from ..domain_enums import CourseCode
 from ..metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -71,7 +70,6 @@ class BatchEssaysReady(BaseModel):
     ready_essays: list[EssayProcessingInputRefV1] = Field(
         description="List of essays ready for processing with their content references"
     )
-    batch_entity: EntityReference = Field(description="Batch entity reference")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
     # Enhanced context from Class Management Service (lean registration refactoring)

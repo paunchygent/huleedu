@@ -64,14 +64,14 @@ class BatchProgressPublisher:
         from datetime import UTC, datetime
 
         from common_core.events.envelope import EventEnvelope
-        from common_core.metadata_models import EntityReference
+        # EntityReference removed - using primitive parameters
 
-        # Create batch progress event data
-        batch_ref = EntityReference(entity_id=batch_id, entity_type="batch")
-
+        # Create batch progress event data with primitive parameters
         event_data = {
             "event_name": "batch.phase.progress.v1",
-            "entity_ref": batch_ref.model_dump(),
+            "entity_id": batch_id,
+            "entity_type": "batch",
+            "parent_id": None,
             "phase": phase,
             "completed_count": completed_count,
             "failed_count": failed_count,
@@ -175,14 +175,14 @@ class BatchProgressPublisher:
         from datetime import UTC, datetime
 
         from common_core.events.envelope import EventEnvelope
-        from common_core.metadata_models import EntityReference
+        # EntityReference removed - using primitive parameters
 
-        # Create batch conclusion event data
-        batch_ref = EntityReference(entity_id=batch_id, entity_type="batch")
-
+        # Create batch conclusion event data with primitive parameters
         event_data = {
             "event_name": "batch.phase.concluded.v1",
-            "entity_ref": batch_ref.model_dump(),
+            "entity_id": batch_id,
+            "entity_type": "batch",
+            "parent_id": None,
             "phase": phase,
             "status": status,
             "details": details,

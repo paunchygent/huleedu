@@ -105,22 +105,16 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
             command_data = BatchStudentMatchingRequestedV1.model_validate(envelope.data)
 
             logger.info(
-                f"Processing Phase 1 student matching for essay {command_data.essay_id}",
+                f"Processing Phase 1 student matching for batch {command_data.batch_id} with {len(command_data.essays_to_process)} essays",
                 extra={
-                    "essay_id": command_data.essay_id,
+                    "batch_id": command_data.batch_id,
                     "class_id": command_data.class_id,
+                    "essay_count": len(command_data.essays_to_process),
                     "correlation_id": str(correlation_id),
                 },
             )
 
-            # Fetch essay content
-            essay_text = await self.content_client.fetch_content(
-                storage_id=command_data.text_storage_id,
-                http_session=http_session,
-                correlation_id=correlation_id,
-            )
-
-            # Get roster (with caching)
+            # Get roster once for all essays in the batch (with caching)
             roster = await self.roster_cache.get_roster(command_data.class_id)
             if not roster:
                 roster = await self.class_management_client.get_class_roster(
@@ -130,40 +124,86 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                 )
                 await self.roster_cache.set_roster(command_data.class_id, roster)
 
-            # Perform student matching
-            suggestions = await self.student_matcher.find_matches(
-                essay_text=essay_text,
-                roster=roster,
-                correlation_id=correlation_id,
-            )
+            # Process each essay in the batch
+            processed_count = 0
+            for essay_ref in command_data.essays_to_process:
+                try:
+                    logger.info(
+                        f"Processing essay {essay_ref.essay_id} in batch {command_data.batch_id}",
+                        extra={
+                            "essay_id": essay_ref.essay_id,
+                            "batch_id": command_data.batch_id,
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
 
-            # Determine match status
-            match_status = determine_match_status(suggestions)
+                    # Fetch essay content
+                    essay_text = await self.content_client.fetch_content(
+                        storage_id=essay_ref.text_storage_id,
+                        http_session=http_session,
+                        correlation_id=correlation_id,
+                    )
 
-            # Publish match result event
-            await self.event_publisher.publish_author_match_result(
-                kafka_bus=self.kafka_bus,
-                essay_id=command_data.essay_id,
-                suggestions=suggestions,
-                match_status=match_status,
-                correlation_id=correlation_id,
-            )
+                    # Perform student matching
+                    suggestions = await self.student_matcher.find_matches(
+                        essay_text=essay_text,
+                        roster=roster,
+                        correlation_id=correlation_id,
+                    )
+
+                    # Determine match status
+                    match_status = determine_match_status(suggestions)
+
+                    # Publish match result event for this essay
+                    await self.event_publisher.publish_author_match_result(
+                        kafka_bus=self.kafka_bus,
+                        essay_id=essay_ref.essay_id,
+                        suggestions=suggestions,
+                        match_status=match_status,
+                        correlation_id=correlation_id,
+                    )
+
+                    processed_count += 1
+                    logger.info(
+                        "Successfully processed Phase 1 student matching for essay %s",
+                        essay_ref.essay_id,
+                        extra={
+                            "essay_id": essay_ref.essay_id,
+                            "batch_id": command_data.batch_id,
+                            "match_status": match_status,
+                            "suggestion_count": len(suggestions),
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+
+                except Exception as essay_error:
+                    logger.error(
+                        f"Failed to process essay {essay_ref.essay_id} in batch {command_data.batch_id}: {essay_error}",
+                        extra={
+                            "essay_id": essay_ref.essay_id,
+                            "batch_id": command_data.batch_id,
+                            "error": str(essay_error),
+                            "correlation_id": str(correlation_id),
+                        },
+                        exc_info=True,
+                    )
+                    # Continue processing other essays instead of failing the entire batch
+                    continue
 
             # TRUE OUTBOX PATTERN: No manual outbox processing needed
             # The relay worker handles all outbox event publishing asynchronously
 
             logger.info(
-                "Successfully processed Phase 1 student matching for essay %s",
-                command_data.essay_id,
+                f"Completed Phase 1 student matching for batch {command_data.batch_id}: {processed_count}/{len(command_data.essays_to_process)} essays processed",
                 extra={
-                    "essay_id": command_data.essay_id,
-                    "match_status": match_status,
-                    "suggestion_count": len(suggestions),
+                    "batch_id": command_data.batch_id,
+                    "processed_count": processed_count,
+                    "total_count": len(command_data.essays_to_process),
                     "correlation_id": str(correlation_id),
                 },
             )
 
-            return True
+            return processed_count > 0  # Return True if at least one essay was processed successfully
 
         except HuleEduError:
             # Re-raise HuleEdu errors as-is

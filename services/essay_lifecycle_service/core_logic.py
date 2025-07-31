@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from common_core.metadata_models import EntityReference
+# EntityReference removed - no longer needed with primitive parameter patterns
 
 
 def generate_correlation_id() -> UUID:
@@ -17,15 +17,5 @@ def generate_correlation_id() -> UUID:
     return uuid4()
 
 
-def create_entity_reference(essay_id: str, batch_id: str | None = None) -> EntityReference:
-    """
-    Create an EntityReference for an essay.
-
-    Args:
-        essay_id: The essay identifier
-        batch_id: Optional batch identifier
-
-    Returns:
-        EntityReference instance for the essay
-    """
-    return EntityReference(entity_id=essay_id, entity_type="essay", parent_id=batch_id)
+# create_entity_reference function removed - EntityReference pattern eliminated
+# Use primitive parameters (essay_id, batch_id, entity_type) directly instead

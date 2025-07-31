@@ -19,7 +19,7 @@ from common_core.events.batch_coordination_events import (
 )
 from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (
-    EntityReference,
+    # EntityReference removed - using primitive parameters
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -534,9 +534,11 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         ready_event = BatchEssaysReady(
             batch_id=batch_id,
             ready_essays=ready_essays,
-            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+            # batch_entity removed - using primitive parameters in event model
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 timestamp=datetime.now(UTC),
                 event="batch.essays.ready",
             ),

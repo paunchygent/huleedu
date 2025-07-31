@@ -176,7 +176,7 @@ class TestProcessSingleMessage:
             published_event_data: SpellcheckResultDataV1 = call_args[0][1]
 
             assert published_event_data.status == EssayStatus.SPELLCHECK_FAILED
-            assert published_event_data.entity_ref.entity_id == sample_essay_id
+            assert published_event_data.entity_id == sample_essay_id
             assert published_event_data.event_name == ESSAY_RESULT_EVENT
             assert published_event_data.system_metadata.processing_stage == ProcessingStage.FAILED
             # Verify modernized structured error information

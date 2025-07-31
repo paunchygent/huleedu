@@ -60,6 +60,14 @@ class MockRedisClient:
             return 1
         return 0
 
+    async def delete(self, *keys: str) -> int:
+        """Mock multi-key DELETE operation required by RedisClientProtocol."""
+        total_deleted = 0
+        for key in keys:
+            deleted_count = await self.delete_key(key)
+            total_deleted += deleted_count
+        return total_deleted
+
     async def get(self, key: str) -> str | None:
         """Mock GET operation that retrieves values."""
         return self.keys.get(key)

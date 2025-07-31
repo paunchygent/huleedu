@@ -76,7 +76,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     await self.batch_tracker.register_batch(event_data, correlation_id)
 
                     # Create initial essay records in the database (atomic batch operation)
-                    from common_core.metadata_models import EntityReference
+                    # EntityReference removed - using primitive parameters
 
                     logger.info(
                         "Creating initial essay records in database for batch",
@@ -87,17 +87,20 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         },
                     )
 
-                    # Create all essay references for atomic batch operation
-                    essay_refs = [
-                        EntityReference(
-                            entity_id=essay_id, entity_type="essay", parent_id=event_data.batch_id
-                        )
+                    # Create all essay data dictionaries for atomic batch operation
+                    # Note: Protocol expects str | None values, but in this context all values are guaranteed non-None
+                    typed_essay_data: list[dict[str, str | None]] = [
+                        {
+                            "essay_id": essay_id,
+                            "batch_id": event_data.batch_id,
+                            "entity_type": "essay",
+                        }
                         for essay_id in event_data.essay_ids
                     ]
 
                     # Create all essay records in single atomic transaction
                     await self.repository.create_essay_records_batch(
-                        essay_refs, correlation_id=correlation_id, session=session
+                        typed_essay_data, correlation_id=correlation_id, session=session
                     )
 
                     logger.info(

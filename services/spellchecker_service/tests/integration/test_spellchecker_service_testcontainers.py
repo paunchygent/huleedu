@@ -5,6 +5,8 @@ This test uses proper testcontainers (PostgreSQL, Redis, Kafka) to create
 an isolated testing environment for the spellchecker service.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import time
@@ -19,7 +21,7 @@ from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from testcontainers.kafka import KafkaContainer
@@ -374,12 +376,14 @@ class TestSpellcheckerServiceTestcontainers:
             request = EssayLifecycleSpellcheckRequestV1(
                 event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
                 text_storage_id=storage_id,
-                entity_ref=EntityReference(
-                    entity_id=essay_name, entity_type="essay", parent_id=f"batch-{uuid4()}"
-                ),
+                entity_id=essay_name,
+                entity_type="essay",
+                parent_id=f"batch-{uuid4()}",
                 status=EssayStatus.SPELLCHECKING_IN_PROGRESS,
                 system_metadata=SystemProcessingMetadata(
-                    entity=EntityReference(entity_id=essay_name, entity_type="essay"),
+                    entity_id=essay_name,
+                    entity_type="essay",
+                    parent_id=f"batch-{uuid4()}",
                     timestamp=datetime.now(UTC),
                     started_at=datetime.now(UTC),
                     processing_stage="processing",

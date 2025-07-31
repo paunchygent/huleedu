@@ -22,7 +22,6 @@ from common_core.events.batch_coordination_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -55,12 +54,9 @@ class TestEventContractsV2:
                     text_storage_id="storage-2",
                 ),
             ],
-            batch_entity=EntityReference(
+            metadata=SystemProcessingMetadata(
                 entity_id="test-batch-123",
                 entity_type="batch",
-            ),
-            metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-batch-123", entity_type="batch"),
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.PROCESSING,
             ),
@@ -126,7 +122,8 @@ class TestEventContractsV2:
             ),
             correlation_id=uuid4(),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-batch-456", entity_type="batch"),
+                entity_id="test-batch-456",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.FAILED,
             ),
@@ -201,7 +198,8 @@ class TestEventContractsV2:
             ),
             correlation_id=uuid4(),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-batch-errors", entity_type="batch"),
+                entity_id="test-batch-errors",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.PROCESSING,
             ),
@@ -234,9 +232,9 @@ class TestEventContractsV2:
         event_data = BatchEssaysReady(
             batch_id="test-pydantic-v2",
             ready_essays=[],
-            batch_entity=EntityReference(entity_id="test-pydantic-v2", entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-pydantic-v2", entity_type="batch"),
+                entity_id="test-pydantic-v2",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.INITIALIZED,  # Enum field
             ),
@@ -271,7 +269,8 @@ class TestEventContractsV2:
             },
             "correlation_id": str(uuid4()),
             "metadata": {
-                "entity": {"entity_type": "batch", "entity_id": "test-batch-123"},
+                "entity_id": "test-batch-123",
+                "entity_type": "batch",
                 "processing_stage": "initialized",
             },
             # Missing batch_id field

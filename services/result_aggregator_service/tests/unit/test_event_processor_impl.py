@@ -18,7 +18,6 @@ from common_core.events import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
@@ -138,12 +137,10 @@ class TestProcessBatchRegistered:
         essay_count = 5
 
         # Create proper metadata
-        entity_ref = EntityReference(
+        metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
-        )
-        metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            parent_id=None,
             processing_stage=ProcessingStage.INITIALIZED,
         )
 
@@ -188,12 +185,10 @@ class TestProcessBatchRegistered:
         essay_count = 3
 
         # Create proper metadata
-        entity_ref = EntityReference(
+        metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
-        )
-        metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            parent_id=None,
             processing_stage=ProcessingStage.INITIALIZED,
         )
 
@@ -240,12 +235,10 @@ class TestProcessBatchRegistered:
         user_id = str(uuid4())
 
         # Create proper metadata
-        entity_ref = EntityReference(
+        metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
-        )
-        metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            parent_id=None,
             processing_stage=ProcessingStage.INITIALIZED,
         )
 
@@ -458,12 +451,7 @@ class TestProcessSpellcheckCompleted:
         batch_id = str(uuid4())
         storage_id = str(uuid4())
 
-        entity_ref = EntityReference(
-            entity_id=essay_id,
-            entity_type="essay",
-            parent_id=batch_id,
-        )
-
+        # EntityReference removed - using primitive parameters
         storage_metadata = StorageReferenceMetadata(
             references={
                 ContentType.CORRECTED_TEXT: {
@@ -473,13 +461,17 @@ class TestProcessSpellcheckCompleted:
         )
 
         system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             original_text_storage_id="original_text_123",
             corrections_made=5,
@@ -523,20 +515,19 @@ class TestProcessSpellcheckCompleted:
         essay_id = str(uuid4())
         batch_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             original_text_storage_id="original_text_123",
             corrections_made=0,
@@ -580,21 +571,20 @@ class TestProcessSpellcheckCompleted:
         essay_id = str(uuid4())
         batch_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.FAILED,
             error_info={"message": "Spellcheck service error", "code": "SC_001"},
         )
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id,
             status=EssayStatus.SPELLCHECK_FAILED,
             original_text_storage_id="original_text_123",
             corrections_made=0,
@@ -646,7 +636,9 @@ class TestProcessSpellcheckCompleted:
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=EntityReference(entity_id="essay1", entity_type="essay"),
+            entity_id="essay1",
+            entity_type="essay",
+            parent_id=None,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             original_text_storage_id="original_text_123",
             corrections_made=0,
@@ -671,20 +663,21 @@ class TestProcessSpellcheckCompleted:
     ) -> None:
         """Test error when batch_id is missing in entity reference."""
         # Arrange
-        entity_ref = EntityReference(
-            entity_id=str(uuid4()),
-            entity_type="essay",
-            parent_id=None,
-        )
+        essay_id = str(uuid4())
+        # EntityReference removed - testing with missing batch_id (parent_id=None)
 
         system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=None,  # This simulates missing batch_id
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=None,  # Missing batch_id should cause error
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             original_text_storage_id="original_text_123",
             corrections_made=0,
@@ -720,19 +713,18 @@ class TestProcessCJAssessmentCompleted:
         essay1_id = str(uuid4())
         essay2_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
             parent_id=None,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = CJAssessmentCompletedV1(
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             cj_assessment_job_id=str(uuid4()),
             rankings=[
                 {
@@ -800,19 +792,18 @@ class TestProcessCJAssessmentCompleted:
         batch_id = str(uuid4())
         essay1_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
             parent_id=None,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = CJAssessmentCompletedV1(
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             cj_assessment_job_id=str(uuid4()),
             rankings=[
                 {
@@ -863,19 +854,18 @@ class TestProcessCJAssessmentCompleted:
         # Arrange
         batch_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
             parent_id=None,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = CJAssessmentCompletedV1(
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             cj_assessment_job_id=str(uuid4()),
             rankings=[],
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
@@ -908,19 +898,18 @@ class TestProcessCJAssessmentCompleted:
         # Arrange
         batch_id = str(uuid4())
 
-        entity_ref = EntityReference(
+        # EntityReference removed - using primitive parameters
+        system_metadata = SystemProcessingMetadata(
             entity_id=batch_id,
             entity_type="batch",
             parent_id=None,
-        )
-
-        system_metadata = SystemProcessingMetadata(
-            entity=entity_ref,
             processing_stage=ProcessingStage.COMPLETED,
         )
 
         data = CJAssessmentCompletedV1(
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             cj_assessment_job_id=str(uuid4()),
             rankings=[
                 {

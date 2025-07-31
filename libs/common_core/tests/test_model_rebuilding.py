@@ -22,7 +22,6 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     SystemProcessingMetadata,
 )
 
@@ -51,7 +50,6 @@ class TestModelRebuilding:
     def test_metadata_models_rebuild(self) -> None:
         """Test that metadata models can be rebuilt without errors."""
         # These should not raise any exceptions
-        EntityReference.model_rebuild(raise_errors=True)
         SystemProcessingMetadata.model_rebuild(raise_errors=True)
 
     def test_forward_references_resolved(self) -> None:
@@ -59,15 +57,11 @@ class TestModelRebuilding:
         # This test validates that Union types and enum forward references work
         from common_core.status_enums import EssayStatus, ProcessingStage
 
-        # Create an instance to ensure forward references are resolved
-        entity_ref = EntityReference(
+        # Create system metadata with primitive fields
+        system_meta = SystemProcessingMetadata(
             entity_id="test-id",
             entity_type="essay",
             parent_id="parent-id",
-        )
-
-        system_meta = SystemProcessingMetadata(
-            entity=entity_ref,
             event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             processing_stage=ProcessingStage.PENDING,
         )
@@ -75,14 +69,15 @@ class TestModelRebuilding:
         # Create a ProcessingUpdate with Union status
         update = ProcessingUpdate(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-            entity_ref=entity_ref,
+            entity_id="test-id",
+            entity_type="essay",
             status=EssayStatus.AWAITING_SPELLCHECK,  # This uses the Union type
             system_metadata=system_meta,
         )
 
         # Validate that the model was created successfully
         assert update.status == EssayStatus.AWAITING_SPELLCHECK
-        assert update.entity_ref.entity_id == "test-id"
+        assert update.entity_id == "test-id"
 
 
 class TestEventEnvelopeSchemaVersion:
@@ -95,7 +90,8 @@ class TestEventEnvelopeSchemaVersion:
         # Dummy data for the envelope
         dummy_data = BaseEventData(
             event_name=ProcessingEvent.PROCESSING_STARTED,
-            entity_ref=EntityReference(entity_id="test_entity", entity_type="test"),
+            entity_id="test_entity",
+            entity_type="test",
         )
 
         # 1. Test default value upon creation

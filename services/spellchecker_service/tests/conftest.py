@@ -31,7 +31,6 @@ from common_core.events.spellcheck_models import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     SystemProcessingMetadata,
 )
 
@@ -70,7 +69,6 @@ SpellcheckResultDataV1.model_rebuild(raise_errors=True)
 EssayLifecycleSpellcheckRequestV1.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
-EntityReference.model_rebuild(raise_errors=True)
 
 # Configure logging for tests to ensure caplog works properly
 # NOTE: Logging now configured globally in root tests/conftest.py to avoid conflicts
@@ -101,16 +99,18 @@ def corrected_text() -> str:
 
 
 @pytest.fixture
-def entity_reference(sample_essay_id: str) -> EntityReference:
-    """Provide a sample EntityReference for testing."""
-    return EntityReference(entity_id=sample_essay_id, entity_type="essay", parent_id=str(uuid4()))
+def sample_parent_id() -> str:
+    """Provide a sample parent ID for testing."""
+    return str(uuid4())
 
 
 @pytest.fixture
-def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetadata:
+def system_metadata(sample_essay_id: str, sample_parent_id: str) -> SystemProcessingMetadata:
     """Provide sample SystemProcessingMetadata for testing."""
     return SystemProcessingMetadata(
-        entity=entity_reference,
+        entity_id=sample_essay_id,
+        entity_type="essay",
+        parent_id=sample_parent_id,
         event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
         processing_stage=ProcessingStage.PENDING,
     )
@@ -118,14 +118,17 @@ def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetada
 
 @pytest.fixture
 def spellcheck_request_data(
-    entity_reference: EntityReference,
+    sample_essay_id: str,
+    sample_parent_id: str,
     system_metadata: SystemProcessingMetadata,
     sample_storage_id: str,
 ) -> EssayLifecycleSpellcheckRequestV1:
     """Provide sample EssayLifecycleSpellcheckRequestV1 for testing."""
     return EssayLifecycleSpellcheckRequestV1(
         event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-        entity_ref=entity_reference,
+        entity_id=sample_essay_id,
+        entity_type="essay",
+        parent_id=sample_parent_id,
         status=EssayStatus.AWAITING_SPELLCHECK,
         system_metadata=system_metadata,
         text_storage_id=sample_storage_id,

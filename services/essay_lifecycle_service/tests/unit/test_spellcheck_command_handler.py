@@ -18,7 +18,6 @@ from common_core.batch_service_models import (
 )
 from common_core.domain_enums import Language
 from common_core.event_enums import ProcessingEvent
-from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -108,7 +107,7 @@ class TestSpellcheckCommandHandler:
         """Sample spellcheck command data."""
         return BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[essay_processing_ref],
             language=Language.ENGLISH,
         )
@@ -275,7 +274,7 @@ class TestSpellcheckCommandHandler:
 
         command_data = BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=essay_refs,
             language=Language.ENGLISH,
         )

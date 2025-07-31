@@ -15,7 +15,6 @@ from common_core.batch_service_models import (
     EssayProcessingInputRefV1,
 )
 from common_core.event_enums import ProcessingEvent
-from common_core.metadata_models import EntityReference
 
 from services.essay_lifecycle_service.implementations.batch_command_handler_impl import (
     DefaultBatchCommandHandler,
@@ -43,7 +42,7 @@ class TestBatchCommandIntegration:
         # Create simple command
         command_data = BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id="test-batch", entity_type="batch"),
+            batch_id="test-batch",
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1")
             ],
@@ -83,7 +82,7 @@ class TestBatchCommandIntegration:
         # Create command for missing essay
         command_data = BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id="test-batch", entity_type="batch"),
+            batch_id="test-batch",
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="missing-essay", text_storage_id="storage-1")
             ],

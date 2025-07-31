@@ -57,7 +57,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
         from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
-        from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+        from common_core.metadata_models import SystemProcessingMetadata  # EntityReference removed
         from common_core.status_enums import EssayStatus, ProcessingStage
 
         logger = create_service_logger("specialized_service_dispatcher")
@@ -74,25 +74,24 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         # Create and publish EssayLifecycleSpellcheckRequestV1 for each essay
         for essay_ref in essays_to_process:
             try:
-                # Create entity reference for the essay
-                essay_entity_ref = EntityReference(
+                # EntityReference removed - using primitive parameters
+
+                # Create system metadata with primitive parameters
+                system_metadata = SystemProcessingMetadata(
                     entity_id=essay_ref.essay_id,
                     entity_type="essay",
-                    parent_id=batch_id,  # Set batch_id as parent for proper entity reference propagation
-                )
-
-                # Create system metadata
-                system_metadata = SystemProcessingMetadata(
-                    entity=essay_entity_ref,
+                    parent_id=batch_id,
                     event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value,
                     timestamp=datetime.now(UTC),
                     processing_stage=ProcessingStage.PENDING,
                 )
 
-                # Create spellcheck request event data
+                # Create spellcheck request event data with primitive parameters
                 spellcheck_request = EssayLifecycleSpellcheckRequestV1(
                     event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
-                    entity_ref=essay_entity_ref,
+                    entity_id=essay_ref.essay_id,
+                    entity_type="essay",
+                    parent_id=batch_id,
                     status=EssayStatus.AWAITING_SPELLCHECK,
                     system_metadata=system_metadata,
                     text_storage_id=essay_ref.text_storage_id,
@@ -202,7 +201,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
         from common_core.events.envelope import EventEnvelope
-        from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+        from common_core.metadata_models import SystemProcessingMetadata  # EntityReference removed
         from common_core.status_enums import ProcessingStage
 
         logger = create_service_logger("specialized_service_dispatcher")
@@ -223,23 +222,24 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         )
 
         try:
-            # Create batch entity reference (CJ assessment works on batches, not individual essays)
-            batch_entity_ref = EntityReference(
+            # EntityReference removed - using primitive parameters
+            # CJ assessment works on batches, not individual essays
+
+            # Create system metadata with primitive parameters
+            system_metadata = SystemProcessingMetadata(
                 entity_id=batch_id,
                 entity_type="batch",
-            )
-
-            # Create system metadata
-            system_metadata = SystemProcessingMetadata(
-                entity=batch_entity_ref,
+                parent_id=None,
                 event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.PENDING,
             )
 
-            # Create CJ assessment request event data
+            # Create CJ assessment request event data with primitive parameters
             cj_request = ELS_CJAssessmentRequestV1(
-                entity_ref=batch_entity_ref,
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 system_metadata=system_metadata,
                 essays_for_cj=essays_to_process,
                 language=language.value,  # Use enum value for serialization

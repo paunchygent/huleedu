@@ -11,7 +11,7 @@ from uuid import UUID
 from common_core.batch_service_models import BatchServiceAIFeedbackInitiateCommandDataV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import (
     raise_validation_error,
@@ -94,11 +94,10 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
             language = _infer_language_from_course_code(batch_context.course_code).value
 
             # Construct AI feedback command with full context
-            batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
-
             ai_feedback_command = BatchServiceAIFeedbackInitiateCommandDataV1(
                 event_name=ProcessingEvent.BATCH_AI_FEEDBACK_INITIATE_COMMAND,
-                entity_ref=batch_entity_ref,
+                entity_id=batch_id,
+                entity_type="batch",
                 essays_to_process=essays_for_processing,
                 language=language,
                 # Orchestration context (from BOS lean registration)

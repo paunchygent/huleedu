@@ -13,7 +13,8 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from testcontainers.postgres import PostgresContainer
 
@@ -92,15 +93,15 @@ class TestBatchStatusPerformanceIntegration:
             await session.commit()
 
         # Create realistic batch of essays
-        essay_refs = [
-            EntityReference(entity_id=f"essay-{i:03d}", entity_type="essay", parent_id=batch_id)
+        essay_data: list[dict[str, str | None]] = [
+            {"entity_id": f"essay-{i:03d}", "entity_type": "essay", "parent_id": batch_id}
             for i in range(essay_count)
         ]
 
         # Create all essays in batch using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                await postgres_repository.create_essay_records_batch(essay_refs, session=session)
+                await postgres_repository.create_essay_records_batch(essay_data, session=session)
 
         # Update some essays to different statuses for variation using Unit of Work pattern
         for i in range(20):  # 20% to SPELLCHECKED_SUCCESS
@@ -188,17 +189,15 @@ class TestBatchStatusPerformanceIntegration:
             await session.commit()
 
         # Create large batch of essays
-        essay_refs = [
-            EntityReference(
-                entity_id=f"large-essay-{i:03d}", entity_type="essay", parent_id=batch_id
-            )
+        essay_data: list[dict[str, str | None]] = [
+            {"entity_id": f"large-essay-{i:03d}", "entity_type": "essay", "parent_id": batch_id}
             for i in range(essay_count)
         ]
 
         # Create all essays in batch using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
             async with session.begin():
-                await postgres_repository.create_essay_records_batch(essay_refs, session=session)
+                await postgres_repository.create_essay_records_batch(essay_data, session=session)
 
         # Update essays to various statuses to create realistic distribution using Unit of Work pattern
         status_updates = [

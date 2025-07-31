@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 import pytest
 from common_core.domain_enums import ContentType
-from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.state_store import EssayState, SQLiteEssayStateStore
@@ -80,9 +79,7 @@ class TestRepositoryPerformanceOptimizations:
         # Create test essays with initial UPLOADED status
         for essay in sample_essays:
             await sqlite_store.create_essay_record(
-                EntityReference(
-                    entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
-                ),
+                essay.essay_id,
                 session=None,
             )
 
@@ -125,9 +122,7 @@ class TestRepositoryPerformanceOptimizations:
         # Create test essays with initial UPLOADED status
         for essay in sample_essays:
             await sqlite_store.create_essay_record(
-                EntityReference(
-                    entity_id=essay.essay_id, entity_type="essay", parent_id=essay.batch_id
-                ),
+                essay.essay_id,
                 session=None,
             )
 

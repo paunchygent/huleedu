@@ -18,7 +18,6 @@ from common_core.events import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
@@ -44,17 +43,19 @@ class TestKafkaConsumerRouting:
         batch_id: str = str(uuid4())
         user_id: str = str(uuid4())
 
-        entity_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch",
-        )
+        # Use primitive parameters directly
+        entity_id = batch_id
+        entity_type = "batch"
+        parent_id = None
 
         data = BatchEssaysRegistered(
             batch_id=batch_id,
             user_id=user_id,
             essay_ids=["essay-1", "essay-2", "essay-3"],
             expected_essay_count=3,
-            metadata=SystemProcessingMetadata(entity=entity_ref),
+            metadata=SystemProcessingMetadata(
+                entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
+            ),
             course_code=CourseCode.ENG5,
             essay_instructions="Write an essay",
         )
@@ -93,17 +94,20 @@ class TestKafkaConsumerRouting:
         essay_id: str = str(uuid4())
         batch_id: str = str(uuid4())
 
-        entity_ref = EntityReference(
-            entity_id=essay_id,
-            entity_type="essay",
-            parent_id=batch_id,
-        )
+        # Use primitive parameters directly
+        entity_id = essay_id
+        entity_type = "essay"
+        parent_id = batch_id
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=entity_id,
+            entity_type=entity_type,
+            parent_id=parent_id,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
-            system_metadata=SystemProcessingMetadata(entity=entity_ref),
+            system_metadata=SystemProcessingMetadata(
+                entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
+            ),
             original_text_storage_id="original-123",
             corrections_made=5,
             storage_metadata=StorageReferenceMetadata(
@@ -132,7 +136,7 @@ class TestKafkaConsumerRouting:
         assert result is True
         mock_event_processor.process_spellcheck_completed.assert_called_once()
         call_args = mock_event_processor.process_spellcheck_completed.call_args
-        assert call_args[0][1].entity_ref.entity_id == essay_id
+        assert call_args[0][1].entity_id == essay_id
 
     async def test_route_cj_assessment_completed_event(
         self,
@@ -143,10 +147,10 @@ class TestKafkaConsumerRouting:
         # Arrange
         batch_id: str = str(uuid4())
 
-        entity_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch",
-        )
+        # Use primitive parameters directly
+        entity_id = batch_id
+        entity_type = "batch"
+        parent_id = None
 
         rankings = [
             {"els_essay_id": "essay-1", "rank": 1, "score": 0.95},
@@ -155,9 +159,13 @@ class TestKafkaConsumerRouting:
 
         data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-            entity_ref=entity_ref,
+            entity_id=entity_id,
+            entity_type=entity_type,
+            parent_id=parent_id,
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=SystemProcessingMetadata(entity=entity_ref),
+            system_metadata=SystemProcessingMetadata(
+                entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
+            ),
             cj_assessment_job_id="job-123",
             rankings=rankings,
         )

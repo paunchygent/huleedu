@@ -127,7 +127,7 @@ class DefaultStudentMatcher(StudentMatcherProtocol):
                 student_name=suggestion.student_name,
                 student_email=getattr(suggestion, "student_email", None),
                 confidence_score=suggestion.confidence_score,
-                match_reasons=[suggestion.match_reasons.value]
+                match_reasons=suggestion.match_reasons
                 if hasattr(suggestion, "match_reasons")
                 else [],
                 extraction_metadata={},

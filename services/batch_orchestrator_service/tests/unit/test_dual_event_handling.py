@@ -26,7 +26,6 @@ from common_core.events.batch_coordination_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -108,9 +107,9 @@ class TestDualEventHandling:
             ready_essays=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),
             ],
-            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.PROCESSING,
             ),
@@ -155,7 +154,8 @@ class TestDualEventHandling:
             ),
             correlation_id=correlation_id,
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
                 processing_stage=ProcessingStage.PROCESSING,
             ),
@@ -245,9 +245,9 @@ class TestDualEventHandling:
             ready_essays=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),
             ],
-            batch_entity=EntityReference(entity_id=batch_id, entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=batch_id, entity_type="batch"),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
             course_code=CourseCode.ENG5,
@@ -295,9 +295,9 @@ class TestDualEventHandling:
             ready_essays=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),
             ],
-            batch_entity=EntityReference(entity_id=f"{batch_id}-success", entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=f"{batch_id}-success", entity_type="batch"),
+                entity_id=f"{batch_id}-success",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
             course_code=CourseCode.ENG5,
@@ -332,7 +332,8 @@ class TestDualEventHandling:
             ),
             correlation_id=uuid4(),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id=f"{batch_id}-error", entity_type="batch"),
+                entity_id=f"{batch_id}-error",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -395,9 +396,9 @@ class TestDualEventHandling:
         success_event = BatchEssaysReady(
             batch_id="test-batch-error",
             ready_essays=[],
-            batch_entity=EntityReference(entity_id="test-batch-error", entity_type="batch"),
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(entity_id="test-batch-error", entity_type="batch"),
+                entity_id="test-batch-error",
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
             course_code=CourseCode.ENG5,

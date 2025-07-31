@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.pipeline_models import ProcessingPipelineState
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -127,9 +127,9 @@ class BatchProcessingServiceImpl:
         )
 
         # 3. Construct lightweight BatchEssaysRegistered event with internal essay IDs
-        batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
         event_metadata = SystemProcessingMetadata(
-            entity=batch_entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
             event=ProcessingEvent.BATCH_ESSAYS_REGISTERED.value,
             timestamp=datetime.now(UTC),
         )

@@ -17,7 +17,9 @@ from common_core.events.cj_assessment_events import (
     CJAssessmentFailedV1,
 )
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+
+# EntityReference removed - using primitive parameters
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, CJBatchStateEnum, ProcessingStage
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import and_, select
@@ -276,19 +278,17 @@ class BatchMonitor:
                     # Get batch upload for failure event
                     batch_upload = await session.get(CJBatchUpload, batch_id)
                     if batch_upload:
-                        # Create the failure event data
+                        # Create the failure event data with primitive parameters
                         failure_event_data = CJAssessmentFailedV1(
                             event_name=ProcessingEvent.CJ_ASSESSMENT_FAILED,
-                            entity_ref=EntityReference(
-                                entity_id=batch_upload.bos_batch_id,
-                                entity_type="batch",
-                            ),
+                            entity_id=batch_upload.bos_batch_id,
+                            entity_type="batch",
+                            parent_id=None,
                             status=BatchStatus.FAILED_CRITICALLY,
                             system_metadata=SystemProcessingMetadata(
-                                entity=EntityReference(
-                                    entity_id=batch_upload.bos_batch_id,
-                                    entity_type="batch",
-                                ),
+                                entity_id=batch_upload.bos_batch_id,
+                                entity_type="batch",
+                                parent_id=None,
                                 timestamp=datetime.now(UTC),
                                 processing_stage=ProcessingStage.FAILED,
                                 started_at=batch_upload.created_at,
@@ -419,19 +419,17 @@ class BatchMonitor:
             # Get final rankings
             rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
-            # Create the event data
+            # Create the event data with primitive parameters
             event_data = CJAssessmentCompletedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-                entity_ref=EntityReference(
-                    entity_id=batch_upload.bos_batch_id,
-                    entity_type="batch",
-                ),
+                entity_id=batch_upload.bos_batch_id,
+                entity_type="batch",
+                parent_id=None,
                 status=BatchStatus.COMPLETED_SUCCESSFULLY,
                 system_metadata=SystemProcessingMetadata(
-                    entity=EntityReference(
-                        entity_id=batch_upload.bos_batch_id,
-                        entity_type="batch",
-                    ),
+                    entity_id=batch_upload.bos_batch_id,
+                    entity_type="batch",
+                    parent_id=None,
                     timestamp=datetime.now(UTC),
                     processing_stage=ProcessingStage.COMPLETED,
                     started_at=batch_upload.created_at,

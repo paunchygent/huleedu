@@ -5,20 +5,29 @@ This test proves that the pending content pattern can solve the race condition
 where EssayContentProvisioned events arrive before BatchEssaysRegistered events.
 """
 
+from __future__ import annotations
+
 import json
 from datetime import UTC, datetime
-from typing import List
+from typing import Any, Awaitable, List, Union
 from uuid import UUID, uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 from redis.asyncio import Redis
 
 logger = create_service_logger("test.pending_content_pattern")
+
+
+async def _ensure_awaitable(result: Union[Awaitable[Any], Any]) -> Any:
+    """Ensure a redis result is properly awaited if it's awaitable."""
+    if hasattr(result, "__await__"):
+        return await result
+    return result
 
 
 class PendingContentManager:
@@ -45,15 +54,15 @@ class PendingContentManager:
             "stored_at": datetime.now(UTC).isoformat(),
         }
 
-        await self.redis.sadd(pending_key, json.dumps(metadata_with_storage))
+        await _ensure_awaitable(self.redis.sadd(pending_key, json.dumps(metadata_with_storage)))
 
         # Add to global index for monitoring/cleanup
         index_key = "pending_content:index"
         score = datetime.now(UTC).timestamp()
-        await self.redis.zadd(index_key, {batch_id: score})
+        await _ensure_awaitable(self.redis.zadd(index_key, {batch_id: score}))
 
         # Set TTL on pending content (24 hours)
-        await self.redis.expire(pending_key, 86400)
+        await _ensure_awaitable(self.redis.expire(pending_key, 86400))
 
         self.logger.info(f"Stored pending content for batch {batch_id}: {text_storage_id}")
 
@@ -62,7 +71,7 @@ class PendingContentManager:
         pending_key = f"pending_content:{batch_id}"
 
         # Get all pending content items
-        pending_items = await self.redis.smembers(pending_key)
+        pending_items = await _ensure_awaitable(self.redis.smembers(pending_key))
 
         if not pending_items:
             return []
@@ -83,19 +92,19 @@ class PendingContentManager:
         pending_key = f"pending_content:{batch_id}"
 
         # Find and remove the specific item
-        pending_items = await self.redis.smembers(pending_key)
+        pending_items = await _ensure_awaitable(self.redis.smembers(pending_key))
 
         for item in pending_items:
             try:
                 metadata = json.loads(item)
                 if metadata.get("text_storage_id") == text_storage_id:
-                    await self.redis.srem(pending_key, item)
+                    await _ensure_awaitable(self.redis.srem(pending_key, item))
 
                     # Clean up index if batch has no more pending content
-                    remaining = await self.redis.scard(pending_key)
+                    remaining = await _ensure_awaitable(self.redis.scard(pending_key))
                     if remaining == 0:
-                        await self.redis.zrem("pending_content:index", batch_id)
-                        await self.redis.delete(pending_key)
+                        await _ensure_awaitable(self.redis.zrem("pending_content:index", batch_id))
+                        await _ensure_awaitable(self.redis.delete(pending_key))
 
                     return True
             except json.JSONDecodeError:
@@ -106,8 +115,8 @@ class PendingContentManager:
     async def clear_all_pending(self, batch_id: str) -> None:
         """Clear all pending content for a batch."""
         pending_key = f"pending_content:{batch_id}"
-        await self.redis.delete(pending_key)
-        await self.redis.zrem("pending_content:index", batch_id)
+        await _ensure_awaitable(self.redis.delete(pending_key))
+        await _ensure_awaitable(self.redis.zrem("pending_content:index", batch_id))
 
 
 class EnhancedBatchTracker:
@@ -120,8 +129,8 @@ class EnhancedBatchTracker:
         self.redis = redis_client
         self.pending_manager = pending_manager
         self.logger = create_service_logger("enhanced_batch_tracker")
-        self.events_processed = []
-        self.outcomes = []
+        self.events_processed: list[tuple[str, str]] = []
+        self.outcomes: list[dict[str, str]] = []
 
     async def register_batch(self, event: BatchEssaysRegistered, correlation_id: UUID) -> None:
         """Register batch and reconcile any pending content."""
@@ -129,10 +138,10 @@ class EnhancedBatchTracker:
 
         # Register batch slots
         for i, essay_id in enumerate(event.essay_ids):
-            await self.redis.sadd(f"batch:{batch_id}:available_slots", essay_id)
+            await _ensure_awaitable(self.redis.sadd(f"batch:{batch_id}:available_slots", essay_id))
 
         # Store batch metadata
-        await self.redis.hset(
+        await _ensure_awaitable(self.redis.hset(
             f"batch:{batch_id}:metadata",
             mapping={
                 "expected_count": str(event.expected_essay_count),
@@ -140,7 +149,7 @@ class EnhancedBatchTracker:
                 "correlation_id": str(correlation_id),
                 "course_code": event.course_code.value,
             },
-        )
+        ))
 
         self.events_processed.append(("BatchEssaysRegistered", batch_id))
         self.logger.info(f"✅ Registered batch {batch_id} with {event.expected_essay_count} slots")
@@ -162,11 +171,11 @@ class EnhancedBatchTracker:
         text_storage_id = content_metadata["text_storage_id"]
 
         # Try to assign to slot
-        slot = await self.redis.spop(f"batch:{batch_id}:available_slots")
+        slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
 
         if slot:
             # Successfully assigned
-            await self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id)
+            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id))
 
             # Remove from pending
             await self.pending_manager.remove_pending_content(batch_id, text_storage_id)
@@ -179,7 +188,7 @@ class EnhancedBatchTracker:
                     "essay": text_storage_id,
                     "result": "reconciled_and_assigned",
                     "slot": slot.decode(),
-                    "was_pending": True,
+                    "was_pending": "true",  # Convert boolean to string for type consistency
                 }
             )
 
@@ -202,7 +211,7 @@ class EnhancedBatchTracker:
         text_storage_id = event.text_storage_id
 
         # Check if batch exists
-        batch_exists = await self.redis.exists(f"batch:{batch_id}:metadata")
+        batch_exists = await _ensure_awaitable(self.redis.exists(f"batch:{batch_id}:metadata"))
 
         if not batch_exists:
             # NEW: Store as pending instead of marking as excess
@@ -234,11 +243,11 @@ class EnhancedBatchTracker:
             return "pending"
 
         # Batch exists - try normal assignment
-        slot = await self.redis.spop(f"batch:{batch_id}:available_slots")
+        slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
 
         if slot:
             # Successfully assigned
-            await self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id)
+            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id))
 
             self.events_processed.append(
                 ("EssayContentProvisioned", f"{text_storage_id} -> ASSIGNED to {slot.decode()}")
@@ -271,10 +280,9 @@ class EnhancedBatchTracker:
 
     async def _check_batch_completion(self, batch_id: str) -> None:
         """Check if batch is complete and log the event."""
-        assigned_count = await self.redis.hlen(f"batch:{batch_id}:assignments")
-        expected_count = int(
-            (await self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")).decode()
-        )
+        assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
+        expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+        expected_count = int(expected_count_raw.decode())
 
         if assigned_count == expected_count:
             self.logger.info(f"🎉 Batch {batch_id} COMPLETE - would publish BatchEssaysReady")
@@ -290,9 +298,9 @@ class TestPendingContentPattern:
     async def redis_client(self):
         """Create Redis client for testing."""
         redis = Redis(host="localhost", port=6379, decode_responses=False)
-        await redis.flushdb()
+        await _ensure_awaitable(redis.flushdb())
         yield redis
-        await redis.aclose()
+        await _ensure_awaitable(redis.aclose())
 
     @pytest.fixture
     def pending_manager(self, redis_client):
@@ -314,10 +322,8 @@ class TestPendingContentPattern:
             essay_instructions="Test instructions",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -480,7 +486,7 @@ class TestPendingContentPattern:
 
         # Verify Redis keys are cleaned up
         pending_key = f"pending_content:{batch_id}"
-        exists = await redis_client.exists(pending_key)
+        exists = await _ensure_awaitable(redis_client.exists(pending_key))
         assert exists == 0, "Pending content key should be deleted"
 
         logger.info("\n✅ SUCCESS: Pending content properly cleaned up!")

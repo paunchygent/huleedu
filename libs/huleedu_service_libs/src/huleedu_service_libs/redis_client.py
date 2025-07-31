@@ -409,6 +409,118 @@ class RedisClient(AtomicRedisClientProtocol):
             )
             raise
 
+    async def srem(self, key: str, *members: str) -> int:
+        """
+        Remove one or more members from a Redis set.
+
+        Args:
+            key: Redis key for the set
+            members: One or more string values to remove
+
+        Returns:
+            Number of elements removed from the set
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.srem(key, *members)
+            count = int(result)
+            logger.debug(
+                f"Redis SREM by '{self.client_id}': key='{key}' removed={count} members",
+            )
+            return count
+        except Exception as e:
+            logger.error(
+                f"Error in Redis SREM operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    # Sorted set operations for indexed content
+    async def zadd(self, key: str, mapping: dict[str, float]) -> int:
+        """
+        Add members to a Redis sorted set with scores.
+
+        Args:
+            key: Redis key for the sorted set
+            mapping: Dictionary of member->score pairs
+
+        Returns:
+            Number of elements added to the sorted set
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.zadd(key, mapping)
+            count = int(result)
+            logger.debug(
+                f"Redis ZADD by '{self.client_id}': key='{key}' added={count} members",
+            )
+            return count
+        except Exception as e:
+            logger.error(
+                f"Error in Redis ZADD operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def zrem(self, key: str, *members: str) -> int:
+        """
+        Remove one or more members from a Redis sorted set.
+
+        Args:
+            key: Redis key for the sorted set
+            members: One or more string values to remove
+
+        Returns:
+            Number of elements removed from the sorted set
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.zrem(key, *members)
+            count = int(result)
+            logger.debug(
+                f"Redis ZREM by '{self.client_id}': key='{key}' removed={count} members",
+            )
+            return count
+        except Exception as e:
+            logger.error(
+                f"Error in Redis ZREM operation by '{self.client_id}' for key '{key}': {e}",
+                exc_info=True,
+            )
+            raise
+
+    async def delete(self, *keys: str) -> int:
+        """
+        Delete one or more keys from Redis.
+
+        Args:
+            keys: One or more Redis keys to delete
+
+        Returns:
+            Number of keys deleted
+        """
+        if not self._started:
+            raise RuntimeError(f"Redis client '{self.client_id}' is not running.")
+
+        try:
+            result = await self.client.delete(*keys)
+            count = int(result)
+            logger.debug(
+                f"Redis DELETE by '{self.client_id}': deleted={count} keys",
+            )
+            return count
+        except Exception as e:
+            logger.error(
+                f"Error in Redis DELETE operation by '{self.client_id}': {e}",
+                exc_info=True,
+            )
+            raise
+
     # Hash operations for metadata storage
     async def hset(self, key: str, field: str, value: str) -> int:
         """

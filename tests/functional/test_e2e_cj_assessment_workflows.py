@@ -9,6 +9,8 @@ Preserves all CJ assessment business logic:
 real student essays, ranking validation, multi-essay coordination.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import UTC
 from typing import Any
@@ -19,7 +21,6 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -290,12 +291,10 @@ class TestE2ECJAssessmentWorkflows:
             )
             essay_inputs.append(essay_input)
 
-        # Create EntityReference for the batch
-        batch_entity_ref = EntityReference(entity_id=batch_id, entity_type="batch")
-
         # Create SystemProcessingMetadata (match original working implementation)
         system_metadata = SystemProcessingMetadata(
-            entity=batch_entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
             timestamp=datetime.now(UTC),
             processing_stage=ProcessingStage.INITIALIZED,
             event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
@@ -303,7 +302,8 @@ class TestE2ECJAssessmentWorkflows:
 
         # Create the request data
         cj_request_data = ELS_CJAssessmentRequestV1(
-            entity_ref=batch_entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
             system_metadata=system_metadata,
             essays_for_cj=essay_inputs,
             language=language,

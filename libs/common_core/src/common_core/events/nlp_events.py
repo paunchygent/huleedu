@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData
-from common_core.metadata_models import EntityReference
 
 
 class StudentMatchSuggestion(BaseModel):
@@ -56,7 +55,6 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
     """
 
     event_name: ProcessingEvent = ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
-    entity_ref: EntityReference  # Batch reference
     batch_id: str = Field(description="Batch identifier")
     class_id: str = Field(description="Class ID for which matching was performed")
     match_results: list[EssayMatchResult] = Field(

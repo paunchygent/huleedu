@@ -16,7 +16,6 @@ from common_core.events import (
     SpellcheckResultDataV1,
 )
 from common_core.metadata_models import (
-    EntityReference,
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
@@ -139,17 +138,17 @@ class TestKafkaConsumerErrorHandling:
         batch_id2 = str(uuid4())
 
         # Valid batch registered event
-        entity_ref1 = EntityReference(
-            entity_id=batch_id1,
-            entity_type="batch",
-        )
-
+        # EntityReference removed - using primitive parameters
         valid_data1 = BatchEssaysRegistered(
             batch_id=batch_id1,
             user_id=str(uuid4()),
             essay_ids=["essay-1", "essay-2"],
             expected_essay_count=2,
-            metadata=SystemProcessingMetadata(entity=entity_ref1),
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id1,
+                entity_type="batch",
+                parent_id=None,
+            ),
             course_code=CourseCode.ENG5,
             essay_instructions="Write an essay",
         )
@@ -185,17 +184,20 @@ class TestKafkaConsumerErrorHandling:
         )
 
         # Valid spellcheck completed event
-        entity_ref2 = EntityReference(
-            entity_id=str(uuid4()),
-            entity_type="essay",
-            parent_id=batch_id2,
-        )
+        # EntityReference removed - using primitive parameters
+        essay_id = str(uuid4())
 
         valid_data2 = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=entity_ref2,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id2,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
-            system_metadata=SystemProcessingMetadata(entity=entity_ref2),
+            system_metadata=SystemProcessingMetadata(
+                entity_id=essay_id,
+                entity_type="essay",
+                parent_id=batch_id2,
+            ),
             original_text_storage_id="original-123",
             corrections_made=3,
             storage_metadata=StorageReferenceMetadata(

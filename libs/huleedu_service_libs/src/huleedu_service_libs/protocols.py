@@ -59,6 +59,18 @@ class RedisClientProtocol(Protocol):
         """
         pass
 
+    async def delete(self, *keys: str) -> int:
+        """
+        Delete one or more keys from Redis.
+
+        Args:
+            keys: One or more Redis keys to delete
+
+        Returns:
+            Number of keys deleted
+        """
+        pass
+
     async def get(self, key: str) -> str | None:
         """
         Get string value from Redis.
@@ -212,6 +224,46 @@ class AtomicRedisClientProtocol(RedisClientProtocol, Protocol):
 
         Returns:
             Set of all members
+        """
+        pass
+
+    async def srem(self, key: str, *members: str) -> int:
+        """
+        Remove one or more members from a Redis set.
+
+        Args:
+            key: Redis key for the set
+            members: One or more string values to remove
+
+        Returns:
+            Number of elements removed from the set
+        """
+        pass
+
+    # Sorted set operations for indexed content
+    async def zadd(self, key: str, mapping: dict[str, float]) -> int:
+        """
+        Add members to a Redis sorted set with scores.
+
+        Args:
+            key: Redis key for the sorted set
+            mapping: Dictionary of member->score pairs
+
+        Returns:
+            Number of elements added to the sorted set
+        """
+        pass
+
+    async def zrem(self, key: str, *members: str) -> int:
+        """
+        Remove one or more members from a Redis sorted set.
+
+        Args:
+            key: Redis key for the sorted set
+            members: One or more string values to remove
+
+        Returns:
+            Number of elements removed from the sorted set
         """
         pass
 

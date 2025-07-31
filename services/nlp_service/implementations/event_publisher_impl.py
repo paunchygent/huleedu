@@ -12,7 +12,8 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -65,10 +66,12 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             extraction_metadata={},
         )
 
-        # Create a batch event with single essay
+        # Create a batch event with single essay using primitive parameters
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            entity_ref=EntityReference(entity_id=essay_id, entity_type="essay"),
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id="single-essay-batch",  # Placeholder for individual essay
             batch_id="single-essay-batch",  # Placeholder for individual essay
             class_id="unknown",  # Not available in this context
             match_results=[match_result],
@@ -128,16 +131,12 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             },
         )
 
-        # Create entity reference for the batch
-        entity_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch",
-        )
-
-        # Create the batch event data
+        # Create the batch event data using primitive parameters
         event_data = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            entity_ref=entity_ref,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
             batch_id=batch_id,
             class_id=class_id,
             match_results=match_results,

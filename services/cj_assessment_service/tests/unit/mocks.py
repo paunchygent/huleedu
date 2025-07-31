@@ -67,6 +67,16 @@ class MockRedisClient(RedisClientProtocol):
         """Mock PING operation required by RedisClientProtocol."""
         return True
 
+    async def delete(self, *keys: str) -> int:
+        """Delete one or more keys from the mock Redis store."""
+        count = 0
+        for key in keys:
+            self.delete_calls.append(key)
+            if key in self.keys:
+                del self.keys[key]
+                count += 1
+        return count
+
 
 class MockDatabase(CJRepositoryProtocol):
     """Mock database that simulates real CJ assessment database operations."""

@@ -47,7 +47,7 @@ class TestFutureServicesCommandHandler:
     ) -> None:
         """Test NLP command stub method executes without error."""
         mock_command = MagicMock()
-        mock_command.entity_ref.entity_id = "test-batch-123"
+        mock_command.entity_id = "test-batch-123"
 
         # Execute - should not raise exception
         await future_services_handler.process_initiate_nlp_command(
@@ -65,7 +65,7 @@ class TestFutureServicesCommandHandler:
     ) -> None:
         """Test AI feedback command stub method executes without error."""
         mock_command = MagicMock()
-        mock_command.entity_ref.entity_id = "test-batch-456"
+        mock_command.entity_id = "test-batch-456"
 
         # Execute - should not raise exception
         await future_services_handler.process_initiate_ai_feedback_command(

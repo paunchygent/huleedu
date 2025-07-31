@@ -12,7 +12,7 @@ from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import (
-    EntityReference,
+    # EntityReference removed - using primitive parameters
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
@@ -157,11 +157,10 @@ class DefaultSpellLogic(SpellLogicProtocol):
             )
 
         # Preserve entity reference from incoming request to maintain parent_id (batch_id)
-        final_entity_ref = (
-            initial_system_metadata.entity.model_copy(update={"entity_id": essay_id or "unknown"})
-            if initial_system_metadata.entity
-            else EntityReference(entity_id=essay_id or "unknown", entity_type="essay")
-        )
+        # Extract primitive parameters
+        final_entity_id = essay_id or "unknown"
+        final_entity_type = "essay"
+        final_parent_id = initial_system_metadata.parent_id if initial_system_metadata else None
 
         # Update system_metadata for successful completion
         final_system_metadata = initial_system_metadata.model_copy(
@@ -172,8 +171,10 @@ class DefaultSpellLogic(SpellLogicProtocol):
                 "error_info": initial_system_metadata.error_info,  # Keep existing error info
             },
         )
-        # Ensure entity in system_metadata is the correct one for this essay
-        final_system_metadata.entity = final_entity_ref
+        # Ensure entity fields in system_metadata are correct for this essay
+        final_system_metadata.entity_id = final_entity_id
+        final_system_metadata.entity_type = final_entity_type
+        final_system_metadata.parent_id = final_parent_id
 
         logger.info(
             f"Spell check completed successfully for essay {essay_id} "
@@ -190,7 +191,9 @@ class DefaultSpellLogic(SpellLogicProtocol):
             storage_metadata=storage_metadata_for_result,
             corrections_made=corrections_count,
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_ref=final_entity_ref,
+            entity_id=final_entity_id,
+            entity_type=final_entity_type,
+            parent_id=final_parent_id,
             timestamp=datetime.now(UTC),
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=final_system_metadata,

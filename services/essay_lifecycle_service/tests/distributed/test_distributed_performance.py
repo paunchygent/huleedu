@@ -21,7 +21,7 @@ import pytest
 from common_core.domain_enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -314,11 +314,9 @@ class TestDistributedPerformance:
                 essay_instructions=f"Scaling test with {instance_count} instances",
                 user_id="scaling_test_user",
                 metadata=SystemProcessingMetadata(
-                    entity=EntityReference(
-                        entity_id=batch_id,
-                        entity_type="batch",
-                        parent_id=None,
-                    ),
+                    entity_id=batch_id,
+                    entity_type="batch",
+                    parent_id=None,
                 ),
             )
 
@@ -513,11 +511,9 @@ class TestDistributedPerformance:
                 essay_instructions=f"Memory test with {batch_size} essays",
                 user_id="memory_test_user",
                 metadata=SystemProcessingMetadata(
-                    entity=EntityReference(
-                        entity_id=batch_id,
-                        entity_type="batch",
-                        parent_id=None,
-                    ),
+                    entity_id=batch_id,
+                    entity_type="batch",
+                    parent_id=None,
                 ),
             )
 
@@ -596,11 +592,9 @@ class TestDistributedPerformance:
             essay_instructions="Endurance test",
             user_id="endurance_test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
             ),
         )
 

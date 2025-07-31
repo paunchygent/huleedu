@@ -28,7 +28,6 @@ from common_core.events.base_event_models import (
 # THEN import the models that depend on these enums
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
-    EntityReference,
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
@@ -47,7 +46,6 @@ ProcessingUpdate.model_rebuild(raise_errors=True)
 EventTracker.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
-EntityReference.model_rebuild(raise_errors=True)
 EssayProcessingInputRefV1.model_rebuild(raise_errors=True)
 BatchServiceNLPInitiateCommandDataV1.model_rebuild(raise_errors=True)
 
@@ -81,16 +79,18 @@ def sample_batch_id() -> str:
 
 
 @pytest.fixture
-def entity_reference(sample_batch_id: str) -> EntityReference:
-    """Provide a sample EntityReference for testing."""
-    return EntityReference(entity_id=sample_batch_id, entity_type="batch", parent_id=str(uuid4()))
+def sample_parent_id() -> str:
+    """Provide a sample parent ID for testing."""
+    return str(uuid4())
 
 
 @pytest.fixture
-def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetadata:
+def system_metadata(sample_batch_id: str, sample_parent_id: str) -> SystemProcessingMetadata:
     """Provide sample SystemProcessingMetadata for testing."""
     return SystemProcessingMetadata(
-        entity=entity_reference,
+        entity_id=sample_batch_id,
+        entity_type="batch",
+        parent_id=sample_parent_id,
         event=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
         processing_stage=ProcessingStage.PENDING,
     )
@@ -98,15 +98,16 @@ def system_metadata(entity_reference: EntityReference) -> SystemProcessingMetada
 
 @pytest.fixture
 def nlp_initiate_command(
-    entity_reference: EntityReference,
-    system_metadata: SystemProcessingMetadata,
     sample_batch_id: str,
+    sample_parent_id: str,
+    system_metadata: SystemProcessingMetadata,
 ) -> BatchServiceNLPInitiateCommandDataV1:
     """Provide sample BatchServiceNLPInitiateCommandDataV1 for testing."""
     return BatchServiceNLPInitiateCommandDataV1(
         event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
-        entity_ref=entity_reference,
-        system_metadata=system_metadata,
+        entity_id=sample_batch_id,
+        entity_type="batch",
+        parent_id=sample_parent_id,
         essays_to_process=[],  # Empty list for testing
         language="en",
     )

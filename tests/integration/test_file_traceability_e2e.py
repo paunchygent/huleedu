@@ -23,7 +23,7 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import EventEnvelope
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.utils.kafka_test_manager import KafkaTestManager, kafka_event_monitor
@@ -98,11 +98,9 @@ class TestFileTraceabilityE2E:
                 expected_essay_count=len(essay_ids),
                 user_id=user_id,
                 metadata=SystemProcessingMetadata(
-                    entity=EntityReference(
-                        entity_id=batch_id,
-                        entity_type="batch",
-                        parent_id=None,
-                    ),
+                    entity_id=batch_id,
+                    entity_type="batch",
+                    parent_id=None,
                     timestamp=datetime.now(UTC),
                     processing_stage=None,
                 ),
@@ -230,11 +228,9 @@ class TestFileTraceabilityE2E:
                 expected_essay_count=len(essay_ids),
                 user_id=user_id,
                 metadata=SystemProcessingMetadata(
-                    entity=EntityReference(
-                        entity_id=batch_id,
-                        entity_type="batch",
-                        parent_id=None,
-                    ),
+                    entity_id=batch_id,
+                    entity_type="batch",
+                    parent_id=None,
                     timestamp=datetime.now(UTC),
                     processing_stage=None,
                 ),

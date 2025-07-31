@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from ..metadata_models import EntityReference, SystemProcessingMetadata
+from ..metadata_models import SystemProcessingMetadata
 
 if TYPE_CHECKING:
     from ..event_enums import ProcessingEvent
@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 class BaseEventData(BaseModel):
     event_name: ProcessingEvent  # Specific event name enum, Pydantic will coerce from string
-    entity_ref: EntityReference
+    entity_id: str | None = None
+    entity_type: str | None = None
+    parent_id: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     # SystemProcessingMetadata is now part of the concrete event data models below
 

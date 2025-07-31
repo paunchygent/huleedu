@@ -18,7 +18,6 @@ from common_core.batch_service_models import (
 )
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
-from common_core.metadata_models import EntityReference
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -108,7 +107,7 @@ class TestCJAssessmentCommandHandler:
         """Sample CJ assessment command data."""
         return BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[essay_processing_ref],
             language="en",
             course_code=CourseCode.ENG5,
@@ -186,7 +185,7 @@ class TestCJAssessmentCommandHandler:
                 language=cj_assessment_command_data.language,
                 course_code=cj_assessment_command_data.course_code,
                 essay_instructions=cj_assessment_command_data.essay_instructions,
-                batch_id=cj_assessment_command_data.entity_ref.entity_id,
+                batch_id=cj_assessment_command_data.entity_id,
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
             )
@@ -273,7 +272,7 @@ class TestCJAssessmentCommandHandler:
 
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=essay_refs,
             language="en",
             course_code=CourseCode.ENG6,
@@ -339,7 +338,7 @@ class TestCJAssessmentCommandHandler:
 
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[essay_ref],
             language="sv",
             course_code=CourseCode.SV3,
@@ -389,7 +388,7 @@ class TestCJAssessmentCommandHandler:
         # Create command with course code
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
                 EssayProcessingInputRefV1(essay_id="essay2", text_storage_id="storage2"),
@@ -458,7 +457,7 @@ class TestCJAssessmentCommandHandler:
         # Create command with minimal data
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
             ],
@@ -512,7 +511,7 @@ class TestCJAssessmentCommandHandler:
         # Create command that should fail validation
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[],  # Empty essays list should cause validation failure
             language="en",
             course_code=CourseCode.ENG7,

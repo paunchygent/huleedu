@@ -23,7 +23,7 @@ import pytest
 from common_core.domain_enums import ContentType, CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.redis_client import RedisClient
@@ -190,11 +190,9 @@ class TestContentProvisionedFlow:
             expected_essay_count=len(essay_ids),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 timestamp=datetime.now(UTC),
                 processing_stage=None,
             ),
@@ -273,11 +271,9 @@ class TestContentProvisionedFlow:
             expected_essay_count=len(essay_ids),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 timestamp=datetime.now(UTC),
                 processing_stage=None,
             ),
@@ -389,11 +385,9 @@ class TestContentProvisionedFlow:
             expected_essay_count=len(essay_ids),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 timestamp=datetime.now(UTC),
                 processing_stage=None,
             ),
@@ -461,11 +455,9 @@ class TestContentProvisionedFlow:
             expected_essay_count=len(essay_ids),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                    parent_id=None,
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
                 timestamp=datetime.now(UTC),
                 processing_stage=None,
             ),

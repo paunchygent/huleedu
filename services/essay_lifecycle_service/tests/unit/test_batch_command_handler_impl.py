@@ -109,11 +109,10 @@ class TestDefaultBatchCommandHandler:
     ) -> BatchServiceSpellcheckInitiateCommandDataV1:
         """Sample spellcheck command data."""
         from common_core.event_enums import ProcessingEvent
-        from common_core.metadata_models import EntityReference
 
         return BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            entity_ref=EntityReference(entity_id=batch_id, entity_type="batch"),
+            batch_id=batch_id,
             essays_to_process=[essay_processing_ref],
             language="en",
         )

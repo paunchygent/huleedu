@@ -52,7 +52,7 @@ class SpellcheckCommandHandler:
         logger.info(
             "Processing spellcheck initiation command from BOS with State Machine",
             extra={
-                "batch_id": command_data.entity_ref.entity_id,
+                "batch_id": command_data.entity_id,
                 "essays_count": len(command_data.essays_to_process),
                 "language": command_data.language,
                 "correlation_id": str(correlation_id),
@@ -73,7 +73,7 @@ class SpellcheckCommandHandler:
                             logger.error(
                                 f"Essay {essay_id} not found in state store for spellcheck command",
                                 extra={
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -111,7 +111,7 @@ class SpellcheckCommandHandler:
                                 f"Essay {essay_id} transitioned to "
                                 f"{essay_machine.current_status.value} via state machine.",
                                 extra={
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -124,7 +124,7 @@ class SpellcheckCommandHandler:
                                 f"for essay {essay_id} from status "
                                 f"{essay_state_model.current_status.value}.",
                                 extra={
-                                    "batch_id": command_data.entity_ref.entity_id,
+                                    "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
@@ -133,7 +133,7 @@ class SpellcheckCommandHandler:
                             f"Failed to process essay {essay_id} with state machine",
                             extra={
                                 "error": str(e),
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "correlation_id": str(correlation_id),
                             },
                         )
@@ -141,13 +141,17 @@ class SpellcheckCommandHandler:
                 # Dispatch requests to specialized services AFTER successful state transitions
                 if successfully_transitioned_essays:
                     try:
+                        if not command_data.entity_id:
+                            logger.error("Missing entity_id in spellcheck command for dispatch")
+                            return
+
                         # Convert string language to Language enum at boundary
                         language_enum = Language(command_data.language)
 
                         await self.request_dispatcher.dispatch_spellcheck_requests(
                             essays_to_process=successfully_transitioned_essays,
                             language=language_enum,
-                            batch_id=command_data.entity_ref.entity_id,
+                            batch_id=command_data.entity_id,
                             correlation_id=correlation_id,
                             session=session,
                         )
@@ -155,7 +159,7 @@ class SpellcheckCommandHandler:
                         logger.info(
                             "Successfully dispatched spellcheck requests for transitioned essays",
                             extra={
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "transitioned_essays_count": len(successfully_transitioned_essays),
                                 "correlation_id": str(correlation_id),
                             },
@@ -188,7 +192,7 @@ class SpellcheckCommandHandler:
                                             f"Essay {essay_ref.essay_id} transitioned to "
                                             f"{essay_machine.current_status.value} after dispatch",
                                             extra={
-                                                "batch_id": command_data.entity_ref.entity_id,
+                                                "batch_id": command_data.entity_id,
                                                 "correlation_id": str(correlation_id),
                                             },
                                         )
@@ -216,14 +220,14 @@ class SpellcheckCommandHandler:
                             "Failed to dispatch spellcheck requests",
                             extra={
                                 "error": str(e),
-                                "batch_id": command_data.entity_ref.entity_id,
+                                "batch_id": command_data.entity_id,
                                 "correlation_id": str(correlation_id),
                             },
                         )
                 else:
                     logger.warning(
                         f"No essays successfully transitioned for spellcheck "
-                        f"for batch {command_data.entity_ref.entity_id}. Skipping dispatch.",
+                        f"for batch {command_data.entity_id}. Skipping dispatch.",
                         extra={"correlation_id": str(correlation_id)},
                     )
                 # Transaction commits here

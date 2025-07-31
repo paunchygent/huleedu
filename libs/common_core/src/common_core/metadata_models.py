@@ -11,7 +11,6 @@ from .domain_enums import ContentType
 from .status_enums import ProcessingStage
 
 __all__ = [
-    "EntityReference",
     "EssayProcessingInputRefV1",
     "StorageReferenceMetadata",
     "SystemProcessingMetadata",
@@ -20,18 +19,13 @@ __all__ = [
 ]
 
 
-class EntityReference(BaseModel):
-    entity_id: str
-    entity_type: str
-    parent_id: str | None = None
-    model_config = {
-        "frozen": True,
-        "json_schema_extra": {"examples": [{"entity_id": "123", "entity_type": "essay"}]},
-    }
+# EntityReference removed - use primitive parameters directly
 
 
 class SystemProcessingMetadata(BaseModel):
-    entity: EntityReference
+    entity_id: str
+    entity_type: str
+    parent_id: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     processing_stage: ProcessingStage | None = None
     started_at: datetime | None = None

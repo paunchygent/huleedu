@@ -120,6 +120,22 @@ class MockRedisClient(AtomicRedisClientProtocol):
         """Mock smembers method for set operations."""
         return set()
 
+    async def srem(self, key: str, *members: str) -> int:
+        """Mock srem method for set operations."""
+        return len(members)
+
+    async def zadd(self, key: str, mapping: dict[str, float]) -> int:
+        """Mock zadd method for sorted set operations."""
+        return len(mapping)
+
+    async def zrem(self, key: str, *members: str) -> int:
+        """Mock zrem method for sorted set operations."""
+        return len(members)
+
+    async def delete(self, *keys: str) -> int:
+        """Mock delete method for key deletion."""
+        return len(keys)
+
     async def lpush(self, key: str, *values: str) -> int:
         """Mock lpush method for list operations."""
         return len(values)

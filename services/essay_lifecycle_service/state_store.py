@@ -14,7 +14,8 @@ from uuid import UUID, uuid4
 
 import aiosqlite
 from common_core.domain_enums import ContentType
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -86,23 +87,40 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
     async def create_essay_record(
         self,
-        essay_ref: EntityReference,
+        essay_id: str,
+        batch_id: str | None = None,
+        entity_type: str = "essay",
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> EssayState:
-        """Create new essay record from entity reference."""
-        return await self.crud_ops.create_essay_record(essay_ref=essay_ref)
+        """Create new essay record from primitive parameters."""
+        return await self.crud_ops.create_essay_record(
+            essay_id=essay_id, batch_id=batch_id, entity_type=entity_type
+        )
 
     async def create_essay_records_batch(
         self,
-        essay_refs: list[EntityReference],
+        essay_data: list[dict[str, str | None]],
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> list[ProtocolEssayState]:
         """Create multiple essay records in single atomic transaction."""
         results = []
-        for essay_ref in essay_refs:
-            result = await self.crud_ops.create_essay_record(essay_ref=essay_ref)
+        for essay_dict in essay_data:
+            # Validate required fields
+            essay_id = essay_dict.get("essay_id")
+            if essay_id is None:
+                raise ValueError("essay_id cannot be None")
+            
+            entity_type = essay_dict.get("entity_type", "essay")
+            if entity_type is None:
+                entity_type = "essay"  # Fallback to default
+                
+            result = await self.crud_ops.create_essay_record(
+                essay_id=essay_id,
+                batch_id=essay_dict.get("batch_id"),
+                entity_type=entity_type,
+            )
             results.append(result)
         return results  # type: ignore[return-value]
 

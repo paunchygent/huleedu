@@ -11,7 +11,7 @@ import pytest
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import BatchEssaysRegistered, EventEnvelope
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from huleedu_service_libs.protocols import RedisClientProtocol
 
 from services.result_aggregator_service.config import Settings
@@ -183,17 +183,16 @@ class TestKafkaConsumerIdempotency:
 
     def _create_batch_registered_data(self, batch_id: str) -> BatchEssaysRegistered:
         """Helper to create BatchEssaysRegistered data."""
-        entity_ref = EntityReference(
-            entity_id=batch_id,
-            entity_type="batch",
-        )
-
         return BatchEssaysRegistered(
             batch_id=batch_id,
             user_id=str(uuid4()),
             essay_ids=["essay-1", "essay-2"],
             expected_essay_count=2,
-            metadata=SystemProcessingMetadata(entity=entity_ref),
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+                parent_id=None,
+            ),
             course_code=CourseCode.ENG5,
             essay_instructions="Write an essay",
         )

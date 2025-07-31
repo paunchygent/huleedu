@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData
-from common_core.metadata_models import EntityReference, EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 
 
 class EssaySlotAssignedV1(BaseModel):
@@ -44,7 +44,6 @@ class BatchStudentMatchingRequestedV1(BaseEventData):
     """
 
     event_name: ProcessingEvent = ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
-    entity_ref: EntityReference  # Batch reference
     batch_id: str = Field(description="Batch identifier")
     essays_to_process: list[EssayProcessingInputRefV1] = Field(
         description="All essays in batch requiring student matching"

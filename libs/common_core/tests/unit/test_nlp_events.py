@@ -9,7 +9,6 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
-from common_core.metadata_models import EntityReference
 
 
 class TestStudentMatchSuggestion:
@@ -91,7 +90,8 @@ class TestBatchAuthorMatchesSuggestedV1:
 
         event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            entity_ref=EntityReference(entity_type="batch", entity_id="batch-123"),
+            entity_id="batch-123",
+            entity_type="batch",
             batch_id="batch-123",
             class_id="class-456",
             match_results=match_results,
@@ -118,7 +118,8 @@ class TestBatchAuthorMatchesSuggestedV1:
 
         event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            entity_ref=EntityReference(entity_type="batch", entity_id="batch-no-match"),
+            entity_id="batch-no-match",
+            entity_type="batch",
             batch_id="batch-no-match",
             class_id="class-789",
             match_results=match_results,

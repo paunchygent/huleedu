@@ -18,19 +18,29 @@ when the batch is registered, ensuring successful assignment regardless of order
 Uses minimal infrastructure to isolate and verify the race condition fix.
 """
 
+from __future__ import annotations
+
 import json
 from datetime import UTC, datetime
+from typing import Any, Awaitable, Union
 from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import EntityReference, SystemProcessingMetadata
+from common_core.metadata_models import SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 from redis.asyncio import Redis
 
 logger = create_service_logger("test.race_condition_fixed")
+
+
+async def _ensure_awaitable(result: Union[Awaitable[Any], Any]) -> Any:
+    """Ensure a redis result is properly awaited if it's awaitable."""
+    if hasattr(result, "__await__"):
+        return await result
+    return result
 
 
 class SimulatedELS:
@@ -45,8 +55,8 @@ class SimulatedELS:
 
     def __init__(self, redis_client: Redis):
         self.redis = redis_client
-        self.events_processed = []
-        self.outcomes = []
+        self.events_processed: list[tuple[str, str]] = []
+        self.outcomes: list[dict[str, str]] = []
 
     async def process_batch_essays_registered(self, event: BatchEssaysRegistered) -> None:
         """Process batch registration - creates slots for essays AND processes pending content."""
@@ -55,17 +65,17 @@ class SimulatedELS:
 
         # Create available slots in Redis (simulating ELS behavior)
         for i in range(expected_count):
-            await self.redis.sadd(f"batch:{batch_id}:available_slots", f"slot_{i}")
+            await _ensure_awaitable(self.redis.sadd(f"batch:{batch_id}:available_slots", f"slot_{i}"))
 
         # Store batch metadata
-        await self.redis.hset(
+        await _ensure_awaitable(self.redis.hset(
             f"batch:{batch_id}:metadata",
             mapping={
                 "expected_count": str(expected_count),
                 "status": "registered",
                 "correlation_id": str(uuid4()),  # Generate a correlation ID for this test
             },
-        )
+        ))
 
         self.events_processed.append(("BatchEssaysRegistered", batch_id))
         logger.info(f"✅ Registered batch {batch_id} with {expected_count} slots")
@@ -84,7 +94,7 @@ class SimulatedELS:
         text_storage_id = event.text_storage_id
 
         # Check if batch exists
-        batch_exists = await self.redis.exists(f"batch:{batch_id}:metadata")
+        batch_exists = await _ensure_awaitable(self.redis.exists(f"batch:{batch_id}:metadata"))
         if not batch_exists:
             # CRITICAL FIX: Store as PENDING content (NOT excess) when batch doesn't exist
             await self._store_pending_content(batch_id, text_storage_id, event)
@@ -104,10 +114,10 @@ class SimulatedELS:
             return "pending"
 
         # Try to assign to available slot
-        slot = await self.redis.spop(f"batch:{batch_id}:available_slots")
+        slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
         if slot:
             # Successfully assigned
-            await self.redis.hset(f"batch:{batch_id}:assignments", text_storage_id, slot.decode())
+            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", text_storage_id, slot.decode()))
             self.events_processed.append(
                 ("EssayContentProvisioned", f"{text_storage_id} -> ASSIGNED")
             )
@@ -121,10 +131,9 @@ class SimulatedELS:
             logger.info(f"✅ Essay {text_storage_id} assigned to {slot.decode()}")
 
             # Check if batch is complete
-            assigned_count = await self.redis.hlen(f"batch:{batch_id}:assignments")
-            expected_count = int(
-                (await self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")).decode()
-            )
+            assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
+            expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+            expected_count = int(expected_count_raw.decode())
 
             if assigned_count == expected_count:
                 logger.info(f"🎉 Batch {batch_id} COMPLETE - would publish BatchEssaysReady")
@@ -172,10 +181,10 @@ class SimulatedELS:
         }
 
         # Store in Redis set for this batch
-        await self.redis.sadd(pending_key, json.dumps(content_metadata))
+        await _ensure_awaitable(self.redis.sadd(pending_key, json.dumps(content_metadata)))
 
         # Set TTL (24 hours) to prevent indefinite storage
-        await self.redis.expire(pending_key, 86400)
+        await _ensure_awaitable(self.redis.expire(pending_key, 86400))
 
         logger.info(f"📦 Stored pending content: {text_storage_id} for batch {batch_id}")
 
@@ -184,7 +193,7 @@ class SimulatedELS:
         pending_key = f"pending_content:{batch_id}"
 
         # Get all pending content items
-        pending_items = await self.redis.smembers(pending_key)
+        pending_items = await _ensure_awaitable(self.redis.smembers(pending_key))
 
         if not pending_items:
             return 0
@@ -197,15 +206,15 @@ class SimulatedELS:
                 text_storage_id = content_metadata["text_storage_id"]
 
                 # Try to assign to available slot
-                slot = await self.redis.spop(f"batch:{batch_id}:available_slots")
+                slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
                 if slot:
                     # Successfully assigned
-                    await self.redis.hset(
+                    await _ensure_awaitable(self.redis.hset(
                         f"batch:{batch_id}:assignments", text_storage_id, slot.decode()
-                    )
+                    ))
 
                     # Remove from pending
-                    await self.redis.srem(pending_key, item)
+                    await _ensure_awaitable(self.redis.srem(pending_key, item))
 
                     # Update outcomes
                     self.events_processed.append(
@@ -233,16 +242,15 @@ class SimulatedELS:
                 continue
 
         # Clean up pending storage if all processed
-        remaining = await self.redis.scard(pending_key)
+        remaining = await _ensure_awaitable(self.redis.scard(pending_key))
         if remaining == 0:
-            await self.redis.delete(pending_key)
+            await _ensure_awaitable(self.redis.delete(pending_key))
 
         # Check if batch is complete after processing pending content
         if processed_count > 0:
-            assigned_count = await self.redis.hlen(f"batch:{batch_id}:assignments")
-            expected_count = int(
-                (await self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")).decode()
-            )
+            assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
+            expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+            expected_count = int(expected_count_raw.decode())
 
             if assigned_count == expected_count:
                 logger.info(
@@ -286,10 +294,8 @@ class TestRaceConditionSimplified:
             essay_instructions="Test instructions",
             user_id="test_user",
             metadata=SystemProcessingMetadata(
-                entity=EntityReference(
-                    entity_id=batch_id,
-                    entity_type="batch",
-                ),
+                entity_id=batch_id,
+                entity_type="batch",
                 timestamp=datetime.now(UTC),
             ),
         )
@@ -454,22 +460,29 @@ class TestRaceConditionSimplified:
             f"Essay 2 stored at {essay2_stored_time}ms, published at {essay2_published_time}ms"
         )
 
-        # Process events in publication order
-        events = [
-            (essay1_published_time, "essay", self.create_essay_event(batch_id, 0)),
-            (essay2_published_time, "essay", self.create_essay_event(batch_id, 1)),
-            (batch_published_time, "batch", self.create_batch_event(batch_id, expected_count=2)),
-        ]
+        # Create events with proper typing
+        essay1_event = self.create_essay_event(batch_id, 0)
+        essay2_event = self.create_essay_event(batch_id, 1)
+        batch_event = self.create_batch_event(batch_id, expected_count=2)
 
-        # Sort by publication time
-        events.sort(key=lambda x: x[0])
+        # Process events in publication order with proper type handling
+        essay_events = [
+            (essay1_published_time, essay1_event),
+            (essay2_published_time, essay2_event),
+        ]
+        batch_events = [(batch_published_time, batch_event)]
+
+        # Combine and sort all events
+        all_events = essay_events + batch_events
+        all_events.sort(key=lambda x: x[0])
 
         logger.info("\nActual processing order due to relay worker delays:")
-        for pub_time, event_type, event in events:
-            logger.info(f"  {pub_time}ms: {event_type}")
-            if event_type == "batch":
+        for pub_time, event in all_events:
+            if isinstance(event, BatchEssaysRegistered):
+                logger.info(f"  {pub_time}ms: batch")
                 await els.process_batch_essays_registered(event)
-            else:
+            elif isinstance(event, EssayContentProvisionedV1):
+                logger.info(f"  {pub_time}ms: essay")
                 result = await els.process_essay_content_provisioned(event)
                 logger.info(f"    Essay result: {result} (pending content fix working!)")
 

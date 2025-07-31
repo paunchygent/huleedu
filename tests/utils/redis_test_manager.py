@@ -138,6 +138,15 @@ class MockRedisClient:
             logger.info(f"[{self.service_name}] Key {key} not found for deletion")
             return 0
 
+    async def delete(self, *keys: str) -> int:
+        """Mock multi-key DELETE operation required by RedisClientProtocol."""
+        total_deleted = 0
+        for key in keys:
+            deleted_count = await self.delete_key(key)
+            total_deleted += deleted_count
+        logger.info(f"[{self.service_name}] Deleted {total_deleted} of {len(keys)} keys")
+        return total_deleted
+
     async def get_key(self, key: str) -> str | None:
         """Mock GET operation with failure simulation."""
         # Always track the call

@@ -13,7 +13,8 @@ from typing import Any, cast
 
 import aiosqlite
 from common_core.domain_enums import ContentType
-from common_core.metadata_models import EntityReference
+
+# EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import raise_resource_not_found
 
@@ -110,27 +111,17 @@ class SQLiteEssayCrudOperations:
 
     async def create_essay_record(
         self,
-        essay_ref: EntityReference | None = None,
-        *,
-        essay_id: str | None = None,
-        slot_assignment: str | None = None,
+        essay_id: str,
         batch_id: str | None = None,
+        entity_type: str = "essay",
         initial_status: EssayStatus | None = None,
+        slot_assignment: str | None = None,
     ) -> EssayState:
-        """Create new essay record from entity reference or keyword arguments."""
-        # Handle both calling patterns
-        if essay_ref is not None:
-            # Legacy pattern with EntityReference
-            actual_essay_id = essay_ref.entity_id
-            actual_batch_id = essay_ref.parent_id
-            actual_status = EssayStatus.UPLOADED
-        else:
-            # New pattern with keyword arguments
-            if essay_id is None:
-                raise ValueError("essay_id is required when essay_ref is not provided")
-            actual_essay_id = essay_id
-            actual_batch_id = batch_id
-            actual_status = initial_status or EssayStatus.READY_FOR_PROCESSING
+        """Create new essay record from primitive parameters."""
+        # EntityReference removed - using primitive parameters only
+        actual_essay_id = essay_id
+        actual_batch_id = batch_id
+        actual_status = initial_status or EssayStatus.READY_FOR_PROCESSING
 
         essay_state = EssayState(
             essay_id=actual_essay_id,

@@ -92,8 +92,8 @@ class TestEventContractCompliance:
 
         # Verify contract compliance - the event should have all required fields
         assert published_result.event_name == ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
-        assert published_result.entity_ref.entity_id == sample_essay_id
-        assert published_result.entity_ref.entity_type == "essay"
+        assert published_result.entity_id == sample_essay_id
+        assert published_result.entity_type == "essay"
         assert published_result.status == EssayStatus.SPELLCHECKED_SUCCESS
         assert published_result.timestamp is not None
         assert published_result.system_metadata is not None
@@ -174,5 +174,5 @@ class TestEventContractCompliance:
         # Verify the published result has the expected correlation ID context
         published_result: SpellcheckResultDataV1 = call_args[0][1]
         assert (
-            published_result.entity_ref.entity_id == sample_essay_id
+            published_result.entity_id == sample_essay_id
         )  # Should match the essay from the request

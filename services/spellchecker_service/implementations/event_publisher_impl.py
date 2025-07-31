@@ -42,7 +42,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         Raises:
             HuleEduError: On any failure to publish event
         """
-        entity_id = event_data.entity_ref.entity_id
+        entity_id = event_data.entity_id
 
         logger.debug(
             f"Publishing spellcheck result event for essay {entity_id} "
