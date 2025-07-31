@@ -408,7 +408,7 @@ class TestPendingContentPattern:
         logger.info(f"\nOutcomes: {json.dumps(batch_tracker.outcomes, indent=2)}")
 
         # One reconciled, two directly assigned
-        reconciled = [o for o in batch_tracker.outcomes if o.get("was_pending") == True]
+        reconciled = [o for o in batch_tracker.outcomes if o.get("was_pending")]
         direct_assigned = [
             o
             for o in batch_tracker.outcomes
@@ -472,7 +472,7 @@ class TestPendingContentPattern:
 
         # Remove it
         removed = await pending_manager.remove_pending_content(batch_id, "storage_1")
-        assert removed == True
+        assert removed
 
         # Verify it's gone
         pending_after = await pending_manager.get_pending_content(batch_id)
@@ -487,5 +487,4 @@ class TestPendingContentPattern:
 
 
 if __name__ == "__main__":
-
     pytest.main([__file__, "-v", "-s", "--tb=short"])

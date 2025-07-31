@@ -308,7 +308,7 @@ class ServiceClientsProvider(Provider):
             expected_exception=Exception,
             name="consumer_recovery",
         )
-        
+
         return ConsumerRecoveryManagerImpl(
             health_monitor=health_monitor,
             circuit_breaker=recovery_circuit_breaker,

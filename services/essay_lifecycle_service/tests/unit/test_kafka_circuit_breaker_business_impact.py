@@ -34,6 +34,9 @@ from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
 )
@@ -147,6 +150,12 @@ def mock_session_factory() -> Mock:
 
 
 @pytest.fixture
+def mock_pending_content_ops() -> AsyncMock:
+    """Mock RedisPendingContentOperations for business logic testing."""
+    return AsyncMock(spec=RedisPendingContentOperations)
+
+
+@pytest.fixture
 def business_context() -> BusinessWorkflowContext:
     """Business workflow tracking context."""
     return BusinessWorkflowContext(
@@ -167,6 +176,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_outbox_repository: AsyncMock,
         business_context: BusinessWorkflowContext,
         mock_session_factory: AsyncMock,
+        mock_pending_content_ops: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: BatchEssaysReady event storage fails during slot fulfillment.
@@ -200,6 +210,7 @@ class TestBatchCoordinationBusinessImpact:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
+            pending_content_ops=mock_pending_content_ops,
             session_factory=mock_session_factory,
         )
 
@@ -286,6 +297,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_outbox_repository: AsyncMock,
         business_context: BusinessWorkflowContext,
         mock_session_factory: AsyncMock,
+        mock_pending_content_ops: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: Content provisioning completes but readiness event storage fails.
@@ -317,6 +329,7 @@ class TestBatchCoordinationBusinessImpact:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
+            pending_content_ops=mock_pending_content_ops,
             session_factory=mock_session_factory,
         )
 
@@ -847,6 +860,7 @@ class TestBusinessImpactIntegrationScenarios:
         business_context: BusinessWorkflowContext,
         mock_session_factory: AsyncMock,
         mock_settings: Settings,
+        mock_pending_content_ops: AsyncMock,
     ) -> None:
         """
         BUSINESS SCENARIO: Complete batch workflow with intermittent Kafka failures.
@@ -879,6 +893,7 @@ class TestBusinessImpactIntegrationScenarios:
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
+            pending_content_ops=mock_pending_content_ops,
             session_factory=mock_session_factory,
         )
 

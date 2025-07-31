@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -268,6 +269,7 @@ class TestRedisMessageListener:
         mock_pubsub = AsyncMock()
         mock_pubsub.get_message = AsyncMock(return_value=None)
 
+        @asynccontextmanager
         async def mock_subscribe(channel: str) -> AsyncIterator[Any]:
             yield mock_pubsub
 
@@ -301,6 +303,7 @@ class TestRedisMessageListener:
         message_calls = [test_message] + [None] * 100  # None forever after first message
         mock_pubsub.get_message = AsyncMock(side_effect=message_calls)
 
+        @asynccontextmanager
         async def mock_subscribe(channel: str) -> AsyncIterator[Any]:
             yield mock_pubsub
 

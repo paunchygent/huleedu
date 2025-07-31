@@ -42,6 +42,9 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.protocols import EventPublisher
 
 
@@ -329,12 +332,16 @@ class TestAtomicBatchCreationIntegration:
         slot_operations: Any,
     ) -> DefaultBatchEssayTracker:
         """Create real batch tracker with PostgreSQL persistence and domain class composition."""
+        # Create mock pending content ops for testing
+        mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+
         return DefaultBatchEssayTracker(
             persistence=batch_tracker_persistence,
             batch_state=batch_state,
             batch_queries=batch_queries,
             failure_tracker=failure_tracker,
             slot_operations=slot_operations,
+            pending_content_ops=mock_pending_content_ops,
         )
 
     @pytest.fixture
@@ -377,10 +384,14 @@ class TestAtomicBatchCreationIntegration:
         session_factory: async_sessionmaker[AsyncSession],
     ) -> DefaultBatchCoordinationHandler:
         """Create coordination handler with real components including session factory."""
+        # Create mock pending content ops for testing
+        mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+
         return DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
             repository=postgres_repository,
             batch_lifecycle_publisher=event_publisher,
+            pending_content_ops=mock_pending_content_ops,
             session_factory=session_factory,
         )
 

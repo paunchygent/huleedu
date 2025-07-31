@@ -166,7 +166,7 @@ async def run_consumer_loop(
                         "Consumer health check failed, attempting recovery",
                         extra=health_monitor.get_health_metrics(),
                     )
-                    
+
                     # Only attempt recovery if not already in progress
                     if not recovery_manager.is_recovery_in_progress():
                         try:
@@ -183,7 +183,7 @@ async def run_consumer_loop(
                         except Exception as recovery_error:
                             logger.error(
                                 f"Recovery attempt failed with exception: {recovery_error}",
-                                exc_info=True
+                                exc_info=True,
                             )
                     else:
                         logger.debug("Recovery already in progress, skipping duplicate attempt")

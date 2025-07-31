@@ -200,6 +200,7 @@ def create_mock_essay_result(
     mock_essay.cj_rank = cj_rank
     mock_essay.cj_score = cj_score
     mock_essay.filename = None
+    mock_essay.file_upload_id = None
     mock_essay.spellcheck_corrected_text_storage_id = None
     mock_essay.spellcheck_error_detail = None
     mock_essay.cj_assessment_error_detail = None

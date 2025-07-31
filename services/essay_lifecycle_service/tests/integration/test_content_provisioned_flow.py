@@ -46,6 +46,9 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 
 logger = create_service_logger("test.content_provisioned_flow")
 
@@ -113,8 +116,17 @@ class TestContentProvisionedFlow:
             await repository.run_migrations()
 
             persistence = BatchTrackerPersistence(repository.engine)
+
+            # Create mock pending content ops for testing
+            mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+
             batch_tracker = DefaultBatchEssayTracker(
-                persistence, batch_state, batch_queries, failure_tracker, slot_operations
+                persistence,
+                batch_state,
+                batch_queries,
+                failure_tracker,
+                slot_operations,
+                mock_pending_content_ops,
             )
             await batch_tracker.initialize_from_database()
 
@@ -139,6 +151,7 @@ class TestContentProvisionedFlow:
                 batch_tracker=batch_tracker,
                 repository=repository,
                 batch_lifecycle_publisher=event_publisher,
+                pending_content_ops=mock_pending_content_ops,
                 session_factory=repository.get_session_factory(),
             )
 

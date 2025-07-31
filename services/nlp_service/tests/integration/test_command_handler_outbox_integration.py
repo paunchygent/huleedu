@@ -201,7 +201,7 @@ class TestCommandHandlerOutboxIntegration:
 
         async with engine.begin() as conn:
             metadata = MetaData()
-            await conn.run_sync(metadata.reflect, bind=engine.sync_engine)
+            await conn.run_sync(metadata.reflect)
             if EventOutbox.__tablename__ not in metadata.tables:
                 await conn.run_sync(EventOutbox.metadata.create_all)
 

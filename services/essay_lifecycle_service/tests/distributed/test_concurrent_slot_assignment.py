@@ -49,6 +49,9 @@ from services.essay_lifecycle_service.implementations.redis_batch_state import (
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
     RedisFailureTracker,
 )
+from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
+    RedisPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.redis_script_manager import (
     RedisScriptManager,
 )
@@ -161,12 +164,17 @@ class TestConcurrentSlotAssignment:
 
             # Batch tracker with modular DI components
             batch_tracker_persistence = BatchTrackerPersistence(repository.engine)
+
+            # Create mock pending content ops for testing
+            mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+
             batch_tracker = DefaultBatchEssayTracker(
                 persistence=batch_tracker_persistence,
                 batch_state=batch_state,
                 batch_queries=batch_queries,
                 failure_tracker=failure_tracker,
                 slot_operations=slot_operations,
+                pending_content_ops=mock_pending_content_ops,
             )
 
             # Event publisher
@@ -177,6 +185,7 @@ class TestConcurrentSlotAssignment:
                 batch_tracker=batch_tracker,
                 repository=repository,
                 batch_lifecycle_publisher=event_publisher,
+                pending_content_ops=mock_pending_content_ops,
                 session_factory=repository.get_session_factory(),
             )
 

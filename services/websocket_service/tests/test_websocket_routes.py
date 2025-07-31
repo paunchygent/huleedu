@@ -8,6 +8,7 @@ connection management, and error scenarios.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
 from unittest.mock import AsyncMock
 
@@ -148,14 +149,13 @@ class TestWebSocketRoutes:
         """Test handling of Redis connection errors."""
         app = create_test_app()
 
-        # Configure Redis to fail - make it an async generator that raises
+        # Configure Redis to fail - make it an async context manager that raises
+        @asynccontextmanager
         async def failing_subscribe(channel_name: str) -> AsyncIterator[Any]:
             mock_redis_client.subscribe_calls.append(channel_name)
-            # This makes it an async generator function
-            if False:  # Never executes, but makes this an async generator
-                yield
-            # Raise when the generator is iterated
+            # Raise when the context manager is entered
             raise ConnectionError("Redis connection failed")
+            yield  # Never reached but needed for type checking
 
         setattr(mock_redis_client, "subscribe", failing_subscribe)
 
