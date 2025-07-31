@@ -272,10 +272,6 @@ class TestEventContractsV2:
                     error_categories={},
                 ),
                 correlation_id=uuid4(),
-                metadata=SystemProcessingMetadata(
-                    entity=EntityReference(entity_id="test", entity_type="batch"),
-                    timestamp=datetime.now(UTC),
-                ),
             )
 
         assert "batch_id" in str(exc_info.value)

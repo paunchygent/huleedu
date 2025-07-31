@@ -21,22 +21,22 @@ class TestStudentMatchSuggestion:
             student_id="student-123",
             student_name="John Doe",
             confidence_score=0.95,
-            match_reason="exact_name",
+            match_reasons=["exact_name"],
         )
 
         assert suggestion.student_id == "student-123"
         assert suggestion.student_name == "John Doe"
         assert suggestion.confidence_score == 0.95
-        assert suggestion.match_reason == "exact_name"
+        assert suggestion.match_reasons == ["exact_name"]
 
     def test_confidence_score_validation(self) -> None:
         """Test confidence score must be between 0 and 1."""
         # Valid scores
         StudentMatchSuggestion(
-            student_id="123", student_name="Test", confidence_score=0.0, match_reason="fuzzy_name"
+            student_id="123", student_name="Test", confidence_score=0.0, match_reasons=["fuzzy_name"]
         )
         StudentMatchSuggestion(
-            student_id="123", student_name="Test", confidence_score=1.0, match_reason="email"
+            student_id="123", student_name="Test", confidence_score=1.0, match_reasons=["email"]
         )
 
         # Invalid scores
@@ -45,7 +45,7 @@ class TestStudentMatchSuggestion:
                 student_id="123",
                 student_name="Test",
                 confidence_score=1.1,
-                match_reason="exact_name",
+                match_reasons=["exact_name"],
             )
 
         with pytest.raises(ValueError):
@@ -53,7 +53,7 @@ class TestStudentMatchSuggestion:
                 student_id="123",
                 student_name="Test",
                 confidence_score=-0.1,
-                match_reason="exact_name",
+                match_reasons=["exact_name"],
             )
 
 

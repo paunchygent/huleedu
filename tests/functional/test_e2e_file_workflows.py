@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
+from tests.utils.auth_manager import AuthTestManager, create_test_teacher
 from tests.utils.service_test_manager import ServiceTestManager
-from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
 class TestE2EFileWorkflows:

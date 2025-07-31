@@ -483,7 +483,6 @@ class TestEnhancedProcessingEvents:
     def test_enhanced_events_exist(self) -> None:
         """Test that all enhanced file and class management events exist."""
         enhanced_events = [
-            "STUDENT_PARSING_COMPLETED",
             "ESSAY_STUDENT_ASSOCIATION_UPDATED",
             "BATCH_FILE_ADDED",
             "BATCH_FILE_REMOVED",
@@ -496,7 +495,6 @@ class TestEnhancedProcessingEvents:
 
     def test_enhanced_events_values(self) -> None:
         """Test that enhanced events have correct string values."""
-        assert ProcessingEvent.STUDENT_PARSING_COMPLETED.value == "student.parsing.completed"
         assert (
             ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED.value
             == "essay.student.association.updated"
@@ -508,10 +506,6 @@ class TestEnhancedProcessingEvents:
 
     def test_enhanced_events_topic_mappings(self) -> None:
         """Test topic mappings for enhanced events."""
-        assert (
-            topic_name(ProcessingEvent.STUDENT_PARSING_COMPLETED)
-            == "huleedu.file.student.parsing.completed.v1"
-        )
         assert (
             topic_name(ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED)
             == "huleedu.class.essay.association.updated.v1"
@@ -526,7 +520,6 @@ class TestEnhancedProcessingEvents:
     def test_enhanced_events_are_mapped(self) -> None:
         """Test that all enhanced events are included in _TOPIC_MAPPING."""
         enhanced_events = [
-            ProcessingEvent.STUDENT_PARSING_COMPLETED,
             ProcessingEvent.ESSAY_STUDENT_ASSOCIATION_UPDATED,
             ProcessingEvent.BATCH_FILE_ADDED,
             ProcessingEvent.BATCH_FILE_REMOVED,

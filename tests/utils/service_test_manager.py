@@ -20,7 +20,7 @@ import httpx
 from common_core.domain_enums import CourseCode
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from tests.utils.test_auth_manager import AuthTestManager, AuthTestUser
+from tests.utils.auth_manager import AuthTestManager, AuthTestUser
 
 logger = create_service_logger("test.service_manager")
 

@@ -156,7 +156,7 @@ __all__ = [
     "EssayContentProvisionedV1",
     "EssayValidationFailedV1",
     # NLP Service Event Models
-    "EssayAuthorMatchSuggestedV1",
+    "BatchAuthorMatchesSuggestedV1",
     "StudentMatchSuggestion",
     # LLM Provider Event Models
     "LLMComparisonResultV1",

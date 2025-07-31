@@ -25,6 +25,7 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     EssayRepositoryProtocol,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestDefaultBatchPhaseCoordinator:
@@ -133,7 +134,7 @@ class TestDefaultBatchPhaseCoordinator:
 
         # Verify
         mock_essay_repository.list_essays_by_batch_and_phase.assert_called_once_with(
-            batch_id="test-batch-1", phase_name="spellcheck"
+            batch_id="test-batch-1", phase_name="spellcheck", session=ANY
         )
 
         mock_event_publisher.publish_els_batch_phase_outcome.assert_called_once()

@@ -24,9 +24,9 @@ from tests.functional.comprehensive_pipeline_utils import (
     upload_real_essays,
     watch_pipeline_progression_with_consumer,
 )
+from tests.utils.auth_manager import AuthTestManager
+from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.service_test_manager import ServiceTestManager
-from tests.utils.test_auth_manager import AuthTestManager
-from tests.utils.test_event_factory import reset_test_event_factory
 
 
 @pytest.mark.slow

@@ -18,6 +18,7 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
+from services.essay_lifecycle_service.tests.unit.test_utils import mock_session_factory
 
 
 class TestFutureServicesCommandHandler:

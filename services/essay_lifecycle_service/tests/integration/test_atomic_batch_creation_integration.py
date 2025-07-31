@@ -475,7 +475,8 @@ class TestAtomicBatchCreationIntegration:
         # Validate error structure
         error = exc_info.value
         assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
-        assert "Failed to process batch essays registration" in error.error_detail.message
+        assert "Unexpected error in batch essays registration" in error.error_detail.message
+        assert "IntegrityError" in error.error_detail.message
         assert error.error_detail.service == "essay_lifecycle_service"
         assert error.error_detail.operation == "handle_batch_essays_registered"
 

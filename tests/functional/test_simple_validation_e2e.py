@@ -11,9 +11,9 @@ from typing import Any
 
 import pytest
 
+from tests.utils.auth_manager import AuthTestManager, create_test_teacher
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
 from tests.utils.service_test_manager import ServiceTestManager
-from tests.utils.test_auth_manager import AuthTestManager, create_test_teacher
 
 
 @pytest.mark.e2e

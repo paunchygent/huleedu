@@ -6,7 +6,7 @@ from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult
+from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1, EssayMatchResult, StudentMatchSuggestion
 from common_core.metadata_models import EntityReference
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
@@ -37,6 +37,57 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         self.outbox_manager = outbox_manager
         self.source_service_name = source_service_name
         self.output_topic = output_topic
+
+    async def publish_author_match_result(
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        essay_id: str,
+        suggestions: list[StudentMatchSuggestion],
+        match_status: str,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish individual essay author match results to Kafka.
+        
+        This is a compatibility method for the essay-level handler.
+        """
+        # Convert to batch format with single essay
+        match_result = EssayMatchResult(
+            essay_id=essay_id,
+            text_storage_id="",  # Not available in this context
+            filename="",  # Not available in this context
+            suggestions=suggestions,
+            no_match_reason=None if suggestions else "No matches found",
+            extraction_metadata={},
+        )
+        
+        # Create a batch event with single essay
+        batch_event = BatchAuthorMatchesSuggestedV1(
+            event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
+            entity_ref=EntityReference(entity_id=essay_id, entity_type="essay"),
+            batch_id="single-essay-batch",  # Placeholder for individual essay
+            class_id="unknown",  # Not available in this context
+            match_results=[match_result],
+            processing_summary={"total_essays": 1, "matched": 1 if suggestions else 0},
+        )
+        
+        # Create event envelope
+        envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
+            event_type=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
+            source_service=self.source_service_name,
+            correlation_id=correlation_id,
+            data=batch_event,
+            metadata=inject_trace_context({}),
+        )
+        
+        # Store in outbox
+        await self.outbox_manager.store_event(
+            aggregate_id=essay_id,
+            aggregate_type="essay",
+            event_type=envelope.event_type,
+            event_data=envelope.model_dump(mode="json"),
+            topic=self.output_topic,
+            event_key=essay_id,
+        )
 
     async def publish_batch_author_match_results(
         self,

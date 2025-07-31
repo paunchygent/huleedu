@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
-from common_core.pipeline_models import PhaseName
+from common_core.pipeline_models import PhaseName, PipelineStateDetail, PipelineExecutionStatus, ProcessingPipelineState
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
@@ -72,9 +72,9 @@ class TestPipelineProgressionScenarios:
             # Get current state
             state = await batch_repository.get_processing_pipeline_state(batch_id)
             if state:
-                phase_key = f"{phase_name.value}_status"
-                if state.get(phase_key) == expected_status.value:
-                    state[phase_key] = new_status.value
+                pipeline_detail = state.get_pipeline(phase_name.value)
+                if pipeline_detail and pipeline_detail.status == expected_status:
+                    pipeline_detail.status = new_status
                     await batch_repository.save_processing_pipeline_state(batch_id, state)
                     return True
             return False
@@ -114,12 +114,12 @@ class TestPipelineProgressionScenarios:
         batch_repository.batch_contexts[batch_id] = batch_context
 
         # Setup initial pipeline state with spellcheck in progress
-        initial_pipeline_state = {
-            "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck", "cj_assessment"],
-            "spellcheck_status": "in_progress",
-            "cj_assessment_status": "pending",
-        }
+        initial_pipeline_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=["spellcheck", "cj_assessment"],
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
         # Test spellcheck completion handling
@@ -133,7 +133,7 @@ class TestPipelineProgressionScenarios:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "completed_successfully"
+        assert updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
 
         # Verify CJ assessment was initiated (with None processed_essays since
         # no data propagation from spellcheck)
@@ -170,12 +170,12 @@ class TestPipelineProgressionScenarios:
         batch_repository.batch_contexts[batch_id] = batch_context
 
         # Setup initial pipeline state
-        initial_pipeline_state = {
-            "batch_id": batch_id,
-            "requested_pipelines": ["spellcheck"],  # CJ assessment disabled, only spellcheck
-            "spellcheck_status": "in_progress",
-            "cj_assessment_status": "pending",
-        }
+        initial_pipeline_state = ProcessingPipelineState(
+            batch_id=batch_id,
+            requested_pipelines=["spellcheck"],  # CJ assessment disabled, only spellcheck
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
+        )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
         # Test spellcheck completion handling
@@ -189,7 +189,7 @@ class TestPipelineProgressionScenarios:
         # Verify pipeline state was updated
         updated_state = await batch_repository.get_processing_pipeline_state(batch_id)
         assert updated_state is not None
-        assert updated_state["spellcheck_status"] == "completed_successfully"
+        assert updated_state.spellcheck.status == PipelineExecutionStatus.COMPLETED_SUCCESSFULLY
 
         # Verify CJ assessment was NOT initiated (disabled)
         mock_cj_initiator.initiate_phase.assert_not_called()

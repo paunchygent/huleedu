@@ -18,9 +18,9 @@ from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from tests.utils.auth_manager import AuthTestManager
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 from tests.utils.service_test_manager import ServiceTestManager
-from tests.utils.test_auth_manager import AuthTestManager
 
 # Configure logging for debugging
 logger = create_service_logger("test.validation_coordination_e2e")

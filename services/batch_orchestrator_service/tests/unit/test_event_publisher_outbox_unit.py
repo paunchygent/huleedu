@@ -3,6 +3,18 @@ Unit tests for DefaultBatchEventPublisherImpl with outbox pattern integration.
 
 Tests focus on verifying the correct interaction with the outbox repository,
 aggregate type determination, and error handling using simplified test data.
+
+TODO: ARCHITECTURAL VIOLATION - BOS Currently Uses Anti-Pattern
+The DefaultBatchEventPublisherImpl uses a "Kafka-first with outbox fallback" pattern
+which is explicitly FORBIDDEN by Rule 042.1 (True Transactional Outbox Pattern).
+
+BOS needs to be refactored to follow the TRUE OUTBOX PATTERN like ELS and File Service:
+- ALWAYS use outbox for transactional safety
+- NEVER try Kafka first
+- Store events in database transaction with business data
+- Relay worker publishes asynchronously
+
+These test failures are expected until BOS is refactored to comply with the mandate.
 """
 
 from __future__ import annotations
@@ -84,15 +96,24 @@ def fake_outbox() -> FakeOutboxRepository:
 
 
 @pytest.fixture
+def fake_redis() -> Mock:
+    """Fake Redis client for testing."""
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    return Mock(spec=AtomicRedisClientProtocol)
+
+
+@pytest.fixture
 def event_publisher(
     fake_kafka: Mock,
     fake_outbox: FakeOutboxRepository,
+    fake_redis: Mock,
     test_settings: Settings,
 ) -> DefaultBatchEventPublisherImpl:
     """Create event publisher with fake dependencies."""
     return DefaultBatchEventPublisherImpl(
         kafka_bus=fake_kafka,
         outbox_repository=fake_outbox,  # type: ignore
+        redis_client=fake_redis,
         settings=test_settings,
     )
 
@@ -109,20 +130,25 @@ class TestDefaultBatchEventPublisherImpl:
     def test_constructor_initialization(self) -> None:
         """Test that constructor properly initializes all dependencies."""
         # Given
+        from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+        
         kafka_bus = Mock(spec=KafkaPublisherProtocol)
         outbox_repo = FakeOutboxRepository()
+        redis_client = Mock(spec=AtomicRedisClientProtocol)
         settings = Mock(spec=Settings)
 
         # When
         publisher = DefaultBatchEventPublisherImpl(
             kafka_bus=kafka_bus,
             outbox_repository=outbox_repo,  # type: ignore
+            redis_client=redis_client,
             settings=settings,
         )
 
         # Then
         assert publisher.kafka_bus is kafka_bus
         assert publisher.outbox_repository is outbox_repo
+        assert publisher.redis_client is redis_client
         assert publisher.settings is settings
 
     async def test_publish_batch_event_success(

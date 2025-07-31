@@ -176,17 +176,17 @@ class NlpServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_examnet_extractor(self, settings: Settings) -> ExamnetExtractor:
         """Provide exam.net format extractor."""
-        return ExamnetExtractor(settings=settings)
+        return ExamnetExtractor()
 
     @provide(scope=Scope.APP)
     def provide_header_extractor(self, settings: Settings) -> HeaderExtractor:
         """Provide header pattern extractor."""
-        return HeaderExtractor(settings=settings)
+        return HeaderExtractor()
 
     @provide(scope=Scope.APP)
     def provide_email_anchor_extractor(self, settings: Settings) -> EmailAnchorExtractor:
         """Provide email anchor extractor."""
-        return EmailAnchorExtractor(settings=settings)
+        return EmailAnchorExtractor()
 
     @provide(scope=Scope.APP)
     def provide_extraction_strategies(
@@ -203,7 +203,7 @@ class NlpServiceProvider(Provider):
         self, strategies: list[BaseExtractor], settings: Settings
     ) -> ExtractionPipeline:
         """Provide extraction pipeline with configured strategies."""
-        return ExtractionPipeline(strategies=strategies, settings=settings)
+        return ExtractionPipeline(strategies=strategies)
 
     # Matching components
     @provide(scope=Scope.APP)
@@ -216,17 +216,17 @@ class NlpServiceProvider(Provider):
         self, name_parser: SwedishNameParser, settings: Settings
     ) -> NameMatcher:
         """Provide name matcher with Swedish support."""
-        return NameMatcher(name_parser=name_parser, settings=settings)
+        return NameMatcher()
 
     @provide(scope=Scope.APP)
     def provide_email_matcher(self, settings: Settings) -> EmailMatcher:
         """Provide email matcher."""
-        return EmailMatcher(settings=settings)
+        return EmailMatcher()
 
     @provide(scope=Scope.APP)
     def provide_confidence_calculator(self, settings: Settings) -> ConfidenceCalculator:
         """Provide confidence calculator."""
-        return ConfidenceCalculator(settings=settings)
+        return ConfidenceCalculator()
 
     @provide(scope=Scope.APP)
     def provide_roster_matcher(
@@ -241,7 +241,6 @@ class NlpServiceProvider(Provider):
             name_matcher=name_matcher,
             email_matcher=email_matcher,
             confidence_calculator=confidence_calculator,
-            settings=settings,
         )
 
     # Main student matcher

@@ -15,7 +15,7 @@ We've implemented a **Test Authentication Manager** that provides:
 
 ## Architecture
 
-### TestAuthManager (`tests/utils/test_auth_manager.py`)
+### TestAuthManager (`tests/utils/auth_manager.py`)
 
 **Core Components:**
 
@@ -226,7 +226,7 @@ headers = await auth_service.get_auth_headers(user_credentials)
 
 ## Example Files
 
-- `tests/utils/test_auth_manager.py` - Core authentication manager
+- `tests/utils/auth_manager.py` - Core authentication manager
 - `tests/utils/service_test_manager.py` - Updated with auth integration
 - `tests/functional/test_e2e_file_workflows_example_fix.py` - Migration example
 

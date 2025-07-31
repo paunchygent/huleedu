@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from huleedu_service_libs.error_handling import (
+    HuleEduError,
     raise_processing_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -129,22 +130,22 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
             return True
 
+        except HuleEduError:
+            # Re-raise HuleEdu errors to preserve error type (EXTERNAL_SERVICE_ERROR, etc.)
+            raise
         except Exception as e:
-            # Re-raise HuleEduError as-is, or wrap other exceptions
-            if hasattr(e, "error_detail"):
-                raise
-            else:
-                raise_processing_error(
-                    service="essay_lifecycle_service",
-                    operation="handle_batch_essays_registered",
-                    message=f"Failed to process batch essays registration: {e.__class__.__name__}",
-                    correlation_id=correlation_id,
-                    batch_id=event_data.batch_id,
-                    expected_count=event_data.expected_essay_count,
-                    essay_count=len(event_data.essay_ids),
-                    error_type=e.__class__.__name__,
-                    error_details=str(e),
-                )
+            # Only wrap unexpected exceptions as PROCESSING_ERROR
+            raise_processing_error(
+                service="essay_lifecycle_service",
+                operation="handle_batch_essays_registered",
+                message=f"Unexpected error in batch essays registration: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                batch_id=event_data.batch_id,
+                expected_count=event_data.expected_essay_count,
+                essay_count=len(event_data.essay_ids),
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+            )
 
     async def handle_essay_content_provisioned(
         self,
@@ -332,34 +333,34 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
             return True
 
+        except HuleEduError:
+            # Re-raise HuleEdu errors to preserve error type (EXTERNAL_SERVICE_ERROR, etc.)
+            raise
         except Exception as e:
-            # Re-raise HuleEduError as-is, or wrap other exceptions
-            if hasattr(e, "error_detail"):
-                raise
-            else:
-                import traceback
+            # Only wrap unexpected exceptions as PROCESSING_ERROR
+            import traceback
 
-                stack_trace = traceback.format_exc()
-                logger.error(
-                    f"Detailed error in handle_essay_content_provisioned: {e.__class__.__name__}: {e}",
-                    extra={
-                        "stack_trace": stack_trace,
-                        "batch_id": event_data.batch_id,
-                        "text_storage_id": event_data.text_storage_id,
-                    },
-                )
-                raise_processing_error(
-                    service="essay_lifecycle_service",
-                    operation="handle_essay_content_provisioned",
-                    message=f"Failed to process essay content provisioning: {e.__class__.__name__}",
-                    correlation_id=correlation_id,
-                    batch_id=event_data.batch_id,
-                    text_storage_id=event_data.text_storage_id,
-                    original_file_name=event_data.original_file_name,
-                    error_type=e.__class__.__name__,
-                    error_details=str(e),
-                    stack_trace=stack_trace,
-                )
+            stack_trace = traceback.format_exc()
+            logger.error(
+                f"Unexpected error in handle_essay_content_provisioned: {e.__class__.__name__}: {e}",
+                extra={
+                    "stack_trace": stack_trace,
+                    "batch_id": event_data.batch_id,
+                    "text_storage_id": event_data.text_storage_id,
+                },
+            )
+            raise_processing_error(
+                service="essay_lifecycle_service",
+                operation="handle_essay_content_provisioned",
+                message=f"Unexpected error in essay content provisioning: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                batch_id=event_data.batch_id,
+                text_storage_id=event_data.text_storage_id,
+                original_file_name=event_data.original_file_name,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+                stack_trace=stack_trace,
+            )
 
     async def handle_essay_validation_failed(
         self,
@@ -401,7 +402,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 async with self.session_factory() as session:
                     async with session.begin():
                         await self.batch_lifecycle_publisher.publish_batch_essays_ready(
-                            batch_ready_event,
+                            event_data=batch_ready_event,
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
@@ -418,19 +419,19 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
             return True
 
+        except HuleEduError:
+            # Re-raise HuleEdu errors to preserve error type (EXTERNAL_SERVICE_ERROR, etc.)
+            raise
         except Exception as e:
-            # Re-raise HuleEduError as-is, or wrap other exceptions
-            if hasattr(e, "error_detail"):
-                raise
-            else:
-                raise_processing_error(
-                    service="essay_lifecycle_service",
-                    operation="handle_essay_validation_failed",
-                    message=f"Failed to process essay validation failure: {e.__class__.__name__}",
-                    correlation_id=correlation_id,
-                    batch_id=event_data.batch_id,
-                    original_file_name=event_data.original_file_name,
-                    validation_error_code=event_data.validation_error_code,
-                    error_type=e.__class__.__name__,
-                    error_details=str(e),
-                )
+            # Only wrap unexpected exceptions as PROCESSING_ERROR
+            raise_processing_error(
+                service="essay_lifecycle_service",
+                operation="handle_essay_validation_failed",
+                message=f"Unexpected error in essay validation failure handling: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                batch_id=event_data.batch_id,
+                original_file_name=event_data.original_file_name,
+                validation_error_code=event_data.validation_error_code,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+            )

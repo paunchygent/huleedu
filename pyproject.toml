@@ -236,6 +236,7 @@ exclude_lines = [
 testpaths = [
     "tests",
     "libs/common_core/tests",
+    "libs/huleedu_service_libs/tests",
     "services/content_service/tests",
     "services/spellchecker_service/tests",
     "services/batch_orchestrator_service/tests",

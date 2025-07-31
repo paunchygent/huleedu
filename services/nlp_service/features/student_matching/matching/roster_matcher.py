@@ -134,8 +134,10 @@ class RosterMatcher:
             suggestion = StudentMatchSuggestion(
                 student_id=match.student.student_id,
                 student_name=match.student.display_name,
+                student_email=getattr(match.student, 'email', None),
                 confidence_score=match.confidence,
-                match_reason=match.match_reason.value,
+                match_reasons=[match.match_reason.value],
+                extraction_metadata={},
             )
             suggestions.append(suggestion)
 

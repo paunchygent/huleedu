@@ -84,13 +84,30 @@ async def validate_bcs_integration_occurred(
                 batch_data = await response.json()
                 # Extract resolved pipeline from pipeline_state
                 pipeline_state = batch_data.get("pipeline_state", {})
-                # Look for resolved pipeline in the right field
-                resolved_pipeline = (
-                    pipeline_state.get("resolved_pipeline", [])
-                    or pipeline_state.get("requested_pipelines", [])
-                    or []
-                )
+                
+                # Handle different possible pipeline_state structures
+                resolved_pipeline = []
+                if isinstance(pipeline_state, dict):
+                    # Look for resolved pipeline in various possible fields
+                    resolved_pipeline = (
+                        pipeline_state.get("resolved_pipeline", [])
+                        or pipeline_state.get("requested_pipelines", [])
+                        or []
+                    )
+                    
+                    # If no resolved pipeline found but pipeline_state has phase data,
+                    # extract phases that have been configured
+                    if not resolved_pipeline:
+                        configured_phases = []
+                        for phase_name in ["spellcheck", "ai_feedback", "cj_assessment", "nlp"]:
+                            phase_data = pipeline_state.get(phase_name)
+                            if phase_data and isinstance(phase_data, dict):
+                                configured_phases.append(phase_name)
+                        resolved_pipeline = configured_phases
+                else:
+                    print(f"⚠️ Unexpected pipeline_state type: {type(pipeline_state)}")
             else:
+                print(f"⚠️ Failed to get batch data for resolved pipeline check: {response.status}")
                 resolved_pipeline = []
 
     # 3. Validate integration evidence

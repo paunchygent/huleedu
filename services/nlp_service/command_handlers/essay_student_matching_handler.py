@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 import aiohttp
 from aiokafka import ConsumerRecord
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import EssayStudentMatchingRequestedV1
+from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -102,7 +102,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
         """
         try:
             # Parse the command data
-            command_data = EssayStudentMatchingRequestedV1.model_validate(envelope.data)
+            command_data = BatchStudentMatchingRequestedV1.model_validate(envelope.data)
 
             logger.info(
                 f"Processing Phase 1 student matching for essay {command_data.essay_id}",
@@ -131,11 +131,9 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                 await self.roster_cache.set_roster(command_data.class_id, roster)
 
             # Perform student matching
-            suggestions = await self.student_matcher.match_student(
+            suggestions = await self.student_matcher.find_matches(
                 essay_text=essay_text,
-                essay_id=command_data.essay_id,
                 roster=roster,
-                filename=command_data.filename,
                 correlation_id=correlation_id,
             )
 
@@ -143,7 +141,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
             match_status = determine_match_status(suggestions)
 
             # Publish match result event
-            await self.event_publisher.publish_match_suggestions(
+            await self.event_publisher.publish_author_match_result(
+                kafka_bus=self.kafka_bus,
                 essay_id=command_data.essay_id,
                 suggestions=suggestions,
                 match_status=match_status,
@@ -161,8 +160,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                             topic=event_data["topic"],
                             envelope=event_data["envelope"],
                         )
-                        await self.outbox_repository.mark_as_published(
-                            session=session, event_id=event_id
+                        await self.outbox_repository.mark_event_published(
+                            event_id=event_id
                         )
                     except Exception as e:
                         logger.error(

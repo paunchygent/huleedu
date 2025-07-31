@@ -80,6 +80,21 @@ class OutboxTestProvider(Provider):
     def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
         """Provide outbox repository."""
         return PostgreSQLOutboxRepository(engine)
+    
+    @provide(scope=Scope.APP)
+    def provide_outbox_settings(self) -> OutboxSettings:
+        """Provide outbox settings."""
+        return OutboxSettings(
+            poll_interval=self._settings.OUTBOX_POLL_INTERVAL,
+            batch_size=self._settings.OUTBOX_BATCH_SIZE,
+            max_retries=self._settings.OUTBOX_MAX_RETRIES,
+            processing_timeout=self._settings.OUTBOX_PROCESSING_TIMEOUT,
+        )
+    
+    @provide(scope=Scope.APP)
+    def provide_service_name(self) -> str:
+        """Provide service name for outbox metadata."""
+        return self._settings.SERVICE_NAME
 
     @provide(scope=Scope.APP)
     def provide_redis_client(self) -> AtomicRedisClientProtocol:
