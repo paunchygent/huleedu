@@ -274,6 +274,7 @@ markers = [
     "functional: marks functional tests that verify cross-service behavior",
     "timeout: marks tests with specific timeout requirements",
     "no_prometheus_clear: marks tests that should not have their Prometheus registry cleared",
+    "unit: marks tests as unit tests for isolated component testing",
 ]
 
 filterwarnings = [
