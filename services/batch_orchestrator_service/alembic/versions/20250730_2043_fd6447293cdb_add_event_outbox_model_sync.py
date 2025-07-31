@@ -29,7 +29,8 @@ def upgrade() -> None:
         "UPDATE batches SET correlation_id = gen_random_uuid()::text WHERE correlation_id IS NULL"
     )
     op.execute(
-        "UPDATE phase_status_log SET correlation_id = gen_random_uuid()::text WHERE correlation_id IS NULL"
+        "UPDATE phase_status_log SET correlation_id = gen_random_uuid()::text "
+        "WHERE correlation_id IS NULL"
     )
 
     op.alter_column(

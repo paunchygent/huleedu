@@ -278,7 +278,8 @@ class TestDualEventHandling:
 
         # Handler should only be called once due to idempotency
         # (In real implementation, idempotency decorator would prevent duplicate processing)
-        # For this test, we verify the handler is called twice (as the mock doesn't have idempotency)
+        # For this test, we verify the handler is called twice
+        # (as the mock doesn't have idempotency)
         assert mock_handlers["batch_essays_ready_handler"].handle_batch_essays_ready.call_count == 2
 
     @pytest.mark.asyncio

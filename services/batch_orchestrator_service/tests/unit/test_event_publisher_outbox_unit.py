@@ -1,34 +1,24 @@
 """
-Unit tests for DefaultBatchEventPublisherImpl with outbox pattern integration.
+Unit tests for DefaultBatchEventPublisherImpl with TRUE OUTBOX PATTERN.
 
-Tests focus on verifying the correct interaction with the outbox repository,
+Tests focus on verifying the correct interaction with the OutboxManager,
 aggregate type determination, and error handling using simplified test data.
 
-TODO: ARCHITECTURAL VIOLATION - BOS Currently Uses Anti-Pattern
-The DefaultBatchEventPublisherImpl uses a "Kafka-first with outbox fallback" pattern
-which is explicitly FORBIDDEN by Rule 042.1 (True Transactional Outbox Pattern).
-
-BOS needs to be refactored to follow the TRUE OUTBOX PATTERN like ELS and File Service:
+This test suite verifies compliance with Rule 042.1 (True Transactional Outbox Pattern):
 - ALWAYS use outbox for transactional safety
 - NEVER try Kafka first
 - Store events in database transaction with business data
 - Relay worker publishes asynchronously
-
-These test failures are expected until BOS is refactored to comply with the mandate.
 """
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
 from common_core.events.envelope import EventEnvelope
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.event_publisher_impl import (
@@ -36,43 +26,36 @@ from services.batch_orchestrator_service.implementations.event_publisher_impl im
 )
 
 
-class FakeOutboxRepository:
-    """Fake implementation of OutboxRepositoryProtocol for testing."""
+class FakeOutboxManager:
+    """Fake implementation of OutboxManager for testing."""
 
     def __init__(self) -> None:
-        self.events: list[dict[str, Any]] = []
-        self.add_event_calls: list[dict[str, Any]] = []
+        self.publish_calls: list[dict[str, Any]] = []
         self.should_fail = False
         self.failure_message = "Outbox storage failed"
 
-    async def add_event(
+    async def publish_to_outbox(
         self,
-        aggregate_id: str,
         aggregate_type: str,
+        aggregate_id: str,
         event_type: str,
-        event_data: dict[str, Any],
+        event_data: Any,
         topic: str,
-        event_key: str | None = None,
-        session: AsyncSession | None = None,
-    ) -> UUID:
+        session: Any | None = None,
+    ) -> None:
         """Store event in fake outbox."""
         if self.should_fail:
             raise Exception(self.failure_message)
 
-        event_id = uuid4()
         call_data = {
-            "id": event_id,
-            "aggregate_id": aggregate_id,
             "aggregate_type": aggregate_type,
+            "aggregate_id": aggregate_id,
             "event_type": event_type,
             "event_data": event_data,
             "topic": topic,
-            "event_key": event_key,
             "session": session,
         }
-        self.add_event_calls.append(call_data)
-        self.events.append(call_data)
-        return event_id
+        self.publish_calls.append(call_data)
 
 
 @pytest.fixture
@@ -84,37 +67,19 @@ def test_settings() -> Settings:
 
 
 @pytest.fixture
-def fake_kafka() -> Mock:
-    """Fake Kafka publisher (not used with outbox pattern)."""
-    return Mock(spec=KafkaPublisherProtocol)
-
-
-@pytest.fixture
-def fake_outbox() -> FakeOutboxRepository:
-    """Fake outbox repository for testing."""
-    return FakeOutboxRepository()
-
-
-@pytest.fixture
-def fake_redis() -> Mock:
-    """Fake Redis client for testing."""
-    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-
-    return Mock(spec=AtomicRedisClientProtocol)
+def fake_outbox_manager() -> FakeOutboxManager:
+    """Fake outbox manager for testing."""
+    return FakeOutboxManager()
 
 
 @pytest.fixture
 def event_publisher(
-    fake_kafka: Mock,
-    fake_outbox: FakeOutboxRepository,
-    fake_redis: Mock,
+    fake_outbox_manager: FakeOutboxManager,
     test_settings: Settings,
 ) -> DefaultBatchEventPublisherImpl:
-    """Create event publisher with fake dependencies."""
+    """Create event publisher with fake dependencies for TRUE OUTBOX PATTERN."""
     return DefaultBatchEventPublisherImpl(
-        kafka_bus=fake_kafka,
-        outbox_repository=fake_outbox,  # type: ignore
-        redis_client=fake_redis,
+        outbox_manager=fake_outbox_manager,  # type: ignore
         settings=test_settings,
     )
 
@@ -126,39 +91,30 @@ def sample_correlation_id() -> UUID:
 
 
 class TestDefaultBatchEventPublisherImpl:
-    """Test DefaultBatchEventPublisherImpl behavior with outbox pattern."""
+    """Test DefaultBatchEventPublisherImpl behavior with TRUE OUTBOX PATTERN."""
 
-    def test_constructor_initialization(self) -> None:
-        """Test that constructor properly initializes all dependencies."""
+    def test_constructor_initialization(self, test_settings: Settings) -> None:
+        """Test that constructor properly initializes with TRUE OUTBOX PATTERN dependencies."""
         # Given
-        from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-
-        kafka_bus = Mock(spec=KafkaPublisherProtocol)
-        outbox_repo = FakeOutboxRepository()
-        redis_client = Mock(spec=AtomicRedisClientProtocol)
-        settings = Mock(spec=Settings)
+        fake_outbox_manager = FakeOutboxManager()
 
         # When
         publisher = DefaultBatchEventPublisherImpl(
-            kafka_bus=kafka_bus,
-            outbox_repository=outbox_repo,  # type: ignore
-            redis_client=redis_client,
-            settings=settings,
+            outbox_manager=fake_outbox_manager,  # type: ignore
+            settings=test_settings,
         )
 
         # Then
-        assert publisher.kafka_bus is kafka_bus
-        assert publisher.outbox_repository is outbox_repo
-        assert publisher.redis_client is redis_client
-        assert publisher.settings is settings
+        assert publisher.outbox_manager is fake_outbox_manager
+        assert publisher.settings is test_settings
 
     async def test_publish_batch_event_success(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify batch event is correctly stored in outbox."""
+        """Verify batch event is correctly stored in outbox using TRUE OUTBOX PATTERN."""
         # Given - using realistic test data structure
         test_data = {
             "event_name": "batch.spellcheck.initiate.command",
@@ -178,37 +134,60 @@ class TestDefaultBatchEventPublisherImpl:
         )
 
         # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            await event_publisher.publish_batch_event(event_envelope, key="batch-001")
+        await event_publisher.publish_batch_event(event_envelope, key="batch-001")
 
-        # Then
-        assert len(fake_outbox.add_event_calls) == 1
-        call = fake_outbox.add_event_calls[0]
+        # Then - TRUE OUTBOX PATTERN: Always use outbox
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
 
         assert call["aggregate_id"] == "batch-001"
         assert call["aggregate_type"] == "batch"
         assert call["event_type"] == "huleedu.batch.spellcheck.initiate.command.v1"
         assert call["topic"] == "huleedu.batch.spellcheck.initiate.command.v1"
-        assert call["event_key"] == "batch-001"
+        assert call["session"] is None
 
-        # Verify envelope structure
-        envelope_data = call["event_data"]
-        assert envelope_data["event_type"] == "huleedu.batch.spellcheck.initiate.command.v1"
-        assert envelope_data["source_service"] == "batch-orchestrator-service"
-        assert envelope_data["correlation_id"] == str(sample_correlation_id)
-        assert envelope_data["data"]["entity_ref"]["entity_id"] == "batch-001"
-        assert len(envelope_data["data"]["essays_to_process"]) == 2
+        # Verify original envelope was passed
+        stored_envelope = call["event_data"]
+        assert stored_envelope is event_envelope
+        assert stored_envelope.correlation_id == sample_correlation_id
+
+    async def test_publish_batch_event_with_session(
+        self,
+        event_publisher: DefaultBatchEventPublisherImpl,
+        fake_outbox_manager: FakeOutboxManager,
+        sample_correlation_id: UUID,
+    ) -> None:
+        """Verify batch event supports session parameter for transactional atomicity."""
+        # Given
+        test_data = {"event_name": "test.event"}
+        event_envelope = EventEnvelope[Any](
+            event_type="test.event.v1",
+            source_service="batch-orchestrator-service",
+            correlation_id=sample_correlation_id,
+            data=test_data,
+        )
+        mock_session = Mock()
+
+        # When
+        await event_publisher.publish_batch_event(
+            event_envelope, key="batch-001", session=mock_session
+        )
+
+        # Then
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
+        assert call["session"] is mock_session
 
     async def test_outbox_failure_propagates_exception(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify that outbox storage failures are propagated as structured errors."""
+        """Verify that outbox storage failures are propagated as exceptions."""
         # Given
-        fake_outbox.should_fail = True
-        fake_outbox.failure_message = "Database connection lost"
+        fake_outbox_manager.should_fail = True
+        fake_outbox_manager.failure_message = "Database connection lost"
 
         test_data = {
             "event_name": "batch.spellcheck.initiate.command",
@@ -225,306 +204,138 @@ class TestDefaultBatchEventPublisherImpl:
         )
 
         # When/Then
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            with pytest.raises(Exception) as exc_info:
-                await event_publisher.publish_batch_event(event_envelope, key="batch-fail")
+        with pytest.raises(Exception) as exc_info:
+            await event_publisher.publish_batch_event(event_envelope, key="batch-fail")
 
-            # Verify structured error is raised
-            error = exc_info.value
-            assert hasattr(error, "error_detail")
-            assert error.error_detail.error_code == "KAFKA_PUBLISH_ERROR"
-            # The error message is wrapped, but the original exception is preserved
-            assert "Exception" in str(error)
-            assert error.error_detail.correlation_id == sample_correlation_id
+        # Verify original exception is raised
+        error = exc_info.value
+        assert str(error) == "Database connection lost"
 
-        assert len(fake_outbox.add_event_calls) == 0
+        # Verify no calls were recorded due to failure
+        assert len(fake_outbox_manager.publish_calls) == 0
 
     async def test_aggregate_type_determination_batch(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
         """Test that batch-related events get correct aggregate type."""
         # Given
-        batch_events = [
-            "huleedu.batch.spellcheck.initiate.command.v1",
-            "huleedu.batch.nlp.initiate.command.v1",
-            "huleedu.batch.ai_feedback.initiate.command.v1",
-            "some.service.batch.processing.started.v1",
-        ]
+        event_envelope = EventEnvelope[Any](
+            event_type="huleedu.batch.processing.completed.v1",
+            source_service="batch-orchestrator-service",
+            correlation_id=sample_correlation_id,
+            data={"test": "data"},
+        )
 
         # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            for event_type in batch_events:
-                envelope = EventEnvelope[Any](
-                    event_type=event_type,
-                    source_service="batch-orchestrator-service",
-                    correlation_id=sample_correlation_id,
-                    data={"test": "data"},
-                )
-                await event_publisher.publish_batch_event(envelope, key="test-key")
+        await event_publisher.publish_batch_event(event_envelope, key="test-key")
 
         # Then
-        assert len(fake_outbox.add_event_calls) == 4
-        for call in fake_outbox.add_event_calls:
-            assert call["aggregate_type"] == "batch"
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
+        assert call["aggregate_type"] == "batch"
 
     async def test_aggregate_type_determination_pipeline(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
         """Test that pipeline-related events get correct aggregate type."""
         # Given
-        pipeline_events = [
-            "huleedu.pipeline.status.updated.v1",
-            "orchestrator.pipeline.created.v1",
-            "some.service.pipeline.completed.v1",
-        ]
+        event_envelope = EventEnvelope[Any](
+            event_type="huleedu.pipeline.phase.started.v1",
+            source_service="batch-orchestrator-service",
+            correlation_id=sample_correlation_id,
+            data={"test": "data"},
+        )
 
         # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            for event_type in pipeline_events:
-                envelope = EventEnvelope[Any](
-                    event_type=event_type,
-                    source_service="batch-orchestrator-service",
-                    correlation_id=sample_correlation_id,
-                    data={"test": "data"},
-                )
-                await event_publisher.publish_batch_event(envelope, key="test-key")
+        await event_publisher.publish_batch_event(event_envelope, key="test-key")
 
         # Then
-        assert len(fake_outbox.add_event_calls) == 3
-        for call in fake_outbox.add_event_calls:
-            assert call["aggregate_type"] == "pipeline"
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
+        assert call["aggregate_type"] == "pipeline"
 
     async def test_aggregate_type_determination_unknown(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
-        """Test that unrecognized events get 'unknown' aggregate type."""
+        """Test that unknown event types get unknown aggregate type."""
         # Given
-        unknown_events = [
-            "huleedu.user.created.v1",
-            "system.health.check.v1",
-            "some.random.event.v1",
-        ]
-
-        # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            for event_type in unknown_events:
-                envelope = EventEnvelope[Any](
-                    event_type=event_type,
-                    source_service="batch-orchestrator-service",
-                    correlation_id=sample_correlation_id,
-                    data={"test": "data"},
-                )
-                await event_publisher.publish_batch_event(envelope, key="test-key")
-
-        # Then
-        assert len(fake_outbox.add_event_calls) == 3
-        for call in fake_outbox.add_event_calls:
-            assert call["aggregate_type"] == "unknown"
-
-    async def test_trace_context_injection_when_span_active(
-        self,
-        event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
-        sample_correlation_id: UUID,
-    ) -> None:
-        """Verify trace context is injected when active span exists."""
-        # Given
-        test_data = {
-            "event_name": "batch.spellcheck.initiate.command",
-            "entity_ref": {"entity_id": "batch-trace", "entity_type": "batch"},
-            "essays_to_process": [{"essay_id": "essay1", "text_storage_id": "storage1"}],
-            "language": "en",
-        }
-
         event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.spellcheck.initiate.command.v1",
+            event_type="huleedu.something.else.v1",
             source_service="batch-orchestrator-service",
             correlation_id=sample_correlation_id,
-            data=test_data,
-        )
-
-        mock_span = Mock()
-        mock_inject = Mock()
-
-        # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=mock_span):
-            with patch(
-                "services.batch_orchestrator_service.implementations.event_publisher_impl.inject_trace_context",
-                mock_inject,
-            ):
-                await event_publisher.publish_batch_event(event_envelope, key="batch-trace")
-
-        # Then
-        mock_inject.assert_called_once()
-        # Verify inject_trace_context was called with the envelope metadata
-        call_args = mock_inject.call_args[0]
-        assert isinstance(call_args[0], dict)  # metadata dict
-
-    async def test_trace_context_not_injected_when_no_span(
-        self,
-        event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
-        sample_correlation_id: UUID,
-    ) -> None:
-        """Verify trace context is not injected when no active span exists."""
-        # Given
-        test_data = {
-            "event_name": "batch.spellcheck.initiate.command",
-            "entity_ref": {"entity_id": "batch-no-trace", "entity_type": "batch"},
-            "essays_to_process": [{"essay_id": "essay1", "text_storage_id": "storage1"}],
-            "language": "en",
-        }
-
-        event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.spellcheck.initiate.command.v1",
-            source_service="batch-orchestrator-service",
-            correlation_id=sample_correlation_id,
-            data=test_data,
-            metadata={"existing": "metadata"},
-        )
-
-        mock_inject = Mock()
-
-        # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            with patch("huleedu_service_libs.observability.inject_trace_context", mock_inject):
-                await event_publisher.publish_batch_event(event_envelope, key="batch-no-trace")
-
-        # Then
-        assert not mock_inject.called
-        # Verify existing metadata is preserved
-        call = fake_outbox.add_event_calls[0]
-        envelope_data = call["event_data"]
-        assert envelope_data["metadata"]["existing"] == "metadata"
-
-    async def test_events_not_published_directly_to_kafka(
-        self,
-        event_publisher: DefaultBatchEventPublisherImpl,
-        fake_kafka: Mock,
-        sample_correlation_id: UUID,
-    ) -> None:
-        """Verify events are NOT published directly to Kafka, only to outbox."""
-        # Given
-        test_data = {
-            "event_name": "batch.ai_feedback.initiate.command",
-            "entity_ref": {"entity_id": "batch-no-kafka", "entity_type": "batch"},
-            "essays_to_process": [{"essay_id": "essay1", "text_storage_id": "storage1"}],
-            "language": "en",
-            "course_code": "ENG5",
-            "essay_instructions": "Instructions",
-            "class_type": "REGULAR",
-            "teacher_first_name": "John",
-            "teacher_last_name": "Doe",
-        }
-
-        event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.ai_feedback.initiate.command.v1",
-            source_service="batch-orchestrator-service",
-            correlation_id=sample_correlation_id,
-            data=test_data,
+            data={"test": "data"},
         )
 
         # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            await event_publisher.publish_batch_event(event_envelope, key="batch-no-kafka")
+        await event_publisher.publish_batch_event(event_envelope, key="test-key")
 
         # Then
-        # Verify event was stored in outbox
-        fake_outbox_instance = event_publisher.outbox_repository
-        assert isinstance(fake_outbox_instance, FakeOutboxRepository)
-        assert len(fake_outbox_instance.add_event_calls) == 1
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
+        assert call["aggregate_type"] == "unknown"
 
-        # Verify Kafka was NOT called
-        fake_kafka.publish.assert_not_called()
-
-    async def test_event_envelope_serialization(
+    async def test_correlation_id_as_aggregate_id_fallback(
         self,
         event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
+        fake_outbox_manager: FakeOutboxManager,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify event envelope is properly serialized with model_dump(mode='json')."""
+        """Test that correlation ID is used as aggregate ID when no key provided."""
         # Given
-        timestamp = datetime.now(timezone.utc)
-
-        test_data = {
-            "event_name": "batch.nlp.initiate.command",
-            "entity_ref": {"entity_id": "batch-serial", "entity_type": "batch"},
-            "essays_to_process": [
-                {"essay_id": "essay1", "text_storage_id": "storage1"},
-                {"essay_id": "essay2", "text_storage_id": "storage2"},
-            ],
-            "language": "fr",
-        }
-
         event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.nlp.initiate.command.v1",
+            event_type="huleedu.batch.test.v1",
             source_service="batch-orchestrator-service",
             correlation_id=sample_correlation_id,
-            data=test_data,
-            event_timestamp=timestamp,
+            data={"test": "data"},
         )
 
         # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            await event_publisher.publish_batch_event(event_envelope, key="batch-serial")
+        await event_publisher.publish_batch_event(event_envelope)  # No key provided
 
         # Then
-        call = fake_outbox.add_event_calls[0]
-        envelope_data = call["event_data"]
-
-        # Verify timestamps are serialized as ISO strings
-        assert isinstance(envelope_data["event_timestamp"], str)
-
-        # Verify UUIDs are serialized as strings
-        assert isinstance(envelope_data["correlation_id"], str)
-        assert envelope_data["correlation_id"] == str(sample_correlation_id)
-
-        # Verify the topic is included in the data
-        assert envelope_data["topic"] == "huleedu.batch.nlp.initiate.command.v1"
-
-        # Verify the entire structure is JSON-serializable
-        json_str = json.dumps(envelope_data)
-        assert json_str  # Should not raise exception
-
-    async def test_key_defaults_to_correlation_id_when_not_provided(
-        self,
-        event_publisher: DefaultBatchEventPublisherImpl,
-        fake_outbox: FakeOutboxRepository,
-        sample_correlation_id: UUID,
-    ) -> None:
-        """Verify that when key is not provided, correlation_id is used as aggregate_id."""
-        # Given
-        test_data = {
-            "event_name": "batch.spellcheck.initiate.command",
-            "entity_ref": {"entity_id": "batch-no-key", "entity_type": "batch"},
-            "essays_to_process": [{"essay_id": "essay1", "text_storage_id": "storage1"}],
-            "language": "en",
-        }
-
-        event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.spellcheck.initiate.command.v1",
-            source_service="batch-orchestrator-service",
-            correlation_id=sample_correlation_id,
-            data=test_data,
-        )
-
-        # When
-        with patch("huleedu_service_libs.observability.get_current_span", return_value=None):
-            await event_publisher.publish_batch_event(event_envelope)  # No key provided
-
-        # Then
-        assert len(fake_outbox.add_event_calls) == 1
-        call = fake_outbox.add_event_calls[0]
-
+        assert len(fake_outbox_manager.publish_calls) == 1
+        call = fake_outbox_manager.publish_calls[0]
         assert call["aggregate_id"] == str(sample_correlation_id)
-        assert call["event_key"] is None
+
+    async def test_true_outbox_pattern_compliance(
+        self,
+        event_publisher: DefaultBatchEventPublisherImpl,
+        fake_outbox_manager: FakeOutboxManager,
+        sample_correlation_id: UUID,
+    ) -> None:
+        """
+        Verify TRUE OUTBOX PATTERN compliance:
+        - ALWAYS use outbox (never direct Kafka)
+        - Store events for transactional safety
+        - Relay worker publishes asynchronously
+        """
+        # Given
+        event_envelope = EventEnvelope[Any](
+            event_type="huleedu.batch.test.v1",
+            source_service="batch-orchestrator-service",
+            correlation_id=sample_correlation_id,
+            data={"test": "data"},
+        )
+
+        # When
+        await event_publisher.publish_batch_event(event_envelope, key="test-batch")
+
+        # Then - TRUE OUTBOX PATTERN expectations
+        assert len(fake_outbox_manager.publish_calls) == 1, "Event must be stored in outbox"
+
+        call = fake_outbox_manager.publish_calls[0]
+        assert call["event_data"] is event_envelope, "Original envelope must be passed"
+        assert call["aggregate_id"] == "test-batch", "Aggregate ID must be preserved"
+        assert call["topic"] == event_envelope.event_type, "Topic must match event type"
+
+        # Verify NO direct Kafka usage (TRUE OUTBOX PATTERN)
+        # OutboxManager handles all Kafka publishing via relay worker

@@ -106,7 +106,8 @@ class BatchPipelineStateManager:
                     return ProcessingPipelineState.model_validate(pipeline_config)
                 else:
                     self.logger.warning(
-                        f"Invalid pipeline configuration type for batch {batch_id}: {type(pipeline_config)}"
+                        f"Invalid pipeline configuration type for batch {batch_id}: "
+                        f"{type(pipeline_config)}"
                     )
                     return None
             except Exception as e:
@@ -138,7 +139,8 @@ class BatchPipelineStateManager:
                     self.logger.error(f"Batch {batch_id} not found for atomic phase update")
                     return False
 
-                # Check current pipeline state - convert from dict to ProcessingPipelineState if needed
+                # Check current pipeline state - convert from dict to
+                # ProcessingPipelineState if needed
                 current_pipeline_dict = batch.pipeline_configuration or {}
                 if current_pipeline_dict:
                     try:

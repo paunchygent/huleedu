@@ -149,8 +149,13 @@ class BatchRepositoryProtocol(Protocol):
 class BatchEventPublisherProtocol(Protocol):
     """Protocol for publishing batch-related events."""
 
-    async def publish_batch_event(self, event_envelope: Any, key: str | None = None) -> None:
-        """Publish a batch event to the appropriate Kafka topic."""
+    async def publish_batch_event(
+        self,
+        event_envelope: Any,
+        key: str | None = None,
+        session: Any | None = None,
+    ) -> None:
+        """Publish a batch event using TRUE OUTBOX PATTERN."""
         pass
 
 

@@ -262,17 +262,23 @@ class TestEventContractsV2:
 
     def test_model_validation_errors(self) -> None:
         """Test that models properly validate required fields and types."""
-        # Test missing required field
+        # Test missing required field (batch_id) using model_validate
+        invalid_data = {
+            "failed_essays": [],
+            "error_summary": {
+                "total_errors": 0,
+                "error_categories": {},
+            },
+            "correlation_id": str(uuid4()),
+            "metadata": {
+                "entity": {"entity_type": "batch", "entity_id": "test-batch-123"},
+                "processing_stage": "initialized",
+            },
+            # Missing batch_id field
+        }
+
         with pytest.raises(ValidationError) as exc_info:
-            BatchValidationErrorsV1(
-                # Missing batch_id
-                failed_essays=[],
-                error_summary=BatchErrorSummary(
-                    total_errors=0,
-                    error_categories={},
-                ),
-                correlation_id=uuid4(),
-            )
+            BatchValidationErrorsV1.model_validate(invalid_data)
 
         assert "batch_id" in str(exc_info.value)
 

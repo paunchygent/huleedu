@@ -91,7 +91,7 @@ async def validate_bcs_integration_occurred(
                     # The BCS-resolved pipeline is stored in 'requested_pipelines'
                     # This field contains the actual phases resolved by BCS
                     resolved_pipeline = pipeline_state.get("requested_pipelines", [])
-                    
+
                     # If requested_pipelines is empty, check for configured phases
                     # as fallback (for backwards compatibility with manual tests)
                     if not resolved_pipeline:

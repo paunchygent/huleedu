@@ -22,11 +22,11 @@ class DistributedStateManager:
     def __init__(self) -> None:
         self.redis_container = "huleedu_redis"
         self.kafka_container = "huleedu_kafka"
-        
+
         # Service health endpoints for coordination
         self.service_health_endpoints = {
             "essay_lifecycle_service": "http://localhost:5001/healthz",
-            "batch_orchestrator_service": "http://localhost:5002/healthz", 
+            "batch_orchestrator_service": "http://localhost:5002/healthz",
             "spellchecker_service": "http://localhost:5003/healthz",
             "cj_assessment_service": "http://localhost:5004/healthz",
             "result_aggregator_service": "http://localhost:5005/healthz",
@@ -35,27 +35,27 @@ class DistributedStateManager:
     async def _wait_for_services_idle(self, timeout_seconds: int = 10) -> bool:
         """
         Wait for all services to be in idle state (not actively processing events).
-        
+
         Uses service health endpoints to check processing status.
         Returns True if all services are idle, False if timeout.
         """
         start_time = time.time()
-        
+
         while (time.time() - start_time) < timeout_seconds:
             idle_services = []
-            
+
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
                 for service_name, health_url in self.service_health_endpoints.items():
                     try:
                         async with session.get(health_url) as response:
                             if response.status == 200:
                                 health_data = await response.json()
-                                
+
                                 # Check if service reports being idle
                                 # Most services report active processing in health endpoint
                                 processing_active = health_data.get("processing_active", False)
                                 active_consumers = health_data.get("active_consumers", 0)
-                                
+
                                 if not processing_active and active_consumers == 0:
                                     idle_services.append(service_name)
                                 else:
@@ -64,20 +64,22 @@ class DistributedStateManager:
                                         f"processing={processing_active}, consumers={active_consumers}"
                                     )
                             else:
-                                logger.debug(f"Service {service_name} health check failed: {response.status}")
-                                
+                                logger.debug(
+                                    f"Service {service_name} health check failed: {response.status}"
+                                )
+
                     except Exception as e:
                         logger.debug(f"Could not check {service_name} health: {e}")
                         # Assume service is idle if we can't reach it (might be stopped)
                         idle_services.append(service_name)
-            
+
             if len(idle_services) == len(self.service_health_endpoints):
                 logger.info(f"✅ All services are idle, proceeding with cleanup")
                 return True
-                
+
             # Brief delay before rechecking (much shorter than sleep anti-pattern)
             await asyncio.sleep(0.1)
-        
+
         active_services = set(self.service_health_endpoints.keys()) - set(idle_services)
         logger.warning(f"⚠️ Timeout waiting for services to be idle. Active: {active_services}")
         return False
@@ -85,7 +87,7 @@ class DistributedStateManager:
     async def _atomic_redis_cleanup(self) -> int:
         """
         Perform atomic Redis cleanup using transactions to handle concurrent modifications.
-        
+
         Returns number of keys cleared.
         """
         # Atomic cleanup script that handles concurrent modifications
@@ -111,23 +113,28 @@ class DistributedStateManager:
             
             return total_deleted
         """
-        
+
         try:
             clear_cmd = [
-                "docker", "exec", self.redis_container,
-                "redis-cli", "EVAL", atomic_cleanup_script, "0"
+                "docker",
+                "exec",
+                self.redis_container,
+                "redis-cli",
+                "EVAL",
+                atomic_cleanup_script,
+                "0",
             ]
-            
+
             result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
             cleared_count = int(result.stdout.strip())
-            
+
             if cleared_count > 0:
                 logger.info(f"🗑️ Atomically cleared {cleared_count} Redis idempotency keys")
             else:
                 logger.info("✅ No Redis idempotency keys to clear")
-            
+
             return cleared_count
-            
+
         except subprocess.CalledProcessError as e:
             logger.warning(f"⚠️ Failed atomic Redis cleanup: {e.stderr}")
             raise
@@ -142,7 +149,7 @@ class DistributedStateManager:
         Ensure clean distributed system state using proper coordination.
 
         Uses service health endpoints to coordinate cleanup instead of sleep() anti-pattern.
-        
+
         Args:
             test_name: Name of the test for logging
             clear_redis: Whether to clear Redis idempotency keys
@@ -163,7 +170,6 @@ class DistributedStateManager:
             await self._reset_kafka_consumer_offsets()
 
         logger.info(f"✅ Coordinated cleanup completed for test: {test_name}")
-
 
     async def _reset_kafka_consumer_offsets(self) -> None:
         """Reset Kafka consumer offsets to skip old events from previous test runs.
@@ -295,7 +301,7 @@ class DistributedStateManager:
     async def ensure_verified_clean_state(self, test_name: str) -> dict[str, Any]:
         """
         Ensure clean state with proper service coordination and verification.
-        
+
         Eliminates sleep() anti-patterns by using deterministic service coordination.
 
         Returns:
@@ -304,16 +310,18 @@ class DistributedStateManager:
         max_attempts = 3  # Reduced attempts - proper coordination should work on first try
 
         for attempt in range(max_attempts):
-            logger.info(f"🧹 Coordinated cleanup attempt {attempt + 1}/{max_attempts} for test: {test_name}")
-            
+            logger.info(
+                f"🧹 Coordinated cleanup attempt {attempt + 1}/{max_attempts} for test: {test_name}"
+            )
+
             # Step 1: Ensure services are idle before cleanup
             services_idle = await self._wait_for_services_idle(timeout_seconds=20)
             if not services_idle:
                 logger.warning("⚠️ Services not idle, proceeding with cleanup anyway")
-            
+
             # Step 2: Perform atomic cleanup with proper coordination
             await self.ensure_clean_test_environment(test_name)
-            
+
             # Step 3: Immediate verification (no artificial delays)
             validation = await self.validate_clean_state()
 
@@ -330,7 +338,7 @@ class DistributedStateManager:
                     f"⚠️ State not clean after coordinated attempt {attempt + 1}: "
                     f"found {key_count} keys, samples: {sample_keys[:3]}"
                 )
-                
+
                 # If cleanup failed, wait for services to settle before retry
                 if attempt < max_attempts - 1:
                     logger.info("🔄 Waiting for services to settle before retry...")

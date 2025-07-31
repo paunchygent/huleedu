@@ -47,6 +47,7 @@ from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.event_publisher_impl import (
     DefaultBatchEventPublisherImpl,
 )
+from services.batch_orchestrator_service.implementations.outbox_manager import OutboxManager
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 
@@ -72,8 +73,8 @@ class OutboxTestProvider(Provider):
         return self._kafka_publisher
 
     @provide(scope=Scope.APP)
-    def provide_settings(self) -> Settings:
-        """Provide test settings."""
+    def provide_settings(self) -> Any:
+        """Provide test settings (mock object with custom attributes)."""
         return self._settings
 
     @provide(scope=Scope.APP)
@@ -85,10 +86,9 @@ class OutboxTestProvider(Provider):
     def provide_outbox_settings(self) -> OutboxSettings:
         """Provide outbox settings."""
         return OutboxSettings(
-            poll_interval=self._settings.OUTBOX_POLL_INTERVAL,
-            batch_size=self._settings.OUTBOX_BATCH_SIZE,
-            max_retries=self._settings.OUTBOX_MAX_RETRIES,
-            processing_timeout=self._settings.OUTBOX_PROCESSING_TIMEOUT,
+            poll_interval_seconds=5.0,
+            batch_size=100,
+            max_retries=3,
         )
 
     @provide(scope=Scope.APP)
@@ -101,18 +101,24 @@ class OutboxTestProvider(Provider):
         """Provide mock Redis client."""
         return self._redis_client
 
+    @provide(scope=Scope.APP)
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Any,
+    ) -> OutboxManager:
+        """Provide outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
     @provide(scope=Scope.REQUEST)
     def provide_event_publisher(
         self,
-        kafka_publisher: KafkaPublisherProtocol,
-        outbox_repository: OutboxRepositoryProtocol,
-        redis_client: AtomicRedisClientProtocol,
-        settings: Settings,
+        outbox_manager: OutboxManager,
+        settings: Any,
     ) -> BatchEventPublisherProtocol:
         """Provide event publisher with outbox support."""
-        return DefaultBatchEventPublisherImpl(
-            kafka_publisher, outbox_repository, redis_client, settings
-        )
+        return DefaultBatchEventPublisherImpl(outbox_manager, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_relay_worker(
@@ -307,23 +313,19 @@ class TestOutboxPatternIntegration:
                 await relay_worker.start()
 
                 try:
-                    # Wait for first batch (5 events)
+                    # Wait for all events to be processed (relay worker processes continuously)
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 5, timeout=1.0
-                    )
-                    assert len(mock_kafka_publisher.published_events) == 5
-
-                    # Wait for second batch (10 events total)
-                    await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 10, timeout=1.0
-                    )
-                    assert len(mock_kafka_publisher.published_events) == 10
-
-                    # Wait for final batch (15 events total)
-                    await self.wait_for_condition(
-                        lambda: len(mock_kafka_publisher.published_events) >= 15, timeout=1.0
+                        lambda: len(mock_kafka_publisher.published_events) >= 15, timeout=2.0
                     )
                     assert len(mock_kafka_publisher.published_events) == 15
+                    
+                    # Verify all events were published with correct data
+                    published_event_ids = {
+                        event["envelope"].data["entity_ref"]["entity_id"]
+                        for event in mock_kafka_publisher.published_events
+                    }
+                    expected_event_ids = {f"batch-{i}" for i in range(15)}
+                    assert published_event_ids == expected_event_ids
 
                 finally:
                     # Always stop the worker

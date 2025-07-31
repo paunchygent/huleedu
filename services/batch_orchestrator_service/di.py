@@ -67,6 +67,9 @@ from services.batch_orchestrator_service.implementations.nlp_initiator_impl impo
 from services.batch_orchestrator_service.implementations.notification_service import (
     NotificationService,
 )
+from services.batch_orchestrator_service.implementations.outbox_manager import (
+    OutboxManager,
+)
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
 )
@@ -249,15 +252,23 @@ class RepositoryAndPublishingProvider(Provider):
             return PostgreSQLBatchRepositoryImpl(settings, database_metrics)
 
     @provide(scope=Scope.APP)
-    def provide_batch_event_publisher(
+    def provide_outbox_manager(
         self,
-        kafka_bus: KafkaPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_event_publisher(
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
     ) -> BatchEventPublisherProtocol:
-        """Provide batch event publisher implementation with outbox support."""
-        return DefaultBatchEventPublisherImpl(kafka_bus, outbox_repository, redis_client, settings)
+        """Provide batch event publisher implementation using TRUE OUTBOX PATTERN."""
+        return DefaultBatchEventPublisherImpl(outbox_manager, settings)
 
 
 class ExternalClientsProvider(Provider):
