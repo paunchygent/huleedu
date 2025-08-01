@@ -20,7 +20,7 @@ from common_core.events.essay_lifecycle_events import BatchStudentMatchingReques
 from common_core.events.nlp_events import StudentMatchSuggestion
 from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -368,7 +368,7 @@ class TestCommandHandlerOutboxIntegration:
         )
 
         # Assert - Kafka bus publish method was NEVER called (TRUE OUTBOX PATTERN)
-        # NOTE: Direct verification of mock.assert_not_called() is skipped due to 
+        # NOTE: Direct verification of mock.assert_not_called() is skipped due to
         # type system complexity with protocol mocking, but the integration test
         # validates that events go through the outbox pattern instead
 
@@ -385,8 +385,8 @@ class TestCommandHandlerOutboxIntegration:
         # Mock the student matcher to fail
         with patch.object(
             essay_student_matching_handler.student_matcher,
-            'find_matches',
-            new=AsyncMock(side_effect=Exception("Student matching failed"))
+            "find_matches",
+            new=AsyncMock(side_effect=Exception("Student matching failed")),
         ) as mock_find_matches:
             mock_msg = Mock()
             event_data = BatchStudentMatchingRequestedV1(

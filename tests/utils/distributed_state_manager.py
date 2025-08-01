@@ -8,10 +8,12 @@ idempotency collisions and ensure clean test environments.
 import asyncio
 import subprocess
 import time
-from typing import Any
+from typing import Any, Dict
 
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
+
+from .service_discovery import ServiceDiscovery
 
 logger = create_service_logger("test.distributed_state")
 
@@ -22,30 +24,28 @@ class DistributedStateManager:
     def __init__(self) -> None:
         self.redis_container = "huleedu_redis"
         self.kafka_container = "huleedu_kafka"
-
-        # Service health endpoints for coordination
-        self.service_health_endpoints = {
-            "essay_lifecycle_service": "http://localhost:5001/healthz",
-            "batch_orchestrator_service": "http://localhost:5002/healthz",
-            "spellchecker_service": "http://localhost:5003/healthz",
-            "cj_assessment_service": "http://localhost:5004/healthz",
-            "result_aggregator_service": "http://localhost:5005/healthz",
-        }
+        self._discovery = ServiceDiscovery()
+        self._endpoints: Dict[str, str] = {}
 
     async def _wait_for_services_idle(self, timeout_seconds: int = 10) -> bool:
         """
         Wait for all services to be in idle state (not actively processing events).
 
-        Uses service health endpoints to check processing status.
+        Uses dynamically discovered service endpoints to check processing status.
         Returns True if all services are idle, False if timeout.
         """
+        # Discover endpoints if not already done
+        if not self._endpoints:
+            self._endpoints = self._discovery.discover_endpoints()
+            logger.info(f"Discovered {len(self._endpoints)} service endpoints")
+
         start_time = time.time()
 
         while (time.time() - start_time) < timeout_seconds:
             idle_services = []
 
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
-                for service_name, health_url in self.service_health_endpoints.items():
+                for service_name, health_url in self._endpoints.items():
                     try:
                         async with session.get(health_url) as response:
                             if response.status == 200:
@@ -73,14 +73,14 @@ class DistributedStateManager:
                         # Assume service is idle if we can't reach it (might be stopped)
                         idle_services.append(service_name)
 
-            if len(idle_services) == len(self.service_health_endpoints):
+            if len(idle_services) == len(self._endpoints):
                 logger.info("✅ All services are idle, proceeding with cleanup")
                 return True
 
             # Brief delay before rechecking (much shorter than sleep anti-pattern)
             await asyncio.sleep(0.1)
 
-        active_services = set(self.service_health_endpoints.keys()) - set(idle_services)
+        active_services = set(self._endpoints.keys()) - set(idle_services)
         logger.warning(f"⚠️ Timeout waiting for services to be idle. Active: {active_services}")
         return False
 
@@ -158,7 +158,7 @@ class DistributedStateManager:
         """
         Ensure clean distributed system state using proper coordination.
 
-        Uses service health endpoints to coordinate cleanup instead of sleep() anti-pattern.
+        Uses dynamically discovered service endpoints to coordinate cleanup.
 
         Args:
             test_name: Name of the test for logging
@@ -166,6 +166,11 @@ class DistributedStateManager:
             reset_kafka_offsets: Whether to reset Kafka consumer offsets
         """
         logger.info(f"🧹 Coordinated cleanup starting for test: {test_name}")
+
+        # Discover endpoints if not already done
+        if not self._endpoints:
+            self._endpoints = self._discovery.discover_endpoints()
+            logger.info(f"Discovered {len(self._endpoints)} service endpoints")
 
         if clear_redis:
             # Step 1: Wait for services to be idle (no sleep anti-pattern)

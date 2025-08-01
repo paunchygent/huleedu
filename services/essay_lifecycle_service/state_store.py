@@ -111,11 +111,11 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
             essay_id = essay_dict.get("essay_id")
             if essay_id is None:
                 raise ValueError("essay_id cannot be None")
-            
+
             entity_type = essay_dict.get("entity_type", "essay")
             if entity_type is None:
                 entity_type = "essay"  # Fallback to default
-                
+
             result = await self.crud_ops.create_essay_record(
                 essay_id=essay_id,
                 batch_id=essay_dict.get("batch_id"),

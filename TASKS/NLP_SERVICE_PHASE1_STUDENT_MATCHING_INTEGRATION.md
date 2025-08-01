@@ -176,7 +176,9 @@ class BatchStudentMatchingRequestedV1(BaseModel):
     """Batch-level request from ELS to NLP Service for Phase 1 student matching."""
     
     event_name: ProcessingEvent = ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
-    entity_ref: EntityReference  # Batch reference
+    entity_id: str  # Batch ID
+    entity_type: str = "batch"
+    parent_id: str | None = None
     batch_id: str
     essays_to_process: list[EssayProcessingInputRefV1]  # All essays in batch
     class_id: str
@@ -198,7 +200,9 @@ class BatchAuthorMatchesSuggestedV1(BaseModel):
     """Batch-level NLP Service suggestions for essay-student matching."""
     
     event_name: ProcessingEvent = ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
-    entity_ref: EntityReference  # Essay reference
+    entity_id: str  # Essay ID
+    entity_type: str = "essay"
+    parent_id: str | None = None
     batch_id: str
     essay_id: str
     class_id: str
@@ -407,15 +411,17 @@ class StudentMatchingCommandHandler:
         """Dispatch batch-level student matching request."""
         # 1. Update batch state to AWAITING_STUDENT_ASSOCIATIONS
         await self.batch_tracker.update_batch_state(
-            batch_id=command_data.entity_ref.entity_id,
+            batch_id=command_data.batch_id,
             state="AWAITING_STUDENT_ASSOCIATIONS",
         )
         
         # 2. Create single batch-level event
         batch_matching_request = BatchStudentMatchingRequestedV1(
             event_name=ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED,
-            entity_ref=command_data.entity_ref,
-            batch_id=command_data.entity_ref.entity_id,
+            entity_id=command_data.batch_id,
+            entity_type="batch",
+            parent_id=None,
+            batch_id=command_data.batch_id,
             essays_to_process=command_data.essays_to_process,
             class_id=command_data.class_id,
         )
@@ -431,17 +437,17 @@ class StudentMatchingCommandHandler:
         
         # 4. Store in outbox for reliable delivery
         await self.outbox_repository.add_event(
-            aggregate_id=command_data.entity_ref.entity_id,
+            aggregate_id=command_data.batch_id,
             aggregate_type="batch",
             event_type=envelope.event_type,
             event_data=envelope.model_dump(mode="json"),
             topic=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
-            event_key=command_data.entity_ref.entity_id,
+            event_key=command_data.batch_id,
         )
         
         # 5. Set timeout timer for 24 hours
         await self.batch_tracker.set_association_timeout(
-            batch_id=command_data.entity_ref.entity_id,
+            batch_id=command_data.batch_id,
             timeout_seconds=86400,  # 24 hours
         )
 ```
@@ -543,7 +549,9 @@ class BatchStudentMatchingHandler:
         # 3. Create batch response
         batch_matches = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            entity_ref=event_data.entity_ref,
+            entity_id=event_data.batch_id,
+            entity_type="batch",
+            parent_id=None,
             batch_id=event_data.batch_id,
             class_id=event_data.class_id,
             match_results=match_results,

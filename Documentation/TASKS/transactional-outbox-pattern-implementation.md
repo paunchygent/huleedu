@@ -138,16 +138,18 @@ class EssayRepositoryProtocol(Protocol):
     
     async def create_essay_record(
         self, 
-        essay_ref: EntityReference, 
+        essay_id: str,
+        entity_type: str,
+        parent_id: str | None = None,
         correlation_id: UUID | None = None,
         session: AsyncSession,  # NEW REQUIRED PARAMETER
     ) -> EssayState:
-        """Create new essay record from entity reference."""
+        """Create new essay record from primitive parameters."""
         ...
     
     async def create_essay_records_batch(
         self, 
-        essay_refs: list[EntityReference], 
+        essay_data: list[dict[str, str | None]], 
         correlation_id: UUID | None = None,
         session: AsyncSession,  # NEW REQUIRED PARAMETER
     ) -> list[EssayState]:
@@ -320,17 +322,17 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     await self.batch_tracker.register_batch(event_data, correlation_id)
                     
                     # Create essay records in database
-                    essay_refs = [
-                        EntityReference(
-                            entity_id=essay_id, 
-                            entity_type="essay", 
-                            parent_id=event_data.batch_id
-                        )
+                    essay_data = [
+                        {
+                            "essay_id": essay_id,
+                            "entity_type": "essay",
+                            "parent_id": event_data.batch_id
+                        }
                         for essay_id in event_data.essay_ids
                     ]
                     
                     await self.repository.create_essay_records_batch(
-                        essay_refs, 
+                        essay_data, 
                         correlation_id=correlation_id,
                         session=session  # PASS SESSION
                     )
@@ -527,10 +529,8 @@ class SpellcheckCommandHandler:
                         
                         # Publish status update event
                         await self.event_publisher.publish_status_update(
-                            essay_ref=EntityReference(
-                                entity_id=essay.essay_id,
-                                entity_type="essay"
-                            ),
+                            essay_id=essay.essay_id,
+                            batch_id=batch_id,
                             status=EssayStatus.SPELLCHECK_IN_PROGRESS,
                             correlation_id=correlation_id,
                             session=session  # PASS SESSION
@@ -605,10 +605,8 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 
                 # Publish status update
                 await self.event_publisher.publish_status_update(
-                    essay_ref=EntityReference(
-                        entity_id=result_data.essay_id,
-                        entity_type="essay"
-                    ),
+                    essay_id=result_data.essay_id,
+                    batch_id=essay_state.batch_id if essay_state else None,
                     status=new_status,
                     correlation_id=correlation_id,
                     session=session  # PASS SESSION
@@ -745,7 +743,8 @@ class SomeHandler:
         
         # Transaction 2: Publish event
         await self.event_publisher.publish_status_update(
-            essay_ref=EntityReference(entity_id=data.essay_id, entity_type="essay"),
+            essay_id=data.essay_id,
+            batch_id=data.batch_id,
             status=EssayStatus.PROCESSING,
             correlation_id=correlation_id
         )
@@ -777,7 +776,8 @@ class SomeHandler:
                 )
                 
                 await self.event_publisher.publish_status_update(
-                    essay_ref=EntityReference(entity_id=data.essay_id, entity_type="essay"),
+                    essay_id=data.essay_id,
+                    batch_id=data.batch_id,
                     status=EssayStatus.PROCESSING,
                     correlation_id=correlation_id,
                     session=session  # SAME SESSION

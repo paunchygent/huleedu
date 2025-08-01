@@ -13,10 +13,10 @@ from typing import Any
 
 def is_related_to_batch(event_data: dict[str, Any], batch_id: str, correlation_id: str) -> bool:
     """Check if event is related to our test batch or correlation ID."""
-    # Check data field for batch_id
+    # Check data field for batch_id (supports both entity_id and batch_id fields)
     data = event_data.get("data", {})
     if isinstance(data, dict):
-        if data.get("batch_id") == batch_id:
+        if data.get("entity_id") == batch_id or data.get("batch_id") == batch_id:
             return True
 
     # Check correlation_id

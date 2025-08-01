@@ -1,8 +1,14 @@
 # Priority 1 Critical Refactoring Guide
 
+**STATUS**: ✅ PARTIALLY COMPLETED  
+**ENTITY REFERENCE ELIMINATION**: ✅ COMPLETED (2025-08-01)  
+**REMAINING TASK**: Batch Orchestrator backwards compatibility removal
+
 ## Executive Summary
 
 This guide provides a complete analysis and step-by-step refactoring plan for eliminating backwards compatibility patterns and legacy code from the HuleEdu platform. The refactoring follows a CLEAN BREAK approach with NO backwards compatibility as per project mandates.
+
+**UPDATE**: EntityReference elimination has been completed via commit `6d29985 refactor: remove EntityReference model in favor of primitive parameters`. All EntityReference usage has been replaced with primitive parameters across the codebase.
 
 ## 1. Remove All Backwards Compatibility in Batch Orchestrator
 
@@ -230,7 +236,8 @@ class BatchEssaysReadyV2(BaseModel):
     event: str = Field(default="batch.essays.ready.v2")
     batch_id: str
     ready_essays: list[EssayProcessingInputRefV1]
-    batch_entity: EntityReference
+    batch_id: str
+    entity_type: str = "batch"
     metadata: SystemProcessingMetadata
     
     # Educational context (no legacy error fields)
@@ -340,7 +347,8 @@ class TestEventContractsV2:
         event = BatchEssaysReadyV2(
             batch_id="test",
             ready_essays=[],
-            batch_entity=EntityReference(entity_type="batch", entity_id="test"),
+            batch_id="test",
+            entity_type="batch",
             metadata=SystemProcessingMetadata(...),
             course_code=CourseCode.EN_101,
             course_language="english",
@@ -410,7 +418,8 @@ class BatchEssaysReadyV2(BaseModel):
     event: str = Field(default="batch.essays.ready.v2")
     batch_id: str
     ready_essays: list[EssayProcessingInputRefV1]
-    batch_entity: EntityReference
+    batch_id: str
+    entity_type: str = "batch"
     metadata: SystemProcessingMetadata
     
     # Educational context (clean)
@@ -464,7 +473,8 @@ async def _publish_batch_ready_events(
         ready_event = BatchEssaysReadyV2(
             batch_id=batch_id,
             ready_essays=ready_essays,
-            batch_entity=EntityReference(entity_type="batch", entity_id=batch_id),
+            batch_id=batch_id,
+            entity_type="batch",
             metadata=SystemProcessingMetadata(
                 correlation_id=self.correlation_id,
                 causation_id=str(uuid4()),

@@ -163,7 +163,7 @@ class TestFileTraceabilityE2E:
 
             # Validate batch registration
             assert batch_registered_event is not None, "BatchEssaysRegistered event not found"
-            assert batch_registered_event["data"]["batch_id"] == batch_id
+            assert batch_registered_event["data"]["entity_id"] == batch_id
             assert len(batch_registered_event["data"]["essay_ids"]) == 3
 
             # Validate content provisioned
@@ -171,7 +171,7 @@ class TestFileTraceabilityE2E:
                 "EssayContentProvisionedV1 event not found"
             )
             content_data = content_provisioned_event["data"]
-            assert content_data["batch_id"] == batch_id
+            assert content_data["entity_id"] == batch_id
             assert content_data["file_upload_id"] == file_upload_id
             assert content_data["original_file_name"] == "test_essay.txt"
 

@@ -85,7 +85,7 @@ async def test_file_service_events_contain_raw_storage_id():
                 event_data = message_value.get("data", {})
 
                 # Check if this is our event
-                if event_data.get("batch_id") == batch_id:
+                if event_data.get("entity_id") == batch_id:
                     print(f"📨 Received event for batch {batch_id}")
 
                     # Validate event structure
@@ -98,7 +98,7 @@ async def test_file_service_events_contain_raw_storage_id():
                             "Missing text_storage_id in success event"
                         )
                         assert event_data["original_file_name"] == test_file_path.name
-                        assert event_data["batch_id"] == batch_id
+                        assert event_data["entity_id"] == batch_id
 
                         print("✅ EssayContentProvisionedV1 event validated:")
                         print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")
@@ -192,7 +192,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
 
                 # Check if this is our validation failure event
                 if (
-                    event_data.get("batch_id") == batch_id
+                    event_data.get("entity_id") == batch_id
                     and event_data.get("original_file_name") == "empty_essay.txt"
                 ):
                     print(f"📨 Received validation failure event for batch {batch_id}")
@@ -209,7 +209,7 @@ async def test_file_service_validation_failure_contains_raw_storage_id():
                     assert "message" in event_data["validation_error_detail"], (
                         "Missing message in validation_error_detail"
                     )
-                    assert event_data["batch_id"] == batch_id
+                    assert event_data["entity_id"] == batch_id
 
                     print("✅ Found validation failure event with raw_file_storage_id")
                     print(f"   - raw_file_storage_id: {event_data['raw_file_storage_id']}")

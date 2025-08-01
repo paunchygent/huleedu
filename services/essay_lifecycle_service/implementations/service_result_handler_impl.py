@@ -373,7 +373,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             extra={"correlation_id": str(correlation_id)},
                         )
                         return False
-                    
+
                     batch_status_summary = await self.repository.get_batch_status_summary(
                         result_data.entity_id
                     )
@@ -483,7 +483,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             extra={"correlation_id": str(correlation_id)},
                         )
                         return False
-                    
+
                     batch_essays = await self.repository.list_essays_by_batch(result_data.entity_id)
 
                     for essay_state in batch_essays:

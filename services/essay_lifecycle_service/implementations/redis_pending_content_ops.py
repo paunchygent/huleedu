@@ -7,14 +7,15 @@ Handles content that arrives before batch registration.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable
 from datetime import UTC, datetime
-from typing import Any, Awaitable, Union
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 
-async def _ensure_awaitable(result: Union[Awaitable[Any], Any]) -> Any:
+async def _ensure_awaitable(result: Awaitable[Any] | Any) -> Any:
     """Ensure a redis result is properly awaited if it's awaitable."""
     if hasattr(result, "__await__"):
         return await result

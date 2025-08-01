@@ -105,7 +105,9 @@ class CircuitBreaker:
 
         return self._lazy_tracer
 
-    async def call(self, func: Callable[..., T] | Callable[..., Coroutine[Any, Any, T]], *args, **kwargs) -> T:
+    async def call(
+        self, func: Callable[..., T] | Callable[..., Coroutine[Any, Any, T]], *args, **kwargs
+    ) -> T:
         """
         Execute function with circuit breaker protection.
 

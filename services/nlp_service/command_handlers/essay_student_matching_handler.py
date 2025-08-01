@@ -203,7 +203,9 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                 },
             )
 
-            return processed_count > 0  # Return True if at least one essay was processed successfully
+            return (
+                processed_count > 0
+            )  # Return True if at least one essay was processed successfully
 
         except HuleEduError:
             # Re-raise HuleEdu errors as-is

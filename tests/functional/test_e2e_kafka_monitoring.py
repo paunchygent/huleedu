@@ -74,7 +74,7 @@ class TestE2EKafkaMonitoring:
             # Collect events using KafkaTestManager utility
             def event_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
-                return "data" in event_data and event_data["data"].get("batch_id") == batch_id
+                return "data" in event_data and event_data["data"].get("entity_id") == batch_id
 
             try:
                 events = await kafka_manager.collect_events(
@@ -104,8 +104,8 @@ class TestE2EKafkaMonitoring:
                 # Validate EssayContentProvisionedV1 data
                 content_data = envelope_data["data"]
 
-                assert content_data["batch_id"] == batch_id, (
-                    f"Event batch_id {content_data['batch_id']} doesn't match expected {batch_id}"
+                assert content_data["entity_id"] == batch_id, (
+                    f"Event entity_id {content_data['entity_id']} doesn't match expected {batch_id}"
                 )
                 assert content_data["original_file_name"] == test_file_path.name, (
                     f"Unexpected filename: {content_data['original_file_name']}"
@@ -199,7 +199,7 @@ class TestE2EKafkaMonitoring:
             # Collect events for all uploaded files using KafkaTestManager
             def event_filter(event_data: dict[str, Any]) -> bool:
                 """Filter for our specific batch (matching batch_id)."""
-                return "data" in event_data and event_data["data"].get("batch_id") == batch_id
+                return "data" in event_data and event_data["data"].get("entity_id") == batch_id
 
             try:
                 events = await kafka_manager.collect_events(
@@ -229,7 +229,7 @@ class TestE2EKafkaMonitoring:
                 # Validate all events have same batch_id and unique storage IDs
                 storage_ids = set()
                 for i, event_data in enumerate(event_data_list):
-                    assert event_data["batch_id"] == batch_id
+                    assert event_data["entity_id"] == batch_id
                     assert event_data["text_storage_id"]  # Should exist
 
                     storage_id = event_data["text_storage_id"]

@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.event_enums import ProcessingEvent
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
     EssayMatchResult,
@@ -95,9 +94,7 @@ class TestTrueOutboxPatternCompliance:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == essay_id
-        assert (
-            call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
-        )
+        assert call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
         assert call_args.kwargs["topic"] == "huleedu.nlp.batch.author.matches.suggested.v1"
 
         # Verify original Pydantic envelope is passed (not reconstructed dict)

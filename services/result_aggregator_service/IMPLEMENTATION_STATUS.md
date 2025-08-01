@@ -137,8 +137,8 @@ The Result Aggregator Service has been implemented as a hybrid Kafka consumer + 
 **Fixed event attribute mismatches:**
 - `ELSBatchPhaseOutcomeV1`: Fixed to use `phase_name.value` instead of `phase`
 - `SpellcheckResultDataV1`: Fixed to extract entity from `system_metadata.entity`
-- Proper handling of `EntityReference` objects from common_core
-- Removed hardcoded entity_ref string parsing
+- **UPDATE (2025-08-01)**: EntityReference has been completely eliminated from the codebase in favor of primitive parameters (`entity_id: str`, `entity_type: str`, `parent_id: str | None = None`)
+- Event processing now uses primitive fields directly from SystemProcessingMetadata
 
 ### 4. Configuration Issues - FIXED
 
@@ -175,7 +175,7 @@ The Result Aggregator Service has been implemented as a hybrid Kafka consumer + 
 2. **HIGH**: Add integration tests for event processing
 3. ~~**HIGH**: Fix type annotations and resolve MyPy errors~~ ✅ DONE
 4. **MEDIUM**: Add proper startup coordination
-5. ~~**MEDIUM**: Define entity_ref format contract~~ ✅ DONE (using EntityReference from common_core)
+5. ~~**MEDIUM**: Define entity_ref format contract~~ ✅ DONE (EntityReference eliminated - now uses primitive parameters)
 6. **LOW**: Add comprehensive unit tests
 7. **LOW**: Implement Alembic migrations
 
@@ -204,6 +204,7 @@ The Result Aggregator Service is now **functionally complete and properly archit
 2. **100% Type Safe**: Zero MyPy errors, removed all `type: ignore` comments
 3. **Event Processing Fixed**: Properly handles all event structures from common_core
 4. **Performance Goals Achieved**: Cache now works correctly, reducing database load
+5. **EntityReference Eliminated (2025-08-01)**: Updated to use primitive parameters directly from SystemProcessingMetadata
 
 ### Remaining Work:
 

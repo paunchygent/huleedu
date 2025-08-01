@@ -141,15 +141,17 @@ class EnhancedBatchTracker:
             await _ensure_awaitable(self.redis.sadd(f"batch:{batch_id}:available_slots", essay_id))
 
         # Store batch metadata
-        await _ensure_awaitable(self.redis.hset(
-            f"batch:{batch_id}:metadata",
-            mapping={
-                "expected_count": str(event.expected_essay_count),
-                "status": "registered",
-                "correlation_id": str(correlation_id),
-                "course_code": event.course_code.value,
-            },
-        ))
+        await _ensure_awaitable(
+            self.redis.hset(
+                f"batch:{batch_id}:metadata",
+                mapping={
+                    "expected_count": str(event.expected_essay_count),
+                    "status": "registered",
+                    "correlation_id": str(correlation_id),
+                    "course_code": event.course_code.value,
+                },
+            )
+        )
 
         self.events_processed.append(("BatchEssaysRegistered", batch_id))
         self.logger.info(f"✅ Registered batch {batch_id} with {event.expected_essay_count} slots")
@@ -175,7 +177,9 @@ class EnhancedBatchTracker:
 
         if slot:
             # Successfully assigned
-            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id))
+            await _ensure_awaitable(
+                self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id)
+            )
 
             # Remove from pending
             await self.pending_manager.remove_pending_content(batch_id, text_storage_id)
@@ -247,7 +251,9 @@ class EnhancedBatchTracker:
 
         if slot:
             # Successfully assigned
-            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id))
+            await _ensure_awaitable(
+                self.redis.hset(f"batch:{batch_id}:assignments", slot.decode(), text_storage_id)
+            )
 
             self.events_processed.append(
                 ("EssayContentProvisioned", f"{text_storage_id} -> ASSIGNED to {slot.decode()}")
@@ -281,7 +287,9 @@ class EnhancedBatchTracker:
     async def _check_batch_completion(self, batch_id: str) -> None:
         """Check if batch is complete and log the event."""
         assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
-        expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+        expected_count_raw = await _ensure_awaitable(
+            self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")
+        )
         expected_count = int(expected_count_raw.decode())
 
         if assigned_count == expected_count:

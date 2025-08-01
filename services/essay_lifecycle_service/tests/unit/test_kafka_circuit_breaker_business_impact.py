@@ -14,8 +14,6 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 import pytest
 from aiokafka.errors import KafkaError
 from common_core.domain_enums import CourseCode, Language
@@ -30,6 +28,7 @@ from huleedu_service_libs.error_handling import HuleEduError, raise_external_ser
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
@@ -198,8 +197,8 @@ class TestBatchCoordinationBusinessImpact:
 
         async def fail_with_external_error(
             event_data: Any | None = None,
-            correlation_id: UUID | None = None, 
-            session: AsyncSession | None = None
+            correlation_id: UUID | None = None,
+            session: AsyncSession | None = None,
         ) -> None:
             raise_external_service_error(
                 service="essay_lifecycle_service",
@@ -311,7 +310,7 @@ class TestBatchCoordinationBusinessImpact:
         async def fail_on_batch_ready(
             event_data: Any | None = None,
             correlation_id: UUID | None = None,
-            session: AsyncSession | None = None
+            session: AsyncSession | None = None,
         ) -> None:
             from huleedu_service_libs.error_handling import raise_external_service_error
 

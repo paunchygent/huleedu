@@ -25,9 +25,21 @@ async def clean_distributed_state():
     """
     from tests.utils.distributed_state_manager import distributed_state_manager
 
-    # Use verified cleanup with retry logic to handle race conditions
-    await distributed_state_manager.ensure_verified_clean_state("comprehensive_test")
-    yield
+    try:
+        # Use verified cleanup with retry logic to handle race conditions
+        await distributed_state_manager.ensure_verified_clean_state("comprehensive_test")
+        yield
+    except RuntimeError as e:
+        # Provide helpful error message if Docker services aren't running
+        pytest.fail(
+            f"\n{'=' * 60}\n"
+            f"🚨 E2E TEST INFRASTRUCTURE ERROR\n\n"
+            f"{str(e)}\n\n"
+            f"To run E2E tests, ensure all services are running:\n"
+            f"  docker compose up -d\n"
+            f"  docker compose ps  # verify all are healthy\n"
+            f"{'=' * 60}\n"
+        )
 
 
 @pytest.fixture

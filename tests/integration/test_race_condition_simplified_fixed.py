@@ -65,17 +65,21 @@ class SimulatedELS:
 
         # Create available slots in Redis (simulating ELS behavior)
         for i in range(expected_count):
-            await _ensure_awaitable(self.redis.sadd(f"batch:{batch_id}:available_slots", f"slot_{i}"))
+            await _ensure_awaitable(
+                self.redis.sadd(f"batch:{batch_id}:available_slots", f"slot_{i}")
+            )
 
         # Store batch metadata
-        await _ensure_awaitable(self.redis.hset(
-            f"batch:{batch_id}:metadata",
-            mapping={
-                "expected_count": str(expected_count),
-                "status": "registered",
-                "correlation_id": str(uuid4()),  # Generate a correlation ID for this test
-            },
-        ))
+        await _ensure_awaitable(
+            self.redis.hset(
+                f"batch:{batch_id}:metadata",
+                mapping={
+                    "expected_count": str(expected_count),
+                    "status": "registered",
+                    "correlation_id": str(uuid4()),  # Generate a correlation ID for this test
+                },
+            )
+        )
 
         self.events_processed.append(("BatchEssaysRegistered", batch_id))
         logger.info(f"✅ Registered batch {batch_id} with {expected_count} slots")
@@ -117,7 +121,9 @@ class SimulatedELS:
         slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
         if slot:
             # Successfully assigned
-            await _ensure_awaitable(self.redis.hset(f"batch:{batch_id}:assignments", text_storage_id, slot.decode()))
+            await _ensure_awaitable(
+                self.redis.hset(f"batch:{batch_id}:assignments", text_storage_id, slot.decode())
+            )
             self.events_processed.append(
                 ("EssayContentProvisioned", f"{text_storage_id} -> ASSIGNED")
             )
@@ -131,8 +137,12 @@ class SimulatedELS:
             logger.info(f"✅ Essay {text_storage_id} assigned to {slot.decode()}")
 
             # Check if batch is complete
-            assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
-            expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+            assigned_count = await _ensure_awaitable(
+                self.redis.hlen(f"batch:{batch_id}:assignments")
+            )
+            expected_count_raw = await _ensure_awaitable(
+                self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")
+            )
             expected_count = int(expected_count_raw.decode())
 
             if assigned_count == expected_count:
@@ -209,9 +219,11 @@ class SimulatedELS:
                 slot = await _ensure_awaitable(self.redis.spop(f"batch:{batch_id}:available_slots"))
                 if slot:
                     # Successfully assigned
-                    await _ensure_awaitable(self.redis.hset(
-                        f"batch:{batch_id}:assignments", text_storage_id, slot.decode()
-                    ))
+                    await _ensure_awaitable(
+                        self.redis.hset(
+                            f"batch:{batch_id}:assignments", text_storage_id, slot.decode()
+                        )
+                    )
 
                     # Remove from pending
                     await _ensure_awaitable(self.redis.srem(pending_key, item))
@@ -248,8 +260,12 @@ class SimulatedELS:
 
         # Check if batch is complete after processing pending content
         if processed_count > 0:
-            assigned_count = await _ensure_awaitable(self.redis.hlen(f"batch:{batch_id}:assignments"))
-            expected_count_raw = await _ensure_awaitable(self.redis.hget(f"batch:{batch_id}:metadata", "expected_count"))
+            assigned_count = await _ensure_awaitable(
+                self.redis.hlen(f"batch:{batch_id}:assignments")
+            )
+            expected_count_raw = await _ensure_awaitable(
+                self.redis.hget(f"batch:{batch_id}:metadata", "expected_count")
+            )
             expected_count = int(expected_count_raw.decode())
 
             if assigned_count == expected_count:

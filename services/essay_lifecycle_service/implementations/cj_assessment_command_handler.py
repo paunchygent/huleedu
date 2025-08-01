@@ -163,7 +163,7 @@ class CJAssessmentCommandHandler:
                             extra={"correlation_id": str(correlation_id)},
                         )
                         return
-                    
+
                     try:
                         # Convert string language to Language enum at boundary
                         language_enum = Language(command_data.language)

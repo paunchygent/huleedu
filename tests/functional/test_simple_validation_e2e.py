@@ -103,9 +103,9 @@ async def test_content_validation_failures_publish_events():
             # Handle EventEnvelope format
             if "data" in event_data and isinstance(event_data["data"], dict):
                 inner_data = event_data["data"]
-                return inner_data.get("batch_id") == batch_id
+                return inner_data.get("entity_id") == batch_id
             # Handle direct event format
-            return event_data.get("batch_id") == batch_id
+            return event_data.get("entity_id") == batch_id
 
         try:
             # Collect events - expect 1 content provision + 2 validation failures
