@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientSession, ClientTimeout
 from dishka import Provider, Scope, provide
@@ -35,6 +35,13 @@ class CoreInfrastructureProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         return CollectorRegistry()
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self) -> dict[str, Any]:
+        """Provide metrics for pipeline service integration."""
+        from services.batch_conductor_service.metrics import get_pipeline_service_metrics
+
+        return get_pipeline_service_metrics()
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self, settings: Settings) -> ClientSession:
@@ -162,20 +169,16 @@ class PipelineServicesProvider(Provider):
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
         dlq_producer: DlqProducerProtocol,
+        metrics: dict[str, Any],
     ) -> PipelineResolutionServiceProtocol:
-        """Provide pipeline resolution service implementation with metrics injection."""
+        """Provide pipeline resolution service implementation with proper DI metrics injection."""
         from services.batch_conductor_service.implementations import (
             pipeline_resolution_service_impl as prs_impl,
         )
-        from services.batch_conductor_service.metrics import get_pipeline_service_metrics
 
-        # Create service instance
+        # Create service instance with metrics injected via constructor
         service = prs_impl.DefaultPipelineResolutionService(
-            pipeline_rules, pipeline_generator, dlq_producer
+            pipeline_rules, pipeline_generator, dlq_producer, metrics
         )
-
-        # Inject shared metrics
-        metrics = get_pipeline_service_metrics()
-        service.set_metrics(metrics)
 
         return service

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
@@ -111,6 +111,13 @@ class CoreInfrastructureProvider(Provider):
     def provide_metrics_registry(self) -> CollectorRegistry:
         """Provide Prometheus metrics registry."""
         return REGISTRY
+
+    @provide(scope=Scope.APP)
+    def provide_metrics(self) -> dict[str, Any]:
+        """Provide shared Prometheus metrics for route injection."""
+        from services.essay_lifecycle_service.metrics import get_metrics
+
+        return get_metrics()
 
     @provide(scope=Scope.APP)
     def provide_tracer(self) -> Tracer:

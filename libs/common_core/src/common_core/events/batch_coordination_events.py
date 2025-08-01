@@ -59,8 +59,8 @@ class BatchEssaysReady(BaseModel):
     Clean event for successful batch readiness - follows structured error handling principles.
 
     ARCHITECTURAL CHANGE: This event has been completely rewritten to eliminate the
-    validation_failures anti-pattern. Error handling now uses separate BatchValidationErrorsV1 events
-    following HuleEdu structured error handling standards.
+    validation_failures anti-pattern. Error handling now uses separate
+    BatchValidationErrorsV1 events following HuleEdu structured error handling standards.
 
     NO BACKWARDS COMPATIBILITY - This is a clean break from the legacy mixed success/error pattern.
     """
@@ -87,7 +87,8 @@ class BatchEssaysReady(BaseModel):
     )
 
     # CLEAN ARCHITECTURE: Legacy validation_failures and total_files_processed fields REMOVED
-    # Errors now handled via separate BatchValidationErrorsV1 events following structured error handling
+    # Errors now handled via separate BatchValidationErrorsV1 events following structured
+    # error handling
 
 
 class BatchReadinessTimeout(BaseModel):
@@ -143,7 +144,8 @@ class BatchContentProvisioningCompletedV1(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-# NEW CLEAN EVENT MODELS - Modern structured error handling replacement for legacy validation_failures pattern
+# NEW CLEAN EVENT MODELS - Modern structured error handling replacement for legacy
+# validation_failures pattern
 
 
 class EssayValidationError(BaseModel):

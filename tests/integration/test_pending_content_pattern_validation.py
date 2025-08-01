@@ -242,7 +242,8 @@ class EnhancedBatchTracker:
             )
 
             self.logger.info(
-                f"📋 Essay {text_storage_id} stored as PENDING - batch {batch_id} not registered yet"
+                f"📋 Essay {text_storage_id} stored as PENDING - "
+                f"batch {batch_id} not registered yet"
             )
             return "pending"
 

@@ -88,7 +88,7 @@ class ServiceDiscovery:
 
         for match in re.finditer(pattern, ports_string):
             host_port = int(match.group(1))
-            container_port = int(match.group(2))
+            int(match.group(2))
 
             # For health checks, we need the host port
             return host_port

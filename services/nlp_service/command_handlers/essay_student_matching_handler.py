@@ -105,7 +105,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
             command_data = BatchStudentMatchingRequestedV1.model_validate(envelope.data)
 
             logger.info(
-                f"Processing Phase 1 student matching for batch {command_data.batch_id} with {len(command_data.essays_to_process)} essays",
+                f"Processing Phase 1 student matching for batch {command_data.batch_id} "
+                f"with {len(command_data.essays_to_process)} essays",
                 extra={
                     "batch_id": command_data.batch_id,
                     "class_id": command_data.class_id,
@@ -178,7 +179,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
 
                 except Exception as essay_error:
                     logger.error(
-                        f"Failed to process essay {essay_ref.essay_id} in batch {command_data.batch_id}: {essay_error}",
+                        f"Failed to process essay {essay_ref.essay_id} in batch "
+                        f"{command_data.batch_id}: {essay_error}",
                         extra={
                             "essay_id": essay_ref.essay_id,
                             "batch_id": command_data.batch_id,
@@ -194,7 +196,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
             # The relay worker handles all outbox event publishing asynchronously
 
             logger.info(
-                f"Completed Phase 1 student matching for batch {command_data.batch_id}: {processed_count}/{len(command_data.essays_to_process)} essays processed",
+                f"Completed Phase 1 student matching for batch {command_data.batch_id}: "
+                f"{processed_count}/{len(command_data.essays_to_process)} essays processed",
                 extra={
                     "batch_id": command_data.batch_id,
                     "processed_count": processed_count,

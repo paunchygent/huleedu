@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID, uuid4
 
 from common_core.observability_enums import OperationType
 from common_core.status_enums import EssayStatus, OperationStatus
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import Counter
 from pydantic import BaseModel
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
@@ -18,15 +18,6 @@ from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix=f"/{settings.API_VERSION}/batches")
-
-# Global metrics reference (initialized in app.py)
-ESSAY_OPERATIONS: Counter | None = None
-
-
-def set_essay_operations_metric(metric: Counter) -> None:
-    """Set the essay operations metric reference."""
-    global ESSAY_OPERATIONS
-    ESSAY_OPERATIONS = metric
 
 
 def _extract_correlation_id() -> UUID:
@@ -55,6 +46,7 @@ class BatchStatusResponse(BaseModel):
 async def get_batch_status(
     batch_id: str,
     state_store: FromDishka[EssayRepositoryProtocol],
+    metrics: FromDishka[dict[str, Any]],
 ) -> Response:
     """Get status summary for a batch of essays."""
     # Extract correlation ID from request headers or generate new one
@@ -71,8 +63,9 @@ async def get_batch_status(
         # Import here to avoid circular imports
         from huleedu_service_libs.error_handling import raise_resource_not_found
 
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(
+        essay_operations = metrics.get("essay_operations")
+        if essay_operations:
+            essay_operations.labels(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
 
@@ -111,4 +104,9 @@ async def get_batch_status(
         completion_percentage=completion_percentage,
     )
 
+    essay_operations = metrics.get("essay_operations")
+    if essay_operations:
+        essay_operations.labels(
+            operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value
+        ).inc()
     return jsonify(batch_response.model_dump(mode="json"))

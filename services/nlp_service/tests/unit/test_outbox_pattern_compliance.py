@@ -263,7 +263,9 @@ class TestAntiPatternPrevention:
         nlp_event_publisher: DefaultNlpEventPublisher,
         mock_outbox_manager: AsyncMock,
     ) -> None:
-        """Verify that NLP Service never implements Kafka-first with outbox fallback anti-pattern."""
+        """
+        Verify that NLP Service never implements Kafka-first with outbox fallback anti-pattern.
+        """
         # This test ensures the anti-pattern is never implemented:
         # try:
         #     await kafka_bus.publish(...)

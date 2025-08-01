@@ -113,7 +113,8 @@ class SimulatedELS:
                 }
             )
             logger.info(
-                f"⏳ Essay {text_storage_id} stored as PENDING - batch {batch_id} not registered yet"
+                f"⏳ Essay {text_storage_id} stored as PENDING - "
+                f"batch {batch_id} not registered yet"
             )
             return "pending"
 
@@ -169,14 +170,18 @@ class SimulatedELS:
                 }
             )
             logger.warning(
-                f"❌ Essay {text_storage_id} marked as EXCESS - no slots available in registered batch"
+                f"❌ Essay {text_storage_id} marked as EXCESS - "
+                f"no slots available in registered batch"
             )
             return "excess_content"
 
     async def _store_pending_content(
         self, batch_id: str, text_storage_id: str, event: EssayContentProvisionedV1
     ) -> None:
-        """Store content as pending until batch registration arrives (simulates RedisPendingContentOperations)."""
+        """
+        Store content as pending until batch registration arrives.
+        (simulates RedisPendingContentOperations)
+        """
         pending_key = f"pending_content:{batch_id}"
 
         # Create content metadata
@@ -199,7 +204,10 @@ class SimulatedELS:
         logger.info(f"📦 Stored pending content: {text_storage_id} for batch {batch_id}")
 
     async def _process_pending_content_for_batch(self, batch_id: str) -> int:
-        """Process any pending content for a newly registered batch (simulates BatchEssayTracker logic)."""
+        """
+        Process any pending content for a newly registered batch.
+        (simulates BatchEssayTracker logic)
+        """
         pending_key = f"pending_content:{batch_id}"
 
         # Get all pending content items
@@ -270,7 +278,8 @@ class SimulatedELS:
 
             if assigned_count == expected_count:
                 logger.info(
-                    f"🎉 Batch {batch_id} COMPLETE after pending reconciliation - would publish BatchEssaysReady"
+                    f"🎉 Batch {batch_id} COMPLETE after pending reconciliation - "
+                    f"would publish BatchEssaysReady"
                 )
                 self.outcomes.append(
                     {
@@ -365,7 +374,9 @@ class TestRaceConditionSimplified:
 
     @pytest.mark.asyncio
     async def test_race_condition_now_fixed(self, redis_client: Redis):
-        """Test: EssayContentProvisioned BEFORE BatchEssaysRegistered = NOW SUCCEEDS WITH PENDING FIX"""
+        """
+        Test: EssayContentProvisioned BEFORE BatchEssaysRegistered = NOW SUCCEEDS WITH PENDING FIX
+        """
         logger.info("\n" + "=" * 80)
         logger.info("TEST 2: RACE CONDITION FIXED (Essay Content → Batch Registration)")
         logger.info("=" * 80)

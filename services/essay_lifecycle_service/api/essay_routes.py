@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from common_core.domain_enums import ContentType
@@ -10,7 +11,6 @@ from common_core.observability_enums import OperationType
 from common_core.status_enums import EssayStatus, OperationStatus
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import Counter
 from pydantic import BaseModel
 from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
@@ -20,15 +20,6 @@ from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 logger = create_service_logger("els.api.essay")
 essay_bp = Blueprint("essay_routes", __name__, url_prefix=f"/{settings.API_VERSION}/essays")
-
-# Global metrics reference (initialized in app.py)
-ESSAY_OPERATIONS: Counter | None = None
-
-
-def set_essay_operations_metric(metric: Counter) -> None:
-    """Set the essay operations metric reference."""
-    global ESSAY_OPERATIONS
-    ESSAY_OPERATIONS = metric
 
 
 def _extract_correlation_id() -> UUID:
@@ -82,6 +73,7 @@ def _calculate_processing_progress(current_status: EssayStatus) -> dict[str, boo
 async def get_essay_status(
     essay_id: str,
     state_store: FromDishka[EssayRepositoryProtocol],
+    metrics: FromDishka[dict[str, Any]],
 ) -> Response:
     """Get current status of an essay."""
     # Extract correlation ID from request headers or generate new one
@@ -98,8 +90,9 @@ async def get_essay_status(
         # Import here to avoid circular imports
         from huleedu_service_libs.error_handling import raise_resource_not_found
 
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(
+        essay_operations = metrics.get("essay_operations")
+        if essay_operations:
+            essay_operations.labels(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
 
@@ -126,8 +119,9 @@ async def get_essay_status(
         updated_at=essay_state.updated_at,
     )
 
-    if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(
+    essay_operations = metrics.get("essay_operations")
+    if essay_operations:
+        essay_operations.labels(
             operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value
         ).inc()
     return jsonify(status_response.model_dump(mode="json"))
@@ -138,6 +132,7 @@ async def get_essay_status(
 async def get_essay_timeline(
     essay_id: str,
     state_store: FromDishka[EssayRepositoryProtocol],
+    metrics: FromDishka[dict[str, Any]],
 ) -> Response:
     """Get detailed timeline for an essay."""
     # Extract correlation ID from request headers or generate new one
@@ -154,8 +149,9 @@ async def get_essay_timeline(
         # Import here to avoid circular imports
         from huleedu_service_libs.error_handling import raise_resource_not_found
 
-        if ESSAY_OPERATIONS:
-            ESSAY_OPERATIONS.labels(
+        essay_operations = metrics.get("essay_operations")
+        if essay_operations:
+            essay_operations.labels(
                 operation=OperationType.DOWNLOAD.value, status=OperationStatus.NOT_FOUND.value
             ).inc()
 
@@ -176,8 +172,9 @@ async def get_essay_timeline(
         "current_status": essay_state.current_status.value,
     }
 
-    if ESSAY_OPERATIONS:
-        ESSAY_OPERATIONS.labels(
+    essay_operations = metrics.get("essay_operations")
+    if essay_operations:
+        essay_operations.labels(
             operation=OperationType.DOWNLOAD.value, status=OperationStatus.SUCCESS.value
         ).inc()
     return jsonify(timeline_response)

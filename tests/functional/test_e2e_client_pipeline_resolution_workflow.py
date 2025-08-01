@@ -137,14 +137,16 @@ class TestClientPipelineResolutionWorkflow:
             # (waiting for client trigger) or not yet initialized if batch is very new
             if cj_assessment_status not in ["pending_dependencies", "not_initialized", "not_found"]:
                 print(
-                    f"⚠️ Unexpected status {cj_assessment_status}, continuing test to see actual behavior"
+                    f"⚠️ Unexpected status {cj_assessment_status}, "
+                    f"continuing test to see actual behavior"
                 )
 
             # Verify the system is correctly waiting for client trigger (not auto-starting)
             # Accept both pending_dependencies (ideal) and not_initialized (batch very new)
             expected_statuses = ["pending_dependencies", "not_initialized", "not_found"]
             assert cj_assessment_status in expected_statuses, (
-                f"Expected cj_assessment to be one of {expected_statuses} (waiting for client trigger), "
+                f"Expected cj_assessment to be one of {expected_statuses} "
+                f"(waiting for client trigger), "
                 f"but got: {cj_assessment_status}"
             )
             print("✅ Batch is ready and correctly waiting for client-triggered processing")

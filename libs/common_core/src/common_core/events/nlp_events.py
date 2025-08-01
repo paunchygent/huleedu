@@ -61,7 +61,8 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
         description="Match results for all essays in batch"
     )
     processing_summary: dict[str, int] = Field(
-        description="Summary statistics e.g., {'total_essays': 10, 'matched': 8, 'no_match': 1, 'errors': 1}"
+        description="Summary statistics e.g., "
+        "{'total_essays': 10, 'matched': 8, 'no_match': 1, 'errors': 1}"
     )
     processing_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional processing metadata"

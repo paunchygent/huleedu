@@ -61,7 +61,8 @@ class DistributedStateManager:
                                 else:
                                     logger.debug(
                                         f"Service {service_name} still active: "
-                                        f"processing={processing_active}, consumers={active_consumers}"
+                                        f"processing={processing_active}, "
+                                        f"consumers={active_consumers}"
                                     )
                             else:
                                 logger.debug(
@@ -103,7 +104,9 @@ class DistributedStateManager:
             for _, pattern in ipairs(patterns) do
                 local cursor = 0
                 repeat
-                    local scan_result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size)
+                    local scan_result = redis.call(
+                        'SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size
+                    )
                     cursor = tonumber(scan_result[1])
                     local keys = scan_result[2]
 
@@ -138,7 +141,8 @@ class DistributedStateManager:
 
             if cleared_count > 0:
                 logger.info(
-                    f"🗑️ Atomically cleared {cleared_count} Redis keys (idempotency + pending content)"
+                    f"🗑️ Atomically cleared {cleared_count} Redis keys "
+                    f"(idempotency + pending content)"
                 )
             else:
                 logger.info("✅ No Redis keys to clear (idempotency or pending content)")

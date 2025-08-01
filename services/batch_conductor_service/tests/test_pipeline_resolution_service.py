@@ -83,17 +83,38 @@ class TestPipelineResolutionServiceBehavior:
         return mock
 
     @pytest.fixture
+    def mock_metrics(self) -> dict:
+        """Mock metrics dictionary for pipeline service."""
+        from unittest.mock import Mock
+
+        # Create mock counter with labels() and inc() methods
+        mock_counter = Mock()
+        mock_counter.labels.return_value = Mock()
+        mock_counter.labels.return_value.inc = Mock()
+
+        # Create mock histogram with labels() and observe() methods
+        mock_histogram = Mock()
+        mock_histogram.labels.return_value = Mock()
+        mock_histogram.labels.return_value.observe = Mock()
+        return {
+            "pipeline_resolutions_total": mock_counter,
+            "pipeline_resolution_duration_seconds": mock_histogram,
+        }
+
+    @pytest.fixture
     def service(
         self,
         mock_pipeline_generator: AsyncMock,
         mock_pipeline_rules: AsyncMock,
         mock_dlq_producer: AsyncMock,
+        mock_metrics: dict,
     ) -> DefaultPipelineResolutionService:
         """Create service instance with realistic external dependencies."""
         return DefaultPipelineResolutionService(
             pipeline_rules=mock_pipeline_rules,
             pipeline_generator=mock_pipeline_generator,
             dlq_producer=mock_dlq_producer,
+            metrics=mock_metrics,
         )
 
     # Test Category 1: Successful Pipeline Resolution

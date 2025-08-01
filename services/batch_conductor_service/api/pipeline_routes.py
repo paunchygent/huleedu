@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from dishka import FromDishka
 from pydantic import ValidationError
-from quart import Blueprint, Response, current_app, jsonify, request
+from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -38,11 +38,6 @@ async def define_pipeline(
     the optimal execution sequence for a requested pipeline.
     """
     try:
-        # Inject metrics into pipeline service if available
-        metrics_ext = current_app.extensions.get("metrics")
-        if metrics_ext and hasattr(pipeline_service, "set_metrics"):
-            pipeline_service.set_metrics(metrics_ext)
-
         # Parse and validate request
         request_data = await request.get_json()
         pipeline_request = BCSPipelineDefinitionRequestV1.model_validate(request_data)

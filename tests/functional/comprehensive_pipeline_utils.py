@@ -286,7 +286,8 @@ async def watch_pipeline_progression_with_consumer(
                             elif message.topic == PIPELINE_TOPICS["batch_ready"]:
                                 ready_essays = event_data.get("ready_essays", [])
                                 ready_count = len(ready_essays) if ready_essays else 0
-                                # Note: validation failures are now sent as separate BatchValidationErrorsV1 events
+                                # Note: validation failures are now sent as separate
+                                # BatchValidationErrorsV1 events
                                 print(
                                     f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready",
                                 )

@@ -47,7 +47,10 @@ class MockContentClient:
         correlation_id: UUID,
     ) -> str:
         """Return mock essay content."""
-        return f"Mock essay content for storage {storage_id}\\n\\nStudent: Test Student\\nEmail: test@student.edu"
+        return (
+            f"Mock essay content for storage {storage_id}\\n\\n"
+            f"Student: Test Student\\nEmail: test@student.edu"
+        )
 
 
 class MockClassManagementClient:
@@ -387,7 +390,7 @@ class TestCommandHandlerOutboxIntegration:
             essay_student_matching_handler.student_matcher,
             "find_matches",
             new=AsyncMock(side_effect=Exception("Student matching failed")),
-        ) as mock_find_matches:
+        ):
             mock_msg = Mock()
             event_data = BatchStudentMatchingRequestedV1(
                 batch_id="test-batch-failure",

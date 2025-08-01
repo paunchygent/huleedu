@@ -9,12 +9,6 @@ from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 
-from services.essay_lifecycle_service.api.batch_routes import (
-    set_essay_operations_metric as set_batch_essay_operations,
-)
-from services.essay_lifecycle_service.api.essay_routes import (
-    set_essay_operations_metric as set_essay_essay_operations,
-)
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.di import (
     BatchCoordinationProvider,
@@ -61,10 +55,6 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
         # Store metrics in app context (proper Quart pattern)
         app.extensions = getattr(app, "extensions", {})
         app.extensions["metrics"] = metrics
-
-        # Share essay operations metric with routes modules (legacy support)
-        set_essay_essay_operations(metrics["essay_operations"])
-        set_batch_essay_operations(metrics["essay_operations"])
 
         # Initialize database schema and store engine for health checks (production only)
         if settings.ENVIRONMENT != "testing" and not getattr(

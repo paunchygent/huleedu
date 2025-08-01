@@ -43,14 +43,11 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
         dlq_producer: DlqProducerProtocol,
+        metrics: dict[str, Any],
     ):
         self.pipeline_rules = pipeline_rules
         self.pipeline_generator = pipeline_generator
         self.dlq_producer = dlq_producer
-        self._metrics: dict[str, Any] | None = None
-
-    def set_metrics(self, metrics: dict[str, Any]) -> None:
-        """Set Prometheus metrics for tracking pipeline resolutions."""
         self._metrics = metrics
 
     async def resolve_pipeline(
@@ -273,7 +270,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
     async def _track_success_metrics(self, requested_pipeline: str) -> None:
         """Track successful pipeline resolution in Prometheus metrics."""
-        if self._metrics and "pipeline_resolutions_total" in self._metrics:
+        if "pipeline_resolutions_total" in self._metrics:
             counter = self._metrics["pipeline_resolutions_total"]
             # Safely handle the counter metric
             if hasattr(counter, "labels") and hasattr(counter, "inc"):
@@ -283,7 +280,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
     async def _track_failure_metrics(self, requested_pipeline: str, failure_reason: str) -> None:
         """Track failed pipeline resolution in Prometheus metrics."""
-        if self._metrics and "pipeline_resolutions_total" in self._metrics:
+        if "pipeline_resolutions_total" in self._metrics:
             counter = self._metrics["pipeline_resolutions_total"]
             # Safely handle the counter metric
             if hasattr(counter, "labels") and hasattr(counter, "inc"):
@@ -291,7 +288,7 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
     async def _track_duration_metrics(self, requested_pipeline: str, duration: float) -> None:
         """Track pipeline resolution duration in Prometheus metrics."""
-        if self._metrics and "pipeline_resolution_duration_seconds" in self._metrics:
+        if "pipeline_resolution_duration_seconds" in self._metrics:
             histogram = self._metrics["pipeline_resolution_duration_seconds"]
             # Safely handle the histogram metric
             if hasattr(histogram, "labels") and hasattr(histogram, "observe"):
