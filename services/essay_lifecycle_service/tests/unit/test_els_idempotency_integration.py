@@ -107,14 +107,15 @@ def sample_batch_registered_event() -> dict:
         "correlation_id": str(uuid.uuid4()),
         "data": {
             "event": "batch.essays.registered",
-            "batch_id": "test-batch-001",
+            "entity_id": "test-batch-001",
             "expected_essay_count": 3,
             "essay_ids": ["essay-1", "essay-2", "essay-3"],
             "course_code": CourseCode.ENG5.value,
             "essay_instructions": "Write a test essay for idempotency testing.",
             "user_id": "test_user_idempotency",
             "metadata": {
-                "entity": {"entity_id": "test-batch-001", "entity_type": "batch"},
+                "entity_id": "test-batch-001",
+                "entity_type": "batch",
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "batch.essays.registered",
@@ -415,14 +416,15 @@ async def test_deterministic_event_id_generation(
         "correlation_id": str(uuid.uuid4()),  # Different UUID each time
         "data": {
             "event": "batch.essays.registered",
-            "batch_id": "same-batch-123",  # Same data content
+            "entity_id": "same-batch-123",  # Same data content
             "expected_essay_count": 2,
             "essay_ids": ["essay-1", "essay-2"],
             "course_code": CourseCode.ENG5.value,
             "essay_instructions": "Test essay for deterministic ID generation.",
             "user_id": "test_user_deterministic",
             "metadata": {
-                "entity": {"entity_id": "same-batch-123", "entity_type": "batch"},
+                "entity_id": "same-batch-123",
+                "entity_type": "batch",
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "batch.essays.registered",

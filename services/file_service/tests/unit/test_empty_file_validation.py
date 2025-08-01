@@ -113,7 +113,7 @@ async def test_empty_file_uses_content_validation() -> None:
     assert (
         published_event.validation_error_detail.error_code == FileValidationErrorCode.EMPTY_CONTENT
     )
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.file_upload_id == file_upload_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_empty_12345"  # Raw storage ID
@@ -204,7 +204,7 @@ async def test_text_extraction_failure_vs_empty_content() -> None:
 
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
     assert published_event.file_upload_id == file_upload_id
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.original_file_name == file_name
     assert "File format not supported" in published_event.validation_error_detail.message
     assert published_event.raw_file_storage_id == "raw_storage_corrupted_67890"  # Raw ID
@@ -288,7 +288,7 @@ async def test_content_too_short_validation() -> None:
     published_event = event_publisher.publish_essay_validation_failed.call_args[0][0]
     assert published_event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
     assert published_event.file_upload_id == file_upload_id
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_short_11111"
 

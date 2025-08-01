@@ -120,7 +120,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert isinstance(event_data, EssayValidationFailedV1)
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.file_upload_id == file_upload_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
@@ -196,7 +196,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert event_data.file_size_bytes == 0
@@ -271,7 +271,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.CONTENT_TOO_LONG
         assert event_data.file_size_bytes == len(file_content)
@@ -340,7 +340,7 @@ class TestCoreLogicValidationFailures:
         assert event_data.correlation_id == correlation_id
         assert passed_correlation_id == correlation_id
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert event_data.raw_file_storage_id == "raw_storage_corr_789"
@@ -436,7 +436,7 @@ class TestCoreLogicValidationFailures:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert "has empty content" in event_data.validation_error_detail.message

@@ -82,7 +82,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         metadata: dict[str, Any] = {}
         inject_trace_context(metadata)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
+            event_type="batch.author.matches.suggested.v1",
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=batch_event,

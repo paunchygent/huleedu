@@ -49,7 +49,7 @@ class TestKafkaConsumerRouting:
         parent_id = None
 
         data = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,  # entity_id at top level (required by model)
             user_id=user_id,
             essay_ids=["essay-1", "essay-2", "essay-3"],
             expected_essay_count=3,
@@ -82,7 +82,7 @@ class TestKafkaConsumerRouting:
         mock_event_processor.process_batch_registered.assert_called_once()
         call_args = mock_event_processor.process_batch_registered.call_args
         assert call_args[0][0].event_id == envelope.event_id
-        assert call_args[0][1].batch_id == batch_id
+        assert call_args[0][1].entity_id == batch_id  # entity_id is the batch identifier
 
     async def test_route_spellcheck_completed_event(
         self,

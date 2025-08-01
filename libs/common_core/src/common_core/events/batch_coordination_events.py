@@ -38,7 +38,7 @@ class BatchEssaysRegistered(BaseModel):
     """
 
     event: str = Field(default="batch.essays.registered", description="Event type identifier")
-    batch_id: str = Field(description="Unique batch identifier")
+    entity_id: str = Field(description="Unique batch identifier")
     expected_essay_count: int = Field(description="Number of essays expected in this batch")
     essay_ids: list[str] = Field(description="List of essay IDs that will be processed")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")

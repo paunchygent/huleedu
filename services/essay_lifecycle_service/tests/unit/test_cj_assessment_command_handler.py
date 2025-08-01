@@ -16,7 +16,7 @@ from common_core.batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent
 from common_core.status_enums import EssayStatus
 
@@ -107,7 +107,7 @@ class TestCJAssessmentCommandHandler:
         """Sample CJ assessment command data."""
         return BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[essay_processing_ref],
             language="en",
             course_code=CourseCode.ENG5,
@@ -272,7 +272,7 @@ class TestCJAssessmentCommandHandler:
 
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=essay_refs,
             language="en",
             course_code=CourseCode.ENG6,
@@ -338,7 +338,7 @@ class TestCJAssessmentCommandHandler:
 
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[essay_ref],
             language="sv",
             course_code=CourseCode.SV3,
@@ -366,7 +366,7 @@ class TestCJAssessmentCommandHandler:
             # Verify command data is passed correctly to dispatcher
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once_with(
                 essays_to_process=[essay_ref],
-                language="sv",
+                language=Language.SWEDISH,
                 course_code=CourseCode.SV3,
                 essay_instructions="Skriv om din semester",
                 batch_id=batch_id,
@@ -388,7 +388,7 @@ class TestCJAssessmentCommandHandler:
         # Create command with course code
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
                 EssayProcessingInputRefV1(essay_id="essay2", text_storage_id="storage2"),
@@ -457,7 +457,7 @@ class TestCJAssessmentCommandHandler:
         # Create command with minimal data
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[
                 EssayProcessingInputRefV1(essay_id="essay1", text_storage_id="storage1"),
             ],
@@ -489,7 +489,7 @@ class TestCJAssessmentCommandHandler:
             # Verify command data is passed correctly to dispatcher
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once_with(
                 essays_to_process=[command_data.essays_to_process[0]],
-                language="sv",
+                language=Language.SWEDISH,
                 course_code=command_data.course_code,
                 essay_instructions=command_data.essay_instructions,
                 batch_id=batch_id,
@@ -511,7 +511,7 @@ class TestCJAssessmentCommandHandler:
         # Create command that should fail validation
         command_data = BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[],  # Empty essays list should cause validation failure
             language="en",
             course_code=CourseCode.ENG7,

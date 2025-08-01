@@ -410,14 +410,16 @@ class TestCommandHandlerOutboxIntegration:
 
             mock_http_session = AsyncMock()
 
-            # Act & Assert - Handler should fail
-            with pytest.raises(Exception, match="Student matching failed"):
-                await essay_student_matching_handler.handle(
-                    msg=mock_msg,
-                    envelope=envelope,
-                    http_session=mock_http_session,
-                    correlation_id=correlation_id,
-                )
+            # Act - Handler should handle the failure gracefully
+            result = await essay_student_matching_handler.handle(
+                msg=mock_msg,
+                envelope=envelope,
+                http_session=mock_http_session,
+                correlation_id=correlation_id,
+            )
+
+            # Assert - Handler should return False (no essays processed successfully)
+            assert result is False
 
             # Assert - No events should be in outbox due to failure before publishing
             unpublished_events = await outbox_repository.get_unpublished_events(limit=10)

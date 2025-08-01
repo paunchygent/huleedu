@@ -42,7 +42,7 @@ def sample_event_envelope() -> EventEnvelope:
 
     # Create properly typed event data
     event_data = EssayContentProvisionedV1(
-        batch_id="test-batch-123",
+        entity_id="test-batch-123",
         file_upload_id="test-file-123",
         original_file_name="test_essay.txt",
         raw_file_storage_id="raw-storage-123",
@@ -252,7 +252,7 @@ class TestOutboxManagerErrorHandling:
 
         # Create properly typed event data
         event_data = EssayContentProvisionedV1(
-            batch_id="test-batch-partition",
+            entity_id="test-batch-partition",
             file_upload_id="test-file-partition",
             original_file_name="partition_test.txt",
             raw_file_storage_id="raw-partition-123",

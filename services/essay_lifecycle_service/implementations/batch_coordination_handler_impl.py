@@ -63,7 +63,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             logger.info(
                 "Processing BatchEssaysRegistered event",
                 extra={
-                    "batch_id": event_data.batch_id,
+                    "batch_id": event_data.entity_id,
                     "expected_count": event_data.expected_essay_count,
                     "correlation_id": str(correlation_id),
                 },
@@ -81,7 +81,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     logger.info(
                         "Creating initial essay records in database for batch",
                         extra={
-                            "batch_id": event_data.batch_id,
+                            "batch_id": event_data.entity_id,
                             "essay_count": len(event_data.essay_ids),
                             "correlation_id": str(correlation_id),
                         },
@@ -91,8 +91,8 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     # Note: Protocol expects str | None values, but in this context all values are guaranteed non-None
                     typed_essay_data: list[dict[str, str | None]] = [
                         {
-                            "essay_id": essay_id,
-                            "batch_id": event_data.batch_id,
+                            "entity_id": essay_id,
+                            "parent_id": event_data.entity_id,
                             "entity_type": "essay",
                         }
                         for essay_id in event_data.essay_ids
@@ -106,14 +106,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     logger.info(
                         "Successfully created initial essay records for batch",
                         extra={
-                            "batch_id": event_data.batch_id,
+                            "batch_id": event_data.entity_id,
                             "correlation_id": str(correlation_id),
                         },
                     )
 
                     # Check if batch is immediately complete due to pending failures
                     batch_completion_result = await self.batch_tracker.check_batch_completion(
-                        event_data.batch_id
+                        event_data.entity_id
                     )
                     if batch_completion_result is not None:
                         batch_ready_event, original_correlation_id = batch_completion_result
@@ -148,7 +148,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 operation="handle_batch_essays_registered",
                 message=f"Unexpected error in batch essays registration: {e.__class__.__name__}",
                 correlation_id=correlation_id,
-                batch_id=event_data.batch_id,
+                batch_id=event_data.entity_id,
                 expected_count=event_data.expected_essay_count,
                 essay_count=len(event_data.essay_ids),
                 error_type=e.__class__.__name__,
@@ -165,7 +165,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             logger.info(
                 "Processing EssayContentProvisionedV1 event",
                 extra={
-                    "batch_id": event_data.batch_id,
+                    "batch_id": event_data.entity_id,
                     "text_storage_id": event_data.text_storage_id,
                     "original_file_name": event_data.original_file_name,
                     "correlation_id": str(correlation_id),
@@ -178,19 +178,19 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # Step 1: Try slot assignment first (maintains existing batch tracker logic)
             # Redis operation, outside transaction
             assigned_essay_id = await self.batch_tracker.assign_slot_to_content(
-                event_data.batch_id, event_data.text_storage_id, event_data.original_file_name
+                event_data.entity_id, event_data.text_storage_id, event_data.original_file_name
             )
 
             if assigned_essay_id is None:
                 # Check if batch exists before deciding on pending vs excess
-                batch_status = await self.batch_tracker.get_batch_status(event_data.batch_id)
+                batch_status = await self.batch_tracker.get_batch_status(event_data.entity_id)
 
                 if batch_status is None:
                     # ALWAYS store as pending content when batch not registered
                     logger.info(
                         "Batch not registered yet, storing content as pending",
                         extra={
-                            "batch_id": event_data.batch_id,
+                            "batch_id": event_data.entity_id,
                             "text_storage_id": event_data.text_storage_id,
                             "correlation_id": str(correlation_id),
                         },
@@ -207,7 +207,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     }
 
                     await self.pending_content_ops.store_pending_content(
-                        event_data.batch_id, event_data.text_storage_id, content_metadata
+                        event_data.entity_id, event_data.text_storage_id, content_metadata
                     )
 
                     # Successfully handled as pending - NO EXCESS CONTENT EVENT
@@ -217,7 +217,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 logger.warning(
                     "No available slots for content, publishing excess content event",
                     extra={
-                        "batch_id": event_data.batch_id,
+                        "batch_id": event_data.entity_id,
                         "text_storage_id": event_data.text_storage_id,
                         "original_file_name": event_data.original_file_name,
                         "correlation_id": str(correlation_id),
@@ -234,7 +234,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         )
 
                         excess_event = ExcessContentProvisionedV1(
-                            batch_id=event_data.batch_id,
+                            batch_id=event_data.entity_id,
                             original_file_name=event_data.original_file_name,
                             text_storage_id=event_data.text_storage_id,
                             reason="NO_AVAILABLE_SLOT",
@@ -270,7 +270,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         was_created,
                         final_essay_id,
                     ) = await self.repository.create_essay_state_with_content_idempotency(
-                        batch_id=event_data.batch_id,
+                        batch_id=event_data.entity_id,
                         text_storage_id=event_data.text_storage_id,
                         essay_data=essay_data,
                         correlation_id=correlation_id,
@@ -280,7 +280,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     if was_created:
                         # New assignment - persist to batch tracker
                         await self.batch_tracker.persist_slot_assignment(
-                            event_data.batch_id,
+                            event_data.entity_id,
                             assigned_essay_id,
                             event_data.text_storage_id,
                             event_data.original_file_name,
@@ -291,7 +291,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             "Successfully assigned content to slot with atomic creation",
                             extra={
                                 "assigned_essay_id": final_essay_id,
-                                "batch_id": event_data.batch_id,
+                                "batch_id": event_data.entity_id,
                                 "text_storage_id": event_data.text_storage_id,
                                 "correlation_id": str(correlation_id),
                             },
@@ -301,7 +301,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 
                     slot_assigned_event = EssaySlotAssignedV1(
-                        batch_id=event_data.batch_id,
+                        batch_id=event_data.entity_id,
                         essay_id=final_essay_id,
                         file_upload_id=event_data.file_upload_id,
                         text_storage_id=event_data.text_storage_id,
@@ -319,7 +319,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         logger.info(
                             "Content already assigned to slot, acknowledging idempotently",
                             extra={
-                                "batch_id": event_data.batch_id,
+                                "batch_id": event_data.entity_id,
                                 "text_storage_id": event_data.text_storage_id,
                                 "assigned_essay_id": final_essay_id,
                                 "correlation_id": str(correlation_id),
@@ -332,14 +332,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         raise_processing_error(
                             service="essay_lifecycle_service",
                             operation="handle_essay_content_provisioned",
-                            message=f"Unexpected None essay_id after content provisioning for batch {event_data.batch_id}",
+                            message=f"Unexpected None essay_id after content provisioning for batch {event_data.entity_id}",
                             correlation_id=correlation_id,
-                            batch_id=event_data.batch_id,
+                            batch_id=event_data.entity_id,
                             text_storage_id=event_data.text_storage_id,
                         )
 
                     batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(
-                        event_data.batch_id, final_essay_id, event_data.text_storage_id
+                        event_data.entity_id, final_essay_id, event_data.text_storage_id
                     )
 
                     # **Step 5: Publish BatchEssaysReady if complete**
@@ -384,7 +384,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 f"Unexpected error in handle_essay_content_provisioned: {e.__class__.__name__}: {e}",
                 extra={
                     "stack_trace": stack_trace,
-                    "batch_id": event_data.batch_id,
+                    "batch_id": event_data.entity_id,
                     "text_storage_id": event_data.text_storage_id,
                 },
             )
@@ -393,7 +393,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 operation="handle_essay_content_provisioned",
                 message=f"Unexpected error in essay content provisioning: {e.__class__.__name__}",
                 correlation_id=correlation_id,
-                batch_id=event_data.batch_id,
+                batch_id=event_data.entity_id,
                 text_storage_id=event_data.text_storage_id,
                 original_file_name=event_data.original_file_name,
                 error_type=e.__class__.__name__,
@@ -411,7 +411,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             logger.info(
                 "Processing EssayValidationFailedV1 event",
                 extra={
-                    "batch_id": event_data.batch_id,
+                    "batch_id": event_data.entity_id,
                     "original_file_name": event_data.original_file_name,
                     "error_code": event_data.validation_error_code,
                     "correlation_id": str(correlation_id),
@@ -450,7 +450,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             logger.info(
                 "Successfully processed validation failure",
                 extra={
-                    "batch_id": event_data.batch_id,
+                    "batch_id": event_data.entity_id,
                     "original_file_name": event_data.original_file_name,
                     "correlation_id": str(correlation_id),
                 },
@@ -468,7 +468,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 operation="handle_essay_validation_failed",
                 message=f"Unexpected error in essay validation failure handling: {e.__class__.__name__}",
                 correlation_id=correlation_id,
-                batch_id=event_data.batch_id,
+                batch_id=event_data.entity_id,
                 original_file_name=event_data.original_file_name,
                 validation_error_code=event_data.validation_error_code,
                 error_type=e.__class__.__name__,

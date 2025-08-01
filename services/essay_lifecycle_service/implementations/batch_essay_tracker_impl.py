@@ -91,7 +91,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             event: BatchEssaysRegistered from BOS containing essay-ID slots and course context
         """
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
-        batch_id = batch_essays_registered.batch_id
+        batch_id = batch_essays_registered.entity_id
 
         # **Idempotency Check: Redis existence first**
         existing_batch_status = await self._batch_queries.get_batch_status(batch_id)
@@ -308,7 +308,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         If batch doesn't exist yet, stores failure as pending.
         """
         validation_failed = EssayValidationFailedV1.model_validate(event_data)
-        batch_id = validation_failed.batch_id
+        batch_id = validation_failed.entity_id
 
         # Track validation failure in Redis
         failure_data = {

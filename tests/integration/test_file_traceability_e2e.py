@@ -91,7 +91,7 @@ class TestFileTraceabilityE2E:
         async with kafka_event_monitor("test_file_traceability", topics_to_monitor) as consumer:
             # Step 1: Register batch (simulating BOS behavior)
             batch_event = BatchEssaysRegistered(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 course_code=CourseCode.ENG5,
                 essay_instructions="Test traceability essay",
                 essay_ids=essay_ids,
@@ -117,7 +117,7 @@ class TestFileTraceabilityE2E:
 
             # Step 2: Simulate file upload and content provisioning
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=file_upload_id,
                 original_file_name="test_essay.txt",
                 raw_file_storage_id=f"raw_{uuid4().hex[:8]}",
@@ -221,7 +221,7 @@ class TestFileTraceabilityE2E:
         async with kafka_event_monitor("test_multi_traceability", topics_to_monitor) as consumer:
             # Register batch
             batch_event = BatchEssaysRegistered(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 course_code=CourseCode.ENG5,
                 essay_instructions="Multi-file test",
                 essay_ids=essay_ids,
@@ -247,7 +247,7 @@ class TestFileTraceabilityE2E:
             # Upload multiple files
             for i, file_upload_id in enumerate(file_upload_ids):
                 content_event = EssayContentProvisionedV1(
-                    batch_id=batch_id,
+                    entity_id=batch_id,
                     file_upload_id=file_upload_id,
                     original_file_name=f"essay_{i}.txt",
                     raw_file_storage_id=f"raw_{i}_{uuid4().hex[:8]}",

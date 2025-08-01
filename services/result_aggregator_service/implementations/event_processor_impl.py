@@ -52,14 +52,14 @@ class EventProcessorImpl(EventProcessorProtocol):
         try:
             logger.info(
                 "Processing batch registration",
-                batch_id=data.batch_id,
+                batch_id=data.entity_id,  # entity_id is the batch identifier
                 user_id=data.user_id,
                 essay_count=data.expected_essay_count,
             )
 
             # Create the initial batch record
             await self.batch_repository.create_batch(
-                batch_id=data.batch_id,
+                batch_id=data.entity_id,  # entity_id is the batch identifier
                 user_id=data.user_id,
                 essay_count=data.expected_essay_count,
                 metadata={"requested_pipelines": data.requested_pipelines}
@@ -71,14 +71,14 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             logger.info(
                 "Created initial batch record and invalidated user cache",
-                batch_id=data.batch_id,
+                batch_id=data.entity_id,  # entity_id is the batch identifier
                 user_id=data.user_id,
             )
 
         except Exception as e:
             logger.error(
                 "Failed to process batch registration",
-                batch_id=data.batch_id,
+                batch_id=data.entity_id,  # entity_id is the batch identifier
                 error=str(e),
                 exc_info=True,
             )

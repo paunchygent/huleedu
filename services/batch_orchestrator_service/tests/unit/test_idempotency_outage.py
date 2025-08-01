@@ -125,9 +125,9 @@ def sample_batch_essays_ready_event() -> dict:
                 {"essay_id": "essay-1", "text_storage_id": "storage-1"},
                 {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
-            "batch_entity": {"entity_type": "batch", "entity_id": batch_id},
             "metadata": {
-                "entity": {"entity_type": "batch", "entity_id": batch_id},
+                "entity_id": batch_id,
+                "entity_type": "batch",
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             # Enhanced lean registration fields (required by updated BatchEssaysReady model)

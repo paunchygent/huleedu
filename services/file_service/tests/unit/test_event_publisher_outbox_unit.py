@@ -158,7 +158,7 @@ class TestDefaultEventPublisher:
         """Verify EssayContentProvisionedV1 event calls OutboxManager with correct parameters."""
         # Given
         event_data = EssayContentProvisionedV1(
-            batch_id="batch-001",
+            entity_id="batch-001",
             file_upload_id="file-123",
             original_file_name="test_essay.pdf",
             raw_file_storage_id="raw-456",
@@ -212,7 +212,7 @@ class TestDefaultEventPublisher:
         )
 
         event_data = EssayValidationFailedV1(
-            batch_id="batch-002",
+            entity_id="batch-002",
             file_upload_id="file-456",
             original_file_name="invalid_essay.docx",
             raw_file_storage_id="raw-999",
@@ -347,7 +347,7 @@ class TestDefaultEventPublisher:
         mock_outbox_manager.publish_to_outbox.side_effect = Exception("Database connection lost")
 
         event_data = EssayContentProvisionedV1(
-            batch_id="batch-fail",
+            entity_id="batch-fail",
             file_upload_id="file-fail",
             original_file_name="fail.pdf",
             raw_file_storage_id="raw-fail",
@@ -419,7 +419,7 @@ class TestDefaultEventPublisher:
         """Verify trace context is injected into event metadata."""
         # Given
         event_data = EssayContentProvisionedV1(
-            batch_id="batch-trace",
+            entity_id="batch-trace",
             file_upload_id="file-trace",
             original_file_name="trace.pdf",
             raw_file_storage_id="raw-trace",
@@ -470,7 +470,7 @@ class TestDefaultEventPublisher:
         )
 
         event_data = EssayValidationFailedV1(
-            batch_id="batch-serial",
+            entity_id="batch-serial",
             file_upload_id="file-serial",
             original_file_name="serial.pdf",
             raw_file_storage_id="raw-serial",
@@ -533,7 +533,7 @@ class TestDefaultEventPublisher:
             (
                 event_publisher.publish_essay_content_provisioned,
                 EssayContentProvisionedV1(
-                    batch_id="batch-1",
+                    entity_id="batch-1",
                     file_upload_id="file-1",
                     original_file_name="test1.pdf",
                     raw_file_storage_id="raw-1",
@@ -548,7 +548,7 @@ class TestDefaultEventPublisher:
             (
                 event_publisher.publish_essay_validation_failed,
                 EssayValidationFailedV1(
-                    batch_id="batch-2",
+                    entity_id="batch-2",
                     file_upload_id="file-2",
                     original_file_name="test2.pdf",
                     raw_file_storage_id="raw-2",

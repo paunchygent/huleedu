@@ -99,7 +99,7 @@ class TestKafkaConsumerFailures:
 
         # Use real event structure that will trigger the handler
         event_data = EssayContentProvisionedV1(
-            batch_id="test_batch",
+            entity_id="test_batch",
             file_upload_id="test-file-upload-kafka-failure",
             text_storage_id="test_storage",
             raw_file_storage_id="raw_storage",

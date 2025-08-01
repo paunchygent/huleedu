@@ -89,7 +89,7 @@ class TestCoreLogicValidationErrors:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
         assert "Unable to extract text from PDF" in event_data.validation_error_detail.message
@@ -144,7 +144,7 @@ class TestCoreLogicValidationErrors:
         failure_event_call = mock_event_publisher.publish_essay_validation_failed.call_args
         event_data = failure_event_call[0][0]
         assert event_data.file_upload_id == file_upload_id
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.original_file_name == file_name
         assert event_data.validation_error_code == FileValidationErrorCode.RAW_STORAGE_FAILED
         assert "Failed to store raw file" in event_data.validation_error_detail.message

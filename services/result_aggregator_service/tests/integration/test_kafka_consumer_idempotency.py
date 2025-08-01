@@ -184,7 +184,7 @@ class TestKafkaConsumerIdempotency:
     def _create_batch_registered_data(self, batch_id: str) -> BatchEssaysRegistered:
         """Helper to create BatchEssaysRegistered data."""
         return BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,  # entity_id at top level (required by model)
             user_id=str(uuid4()),
             essay_ids=["essay-1", "essay-2"],
             expected_essay_count=2,

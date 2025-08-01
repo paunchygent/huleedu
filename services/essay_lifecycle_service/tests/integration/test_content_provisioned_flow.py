@@ -183,7 +183,7 @@ class TestContentProvisionedFlow:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Test atomic assignment",
             essay_ids=essay_ids,
@@ -205,7 +205,7 @@ class TestContentProvisionedFlow:
         text_storage_id = f"text_{uuid4().hex[:8]}"
 
         content_event = EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=file_upload_id,
             original_file_name="test_atomic.txt",
             raw_file_storage_id=f"raw_{uuid4().hex[:8]}",
@@ -264,7 +264,7 @@ class TestContentProvisionedFlow:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Concurrent test",
             essay_ids=essay_ids,
@@ -286,7 +286,7 @@ class TestContentProvisionedFlow:
             """Provision content for a single file."""
             file_upload_id = f"upload_concurrent_{index}_{uuid4().hex[:8]}"
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=file_upload_id,
                 original_file_name=f"concurrent_{index}.txt",
                 raw_file_storage_id=f"raw_{index}_{uuid4().hex[:8]}",
@@ -378,7 +378,7 @@ class TestContentProvisionedFlow:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Idempotency test",
             essay_ids=essay_ids,
@@ -400,7 +400,7 @@ class TestContentProvisionedFlow:
         text_storage_id = f"text_idempotent_{uuid4().hex[:8]}"
 
         content_event = EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=file_upload_id,
             original_file_name="idempotent.txt",
             raw_file_storage_id=f"raw_{uuid4().hex[:8]}",
@@ -448,7 +448,7 @@ class TestContentProvisionedFlow:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Publishing failure test",
             essay_ids=essay_ids,
@@ -470,7 +470,7 @@ class TestContentProvisionedFlow:
 
         # Test: Try to provision content
         content_event = EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=f"upload_fail_{uuid4().hex[:8]}",
             original_file_name="fail_test.txt",
             raw_file_storage_id=f"raw_{uuid4().hex[:8]}",

@@ -194,7 +194,7 @@ async def _route_event(
             # Record batch coordination event
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="batch_registered", batch_id=str(batch_event_data.batch_id)
+                    event_type="batch_registered", batch_id=str(batch_event_data.entity_id)
                 ).inc()
 
             batch_result: bool = await batch_coordination_handler.handle_batch_essays_registered(
@@ -210,7 +210,7 @@ async def _route_event(
             # Record coordination event
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="content_provisioned", batch_id=str(content_event_data.batch_id)
+                    event_type="content_provisioned", batch_id=str(content_event_data.entity_id)
                 ).inc()
 
             content_result: bool = (
@@ -228,7 +228,7 @@ async def _route_event(
             # Record validation failure
             if coordination_events_metric:
                 coordination_events_metric.labels(
-                    event_type="validation_failed", batch_id=str(validation_event_data.batch_id)
+                    event_type="validation_failed", batch_id=str(validation_event_data.entity_id)
                 ).inc()
 
             validation_result: bool = (

@@ -109,7 +109,7 @@ class TestCoreLogicValidationSuccess:
         success_event_call = mock_event_publisher.publish_essay_content_provisioned.call_args
         event_data = success_event_call[0][0]
         assert isinstance(event_data, EssayContentProvisionedV1)
-        assert event_data.batch_id == batch_id
+        assert event_data.entity_id == batch_id
         assert event_data.file_upload_id == file_upload_id
         assert event_data.original_file_name == file_name
         assert event_data.raw_file_storage_id == "raw_storage_id_12345"  # Raw storage ID

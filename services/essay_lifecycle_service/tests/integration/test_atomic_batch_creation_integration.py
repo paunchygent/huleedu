@@ -140,7 +140,7 @@ class MockEventPublisher(EventPublisher):
         )
 
         # Validate field values
-        assert event_data.batch_id, "batch_id must not be empty"
+        assert event_data.entity_id, "batch_id must not be empty"
         assert event_data.essay_id, "essay_id must not be empty"
         assert event_data.file_upload_id, "file_upload_id must not be empty"
         assert event_data.text_storage_id, "text_storage_id must not be empty"
@@ -355,7 +355,7 @@ class TestAtomicBatchCreationIntegration:
     def sample_batch_event(self) -> BatchEssaysRegistered:
         """Create sample BatchEssaysRegistered event."""
         return BatchEssaysRegistered(
-            batch_id="integration-test-batch",
+            entity_id="integration-test-batch",
             expected_essay_count=3,
             essay_ids=["essay_001", "essay_002", "essay_003"],
             course_code=CourseCode.ENG5,
@@ -418,14 +418,14 @@ class TestAtomicBatchCreationIntegration:
             essay = await postgres_repository.get_essay_state(essay_id)
             assert essay is not None
             assert essay.essay_id == essay_id
-            assert essay.batch_id == sample_batch_event.batch_id
+            assert essay.batch_id == sample_batch_event.entity_id
             # Verify all essays have the expected initial status
             from common_core.status_enums import EssayStatus
 
             assert essay.current_status == EssayStatus.UPLOADED
 
         # Assert - Batch listing returns all essays
-        batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.batch_id)
+        batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.entity_id)
         assert len(batch_essays) == 3
         essay_ids = {essay.essay_id for essay in batch_essays}
         expected_ids = set(sample_batch_event.essay_ids)
@@ -445,7 +445,7 @@ class TestAtomicBatchCreationIntegration:
 
         async with postgres_repository.session() as session:
             batch_tracker_record = BatchEssayTracker(
-                batch_id=sample_batch_event.batch_id,
+                batch_id=sample_batch_event.entity_id,
                 expected_essay_ids=sample_batch_event.essay_ids,
                 available_slots=sample_batch_event.essay_ids,
                 expected_count=len(sample_batch_event.essay_ids),
@@ -464,7 +464,7 @@ class TestAtomicBatchCreationIntegration:
 
         # Now create one essay manually to cause constraint violation
         essay_id = "essay_001"  # Same as first essay in batch
-        batch_id = sample_batch_event.batch_id
+        batch_id = sample_batch_event.entity_id
 
         # Create essay using Unit of Work pattern
         async with postgres_repository.get_session_factory()() as session:
@@ -500,7 +500,7 @@ class TestAtomicBatchCreationIntegration:
         assert essay_003 is None
 
         # Batch should still only have 1 essay (the pre-existing one)
-        batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.batch_id)
+        batch_essays = await postgres_repository.list_essays_by_batch(sample_batch_event.entity_id)
         assert len(batch_essays) == 1
 
     @pytest.mark.asyncio
@@ -513,7 +513,7 @@ class TestAtomicBatchCreationIntegration:
         """Test that handler gracefully handles empty essay list."""
         # Arrange - Event with empty essay list
         empty_event = BatchEssaysRegistered(
-            batch_id="empty-batch",
+            entity_id="empty-batch",
             expected_essay_count=0,
             essay_ids=[],  # Empty list
             course_code=CourseCode.ENG5,
@@ -567,7 +567,7 @@ class TestAtomicBatchCreationIntegration:
         assert result is True
 
         # Assert - Batch tracker registered the batch expectation
-        batch_status = await batch_tracker.get_batch_status(sample_batch_event.batch_id)
+        batch_status = await batch_tracker.get_batch_status(sample_batch_event.entity_id)
         assert batch_status is not None
         assert batch_status["expected_count"] == 3
         assert batch_status["ready_count"] == 0  # No content assigned yet
@@ -577,7 +577,7 @@ class TestAtomicBatchCreationIntegration:
             essay = await postgres_repository.get_essay_state(essay_id)
             assert essay is not None
             assert essay.essay_id == essay_id
-            assert essay.batch_id == sample_batch_event.batch_id
+            assert essay.batch_id == sample_batch_event.entity_id
             # Verify default state from atomic creation
             from common_core.status_enums import EssayStatus
 

@@ -107,7 +107,7 @@ class TestSpellcheckCommandHandler:
         """Sample spellcheck command data."""
         return BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=[essay_processing_ref],
             language=Language.ENGLISH,
         )
@@ -274,7 +274,7 @@ class TestSpellcheckCommandHandler:
 
         command_data = BatchServiceSpellcheckInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND,
-            batch_id=batch_id,
+            entity_id=batch_id,
             essays_to_process=essay_refs,
             language=Language.ENGLISH,
         )

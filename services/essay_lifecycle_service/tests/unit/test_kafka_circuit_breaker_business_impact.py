@@ -220,7 +220,7 @@ class TestBatchCoordinationBusinessImpact:
         )
 
         batch_registered_event = BatchEssaysRegistered(
-            batch_id=business_context.batch_id,
+            entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(business_context.essay_count)],
             expected_essay_count=business_context.essay_count,
             user_id="test_user_123",
@@ -372,7 +372,7 @@ class TestBatchCoordinationBusinessImpact:
         mock_batch_tracker.mark_slot_fulfilled.return_value = (batch_ready_event, correlation_id)
 
         content_provisioned_event = EssayContentProvisionedV1(
-            batch_id=business_context.batch_id,
+            entity_id=business_context.batch_id,
             file_upload_id="test-file-upload-circuit-breaker-2",
             text_storage_id="content_123",
             raw_file_storage_id="raw_123",
@@ -915,7 +915,7 @@ class TestBusinessImpactIntegrationScenarios:
 
         # Step 1: Batch registration (should succeed - index 0, False)
         batch_event = BatchEssaysRegistered(
-            batch_id=business_context.batch_id,
+            entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(3)],  # Small batch for testing
             expected_essay_count=3,
             user_id="integration_user",

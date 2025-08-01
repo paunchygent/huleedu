@@ -96,7 +96,7 @@ class TestTrueOutboxPatternCompliance:
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == essay_id
         assert (
-            call_args.kwargs["event_type"] == ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value
+            call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
         )
         assert call_args.kwargs["topic"] == "huleedu.nlp.batch.author.matches.suggested.v1"
 

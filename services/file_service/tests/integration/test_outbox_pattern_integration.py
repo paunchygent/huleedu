@@ -45,7 +45,7 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
                 # Create test event data
                 event_data = EssayContentProvisionedV1(
-                    batch_id="test-batch-123",
+                    entity_id="test-batch-123",
                     file_upload_id=test_file_upload_id,
                     original_file_name="test_essay.txt",
                     raw_file_storage_id="raw_storage_123",
@@ -163,7 +163,7 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                 )
 
                 event_data = EssayValidationFailedV1(
-                    batch_id="test-batch-456",
+                    entity_id="test-batch-456",
                     file_upload_id=test_file_upload_id,
                     original_file_name="invalid_essay.txt",
                     raw_file_storage_id="raw_storage_789",
@@ -267,7 +267,7 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
                 timestamp = datetime.now(timezone.utc)
                 event_data = EssayContentProvisionedV1(
-                    batch_id="test-serialization",
+                    entity_id="test-serialization",
                     file_upload_id=test_file_upload_id,
                     original_file_name="serialization_test.pdf",
                     raw_file_storage_id="raw_serial_123",
@@ -297,6 +297,6 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
                 # Verify nested data structure
                 nested_data = envelope_data["data"]
-                assert nested_data["batch_id"] == "test-serialization"
+                assert nested_data["entity_id"] == "test-serialization"
                 assert nested_data["file_upload_id"] == test_file_upload_id
                 assert nested_data["file_size_bytes"] == 4096

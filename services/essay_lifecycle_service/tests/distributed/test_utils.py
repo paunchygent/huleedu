@@ -125,7 +125,7 @@ class MockEventPublisher(EventPublisher):
             )
 
             # Validate field values
-            assert event_data.batch_id, "batch_id must not be empty"
+            assert event_data.entity_id, "entity_id must not be empty"
             assert event_data.essay_id, "essay_id must not be empty"
             assert event_data.file_upload_id, "file_upload_id must not be empty"
             assert event_data.text_storage_id, "text_storage_id must not be empty"

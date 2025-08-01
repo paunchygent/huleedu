@@ -307,7 +307,7 @@ class TestDistributedPerformance:
 
             # Create batch
             batch_event = BatchEssaysRegistered(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 expected_essay_count=essay_count,
                 essay_ids=[f"essay_{batch_id}_{i:03d}" for i in range(essay_count)],
                 course_code=CourseCode.ENG5,
@@ -335,7 +335,7 @@ class TestDistributedPerformance:
                 handler = test_handlers[handler_idx]
 
                 content_event = EssayContentProvisionedV1(
-                    batch_id=batch_id,
+                    entity_id=batch_id,
                     file_upload_id=f"test-file-upload-scaling-{i}",
                     text_storage_id=f"scaling_content_{i}_{uuid4().hex[:8]}",
                     raw_file_storage_id=f"raw_essay_{i:03d}_{uuid4().hex[:8]}",
@@ -504,7 +504,7 @@ class TestDistributedPerformance:
 
             # Create batch
             batch_event = BatchEssaysRegistered(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 expected_essay_count=batch_size,
                 essay_ids=essay_ids,
                 course_code=CourseCode.ENG5,
@@ -526,7 +526,7 @@ class TestDistributedPerformance:
             # Process all essays for this batch
             for i in range(batch_size):
                 content_event = EssayContentProvisionedV1(
-                    batch_id=batch_id,
+                    entity_id=batch_id,
                     file_upload_id=f"test-file-upload-memory-{i}",
                     text_storage_id=f"memory_content_{i}_{uuid4().hex[:8]}",
                     raw_file_storage_id=f"raw_essay_{i:03d}_{uuid4().hex[:8]}",
@@ -585,7 +585,7 @@ class TestDistributedPerformance:
 
         # Create large batch
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=essay_count,
             essay_ids=[f"essay_{batch_id}_{i:03d}" for i in range(essay_count)],
             course_code=CourseCode.ENG5,
@@ -611,7 +611,7 @@ class TestDistributedPerformance:
             handler = handlers[operation_count % len(handlers)]
 
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=f"test-file-upload-endurance-{operation_count}",
                 text_storage_id=f"endurance_content_{operation_count}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_essay_{operation_count:03d}_{uuid4().hex[:8]}",

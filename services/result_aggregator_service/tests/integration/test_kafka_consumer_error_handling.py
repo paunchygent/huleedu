@@ -140,7 +140,7 @@ class TestKafkaConsumerErrorHandling:
         # Valid batch registered event
         # EntityReference removed - using primitive parameters
         valid_data1 = BatchEssaysRegistered(
-            batch_id=batch_id1,
+            entity_id=batch_id1,  # entity_id at top level (modernized from batch_id)
             user_id=str(uuid4()),
             essay_ids=["essay-1", "essay-2"],
             expected_essay_count=2,

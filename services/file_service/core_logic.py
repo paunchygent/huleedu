@@ -118,7 +118,7 @@ async def process_single_file_upload(
         )
 
         validation_failure_event = EssayValidationFailedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id="STORAGE_FAILED",  # Indicate storage failure
@@ -174,7 +174,7 @@ async def process_single_file_upload(
 
         # Publish technical extraction failure event WITH raw_file_storage_id
         validation_failure_event = EssayValidationFailedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
@@ -229,7 +229,7 @@ async def process_single_file_upload(
 
         # Publish business rule validation failure event WITH raw_file_storage_id
         validation_failure_event = EssayValidationFailedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id=file_upload_id,
             original_file_name=file_name,
             raw_file_storage_id=raw_file_storage_id,
@@ -286,7 +286,7 @@ async def process_single_file_upload(
 
     # Construct success event WITH both storage IDs
     content_provisioned_event_data = EssayContentProvisionedV1(
-        batch_id=batch_id,
+        entity_id=batch_id,
         file_upload_id=file_upload_id,
         original_file_name=file_name,
         raw_file_storage_id=raw_file_storage_id,

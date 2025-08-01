@@ -418,8 +418,8 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         try:
             # Log batch creation start
-            batch_id = essay_data[0].get("batch_id", "unknown") if essay_data else "unknown"
-            essay_ids = [data.get("essay_id", "unknown") for data in essay_data]
+            batch_id = essay_data[0].get("parent_id", "unknown") if essay_data else "unknown"
+            essay_ids = [data.get("entity_id", "unknown") for data in essay_data]
             self.logger.info(
                 f"Creating batch of {len(essay_data)} essay records for batch {batch_id}: {essay_ids}"
             )
@@ -428,8 +428,8 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             essay_states: list[EssayState] = []
             for data in essay_data:
                 essay_state: EssayState = ConcreteEssayState(
-                    essay_id=data["essay_id"],
-                    batch_id=data.get("batch_id"),
+                    essay_id=data["entity_id"],
+                    batch_id=data.get("parent_id"),
                     current_status=EssayStatus.UPLOADED,
                     timeline={EssayStatus.UPLOADED.value: datetime.now(UTC)},
                 )
@@ -452,7 +452,7 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             if hasattr(e, "error_detail"):
                 raise
             else:
-                batch_id = essay_data[0].get("batch_id", "unknown") if essay_data else "unknown"
+                batch_id = essay_data[0].get("parent_id", "unknown") if essay_data else "unknown"
                 raise_processing_error(
                     service="essay_lifecycle_service",
                     operation="create_essay_records_batch",

@@ -60,7 +60,7 @@ class SimulatedELS:
 
     async def process_batch_essays_registered(self, event: BatchEssaysRegistered) -> None:
         """Process batch registration - creates slots for essays AND processes pending content."""
-        batch_id = event.batch_id
+        batch_id = event.entity_id
         expected_count = event.expected_essay_count
 
         # Create available slots in Redis (simulating ELS behavior)
@@ -90,7 +90,7 @@ class SimulatedELS:
         Process essay content with PENDING CONTENT FIX.
         Returns: "assigned", "pending", or "excess_content"
         """
-        batch_id = event.batch_id
+        batch_id = event.entity_id
         text_storage_id = event.text_storage_id
 
         # Check if batch exists
@@ -287,7 +287,7 @@ class TestRaceConditionSimplified:
     def create_batch_event(self, batch_id: str, expected_count: int = 2) -> BatchEssaysRegistered:
         """Helper to create a BatchEssaysRegistered event with required fields."""
         return BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=expected_count,
             essay_ids=[f"essay_{i}" for i in range(expected_count)],
             course_code=CourseCode.ENG5,
@@ -303,7 +303,7 @@ class TestRaceConditionSimplified:
     def create_essay_event(self, batch_id: str, index: int) -> EssayContentProvisionedV1:
         """Helper to create an EssayContentProvisionedV1 event with required fields."""
         return EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             text_storage_id=f"storage_{index}",
             original_file_name=f"essay_{index}.txt",
             file_upload_id=f"upload_{index}",

@@ -71,6 +71,7 @@ class MockRedisClient:
 def create_sample_spellcheck_event() -> dict:
     """Create sample spell check request event."""
     essay_id = str(uuid.uuid4())
+    batch_id = str(uuid.uuid4())
     correlation_id = str(uuid.uuid4())
 
     return {
@@ -81,12 +82,16 @@ def create_sample_spellcheck_event() -> dict:
         "correlation_id": correlation_id,
         "data": {
             "event_name": "essay.spellcheck.requested",
-            "entity_ref": {"entity_id": essay_id, "entity_type": "essay"},
+            "entity_id": essay_id,
+            "entity_type": "essay",
+            "parent_id": batch_id,
             "status": EssayStatus.AWAITING_SPELLCHECK.value,
             "text_storage_id": "storage-123",
             "language": "en",
             "system_metadata": {
-                "entity": {"entity_id": essay_id, "entity_type": "essay"},
+                "entity_id": essay_id,
+                "entity_type": "essay",
+                "parent_id": batch_id,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "processing_stage": "pending",
                 "event": "essay.spellcheck.requested",
@@ -128,7 +133,7 @@ def mock_dependencies() -> tuple[AsyncMock, AsyncMock, AsyncMock, AsyncMock, Asy
     # Use a MagicMock for the return value since it's a complex Pydantic model
     spell_result = MagicMock()
     spell_result.corrected_text_storage_id = "storage-corrected-123"
-    spell_result.total_corrections_made = 2
+    spell_result.corrections_made = 2  # Fixed: use correct field name
     spell_logic.perform_spell_check.return_value = spell_result  # Correct method name
 
     # Mock event publisher

@@ -61,9 +61,13 @@ def sample_cj_request_event() -> dict:
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),
         "data": {
-            "entity_ref": {"entity_id": batch_id, "entity_type": "batch"},
+            # Top-level primitive fields (required by BaseEventData)
+            "entity_id": batch_id,
+            "entity_type": "batch",
+            "parent_id": None,
             "system_metadata": {
-                "entity": {"entity_id": batch_id, "entity_type": "batch"},
+                "entity_id": batch_id,
+                "entity_type": "batch",
                 "timestamp": "2024-01-01T12:00:00Z",
                 "processing_stage": "pending",
                 "event": "els.cj_assessment.requested",
@@ -248,9 +252,13 @@ async def test_deterministic_event_id_generation(
     database, content_client, event_publisher, llm_interaction, settings = mock_boundary_services
 
     base_event_data = {
-        "entity_ref": {"entity_id": "test-batch-123", "entity_type": "batch"},
+        # Top-level primitive fields (required by BaseEventData)
+        "entity_id": "test-batch-123",
+        "entity_type": "batch",
+        "parent_id": None,
         "system_metadata": {
-            "entity": {"entity_id": "test-batch-123", "entity_type": "batch"},
+            "entity_id": "test-batch-123",
+            "entity_type": "batch",
             "timestamp": "2024-01-01T12:00:00Z",
             "processing_stage": "pending",
             "event": "els.cj_assessment.requested",

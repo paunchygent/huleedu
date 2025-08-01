@@ -134,7 +134,7 @@ class EnhancedBatchTracker:
 
     async def register_batch(self, event: BatchEssaysRegistered, correlation_id: UUID) -> None:
         """Register batch and reconcile any pending content."""
-        batch_id = event.batch_id
+        batch_id = event.entity_id
 
         # Register batch slots
         for i, essay_id in enumerate(event.essay_ids):
@@ -207,7 +207,7 @@ class EnhancedBatchTracker:
         Process essay content - either assign to slot or store as pending.
         Returns: "assigned", "pending", or "excess_content"
         """
-        batch_id = event.batch_id
+        batch_id = event.entity_id
         text_storage_id = event.text_storage_id
 
         # Check if batch exists
@@ -315,7 +315,7 @@ class TestPendingContentPattern:
     def create_batch_event(self, batch_id: str, expected_count: int = 2) -> BatchEssaysRegistered:
         """Helper to create a BatchEssaysRegistered event."""
         return BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=expected_count,
             essay_ids=[f"essay_{i}" for i in range(expected_count)],
             course_code=CourseCode.ENG5,
@@ -331,7 +331,7 @@ class TestPendingContentPattern:
     def create_essay_event(self, batch_id: str, index: int) -> EssayContentProvisionedV1:
         """Helper to create an EssayContentProvisionedV1 event."""
         return EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             text_storage_id=f"storage_{index}",
             original_file_name=f"essay_{index}.txt",
             file_upload_id=f"upload_{index}",

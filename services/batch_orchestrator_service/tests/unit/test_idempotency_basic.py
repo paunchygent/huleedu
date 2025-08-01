@@ -125,15 +125,19 @@ def sample_batch_essays_ready_event() -> dict:
         "correlation_id": correlation_id,
         "data": {
             "event": "batch.essays.ready",
+            "entity_id": batch_id,
+            "entity_type": "batch",
             "batch_id": batch_id,
             "ready_essays": [
                 {"essay_id": "essay-1", "text_storage_id": "storage-1"},
                 {"essay_id": "essay-2", "text_storage_id": "storage-2"},
             ],
-            "batch_entity": {"entity_type": "batch", "entity_id": batch_id},
             "metadata": {
-                "entity": {"entity_type": "batch", "entity_id": batch_id},
+                "entity_id": batch_id,
+                "entity_type": "batch",
                 "timestamp": datetime.now(UTC).isoformat(),
+                "processing_stage": "pending",
+                "event": "batch.essays.ready",
             },
             # Enhanced lean registration fields (required by updated BatchEssaysReady model)
             "course_code": CourseCode.ENG5.value,

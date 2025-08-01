@@ -76,10 +76,11 @@ class TestRepositoryPerformanceOptimizations:
         self, sqlite_store: SQLiteEssayStateStore, sample_essays: list[EssayState]
     ) -> None:
         """Test that combined method fetches essays once and computes summary."""
-        # Create test essays with initial UPLOADED status
+        # Create test essays with default READY_FOR_PROCESSING status
         for essay in sample_essays:
             await sqlite_store.create_essay_record(
                 essay.essay_id,
+                batch_id=essay.batch_id,
                 session=None,
             )
 
@@ -100,7 +101,7 @@ class TestRepositoryPerformanceOptimizations:
             # Verify we got the expected results
             assert len(essays) == 3
             assert status_summary == {
-                EssayStatus.UPLOADED: 2,
+                EssayStatus.READY_FOR_PROCESSING: 2,
                 EssayStatus.SPELLCHECKED_SUCCESS: 1,
             }
 

@@ -134,7 +134,7 @@ class BatchProcessingServiceImpl:
             timestamp=datetime.now(UTC),
         )
         batch_registered_event_data = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=registration_data.expected_essay_count,
             essay_ids=internal_essay_ids,  # Use generated internal IDs instead of user-provided
             metadata=event_metadata,

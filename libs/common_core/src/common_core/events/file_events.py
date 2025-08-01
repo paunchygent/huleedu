@@ -27,7 +27,7 @@ class EssayContentProvisionedV1(BaseModel):
     """
 
     event: str = Field(default="essay.content.provisioned", description="Event type identifier")
-    batch_id: str = Field(description="Batch identifier this content belongs to")
+    entity_id: str = Field(description="Batch identifier this content belongs to")
     file_upload_id: str = Field(description="Unique identifier for this file upload")
     original_file_name: str = Field(description="Original uploaded file name")
     raw_file_storage_id: str = Field(
@@ -51,7 +51,7 @@ class EssayValidationFailedV1(BaseModel):
     """
 
     event: str = Field(default="essay.validation.failed", description="Event type identifier")
-    batch_id: str = Field(description="Batch identifier this failed validation belongs to")
+    entity_id: str = Field(description="Batch identifier this failed validation belongs to")
     file_upload_id: str = Field(description="Unique identifier for this file upload")
     original_file_name: str = Field(description="Name of the file that failed validation")
     raw_file_storage_id: str = Field(

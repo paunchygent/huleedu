@@ -175,10 +175,14 @@ async def test_deterministic_event_id_generation(
     http_session, content_client, result_store, event_publisher, kafka_bus = mock_boundary_services
     base_event_data = {
         "event_name": "essay.spellcheck.requested",
-        "entity_ref": {"entity_id": "test-essay-123", "entity_type": "essay"},
+        "entity_id": "test-essay-123",
+        "entity_type": "essay",
+        "parent_id": "test-batch-456",
         "status": EssayStatus.AWAITING_SPELLCHECK.value,
         "system_metadata": {
-            "entity": {"entity_id": "test-essay-123", "entity_type": "essay"},
+            "entity_id": "test-essay-123",
+            "entity_type": "essay",
+            "parent_id": "test-batch-456",
             "timestamp": "2024-01-01T12:00:00Z",
             "processing_stage": "pending",
             "event": "essay.spellcheck.requested",

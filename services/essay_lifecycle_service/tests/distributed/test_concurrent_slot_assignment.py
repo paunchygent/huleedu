@@ -226,7 +226,7 @@ class TestConcurrentSlotAssignment:
         essay_ids = ["essay_001", "essay_002", "essay_003"]
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=len(essay_ids),
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
@@ -266,7 +266,7 @@ class TestConcurrentSlotAssignment:
         target_essay_id = "essay_001"
 
         identical_content_event = EssayContentProvisionedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id="test-file-upload-identical",
             text_storage_id=identical_text_storage_id,
             raw_file_storage_id=f"raw_{target_essay_id}_{uuid4().hex[:8]}",
@@ -360,7 +360,7 @@ class TestConcurrentSlotAssignment:
         essay_ids = [f"essay_{i:03d}" for i in range(essay_count)]
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
@@ -399,7 +399,7 @@ class TestConcurrentSlotAssignment:
             coord_handler, _, _ = distributed_coordinator_instances[instance_idx]
 
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=f"test-file-upload-bulk-{i}",
                 text_storage_id=f"content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",
@@ -480,7 +480,7 @@ class TestConcurrentSlotAssignment:
         essay_ids = [f"essay_{i:03d}" for i in range(essay_count)]
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
@@ -516,7 +516,7 @@ class TestConcurrentSlotAssignment:
             coord_handler, _, instance_publisher = distributed_coordinator_instances[instance_idx]
 
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=f"test-file-upload-completion-{i}",
                 text_storage_id=f"completion_content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",
@@ -559,7 +559,7 @@ class TestConcurrentSlotAssignment:
         essay_ids = [f"essay_{i:03d}" for i in range(essay_count)]
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
@@ -603,7 +603,7 @@ class TestConcurrentSlotAssignment:
             coord_handler, _, _ = distributed_coordinator_instances[instance_idx]
 
             content_event = EssayContentProvisionedV1(
-                batch_id=batch_id,
+                entity_id=batch_id,
                 file_upload_id=f"test-file-upload-perf-{i}",
                 text_storage_id=f"perf_content_{i}_{uuid4().hex[:8]}",
                 raw_file_storage_id=f"raw_{essay_id}_{uuid4().hex[:8]}",

@@ -33,7 +33,7 @@ class TestValidationEventConsumerIntegration:
     def sample_validation_failure_event(self) -> EssayValidationFailedV1:
         """Fixture providing a sample validation failure event."""
         return EssayValidationFailedV1(
-            batch_id="batch_consumer_test",
+            entity_id="batch_consumer_test",
             file_upload_id="test-file-upload-consumer",
             original_file_name="failed_essay.txt",
             validation_error_code=FileValidationErrorCode.EMPTY_CONTENT,
@@ -108,7 +108,7 @@ class TestValidationEventConsumerIntegration:
 
         # Verify the validation failure data
         validation_data = reconstructed_envelope.data
-        assert validation_data.batch_id == sample_validation_failure_event.batch_id
+        assert validation_data.entity_id == sample_validation_failure_event.entity_id
         assert (
             validation_data.validation_error_code
             == sample_validation_failure_event.validation_error_code
@@ -135,7 +135,7 @@ class TestValidationEventConsumerIntegration:
         # Create multiple validation failure events
         validation_failures = [
             EssayValidationFailedV1(
-                batch_id="batch_multiple",
+                entity_id="batch_multiple",
                 file_upload_id=f"test-file-upload-multiple-{i}",
                 original_file_name=f"failed_{i}.txt",
                 validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
@@ -167,7 +167,7 @@ class TestValidationEventConsumerIntegration:
         correlation_id = uuid4()
 
         validation_failure = EssayValidationFailedV1(
-            batch_id="batch_correlation",
+            entity_id="batch_correlation",
             file_upload_id="test-file-upload-correlation",
             original_file_name="tracked_file.txt",
             validation_error_code=FileValidationErrorCode.CONTENT_TOO_LONG,
@@ -200,7 +200,7 @@ class TestValidationEventConsumerIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="file_service",
             data=EssayValidationFailedV1(
-                batch_id="batch_invalid",
+                entity_id="batch_invalid",
                 file_upload_id="test-file-upload-invalid",
                 original_file_name="test.txt",
                 validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
@@ -231,7 +231,7 @@ class TestValidationEventConsumerIntegration:
         mock_batch_tracker.handle_validation_failure.side_effect = Exception("Processing error")
 
         validation_failure = EssayValidationFailedV1(
-            batch_id="batch_error",
+            entity_id="batch_error",
             file_upload_id="test-file-upload-error",
             original_file_name="error_test.txt",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
@@ -278,7 +278,7 @@ class TestValidationEventConsumerIntegration:
         batch_id = "batch_consistency_test"
 
         validation_failure = EssayValidationFailedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id="test-file-upload-consistency",
             original_file_name="consistency_test.txt",
             validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
@@ -307,8 +307,8 @@ class TestValidationEventConsumerIntegration:
 
         # Verify consistency
         call_args = mock_batch_tracker.handle_validation_failure.call_args[0][0]
-        assert envelope.data.batch_id == batch_id
-        assert call_args.batch_id == batch_id
+        assert envelope.data.entity_id == batch_id
+        assert call_args.entity_id == batch_id
 
     async def test_concurrent_event_processing(self, mock_batch_tracker: AsyncMock) -> None:
         """Test concurrent processing of validation failure events."""
@@ -317,7 +317,7 @@ class TestValidationEventConsumerIntegration:
         # Create multiple validation failures for different batches
         validation_failures = [
             EssayValidationFailedV1(
-                batch_id=f"batch_concurrent_{i}",
+                entity_id=f"batch_concurrent_{i}",
                 file_upload_id=f"test-file-upload-concurrent-{i}",
                 original_file_name=f"concurrent_{i}.txt",
                 validation_error_code=FileValidationErrorCode.CONTENT_TOO_SHORT,
@@ -393,7 +393,7 @@ class TestValidationEventConsumerIntegration:
 
         for error_code in error_codes:
             validation_failure = EssayValidationFailedV1(
-                batch_id="batch_error_codes",
+                entity_id="batch_error_codes",
                 file_upload_id=f"test-file-upload-{error_code.value.lower()}",
                 original_file_name=f"test_{error_code.value.lower()}.txt",
                 validation_error_code=error_code,

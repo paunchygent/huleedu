@@ -168,7 +168,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Test essay",
             essay_ids=essay_ids,
@@ -270,7 +270,7 @@ class TestRedisTransactionAndDatabaseUpdate:
         correlation_id = uuid4()
 
         batch_event = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,
             course_code=CourseCode.ENG5,
             essay_instructions="Test concurrent",
             essay_ids=essay_ids,

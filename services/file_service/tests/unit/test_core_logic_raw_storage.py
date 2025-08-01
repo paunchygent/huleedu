@@ -145,7 +145,7 @@ async def test_extraction_failure_includes_raw_storage_id() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.file_upload_id == file_upload_id
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
     assert published_event.validation_error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
@@ -215,7 +215,7 @@ async def test_validation_failure_includes_raw_storage_id() -> None:
 
     assert isinstance(published_event, EssayValidationFailedV1)
     assert published_event.file_upload_id == file_upload_id
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
     assert published_event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
@@ -265,7 +265,7 @@ async def test_success_event_includes_both_storage_ids() -> None:
 
     assert isinstance(published_event, EssayContentProvisionedV1)
     assert published_event.file_upload_id == file_upload_id
-    assert published_event.batch_id == batch_id
+    assert published_event.entity_id == batch_id
     assert published_event.original_file_name == file_name
     assert published_event.raw_file_storage_id == "raw_storage_id_123"
     assert published_event.text_storage_id == "text_storage_id_456"

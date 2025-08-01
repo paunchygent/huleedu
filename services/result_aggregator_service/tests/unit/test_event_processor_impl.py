@@ -145,7 +145,7 @@ class TestProcessBatchRegistered:
         )
 
         data = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,  # entity_id at top level (modernized from batch_id)
             user_id=user_id,
             essay_ids=["essay1", "essay2", "essay3", "essay4", "essay5"],
             expected_essay_count=essay_count,
@@ -193,7 +193,7 @@ class TestProcessBatchRegistered:
         )
 
         data = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,  # entity_id at top level (modernized from batch_id)
             user_id=user_id,
             essay_ids=["essay1", "essay2", "essay3"],
             expected_essay_count=essay_count,
@@ -243,7 +243,7 @@ class TestProcessBatchRegistered:
         )
 
         data = BatchEssaysRegistered(
-            batch_id=batch_id,
+            entity_id=batch_id,  # entity_id at top level (modernized from batch_id)
             user_id=user_id,
             essay_ids=["essay1", "essay2"],
             expected_essay_count=2,
@@ -625,14 +625,14 @@ class TestProcessSpellcheckCompleted:
     async def test_spellcheck_missing_entity_reference(
         self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock
     ) -> None:
-        """Test error when entity reference is missing."""
+        """Test error when entity information is missing."""
         # Arrange
-        # The test wants to simulate missing entity reference in system_metadata
-        # Create a minimal system_metadata without entity
+        # The test wants to simulate missing entity_id in system_metadata
+        # Create a minimal system_metadata without entity_id
         from unittest.mock import Mock
 
         mock_metadata = Mock(spec=SystemProcessingMetadata)
-        mock_metadata.entity = None  # This simulates the missing entity reference
+        mock_metadata.entity_id = None  # This simulates missing entity_id
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
@@ -654,7 +654,7 @@ class TestProcessSpellcheckCompleted:
         )
 
         # Act & Assert
-        with pytest.raises(ValueError, match="Missing entity reference"):
+        with pytest.raises(ValueError, match="Missing entity information"):
             await event_processor.process_spellcheck_completed(envelope, data)
 
     @pytest.mark.asyncio
