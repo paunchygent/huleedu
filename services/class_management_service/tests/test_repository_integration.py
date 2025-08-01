@@ -59,13 +59,13 @@ class TestRepositoryIntegration:
             # Seed courses (essential for class creation)
             await conn.execute(
                 text("""
-                INSERT INTO courses (id, course_code, name, language, skill_level) VALUES
-                (gen_random_uuid(), 'ENG5', 'English 5', 'en', 5),
-                (gen_random_uuid(), 'ENG6', 'English 6', 'en', 6),
-                (gen_random_uuid(), 'ENG7', 'English 7', 'en', 7),
-                (gen_random_uuid(), 'SV1', 'Svenska 1', 'sv', 1),
-                (gen_random_uuid(), 'SV2', 'Svenska 2', 'sv', 2),
-                (gen_random_uuid(), 'SV3', 'Svenska 3', 'sv', 3)
+                INSERT INTO courses (id, course_code, name, language) VALUES
+                (gen_random_uuid(), 'ENG5', 'English 5', 'en'),
+                (gen_random_uuid(), 'ENG6', 'English 6', 'en'),
+                (gen_random_uuid(), 'ENG7', 'English 7', 'en'),
+                (gen_random_uuid(), 'SV1', 'Svenska 1', 'sv'),
+                (gen_random_uuid(), 'SV2', 'Svenska 2', 'sv'),
+                (gen_random_uuid(), 'SV3', 'Svenska 3', 'sv')
                 ON CONFLICT (course_code) DO NOTHING
             """)
             )

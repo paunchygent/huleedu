@@ -43,7 +43,6 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             course_code=class_data.course_codes[0],
             name="Mock Course",
             language=Language.ENGLISH,
-            skill_level=1,
         )
         new_class = UserClass(
             id=class_id,

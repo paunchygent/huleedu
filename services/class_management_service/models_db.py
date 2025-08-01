@@ -9,7 +9,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    Integer,
     String,
     Table,
     UniqueConstraint,
@@ -55,7 +54,6 @@ class Course(Base):
         nullable=False,
         default=Language.SWEDISH,
     )
-    skill_level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     classes: Mapped[list["UserClass"]] = relationship(back_populates="course")
 
