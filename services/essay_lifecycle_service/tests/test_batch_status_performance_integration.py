@@ -84,9 +84,6 @@ class TestBatchStatusPerformanceIntegration:
                 user_id="perf_test_user",
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,
-                total_slots=essay_count,
-                assigned_slots=0,
-                is_ready=False,
                 # Don't set created_at/updated_at - they have server_default
             )
             session.add(batch_tracker)
@@ -180,9 +177,6 @@ class TestBatchStatusPerformanceIntegration:
                 user_id="perf_test_user",
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,
-                total_slots=essay_count,
-                assigned_slots=0,
-                is_ready=False,
                 # Don't set created_at/updated_at - they have server_default
             )
             session.add(batch_tracker)

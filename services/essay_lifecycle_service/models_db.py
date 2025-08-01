@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 from common_core.status_enums import EssayStatus
 from sqlalchemy import (
     JSON,
-    Boolean,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -130,10 +129,6 @@ class BatchEssayTracker(Base):
         Integer, default=86400, nullable=False
     )  # 24 hours for complex processing
 
-    # Legacy fields (maintained for compatibility)
-    total_slots: Mapped[int] = mapped_column(Integer, nullable=False)
-    assigned_slots: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    is_ready: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Additional metadata as JSON
     batch_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=True)

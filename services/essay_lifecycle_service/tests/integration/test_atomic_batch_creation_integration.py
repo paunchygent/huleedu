@@ -454,9 +454,6 @@ class TestAtomicBatchCreationIntegration:
                 user_id=sample_batch_event.user_id,
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,
-                total_slots=len(sample_batch_event.essay_ids),
-                assigned_slots=0,
-                is_ready=False,
                 # Don't set created_at/updated_at - they have server_default
             )
             session.add(batch_tracker_record)

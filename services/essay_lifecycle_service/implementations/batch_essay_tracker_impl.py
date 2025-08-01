@@ -103,7 +103,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 extra={
                     "batch_id": batch_id,
                     "new_correlation_id": str(correlation_id),
-                    "total_slots": existing_batch_status["total_slots"],
+                    "expected_count": existing_batch_status["total_slots"],
                     "available_slots": existing_batch_status["available_slots"],
                 },
             )

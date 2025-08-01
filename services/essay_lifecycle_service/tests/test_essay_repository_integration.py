@@ -121,9 +121,6 @@ class TestPostgreSQLEssayRepositoryIntegration:
                 user_id="test-user",
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,
-                total_slots=len(essay_ids),
-                assigned_slots=0,
-                is_ready=False,
             )
 
             session.add(batch_tracker)

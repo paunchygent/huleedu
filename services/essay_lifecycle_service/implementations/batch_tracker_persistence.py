@@ -60,9 +60,6 @@ class BatchTrackerPersistence:
                     user_id=expectation.user_id,
                     correlation_id=str(expectation.correlation_id),
                     timeout_seconds=expectation.timeout_seconds,
-                    total_slots=expectation.expected_count,
-                    assigned_slots=0,
-                    is_ready=False,
                 )
 
                 session.add(tracker_db)
@@ -105,8 +102,7 @@ class BatchTrackerPersistence:
 
                 db_session.add(slot_db)
 
-                # Update tracker assigned_slots count
-                tracker_db.assigned_slots += 1
+                # Update available slots (assigned count now tracked in Redis)
                 tracker_db.available_slots = [
                     slot for slot in tracker_db.available_slots if slot != internal_essay_id
                 ]
