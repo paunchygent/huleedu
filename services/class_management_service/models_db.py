@@ -7,18 +7,18 @@ from typing import Any
 from common_core.domain_enums import CourseCode, Language
 from common_core.metadata_models import PersonNameV1
 from sqlalchemy import (
+    JSON,
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
-    JSON,
     String,
     Table,
     Text,
     UniqueConstraint,
-    text,
     func,
-    Index,
+    text,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+
+from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -11,6 +16,7 @@ from services.class_management_service.api.health_routes import health_bp
 from services.class_management_service.api.student_routes import student_bp
 from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
+from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
 
 # Configure logging first
 configure_service_logging("class-management-service", log_level=settings.LOG_LEVEL)
@@ -38,8 +44,17 @@ def create_app() -> HuleEduApp:
         pool_recycle=settings.DATABASE_POOL_RECYCLE,
     )
 
+    # Initialize tracing early, before blueprint registration
+    tracer = init_tracing("class_management_service")
+    app.extensions = {"tracer": tracer}
+    setup_tracing_middleware(app, tracer)
+
     # Integrate DI with Quart (must be done before registering blueprints)
     QuartDishka(app=app, container=app.container)
+
+    # Optional service-specific attributes for Kafka consumer
+    app.consumer_task = None
+    app.kafka_consumer = None
 
     # Register Blueprints
     app.register_blueprint(health_bp)
@@ -55,15 +70,58 @@ app = create_app()
 
 @app.before_serving
 async def startup() -> None:
-    """Initialize database schema before the app starts serving."""
-    await startup_setup.initialize_database_schema(app)
+    """Application startup tasks including Kafka consumer."""
+    try:
+        # Initialize database schema
+        await startup_setup.initialize_database_schema(app)
+
+        # Setup metrics middleware
+        setup_standard_service_metrics_middleware(app, "class_management")
+
+        # Get Kafka consumer from DI container and start it
+        async with app.container() as request_container:
+            app.kafka_consumer = await request_container.get(ClassManagementKafkaConsumer)
+
+        # Start consumer as background task
+        assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
+        app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
+
+        logger.info("Class Management Service started successfully")
+        logger.info("Health endpoint: /healthz")
+        logger.info("Metrics endpoint: /metrics")
+        logger.info("API endpoints: /v1/classes/")
+        logger.info("Kafka consumer: running")
+
+    except Exception as e:
+        logger.critical(f"Failed to start Class Management Service: {e}", exc_info=True)
+        raise
 
 
 @app.after_serving
 async def shutdown() -> None:
-    """Gracefully shutdown services."""
-    await startup_setup.shutdown_services()
-    await app.container.close()
+    """Application cleanup tasks including Kafka consumer shutdown."""
+    try:
+        # Stop Kafka consumer
+        if app.kafka_consumer:
+            logger.info("Stopping Kafka consumer...")
+            await app.kafka_consumer.stop_consumer()
+
+        # Cancel consumer task
+        if app.consumer_task and not app.consumer_task.done():
+            app.consumer_task.cancel()
+            try:
+                await app.consumer_task
+            except asyncio.CancelledError:
+                logger.info("Consumer task cancelled successfully")
+
+        # Additional cleanup
+        await startup_setup.shutdown_services()
+        await app.container.close()
+
+        logger.info("Class Management Service shutdown complete")
+
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

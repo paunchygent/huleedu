@@ -170,9 +170,8 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                         extraction_metadata={
                             "match_status": match_status,
                             "confidence_scores": (
-                                [s.confidence_score for s in suggestions] 
-                                if suggestions else []
-                            )
+                                [s.confidence_score for s in suggestions] if suggestions else []
+                            ),
                         },
                     )
                     match_results.append(match_result)
@@ -212,10 +211,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                         filename=getattr(essay_ref, "filename", ""),
                         suggestions=[],
                         no_match_reason=f"Processing error: {str(essay_error)}",
-                        extraction_metadata={
-                            "error": str(essay_error),
-                            "match_status": "ERROR"
-                        },
+                        extraction_metadata={"error": str(essay_error), "match_status": "ERROR"},
                     )
                     match_results.append(match_result)
                     # Continue processing other essays instead of failing the entire batch

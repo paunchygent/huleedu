@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from services.class_management_service.config import Settings, settings
+from services.class_management_service.implementations.batch_author_matches_handler import (
+    BatchAuthorMatchesHandler,
+)
 from services.class_management_service.implementations.class_management_service_impl import (
     ClassManagementServiceImpl,
 )
@@ -34,6 +37,7 @@ from services.class_management_service.implementations.event_publisher_impl impo
     DefaultClassEventPublisherImpl,
 )
 from services.class_management_service.implementations.outbox_manager import OutboxManager
+from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
 from services.class_management_service.metrics import (
     CmsMetrics,
     setup_class_management_database_monitoring,
@@ -43,6 +47,7 @@ from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
     ClassManagementServiceProtocol,
     ClassRepositoryProtocol,
+    CommandHandlerProtocol,
 )
 
 
@@ -209,6 +214,43 @@ class ServiceProvider(Provider):
             self._redis_shutdown_handlers.clear()
 
 
+class KafkaProvider(Provider):
+    """Provides Kafka consumer and command handlers."""
+
+    @provide(scope=Scope.APP)
+    def provide_command_handlers(
+        self,
+        class_repository: ClassRepositoryProtocol[UserClass, Student],
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> dict[str, CommandHandlerProtocol]:
+        """Provide command handlers for Kafka event processing."""
+        batch_handler = BatchAuthorMatchesHandler(
+            class_repository=class_repository,
+            session_factory=session_factory,
+        )
+
+        return {
+            "batch_author_matches": batch_handler,
+        }
+
+    @provide(scope=Scope.APP)
+    def provide_kafka_consumer(
+        self,
+        settings: Settings,
+        redis_client: AtomicRedisClientProtocol,
+        command_handlers: dict[str, CommandHandlerProtocol],
+    ) -> ClassManagementKafkaConsumer:
+        """Provide Kafka consumer for Class Management Service."""
+        return ClassManagementKafkaConsumer(
+            kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            consumer_group=f"{settings.SERVICE_NAME}-consumer-group",
+            consumer_client_id=f"{settings.SERVICE_NAME}-consumer",
+            redis_client=redis_client,
+            command_handlers=command_handlers,
+            tracer=None,  # TODO: Add tracer when observability is needed
+        )
+
+
 class MetricsProvider(Provider):
     """Provides Prometheus metrics-related dependencies."""
 
@@ -233,6 +275,7 @@ def create_container() -> AsyncContainer:
         DatabaseProvider(),
         RepositoryProvider(),
         _service_provider,
+        KafkaProvider(),
         MetricsProvider(),
     )
 

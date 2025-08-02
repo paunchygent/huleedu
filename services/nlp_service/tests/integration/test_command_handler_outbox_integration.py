@@ -433,12 +433,12 @@ class TestCommandHandlerOutboxIntegration:
 
             # Should have one event with failure information
             assert len(test_events) == 1
-            
+
             # Verify it's a batch event with failure information
             event = test_events[0]
             assert event.aggregate_type == "batch"
             assert event.event_type == "batch.author.matches.suggested.v1"
-            
+
             # Verify the event data contains failure information
             event_data_str = str(event.event_data)
             assert "ERROR" in event_data_str or "Processing error" in event_data_str

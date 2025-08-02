@@ -44,7 +44,22 @@ async def process_single_message(
     # First, parse the message to get the envelope
     try:
         raw_message = msg.value.decode("utf-8")
-        envelope: EventEnvelope = EventEnvelope.model_validate_json(raw_message)
+        
+        # Parse JSON manually to preserve data as dict for handlers
+        import json
+        json_data = json.loads(raw_message)
+        
+        envelope = EventEnvelope(
+            event_id=json_data.get("event_id"),
+            event_type=json_data.get("event_type", ""),
+            event_timestamp=json_data.get("event_timestamp"),
+            source_service=json_data.get("source_service", ""),
+            schema_version=json_data.get("schema_version", 1),
+            correlation_id=json_data.get("correlation_id"),
+            data_schema_uri=json_data.get("data_schema_uri"),
+            data=json_data.get("data", {}),  # Keep as dict for handlers to validate
+            metadata=json_data.get("metadata"),
+        )
     except Exception as e:
         # Use structured error handling for parsing failures
         correlation_id = uuid4()  # Generate correlation_id for parsing errors

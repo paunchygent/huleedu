@@ -154,7 +154,7 @@ def sample_kafka_message(sample_batch_request: BatchStudentMatchingRequestedV1) 
         correlation_id=uuid4(),
         data=sample_batch_request,
     )
-    
+
     msg = Mock(spec=ConsumerRecord)
     msg.value = envelope.model_dump_json().encode("utf-8")
     msg.topic = "huleedu.batch.student.matching.requested.v1"
@@ -193,10 +193,10 @@ class TestEssayStudentMatchingHandler:
             correlation_id=uuid4(),
             data=sample_batch_request,
         )
-        
+
         http_session = AsyncMock()
         correlation_id = uuid4()
-        
+
         # Process the message
         result = await handler.handle(
             msg=sample_kafka_message,
@@ -205,18 +205,18 @@ class TestEssayStudentMatchingHandler:
             correlation_id=correlation_id,
             span=None,
         )
-        
+
         # Verify success
         assert result is True
-        
+
         # Verify roster was fetched and cached
         mock_roster_cache.get_roster.assert_called_once_with("class-456")
         mock_class_management_client.get_class_roster.assert_called_once()
         mock_roster_cache.set_roster.assert_called_once()
-        
+
         # Verify batch results were published
         mock_event_publisher.publish_batch_author_match_results.assert_called_once()
-        
+
         # Check the published data
         call_args = mock_event_publisher.publish_batch_author_match_results.call_args
         assert call_args.kwargs["batch_id"] == "batch-123"
@@ -241,14 +241,14 @@ class TestEssayStudentMatchingHandler:
             Exception("Content fetch failed"),
             "Essay 2 content with Jane Smith",
         ]
-        
+
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
             event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
         )
-        
+
         result = await handler.handle(
             msg=sample_kafka_message,
             envelope=envelope,
@@ -256,10 +256,10 @@ class TestEssayStudentMatchingHandler:
             correlation_id=uuid4(),
             span=None,
         )
-        
+
         # Should still succeed
         assert result is True
-        
+
         # Verify batch results were published with partial results
         mock_event_publisher.publish_batch_author_match_results.assert_called_once()
         call_args = mock_event_publisher.publish_batch_author_match_results.call_args
@@ -279,14 +279,14 @@ class TestEssayStudentMatchingHandler:
         """Test handling when no student matches are found."""
         # No matches found
         mock_student_matcher.find_matches.return_value = []
-        
+
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
             event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
         )
-        
+
         result = await handler.handle(
             msg=sample_kafka_message,
             envelope=envelope,
@@ -294,14 +294,14 @@ class TestEssayStudentMatchingHandler:
             correlation_id=uuid4(),
             span=None,
         )
-        
+
         assert result is True
-        
+
         # Verify results show unmatched essays
         call_args = mock_event_publisher.publish_batch_author_match_results.call_args
         assert call_args.kwargs["processing_summary"]["matched"] == 0
         assert call_args.kwargs["processing_summary"]["unmatched"] == 2
-        
+
         # Check match results have no_match_reason
         match_results = call_args.kwargs["match_results"]
         for result in match_results:
@@ -323,14 +323,14 @@ class TestEssayStudentMatchingHandler:
             {"student_id": "cached-1", "name": "Cached Student", "email": "cached@example.com"}
         ]
         mock_roster_cache.get_roster.return_value = cached_roster
-        
+
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
             event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
         )
-        
+
         await handler.handle(
             msg=sample_kafka_message,
             envelope=envelope,
@@ -338,7 +338,7 @@ class TestEssayStudentMatchingHandler:
             correlation_id=uuid4(),
             span=None,
         )
-        
+
         # Verify cache was used, not the client
         mock_roster_cache.get_roster.assert_called_once()
         mock_class_management_client.get_class_roster.assert_not_called()
@@ -368,14 +368,14 @@ class TestEssayStudentMatchingHandler:
             },
         )
         mock_content_client.fetch_content.side_effect = HuleEduError(error_detail)
-        
+
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
             event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
         )
-        
+
         # Should still process batch but with failures
         result = await handler.handle(
             msg=sample_kafka_message,
@@ -384,16 +384,16 @@ class TestEssayStudentMatchingHandler:
             correlation_id=uuid4(),
             span=None,
         )
-        
+
         # Handler returns False when no essays are processed successfully
         assert result is False
-        
+
         # But it should still publish results with failure information
         mock_event_publisher.publish_batch_author_match_results.assert_called_once()
         call_args = mock_event_publisher.publish_batch_author_match_results.call_args
         assert call_args.kwargs["processing_summary"]["failed"] == 2
         assert call_args.kwargs["processing_summary"]["processed"] == 0
-        
+
         # Check that error details are included in match results
         match_results = call_args.kwargs["match_results"]
         assert len(match_results) == 2
