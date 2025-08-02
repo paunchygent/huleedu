@@ -114,7 +114,6 @@ class TestStudentAssociationHandler:
             EssayStateDB(
                 essay_id=assoc.essay_id,
                 batch_id=str(uuid4()),
-                user_id="teacher_123",
                 text_storage_id=str(uuid4()),
                 processing_metadata={"course_code": "ENG5"},
                 created_at=datetime.now(UTC),
@@ -128,9 +127,13 @@ class TestStudentAssociationHandler:
         """Create sample batch status."""
         return BatchEssayTrackerDB(
             batch_id=str(uuid4()),
-            expected_essay_count=3,
-            assigned_essay_count=3,
-            submitted_essay_count=3,
+            expected_essay_ids=["essay1", "essay2", "essay3"],
+            available_slots=["essay1", "essay2", "essay3"],
+            expected_count=3,
+            course_code="ENG5",
+            essay_instructions="Write a descriptive essay",
+            user_id="teacher_123",
+            correlation_id=str(uuid4()),
         )
 
     @pytest.fixture

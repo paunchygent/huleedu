@@ -40,19 +40,19 @@ class TestEventContractCompliance:
             data=original_data,
         )
 
-        # Act - serialize and deserialize
+        # Act - serialize and deserialize using established EventEnvelope pattern
         serialized = original_envelope.model_dump_json()
-        deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
-        reconstructed = EventEnvelope[ClassCreatedV1].model_validate(deserialized_dict)
+        reconstructed_envelope = EventEnvelope[ClassCreatedV1].model_validate_json(serialized)
+        typed_data = ClassCreatedV1.model_validate(reconstructed_envelope.data)
 
         # Assert - round-trip integrity
-        assert reconstructed.event_type == original_envelope.event_type
-        assert reconstructed.source_service == original_envelope.source_service
-        assert reconstructed.correlation_id == original_envelope.correlation_id
-        assert reconstructed.data.class_id == original_data.class_id
-        assert reconstructed.data.class_designation == original_data.class_designation
-        assert reconstructed.data.course_codes == original_data.course_codes
-        assert reconstructed.data.user_id == original_data.user_id
+        assert reconstructed_envelope.event_type == original_envelope.event_type
+        assert reconstructed_envelope.source_service == original_envelope.source_service
+        assert reconstructed_envelope.correlation_id == original_envelope.correlation_id
+        assert typed_data.class_id == original_data.class_id
+        assert typed_data.class_designation == original_data.class_designation
+        assert typed_data.course_codes == original_data.course_codes
+        assert typed_data.user_id == original_data.user_id
 
     def test_event_envelope_class_updated_round_trip(self) -> None:
         """Test ClassUpdatedV1 event serialization/deserialization round-trip."""
@@ -71,16 +71,16 @@ class TestEventContractCompliance:
             data=original_data,
         )
 
-        # Act - serialize and deserialize
+        # Act - serialize and deserialize using established EventEnvelope pattern
         serialized = original_envelope.model_dump_json()
-        deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
-        reconstructed = EventEnvelope[ClassUpdatedV1].model_validate(deserialized_dict)
+        reconstructed_envelope = EventEnvelope[ClassUpdatedV1].model_validate_json(serialized)
+        typed_data = ClassUpdatedV1.model_validate(reconstructed_envelope.data)
 
         # Assert - round-trip integrity
-        assert reconstructed.data.class_id == original_data.class_id
-        assert reconstructed.data.class_designation == original_data.class_designation
-        assert reconstructed.data.course_codes == original_data.course_codes
-        assert reconstructed.correlation_id == original_envelope.correlation_id
+        assert typed_data.class_id == original_data.class_id
+        assert typed_data.class_designation == original_data.class_designation
+        assert typed_data.course_codes == original_data.course_codes
+        assert reconstructed_envelope.correlation_id == original_envelope.correlation_id
 
     def test_event_envelope_student_created_round_trip(self) -> None:
         """Test StudentCreatedV1 event serialization/deserialization round-trip."""
@@ -101,17 +101,17 @@ class TestEventContractCompliance:
             data=original_data,
         )
 
-        # Act - serialize and deserialize
+        # Act - serialize and deserialize using established EventEnvelope pattern
         serialized = original_envelope.model_dump_json()
-        deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
-        reconstructed = EventEnvelope[StudentCreatedV1].model_validate(deserialized_dict)
+        reconstructed_envelope = EventEnvelope[StudentCreatedV1].model_validate_json(serialized)
+        typed_data = StudentCreatedV1.model_validate(reconstructed_envelope.data)
 
         # Assert - round-trip integrity
-        assert reconstructed.data.student_id == original_data.student_id
-        assert reconstructed.data.first_name == original_data.first_name
-        assert reconstructed.data.last_name == original_data.last_name
-        assert reconstructed.data.student_email == original_data.student_email
-        assert reconstructed.data.created_by_user_id == original_data.created_by_user_id
+        assert typed_data.student_id == original_data.student_id
+        assert typed_data.first_name == original_data.first_name
+        assert typed_data.last_name == original_data.last_name
+        assert typed_data.student_email == original_data.student_email
+        assert typed_data.created_by_user_id == original_data.created_by_user_id
 
     def test_event_envelope_student_updated_round_trip(self) -> None:
         """Test StudentUpdatedV1 event serialization/deserialization round-trip."""
@@ -133,16 +133,16 @@ class TestEventContractCompliance:
             data=original_data,
         )
 
-        # Act - serialize and deserialize
+        # Act - serialize and deserialize using established EventEnvelope pattern
         serialized = original_envelope.model_dump_json()
-        deserialized_dict = original_envelope.model_validate_json(serialized).model_dump()
-        reconstructed = EventEnvelope[StudentUpdatedV1].model_validate(deserialized_dict)
+        reconstructed_envelope = EventEnvelope[StudentUpdatedV1].model_validate_json(serialized)
+        typed_data = StudentUpdatedV1.model_validate(reconstructed_envelope.data)
 
         # Assert - round-trip integrity
-        assert reconstructed.data.student_id == original_data.student_id
-        assert reconstructed.data.first_name == original_data.first_name
-        assert reconstructed.data.last_name == original_data.last_name
-        assert reconstructed.data.student_email == original_data.student_email
+        assert typed_data.student_id == original_data.student_id
+        assert typed_data.first_name == original_data.first_name
+        assert typed_data.last_name == original_data.last_name
+        assert typed_data.student_email == original_data.student_email
 
     def test_event_envelope_correlation_id_propagation(self) -> None:
         """Test correlation ID propagates correctly through event processing."""
@@ -267,9 +267,10 @@ class TestEventContractCompliance:
         assert "ENG5" in json_str
         assert "class_management_service" in json_str
 
-        # Verify we can deserialize back
-        reconstructed = EventEnvelope[ClassCreatedV1].model_validate_json(json_str)
-        assert reconstructed.data.class_designation == "JSON Test Class"
+        # Verify we can deserialize back using established EventEnvelope pattern
+        reconstructed_envelope = EventEnvelope[ClassCreatedV1].model_validate_json(json_str)
+        typed_data = ClassCreatedV1.model_validate(reconstructed_envelope.data)
+        assert typed_data.class_designation == "JSON Test Class"
 
     def test_event_schema_backward_compatibility(self) -> None:
         """Test that event schemas maintain backward compatibility."""

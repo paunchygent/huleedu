@@ -208,7 +208,7 @@ class TestBatchCoordinationBusinessImpact:
                 correlation_id=correlation_id or test_uuid4(),
             )
 
-        event_publisher.publish_batch_essays_ready.side_effect = fail_with_external_error
+        event_publisher.publish_batch_content_provisioning_completed.side_effect = fail_with_external_error
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -251,6 +251,9 @@ class TestBatchCoordinationBusinessImpact:
         # Mock check_batch_completion to return the ready event during registration
         correlation_id = uuid4()
         mock_batch_tracker.check_batch_completion.return_value = (batch_ready_event, correlation_id)
+        
+        # Mock get_batch_status to return batch info with user_id
+        mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user_123"}
 
         # Act: Process batch registration - this should fail when trying to publish BatchEssaysReady
         with pytest.raises(Exception) as exc_info:
@@ -322,8 +325,8 @@ class TestBatchCoordinationBusinessImpact:
                 correlation_id=correlation_id or uuid4(),
             )
 
-        # Make only the batch ready publishing fail
-        event_publisher.publish_batch_essays_ready.side_effect = fail_on_batch_ready
+        # Make only the batch content provisioning completed publishing fail
+        event_publisher.publish_batch_content_provisioning_completed.side_effect = fail_on_batch_ready
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -335,6 +338,9 @@ class TestBatchCoordinationBusinessImpact:
 
         # Mock batch tracker to assign a slot
         mock_batch_tracker.assign_slot_to_content.return_value = "essay_0"
+        
+        # Mock get_batch_status to return batch info with user_id
+        mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user_123"}
 
         # Mock repository to succeed in creating essay state
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
@@ -410,7 +416,7 @@ class TestBatchCoordinationBusinessImpact:
 
         # The event publisher methods would have been called
         event_publisher.publish_essay_slot_assigned.assert_called_once()
-        event_publisher.publish_batch_essays_ready.assert_called_once()  # This one failed
+        event_publisher.publish_batch_content_provisioning_completed.assert_called_once()  # This one failed
 
         # BUSINESS IMPACT VERIFICATION:
         # 1. Content is provisioned and essays are ready for processing

@@ -256,11 +256,14 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
         handler: BatchAuthorMatchesHandler,
     ) -> None:
         """Test that empty data field from JSON deserialization raises appropriate error."""
-        # This simulates when EventEnvelope deserialization creates an empty BaseModel
-        envelope = Mock()
-        envelope.data = Mock()
-        envelope.data.model_dump.side_effect = Exception("Pydantic models should inherit from BaseModel")
-        envelope.data.__dict__ = {}  # Empty dict like we observed in debug
+        # This simulates when EventEnvelope deserialization creates an empty data dict
+        # Use a real EventEnvelope with empty data to avoid mock issues
+        envelope = EventEnvelope(
+            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            source_service="nlp_service",
+            correlation_id=uuid4(),
+            data={},  # Empty data dict - this will fail model_validate
+        )
         
         kafka_msg = Mock(spec=ConsumerRecord)
         kafka_msg.value = b'{"empty": "data"}'

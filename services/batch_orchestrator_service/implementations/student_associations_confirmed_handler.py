@@ -59,11 +59,11 @@ class StudentAssociationsConfirmedHandler:
         )
 
         try:
-            # Deserialize the message
+            # Deserialize the message using established EventEnvelope pattern
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
+            associations_data = StudentAssociationsConfirmedV1.model_validate(envelope.data)
 
-            associations_data = envelope.data
             batch_id = associations_data.batch_id
 
             # Define async function to process within trace context
@@ -104,7 +104,7 @@ class StudentAssociationsConfirmedHandler:
                         )
 
                     # Validate batch is in correct state
-                    current_status = batch_data.get("status")
+                    current_status = batch_data.status
                     if current_status != BatchStatus.AWAITING_STUDENT_VALIDATION.value:
                         self.logger.warning(
                             f"Batch {batch_id} not in expected state for student associations",
@@ -201,7 +201,8 @@ class StudentAssociationsConfirmedHandler:
             try:
                 raw_message = msg.value.decode("utf-8")
                 envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
-                batch_id = envelope.data.batch_id
+                associations_data = StudentAssociationsConfirmedV1.model_validate(envelope.data)
+                batch_id = associations_data.batch_id
                 correlation_id = envelope.correlation_id
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass

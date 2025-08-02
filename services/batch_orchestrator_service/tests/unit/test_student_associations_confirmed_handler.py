@@ -55,15 +55,12 @@ class TestStudentAssociationsConfirmedHandler:
         """Create a batch in AWAITING_STUDENT_VALIDATION status."""
         return Batch(
             id=str(uuid4()),
-            user_id="teacher_123",
-            school_name="Lincoln High",
-            teacher_first_name="Jane",
-            teacher_last_name="Smith",
-            essay_instructions="Write about your summer vacation",
-            course_code=CourseCode.ENG5,
-            expected_essay_count=3,
+            correlation_id=str(uuid4()),
+            name="Test Batch",
+            description="Test batch for student associations",
             status=BatchStatus.AWAITING_STUDENT_VALIDATION,
             class_id="class_456",  # REGULAR batch
+            total_essays=3,
         )
 
     @pytest.mark.asyncio
@@ -94,18 +91,14 @@ class TestStudentAssociationsConfirmedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
 
         # Mock batch retrieval
         mock_batch_repo.get_batch_by_id.return_value = valid_batch
 
         # Act
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_student_associations_confirmed(mock_msg)
+        await handler.handle_student_associations_confirmed(mock_msg)
 
         # Assert
         # Should retrieve the batch
@@ -128,15 +121,12 @@ class TestStudentAssociationsConfirmedHandler:
         # Arrange
         batch = Batch(
             id=str(uuid4()),
-            user_id="teacher_123",
-            school_name="Lincoln High",
-            teacher_first_name="Jane",
-            teacher_last_name="Smith",
-            essay_instructions="Write about your summer vacation",
-            course_code=CourseCode.ENG5,
-            expected_essay_count=3,
+            correlation_id=str(uuid4()),
+            name="Test Batch Wrong Status",
+            description="Test batch with wrong status",
             status=BatchStatus.READY_FOR_PIPELINE_EXECUTION,  # Wrong status
             class_id="class_456",
+            total_essays=3,
         )
 
         event = StudentAssociationsConfirmedV1(
@@ -154,17 +144,13 @@ class TestStudentAssociationsConfirmedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
 
         mock_batch_repo.get_batch_by_id.return_value = batch
 
         # Act
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_student_associations_confirmed(mock_msg)
+        await handler.handle_student_associations_confirmed(mock_msg)
 
         # Assert
         # Should retrieve batch but not update anything
@@ -202,20 +188,15 @@ class TestStudentAssociationsConfirmedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
 
         # Mock batch not found
         mock_batch_repo.get_batch_by_id.return_value = None
 
         # Act & Assert
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-
-            with pytest.raises(HuleEduError) as exc_info:
-                await handler.handle_student_associations_confirmed(mock_msg)
+        with pytest.raises(HuleEduError) as exc_info:
+            await handler.handle_student_associations_confirmed(mock_msg)
 
             error = exc_info.value
             assert error.error_detail.service == "batch_orchestrator_service"
@@ -250,17 +231,13 @@ class TestStudentAssociationsConfirmedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
 
         mock_batch_repo.get_batch_by_id.return_value = valid_batch
 
         # Act
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_student_associations_confirmed(mock_msg)
+        await handler.handle_student_associations_confirmed(mock_msg)
 
         # Assert - Should still process even with empty associations
         mock_batch_repo.update_batch_status.assert_called_once()
@@ -293,27 +270,19 @@ class TestStudentAssociationsConfirmedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
 
         # First call - batch in correct state
         mock_batch_repo.get_batch_by_id.return_value = valid_batch
 
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_student_associations_confirmed(mock_msg)
+        await handler.handle_student_associations_confirmed(mock_msg)
 
         # Second call - batch already processed
         valid_batch.status = BatchStatus.READY_FOR_PIPELINE_EXECUTION
         caplog.clear()
 
-        with patch(
-            "services.batch_orchestrator_service.implementations.student_associations_confirmed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_student_associations_confirmed(mock_msg)
+        await handler.handle_student_associations_confirmed(mock_msg)
 
         # Assert - Second call should return early
         assert mock_batch_repo.get_batch_by_id.call_count == 2

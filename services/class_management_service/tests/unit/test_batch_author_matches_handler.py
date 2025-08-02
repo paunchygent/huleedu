@@ -39,7 +39,7 @@ def mock_session_factory() -> Mock:
     """Mock session factory for tests."""
     # Create mock session with required methods
     session = AsyncMock(spec=AsyncSession)
-    session.get.return_value = None  # No existing associations by default
+    session.scalar.return_value = None  # No existing associations by default (handler uses scalar, not get)
     session.add = Mock()
     session.flush = AsyncMock()
     session.commit = AsyncMock()
@@ -261,7 +261,7 @@ class TestBatchAuthorMatchesHandler:
         existing_association.student_id = uuid4()
 
         session = mock_session_factory.session
-        session.get.side_effect = [existing_association, None]  # First exists, second doesn't
+        session.scalar.side_effect = [existing_association, None]  # First exists, second doesn't
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
             event_type="huleedu.nlp.batch.author.matches.suggested.v1",
