@@ -60,8 +60,8 @@ class StudentAssociationsConfirmedHandler:
 
         try:
             # Deserialize the message
-            message_data = json.loads(msg.value.decode("utf-8"))
-            envelope = EventEnvelope[StudentAssociationsConfirmedV1](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
 
             associations_data = envelope.data
             batch_id = associations_data.batch_id
@@ -199,8 +199,8 @@ class StudentAssociationsConfirmedHandler:
             batch_id = "unknown"
             correlation_id = None
             try:
-                message_data = json.loads(msg.value.decode("utf-8"))
-                envelope = EventEnvelope[StudentAssociationsConfirmedV1](**message_data)
+                raw_message = msg.value.decode("utf-8")
+                envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
                 batch_id = envelope.data.batch_id
                 correlation_id = envelope.correlation_id
             except (json.JSONDecodeError, KeyError, TypeError):

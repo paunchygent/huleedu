@@ -223,7 +223,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
             # Missing required fields: class_id, match_results, processing_summary
         }
         
-        envelope = EventEnvelope(
+        envelope: EventEnvelope = EventEnvelope(
             event_type="huleedu.nlp.batch.author.matches.suggested.v1",
             source_service="nlp_service",
             correlation_id=uuid4(),

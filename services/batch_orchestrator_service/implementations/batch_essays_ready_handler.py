@@ -6,7 +6,6 @@ Handles BatchEssaysReady events from ELS to initiate pipeline processing.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from common_core.events.batch_coordination_events import BatchEssaysReady
@@ -57,8 +56,8 @@ class BatchEssaysReadyHandler:
 
         try:
             # Deserialize the message
-            message_data = json.loads(msg.value.decode("utf-8"))
-            envelope = EventEnvelope[BatchEssaysReady](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[BatchEssaysReady].model_validate_json(raw_message)
 
             batch_essays_ready_data = envelope.data
             batch_id = batch_essays_ready_data.batch_id

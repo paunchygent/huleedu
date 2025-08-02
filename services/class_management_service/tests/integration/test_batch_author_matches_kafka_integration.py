@@ -368,7 +368,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         # Process the message using the handler (simulate real event processor flow)
         # In real flow, the envelope comes from parsing the Kafka message
         raw_message = consumer_msg.value.decode("utf-8")
-        parsed_envelope = EventEnvelope.model_validate_json(raw_message)
+        parsed_envelope: EventEnvelope = EventEnvelope.model_validate_json(raw_message)
         
         mock_http_session = AsyncMock()
         result = await handler.handle(

@@ -254,7 +254,7 @@ async def _process_single_message_impl(
     essay_id_for_logging: str = f"offset-{msg.offset}-partition-{msg.partition}"
 
     try:
-        request_data = request_envelope.data
+        request_data = EssayLifecycleSpellcheckRequestV1.model_validate(request_envelope.data)
 
         # Record queue latency metric if available
         if (
@@ -534,9 +534,16 @@ async def _publish_structured_error_event(
         entity_type = "essay"
         batch_id = None
         if request_envelope.data:
-            entity_id = request_envelope.data.entity_id or essay_id_for_logging
-            entity_type = request_envelope.data.entity_type or "essay"
-            batch_id = request_envelope.data.parent_id
+            try:
+                typed_data = EssayLifecycleSpellcheckRequestV1.model_validate(request_envelope.data)
+                entity_id = typed_data.entity_id or essay_id_for_logging
+                entity_type = typed_data.entity_type or "essay"
+                batch_id = typed_data.parent_id
+            except Exception:
+                # Fallback to defaults if data validation fails
+                entity_id = essay_id_for_logging
+                entity_type = "essay"
+                batch_id = None
 
         # Create structured error info from ErrorDetail
         structured_error_info = {
@@ -555,11 +562,29 @@ async def _publish_structured_error_event(
             "error_info": structured_error_info,
         }
 
-        if request_envelope.data and request_envelope.data.system_metadata:
-            final_error_sys_meta = request_envelope.data.system_metadata.model_copy(
-                update=error_sys_meta_update,
-            )
-        else:  # Create minimal if no incoming
+        if request_envelope.data:
+            try:
+                typed_data = EssayLifecycleSpellcheckRequestV1.model_validate(request_envelope.data)
+                if typed_data.system_metadata:
+                    final_error_sys_meta = typed_data.system_metadata.model_copy(
+                        update=error_sys_meta_update,
+                    )
+                else:
+                    final_error_sys_meta = SystemProcessingMetadata(
+                        entity_id=entity_id,
+                        entity_type=entity_type,
+                        parent_id=batch_id,
+                        **error_sys_meta_update,
+                    )
+            except Exception:
+                # Fallback to minimal metadata if data validation fails
+                final_error_sys_meta = SystemProcessingMetadata(
+                    entity_id=entity_id,
+                    entity_type=entity_type,
+                    parent_id=batch_id,
+                    **error_sys_meta_update,
+                )
+        else:  # Create minimal if no incoming data
             final_error_sys_meta = SystemProcessingMetadata(
                 entity_id=entity_id,
                 entity_type=entity_type,
@@ -572,10 +597,17 @@ async def _publish_structured_error_event(
                 error_info=structured_error_info,
             )
 
+        # Extract text_storage_id safely
+        text_storage_id = "unknown"
+        if request_envelope.data:
+            try:
+                typed_data = EssayLifecycleSpellcheckRequestV1.model_validate(request_envelope.data)
+                text_storage_id = typed_data.text_storage_id
+            except Exception:
+                text_storage_id = "unknown"
+
         structured_failure_data = SpellcheckResultDataV1(
-            original_text_storage_id=(
-                request_envelope.data.text_storage_id if request_envelope.data else "unknown"
-            ),
+            original_text_storage_id=text_storage_id,
             storage_metadata=None,
             corrections_made=None,
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,

@@ -304,8 +304,8 @@ class ClientPipelineRequestHandler:
     def _parse_message_envelope(self, msg: Any) -> EventEnvelope[ClientBatchPipelineRequestV1]:
         """Parse and validate Kafka message envelope."""
         try:
-            message_data = json.loads(msg.value.decode("utf-8"))
-            envelope = EventEnvelope[ClientBatchPipelineRequestV1].model_validate(message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[ClientBatchPipelineRequestV1].model_validate_json(raw_message)
             return envelope
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON in client pipeline request message: {e}"

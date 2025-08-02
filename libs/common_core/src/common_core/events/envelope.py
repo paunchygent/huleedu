@@ -17,7 +17,12 @@ class EventEnvelope(BaseModel, Generic[T_EventData]):
     schema_version: int = 1
     correlation_id: UUID = Field(default_factory=uuid4)
     data_schema_uri: str | None = None
-    data: T_EventData
+    # CRITICAL: Use Any type to prevent Pydantic v2 from creating malformed BaseModel instances
+    # during JSON deserialization when generic type information is not available.
+    # This is a known limitation in Pydantic v2 with generic models - see GitHub issues #6895, #7815.
+    # When creating typed envelopes like EventEnvelope[SpecificType], type safety is still enforced.
+    # During deserialization, this field will contain a dict that can be validated with model_validate().
+    data: Any  # Will be T_EventData when typed, dict when deserialized from JSON
     metadata: Optional[Dict[str, Any]] = Field(
         default=None, description="Optional metadata for tracing and other cross-cutting concerns"
     )

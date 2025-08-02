@@ -7,7 +7,6 @@ Part of the new dual-event architecture that separates success and error flows.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from common_core.events.batch_coordination_events import BatchValidationErrorsV1
@@ -61,8 +60,8 @@ class BatchValidationErrorsHandler:
 
         try:
             # Deserialize the message
-            message_data = json.loads(msg.value.decode("utf-8"))
-            envelope = EventEnvelope[BatchValidationErrorsV1](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[BatchValidationErrorsV1].model_validate_json(raw_message)
 
             batch_validation_errors_data = envelope.data
             batch_id = batch_validation_errors_data.batch_id

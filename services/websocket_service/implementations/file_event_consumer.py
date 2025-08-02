@@ -155,9 +155,9 @@ class FileEventConsumer(FileEventConsumerProtocol):
     async def process_message(self, msg: ConsumerRecord) -> bool:
         """Process a single Kafka message containing file events."""
         try:
-            # Parse raw message bytes to dict
+            # Parse raw message bytes to EventEnvelope
             raw_message = msg.value.decode("utf-8")
-            envelope_data = json.loads(raw_message)
+            envelope_data = json.loads(raw_message)  # Still need for trace context extraction
 
             # Extract trace context if present
             if envelope_data.get("metadata"):

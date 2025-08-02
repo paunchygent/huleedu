@@ -518,7 +518,10 @@ class TestEventSerialization:
         assert reconstructed_envelope.event_type == envelope.event_type
         assert reconstructed_envelope.source_service == envelope.source_service
         assert reconstructed_envelope.correlation_id == envelope.correlation_id
-        assert reconstructed_envelope.data.request_id == envelope.data.request_id
+        # Validate data using proper model validation pattern
+        reconstructed_data = LLMComparisonResultV1.model_validate(reconstructed_envelope.data)
+        original_data = LLMComparisonResultV1.model_validate(envelope.data)
+        assert reconstructed_data.request_id == original_data.request_id
 
     @pytest.mark.asyncio
     async def test_correlation_id_preserved_through_event_publishing(

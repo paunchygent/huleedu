@@ -187,10 +187,11 @@ class TestEventEnvelopeWithOverrides:
         assert reconstructed.correlation_id == cj_request_envelope_with_overrides.correlation_id
 
         # Assert data structure with overrides
-        assert reconstructed.data.llm_config_overrides is not None
-        assert reconstructed.data.llm_config_overrides.model_override == "gpt-4o"
-        assert reconstructed.data.llm_config_overrides.temperature_override == 0.3
-        assert reconstructed.data.llm_config_overrides.max_tokens_override == 2000
+        typed_data = ELS_CJAssessmentRequestV1.model_validate(reconstructed.data)
+        assert typed_data.llm_config_overrides is not None
+        assert typed_data.llm_config_overrides.model_override == "gpt-4o"
+        assert typed_data.llm_config_overrides.temperature_override == 0.3
+        assert typed_data.llm_config_overrides.max_tokens_override == 2000
 
     def test_envelope_serialization_without_overrides(
         self,
@@ -210,4 +211,5 @@ class TestEventEnvelopeWithOverrides:
         assert reconstructed.correlation_id == cj_request_envelope_no_overrides.correlation_id
 
         # Assert data structure without overrides
-        assert reconstructed.data.llm_config_overrides is None
+        typed_data = ELS_CJAssessmentRequestV1.model_validate(reconstructed.data)
+        assert typed_data.llm_config_overrides is None

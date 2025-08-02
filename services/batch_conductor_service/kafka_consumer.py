@@ -10,7 +10,6 @@ Follows established patterns from spellchecker_service and cj_assessment_service
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
@@ -212,8 +211,8 @@ class BCSKafkaConsumer:
     async def _handle_spellcheck_completed(self, msg: ConsumerRecord) -> None:
         """Handle spellcheck completion events."""
         try:
-            message_data = json.loads(msg.value)
-            envelope = EventEnvelope[SpellcheckResultDataV1](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(raw_message)
 
             spellcheck_data = envelope.data
             essay_id = spellcheck_data.entity_id
@@ -264,8 +263,8 @@ class BCSKafkaConsumer:
     async def _handle_cj_assessment_completed(self, msg: ConsumerRecord) -> None:
         """Handle CJ assessment completion events."""
         try:
-            message_data = json.loads(msg.value)
-            envelope = EventEnvelope[CJAssessmentCompletedV1](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(raw_message)
 
             cj_data = envelope.data
             batch_id = cj_data.entity_id  # CJ assessment is batch-level

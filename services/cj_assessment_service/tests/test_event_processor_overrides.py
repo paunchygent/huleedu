@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.events.cj_assessment_events import (
+    CJAssessmentCompletedV1,
     ELS_CJAssessmentRequestV1,
     LLMConfigOverrides,
 )
@@ -161,9 +162,10 @@ class TestEventProcessorOverrides:
 
         # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
         assert isinstance(completion_data, EventEnvelope)
-        assert completion_data.data.status.value == "completed_successfully"
-        assert hasattr(completion_data.data, "cj_assessment_job_id")
-        assert completion_data.data.cj_assessment_job_id == "12345"
+        typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
+        assert typed_data.status.value == "completed_successfully"
+        assert hasattr(typed_data, "cj_assessment_job_id")
+        assert typed_data.cj_assessment_job_id == "12345"
 
     @pytest.mark.asyncio
     async def test_process_message_without_llm_overrides(
@@ -220,9 +222,10 @@ class TestEventProcessorOverrides:
 
         # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
         assert isinstance(completion_data, EventEnvelope)
-        assert completion_data.data.status.value == "completed_successfully"
-        assert hasattr(completion_data.data, "cj_assessment_job_id")
-        assert completion_data.data.cj_assessment_job_id == "98765"
+        typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
+        assert typed_data.status.value == "completed_successfully"
+        assert hasattr(typed_data, "cj_assessment_job_id")
+        assert typed_data.cj_assessment_job_id == "98765"
 
     @pytest.mark.asyncio
     async def test_process_message_deserialization_with_overrides(

@@ -129,9 +129,11 @@ class TestFileEventConsumer:
         """Factory for creating mock Kafka messages."""
 
         def _create_message(event_type: str, data: dict) -> MagicMock:
+            import json
+            
             message_data = {
                 "event_id": "550e8400-e29b-41d4-a716-446655440000",
-                "event_type": event_type,
+                "event_type": f"huleedu.{event_type}",  # Add huleedu prefix for proper routing
                 "event_timestamp": "2024-01-01T12:00:00Z",
                 "source_service": "file_service",
                 "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -140,7 +142,7 @@ class TestFileEventConsumer:
             }
 
             msg = MagicMock(spec=ConsumerRecord)
-            msg.value = message_data
+            msg.value = json.dumps(message_data).encode("utf-8")  # Convert to bytes like real Kafka
             msg.topic = event_type
             msg.partition = 0
             msg.offset = 100
@@ -261,21 +263,31 @@ class TestFileEventConsumer:
             redis_client=redis_client,
         )
 
-        # Create a message with trace context metadata
-        msg = create_kafka_message(
-            "file.batch.file.added.v1",
-            {
+        # Create message data with trace context metadata
+        import json
+        message_data = {
+            "event_id": "550e8400-e29b-41d4-a716-446655440000",
+            "event_type": "huleedu.file.batch.file.added.v1",
+            "event_timestamp": "2024-01-01T12:00:00Z",
+            "source_service": "file_service",
+            "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+            "data": {
                 "batch_id": "batch-123",
                 "file_upload_id": "file-456",
                 "filename": "test.pdf",
                 "user_id": "user-789",
                 "timestamp": "2024-01-01T12:00:00Z",
             },
-        )
-        # Add trace context to metadata
-        msg.value["metadata"] = {
-            "traceparent": "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"
+            "metadata": {
+                "traceparent": "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"
+            },
         }
+        
+        msg = MagicMock(spec=ConsumerRecord)
+        msg.value = json.dumps(message_data).encode("utf-8")
+        msg.topic = "file.batch.file.added.v1"
+        msg.partition = 0
+        msg.offset = 100
 
         result = await consumer.process_message(msg)
 

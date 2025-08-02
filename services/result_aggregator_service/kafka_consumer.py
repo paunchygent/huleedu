@@ -193,7 +193,7 @@ class ResultAggregatorKafkaConsumer:
                     message_value_str
                 )
                 await self.event_processor.process_batch_registered(
-                    batch_envelope, batch_envelope.data
+                    batch_envelope, BatchEssaysRegistered.model_validate(batch_envelope.data)
                 )
 
             elif record.topic == "huleedu.els.batch.phase.outcome.v1":
@@ -201,7 +201,7 @@ class ResultAggregatorKafkaConsumer:
                     message_value_str
                 )
                 await self.event_processor.process_batch_phase_outcome(
-                    phase_envelope, phase_envelope.data
+                    phase_envelope, ELSBatchPhaseOutcomeV1.model_validate(phase_envelope.data)
                 )
 
             elif record.topic == "huleedu.essay.spellcheck.completed.v1":
@@ -209,7 +209,7 @@ class ResultAggregatorKafkaConsumer:
                     message_value_str
                 )
                 await self.event_processor.process_spellcheck_completed(
-                    spell_envelope, spell_envelope.data
+                    spell_envelope, SpellcheckResultDataV1.model_validate(spell_envelope.data)
                 )
 
             elif record.topic == "huleedu.cj_assessment.completed.v1":
@@ -217,7 +217,7 @@ class ResultAggregatorKafkaConsumer:
                     message_value_str
                 )
                 await self.event_processor.process_cj_assessment_completed(
-                    cj_envelope, cj_envelope.data
+                    cj_envelope, CJAssessmentCompletedV1.model_validate(cj_envelope.data)
                 )
 
             elif record.topic == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED):
@@ -228,7 +228,7 @@ class ResultAggregatorKafkaConsumer:
                     message_value_str
                 )
                 await self.event_processor.process_essay_slot_assigned(
-                    slot_envelope, slot_envelope.data
+                    slot_envelope, EssaySlotAssignedV1.model_validate(slot_envelope.data)
                 )
 
             else:

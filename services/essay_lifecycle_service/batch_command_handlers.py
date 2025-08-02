@@ -159,8 +159,8 @@ async def _process_message_impl(
 def _deserialize_message(msg: ConsumerRecord) -> EventEnvelope[Any] | None:
     """Deserialize Kafka message to EventEnvelope."""
     try:
-        data = json.loads(msg.value.decode("utf-8"))
-        return EventEnvelope[Any].model_validate(data)
+        raw_message = msg.value.decode("utf-8")
+        return EventEnvelope[Any].model_validate_json(raw_message)
     except (json.JSONDecodeError, ValueError) as e:
         logger.error(
             "Failed to deserialize message",

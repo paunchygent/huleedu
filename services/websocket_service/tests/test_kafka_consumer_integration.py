@@ -68,7 +68,7 @@ def create_batch_file_added_event(
     """Create a batch file added event for testing."""
     return EventEnvelope[BatchFileAddedV1](
         event_id=uuid4(),
-        event_type="file.batch.file.added.v1",
+        event_type="huleedu.file.batch.file.added.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file_service",
         data=BatchFileAddedV1(
@@ -89,7 +89,7 @@ def create_batch_file_removed_event(
     """Create a batch file removed event for testing."""
     return EventEnvelope[BatchFileRemovedV1](
         event_id=uuid4(),
-        event_type="file.batch.file.removed.v1",
+        event_type="huleedu.file.batch.file.removed.v1",
         event_timestamp=datetime.now(timezone.utc),
         source_service="file_service",
         data=BatchFileRemovedV1(
@@ -112,7 +112,7 @@ async def test_process_batch_file_added_message(
 
     # Create mock Kafka message
     mock_message = MagicMock()
-    mock_message.value = json.loads(event.model_dump_json())
+    mock_message.value = event.model_dump_json().encode("utf-8")  # Convert to bytes
     mock_message.topic = topic_name(ProcessingEvent.BATCH_FILE_ADDED)
     mock_message.partition = 0
     mock_message.offset = 100
@@ -147,7 +147,7 @@ async def test_process_batch_file_removed_message(
 
     # Create mock Kafka message
     mock_message = MagicMock()
-    mock_message.value = json.loads(event.model_dump_json())
+    mock_message.value = event.model_dump_json().encode("utf-8")  # Convert to bytes
     mock_message.topic = topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
     mock_message.partition = 0
     mock_message.offset = 100
@@ -210,7 +210,7 @@ async def test_process_message_with_unknown_event_type(
 
     # Create mock message
     mock_message = MagicMock()
-    mock_message.value = envelope_dict
+    mock_message.value = json.dumps(envelope_dict).encode("utf-8")  # Convert to bytes
     mock_message.topic = "unknown.topic"
     mock_message.partition = 0
     mock_message.offset = 100
@@ -241,7 +241,7 @@ async def test_process_message_with_trace_context(
 
     # Create mock message
     mock_message = MagicMock()
-    mock_message.value = envelope_dict
+    mock_message.value = json.dumps(envelope_dict).encode("utf-8")  # Convert to bytes
     mock_message.topic = topic_name(ProcessingEvent.BATCH_FILE_ADDED)
     mock_message.partition = 0
     mock_message.offset = 100
@@ -266,7 +266,7 @@ async def test_process_message_with_notification_handler_error(
 
     # Create mock message
     mock_message = MagicMock()
-    mock_message.value = json.loads(event.model_dump_json())
+    mock_message.value = event.model_dump_json().encode("utf-8")  # Convert to bytes
     mock_message.topic = topic_name(ProcessingEvent.BATCH_FILE_ADDED)
     mock_message.partition = 0
     mock_message.offset = 100

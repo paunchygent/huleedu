@@ -64,8 +64,8 @@ class BatchContentProvisioningCompletedHandler:
 
         try:
             # Deserialize the message
-            message_data = json.loads(msg.value.decode("utf-8"))
-            envelope = EventEnvelope[BatchContentProvisioningCompletedV1](**message_data)
+            raw_message = msg.value.decode("utf-8")
+            envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
 
             content_completed_data = envelope.data
             batch_id = content_completed_data.batch_id
@@ -210,8 +210,8 @@ class BatchContentProvisioningCompletedHandler:
             batch_id = "unknown"
             correlation_id = None
             try:
-                message_data = json.loads(msg.value.decode("utf-8"))
-                envelope = EventEnvelope[BatchContentProvisioningCompletedV1](**message_data)
+                raw_message = msg.value.decode("utf-8")
+                envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
                 batch_id = envelope.data.batch_id
                 correlation_id = envelope.correlation_id
             except (json.JSONDecodeError, KeyError, TypeError):
