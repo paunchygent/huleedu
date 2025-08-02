@@ -47,6 +47,12 @@ class Batch(Base):
     # Batch metadata
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Class ID for REGULAR batches requiring student matching, NULL for GUEST batches",
+    )
 
     # Status tracking
     status: Mapped[BatchStatus] = mapped_column(

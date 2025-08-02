@@ -105,6 +105,51 @@ class ClientPipelineRequestHandler:
                         )
                         raise ValueError(error_msg)
 
+                    # Validate batch is ready for pipeline execution
+                    batch_data = await self.batch_repo.get_batch_by_id(batch_id)
+                    if not batch_data:
+                        error_msg = f"Batch data not found: {batch_id}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+                        raise ValueError(error_msg)
+
+                    from common_core.status_enums import BatchStatus
+
+                    current_status = batch_data.get("status")
+                    if current_status != BatchStatus.READY_FOR_PIPELINE_EXECUTION.value:
+                        from huleedu_service_libs.error_handling import raise_validation_error
+
+                        logger.error(
+                            f"Batch {batch_id} not ready for pipeline execution",
+                            extra={
+                                "batch_id": batch_id,
+                                "current_status": current_status,
+                                "expected_status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+                                "requested_pipeline": requested_pipeline,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+
+                        raise_validation_error(
+                            service="batch_orchestrator_service",
+                            operation="client_pipeline_request_handling",
+                            field="batch_status",
+                            message=(
+                                f"Batch {batch_id} is not ready for pipeline execution. "
+                                f"Current status: {current_status}"
+                            ),
+                            correlation_id=correlation_id,
+                            batch_id=batch_id,
+                            current_status=current_status,
+                            expected_status=BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+                        )
+
                     # Check if batch already has a pipeline in progress
                     pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
                     if pipeline_state and self._has_active_pipeline(pipeline_state):

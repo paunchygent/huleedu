@@ -50,6 +50,7 @@ class BatchContextOperations:
                         or batch_id,  # Use correlation_id or fall back to batch_id
                         name=f"{registration_data.course_code.value} - {registration_data.user_id}",
                         description=registration_data.essay_instructions,
+                        class_id=registration_data.class_id,
                         status=BatchStatus.AWAITING_CONTENT_VALIDATION,
                         total_essays=registration_data.expected_essay_count,
                         processing_metadata=registration_data.model_dump(),
@@ -66,6 +67,7 @@ class BatchContextOperations:
                                 f"{registration_data.user_id}"
                             ),
                             description=registration_data.essay_instructions,
+                            class_id=registration_data.class_id,
                             total_essays=registration_data.expected_essay_count,
                             processing_metadata=registration_data.model_dump(),
                             updated_at=datetime.now(UTC).replace(tzinfo=None),

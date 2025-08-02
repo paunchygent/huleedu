@@ -12,6 +12,8 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
@@ -39,18 +41,18 @@ async def process_single_message(
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
     tracer: Tracer | None = None,
-    confirm_idempotency: Any = None,
+    confirm_idempotency: Callable[[], Awaitable[None]] | None = None,
 ) -> bool:
     """
     Process a single Kafka message and update essay state accordingly.
 
     Args:
         msg: Kafka consumer record
-        state_store: Essay state persistence layer
-        event_publisher: Event publishing interface
-        transition_validator: State transition validation logic
-        metrics_collector: Metrics collection interface
-        batch_tracker: Batch coordination and readiness tracking
+        batch_coordination_handler: Handler for batch coordination events
+        batch_command_handler: Handler for batch processing commands
+        service_result_handler: Handler for specialized service results
+        tracer: Optional OpenTelemetry tracer for distributed tracing
+        confirm_idempotency: Optional idempotency confirmation callback
 
     Returns:
         True if message was processed successfully, False otherwise
@@ -115,7 +117,7 @@ async def _process_message_impl(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
-    confirm_idempotency: Any = None,
+    confirm_idempotency: Callable[[], Awaitable[None]] | None = None,
 ) -> bool:
     """Process the message after tracing context has been set up."""
     # Record Kafka queue latency
@@ -172,7 +174,7 @@ async def _route_event(
     batch_coordination_handler: BatchCoordinationHandler,
     batch_command_handler: BatchCommandHandler,
     service_result_handler: ServiceResultHandler,
-    confirm_idempotency: Any = None,
+    confirm_idempotency: Callable[[], Awaitable[None]] | None = None,
 ) -> bool:
     """Route events to appropriate handlers based on event type."""
     from huleedu_service_libs.observability import use_trace_context
@@ -326,6 +328,55 @@ async def _route_event(
                 confirm_idempotency=confirm_idempotency,
             )
             return cj_result
+
+        # Handle Phase 1 student matching events
+        elif event_type == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND):
+            from common_core.batch_service_models import (
+                BatchServiceStudentMatchingInitiateCommandDataV1,
+            )
+
+            student_matching_command_data = (
+                BatchServiceStudentMatchingInitiateCommandDataV1.model_validate(envelope.data)
+            )
+
+            # Record student matching command
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="student_matching_command",
+                    batch_id=str(student_matching_command_data.entity_id),
+                ).inc()
+
+            # Get student matching command handler from batch command handler
+            # Maintain trace context when calling the handler
+            if envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await batch_command_handler.process_student_matching_command(
+                        command_data=student_matching_command_data, correlation_id=correlation_id
+                    )
+            else:
+                await batch_command_handler.process_student_matching_command(
+                    command_data=student_matching_command_data, correlation_id=correlation_id
+                )
+            return True
+
+        elif event_type == topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED):
+            from common_core.events.validation_events import StudentAssociationsConfirmedV1
+
+            associations_data = StudentAssociationsConfirmedV1.model_validate(envelope.data)
+
+            # Record student associations confirmed
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="associations_confirmed", batch_id=str(associations_data.batch_id)
+                ).inc()
+
+            # Handle through BatchCoordinationHandler for proper protocol compliance
+            associations_result: bool = (
+                await batch_coordination_handler.handle_student_associations_confirmed(
+                    event_data=associations_data, correlation_id=correlation_id
+                )
+            )
+            return associations_result
 
         else:
             logger.warning(

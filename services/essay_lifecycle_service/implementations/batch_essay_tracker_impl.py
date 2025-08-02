@@ -276,6 +276,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     "is_complete": redis_status["is_complete"],
                     "is_timeout_due": not redis_status["has_timeout"],
                     "created_at": redis_status.get("metadata", {}).get("created_at"),
+                    "user_id": redis_status.get("metadata", {}).get("user_id"),
                 }
 
             return None

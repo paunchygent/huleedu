@@ -27,6 +27,9 @@ from services.batch_orchestrator_service.implementations.ai_feedback_initiator_i
 from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
     BatchConductorClientImpl,
 )
+from services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler import (  # noqa: E501
+    BatchContentProvisioningCompletedHandler,
+)
 from services.batch_orchestrator_service.implementations.batch_database_infrastructure import (
     BatchDatabaseInfrastructure,
 )
@@ -76,6 +79,12 @@ from services.batch_orchestrator_service.implementations.pipeline_phase_coordina
 from services.batch_orchestrator_service.implementations.spellcheck_initiator_impl import (
     SpellcheckInitiatorImpl,
 )
+from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (  # noqa: E501
+    StudentAssociationsConfirmedHandler,
+)
+from services.batch_orchestrator_service.implementations.student_matching_initiator_impl import (
+    StudentMatchingInitiatorImpl,
+)
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
 from services.batch_orchestrator_service.metrics import (
     get_circuit_breaker_metrics,
@@ -93,6 +102,7 @@ from services.batch_orchestrator_service.protocols import (
     PipelinePhaseCoordinatorProtocol,
     PipelinePhaseInitiatorProtocol,
     SpellcheckInitiatorProtocol,
+    StudentMatchingInitiatorProtocol,
 )
 
 
@@ -324,6 +334,14 @@ class PhaseInitiatorsProvider(Provider):
         return SpellcheckInitiatorImpl(event_publisher)
 
     @provide(scope=Scope.APP)
+    def provide_student_matching_initiator(
+        self,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> StudentMatchingInitiatorProtocol:
+        """Provide student matching initiator implementation for Phase 1."""
+        return StudentMatchingInitiatorImpl(event_publisher)
+
+    @provide(scope=Scope.APP)
     def provide_ai_feedback_initiator(
         self,
         event_publisher: BatchEventPublisherProtocol,
@@ -441,6 +459,23 @@ class EventHandlingProvider(Provider):
         return ClientPipelineRequestHandler(bcs_client, batch_repo, phase_coordinator)
 
     @provide(scope=Scope.APP)
+    def provide_student_associations_confirmed_handler(
+        self,
+        batch_repo: BatchRepositoryProtocol,
+    ) -> StudentAssociationsConfirmedHandler:
+        """Provide StudentAssociationsConfirmed message handler."""
+        return StudentAssociationsConfirmedHandler(batch_repo)
+
+    @provide(scope=Scope.APP)
+    def provide_batch_content_provisioning_completed_handler(
+        self,
+        batch_repo: BatchRepositoryProtocol,
+        phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol],
+    ) -> BatchContentProvisioningCompletedHandler:
+        """Provide BatchContentProvisioningCompleted message handler for Phase 1."""
+        return BatchContentProvisioningCompletedHandler(batch_repo, phase_initiators_map)
+
+    @provide(scope=Scope.APP)
     def provide_batch_validation_errors_handler(
         self,
         event_publisher: BatchEventPublisherProtocol,
@@ -454,9 +489,11 @@ class EventHandlingProvider(Provider):
         self,
         settings: Settings,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
+        batch_content_provisioning_completed_handler: BatchContentProvisioningCompletedHandler,
         batch_validation_errors_handler: BatchValidationErrorsHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
         client_pipeline_request_handler: ClientPipelineRequestHandler,
+        student_associations_confirmed_handler: StudentAssociationsConfirmedHandler,
         redis_client: AtomicRedisClientProtocol,
     ) -> BatchKafkaConsumer:
         """Provide Kafka consumer with idempotency support."""
@@ -464,9 +501,11 @@ class EventHandlingProvider(Provider):
             kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             consumer_group=settings.KAFKA_CONSUMER_GROUP_ID,
             batch_essays_ready_handler=batch_essays_ready_handler,
+            batch_content_provisioning_completed_handler=batch_content_provisioning_completed_handler,
             batch_validation_errors_handler=batch_validation_errors_handler,
             els_batch_phase_outcome_handler=els_batch_phase_outcome_handler,
             client_pipeline_request_handler=client_pipeline_request_handler,
+            student_associations_confirmed_handler=student_associations_confirmed_handler,
             redis_client=redis_client,
         )
 
@@ -481,6 +520,7 @@ class InitiatorMapProvider(Provider):
         cj_assessment_initiator: CJAssessmentInitiatorProtocol,
         ai_feedback_initiator: AIFeedbackInitiatorProtocol,
         nlp_initiator: NLPInitiatorProtocol,
+        student_matching_initiator: StudentMatchingInitiatorProtocol,
     ) -> dict[PhaseName, PipelinePhaseInitiatorProtocol]:
         """
         Provide complete phase initiators map for dynamic dispatch.
@@ -496,4 +536,5 @@ class InitiatorMapProvider(Provider):
             PhaseName.CJ_ASSESSMENT: cj_assessment_initiator,
             PhaseName.AI_FEEDBACK: ai_feedback_initiator,  # TODO: Service not implemented
             PhaseName.NLP: nlp_initiator,  # TODO: Service not implemented
+            PhaseName.STUDENT_MATCHING: student_matching_initiator,  # Phase 1 student matching
         }

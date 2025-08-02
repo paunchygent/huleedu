@@ -47,11 +47,23 @@ class EssayMatchResult(BaseModel):
 
 class BatchAuthorMatchesSuggestedV1(BaseEventData):
     """
-    Batch-level NLP Service suggestions for essay-student matching.
+    Batch-level student match suggestions from NLP Service.
 
-    Sent by NLP Service to Class Management Service after processing
-    a batch of essays for student matching. Contains match results
-    for all essays in the batch.
+    Publisher: NLP Service
+    Consumer: Class Management Service
+    Topic: batch.author.matches.suggested
+    Handler: Class Management - MatchSuggestionHandler.handle_batch_match_suggestions()
+
+    Flow (REGULAR batches only):
+    1. NLP receives BatchStudentMatchingRequestedV1 from ELS
+    2. NLP extracts student names from all essays in parallel
+    3. NLP matches extracted names against class roster
+    4. NLP publishes this event with all match suggestions
+    5. Class Management stores suggestions for human validation
+    6. Class Management notifies teacher via WebSocket
+    7. After validation/timeout, Class Management publishes StudentAssociationsConfirmedV1
+
+    Note: This is a Phase 1 event - part of the pre-readiness student matching flow.
     """
 
     event_name: ProcessingEvent = ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED

@@ -7,7 +7,7 @@ using injected service-specific command handlers.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         BatchServiceCJAssessmentInitiateCommandDataV1,
         BatchServiceNLPInitiateCommandDataV1,
         BatchServiceSpellcheckInitiateCommandDataV1,
+        BatchServiceStudentMatchingInitiateCommandDataV1,
     )
 
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
@@ -38,6 +39,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         spellcheck_handler: SpellcheckCommandHandler,
         cj_assessment_handler: CJAssessmentCommandHandler,
         future_services_handler: FutureServicesCommandHandler,
+        student_matching_handler: Any | None = None,  # StudentMatchingCommandHandler
     ) -> None:
         """
         Initialize with injected service-specific command handlers.
@@ -46,10 +48,12 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
             spellcheck_handler: Handler for spellcheck commands
             cj_assessment_handler: Handler for CJ assessment commands
             future_services_handler: Handler for future service commands
+            student_matching_handler: Handler for Phase 1 student matching commands
         """
         self.spellcheck_handler = spellcheck_handler
         self.cj_assessment_handler = cj_assessment_handler
         self.future_services_handler = future_services_handler
+        self.student_matching_handler = student_matching_handler
 
     async def process_initiate_spellcheck_command(
         self,
@@ -86,5 +90,18 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
         await self.cj_assessment_handler.process_initiate_cj_assessment_command(
+            command_data, correlation_id
+        )
+
+    async def process_student_matching_command(
+        self,
+        command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
+        correlation_id: UUID,
+    ) -> None:
+        """Process Phase 1 student matching command from Batch Orchestrator Service."""
+        if self.student_matching_handler is None:
+            raise NotImplementedError("Student matching handler not configured")
+
+        await self.student_matching_handler.handle_student_matching_command(
             command_data, correlation_id
         )

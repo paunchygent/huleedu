@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from common_core.config_enums import Environment
+from common_core.event_enums import ProcessingEvent, topic_name
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,6 +39,27 @@ class Settings(BaseSettings):
     REDIS_CHANNEL_PREFIX: str = Field(default="ws", description="Prefix for user channels")
     REDIS_CONNECT_TIMEOUT: int = Field(default=5, description="Redis connection timeout in seconds")
     REDIS_SOCKET_TIMEOUT: int = Field(default=5, description="Redis socket timeout in seconds")
+
+    # Kafka Configuration
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092", description="Kafka bootstrap servers"
+    )
+    KAFKA_CONSUMER_GROUP: str = Field(
+        default="websocket-service-consumer", description="Kafka consumer group ID"
+    )
+    KAFKA_CONSUMER_CLIENT_ID: str = Field(
+        default="websocket-service-client", description="Kafka consumer client ID"
+    )
+
+    @property
+    def BATCH_FILE_ADDED_TOPIC(self) -> str:
+        """Topic for file added events."""
+        return topic_name(ProcessingEvent.BATCH_FILE_ADDED)
+
+    @property
+    def BATCH_FILE_REMOVED_TOPIC(self) -> str:
+        """Topic for file removed events."""
+        return topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
 
     # JWT Configuration
     JWT_SECRET_KEY: str = Field(

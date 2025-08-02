@@ -171,6 +171,72 @@ class BatchLifecyclePublisher:
             },
         )
 
+    async def publish_batch_content_provisioning_completed(
+        self,
+        event_data: Any,  # BatchContentProvisioningCompletedV1
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """
+        Publish BatchContentProvisioningCompletedV1 event when all content is provisioned.
+
+        This replaces BatchEssaysReady for initial content provisioning completion.
+        For GUEST batches, BOS will transition directly to READY_FOR_PIPELINE_EXECUTION.
+        For REGULAR batches, BOS will initiate student matching workflow.
+
+        Args:
+            event_data: The batch content provisioning completed event data
+            correlation_id: Correlation ID for event tracking
+            session: Optional database session (unused in this implementation)
+
+        Raises:
+            HuleEduError: If publishing fails to both Kafka and outbox would be needed
+        """
+        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+
+        # Create event envelope
+        envelope = EventEnvelope[Any](
+            event_type="huleedu.els.batch.content.provisioning.completed.v1",
+            source_service=self.settings.SERVICE_NAME,
+            correlation_id=correlation_id or uuid4(),
+            data=event_data,
+        )
+
+        # Only inject trace context if we have an active span
+        from huleedu_service_libs.observability import get_current_span
+
+        if get_current_span():
+            if envelope.metadata is None:
+                envelope.metadata = {}
+            inject_trace_context(envelope.metadata)
+
+        # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
+        # Store event in outbox within same transaction as business data
+        # The relay worker will publish from outbox asynchronously
+        topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
+        batch_id = getattr(event_data, "batch_id", "unknown")
+
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id=batch_id,
+            event_type="huleedu.els.batch.content.provisioning.completed.v1",
+            event_data=envelope,
+            topic=topic,
+            session=session,  # Pass session for transactional atomicity
+        )
+
+        logger.info(
+            "BatchContentProvisioningCompletedV1 event stored in outbox for reliable delivery",
+            extra={
+                "batch_id": batch_id,
+                "provisioned_count": getattr(event_data, "provisioned_count", 0),
+                "expected_count": getattr(event_data, "expected_count", 0),
+                "correlation_id": str(correlation_id),
+                "topic": topic,
+            },
+        )
+
     async def publish_batch_validation_errors(
         self,
         event_data: Any,  # BatchValidationErrorsV1

@@ -42,8 +42,8 @@ class OutboxManager:
 
     async def publish_to_outbox(
         self,
-        aggregate_type: str,
         aggregate_id: str,
+        aggregate_type: str,
         event_type: str,
         event_data: Any,  # EventEnvelope[Any]
         topic: str,

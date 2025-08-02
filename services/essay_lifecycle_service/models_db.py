@@ -73,6 +73,11 @@ class EssayStateDB(Base):
     # Extracted text storage ID for content idempotency (ELS-002 Phase 1)
     text_storage_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
+    # Student association fields for NLP Phase 1 student matching
+    student_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    association_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    association_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Version field for optimistic locking
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
@@ -128,7 +133,6 @@ class BatchEssayTracker(Base):
     timeout_seconds: Mapped[int] = mapped_column(
         Integer, default=86400, nullable=False
     )  # 24 hours for complex processing
-
 
     # Additional metadata as JSON
     batch_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=True)

@@ -127,10 +127,9 @@ class MinimalOutboxTestProvider(Provider):
         self,
         outbox_manager: OutboxManager,
         settings: Settings,
-        redis_client: AtomicRedisClientProtocol,
     ) -> EventPublisherProtocol:
         """Provide EventPublisher with outbox pattern."""
-        return DefaultEventPublisher(outbox_manager, settings, redis_client)
+        return DefaultEventPublisher(outbox_manager, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_relay_worker(

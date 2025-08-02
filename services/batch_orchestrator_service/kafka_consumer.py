@@ -15,6 +15,9 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 
+from services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler import (  # noqa: E501
+    BatchContentProvisioningCompletedHandler,
+)
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -26,6 +29,9 @@ from services.batch_orchestrator_service.implementations.client_pipeline_request
 )
 from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
     ELSBatchPhaseOutcomeHandler,
+)
+from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (  # noqa: E501
+    StudentAssociationsConfirmedHandler,
 )
 from services.batch_orchestrator_service.metrics import get_kafka_consumer_metrics
 
@@ -41,17 +47,23 @@ class BatchKafkaConsumer:
         kafka_bootstrap_servers: str,
         consumer_group: str,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
+        batch_content_provisioning_completed_handler: BatchContentProvisioningCompletedHandler,
         batch_validation_errors_handler: BatchValidationErrorsHandler,
         els_batch_phase_outcome_handler: ELSBatchPhaseOutcomeHandler,
         client_pipeline_request_handler: ClientPipelineRequestHandler,
+        student_associations_confirmed_handler: StudentAssociationsConfirmedHandler,
         redis_client: RedisClientProtocol,
     ) -> None:
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.consumer_group = consumer_group
         self.batch_essays_ready_handler = batch_essays_ready_handler
+        self.batch_content_provisioning_completed_handler = (
+            batch_content_provisioning_completed_handler
+        )
         self.batch_validation_errors_handler = batch_validation_errors_handler
         self.els_batch_phase_outcome_handler = els_batch_phase_outcome_handler
         self.client_pipeline_request_handler = client_pipeline_request_handler
+        self.student_associations_confirmed_handler = student_associations_confirmed_handler
         self.redis_client = redis_client
         self.consumer: AIOKafkaConsumer | None = None
         self.should_stop = False
@@ -62,6 +74,9 @@ class BatchKafkaConsumer:
         topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             topic_name(
+                ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED
+            ),  # BatchContentProvisioningCompletedV1 events from ELS for Phase 1
+            topic_name(
                 ProcessingEvent.ELS_BATCH_PHASE_OUTCOME
             ),  # ELSBatchPhaseOutcomeV1 events from ELS
             topic_name(
@@ -70,6 +85,9 @@ class BatchKafkaConsumer:
             topic_name(
                 ProcessingEvent.BATCH_VALIDATION_ERRORS
             ),  # BatchValidationErrorsV1 events from ELS
+            topic_name(
+                ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED
+            ),  # StudentAssociationsConfirmedV1 from Class Management Service
         ]
 
         # TODO: Add subscription to ExcessContentProvisionedV1 topic for handling
@@ -213,6 +231,12 @@ class BatchKafkaConsumer:
                     pass
                 await self.batch_essays_ready_handler.handle_batch_essays_ready(msg)
 
+            elif msg.topic == topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED):
+                # Handle Phase 1 content provisioning completion from ELS
+                await self.batch_content_provisioning_completed_handler.handle_batch_content_provisioning_completed(
+                    msg
+                )
+
             elif msg.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
                 # Track phase transitions with timing context manager
                 if phase_transition_metric:
@@ -229,6 +253,11 @@ class BatchKafkaConsumer:
 
             elif msg.topic == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS):
                 await self.batch_validation_errors_handler.handle_batch_validation_errors(msg)
+
+            elif msg.topic == topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED):
+                await self.student_associations_confirmed_handler.handle_student_associations_confirmed(
+                    msg
+                )
             else:
                 logger.warning(f"Received message from unknown topic: {msg.topic}")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from dishka import make_async_container
@@ -21,8 +22,13 @@ except ImportError:
 
 from services.websocket_service.config import settings
 from services.websocket_service.di import WebSocketServiceProvider
+from services.websocket_service.protocols import FileEventConsumerProtocol
 
 logger = create_service_logger("websocket.startup")
+
+# Global references for service management
+kafka_consumer_instance: FileEventConsumerProtocol | None = None
+consumer_task: asyncio.Task | None = None
 
 
 def create_di_container() -> Any:
@@ -63,3 +69,42 @@ def setup_tracing(app: FastAPI) -> None:
     FastAPIInstrumentor.instrument_app(app)
 
     logger.info("Distributed tracing setup complete")
+
+
+async def start_kafka_consumer(container: Any) -> None:
+    """Start the Kafka consumer as a background task."""
+    global kafka_consumer_instance, consumer_task
+
+    try:
+        async with container() as request_container:
+            # Get Kafka consumer from DI container
+            kafka_consumer_instance = await request_container.get(FileEventConsumerProtocol)
+
+            # Start Kafka consumer as background task
+            consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())
+            logger.info("Kafka consumer background task started")
+    except Exception as e:
+        logger.error(f"Failed to start Kafka consumer: {e}", exc_info=True)
+        raise
+
+
+async def stop_kafka_consumer() -> None:
+    """Stop the Kafka consumer and background tasks."""
+    global kafka_consumer_instance, consumer_task
+
+    try:
+        if kafka_consumer_instance:
+            logger.info("Stopping Kafka consumer...")
+            await kafka_consumer_instance.stop_consumer()
+
+        if consumer_task and not consumer_task.done():
+            logger.info("Cancelling consumer background task...")
+            consumer_task.cancel()
+            try:
+                await consumer_task
+            except asyncio.CancelledError:
+                logger.info("Consumer background task cancelled successfully")
+
+        logger.info("Kafka consumer shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during Kafka consumer shutdown: {e}", exc_info=True)

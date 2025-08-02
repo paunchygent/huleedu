@@ -53,9 +53,11 @@ class TestDualEventHandling:
         """Create mock handlers for testing."""
         return {
             "batch_essays_ready_handler": AsyncMock(spec=BatchEssaysReadyHandler),
+            "batch_content_provisioning_completed_handler": AsyncMock(),
             "batch_validation_errors_handler": AsyncMock(spec=BatchValidationErrorsHandler),
             "els_batch_phase_outcome_handler": AsyncMock(),
             "client_pipeline_request_handler": AsyncMock(),
+            "student_associations_confirmed_handler": AsyncMock(),
             "redis_client": AsyncMock(),
         }
 
@@ -66,9 +68,15 @@ class TestDualEventHandling:
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
             batch_essays_ready_handler=mock_handlers["batch_essays_ready_handler"],
+            batch_content_provisioning_completed_handler=mock_handlers[
+                "batch_content_provisioning_completed_handler"
+            ],
             batch_validation_errors_handler=mock_handlers["batch_validation_errors_handler"],
             els_batch_phase_outcome_handler=mock_handlers["els_batch_phase_outcome_handler"],
             client_pipeline_request_handler=mock_handlers["client_pipeline_request_handler"],
+            student_associations_confirmed_handler=mock_handlers[
+                "student_associations_confirmed_handler"
+            ],
             redis_client=mock_handlers["redis_client"],
         )
 

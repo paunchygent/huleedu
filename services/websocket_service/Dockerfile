@@ -37,5 +37,5 @@ USER appuser
 
 EXPOSE ${WEBSOCKET_SERVICE_PORT}
 
-# Command to run the application from the service directory
+# Command to run the application (includes both HTTP server and Kafka consumer)
 CMD ["pdm", "run", "start"]

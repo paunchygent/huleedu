@@ -21,17 +21,51 @@ __all__ = [
 
 
 class BatchServiceSpellcheckInitiateCommandDataV1(BaseEventData):
-    """Command data for Batch Orchestrator Service to initiate spellcheck phase for a batch."""
+    """
+    Command to initiate Phase 2 spellcheck processing (first pipeline step).
+
+    Publisher: Batch Orchestrator Service (BOS)
+    Consumer: Essay Lifecycle Service (ELS)
+    Topic: batch.service.spellcheck.initiate.command
+    Handler: ELS - SpellcheckCommandHandler (dispatches to Spellcheck Service)
+
+    Flow (both GUEST and REGULAR batches):
+    1. Client requests pipeline execution via API
+    2. BOS verifies batch is in READY_FOR_PIPELINE_EXECUTION state
+    3. BOS publishes this command to start Phase 2 processing
+    4. ELS forwards request to Spellcheck Service
+    5. Pipeline processing begins
+
+    Note: This is the first Phase 2 command after batch readiness is achieved.
+    GUEST batches reach this state directly from BatchContentProvisioningCompletedV1.
+    REGULAR batches reach this state after student associations are confirmed.
+    """
 
     essays_to_process: list[EssayProcessingInputRefV1]
     language: str  # infered from course_code
 
 
 class BatchServiceStudentMatchingInitiateCommandDataV1(BaseEventData):
-    """Command data for Batch Orchestrator Service to initiate Phase 1 student matching."""
+    """
+    Command to initiate Phase 1 student matching for REGULAR batches.
+
+    Publisher: Batch Orchestrator Service (BOS)
+    Consumer: Essay Lifecycle Service (ELS)
+    Topic: batch.service.student.matching.initiate.command
+    Handler: ELS - StudentMatchingCommandHandler.handle_student_matching_command()
+
+    Flow (REGULAR batches only):
+    1. BOS receives BatchContentProvisioningCompletedV1 from ELS
+    2. BOS checks class_id exists (REGULAR batch)
+    3. BOS publishes this command to ELS
+    4. ELS marks batch as awaiting_student_associations
+    5. ELS publishes BatchStudentMatchingRequestedV1 to NLP Service
+
+    Note: GUEST batches never receive this command - they skip student matching entirely.
+    """
 
     essays_to_process: list[EssayProcessingInputRefV1]
-    class_id: str  # Class ID for roster lookup
+    class_id: str  # Class ID for roster lookup (always present for REGULAR batches)
 
 
 class BatchServiceNLPInitiateCommandDataV1(BaseEventData):

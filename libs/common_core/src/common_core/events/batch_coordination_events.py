@@ -31,7 +31,18 @@ if TYPE_CHECKING:
 
 class BatchEssaysRegistered(BaseModel):
     """
-    Event sent by BOS to ELS to register batch processing expectations.
+    Event to register batch processing expectations with ELS.
+
+    Publisher: Batch Orchestrator Service (BOS)
+    Consumer: Essay Lifecycle Service (ELS)
+    Topic: batch.essays.registered
+    Handler: ELS - DefaultBatchCoordinationHandler.handle_batch_essays_registered()
+
+    Flow:
+    1. API Gateway sends BatchRegistrationRequestV1 to BOS (with/without class_id)
+    2. BOS creates batch record and generates essay IDs
+    3. BOS publishes this event to ELS
+    4. ELS creates essay slots and starts tracking content provisioning
 
     This establishes the count-based coordination contract between BOS and ELS.
     Enhanced to include course context so ELS can create proper BatchEssaysReady events.
@@ -56,13 +67,26 @@ class BatchEssaysRegistered(BaseModel):
 
 class BatchEssaysReady(BaseModel):
     """
-    Clean event for successful batch readiness - follows structured error handling principles.
+    Event indicating batch is ready for Phase 2 pipeline processing.
+
+    Publisher: Essay Lifecycle Service (ELS)
+    Consumer: Batch Orchestrator Service (BOS)
+    Topic: batch.essays.ready
+    Handler: BOS - BatchEssaysReadyHandler.handle_batch_essays_ready()
+
+    IMPORTANT: This event is ONLY published for REGULAR batches after student associations.
+    GUEST batches do NOT receive this event - they transition directly from
+    BatchContentProvisioningCompletedV1 to READY_FOR_PIPELINE_EXECUTION.
+
+    Flow for REGULAR batches only:
+    1. ELS receives StudentAssociationsConfirmedV1 from Class Management
+    2. ELS updates essays with student associations
+    3. ELS publishes this event with enriched essay data
+    4. BOS stores essays and transitions to READY_FOR_PIPELINE_EXECUTION
 
     ARCHITECTURAL CHANGE: This event has been completely rewritten to eliminate the
     validation_failures anti-pattern. Error handling now uses separate
     BatchValidationErrorsV1 events following HuleEdu structured error handling standards.
-
-    NO BACKWARDS COMPATIBILITY - This is a clean break from the legacy mixed success/error pattern.
     """
 
     event: str = Field(default="batch.essays.ready", description="Event type identifier")
@@ -126,9 +150,23 @@ class ExcessContentProvisionedV1(BaseModel):
 
 class BatchContentProvisioningCompletedV1(BaseModel):
     """
-    Event sent by ELS to BOS when all expected content has been provisioned.
+    Event indicating all expected content has been provisioned for a batch.
 
-    This signals BOS to initiate Phase 1 student matching before batch readiness.
+    Publisher: Essay Lifecycle Service (ELS)
+    Consumer: Batch Orchestrator Service (BOS)
+    Topic: batch.content.provisioning.completed
+
+    Flow for GUEST batches (class_id = null):
+    1. ELS publishes this event when all content is provisioned
+    2. BOS receives event and directly transitions batch to READY_FOR_PIPELINE_EXECUTION
+    3. No student matching needed, no BatchEssaysReady event needed
+
+    Flow for REGULAR batches (class_id exists):
+    1. ELS publishes this event when all content is provisioned
+    2. BOS receives event and initiates Phase 1 student matching
+    3. Student matching flow completes with StudentAssociationsConfirmedV1
+    4. ELS then publishes BatchEssaysReady with student associations
+    5. BOS transitions to READY_FOR_PIPELINE_EXECUTION
     """
 
     event: str = Field(
@@ -137,9 +175,11 @@ class BatchContentProvisioningCompletedV1(BaseModel):
     batch_id: str = Field(description="Batch identifier")
     provisioned_count: int = Field(description="Number of essays successfully provisioned")
     expected_count: int = Field(description="Originally expected essay count")
-    class_id: str = Field(description="Class ID for student matching")
     course_code: CourseCode = Field(description="Course code for language detection")
     user_id: str = Field(description="User who owns this batch")
+    essays_for_processing: list[EssayProcessingInputRefV1] = Field(
+        description="All provisioned essays with content references - used by BOS for GUEST batches"
+    )
     correlation_id: UUID = Field(default_factory=uuid4, description="Request correlation ID")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

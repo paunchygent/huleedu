@@ -412,6 +412,85 @@ class SQLiteEssayStateStore(EssayRepositoryProtocol):
 
                 return essay_states
 
+    async def update_essay_processing_metadata(
+        self,
+        essay_id: str,
+        metadata_updates: dict[str, Any],
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay processing metadata fields."""
+        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Get current essay state
+            async with db.execute(
+                "SELECT processing_metadata FROM essay_states WHERE essay_id = ?", (essay_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+                if row is None:
+                    raise ValueError(f"Essay {essay_id} not found")
+
+                # Merge updates into existing metadata
+                current_metadata = json.loads(row["processing_metadata"])
+                updated_metadata = {**current_metadata, **metadata_updates}
+
+                # Update the record
+                await db.execute(
+                    "UPDATE essay_states SET processing_metadata = ?, updated_at = ? WHERE essay_id = ?",
+                    (json.dumps(updated_metadata), datetime.now(UTC).isoformat(), essay_id),
+                )
+                await db.commit()
+
+    async def update_student_association(
+        self,
+        essay_id: str,
+        student_id: str | None,
+        association_confirmed_at: Any,  # datetime
+        association_method: str,
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay with student association from Phase 1 matching."""
+        async with aiosqlite.connect(self.database_path, timeout=self.timeout) as db:
+            # Convert association_confirmed_at to ISO string if needed
+            confirmed_at_str = None
+            if association_confirmed_at is not None:
+                if isinstance(association_confirmed_at, str):
+                    confirmed_at_str = association_confirmed_at
+                elif hasattr(association_confirmed_at, "isoformat"):
+                    confirmed_at_str = association_confirmed_at.isoformat()
+
+            # Check if essay exists
+            async with db.execute(
+                "SELECT essay_id FROM essay_states WHERE essay_id = ?", (essay_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+                if row is None:
+                    raise ValueError(f"Essay {essay_id} not found")
+
+                # Update student association fields
+                await db.execute(
+                    """
+                    UPDATE essay_states
+                    SET student_id = ?,
+                        association_confirmed_at = ?,
+                        association_method = ?,
+                        updated_at = ?
+                    WHERE essay_id = ?
+                    """,
+                    (
+                        student_id,
+                        confirmed_at_str,
+                        association_method,
+                        datetime.now(UTC).isoformat(),
+                        essay_id,
+                    ),
+                )
+                await db.commit()
+
     def get_session_factory(self) -> Any:
         """Get the session factory for transaction management.
 

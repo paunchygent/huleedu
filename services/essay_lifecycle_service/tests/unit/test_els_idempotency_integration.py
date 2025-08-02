@@ -169,6 +169,8 @@ async def test_first_time_event_processing_success(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=None,
+            confirm_idempotency=confirm_idempotency,
         )
         await confirm_idempotency()  # Confirm after successful processing
         return result
@@ -246,6 +248,8 @@ async def test_duplicate_event_skipped(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=None,
+            confirm_idempotency=confirm_idempotency,
         )
         await confirm_idempotency()  # Confirm after successful processing
         return result
@@ -298,6 +302,8 @@ async def test_processing_failure_keeps_lock(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=None,
+            confirm_idempotency=confirm_idempotency,
         )
         await confirm_idempotency()  # Confirm after successful processing
         return result
@@ -381,6 +387,8 @@ async def test_redis_failure_fallback(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=None,
+            confirm_idempotency=confirm_idempotency,
         )
         await confirm_idempotency()  # Confirm after successful processing
         return result
@@ -453,6 +461,8 @@ async def test_deterministic_event_id_generation(
             batch_coordination_handler=batch_coordination_handler,
             batch_command_handler=batch_command_handler,
             service_result_handler=service_result_handler,
+            tracer=None,
+            confirm_idempotency=confirm_idempotency,
         )
         await confirm_idempotency()  # Confirm after successful processing
         return result

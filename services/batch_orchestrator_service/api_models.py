@@ -40,6 +40,13 @@ class BatchRegistrationRequestV1(BaseModel):
         ...,
         description="The ID of the user who owns this batch (from API Gateway JWT).",
     )
+    class_id: str | None = Field(
+        default=None,
+        description=(
+            "Class ID for REGULAR batches requiring student matching, "
+            "None for GUEST batches. Provided by API Gateway based on authentication context."
+        ),
+    )
 
     # CJ Assessment pipeline parameters
     enable_cj_assessment: bool = Field(

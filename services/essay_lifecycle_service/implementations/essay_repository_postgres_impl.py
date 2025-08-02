@@ -464,6 +464,169 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     error_details=str(e),
                 )
 
+    async def update_essay_processing_metadata(
+        self,
+        essay_id: str,
+        metadata_updates: dict[str, Any],
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay processing metadata fields."""
+        if session is None:
+            async with self.session() as session:
+                return await self.update_essay_processing_metadata(
+                    essay_id, metadata_updates, correlation_id, session
+                )
+
+        try:
+            # Use SELECT FOR UPDATE to prevent race conditions
+            stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
+            result = await session.execute(stmt)
+            db_essay = result.scalars().first()
+
+            if db_essay is None:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_processing_metadata",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
+                )
+
+            # Merge updates into existing processing metadata
+            updated_metadata = {**db_essay.processing_metadata, **metadata_updates}
+
+            # Update the database record
+            update_stmt = (
+                update(EssayStateDB)
+                .where(EssayStateDB.essay_id == essay_id)
+                .values(
+                    processing_metadata=updated_metadata,
+                    updated_at=datetime.now(UTC).replace(tzinfo=None),
+                    version=db_essay.version + 1,
+                )
+            )
+            update_result = await session.execute(update_stmt)
+
+            if update_result.rowcount == 0:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_processing_metadata",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
+                    operation_details="Essay metadata update failed after successful selection",
+                )
+
+            self.logger.debug(f"Updated processing metadata for essay {essay_id}")
+
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="update_essay_processing_metadata",
+                    message=f"Database error during metadata update: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    essay_id=essay_id,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
+
+    async def update_student_association(
+        self,
+        essay_id: str,
+        student_id: str | None,
+        association_confirmed_at: Any,  # datetime
+        association_method: str,
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay with student association from Phase 1 matching."""
+        if session is None:
+            async with self.session() as session:
+                return await self.update_student_association(
+                    essay_id,
+                    student_id,
+                    association_confirmed_at,
+                    association_method,
+                    correlation_id,
+                    session,
+                )
+
+        try:
+            # Use SELECT FOR UPDATE to prevent race conditions
+            stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id).with_for_update()
+            result = await session.execute(stmt)
+            db_essay = result.scalars().first()
+
+            if db_essay is None:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_student_association",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
+                )
+
+            # Convert association_confirmed_at to datetime if needed
+            confirmed_at_datetime = association_confirmed_at
+            if isinstance(association_confirmed_at, str):
+                confirmed_at_datetime = datetime.fromisoformat(
+                    association_confirmed_at.replace("Z", "+00:00")
+                )
+            elif association_confirmed_at is not None and hasattr(
+                association_confirmed_at, "replace"
+            ):
+                # Handle timezone-aware datetime by converting to naive UTC
+                confirmed_at_datetime = association_confirmed_at.replace(tzinfo=None)
+
+            # Update the database record
+            update_stmt = (
+                update(EssayStateDB)
+                .where(EssayStateDB.essay_id == essay_id)
+                .values(
+                    student_id=student_id,
+                    association_confirmed_at=confirmed_at_datetime,
+                    association_method=association_method,
+                    updated_at=datetime.now(UTC).replace(tzinfo=None),
+                    version=db_essay.version + 1,
+                )
+            )
+            update_result = await session.execute(update_stmt)
+
+            if update_result.rowcount == 0:
+                raise_resource_not_found(
+                    service="essay_lifecycle_service",
+                    operation="update_student_association",
+                    resource_type="Essay",
+                    resource_id=essay_id,
+                    correlation_id=correlation_id,
+                    operation_details="Essay student association update failed after successful selection",
+                )
+
+            self.logger.debug(
+                f"Updated student association for essay {essay_id} with student {student_id}"
+            )
+
+        except Exception as e:
+            # Re-raise HuleEduError as-is, or wrap other exceptions
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="update_student_association",
+                    message=f"Database error during student association update: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    essay_id=essay_id,
+                    student_id=student_id,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
+
     async def list_essays_by_batch(self, batch_id: str) -> list[EssayState]:
         """List all essays in a batch."""
         async with self.session() as session:

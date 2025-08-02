@@ -29,6 +29,7 @@ class EssayState(BaseModel):
     processing_metadata: dict[str, Any] = Field(default_factory=dict)
     timeline: dict[str, datetime] = Field(default_factory=dict)
     storage_references: dict[ContentType, str] = Field(default_factory=dict)
+    text_storage_id: str | None = None  # Added for student association tracking
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -571,7 +571,11 @@ services:
     container_name: huleedu_websocket_service
     restart: unless-stopped
     depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - huleedu_internal_network
@@ -593,6 +597,10 @@ services:
       - ENABLE_METRICS=true
       - ENABLE_TRACING=false
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Kafka configuration
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CONSUMER_GROUP=websocket-service-consumer
+      - KAFKA_CONSUMER_CLIENT_ID=websocket-service-client
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
       interval: 15s

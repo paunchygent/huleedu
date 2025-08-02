@@ -37,10 +37,21 @@ class EssaySlotAssignedV1(BaseModel):
 
 class BatchStudentMatchingRequestedV1(BaseEventData):
     """
-    Batch-level request from ELS to NLP Service for Phase 1 student matching.
+    Batch-level request for Phase 1 student matching.
 
-    Sent when ELS receives BATCH_STUDENT_MATCHING_INITIATE_COMMAND from BOS.
-    Contains all essays in the batch that need student matching.
+    Publisher: Essay Lifecycle Service (ELS)
+    Consumer: NLP Service
+    Topic: batch.student.matching.requested
+    Handler: NLP - BatchStudentMatchingHandler.handle_batch_student_matching()
+
+    Flow (REGULAR batches only):
+    1. ELS receives BatchServiceStudentMatchingInitiateCommandDataV1 from BOS
+    2. ELS updates batch state to awaiting_student_associations
+    3. ELS publishes this event to NLP Service
+    4. NLP processes all essays in parallel for student name extraction
+    5. NLP publishes BatchAuthorMatchesSuggestedV1 to Class Management
+
+    Note: This is a Phase 1 event - occurs BEFORE batch readiness for REGULAR batches only.
     """
 
     event_name: ProcessingEvent = ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED

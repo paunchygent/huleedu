@@ -21,6 +21,7 @@ dependencies = [
     "opentelemetry-sdk",
     "opentelemetry-instrumentation-fastapi",
     "httpx",
+    "aiokafka",
     "huleedu-common-core",
     "huleedu-service-libs",
 ]

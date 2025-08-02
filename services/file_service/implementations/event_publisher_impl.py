@@ -8,7 +8,6 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.file_service.config import Settings
 from services.file_service.implementations.outbox_manager import OutboxManager
@@ -24,11 +23,9 @@ class DefaultEventPublisher(EventPublisherProtocol):
         self,
         outbox_manager: OutboxManager,
         settings: Settings,
-        redis_client: AtomicRedisClientProtocol,
     ):
         self.outbox_manager = outbox_manager
         self.settings = settings
-        self.redis_client = redis_client
 
     async def publish_essay_content_provisioned(
         self,
@@ -166,24 +163,6 @@ class DefaultEventPublisher(EventPublisherProtocol):
             },
         )
 
-        # Redis publication for real-time UI updates (separate from event bus)
-        try:
-            # Publish to Redis for real-time updates (maintained as-is)
-            await self._publish_file_event_to_redis(
-                event_data.user_id,
-                "batch_file_added",
-                {
-                    "batch_id": event_data.batch_id,
-                    "file_upload_id": event_data.file_upload_id,
-                    "filename": event_data.filename,
-                    "timestamp": event_data.timestamp.isoformat(),
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Error publishing BatchFileAddedV1 Redis notification: {e}")
-            raise
-
     async def publish_batch_file_removed_v1(
         self,
         event_data: BatchFileRemovedV1,
@@ -229,46 +208,3 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 "topic": topic,
             },
         )
-
-        # Redis publication for real-time UI updates (separate from event bus)
-        try:
-            # Publish to Redis for real-time updates (maintained as-is)
-            await self._publish_file_event_to_redis(
-                event_data.user_id,
-                "batch_file_removed",
-                {
-                    "batch_id": event_data.batch_id,
-                    "file_upload_id": event_data.file_upload_id,
-                    "filename": event_data.filename,
-                    "timestamp": event_data.timestamp.isoformat(),
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"Error publishing BatchFileRemovedV1 Redis notification: {e}")
-            raise
-
-    async def _publish_file_event_to_redis(
-        self,
-        user_id: str,
-        event_type: str,
-        data: dict,
-    ) -> None:
-        """Publish file event to Redis for real-time UI notifications."""
-        try:
-            await self.redis_client.publish_user_notification(
-                user_id=user_id, event_type=event_type, data=data
-            )
-
-            logger.info(
-                f"Published {event_type} notification to Redis for user {user_id}",
-                extra={"user_id": user_id, "event_type": event_type},
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Error publishing {event_type} to Redis: {e}",
-                extra={"user_id": user_id, "event_type": event_type},
-                exc_info=True,
-            )
-            # Don't fail the entire event publishing if Redis fails

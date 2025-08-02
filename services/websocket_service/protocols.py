@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, AsyncIterator, Protocol
+
+from aiokafka import ConsumerRecord
+from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 
 
 class WebSocketManagerProtocol(Protocol):
@@ -57,5 +60,71 @@ class MessageListenerProtocol(Protocol):
         """
         Start listening for messages for a specific user and forward them to the WebSocket.
         This should handle the entire lifecycle of the listener.
+        """
+        ...
+
+
+class KafkaConsumerProtocol(Protocol):
+    """
+    Protocol for Kafka consumer operations.
+    """
+
+    async def start(self) -> None:
+        """Start the consumer."""
+        ...
+
+    async def stop(self) -> None:
+        """Stop the consumer."""
+        ...
+
+    def __aiter__(self) -> AsyncIterator[ConsumerRecord]:
+        """Iterate over messages."""
+        ...
+
+    async def commit(self) -> None:
+        """Commit the current offset."""
+        ...
+
+
+class FileEventConsumerProtocol(Protocol):
+    """
+    Protocol for consuming file management events from Kafka.
+    """
+
+    async def start_consumer(self) -> None:
+        """
+        Start consuming file events from Kafka topics.
+        This should run indefinitely until stopped.
+        """
+        ...
+
+    async def stop_consumer(self) -> None:
+        """
+        Stop the Kafka consumer gracefully.
+        """
+        ...
+
+    async def process_message(self, msg: ConsumerRecord) -> bool:
+        """
+        Process a single Kafka message containing file events.
+        Returns True if message was processed successfully, False otherwise.
+        """
+        ...
+
+
+class FileNotificationHandlerProtocol(Protocol):
+    """
+    Protocol for handling file events and converting them to notifications.
+    """
+
+    async def handle_batch_file_added(self, event: BatchFileAddedV1) -> None:
+        """
+        Handle BatchFileAddedV1 event and publish notification to Redis.
+        """
+        ...
+
+    async def handle_batch_file_removed(self, event: BatchFileRemovedV1) -> None:
+        """
+        Handle BatchFileRemovedV1 event and publish notification to Redis.
         """
         ...

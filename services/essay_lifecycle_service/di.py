@@ -95,6 +95,7 @@ from services.essay_lifecycle_service.protocols import (
     MetricsCollector,
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
+    StudentAssociationHandler,
 )
 from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
@@ -356,18 +357,57 @@ class CommandHandlerProvider(Provider):
         return FutureServicesCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
+    def provide_student_matching_command_handler(
+        self,
+        repository: EssayRepositoryProtocol,
+        batch_tracker: BatchEssayTracker,
+        outbox_manager: OutboxManager,
+        session_factory: async_sessionmaker,
+    ) -> Any:  # StudentMatchingCommandHandler
+        """Provide student matching command handler for Phase 1 NLP integration."""
+        from services.essay_lifecycle_service.implementations.student_matching_command_handler import (
+            StudentMatchingCommandHandler,
+        )
+
+        return StudentMatchingCommandHandler(
+            repository, batch_tracker, outbox_manager, session_factory
+        )
+
+    @provide(scope=Scope.APP)
     def provide_batch_command_handler(
         self,
         spellcheck_handler: SpellcheckCommandHandler,
         cj_assessment_handler: CJAssessmentCommandHandler,
         future_handler: FutureServicesCommandHandler,
+        student_matching_handler: Any,  # StudentMatchingCommandHandler
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation."""
-        return DefaultBatchCommandHandler(spellcheck_handler, cj_assessment_handler, future_handler)
+
+        # Need to create an extended version that includes student matching
+        return DefaultBatchCommandHandler(
+            spellcheck_handler, cj_assessment_handler, future_handler, student_matching_handler
+        )
 
 
 class BatchCoordinationProvider(Provider):
     """Provider for batch coordination and tracking implementations."""
+
+    @provide(scope=Scope.APP)
+    def provide_student_association_handler(
+        self,
+        repository: EssayRepositoryProtocol,
+        batch_tracker: BatchEssayTracker,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
+        session_factory: async_sessionmaker,
+    ) -> StudentAssociationHandler:
+        """Provide student association handler for Phase 1 NLP integration."""
+        from services.essay_lifecycle_service.implementations.student_association_handler import (
+            StudentAssociationHandler as StudentAssociationHandlerImpl,
+        )
+
+        return StudentAssociationHandlerImpl(
+            repository, batch_tracker, batch_lifecycle_publisher, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_coordination_handler(
@@ -379,13 +419,14 @@ class BatchCoordinationProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
         """Provide batch coordination handler implementation with direct publisher injection."""
-        return DefaultBatchCoordinationHandler(
+        handler = DefaultBatchCoordinationHandler(
             batch_tracker,
             repository,
             batch_lifecycle_publisher,
             pending_content_ops,
             session_factory,
         )
+        return handler
 
     @provide(scope=Scope.APP)
     def provide_batch_tracker_persistence(self, engine: AsyncEngine) -> BatchTrackerPersistence:

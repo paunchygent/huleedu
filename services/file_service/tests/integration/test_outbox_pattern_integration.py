@@ -121,15 +121,8 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                 assert outbox_event.event_type == "file.batch.file.added.v1"
                 assert outbox_event.published_at is None
 
-                # Verify Redis notification was called (includes timestamp)
-                call_args = mock_redis_client.publish_user_notification.call_args
-                assert call_args[1]["user_id"] == test_user_id
-                assert call_args[1]["event_type"] == "batch_file_added"
-                data = call_args[1]["data"]
-                assert data["batch_id"] == test_batch_id
-                assert data["file_upload_id"] == test_file_upload_id
-                assert data["filename"] == "test_file.txt"
-                assert "timestamp" in data  # Timestamp is included in actual implementation
+                # Verify Redis notification was NOT called (since we removed Redis publishing)
+                mock_redis_client.publish_user_notification.assert_not_called()
 
     async def test_relay_worker_processes_outbox_events(
         self,
@@ -212,17 +205,12 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
         correlation_id: UUID,
         test_file_upload_id: str,
     ) -> None:
-        """Test that outbox maintains transactional consistency during failures."""
+        """Test that outbox maintains transactional consistency."""
         async with self.create_test_container(
             test_engine, mock_kafka_publisher, mock_redis_client
         ) as container:
             async with container() as request_container:
                 event_publisher = await request_container.get(EventPublisherProtocol)
-
-                # Configure Redis to fail to test transactional isolation
-                mock_redis_client.publish_user_notification.side_effect = Exception(
-                    "Redis unavailable"
-                )
 
                 event_data = BatchFileRemovedV1(
                     batch_id="test-batch-consistency",
@@ -232,10 +220,10 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                     timestamp=datetime.now(timezone.utc),
                 )
 
-                # Event publishing should succeed despite Redis failure
+                # Event publishing should store in outbox
                 await event_publisher.publish_batch_file_removed_v1(event_data, correlation_id)
 
-                # Verify event still stored in outbox despite Redis failure
+                # Verify event stored in outbox
                 stmt = select(EventOutbox).where(
                     EventOutbox.aggregate_id == "test-batch-consistency",
                     EventOutbox.event_type == "file.batch.file.removed.v1",
@@ -246,8 +234,8 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
 
                 assert outbox_event is not None
                 assert outbox_event.published_at is None
-                # Verify Redis was attempted but failed gracefully
-                mock_redis_client.publish_user_notification.assert_called_once()
+                # Verify Redis was NOT called (since we removed Redis publishing)
+                mock_redis_client.publish_user_notification.assert_not_called()
 
     async def test_event_envelope_serialization_in_outbox(
         self,

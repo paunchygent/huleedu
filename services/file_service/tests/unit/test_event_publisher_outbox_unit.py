@@ -63,33 +63,6 @@ class FakeOutboxRepository:
         return event_id
 
 
-class FakeRedisClient:
-    """Fake implementation of AtomicRedisClientProtocol for testing."""
-
-    def __init__(self) -> None:
-        self.notifications: list[dict[str, Any]] = []
-        self.should_fail = False
-        self.failure_message = "Redis unavailable"
-
-    async def publish_user_notification(
-        self,
-        user_id: str,
-        event_type: str,
-        data: dict[str, Any],
-    ) -> None:
-        """Store notification in fake Redis."""
-        if self.should_fail:
-            raise Exception(self.failure_message)
-
-        self.notifications.append(
-            {
-                "user_id": user_id,
-                "event_type": event_type,
-                "data": data,
-            }
-        )
-
-
 @pytest.fixture
 def test_settings() -> Settings:
     """Test settings with configured topics."""
@@ -109,12 +82,6 @@ def fake_kafka() -> Mock:
 
 
 @pytest.fixture
-def fake_redis() -> FakeRedisClient:
-    """Fake Redis client for testing."""
-    return FakeRedisClient()
-
-
-@pytest.fixture
 def fake_outbox() -> FakeOutboxRepository:
     """Fake outbox repository for testing."""
     return FakeOutboxRepository()
@@ -129,14 +96,12 @@ def mock_outbox_manager() -> AsyncMock:
 @pytest.fixture
 def event_publisher(
     test_settings: Settings,
-    fake_redis: FakeRedisClient,
     mock_outbox_manager: AsyncMock,
 ) -> DefaultEventPublisher:
     """Create event publisher with mocked dependencies for TRUE OUTBOX PATTERN testing."""
     return DefaultEventPublisher(
         outbox_manager=mock_outbox_manager,
         settings=test_settings,
-        redis_client=fake_redis,  # type: ignore
     )
 
 
@@ -242,14 +207,13 @@ class TestDefaultEventPublisher:
         assert envelope.correlation_id == sample_correlation_id
         assert envelope.data == event_data
 
-    async def test_publish_batch_file_added_with_redis_notification(
+    async def test_publish_batch_file_added_success(
         self,
         event_publisher: DefaultEventPublisher,
         mock_outbox_manager: AsyncMock,
-        fake_redis: FakeRedisClient,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify BatchFileAddedV1 event calls OutboxManager and sends Redis notification."""
+        """Verify BatchFileAddedV1 event calls OutboxManager with correct parameters."""
         # Given
         event_data = BatchFileAddedV1(
             batch_id="batch-789",
@@ -279,24 +243,13 @@ class TestDefaultEventPublisher:
         assert envelope.correlation_id == sample_correlation_id
         assert envelope.data == event_data
 
-        # Verify Redis notification
-        assert len(fake_redis.notifications) == 1
-        notification = fake_redis.notifications[0]
-
-        assert notification["user_id"] == "user-123"
-        assert notification["event_type"] == "batch_file_added"
-        assert notification["data"]["batch_id"] == "batch-789"
-        assert notification["data"]["file_upload_id"] == "file-999"
-        assert notification["data"]["filename"] == "student_essay.pdf"
-
-    async def test_publish_batch_file_removed_with_redis_notification(
+    async def test_publish_batch_file_removed_success(
         self,
         event_publisher: DefaultEventPublisher,
         mock_outbox_manager: AsyncMock,
-        fake_redis: FakeRedisClient,
         sample_correlation_id: UUID,
     ) -> None:
-        """Verify BatchFileRemovedV1 event calls OutboxManager and sends Redis notification."""
+        """Verify BatchFileRemovedV1 event calls OutboxManager with correct parameters."""
         # Given
         event_data = BatchFileRemovedV1(
             batch_id="batch-111",
@@ -325,16 +278,6 @@ class TestDefaultEventPublisher:
         assert envelope.source_service == "file-service"
         assert envelope.correlation_id == sample_correlation_id
         assert envelope.data == event_data
-
-        # Verify Redis notification
-        assert len(fake_redis.notifications) == 1
-        notification = fake_redis.notifications[0]
-
-        assert notification["user_id"] == "user-456"
-        assert notification["event_type"] == "batch_file_removed"
-        assert notification["data"]["batch_id"] == "batch-111"
-        assert notification["data"]["file_upload_id"] == "file-222"
-        assert notification["data"]["filename"] == "removed_essay.pdf"
 
     async def test_outbox_failure_propagates_exception(
         self,
@@ -365,50 +308,6 @@ class TestDefaultEventPublisher:
 
         assert "Database connection lost" in str(exc_info.value)
         mock_outbox_manager.publish_to_outbox.assert_called_once()
-
-    async def test_redis_failure_does_not_affect_outbox_storage(
-        self,
-        event_publisher: DefaultEventPublisher,
-        mock_outbox_manager: AsyncMock,
-        fake_redis: FakeRedisClient,
-        sample_correlation_id: UUID,
-    ) -> None:
-        """Verify that Redis failures don't prevent outbox storage for batch events."""
-        # Given
-        fake_redis.should_fail = True
-        fake_redis.failure_message = "Redis connection timeout"
-
-        event_data = BatchFileAddedV1(
-            batch_id="batch-redis-fail",
-            file_upload_id="file-redis-fail",
-            filename="redis_fail.pdf",
-            user_id="user-redis-fail",
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        # When
-        with patch("huleedu_service_libs.observability.inject_trace_context"):
-            # Should not raise exception despite Redis failure
-            await event_publisher.publish_batch_file_added_v1(event_data, sample_correlation_id)
-
-        # Then - Verify OutboxManager.publish_to_outbox was called with correct parameters
-        mock_outbox_manager.publish_to_outbox.assert_called_once()
-        call_args = mock_outbox_manager.publish_to_outbox.call_args
-
-        assert call_args.kwargs["aggregate_type"] == "batch"
-        assert call_args.kwargs["aggregate_id"] == "batch-redis-fail"
-        assert call_args.kwargs["event_type"] == "file.batch.file.added.v1"
-        assert call_args.kwargs["topic"] == "file.batch.file.added.v1"
-
-        # Verify envelope structure in event_data parameter
-        envelope = call_args.kwargs["event_data"]
-        assert envelope.event_type == "file.batch.file.added.v1"
-        assert envelope.source_service == "file-service"
-        assert envelope.correlation_id == sample_correlation_id
-        assert envelope.data == event_data
-
-        # Verify no Redis notifications were sent due to failure
-        assert len(fake_redis.notifications) == 0
 
     async def test_trace_context_injection(
         self,

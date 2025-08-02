@@ -6,20 +6,19 @@ Handles batch coordination events like batch registration and content provisioni
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
     from common_core.events.batch_coordination_events import BatchEssaysRegistered
     from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
-    from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_processing_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
     BatchLifecyclePublisher,
@@ -45,7 +44,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
         pending_content_ops: RedisPendingContentOperations,
-        session_factory: async_sessionmaker | Callable[[], Any],
+        session_factory: async_sessionmaker,
     ) -> None:
         self.batch_tracker = batch_tracker
         self.repository = repository
@@ -121,7 +120,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         publish_correlation_id = original_correlation_id or correlation_id
 
                         logger.info(
-                            "Batch is immediately complete, publishing clean BatchEssaysReady event",
+                            "Batch is immediately complete, publishing BatchContentProvisioningCompletedV1 event",
                             extra={
                                 "batch_id": batch_ready_event.batch_id,
                                 "ready_count": len(batch_ready_event.ready_essays),
@@ -129,8 +128,23 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             },
                         )
 
-                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
-                            event_data=batch_ready_event,
+                        # Create BatchContentProvisioningCompletedV1 event
+                        from common_core.events.batch_coordination_events import (
+                            BatchContentProvisioningCompletedV1,
+                        )
+
+                        content_completed_event = BatchContentProvisioningCompletedV1(
+                            batch_id=batch_ready_event.batch_id,
+                            provisioned_count=len(batch_ready_event.ready_essays),
+                            expected_count=event_data.expected_essay_count,
+                            course_code=batch_ready_event.course_code,
+                            user_id=event_data.user_id,
+                            essays_for_processing=batch_ready_event.ready_essays,
+                            correlation_id=publish_correlation_id,
+                        )
+
+                        await self.batch_lifecycle_publisher.publish_batch_content_provisioning_completed(
+                            event_data=content_completed_event,
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
@@ -342,14 +356,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         event_data.entity_id, final_essay_id, event_data.text_storage_id
                     )
 
-                    # **Step 5: Publish BatchEssaysReady if complete**
+                    # **Step 5: Publish BatchContentProvisioningCompletedV1 if complete**
                     if batch_completion_result is not None:
                         batch_ready_event, original_correlation_id = batch_completion_result
                         # Use original correlation ID from batch registration, fallback to current if none
                         publish_correlation_id = original_correlation_id or correlation_id
 
                         logger.info(
-                            "Batch is complete, publishing BatchEssaysReady event",
+                            "Batch is complete, publishing BatchContentProvisioningCompletedV1 event",
                             extra={
                                 "batch_id": batch_ready_event.batch_id,
                                 "ready_count": len(batch_ready_event.ready_essays),
@@ -358,8 +372,29 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             },
                         )
 
-                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
-                            event_data=batch_ready_event,
+                        # Create BatchContentProvisioningCompletedV1 event
+                        from common_core.events.batch_coordination_events import (
+                            BatchContentProvisioningCompletedV1,
+                        )
+
+                        # Get user_id from batch tracker for this batch
+                        batch_status = await self.batch_tracker.get_batch_status(
+                            batch_ready_event.batch_id
+                        )
+                        user_id = batch_status.get("user_id") if batch_status else "unknown"
+
+                        content_completed_event = BatchContentProvisioningCompletedV1(
+                            batch_id=batch_ready_event.batch_id,
+                            provisioned_count=len(batch_ready_event.ready_essays),
+                            expected_count=len(batch_ready_event.ready_essays),  # All essays ready
+                            course_code=batch_ready_event.course_code,
+                            user_id=user_id,
+                            essays_for_processing=batch_ready_event.ready_essays,
+                            correlation_id=publish_correlation_id,
+                        )
+
+                        await self.batch_lifecycle_publisher.publish_batch_content_provisioning_completed(
+                            event_data=content_completed_event,
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
@@ -421,14 +456,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
             # Handle validation failure in batch tracker
             validation_result = await self.batch_tracker.handle_validation_failure(event_data)
 
-            # Publish BatchEssaysReady if batch is now complete
+            # Publish BatchContentProvisioningCompletedV1 if batch is now complete
             if validation_result is not None:
                 batch_ready_event, original_correlation_id = validation_result
                 # Use original correlation ID from batch registration, fallback to current if none
                 publish_correlation_id = original_correlation_id or correlation_id
 
                 logger.info(
-                    "Batch is complete after validation failure, publishing clean BatchEssaysReady event",
+                    "Batch is complete after validation failure, publishing BatchContentProvisioningCompletedV1 event",
                     extra={
                         "batch_id": batch_ready_event.batch_id,
                         "ready_count": len(batch_ready_event.ready_essays),
@@ -440,8 +475,29 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 # START UNIT OF WORK for event publishing
                 async with self.session_factory() as session:
                     async with session.begin():
-                        await self.batch_lifecycle_publisher.publish_batch_essays_ready(
-                            event_data=batch_ready_event,
+                        # Create BatchContentProvisioningCompletedV1 event
+                        from common_core.events.batch_coordination_events import (
+                            BatchContentProvisioningCompletedV1,
+                        )
+
+                        # Get user_id from batch tracker for this batch
+                        batch_status = await self.batch_tracker.get_batch_status(
+                            batch_ready_event.batch_id
+                        )
+                        user_id = batch_status.get("user_id") if batch_status else "unknown"
+
+                        content_completed_event = BatchContentProvisioningCompletedV1(
+                            batch_id=batch_ready_event.batch_id,
+                            provisioned_count=len(batch_ready_event.ready_essays),
+                            expected_count=len(batch_ready_event.ready_essays),  # All essays ready
+                            course_code=batch_ready_event.course_code,
+                            user_id=user_id,
+                            essays_for_processing=batch_ready_event.ready_essays,
+                            correlation_id=publish_correlation_id,
+                        )
+
+                        await self.batch_lifecycle_publisher.publish_batch_content_provisioning_completed(
+                            event_data=content_completed_event,
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
@@ -471,6 +527,72 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 batch_id=event_data.entity_id,
                 original_file_name=event_data.original_file_name,
                 validation_error_code=event_data.validation_error_code,
+                error_type=e.__class__.__name__,
+                error_details=str(e),
+            )
+
+    async def handle_student_associations_confirmed(
+        self,
+        event_data: Any,  # StudentAssociationsConfirmedV1
+        correlation_id: UUID,
+    ) -> bool:
+        """Handle Phase 1 student associations confirmed from Class Management.
+
+        This method satisfies the BatchCoordinationHandler protocol requirement
+        while delegating the actual work through event publishing to avoid
+        circular dependencies.
+        """
+        try:
+            logger.info(
+                "BatchCoordinationHandler received student associations confirmed event",
+                extra={
+                    "batch_id": event_data.batch_id,
+                    "class_id": event_data.class_id,
+                    "associations_count": len(event_data.associations),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # Instead of directly calling StudentAssociationHandler (which would create
+            # a circular dependency), we publish an internal command event for
+            # proper decoupling. The ELS worker will handle this through proper routing.
+
+            # For now, since the StudentAssociationHandler doesn't create circular
+            # dependencies anymore (it only depends on repository, batch_tracker, and
+            # batch_lifecycle_publisher), we can actually use it directly.
+
+            # Import here to avoid circular import at module level
+            from services.essay_lifecycle_service.implementations.student_association_handler import (
+                StudentAssociationHandler,
+            )
+
+            # Create handler instance with our dependencies
+            # The session_factory is the correct type, no casting needed
+
+            student_handler = StudentAssociationHandler(
+                self.repository,
+                self.batch_tracker,
+                self.batch_lifecycle_publisher,
+                self.session_factory,
+            )
+
+            # Delegate to the specialized handler
+            await student_handler.handle_student_associations_confirmed(event_data, correlation_id)
+
+            return True
+
+        except HuleEduError:
+            # Re-raise HuleEdu errors to preserve error type
+            raise
+        except Exception as e:
+            # Only wrap unexpected exceptions as PROCESSING_ERROR
+            raise_processing_error(
+                service="essay_lifecycle_service",
+                operation="handle_student_associations_confirmed",
+                message=f"Unexpected error in student associations handling: {e.__class__.__name__}",
+                correlation_id=correlation_id,
+                batch_id=event_data.batch_id,
+                class_id=event_data.class_id,
                 error_type=e.__class__.__name__,
                 error_details=str(e),
             )

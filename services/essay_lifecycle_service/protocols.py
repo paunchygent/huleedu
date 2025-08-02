@@ -27,6 +27,7 @@ class EssayState(Protocol):
     processing_metadata: dict[str, Any]
     timeline: dict[str, Any]
     storage_references: dict[ContentType, str]
+    text_storage_id: str | None  # Added for student association handler
     created_at: Any  # datetime
     updated_at: Any  # datetime
 
@@ -155,6 +156,28 @@ class EssayRepositoryProtocol(Protocol):
         """Get the session factory for transaction management."""
         ...
 
+    async def update_essay_processing_metadata(
+        self,
+        essay_id: str,
+        metadata_updates: dict[str, Any],
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay processing metadata fields."""
+        ...
+
+    async def update_student_association(
+        self,
+        essay_id: str,
+        student_id: str | None,
+        association_confirmed_at: Any,  # datetime
+        association_method: str,
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Update essay with student association from Phase 1 matching."""
+        ...
+
 
 class EventPublisher(Protocol):
     """Protocol for publishing events to Kafka."""
@@ -260,6 +283,14 @@ class BatchCommandHandler(Protocol):
         """Process CJ assessment phase initiation command from Batch Service."""
         ...
 
+    async def process_student_matching_command(
+        self,
+        command_data: Any,  # BatchServiceStudentMatchingInitiateCommandDataV1
+        correlation_id: UUID,
+    ) -> None:
+        """Process Phase 1 student matching command from Batch Service."""
+        ...
+
 
 class BatchCoordinationHandler(Protocol):
     """Protocol for handling batch coordination events."""
@@ -286,6 +317,14 @@ class BatchCoordinationHandler(Protocol):
         correlation_id: UUID,
     ) -> bool:
         """Handle validation failure events for coordination."""
+        ...
+
+    async def handle_student_associations_confirmed(
+        self,
+        event_data: Any,  # StudentAssociationsConfirmedV1
+        correlation_id: UUID,
+    ) -> bool:
+        """Handle Phase 1 student associations confirmed from Class Management."""
         ...
 
 
@@ -507,6 +546,44 @@ class KafkaConsumerHealthMonitor(Protocol):
         ...
 
 
+class BatchLifecyclePublisherProtocol(Protocol):
+    """Protocol for publishing batch lifecycle events."""
+
+    async def publish_batch_essays_ready(
+        self,
+        event_data: Any,  # BatchEssaysReady
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Publish BatchEssaysReady event when batch is complete."""
+        ...
+
+    async def publish_batch_content_provisioning_completed(
+        self,
+        event_data: Any,  # BatchContentProvisioningCompletedV1
+        correlation_id: UUID,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Publish BatchContentProvisioningCompletedV1 event when all content is provisioned."""
+        ...
+
+
+class OutboxManagerProtocol(Protocol):
+    """Protocol for managing outbox pattern for reliable event delivery."""
+
+    async def publish_to_outbox(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_type: str,
+        event_data: Any,
+        topic: str,
+        session: AsyncSession | None = None,
+    ) -> None:
+        """Store event in outbox for reliable delivery."""
+        ...
+
+
 class ConsumerRecoveryManager(Protocol):
     """Protocol for managing Kafka consumer recovery and self-healing."""
 
@@ -533,6 +610,20 @@ class ConsumerRecoveryManager(Protocol):
         """Get current recovery status and metrics for observability."""
         ...
 
-    async def record_recovery_attempt(self, recovery_type: str, success: bool) -> None:
-        """Record recovery attempt for metrics and circuit breaker management."""
+
+class StudentAssociationHandler(Protocol):
+    """Protocol for handling student association confirmation events from Class Management."""
+
+    async def handle_student_associations_confirmed(
+        self,
+        event_data: Any,  # StudentAssociationsConfirmedV1
+        correlation_id: UUID,
+    ) -> None:
+        """
+        Handle student associations confirmed from Class Management Service.
+
+        Args:
+            event_data: StudentAssociationsConfirmedV1 event containing association confirmations
+            correlation_id: Correlation ID for tracking the event flow
+        """
         ...

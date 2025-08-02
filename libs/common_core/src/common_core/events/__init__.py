@@ -36,6 +36,7 @@ from .nlp_events import (
 from .spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .validation_events import (
     StudentAssociation,
+    StudentAssociationConfirmation,
     StudentAssociationsConfirmedV1,
     ValidationTimeoutProcessedV1,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
     "StudentAssociation",
+    "StudentAssociationConfirmation",
     "StudentAssociationsConfirmedV1",
     "StudentCreatedV1",
     "StudentMatchSuggestion",

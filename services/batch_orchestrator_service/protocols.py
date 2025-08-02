@@ -78,6 +78,17 @@ class SpellcheckInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     pass
 
 
+class StudentMatchingInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
+    """
+    Protocol for initiating Phase 1 student matching operations.
+
+    Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
+    used for REGULAR batches that require student-essay association validation.
+    """
+
+    pass
+
+
 class BatchRepositoryProtocol(Protocol):
     """Protocol for batch data persistence operations."""
 

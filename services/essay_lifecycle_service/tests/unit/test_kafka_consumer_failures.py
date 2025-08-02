@@ -87,6 +87,8 @@ class TestKafkaConsumerFailures:
             batch_coordination_handler=AsyncMock(spec=BatchCoordinationHandler),
             batch_command_handler=AsyncMock(spec=BatchCommandHandler),
             service_result_handler=AsyncMock(spec=ServiceResultHandler),
+            tracer=None,
+            confirm_idempotency=None,
         )
 
         assert result is False
@@ -136,6 +138,8 @@ class TestKafkaConsumerFailures:
             batch_coordination_handler=mock_handler,
             batch_command_handler=AsyncMock(spec=BatchCommandHandler),
             service_result_handler=AsyncMock(spec=ServiceResultHandler),
+            tracer=None,
+            confirm_idempotency=None,
         )
 
         assert result is False

@@ -19,11 +19,22 @@ from ..models.error_models import ErrorDetail
 
 class EssayContentProvisionedV1(BaseModel):
     """
-    Event sent by File Service when content is successfully processed and stored.
+    Event indicating file content has been extracted and stored.
 
-    This event decouples File Service from internal
-    essay ID management. File Service simply announces that content has been
-    provisioned for a batch.
+    Publisher: File Service
+    Consumer: Essay Lifecycle Service (ELS)
+    Topic: essay.content.provisioned
+    Handler: ELS - DefaultBatchCoordinationHandler.handle_essay_content_provisioned()
+
+    Flow (all batches):
+    1. Client uploads file via API to File Service
+    2. File Service extracts text content and stores in Content Service
+    3. File Service publishes this event
+    4. ELS assigns content to available essay slot
+    5. When all slots filled, ELS publishes BatchContentProvisioningCompletedV1
+
+    This event decouples File Service from internal essay ID management.
+    File Service simply announces that content has been provisioned for a batch.
     """
 
     event: str = Field(default="essay.content.provisioned", description="Event type identifier")

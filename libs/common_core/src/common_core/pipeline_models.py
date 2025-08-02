@@ -22,6 +22,7 @@ class PhaseName(str, Enum):
     AI_FEEDBACK = "ai_feedback"
     CJ_ASSESSMENT = "cj_assessment"
     NLP = "nlp"
+    STUDENT_MATCHING = "student_matching"
 
 
 class PipelineExecutionStatus(str, Enum):

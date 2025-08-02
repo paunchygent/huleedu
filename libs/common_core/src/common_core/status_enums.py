@@ -80,7 +80,6 @@ class BatchStatus(str, Enum):
     PROCESSING_PIPELINES = "processing_pipelines"
     AWAITING_STUDENT_VALIDATION = "awaiting_student_validation"
     VALIDATION_TIMEOUT_PROCESSED = "validation_timeout_processed"
-    GUEST_CLASS_READY = "guest_class_ready"
     COMPLETED_SUCCESSFULLY = "completed_successfully"
     COMPLETED_WITH_FAILURES = "completed_with_failures"
     FAILED_CRITICALLY = "failed_critically"

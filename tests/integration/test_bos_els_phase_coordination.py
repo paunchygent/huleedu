@@ -135,12 +135,32 @@ class TestBosElsPhaseCoordination:
         return AsyncMock(spec=ClientPipelineRequestHandler)
 
     @pytest.fixture
+    def mock_batch_content_provisioning_completed_handler(self):
+        """Mock the BatchContentProvisioningCompletedHandler for Phase 1."""
+        from services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler import (
+            BatchContentProvisioningCompletedHandler,
+        )
+
+        return AsyncMock(spec=BatchContentProvisioningCompletedHandler)
+
+    @pytest.fixture
+    def mock_student_associations_confirmed_handler(self):
+        """Mock the StudentAssociationsConfirmedHandler for Phase 1."""
+        from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (
+            StudentAssociationsConfirmedHandler,
+        )
+
+        return AsyncMock(spec=StudentAssociationsConfirmedHandler)
+
+    @pytest.fixture
     def kafka_consumer(
         self,
         mock_batch_essays_ready_handler,
+        mock_batch_content_provisioning_completed_handler,
         mock_batch_validation_errors_handler,
         real_els_outcome_handler,
         mock_client_pipeline_request_handler,
+        mock_student_associations_confirmed_handler,
     ):
         """Create real BatchKafkaConsumer with real outcome handler and mocked dependencies."""
         redis_client = MockRedisClient()
@@ -148,9 +168,11 @@ class TestBosElsPhaseCoordination:
             kafka_bootstrap_servers="localhost:9092",
             consumer_group="test-group",
             batch_essays_ready_handler=mock_batch_essays_ready_handler,
+            batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
             batch_validation_errors_handler=mock_batch_validation_errors_handler,
             els_batch_phase_outcome_handler=real_els_outcome_handler,
             client_pipeline_request_handler=mock_client_pipeline_request_handler,
+            student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
             redis_client=redis_client,
         )
 

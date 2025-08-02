@@ -234,13 +234,19 @@ class TestBOSIdempotencyBasic:
         async def handle_message_idempotently(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> bool:
+            # Mock the Phase 1 handlers
+            mock_batch_content_provisioning_completed_handler = AsyncMock()
+            mock_student_associations_confirmed_handler = AsyncMock()
+
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
                 batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -304,13 +310,19 @@ class TestBOSIdempotencyBasic:
         async def handle_message_idempotently(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> bool:
+            # Mock the Phase 1 handlers
+            mock_batch_content_provisioning_completed_handler = AsyncMock()
+            mock_student_associations_confirmed_handler = AsyncMock()
+
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
                 batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -350,13 +362,19 @@ class TestBOSIdempotencyBasic:
         async def handle_message_idempotently(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> bool:
+            # Mock the Phase 1 handlers
+            mock_batch_content_provisioning_completed_handler = AsyncMock()
+            mock_student_associations_confirmed_handler = AsyncMock()
+
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
                 batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
                 redis_client=redis_client,
             )
             await consumer._handle_message(msg)
@@ -395,13 +413,19 @@ class TestBOSIdempotencyBasic:
         async def handle_message_with_controlled_confirmation(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> Any:
+            # Mock the Phase 1 handlers
+            mock_batch_content_provisioning_completed_handler = AsyncMock()
+            mock_student_associations_confirmed_handler = AsyncMock()
+
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
                 batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
                 redis_client=redis_client,
             )
             return await helper.process_with_controlled_confirmation(
@@ -459,13 +483,19 @@ class TestBOSIdempotencyBasic:
         async def handle_message_with_controlled_confirmation(
             msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
         ) -> Any:
+            # Mock the Phase 1 handlers
+            mock_batch_content_provisioning_completed_handler = AsyncMock()
+            mock_student_associations_confirmed_handler = AsyncMock()
+
             consumer = BatchKafkaConsumer(
                 kafka_bootstrap_servers="test:9092",
                 consumer_group="test-group",
                 batch_essays_ready_handler=batch_essays_ready_handler,
+                batch_content_provisioning_completed_handler=mock_batch_content_provisioning_completed_handler,
                 batch_validation_errors_handler=batch_validation_errors_handler,
                 els_batch_phase_outcome_handler=els_phase_outcome_handler,
                 client_pipeline_request_handler=mock_client_pipeline_request_handler,
+                student_associations_confirmed_handler=mock_student_associations_confirmed_handler,
                 redis_client=redis_client,
             )
             return await helper.process_with_controlled_confirmation(
