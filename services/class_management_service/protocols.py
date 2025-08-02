@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 from uuid import UUID
 
+if TYPE_CHECKING:
+    from opentelemetry.trace import Span
+
+import aiohttp
+from aiokafka import ConsumerRecord
 from common_core.events.envelope import EventEnvelope
 
 from services.class_management_service.api_models import (
@@ -63,6 +68,18 @@ class ClassEventPublisherProtocol(Protocol):
         """Publish a class management event to the appropriate Kafka topic."""
         ...
 
+    async def publish_student_associations_confirmed(
+        self,
+        batch_id: str,
+        class_id: str,
+        associations: list[dict[str, Any]],
+        timeout_triggered: bool,
+        validation_summary: dict[str, int],
+        correlation_id: UUID,
+    ) -> None:
+        """Publish StudentAssociationsConfirmedV1 event to ELS."""
+        ...
+
 
 class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
     """Protocol for the core business logic of the Class Management Service."""
@@ -111,4 +128,27 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
 
     async def delete_student(self, student_id: uuid.UUID) -> bool:
         """Delete a student by their ID."""
+        ...
+
+
+class CommandHandlerProtocol(Protocol):
+    """Protocol for Kafka event command handlers."""
+
+    async def can_handle(self, event_type: str) -> bool:
+        """Check if this handler can process the given event type."""
+        ...
+
+    async def handle(
+        self,
+        msg: ConsumerRecord,
+        envelope: EventEnvelope,
+        http_session: aiohttp.ClientSession,
+        correlation_id: UUID,
+        span: "Span | None" = None,
+    ) -> bool:
+        """Handle the incoming event.
+
+        Returns:
+            True if processing succeeded, False otherwise
+        """
         ...

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from common_core.domain_enums import CourseCode, Language
 from common_core.metadata_models import PersonNameV1
@@ -9,10 +10,15 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
+    JSON,
     String,
     Table,
+    Text,
     UniqueConstraint,
     text,
+    func,
+    Index,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy.dialects.postgresql import UUID
@@ -122,3 +128,95 @@ class EssayStudentAssociation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
 
     student: Mapped["Student"] = relationship(back_populates="essay_associations")
+
+
+class EventOutbox(Base):
+    """
+    Generic event outbox table for reliable event publishing.
+
+    This table stores events that need to be published to Kafka, ensuring
+    that database updates and event publications are atomic. Events are
+    written to this table in the same transaction as business logic updates.
+
+    The event relay worker polls this table and publishes events to Kafka,
+    marking them as published upon success.
+    """
+
+    __tablename__ = "event_outbox"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+    )
+
+    # Aggregate information
+    aggregate_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    aggregate_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    # Event information
+    event_type: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    event_data: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+    )
+    event_key: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    # Publishing state
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Retry handling
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        # Index for polling unpublished events efficiently
+        Index(
+            "ix_event_outbox_unpublished",
+            "published_at",
+            "created_at",
+            postgresql_where="published_at IS NULL",
+        ),
+        # Index for looking up events by aggregate
+        Index(
+            "ix_event_outbox_aggregate",
+            "aggregate_type",
+            "aggregate_id",
+        ),
+        # Index for monitoring/debugging by event type
+        Index(
+            "ix_event_outbox_event_type",
+            "event_type",
+        ),
+    )

@@ -41,6 +41,7 @@
 - Update relevant task documents per `.cursor/rules/090-documentation-standards.mdc`
 - Never create files in root - follow folder patterns
 - All code changes require tests (run and verified)
+- Always run typecheck-all from root after creating a test or implementing new code
 ```
 
 ---
@@ -162,6 +163,23 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 - **Rebuild**: `docker compose build --no-cache <service>`
 - **Start**: `docker compose up -d`
 - **Logs**: `docker compose logs -f <service>`
+```
+
+### Database Access (Common Issue)
+
+```markdown
+# IMPORTANT: Shell doesn't have .env variables by default!
+# Always source .env first:
+source /Users/olofs_mba/Documents/Repos/huledu-reboot/.env
+
+# Then access database:
+docker exec huleedu_<service>_db psql -U $HULEEDU_DB_USER -d <db_name> -c "SQL"
+
+# Or use hardcoded values:
+docker exec huleedu_class_management_db psql -U huleedu_user -d huledu_class_management -c "\dt"
+
+# Database names follow pattern: huledu_<service_name>
+# Example: huledu_class_management, huledu_essay_lifecycle, etc.
 ```
 
 ### Service Management

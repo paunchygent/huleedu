@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from aiohttp import ClientSession
 from aiokafka import ConsumerRecord
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import StudentMatchSuggestion
+from common_core.events.nlp_events import EssayMatchResult, StudentMatchSuggestion
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 
@@ -83,6 +83,18 @@ class NlpEventPublisherProtocol(Protocol):
         correlation_id: UUID,
     ) -> None:
         """Publish author match results to Kafka."""
+        ...
+
+    async def publish_batch_author_match_results(
+        self,
+        kafka_bus: KafkaPublisherProtocol,
+        batch_id: str,
+        class_id: str,
+        match_results: list[EssayMatchResult],
+        processing_summary: dict[str, int],
+        correlation_id: UUID,
+    ) -> None:
+        """Publish batch author match results to Kafka."""
         ...
 
 

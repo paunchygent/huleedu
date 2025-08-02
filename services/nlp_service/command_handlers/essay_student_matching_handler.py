@@ -76,9 +76,9 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
             event_type: The event type string to check
 
         Returns:
-            True if this handler can process essay student matching requests
+            True if this handler can process batch student matching requests
         """
-        return event_type == "huleedu.essay.student.matching.requested.v1"
+        return event_type == "huleedu.batch.student.matching.requested.v1"
 
     async def handle(
         self,
@@ -125,8 +125,13 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                 )
                 await self.roster_cache.set_roster(command_data.class_id, roster)
 
-            # Process each essay in the batch
+            # Process each essay in the batch and collect results
+            from common_core.events.nlp_events import EssayMatchResult
+
+            match_results: list[EssayMatchResult] = []
             processed_count = 0
+            matched_count = 0
+
             for essay_ref in command_data.essays_to_process:
                 try:
                     logger.info(
@@ -155,16 +160,27 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                     # Determine match status
                     match_status = determine_match_status(suggestions)
 
-                    # Publish match result event for this essay
-                    await self.event_publisher.publish_author_match_result(
-                        kafka_bus=self.kafka_bus,
+                    # Create match result for this essay
+                    match_result = EssayMatchResult(
                         essay_id=essay_ref.essay_id,
+                        text_storage_id=essay_ref.text_storage_id,
+                        filename=getattr(essay_ref, "filename", ""),
                         suggestions=suggestions,
-                        match_status=match_status,
-                        correlation_id=correlation_id,
+                        no_match_reason=None if suggestions else "No matches found",
+                        extraction_metadata={
+                            "match_status": match_status,
+                            "confidence_scores": (
+                                [s.confidence_score for s in suggestions] 
+                                if suggestions else []
+                            )
+                        },
                     )
+                    match_results.append(match_result)
 
                     processed_count += 1
+                    if suggestions:
+                        matched_count += 1
+
                     logger.info(
                         "Successfully processed Phase 1 student matching for essay %s",
                         essay_ref.essay_id,
@@ -189,11 +205,52 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                         },
                         exc_info=True,
                     )
+                    # Add a failed result for this essay
+                    match_result = EssayMatchResult(
+                        essay_id=essay_ref.essay_id,
+                        text_storage_id=essay_ref.text_storage_id,
+                        filename=getattr(essay_ref, "filename", ""),
+                        suggestions=[],
+                        no_match_reason=f"Processing error: {str(essay_error)}",
+                        extraction_metadata={
+                            "error": str(essay_error),
+                            "match_status": "ERROR"
+                        },
+                    )
+                    match_results.append(match_result)
                     # Continue processing other essays instead of failing the entire batch
                     continue
 
-            # TRUE OUTBOX PATTERN: No manual outbox processing needed
-            # The relay worker handles all outbox event publishing asynchronously
+            # Publish batch results to Class Management Service
+            if match_results:
+                processing_summary = {
+                    "total_essays": len(command_data.essays_to_process),
+                    "processed": processed_count,
+                    "matched": matched_count,
+                    "unmatched": processed_count - matched_count,
+                    "failed": len(command_data.essays_to_process) - processed_count,
+                }
+
+                await self.event_publisher.publish_batch_author_match_results(
+                    kafka_bus=self.kafka_bus,
+                    batch_id=command_data.batch_id,
+                    class_id=command_data.class_id,
+                    match_results=match_results,
+                    processing_summary=processing_summary,
+                    correlation_id=correlation_id,
+                )
+
+                logger.info(
+                    "Published batch author matches for batch %s to Class Management",
+                    command_data.batch_id,
+                    extra={
+                        "batch_id": command_data.batch_id,
+                        "class_id": command_data.class_id,
+                        "total_results": len(match_results),
+                        "processing_summary": processing_summary,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
 
             logger.info(
                 f"Completed Phase 1 student matching for batch {command_data.batch_id}: "

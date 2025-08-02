@@ -1,12 +1,20 @@
+"""Event publisher implementation using the transactional outbox pattern."""
+
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
+
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from huleedu_service_libs.event_utils import (
-    extract_correlation_id_as_string,
-    extract_user_id_from_event_data,
-)
+from common_core.events.validation_events import StudentAssociationConfirmation, StudentAssociationsConfirmedV1
+from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
+
+if TYPE_CHECKING:
+    from services.class_management_service.config import Settings
+    from services.class_management_service.implementations.outbox_manager import OutboxManager
 
 from services.class_management_service.protocols import ClassEventPublisherProtocol
 
@@ -14,68 +22,147 @@ logger = create_service_logger("class_management_service.event_publisher")
 
 
 class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):
-    """Default implementation of ClassEventPublisherProtocol using KafkaBus and Redis."""
+    """Event publisher implementation using TRUE OUTBOX PATTERN."""
 
     def __init__(
-        self, kafka_bus: KafkaPublisherProtocol, redis_client: AtomicRedisClientProtocol
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
     ) -> None:
-        self.kafka_bus = kafka_bus
-        self.redis_client = redis_client
+        self.outbox_manager = outbox_manager
+        self.settings = settings
 
     async def publish_class_event(self, event_envelope: EventEnvelope) -> None:
-        """Publish event to both Kafka and Redis for real-time updates."""
-        # 1. Publish to Kafka (existing behavior)
-        topic = event_envelope.event_type
-        await self.kafka_bus.publish(topic, event_envelope)
-
-        # 2. Extract user_id from event data and publish to Redis
+        """Publish a class management event using the outbox pattern."""
         try:
-            event_data = event_envelope.data
+            # Determine topic from event type
+            event_type = event_envelope.event_type
+            topic = topic_name(ProcessingEvent(event_type))
 
-            # Use utility to extract user_id
-            user_id = extract_user_id_from_event_data(event_data)
+            # Extract aggregate information
+            aggregate_id = str(event_envelope.correlation_id)
+            aggregate_type = "class"
 
-            if user_id:
-                # Construct UI-friendly payload
-                ui_payload = {
-                    "timestamp": event_envelope.event_timestamp.isoformat(),
-                    "correlation_id": extract_correlation_id_as_string(
-                        event_envelope.correlation_id
-                    ),
-                }
+            # Use outbox pattern for reliable delivery
+            await self.outbox_manager.publish_to_outbox(
+                aggregate_id=aggregate_id,
+                aggregate_type=aggregate_type,
+                event_type=event_type,
+                event_data=event_envelope,
+                topic=topic,
+            )
 
-                # Add event-specific data
-                if hasattr(event_data, "class_id"):
-                    ui_payload["class_id"] = event_data.class_id
-                if hasattr(event_data, "class_designation"):
-                    ui_payload["class_name"] = event_data.class_designation
-                if hasattr(event_data, "student_id"):
-                    ui_payload["student_id"] = event_data.student_id
-                if hasattr(event_data, "first_name") and hasattr(event_data, "last_name"):
-                    ui_payload["student_name"] = f"{event_data.first_name} {event_data.last_name}"
-
-                # Determine event type for UI
-                ui_event_type = getattr(event_data, "event", event_envelope.event_type)
-
-                # Publish to Redis
-                await self.redis_client.publish_user_notification(
-                    user_id=user_id, event_type=ui_event_type, data=ui_payload
-                )
-
-                logger.info(
-                    f"Published real-time notification to Redis channel for user {user_id}",
-                    extra={"event_type": event_envelope.event_type, "user_id": user_id},
-                )
-            else:
-                logger.warning(
-                    "No user_id found in event data, skipping Redis publish",
-                    extra={"event_type": event_envelope.event_type},
-                )
+            logger.info(
+                "Event published via outbox",
+                extra={
+                    "event_type": event_type,
+                    "correlation_id": str(event_envelope.correlation_id),
+                    "topic": topic,
+                },
+            )
 
         except Exception as e:
             logger.error(
-                f"Error publishing to Redis: {e}",
-                extra={"event_type": event_envelope.event_type},
+                f"Failed to publish event: {e}",
+                extra={
+                    "event_type": event_envelope.event_type,
+                    "correlation_id": str(event_envelope.correlation_id),
+                },
                 exc_info=True,
             )
-            # Don't fail the entire event publishing if Redis fails
+            raise_external_service_error(
+                service="class_management_service",
+                operation="publish_class_event",
+                external_service="outbox",
+                message=f"Failed to publish event: {str(e)}",
+                correlation_id=event_envelope.correlation_id,
+                event_type=event_envelope.event_type,
+            )
+
+    async def publish_student_associations_confirmed(
+        self,
+        batch_id: str,
+        class_id: str,
+        associations: list[dict[str, Any]],
+        timeout_triggered: bool,
+        validation_summary: dict[str, int],
+        correlation_id: UUID,
+    ) -> None:
+        """Publish StudentAssociationsConfirmedV1 event to ELS."""
+        try:
+            # Convert dictionary associations to proper model instances
+            association_models = []
+            for assoc in associations:
+                confirmation = StudentAssociationConfirmation(
+                    essay_id=assoc["essay_id"],
+                    student_id=assoc.get("student_id"),
+                    confidence_score=assoc["confidence_score"],
+                    validation_method=assoc["validation_method"],
+                    validated_by=assoc.get("validated_by"),
+                    validated_at=assoc.get("validated_at", datetime.now(UTC)),
+                )
+                association_models.append(confirmation)
+
+            # Create the event
+            event = StudentAssociationsConfirmedV1(
+                batch_id=batch_id,
+                class_id=class_id,
+                associations=association_models,
+                timeout_triggered=timeout_triggered,
+                validation_summary=validation_summary,
+            )
+
+            # Create event envelope
+            envelope: EventEnvelope = EventEnvelope(
+                event_id=UUID("00000000-0000-0000-0000-000000000000"),  # Will be generated by outbox
+                event_type=topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED),
+                event_timestamp=datetime.now(UTC),
+                source_service="class_management_service",
+                correlation_id=correlation_id,
+                data=event,
+                metadata={
+                    "batch_id": batch_id,
+                    "class_id": class_id,
+                    "partition_key": batch_id,  # Partition by batch for ordering
+                },
+            )
+
+            # Use outbox pattern for reliable delivery
+            await self.outbox_manager.publish_to_outbox(
+                aggregate_id=batch_id,
+                aggregate_type="batch",
+                event_type=envelope.event_type,
+                event_data=envelope,
+                topic=topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED),
+            )
+
+            logger.info(
+                "StudentAssociationsConfirmedV1 published via outbox",
+                extra={
+                    "batch_id": batch_id,
+                    "class_id": class_id,
+                    "correlation_id": str(correlation_id),
+                    "association_count": len(associations),
+                    "timeout_triggered": timeout_triggered,
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to publish student associations confirmed: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "class_id": class_id,
+                    "correlation_id": str(correlation_id),
+                },
+                exc_info=True,
+            )
+            raise_external_service_error(
+                service="class_management_service",
+                operation="publish_student_associations_confirmed",
+                external_service="outbox",
+                message=f"Failed to publish student associations confirmed: {str(e)}",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+                class_id=class_id,
+            )

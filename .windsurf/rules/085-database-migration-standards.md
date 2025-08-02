@@ -44,8 +44,25 @@ cd services/<service>
 **MUST verify after migration:**
 ```bash
 cd services/<service> && ../../.venv/bin/alembic current
-docker exec huleedu_<service>_db psql -U ${HULEEDU_DB_USER} -d <db> -c "\d <table>"
+
+# Database Access Pattern (IMPORTANT - Environment variables are NOT available in shell by default)
+# Option 1: Load environment first
+source /Users/olofs_mba/Documents/Repos/huledu-reboot/.env
+docker exec huleedu_<service>_db psql -U $HULEEDU_DB_USER -d <db_name> -c "\d <table>"
+
+# Option 2: Use hardcoded user (from .env file)
+docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table>"
 ```
+
+**Database Name Mapping:**
+| Service | Container Name | Database Name | Port |
+|---------|---------------|---------------|------|
+| `cj_assessment_service` | `huleedu_cj_assessment_db` | `huledu_cj_assessment` | 5434 |
+| `class_management_service` | `huleedu_class_management_db` | `huledu_class_management` | 5435 |
+| `essay_lifecycle_service` | `huleedu_essay_lifecycle_db` | `huledu_essay_lifecycle` | 5433 |
+| `batch_orchestrator_service` | `huleedu_batch_orchestrator_db` | `huledu_batch_orchestrator` | 5438 |
+| `result_aggregator_service` | `huleedu_result_aggregator_db` | `huledu_result_aggregator` | 5436 |
+| `spellchecker_service` | `huleedu_spellchecker_db` | `huledu_spellchecker` | 5437 |
 
 ## 6. Secure Configuration Pattern (MANDATORY)
 

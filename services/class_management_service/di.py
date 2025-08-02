@@ -7,6 +7,8 @@ from dishka import AsyncContainer, Provider, Scope, make_async_container, provid
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -31,6 +33,7 @@ from services.class_management_service.implementations.class_repository_postgres
 from services.class_management_service.implementations.event_publisher_impl import (
     DefaultClassEventPublisherImpl,
 )
+from services.class_management_service.implementations.outbox_manager import OutboxManager
 from services.class_management_service.metrics import (
     CmsMetrics,
     setup_class_management_database_monitoring,
@@ -150,12 +153,33 @@ class ServiceProvider(Provider):
         return redis_client
 
     @provide(scope=Scope.APP)
+    def provide_outbox_repository(
+        self, engine: AsyncEngine, settings: Settings
+    ) -> OutboxRepositoryProtocol:
+        """Provide outbox repository for transactional event publishing."""
+        return PostgreSQLOutboxRepository(
+            engine=engine,
+            service_name=settings.SERVICE_NAME,
+            enable_metrics=True,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
-        kafka_bus: KafkaPublisherProtocol,
-        redis_client: AtomicRedisClientProtocol,
+        outbox_manager: OutboxManager,
+        settings: Settings,
     ) -> ClassEventPublisherProtocol:
-        return DefaultClassEventPublisherImpl(kafka_bus, redis_client)
+        return DefaultClassEventPublisherImpl(outbox_manager, settings)
 
     @provide(scope=Scope.REQUEST)
     def provide_class_management_service(

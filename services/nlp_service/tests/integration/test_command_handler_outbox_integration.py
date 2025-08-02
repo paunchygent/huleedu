@@ -285,14 +285,13 @@ class TestCommandHandlerOutboxIntegration:
                 EssayProcessingInputRefV1(
                     essay_id="essay-1",
                     text_storage_id="storage-1",
-                    student_name="Unknown Student",
                 )
             ],
             class_id="test-class-456",
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-            event_type="huleedu.essay.student.matching.requested.v1",
+            event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -321,7 +320,7 @@ class TestCommandHandlerOutboxIntegration:
 
         # Verify event structure
         event = unpublished_events[0]
-        assert event.aggregate_type == "essay"
+        assert event.aggregate_type == "batch"
         assert event.event_type == "batch.author.matches.suggested.v1"
 
         # Verify event data contains expected structure
@@ -347,14 +346,13 @@ class TestCommandHandlerOutboxIntegration:
                 EssayProcessingInputRefV1(
                     essay_id="essay-2",
                     text_storage_id="storage-2",
-                    student_name="Test Student",
                 )
             ],
             class_id="test-class-999",
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-            event_type="huleedu.essay.student.matching.requested.v1",
+            event_type="huleedu.batch.student.matching.requested.v1",
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -398,14 +396,13 @@ class TestCommandHandlerOutboxIntegration:
                     EssayProcessingInputRefV1(
                         essay_id="essay-fail",
                         text_storage_id="storage-fail",
-                        student_name="Test Student",
                     )
                 ],
                 class_id="test-class-fail",
             )
 
             envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-                event_type="huleedu.essay.student.matching.requested.v1",
+                event_type="huleedu.batch.student.matching.requested.v1",
                 source_service="essay-lifecycle-service",
                 correlation_id=correlation_id,
                 data=event_data,
@@ -424,7 +421,7 @@ class TestCommandHandlerOutboxIntegration:
             # Assert - Handler should return False (no essays processed successfully)
             assert result is False
 
-            # Assert - No events should be in outbox due to failure before publishing
+            # Assert - Event should still be published with failure information
             unpublished_events = await outbox_repository.get_unpublished_events(limit=10)
 
             # Filter for events from this specific test
@@ -434,5 +431,14 @@ class TestCommandHandlerOutboxIntegration:
                 if "test-batch-failure" in str(event.event_data)
             ]
 
-            # Should have no events from failed operation
-            assert len(test_events) == 0
+            # Should have one event with failure information
+            assert len(test_events) == 1
+            
+            # Verify it's a batch event with failure information
+            event = test_events[0]
+            assert event.aggregate_type == "batch"
+            assert event.event_type == "batch.author.matches.suggested.v1"
+            
+            # Verify the event data contains failure information
+            event_data_str = str(event.event_data)
+            assert "ERROR" in event_data_str or "Processing error" in event_data_str
