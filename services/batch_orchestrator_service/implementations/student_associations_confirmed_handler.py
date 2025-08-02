@@ -104,14 +104,21 @@ class StudentAssociationsConfirmedHandler:
                         )
 
                     # Validate batch is in correct state
-                    current_status = batch_data.status
+                    current_status = batch_data["status"]
                     if current_status != BatchStatus.AWAITING_STUDENT_VALIDATION.value:
                         self.logger.warning(
-                            f"Batch {batch_id} not in expected state for student associations",
+                            f"Batch {batch_id} is not in AWAITING_STUDENT_VALIDATION status",
                             extra={
                                 "correlation_id": str(envelope.correlation_id),
                                 "current_status": current_status,
                                 "expected_status": BatchStatus.AWAITING_STUDENT_VALIDATION.value,
+                            },
+                        )
+                        self.logger.warning(
+                            f"Current status: {current_status}",
+                            extra={
+                                "correlation_id": str(envelope.correlation_id),
+                                "batch_id": batch_id,
                             },
                         )
                         # Don't error - could be idempotent redelivery
@@ -184,17 +191,21 @@ class StudentAssociationsConfirmedHandler:
             else:
                 await process_student_associations()
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON message: {e}")
-            raise_validation_error(
-                service="batch_orchestrator_service",
-                operation="student_associations_confirmed_handling",
-                field="message_format",
-                message=f"Invalid JSON in Kafka message: {e}",
-                correlation_id=uuid4(),  # Generate new correlation_id for error
-            )
 
         except Exception as e:
+            # Check if it's a JSON or Pydantic validation error
+            from pydantic_core import ValidationError as PydanticValidationError
+            
+            if isinstance(e, (json.JSONDecodeError, ValueError, PydanticValidationError)):
+                # Handle JSON and Pydantic validation errors specifically
+                self.logger.error(f"Failed to decode JSON message: {e}")
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="student_associations_confirmed_handling",
+                    field="message_format",
+                    message=f"Invalid JSON in Kafka message: {e}",
+                    correlation_id=uuid4(),  # Generate new correlation_id for error
+                )
             # Extract batch_id if possible for better error context
             batch_id = "unknown"
             correlation_id = None

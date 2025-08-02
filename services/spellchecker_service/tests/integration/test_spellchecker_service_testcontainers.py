@@ -331,7 +331,8 @@ class TestSpellcheckerServiceTestcontainers:
                     if envelope.correlation_id == correlation_id:
                         processing_time = time.time() - start_time
                         print(f"✅ Found matching result in {processing_time:.3f}s")
-                        return envelope.data, processing_time
+                        typed_data = SpellcheckResultDataV1.model_validate(envelope.data)
+                        return typed_data, processing_time
                     else:
                         print("   ⚠ Wrong correlation_id, continuing...")
                 except Exception as e:

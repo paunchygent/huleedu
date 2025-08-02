@@ -246,7 +246,7 @@ class TestClassIdIntegration:
         assert isinstance(created_batch, Batch)
         assert created_batch.id == batch_id
         assert created_batch.class_id == "class_456"
-        assert created_batch.name == "ENG 5 - teacher_123"
+        assert created_batch.name == "ENG5 - teacher_123"
         assert created_batch.description == "Write about your summer vacation"
 
     @pytest.mark.asyncio

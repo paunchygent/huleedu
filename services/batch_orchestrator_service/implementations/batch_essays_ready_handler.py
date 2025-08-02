@@ -59,7 +59,7 @@ class BatchEssaysReadyHandler:
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[BatchEssaysReady].model_validate_json(raw_message)
 
-            batch_essays_ready_data = envelope.data
+            batch_essays_ready_data = BatchEssaysReady.model_validate(envelope.data)
             batch_id = batch_essays_ready_data.batch_id
 
             # Define async function to process within trace context

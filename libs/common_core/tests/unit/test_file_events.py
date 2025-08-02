@@ -23,14 +23,14 @@ class TestEssayContentProvisionedV1:
     def test_model_creation_with_required_fields(self) -> None:
         """Test creating EssayContentProvisionedV1 with only required fields."""
         model = EssayContentProvisionedV1(
-            batch_id="batch_123",
+            entity_id="batch_123",
             file_upload_id="test-file-upload-id",
             original_file_name="essay.txt",
             raw_file_storage_id="raw_abc123",
             text_storage_id="text_def456",
             file_size_bytes=1024,
         )
-        assert model.batch_id == "batch_123"
+        assert model.entity_id == "batch_123"
         assert model.original_file_name == "essay.txt"
         assert model.raw_file_storage_id == "raw_abc123"
         assert model.text_storage_id == "text_def456"
@@ -44,7 +44,7 @@ class TestEssayContentProvisionedV1:
         """Test EssayContentProvisionedV1 serialization to dict."""
         correlation_id = uuid4()
         model = EssayContentProvisionedV1(
-            batch_id="batch_123",
+            entity_id="batch_123",
             file_upload_id="test-file-upload-id",
             original_file_name="essay.txt",
             raw_file_storage_id="raw_abc123",
@@ -53,7 +53,7 @@ class TestEssayContentProvisionedV1:
             correlation_id=correlation_id,
         )
         serialized = model.model_dump()
-        assert serialized["batch_id"] == "batch_123"
+        assert serialized["entity_id"] == "batch_123"
         assert serialized["raw_file_storage_id"] == "raw_abc123"
         assert str(serialized["correlation_id"]) == str(correlation_id)
 
@@ -64,7 +64,7 @@ class TestEssayValidationFailedV1:
     def test_model_creation_with_required_fields(self) -> None:
         """Test that validation failure event can be created with required fields."""
         event = EssayValidationFailedV1(
-            batch_id="batch_456",
+            entity_id="batch_456",
             file_upload_id="test-file-upload-id",
             original_file_name="empty_essay.txt",
             raw_file_storage_id="raw_xyz789",
@@ -80,7 +80,7 @@ class TestEssayValidationFailedV1:
             file_size_bytes=0,
         )
 
-        assert event.batch_id == "batch_456"
+        assert event.entity_id == "batch_456"
         assert event.original_file_name == "empty_essay.txt"
         assert event.validation_error_code == FileValidationErrorCode.EMPTY_CONTENT
         assert (
@@ -98,7 +98,7 @@ class TestEssayValidationFailedV1:
         timestamp = datetime.now(UTC)
 
         event = EssayValidationFailedV1(
-            batch_id="batch_789",
+            entity_id="batch_789",
             file_upload_id="test-file-upload-id",
             original_file_name="too_short_essay.docx",
             raw_file_storage_id="raw_abc456",
@@ -116,7 +116,7 @@ class TestEssayValidationFailedV1:
             timestamp=timestamp,
         )
 
-        assert event.batch_id == "batch_789"
+        assert event.entity_id == "batch_789"
         assert event.validation_error_code == FileValidationErrorCode.CONTENT_TOO_SHORT
         assert event.file_size_bytes == 512
         assert event.correlation_id == correlation_id
@@ -126,7 +126,7 @@ class TestEssayValidationFailedV1:
         """Test that validation failure event can be serialized and deserialized."""
         correlation_id = uuid4()
         original_event = EssayValidationFailedV1(
-            batch_id="batch_serialize",
+            entity_id="batch_serialize",
             file_upload_id="test-file-upload-id",
             original_file_name="test_file.pdf",
             raw_file_storage_id="raw_serialize123",
@@ -152,7 +152,7 @@ class TestEssayValidationFailedV1:
         reconstructed_event = EssayValidationFailedV1.model_validate(data_dict)
 
         # Verify all fields match
-        assert reconstructed_event.batch_id == original_event.batch_id
+        assert reconstructed_event.entity_id == original_event.entity_id
         assert reconstructed_event.original_file_name == original_event.original_file_name
         assert reconstructed_event.validation_error_code == original_event.validation_error_code
         assert (
@@ -165,7 +165,7 @@ class TestEssayValidationFailedV1:
     def test_default_values(self) -> None:
         """Test that default values are properly set."""
         event = EssayValidationFailedV1(
-            batch_id="test_batch",
+            entity_id="test_batch",
             file_upload_id="test-file-upload-id",
             original_file_name="test.txt",
             raw_file_storage_id="raw_default123",
@@ -202,7 +202,7 @@ class TestEssayValidationFailedV1:
 
         for code in error_codes:
             event = EssayValidationFailedV1(
-                batch_id=f"batch_{code.value.lower()}",
+                entity_id=f"batch_{code.value.lower()}",
                 file_upload_id="test-file-upload-id",
                 original_file_name=f"test_{code.value.lower()}.txt",
                 raw_file_storage_id="raw_test123",
@@ -223,7 +223,7 @@ class TestEssayValidationFailedV1:
         """Test validation failure event with edge case file sizes."""
         # Zero byte file
         event_zero = EssayValidationFailedV1(
-            batch_id="batch_zero",
+            entity_id="batch_zero",
             file_upload_id="test-file-upload-id",
             original_file_name="empty.txt",
             raw_file_storage_id="raw_zero123",
@@ -242,7 +242,7 @@ class TestEssayValidationFailedV1:
 
         # Large file
         event_large = EssayValidationFailedV1(
-            batch_id="batch_large",
+            entity_id="batch_large",
             file_upload_id="test-file-upload-id",
             original_file_name="huge.txt",
             raw_file_storage_id="raw_large123",
@@ -263,7 +263,7 @@ class TestEssayValidationFailedV1:
         """Test that timestamps are properly handled with timezone information."""
         # Event with default timestamp
         event_default = EssayValidationFailedV1(
-            batch_id="batch_tz",
+            entity_id="batch_tz",
             file_upload_id="test-file-upload-id",
             original_file_name="test.txt",
             raw_file_storage_id="raw_tz123",
@@ -286,7 +286,7 @@ class TestEssayValidationFailedV1:
         # Event with explicit timestamp
         explicit_time = datetime(2025, 1, 16, 12, 0, 0, tzinfo=UTC)
         event_explicit = EssayValidationFailedV1(
-            batch_id="batch_explicit",
+            entity_id="batch_explicit",
             file_upload_id="test-file-upload-id",
             original_file_name="test2.txt",
             raw_file_storage_id="raw_explicit123",
@@ -308,7 +308,7 @@ class TestEssayValidationFailedV1:
     def test_model_field_validation(self) -> None:
         """Test that required fields are validated."""
         with pytest.raises(ValueError):
-            # Missing required batch_id
+            # Missing required entity_id
             EssayValidationFailedV1(  # type: ignore[call-arg]
                 original_file_name="test.txt",
                 validation_error_code=FileValidationErrorCode.UNKNOWN_VALIDATION_ERROR,
@@ -330,7 +330,7 @@ class TestEssayValidationFailedV1:
         correlation_id = uuid4()
 
         event = EssayValidationFailedV1(
-            batch_id=batch_id,
+            entity_id=batch_id,
             file_upload_id="test-file-upload-id",
             original_file_name="student_essay_3.docx",
             raw_file_storage_id="raw_coordination123",
@@ -348,7 +348,7 @@ class TestEssayValidationFailedV1:
         )
 
         # Verify event contains all information needed for coordination
-        assert event.batch_id == batch_id
+        assert event.entity_id == batch_id
         assert "student_essay_3.docx" in event.original_file_name
         assert "15 words" in event.validation_error_detail.message
         assert "50 words" in event.validation_error_detail.message

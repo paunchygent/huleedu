@@ -52,7 +52,7 @@ class ELSBatchPhaseOutcomeHandler:
         try:
             # FIXED: Use proper EventEnvelope deserialization like other services
             envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(msg.value)
-            event_data = envelope.data  # Fully typed ELSBatchPhaseOutcomeV1 object
+            event_data = ELSBatchPhaseOutcomeV1.model_validate(envelope.data)  # envelope.data is dict
             correlation_id = envelope.correlation_id
 
             batch_id = event_data.batch_id

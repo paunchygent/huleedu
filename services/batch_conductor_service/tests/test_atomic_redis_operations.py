@@ -24,12 +24,19 @@ class TestAtomicRedisOperations:
         """Create a mock Redis client that supports atomic operations."""
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=None)  # No existing data
-        mock_client.setex = AsyncMock(return_value=True)
-        mock_client.delete_key = AsyncMock(return_value=1)
-        mock_client.watch = AsyncMock(return_value=True)
-        mock_client.multi = AsyncMock(return_value=True)
-        mock_client.exec = AsyncMock(return_value=[True, 1])  # Successful transaction
-        mock_client.unwatch = AsyncMock(return_value=True)
+        mock_client.setex = AsyncMock(return_value=True)  # For fallback operations
+        mock_client.delete_key = AsyncMock(return_value=1)  # For fallback operations
+        
+        # Create mock pipeline for transaction operations
+        mock_pipeline = AsyncMock()
+        mock_pipeline.multi = lambda: None  # Sync method, no return
+        mock_pipeline.setex = lambda key, ttl, value: None  # Sync method, no return  
+        mock_pipeline.delete = lambda key: None  # Sync method, no return
+        mock_pipeline.execute = AsyncMock(return_value=[True, 1])  # Async method, returns transaction results
+        
+        # Redis client returns the pipeline when creating transaction
+        mock_client.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
+        
         return mock_client
 
     @pytest.fixture
@@ -47,23 +54,18 @@ class TestAtomicRedisOperations:
         step_name = "spellcheck"
         metadata = {"status": "success"}
 
-        # Mock Redis to return successful transaction on first attempt
-        mock_redis_client.exec.return_value = [True, 1]  # Transaction succeeded
-
         result = await repository.record_essay_step_completion(
             batch_id, essay_id, step_name, metadata
         )
 
         assert result is True
 
-        # Verify atomic operations were called
-        mock_redis_client.watch.assert_called_once_with(f"bcs:essay_state:{batch_id}:{essay_id}")
-        mock_redis_client.multi.assert_called_once()
-        mock_redis_client.exec.assert_called_once()
-
-        # Verify setex and delete were called during transaction
-        assert mock_redis_client.setex.call_count == 1
-        assert mock_redis_client.delete_key.call_count == 1
+        # Verify transaction pipeline was created and executed
+        mock_redis_client.create_transaction_pipeline.assert_called_once_with(f"bcs:essay_state:{batch_id}:{essay_id}")
+        
+        # Get the pipeline that was returned and verify execute was called
+        pipeline = mock_redis_client.create_transaction_pipeline.return_value
+        pipeline.execute.assert_called_once()
 
     async def test_atomic_operation_retry_on_watch_failure(self, repository, mock_redis_client):
         """Test retry logic when watched key changes."""
@@ -72,10 +74,23 @@ class TestAtomicRedisOperations:
         step_name = "nlp"
         metadata = {"status": "success"}
 
-        # Mock Redis to fail first attempt (watched key changed), succeed second
-        mock_redis_client.exec.side_effect = [
-            None,  # First attempt: transaction discarded
-            [True, 1],  # Second attempt: transaction succeeded
+        # Create pipelines for each retry attempt
+        mock_pipeline_1 = AsyncMock()
+        mock_pipeline_1.multi = lambda: None
+        mock_pipeline_1.setex = lambda key, ttl, value: None
+        mock_pipeline_1.delete = lambda key: None
+        mock_pipeline_1.execute = AsyncMock(return_value=None)  # First attempt fails
+        
+        mock_pipeline_2 = AsyncMock()
+        mock_pipeline_2.multi = lambda: None
+        mock_pipeline_2.setex = lambda key, ttl, value: None
+        mock_pipeline_2.delete = lambda key: None
+        mock_pipeline_2.execute = AsyncMock(return_value=[True, 1])  # Second attempt succeeds
+        
+        # Mock create_transaction_pipeline to return different pipelines for retries
+        mock_redis_client.create_transaction_pipeline.side_effect = [
+            mock_pipeline_1,
+            mock_pipeline_2,
         ]
 
         result = await repository.record_essay_step_completion(
@@ -84,10 +99,10 @@ class TestAtomicRedisOperations:
 
         assert result is True
 
-        # Verify retry occurred
-        assert mock_redis_client.watch.call_count == 2
-        assert mock_redis_client.multi.call_count == 2
-        assert mock_redis_client.exec.call_count == 2
+        # Verify retry occurred - pipeline was created twice
+        assert mock_redis_client.create_transaction_pipeline.call_count == 2
+        mock_pipeline_1.execute.assert_called_once()
+        mock_pipeline_2.execute.assert_called_once()
 
     async def test_atomic_operation_fallback_after_max_retries(self, repository, mock_redis_client):
         """Test fallback to non-atomic operation after max retries."""
@@ -96,8 +111,18 @@ class TestAtomicRedisOperations:
         step_name = "ai_feedback"
         metadata = {"status": "success"}
 
-        # Mock Redis to always fail atomic operations (watched key keeps changing)
-        mock_redis_client.exec.return_value = None  # Always return None (discarded)
+        # Create failing pipelines for each retry attempt
+        failing_pipelines = []
+        for _ in range(5):
+            mock_pipeline = AsyncMock()
+            mock_pipeline.multi = lambda: None
+            mock_pipeline.setex = lambda key, ttl, value: None
+            mock_pipeline.delete = lambda key: None
+            mock_pipeline.execute = AsyncMock(return_value=None)  # Transaction fails
+            failing_pipelines.append(mock_pipeline)
+
+        # Mock create_transaction_pipeline to return failing pipelines
+        mock_redis_client.create_transaction_pipeline.side_effect = failing_pipelines
 
         result = await repository.record_essay_step_completion(
             batch_id, essay_id, step_name, metadata
@@ -106,14 +131,13 @@ class TestAtomicRedisOperations:
         assert result is True  # Should succeed via fallback
 
         # Verify max retries were attempted (5 attempts)
-        assert mock_redis_client.watch.call_count == 5
-        assert mock_redis_client.multi.call_count == 5
-        assert mock_redis_client.exec.call_count == 5
+        assert mock_redis_client.create_transaction_pipeline.call_count == 5
+        for pipeline in failing_pipelines:
+            pipeline.execute.assert_called_once()
 
         # Verify fallback to non-atomic operation occurred
-        # Non-atomic operation should call setex outside of transaction
-        total_setex_calls = mock_redis_client.setex.call_count
-        assert total_setex_calls >= 6  # 5 atomic attempts + 1 fallback
+        mock_redis_client.setex.assert_called()  # Fallback operation
+        mock_redis_client.delete_key.assert_called()  # Fallback operation
 
     async def test_atomic_operation_idempotency(self, repository, mock_redis_client):
         """Test that atomic operation handles idempotency correctly."""
@@ -133,11 +157,11 @@ class TestAtomicRedisOperations:
 
         assert result is True
 
-        # Verify watch was called but transaction was not executed (idempotency)
-        mock_redis_client.watch.assert_called_once()
-        mock_redis_client.unwatch.assert_called_once()  # Should unwatch when skipping
-        mock_redis_client.multi.assert_not_called()  # Transaction not needed
-        mock_redis_client.exec.assert_not_called()
+        # Verify no transaction pipeline was created due to idempotency
+        mock_redis_client.create_transaction_pipeline.assert_not_called()
+        # Verify no fallback operations occurred
+        mock_redis_client.setex.assert_not_called()
+        mock_redis_client.delete_key.assert_not_called()
 
     async def test_concurrent_updates_simulation(self, mock_redis_client):
         """Test concurrent updates to the same essay state."""
@@ -165,5 +189,4 @@ class TestAtomicRedisOperations:
         assert all(results)
 
         # Verify atomic operations were used for each
-        assert mock_redis_client.watch.call_count >= 3
-        assert mock_redis_client.multi.call_count >= 3
+        assert mock_redis_client.create_transaction_pipeline.call_count >= 3

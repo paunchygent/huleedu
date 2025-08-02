@@ -67,7 +67,7 @@ class BatchContentProvisioningCompletedHandler:
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
 
-            content_completed_data = envelope.data
+            content_completed_data = BatchContentProvisioningCompletedV1.model_validate(envelope.data)
             batch_id = content_completed_data.batch_id
 
             # Define async function to process within trace context
@@ -195,24 +195,31 @@ class BatchContentProvisioningCompletedHandler:
             else:
                 await process_content_provisioning_completed()
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON message: {e}")
-            raise_validation_error(
-                service="batch_orchestrator_service",
-                operation="content_provisioning_completed_handling",
-                field="message_format",
-                message=f"Invalid JSON in Kafka message: {e}",
-                correlation_id=uuid4(),  # Generate new correlation_id for error
-            )
-
         except Exception as e:
+            # Check if it's a JSON or Pydantic validation error
+            from pydantic_core import ValidationError as PydanticValidationError
+            
+            if isinstance(e, (json.JSONDecodeError, ValueError, PydanticValidationError)):
+                # Handle JSON and Pydantic validation errors specifically
+                self.logger.error(f"Failed to decode JSON message: {e}")
+                raise_validation_error(
+                    service="batch_orchestrator_service",
+                    operation="content_provisioning_completed_handling",
+                    field="message_format",
+                    message=f"Invalid JSON in Kafka message: {e}",
+                    correlation_id=uuid4(),  # Generate new correlation_id for error
+                )
+            # Re-raise if not a validation error
+            raise
+
             # Extract batch_id if possible for better error context
             batch_id = "unknown"
             correlation_id = None
             try:
                 raw_message = msg.value.decode("utf-8")
                 envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
-                batch_id = envelope.data.batch_id
+                content_data = BatchContentProvisioningCompletedV1.model_validate(envelope.data)
+                batch_id = content_data.batch_id
                 correlation_id = envelope.correlation_id
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass

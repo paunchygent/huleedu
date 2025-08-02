@@ -4,7 +4,7 @@ Shared test utilities for testing idempotency with realistic patterns.
 
 import asyncio
 import json
-from typing import Any, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from aiokafka import ConsumerRecord
 
@@ -12,7 +12,7 @@ from aiokafka import ConsumerRecord
 class AsyncConfirmationTestHelper:
     """Helper for testing async confirmation patterns in idempotency."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.processing_started = asyncio.Event()
         self.processing_complete = asyncio.Event()
         self.confirmation_allowed = asyncio.Event()
@@ -23,11 +23,11 @@ class AsyncConfirmationTestHelper:
 
     async def process_with_controlled_confirmation(
         self,
-        process_func: Callable,
+        process_func: Callable[..., Awaitable[Any]],
         msg: ConsumerRecord,
-        confirm_idempotency: Callable,
-        *args,
-        **kwargs,
+        confirm_idempotency: Callable[[], Awaitable[None]],
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         """
         Process a message with controlled confirmation timing.
@@ -61,19 +61,19 @@ class AsyncConfirmationTestHelper:
             self.processing_complete.set()
             raise
 
-    async def wait_for_processing_started(self, timeout: float = 1.0):
+    async def wait_for_processing_started(self, timeout: float = 1.0) -> None:
         """Wait for processing to start."""
         await asyncio.wait_for(self.processing_started.wait(), timeout)
 
-    async def wait_for_processing_complete(self, timeout: float = 1.0):
+    async def wait_for_processing_complete(self, timeout: float = 1.0) -> None:
         """Wait for processing to complete (but before confirmation)."""
         await asyncio.wait_for(self.processing_complete.wait(), timeout)
 
-    def allow_confirmation(self):
+    def allow_confirmation(self) -> None:
         """Allow the confirmation to proceed."""
         self.confirmation_allowed.set()
 
-    async def wait_for_confirmation(self, timeout: float = 1.0):
+    async def wait_for_confirmation(self, timeout: float = 1.0) -> None:
         """Wait for confirmation to complete."""
         await asyncio.wait_for(self.confirmation_complete.wait(), timeout)
 

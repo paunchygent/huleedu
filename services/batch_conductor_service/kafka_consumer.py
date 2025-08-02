@@ -214,7 +214,7 @@ class BCSKafkaConsumer:
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(raw_message)
 
-            spellcheck_data = envelope.data
+            spellcheck_data = SpellcheckResultDataV1.model_validate(envelope.data)
             essay_id = spellcheck_data.entity_id
             if essay_id is None:
                 logger.error("Cannot process spellcheck result: entity_id (essay_id) is None")
@@ -266,7 +266,7 @@ class BCSKafkaConsumer:
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(raw_message)
 
-            cj_data = envelope.data
+            cj_data = CJAssessmentCompletedV1.model_validate(envelope.data)
             batch_id = cj_data.entity_id  # CJ assessment is batch-level
             if batch_id is None:
                 logger.error("Cannot process CJ assessment result: entity_id (batch_id) is None")

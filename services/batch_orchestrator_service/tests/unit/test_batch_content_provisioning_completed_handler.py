@@ -7,8 +7,7 @@ content provisioning completion events and routing GUEST vs REGULAR batches.
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -133,7 +132,7 @@ class TestBatchContentProvisioningCompletedHandler:
 
         # Create mock Kafka message
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
 
         # Mock repository to return REGULAR batch context
@@ -141,11 +140,7 @@ class TestBatchContentProvisioningCompletedHandler:
         mock_batch_repo.get_batch_essays.return_value = sample_essays
 
         # Act
-        with patch(
-            "services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_batch_content_provisioning_completed(mock_msg)
+        await handler.handle_batch_content_provisioning_completed(mock_msg)
 
         # Assert
         # Should retrieve batch context
@@ -196,18 +191,14 @@ class TestBatchContentProvisioningCompletedHandler:
 
         # Create mock Kafka message
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
 
         # Mock repository to return GUEST batch context
         mock_batch_repo.get_batch_context.return_value = guest_batch_context
 
         # Act
-        with patch(
-            "services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_batch_content_provisioning_completed(mock_msg)
+        await handler.handle_batch_content_provisioning_completed(mock_msg)
 
         # Assert
         # Should retrieve batch context
@@ -250,20 +241,15 @@ class TestBatchContentProvisioningCompletedHandler:
 
         # Create mock Kafka message
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
 
         # Mock repository to return None (batch context not found)
         mock_batch_repo.get_batch_context.return_value = None
 
         # Act & Assert
-        with patch(
-            "services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-
-            with pytest.raises(HuleEduError) as exc_info:
-                await handler.handle_batch_content_provisioning_completed(mock_msg)
+        with pytest.raises(HuleEduError) as exc_info:
+            await handler.handle_batch_content_provisioning_completed(mock_msg)
 
             error = exc_info.value
             assert error.error_detail.service == "batch_orchestrator_service"
@@ -293,7 +279,7 @@ class TestBatchContentProvisioningCompletedHandler:
         assert "Invalid JSON" in error.error_detail.message
 
     @pytest.mark.asyncio
-    async def test_batch_type_logging(
+    async def test_batch_type_behavior_regular_vs_guest(
         self,
         handler: BatchContentProvisioningCompletedHandler,
         mock_batch_repo: AsyncMock,
@@ -301,10 +287,9 @@ class TestBatchContentProvisioningCompletedHandler:
         regular_batch_context: BatchRegistrationRequestV1,
         guest_batch_context: BatchRegistrationRequestV1,
         sample_essays: list[EssayProcessingInputRefV1],
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test that batch type (REGULAR/GUEST) is properly logged."""
-        # Test REGULAR batch
+        """Test that REGULAR batches initiate student matching while GUEST batches do not."""
+        # Arrange
         batch_id = str(uuid4())
         correlation_id = uuid4()
 
@@ -326,31 +311,22 @@ class TestBatchContentProvisioningCompletedHandler:
         )
 
         mock_msg = MagicMock()
-        mock_msg.value = json.dumps(envelope.model_dump()).encode("utf-8")
+        mock_msg.value = envelope.model_dump_json().encode("utf-8")
         mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
 
-        # Test REGULAR batch
+        # Test REGULAR batch behavior
         mock_batch_repo.get_batch_context.return_value = regular_batch_context
 
-        with patch(
-            "services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_batch_content_provisioning_completed(mock_msg)
+        await handler.handle_batch_content_provisioning_completed(mock_msg)
 
-        assert f"Batch {batch_id} identified as REGULAR batch (class_id: class_456)" in caplog.text
-        assert f"Initiating Phase 1 student matching for REGULAR batch {batch_id}" in caplog.text
+        # Assert REGULAR batch behavior - should initiate student matching phase
+        mock_student_matching_initiator.initiate_phase.assert_called_once()
 
-        # Clear logs and test GUEST batch
-        caplog.clear()
+        # Reset mocks for GUEST batch test
+        mock_student_matching_initiator.reset_mock()
         mock_batch_repo.get_batch_context.return_value = guest_batch_context
 
-        with patch(
-            "services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler.use_trace_context"
-        ) as mock_trace:
-            mock_trace.side_effect = lambda _, __, fn: fn()
-            await handler.handle_batch_content_provisioning_completed(mock_msg)
+        await handler.handle_batch_content_provisioning_completed(mock_msg)
 
-        assert f"Batch {batch_id} identified as GUEST batch (class_id: None)" in caplog.text
-        assert f"GUEST batch {batch_id} content provisioning completed" in caplog.text
-        assert "No student matching required - ELS will handle essay readiness" in caplog.text
+        # Assert GUEST batch behavior - should NOT initiate student matching phase
+        mock_student_matching_initiator.initiate_phase.assert_not_called()

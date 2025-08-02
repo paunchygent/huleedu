@@ -63,7 +63,7 @@ class BatchValidationErrorsHandler:
             raw_message = msg.value.decode("utf-8")
             envelope = EventEnvelope[BatchValidationErrorsV1].model_validate_json(raw_message)
 
-            batch_validation_errors_data = envelope.data
+            batch_validation_errors_data = BatchValidationErrorsV1.model_validate(envelope.data)
             batch_id = batch_validation_errors_data.batch_id
 
             # Define async function to process within trace context

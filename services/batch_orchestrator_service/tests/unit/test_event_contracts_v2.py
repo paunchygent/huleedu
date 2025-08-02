@@ -88,9 +88,12 @@ class TestEventContractsV2:
         assert reconstructed.event_type == envelope.event_type
         assert reconstructed.source_service == envelope.source_service
         assert reconstructed.correlation_id == envelope.correlation_id
-        assert reconstructed.data.batch_id == event_data.batch_id
-        assert len(reconstructed.data.ready_essays) == 2
-        assert reconstructed.data.course_code == CourseCode.ENG5
+        
+        # Apply EventEnvelope pattern for data access
+        essays_ready_data = BatchEssaysReady.model_validate(reconstructed.data)
+        assert essays_ready_data.batch_id == event_data.batch_id
+        assert len(essays_ready_data.ready_essays) == 2
+        assert essays_ready_data.course_code == CourseCode.ENG5
 
     def test_batch_validation_errors_model_validation(self) -> None:
         """Test BatchValidationErrorsV1 model validation with structured errors."""
@@ -222,8 +225,10 @@ class TestEventContractsV2:
         deserialized = json.loads(kafka_payload.decode("utf-8"))
         reconstructed = EventEnvelope[BatchValidationErrorsV1].model_validate(deserialized)
 
-        assert len(reconstructed.data.failed_essays) == 3
-        assert reconstructed.data.error_summary.critical_failure is False
+        # Apply EventEnvelope pattern for data access
+        validation_errors_data = BatchValidationErrorsV1.model_validate(reconstructed.data)
+        assert len(validation_errors_data.failed_essays) == 3
+        assert validation_errors_data.error_summary.critical_failure is False
         assert reconstructed.metadata == {"trace_id": "test-trace-123"}
 
     def test_pydantic_v2_mode_json_compliance(self) -> None:

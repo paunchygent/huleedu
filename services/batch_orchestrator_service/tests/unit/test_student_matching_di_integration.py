@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from common_core.pipeline_models import PhaseName
-from dishka import Scope, make_container
+from dishka import Provider, Scope, make_container, provide
 
 from services.batch_orchestrator_service.di import (
     CoreInfrastructureProvider,
@@ -23,9 +23,24 @@ from services.batch_orchestrator_service.implementations.student_matching_initia
 )
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
+    BatchRepositoryProtocol,
     PipelinePhaseInitiatorProtocol,
     StudentMatchingInitiatorProtocol,
 )
+
+
+class MockEventPublisherProvider(Provider):
+    """Test provider for mocking BatchEventPublisherProtocol and BatchRepositoryProtocol."""
+    
+    @provide(scope=Scope.APP)
+    def provide_batch_event_publisher(self) -> BatchEventPublisherProtocol:
+        """Provide mock batch event publisher for testing."""
+        return AsyncMock(spec=BatchEventPublisherProtocol)
+    
+    @provide(scope=Scope.APP)
+    def provide_batch_repository(self) -> BatchRepositoryProtocol:
+        """Provide mock batch repository for testing."""
+        return AsyncMock(spec=BatchRepositoryProtocol)
 
 
 class TestStudentMatchingDIIntegration:
@@ -49,13 +64,14 @@ class TestStudentMatchingDIIntegration:
                 # Create container with relevant providers
                 container = make_container(
                     CoreInfrastructureProvider(),
+                    MockEventPublisherProvider(),
                     PhaseInitiatorsProvider(),
                 )
 
-                # Enter APP scope
-                with container(scope=Scope.APP) as app_container:
+                # Enter container and get from APP scope
+                with container() as request_container:
                     # Resolve the student matching initiator
-                    initiator = app_container.get(StudentMatchingInitiatorProtocol)
+                    initiator = request_container.get(StudentMatchingInitiatorProtocol)
 
                     # Verify it's the correct implementation
                     assert isinstance(initiator, StudentMatchingInitiatorImpl)

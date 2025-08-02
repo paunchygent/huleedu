@@ -11,6 +11,7 @@ from .batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     BatchServiceNLPInitiateCommandDataV1,
     BatchServiceSpellcheckInitiateCommandDataV1,
+    BatchServiceStudentMatchingInitiateCommandDataV1,
 )
 from .config_enums import Environment, LLMProviderType
 from .domain_enums import (
@@ -170,6 +171,7 @@ __all__ = [
     "BatchServiceNLPInitiateCommandDataV1",
     "BatchServiceAIFeedbackInitiateCommandDataV1",
     "BatchServiceCJAssessmentInitiateCommandDataV1",
+    "BatchServiceStudentMatchingInitiateCommandDataV1",
     # Essay Service Request Models
     "EssayLifecycleSpellcheckRequestV1",
     "EssayLifecycleNLPRequestV1",
@@ -187,6 +189,7 @@ BatchServiceSpellcheckInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceNLPInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceAIFeedbackInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceCJAssessmentInitiateCommandDataV1.model_rebuild(raise_errors=True)
+BatchServiceStudentMatchingInitiateCommandDataV1.model_rebuild(raise_errors=True)
 EssayLifecycleSpellcheckRequestV1.model_rebuild(raise_errors=True)
 EssayLifecycleNLPRequestV1.model_rebuild(raise_errors=True)
 EssayLifecycleAIFeedbackRequestV1.model_rebuild(raise_errors=True)

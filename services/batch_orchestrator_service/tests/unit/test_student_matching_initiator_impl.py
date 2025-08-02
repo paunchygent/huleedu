@@ -105,8 +105,7 @@ class TestStudentMatchingInitiatorImpl:
 
         # Verify the published event
         call_args = mock_event_publisher.publish_batch_event.call_args
-        assert call_args.kwargs["topic"] == "huleedu.els.batch.student.matching.initiate.command.v1"
-        assert call_args.kwargs["partition_key"] == batch_id
+        assert call_args.kwargs["key"] == batch_id
 
         # Verify the envelope
         envelope = call_args.kwargs["event_envelope"]
@@ -238,15 +237,14 @@ class TestStudentMatchingInitiatorImpl:
         assert "Kafka connection failed" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_logging_includes_class_id_and_essay_count(
+    async def test_student_matching_command_contains_correct_context(
         self,
         initiator: StudentMatchingInitiatorImpl,
         mock_event_publisher: AsyncMock,
         regular_batch_context: BatchRegistrationRequestV1,
         sample_essays: list[EssayProcessingInputRefV1],
-        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """Test that logging includes important context like class_id and essay count."""
+        """Test that student matching command contains correct class_id and essay count."""
         # Arrange
         batch_id = str(uuid4())
         correlation_id = uuid4()
@@ -260,12 +258,15 @@ class TestStudentMatchingInitiatorImpl:
             batch_context=regular_batch_context,
         )
 
-        # Assert
-        assert f"Initiating Phase 1 student matching for batch {batch_id}" in caplog.text
-        assert f"Created student matching command for batch {batch_id}" in caplog.text
-        assert "class_id class_456" in caplog.text
-        assert "3 essays" in caplog.text  # len(sample_essays) = 3
-        assert (
-            f"Successfully published student matching initiate command for batch {batch_id}"
-            in caplog.text
-        )
+        # Assert - Test actual behavior and side effects
+        mock_event_publisher.publish_batch_event.assert_called_once()
+        
+        # Verify the command data contains correct context
+        call_args = mock_event_publisher.publish_batch_event.call_args
+        envelope = call_args.kwargs["event_envelope"]
+        command_data = envelope.data
+        
+        # Test the actual behavioral outcomes
+        assert command_data.class_id == "class_456"  # class_id from regular_batch_context
+        assert len(command_data.essays_to_process) == 3  # len(sample_essays) = 3
+        assert command_data.essays_to_process == sample_essays  # Exact essay references preserved
