@@ -19,7 +19,7 @@ from aiokafka import AIOKafkaProducer, ConsumerRecord
 # CRITICAL: Import ALL enum types FIRST
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 
 # Import models that need rebuilding
 from common_core.events.base_event_models import (
@@ -261,8 +261,8 @@ def mock_settings() -> Settings:
     settings.llm_request_timeout_seconds = 30
     settings.MAX_PAIRWISE_COMPARISONS = 100
     # Add required Kafka and service configuration
-    settings.CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
-    settings.CJ_ASSESSMENT_FAILED_TOPIC = "huleedu.cj_assessment.failed.v1"
+    settings.CJ_ASSESSMENT_COMPLETED_TOPIC = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
+    settings.CJ_ASSESSMENT_FAILED_TOPIC = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
     settings.SERVICE_NAME = "cj-assessment-service"
     settings.LLM_PROVIDERS_CONFIG = {
         "openai": MagicMock(

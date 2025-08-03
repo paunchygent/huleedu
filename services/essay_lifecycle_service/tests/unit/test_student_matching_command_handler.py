@@ -211,7 +211,9 @@ class TestStudentMatchingCommandHandler:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_id"] == command_data.entity_id
         assert call_args.kwargs["aggregate_type"] == "batch"
-        assert call_args.kwargs["event_type"] == "huleedu.els.batch.student.matching.requested.v1"
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
+        )
         assert call_args.kwargs["topic"] == topic_name(
             ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED
         )
@@ -398,4 +400,4 @@ class TestStudentMatchingCommandHandler:
         # Verify event data
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_id"] == command_data.entity_id
-        assert call_args.kwargs["topic"] == "huleedu.batch.student.matching.requested.v1"
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)

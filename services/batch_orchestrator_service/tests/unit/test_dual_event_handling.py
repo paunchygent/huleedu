@@ -130,7 +130,7 @@ class TestDualEventHandling:
         )
 
         success_envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=success_event,
@@ -170,7 +170,7 @@ class TestDualEventHandling:
         )
 
         error_envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=error_event,
@@ -266,7 +266,7 @@ class TestDualEventHandling:
 
         success_envelope = EventEnvelope[BatchEssaysReady](
             event_id=uuid4(),  # Same event ID for duplicates
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=success_event,
@@ -348,14 +348,14 @@ class TestDualEventHandling:
 
         # Create envelopes
         success_envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=uuid4(),
             data=success_event,
         )
 
         error_envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=uuid4(),
             data=error_event,
@@ -416,7 +416,7 @@ class TestDualEventHandling:
         )
 
         success_envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             data=success_event,
         )

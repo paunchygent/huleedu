@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 
 from services.websocket_service.config import Settings
@@ -268,7 +269,7 @@ class TestFileEventConsumer:
 
         message_data = {
             "event_id": "550e8400-e29b-41d4-a716-446655440000",
-            "event_type": "huleedu.file.batch.file.added.v1",
+            "event_type": topic_name(ProcessingEvent.BATCH_FILE_ADDED),
             "event_timestamp": "2024-01-01T12:00:00Z",
             "source_service": "file_service",
             "correlation_id": "550e8400-e29b-41d4-a716-446655440001",

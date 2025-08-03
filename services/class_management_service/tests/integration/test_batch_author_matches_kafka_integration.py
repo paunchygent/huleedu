@@ -21,7 +21,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -244,7 +244,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
     ) -> AsyncGenerator[AIOKafkaConsumer, None]:
         """Create Kafka consumer for receiving test events."""
         consumer = AIOKafkaConsumer(
-            "huleedu.nlp.batch.author.matches.suggested.v1",
+            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             bootstrap_servers=test_settings.KAFKA_BOOTSTRAP_SERVERS,
             group_id="test-consumer-group",
             auto_offset_reset="earliest",
@@ -307,7 +307,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
     ) -> EventEnvelope[BatchAuthorMatchesSuggestedV1]:
         """Create an event envelope for the batch event."""
         return EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
             source_service="nlp_service",
             correlation_id=correlation_id or uuid4(),
@@ -345,7 +345,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
 
         # Act - Send event through real Kafka
         await kafka_producer.send_and_wait(
-            "huleedu.nlp.batch.author.matches.suggested.v1",
+            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             envelope.model_dump(mode="json"),
             key=batch_event.batch_id.encode("utf-8"),  # Kafka key must be bytes
         )
@@ -415,7 +415,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         batch_event = self.create_batch_event(test_students, essay_count=2)
         envelope = self.create_event_envelope(batch_event, correlation_id)
         kafka_msg = self.create_kafka_message(
-            envelope, "huleedu.nlp.batch.author.matches.suggested.v1", batch_event.batch_id
+            envelope, topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED), batch_event.batch_id
         )
 
         mock_http_session = AsyncMock()
@@ -471,7 +471,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         batch_event = self.create_batch_event(test_students, essay_count=1)
         envelope = self.create_event_envelope(batch_event, correlation_id)
         kafka_msg = self.create_kafka_message(
-            envelope, "huleedu.nlp.batch.author.matches.suggested.v1"
+            envelope, topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
         )
 
         mock_http_session = AsyncMock()

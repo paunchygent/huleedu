@@ -68,7 +68,7 @@ def create_batch_file_added_event(
     """Create a batch file added event for testing."""
     return EventEnvelope[BatchFileAddedV1](
         event_id=uuid4(),
-        event_type="huleedu.file.batch.file.added.v1",
+        event_type=topic_name(ProcessingEvent.BATCH_FILE_ADDED),
         event_timestamp=datetime.now(timezone.utc),
         source_service="file_service",
         data=BatchFileAddedV1(
@@ -89,7 +89,7 @@ def create_batch_file_removed_event(
     """Create a batch file removed event for testing."""
     return EventEnvelope[BatchFileRemovedV1](
         event_id=uuid4(),
-        event_type="huleedu.file.batch.file.removed.v1",
+        event_type=topic_name(ProcessingEvent.BATCH_FILE_REMOVED),
         event_timestamp=datetime.now(timezone.utc),
         source_service="file_service",
         data=BatchFileRemovedV1(

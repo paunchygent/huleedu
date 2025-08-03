@@ -84,10 +84,23 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
         )
 
     def _determine_aggregate_type(self, event_type: str) -> str:
-        """Determine aggregate type from event type."""
-        if "batch" in event_type.lower():
+        """Determine aggregate type from event type.
+        
+        Now checks both the ProcessingEvent enum value and the full topic name
+        to handle both patterns during transition.
+        """
+        event_lower = event_type.lower()
+        
+        # Check for batch-related patterns in both enum values and topic names
+        # Only match complete words/segments to avoid false positives
+        batch_patterns = [
+            ".batch.", "batch.", ".spellcheck.", "spellcheck.",
+            ".cj_assessment.", "cj_assessment.", ".nlp.", "nlp.",
+            ".els.", "els."
+        ]
+        if any(pattern in event_lower for pattern in batch_patterns):
             return "batch"
-        elif "pipeline" in event_type.lower():
+        elif ".pipeline." in event_lower or "pipeline." in event_lower:
             return "pipeline"
         else:
             return "unknown"

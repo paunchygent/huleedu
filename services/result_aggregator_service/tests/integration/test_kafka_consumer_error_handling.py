@@ -215,7 +215,7 @@ class TestKafkaConsumerErrorHandling:
         )
 
         valid_record2 = create_kafka_record(
-            topic="huleedu.essay.spellcheck.completed.v1",
+            topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             event_envelope=valid_envelope2,
             offset=3,
         )

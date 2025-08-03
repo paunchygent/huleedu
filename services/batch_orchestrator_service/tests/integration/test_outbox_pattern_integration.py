@@ -25,7 +25,7 @@ from common_core.batch_service_models import (
     BatchServiceNLPInitiateCommandDataV1,
     BatchServiceSpellcheckInitiateCommandDataV1,
 )
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
@@ -298,7 +298,7 @@ class TestOutboxPatternIntegration:
                     )
 
                     event_envelope = EventEnvelope[BatchServiceSpellcheckInitiateCommandDataV1](
-                        event_type="huleedu.batch.spellcheck.initiate.command.v1",
+                        event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
                         source_service="batch-orchestrator-service",
                         correlation_id=correlation_id,
                         data=command_data,
@@ -417,7 +417,7 @@ class TestOutboxPatternIntegration:
                     )
 
                     event_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV1](
-                        event_type="huleedu.batch.nlp.initiate.command.v1",
+                        event_type=topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
                         source_service="batch-orchestrator-service",
                         correlation_id=correlation_id,
                         data=command_data,

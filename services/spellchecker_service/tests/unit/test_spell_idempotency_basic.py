@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
@@ -194,7 +195,7 @@ async def test_deterministic_event_id_generation(
     shared_event_id = str(uuid.uuid4())
     event1 = {
         "event_id": shared_event_id,
-        "event_type": "huleedu.essay.spellcheck.requested.v1",
+        "event_type": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
         "event_timestamp": "2024-01-01T12:00:00Z",
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),
@@ -202,7 +203,7 @@ async def test_deterministic_event_id_generation(
     }
     event2 = {
         "event_id": shared_event_id,  # Same event_id = same event (retry)
-        "event_type": "huleedu.essay.spellcheck.requested.v1",
+        "event_type": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
         "event_timestamp": "2024-01-01T13:00:00Z",  # Different timestamp (retry delay)
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),

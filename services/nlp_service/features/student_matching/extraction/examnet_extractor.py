@@ -173,8 +173,10 @@ class ExamnetExtractor(BaseExtractor):
             if indicator in text_lower:
                 return False
 
-        # Check space count - allow single names (0 spaces) but not sentences
+        # Check space count - require at least one space (first and last name)
         space_count = text.count(" ")
+        if space_count == 0:  # Single word, not a full name
+            return False
         if space_count > 4:  # Too many spaces, probably a sentence
             return False
 

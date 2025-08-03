@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.event_enums import ProcessingEvent
 
 from services.cj_assessment_service.event_processor import process_single_message
@@ -51,7 +52,7 @@ def sample_cj_request_event() -> dict:
     storage2_id = str(uuid.uuid4())
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.els.cj_assessment.requested.v1",
+        "event_type": topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
         "event_timestamp": "2024-01-01T12:00:00Z",
         "source_service": "essay_lifecycle_service",
         "correlation_id": str(uuid.uuid4()),

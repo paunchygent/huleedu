@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
 from common_core.events.nlp_events import StudentMatchSuggestion
@@ -291,7 +292,7 @@ class TestCommandHandlerOutboxIntegration:
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -352,7 +353,7 @@ class TestCommandHandlerOutboxIntegration:
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -402,7 +403,7 @@ class TestCommandHandlerOutboxIntegration:
             )
 
             envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
-                event_type="huleedu.batch.student.matching.requested.v1",
+                event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
                 source_service="essay-lifecycle-service",
                 correlation_id=correlation_id,
                 data=event_data,

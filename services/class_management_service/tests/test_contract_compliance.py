@@ -11,6 +11,7 @@ import uuid
 
 import pytest
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.class_events import (
     ClassCreatedV1,
     ClassUpdatedV1,
@@ -34,7 +35,7 @@ class TestEventContractCompliance:
         )
 
         original_envelope = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
@@ -65,7 +66,7 @@ class TestEventContractCompliance:
         )
 
         original_envelope = EventEnvelope[ClassUpdatedV1](
-            event_type="huleedu.class.updated.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_UPDATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
@@ -95,7 +96,7 @@ class TestEventContractCompliance:
         )
 
         original_envelope = EventEnvelope[StudentCreatedV1](
-            event_type="huleedu.student.created.v1",
+            event_type=topic_name(ProcessingEvent.STUDENT_CREATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
@@ -127,7 +128,7 @@ class TestEventContractCompliance:
         )
 
         original_envelope = EventEnvelope[StudentUpdatedV1](
-            event_type="huleedu.student.updated.v1",
+            event_type=topic_name(ProcessingEvent.STUDENT_UPDATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=original_data,
@@ -151,7 +152,7 @@ class TestEventContractCompliance:
 
         # Test with different event types to ensure pattern consistency
         class_event = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=test_correlation_id,
             data=ClassCreatedV1(
@@ -163,7 +164,7 @@ class TestEventContractCompliance:
         )
 
         student_event = EventEnvelope[StudentCreatedV1](
-            event_type="huleedu.student.created.v1",
+            event_type=topic_name(ProcessingEvent.STUDENT_CREATED),
             source_service="class_management_service",
             correlation_id=test_correlation_id,  # Same correlation ID
             data=StudentCreatedV1(
@@ -226,7 +227,7 @@ class TestEventContractCompliance:
 
         # Act & Assert - valid envelope
         valid_envelope = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=test_data,
@@ -235,7 +236,7 @@ class TestEventContractCompliance:
         # Verify envelope structure
         assert valid_envelope.event_id is not None
         assert valid_envelope.event_timestamp is not None
-        assert valid_envelope.event_type == "huleedu.class.created.v1"
+        assert valid_envelope.event_type == topic_name(ProcessingEvent.CLASS_CREATED)
         assert valid_envelope.source_service == "class_management_service"
         assert valid_envelope.correlation_id is not None
         assert valid_envelope.data == test_data
@@ -251,7 +252,7 @@ class TestEventContractCompliance:
         )
 
         envelope = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=event_data,

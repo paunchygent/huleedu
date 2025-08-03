@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka.errors import KafkaError
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -62,7 +63,7 @@ def test_event() -> EventEnvelope[SpellCheckResultData]:
     """Test event envelope for spellcheck completion events."""
     return EventEnvelope[SpellCheckResultData](
         event_id=uuid4(),
-        event_type="huleedu.essay.spellcheck.completed.v1",
+        event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
         event_timestamp=datetime.now(timezone.utc),
         source_service="spell-checker-service",
         correlation_id=uuid4(),
@@ -293,7 +294,7 @@ async def test_spellcheck_specific_topics() -> None:
     try:
         # Common Spell Checker Service topics
         topics = [
-            "huleedu.essay.spellcheck.completed.v1",
+            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             "huleedu.essay.spellcheck.initiated.v1",
             "huleedu.batch.spellcheck.phase.completed.v1",
             "huleedu.spellcheck.processing.error.v1",
@@ -387,14 +388,14 @@ async def test_spellcheck_specific_error_scenarios(
         )
 
         large_spellcheck_event = EventEnvelope[SpellCheckResultData](
-            event_type="huleedu.essay.spellcheck.completed.v1",
+            event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spell-checker-service",
             correlation_id=uuid4(),
             data=large_spellcheck_data,
         )
 
-        topic = "huleedu.essay.spellcheck.completed.v1"
+        topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Mock Kafka timeout (common with large messages)
         mock_kafka_bus.publish.side_effect = KafkaError("Message too large")

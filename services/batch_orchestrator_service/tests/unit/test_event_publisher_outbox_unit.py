@@ -18,6 +18,7 @@ from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 
 from services.batch_orchestrator_service.config import Settings
@@ -127,7 +128,7 @@ class TestDefaultBatchEventPublisherImpl:
         }
 
         event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.spellcheck.initiate.command.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
             source_service="batch-orchestrator-service",
             correlation_id=sample_correlation_id,
             data=test_data,
@@ -142,8 +143,8 @@ class TestDefaultBatchEventPublisherImpl:
 
         assert call["aggregate_id"] == "batch-001"
         assert call["aggregate_type"] == "batch"
-        assert call["event_type"] == "huleedu.batch.spellcheck.initiate.command.v1"
-        assert call["topic"] == "huleedu.batch.spellcheck.initiate.command.v1"
+        assert call["event_type"] == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND)
+        assert call["topic"] == topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND)
         assert call["session"] is None
 
         # Verify original envelope was passed
@@ -197,7 +198,7 @@ class TestDefaultBatchEventPublisherImpl:
         }
 
         event_envelope = EventEnvelope[Any](
-            event_type="huleedu.batch.spellcheck.initiate.command.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
             source_service="batch-orchestrator-service",
             correlation_id=sample_correlation_id,
             data=test_data,

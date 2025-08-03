@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 from common_core.batch_service_models import BatchServiceStudentMatchingInitiateCommandDataV1
 from common_core.domain_enums import CourseCode
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
@@ -110,7 +110,7 @@ class TestStudentMatchingInitiatorImpl:
         # Verify the envelope
         envelope = call_args.kwargs["event_envelope"]
         assert isinstance(envelope, EventEnvelope)
-        assert envelope.event_type == ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND.value
+        assert envelope.event_type == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND)
         assert envelope.source_service == "batch_orchestrator_service"
         assert envelope.correlation_id == correlation_id
 

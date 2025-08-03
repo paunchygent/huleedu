@@ -108,7 +108,7 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
             json=class_data,
             user=teacher_user
         )
-        created_class_id = response["id"]
+        created_class_id = str(response["id"])
         logger.info(f"✅ Created class with ID: {created_class_id}")
     except Exception as e:
         raise RuntimeError(f"Failed to create test class: {e}")

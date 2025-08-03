@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import (
     BatchErrorSummary,
@@ -70,7 +71,7 @@ class TestEventContractsV2:
 
         # Create envelope
         envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=uuid4(),
             data=event_data,
@@ -210,7 +211,7 @@ class TestEventContractsV2:
 
         # Wrap in envelope
         envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=validation_event.correlation_id,
             data=validation_event,

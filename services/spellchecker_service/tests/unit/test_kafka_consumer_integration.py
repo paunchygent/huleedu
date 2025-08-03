@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.status_enums import EssayStatus
 
 from services.spellchecker_service.kafka_consumer import SpellCheckerKafkaConsumer
@@ -76,7 +77,7 @@ def create_sample_spellcheck_event() -> dict:
 
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.essay.spellcheck.requested.v1",
+        "event_type": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
@@ -103,7 +104,7 @@ def create_sample_spellcheck_event() -> dict:
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     """Create a mock Kafka ConsumerRecord."""
     return ConsumerRecord(
-        topic="huleedu.essay.spellcheck.requested.v1",
+        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
         partition=0,
         offset=12345,
         timestamp=None,

@@ -646,10 +646,10 @@ async def test_coordination_event_ttl_verification(
         service_name="batch-conductor-service",
         event_type_ttls={
             "SpellcheckResultDataV1": 86400,  # 24 hours for coordination events
-            "huleedu.essay.spellcheck.completed.v1": 86400,
+            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED): 86400,
             "CJAssessmentCompletedV1": 86400,
-            "huleedu.cj_assessment.completed.v1": 86400,
-            "huleedu.essay.aifeedback.completed.v1": 86400,
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED): 86400,
+            topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED): 86400,
         },
         default_ttl=86400,  # 24 hours for coordination events
         enable_debug_logging=True,

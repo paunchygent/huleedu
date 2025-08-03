@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import (
     BatchErrorSummary,
     BatchEssaysReady,
@@ -116,8 +117,8 @@ class TestDualEventPublishing:
 
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
-        assert call_args.kwargs["event_type"] == "huleedu.els.batch.essays.ready.v1"
-        assert call_args.kwargs["topic"] == "huleedu.els.batch.essays.ready.v1"
+        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
 
         # Verify event envelope contains correct data
         envelope = call_args.kwargs["event_data"]
@@ -190,8 +191,8 @@ class TestDualEventPublishing:
 
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
-        assert call_args.kwargs["event_type"] == "huleedu.els.batch.validation.errors.v1"
-        assert call_args.kwargs["topic"] == "huleedu.els.batch.validation.errors.v1"
+        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
 
         # Verify event envelope contains correct data
         envelope = call_args.kwargs["event_data"]
@@ -274,13 +275,13 @@ class TestDualEventPublishing:
 
         # Verify first call (success event)
         first_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
-        assert first_call.kwargs["event_type"] == "huleedu.els.batch.essays.ready.v1"
-        assert first_call.kwargs["topic"] == "huleedu.els.batch.essays.ready.v1"
+        assert first_call.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        assert first_call.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
 
         # Verify second call (error event)
         second_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
-        assert second_call.kwargs["event_type"] == "huleedu.els.batch.validation.errors.v1"
-        assert second_call.kwargs["topic"] == "huleedu.els.batch.validation.errors.v1"
+        assert second_call.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        assert second_call.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
 
     async def test_critical_failure_flag_in_error_summary(
         self,
@@ -346,9 +347,9 @@ class TestDualEventPublishing:
     ) -> None:
         """Test that topic_name() function is used instead of hardcoded strings."""
         # Arrange
-        from common_core.event_enums import ProcessingEvent
+        from common_core.event_enums import ProcessingEvent, topic_name
 
-        mock_topic_name.return_value = "huleedu.els.batch.validation.errors.v1"
+        mock_topic_name.return_value = topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
 
         event_data = BatchValidationErrorsV1(
             batch_id="test-batch",
@@ -373,4 +374,6 @@ class TestDualEventPublishing:
         )
 
         # Assert
-        mock_topic_name.assert_called_once_with(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        # topic_name is called twice: once for event_type in envelope, once for topic
+        assert mock_topic_name.call_count == 2
+        mock_topic_name.assert_any_call(ProcessingEvent.BATCH_VALIDATION_ERRORS)

@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -221,7 +221,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         # Arrange - Create event with multiple essays where one will fail
         batch_event = self.create_batch_event(test_students, essay_count=3)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
             source_service="nlp_service",
             correlation_id=uuid4(),
@@ -280,7 +280,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         for i in range(events_count):
             batch_event = self.create_batch_event(test_students, essay_count=2)
             envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-                event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+                event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
                 event_timestamp=datetime.now(UTC),
                 source_service="nlp_service",
                 correlation_id=uuid4(),
@@ -382,7 +382,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         )
 
         envelope1 = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
             source_service="nlp_service",
             correlation_id=uuid4(),
@@ -390,7 +390,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         )
 
         envelope2 = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
             source_service="nlp_service",
             correlation_id=uuid4(),

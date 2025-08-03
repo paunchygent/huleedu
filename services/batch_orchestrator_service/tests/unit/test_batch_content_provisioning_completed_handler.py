@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchContentProvisioningCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -133,7 +134,7 @@ class TestBatchContentProvisioningCompletedHandler:
         # Create mock Kafka message
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
 
         # Mock repository to return REGULAR batch context
         mock_batch_repo.get_batch_context.return_value = regular_batch_context
@@ -192,7 +193,7 @@ class TestBatchContentProvisioningCompletedHandler:
         # Create mock Kafka message
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
 
         # Mock repository to return GUEST batch context
         mock_batch_repo.get_batch_context.return_value = guest_batch_context
@@ -242,7 +243,7 @@ class TestBatchContentProvisioningCompletedHandler:
         # Create mock Kafka message
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
 
         # Mock repository to return None (batch context not found)
         mock_batch_repo.get_batch_context.return_value = None
@@ -266,7 +267,7 @@ class TestBatchContentProvisioningCompletedHandler:
         # Arrange
         mock_msg = MagicMock()
         mock_msg.value = b"invalid json {"  # Invalid JSON
-        mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
 
         # Act & Assert
         with pytest.raises(HuleEduError) as exc_info:
@@ -312,7 +313,7 @@ class TestBatchContentProvisioningCompletedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.batch.content.provisioning.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
 
         # Test REGULAR batch behavior
         mock_batch_repo.get_batch_context.return_value = regular_batch_context

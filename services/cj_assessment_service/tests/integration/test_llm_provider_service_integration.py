@@ -14,7 +14,7 @@ import pytest
 from aiokafka import AIOKafkaProducer
 from common_core.config_enums import LLMProviderType
 from common_core.domain_enums import CourseCode
-from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent, topic_name, topic_name
 from common_core.events.cj_assessment_events import (
     ELS_CJAssessmentRequestV1,
     LLMConfigOverrides,
@@ -83,7 +83,7 @@ class TestLLMProviderServiceIntegration:
             "user_prompt": "Compare these two essays and determine which is better written.",
             "essay_a": "This is a well-structured essay with clear arguments and good flow.",
             "essay_b": "This essay lacks structure and has unclear arguments.",
-            "callback_topic": "huleedu.cj_assessment.completed.v1",
+            "callback_topic": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             "llm_config_overrides": {
                 "provider_override": LLMProviderType.ANTHROPIC.value,
                 "temperature_override": 0.1,
@@ -254,7 +254,7 @@ class TestMockProviderIntegration:
                     "temperature_override": 0.1,
                 },
                 "correlation_id": str(uuid4()),
-                "callback_topic": "huleedu.cj_assessment.completed.v1",
+                "callback_topic": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             }
 
             async with session.post(
@@ -370,7 +370,7 @@ class TestQueueIntegration:
             "user_prompt": "Compare these two essays and determine which is better written.",
             "essay_a": "This is a well-structured essay with clear arguments and good flow.",
             "essay_b": "This essay lacks structure and has unclear arguments.",
-            "callback_topic": "huleedu.cj_assessment.completed.v1",
+            "callback_topic": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             "llm_config_overrides": {
                 "provider_override": LLMProviderType.ANTHROPIC.value,
                 "temperature_override": 0.1,

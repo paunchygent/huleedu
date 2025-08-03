@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.protocols import (
@@ -101,7 +102,7 @@ def sample_batch_registered_event() -> dict:
     """Sample batch registered event data."""
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.batch.essays.registered.v1",
+        "event_type": topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "batch_orchestrator_service",
         "correlation_id": str(uuid.uuid4()),
@@ -418,7 +419,7 @@ async def test_deterministic_event_id_generation(
     # Create two identical event payloads (same data content)
     event_data = {
         "event_id": str(uuid.uuid4()),  # Different UUID each time
-        "event_type": "huleedu.batch.essays.registered.v1",  # Fixed: correct event type
+        "event_type": topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Fixed: correct event type
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "batch_orchestrator_service",
         "correlation_id": str(uuid.uuid4()),  # Different UUID each time

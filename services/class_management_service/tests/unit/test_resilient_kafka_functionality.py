@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 from aiokafka.errors import KafkaError
 from common_core import CircuitBreakerState
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka.fallback_handler import QueuedMessage
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -260,14 +261,14 @@ async def test_class_specific_error_scenarios(resilient_publisher: ResilientKafk
         metadata={"description": "A" * 10000},  # Large metadata
     )
     large_class_event = EventEnvelope[LargeClassData](
-        event_type="huleedu.class.created.v1",
+        event_type=topic_name(ProcessingEvent.CLASS_CREATED),
         event_timestamp=datetime.now(timezone.utc),
         source_service="class_management_service",
         correlation_id=uuid4(),
         data=large_class_data,
     )
 
-    topic = "huleedu.class.created.v1"
+    topic = topic_name(ProcessingEvent.CLASS_CREATED)
 
     # Mock Kafka timeout (common with large messages)
     cast(AsyncMock, resilient_publisher.delegate.publish).side_effect = KafkaError(

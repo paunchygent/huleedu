@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -110,7 +111,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         """Test that ELS batch phase outcome messages are routed to the correct handler."""
         # Mock Kafka message for ELS batch phase outcome
         mock_message = Mock()
-        mock_message.topic = "huleedu.els.batch.phase.outcome.v1"
+        mock_message.topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
         mock_message.partition = 0
         mock_message.offset = 123
 
@@ -131,7 +132,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         """Test that BatchEssaysReady messages are routed to the correct handler."""
         # Mock Kafka message for BatchEssaysReady
         mock_message = Mock()
-        mock_message.topic = "huleedu.els.batch.essays.ready.v1"  # Correct topic name
+        mock_message.topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)  # Correct topic name
         mock_message.partition = 0
         mock_message.offset = 456
 
@@ -151,7 +152,7 @@ class TestBatchKafkaConsumerBusinessLogic:
         """Test that ClientBatchPipelineRequest messages are routed to the correct handler."""
         # Mock Kafka message for ClientBatchPipelineRequest
         mock_message = Mock()
-        mock_message.topic = "huleedu.commands.batch.pipeline.v1"
+        mock_message.topic = topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST)
         mock_message.partition = 0
         mock_message.offset = 789
 
@@ -244,7 +245,7 @@ class TestELSBatchPhaseOutcomeHandler:
         # Mock Kafka message
         mock_message = Mock()
         mock_message.value = event_envelope.model_dump_json().encode()
-        mock_message.topic = "huleedu.els.batch.phase.outcome.v1"
+        mock_message.topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
         mock_message.partition = 0
         mock_message.offset = 123
 

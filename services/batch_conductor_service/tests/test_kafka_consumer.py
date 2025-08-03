@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.status_enums import EssayStatus
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
@@ -62,7 +63,7 @@ class TestBCSKafkaConsumerBehavior:
         """Create a sample spellcheck event message that matches the expected structure."""
         return {
             "event_id": "550e8400-e29b-41d4-a716-446655440000",
-            "event_type": "huleedu.essay.spellcheck.completed.v1",
+            "event_type": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             "event_timestamp": "2024-01-01T00:00:00Z",
             "source_service": "spell-checker-service",
             "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -93,7 +94,7 @@ class TestBCSKafkaConsumerBehavior:
         """Create a sample CJ assessment event message."""
         return {
             "event_id": str(uuid4()),
-            "event_type": "huleedu.cj_assessment.completed.v1",
+            "event_type": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             "event_timestamp": datetime.now(UTC).isoformat(),
             "source_service": "cj-assessment-service",
             "correlation_id": str(uuid4()),
@@ -155,7 +156,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
         await kafka_consumer._handle_spellcheck_completed(mock_msg)
@@ -183,7 +184,7 @@ class TestBCSKafkaConsumerBehavior:
         sample_spellcheck_message_data["data"]["status"] = EssayStatus.SPELLCHECK_FAILED.value
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
         await kafka_consumer._handle_spellcheck_completed(mock_msg)
@@ -208,7 +209,7 @@ class TestBCSKafkaConsumerBehavior:
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
         await kafka_consumer._handle_spellcheck_completed(mock_msg)
@@ -233,7 +234,7 @@ class TestBCSKafkaConsumerBehavior:
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
         await kafka_consumer._handle_spellcheck_completed(mock_msg)
@@ -252,7 +253,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = "invalid json"
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act & Assert
         with pytest.raises(json.JSONDecodeError):
@@ -274,7 +275,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
         await kafka_consumer._handle_cj_assessment_completed(mock_msg)
@@ -304,7 +305,7 @@ class TestBCSKafkaConsumerBehavior:
         sample_cj_assessment_message_data["data"]["rankings"] = []
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
         await kafka_consumer._handle_cj_assessment_completed(mock_msg)
@@ -325,7 +326,7 @@ class TestBCSKafkaConsumerBehavior:
         sample_cj_assessment_message_data["data"]["rankings"][0]["els_essay_id"] = None
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
         await kafka_consumer._handle_cj_assessment_completed(mock_msg)
@@ -346,7 +347,7 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo.record_essay_step_completion.return_value = False
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
         await kafka_consumer._handle_cj_assessment_completed(mock_msg)
@@ -424,8 +425,8 @@ class TestBCSKafkaConsumerBehavior:
         """Test event type extraction from various topic formats."""
         # Test cases
         test_cases = [
-            ("huleedu.essay.spellcheck.completed.v1", "spellcheck_completed"),
-            ("huleedu.cj_assessment.completed.v1", "cj_assessment_completed"),
+            (topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED), "spellcheck_completed"),
+            (topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED), "cj_assessment_completed"),
             ("huleedu.ai.feedback.completed.v1", "ai_feedback_completed"),
             ("short.topic", "unknown_event"),
             ("single", "unknown_event"),
@@ -447,7 +448,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Mock the handler to verify it's called
         with patch.object(kafka_consumer, "_handle_spellcheck_completed") as mock_handler:
@@ -466,7 +467,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Mock the handler to verify it's called
         with patch.object(kafka_consumer, "_handle_cj_assessment_completed") as mock_handler:
@@ -491,7 +492,7 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo.record_essay_step_completion.side_effect = Exception("Database error")
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act & Assert
         with pytest.raises(Exception, match="Database error"):
@@ -506,7 +507,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data)
-        mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Mock handler to raise exception
         with patch.object(
@@ -596,7 +597,7 @@ class TestBCSKafkaConsumerBehavior:
 
             mock_msg = Mock()
             mock_msg.value = json.dumps(msg_data)
-            mock_msg.topic = "huleedu.essay.spellcheck.completed.v1"
+            mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
             messages.append(mock_msg)
 
         # Act
@@ -658,7 +659,7 @@ class TestBCSKafkaConsumerBehavior:
         sample_cj_assessment_message_data["data"]["rankings"] = rankings
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data)
-        mock_msg.topic = "huleedu.cj_assessment.completed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
         await kafka_consumer._handle_cj_assessment_completed(mock_msg)

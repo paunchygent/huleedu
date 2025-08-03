@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.validation_events import StudentAssociationsConfirmedV1
 from common_core.status_enums import BatchStatus
@@ -89,7 +90,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         # Mock batch retrieval
         mock_batch_repo.get_batch_by_id.return_value = valid_batch_dict
@@ -141,7 +142,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         mock_batch_repo.get_batch_by_id.return_value = batch_dict
 
@@ -180,7 +181,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         # Mock batch not found
         mock_batch_repo.get_batch_by_id.return_value = None
@@ -223,7 +224,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         mock_batch_repo.get_batch_by_id.return_value = valid_batch_dict
 
@@ -261,7 +262,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         mock_msg = MagicMock()
         mock_msg.value = envelope.model_dump_json().encode("utf-8")
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         # First call - batch in correct state
         mock_batch_repo.get_batch_by_id.return_value = valid_batch_dict
@@ -288,7 +289,7 @@ class TestStudentAssociationsConfirmedHandler:
         # Arrange
         mock_msg = MagicMock()
         mock_msg.value = b"invalid json {"  # Invalid JSON
-        mock_msg.topic = "huleedu.validation.student.associations.confirmed.v1"
+        mock_msg.topic = topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED)
 
         # Act & Assert
         with pytest.raises(HuleEduError) as exc_info:

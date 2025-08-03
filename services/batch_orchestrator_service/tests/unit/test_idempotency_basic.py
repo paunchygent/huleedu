@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.pipeline_models import PhaseName
 
 from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
@@ -92,9 +93,9 @@ def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     message_value = json.dumps(event_data).encode("utf-8")
     event_type = event_data.get("event_type", "")
     if "batch.essays.ready" in event_type:
-        topic = "huleedu.els.batch.essays.ready.v1"
+        topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
     elif "batch.phase.outcome" in event_type:
-        topic = "huleedu.els.batch.phase.outcome.v1"
+        topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
     else:
         topic = "huleedu.test.unknown"
     return ConsumerRecord(
@@ -119,7 +120,7 @@ def sample_batch_essays_ready_event() -> dict:
     correlation_id = str(uuid.uuid4())
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.batch.essays.ready.v1",
+        "event_type": topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,
@@ -159,7 +160,7 @@ def sample_els_phase_outcome_event() -> dict:
 
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "huleedu.els.batch.phase.outcome.v1",
+        "event_type": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "essay_lifecycle_service",
         "correlation_id": correlation_id,

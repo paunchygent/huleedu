@@ -17,6 +17,7 @@ import pytest
 # Test all critical imports from analysis
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ClassManagementErrorCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.class_events import (
     ClassCreatedV1,
     ClassUpdatedV1,
@@ -105,14 +106,14 @@ class TestAnalysisValidation:
         )
 
         envelope = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=uuid.uuid4(),
             data=test_event_data,
         )
 
         assert envelope.data == test_event_data
-        assert envelope.event_type == "huleedu.class.created.v1"
+        assert envelope.event_type == topic_name(ProcessingEvent.CLASS_CREATED)
         assert envelope.source_service == "class_management_service"
         assert envelope.correlation_id is not None
         print("✓ EventEnvelope generic structure validated")

@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.error_enums import ErrorCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
 from common_core.events.nlp_events import StudentMatchSuggestion
@@ -149,7 +150,7 @@ def sample_batch_request() -> BatchStudentMatchingRequestedV1:
 def sample_kafka_message(sample_batch_request: BatchStudentMatchingRequestedV1) -> ConsumerRecord:
     """Create sample Kafka message."""
     envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-        event_type="huleedu.batch.student.matching.requested.v1",
+        event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
         source_service="essay_lifecycle_service",
         correlation_id=uuid4(),
         data=sample_batch_request,
@@ -157,7 +158,7 @@ def sample_kafka_message(sample_batch_request: BatchStudentMatchingRequestedV1) 
 
     msg = Mock(spec=ConsumerRecord)
     msg.value = envelope.model_dump_json().encode("utf-8")
-    msg.topic = "huleedu.batch.student.matching.requested.v1"
+    msg.topic = topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
     msg.partition = 0
     msg.offset = 100
     return msg
@@ -171,7 +172,7 @@ class TestEssayStudentMatchingHandler:
         self, handler: EssayStudentMatchingHandler
     ) -> None:
         """Test handler recognizes correct event type."""
-        assert await handler.can_handle("huleedu.batch.student.matching.requested.v1") is True
+        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)) is True
         assert await handler.can_handle("huleedu.essay.student.matching.requested.v1") is False
         assert await handler.can_handle("some.other.event.v1") is False
 
@@ -188,7 +189,7 @@ class TestEssayStudentMatchingHandler:
         """Test successful processing of batch student matching request."""
         # Create envelope with proper data
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
@@ -243,7 +244,7 @@ class TestEssayStudentMatchingHandler:
         ]
 
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
@@ -281,7 +282,7 @@ class TestEssayStudentMatchingHandler:
         mock_student_matcher.find_matches.return_value = []
 
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
@@ -325,7 +326,7 @@ class TestEssayStudentMatchingHandler:
         mock_roster_cache.get_roster.return_value = cached_roster
 
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,
@@ -370,7 +371,7 @@ class TestEssayStudentMatchingHandler:
         mock_content_client.fetch_content.side_effect = HuleEduError(error_detail)
 
         envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-            event_type="huleedu.batch.student.matching.requested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
             source_service="essay_lifecycle_service",
             correlation_id=uuid4(),
             data=sample_batch_request,

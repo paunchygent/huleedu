@@ -20,6 +20,7 @@ from common_core.events.batch_coordination_events import (
     BatchValidationErrorsV1,
     EssayValidationError,
 )
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
@@ -112,7 +113,7 @@ class TestBatchDualEventCoordination:
         )
 
         envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -174,7 +175,7 @@ class TestBatchDualEventCoordination:
         )
 
         envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -235,7 +236,7 @@ class TestBatchDualEventCoordination:
         )
 
         envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=event_data,
@@ -287,7 +288,7 @@ class TestBatchDualEventCoordination:
         )
 
         success_envelope = EventEnvelope[BatchEssaysReady](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=success_event,
@@ -331,7 +332,7 @@ class TestBatchDualEventCoordination:
         )
 
         error_envelope = EventEnvelope[BatchValidationErrorsV1](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service="essay-lifecycle-service",
             correlation_id=correlation_id,
             data=error_event,

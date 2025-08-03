@@ -258,6 +258,7 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
+        from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope for validation errors
@@ -285,7 +286,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
+            event_type=topic,
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity

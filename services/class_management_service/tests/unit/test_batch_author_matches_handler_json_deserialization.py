@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -129,7 +129,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
         """Create a Kafka message that simulates real-world JSON deserialization."""
         # Create envelope with proper typing
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
             source_service="nlp_service",
             correlation_id=uuid4(),
@@ -143,7 +143,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
         # Create mock Kafka message
         msg = Mock(spec=ConsumerRecord)
         msg.value = json_bytes
-        msg.topic = "huleedu.nlp.batch.author.matches.suggested.v1"
+        msg.topic = topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
         msg.partition = 0
         msg.offset = 100
         return msg
@@ -227,7 +227,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
         }
 
         envelope: EventEnvelope = EventEnvelope(
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=malformed_data,  # This will become a generic BaseModel
@@ -262,7 +262,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
         # This simulates when EventEnvelope deserialization creates an empty data dict
         # Use a real EventEnvelope with empty data to avoid mock issues
         envelope: EventEnvelope[Any] = EventEnvelope(
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data={},  # Empty data dict - this will fail model_validate

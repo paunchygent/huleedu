@@ -16,7 +16,7 @@ import pytest
 from aiokafka import ConsumerRecord
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, EssayComparisonWinner
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     ELS_CJAssessmentRequestV1,
@@ -271,7 +271,7 @@ class TestBatchWorkflowIntegration:
         # Verify the published event structure
         published_call = mock_event_publisher.publish_assessment_completed.call_args
         completion_envelope = published_call[1]["completion_data"]
-        assert completion_envelope.event_type == "huleedu.cj_assessment.completed.v1"
+        assert completion_envelope.event_type == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
         assert completion_envelope.correlation_id == correlation_id
         typed_completion_data = CJAssessmentCompletedV1.model_validate(completion_envelope.data)
         assert typed_completion_data.status == BatchStatus.COMPLETED_SUCCESSFULLY

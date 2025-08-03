@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -147,7 +147,7 @@ def sample_batch_event(
 def sample_kafka_message(sample_batch_event: BatchAuthorMatchesSuggestedV1) -> ConsumerRecord:
     """Create sample Kafka message."""
     envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-        event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+        event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
         event_timestamp=datetime.now(UTC),
         source_service="nlp_service",
         correlation_id=uuid4(),
@@ -156,7 +156,7 @@ def sample_kafka_message(sample_batch_event: BatchAuthorMatchesSuggestedV1) -> C
 
     msg = Mock(spec=ConsumerRecord)
     msg.value = envelope.model_dump_json().encode("utf-8")
-    msg.topic = "huleedu.nlp.batch.author.matches.suggested.v1"
+    msg.topic = topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
     msg.partition = 0
     msg.offset = 100
     return msg
@@ -168,8 +168,8 @@ class TestBatchAuthorMatchesHandler:
     @pytest.mark.asyncio
     async def test_can_handle_correct_event_type(self, handler: BatchAuthorMatchesHandler) -> None:
         """Test handler recognizes correct event type."""
-        assert await handler.can_handle("huleedu.nlp.batch.author.matches.suggested.v1") is True
-        assert await handler.can_handle("huleedu.batch.student.matching.requested.v1") is False
+        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)) is True
+        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)) is False
         assert await handler.can_handle("some.other.event.v1") is False
 
     @pytest.mark.asyncio
@@ -184,7 +184,7 @@ class TestBatchAuthorMatchesHandler:
         """Test successful processing of batch author matches."""
         # Create envelope with proper data
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,
@@ -227,7 +227,7 @@ class TestBatchAuthorMatchesHandler:
         mock_class_repository.get_student_by_id.side_effect = [None, Mock()]
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,
@@ -266,7 +266,7 @@ class TestBatchAuthorMatchesHandler:
         session.scalar.side_effect = [existing_association, None]  # First exists, second doesn't
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,
@@ -306,7 +306,7 @@ class TestBatchAuthorMatchesHandler:
         )
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=empty_event,
@@ -355,7 +355,7 @@ class TestBatchAuthorMatchesHandler:
         )
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=event_with_multiple,
@@ -395,7 +395,7 @@ class TestBatchAuthorMatchesHandler:
         ]
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,
@@ -433,7 +433,7 @@ class TestBatchAuthorMatchesHandler:
         session.flush.side_effect = Exception("Constraint violation")
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,
@@ -459,7 +459,7 @@ class TestBatchAuthorMatchesHandler:
         """Test that malformed event data raises appropriate error."""
         # Create envelope with invalid data
         envelope: EventEnvelope = EventEnvelope(
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data={"invalid": "data", "missing_required_fields": True},
@@ -502,7 +502,7 @@ class TestBatchAuthorMatchesHandler:
         )
 
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=event_no_suggestions,
@@ -533,7 +533,7 @@ class TestBatchAuthorMatchesHandler:
     ) -> None:
         """Test that EssayStudentAssociation is created with correct data."""
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="huleedu.nlp.batch.author.matches.suggested.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service="nlp_service",
             correlation_id=uuid4(),
             data=sample_batch_event,

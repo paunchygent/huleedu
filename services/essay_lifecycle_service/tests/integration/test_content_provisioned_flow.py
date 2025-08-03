@@ -21,6 +21,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import SystemProcessingMetadata
@@ -239,12 +240,12 @@ class TestContentProvisionedFlow:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == str(assigned_essay.essay_id)
-        assert call_args.kwargs["event_type"] == "huleedu.els.essay.slot.assigned.v1"
-        assert call_args.kwargs["topic"] == "huleedu.els.essay.slot.assigned.v1"
+        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
 
         # Verify the event data envelope is properly structured
         event_envelope = call_args.kwargs["event_data"]
-        assert event_envelope.event_type == "huleedu.els.essay.slot.assigned.v1"
+        assert event_envelope.event_type == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
         assert (
             event_envelope.source_service
             == test_infrastructure["event_publisher"].settings.SERVICE_NAME
@@ -358,7 +359,7 @@ class TestContentProvisionedFlow:
             excess_events = [
                 e
                 for e in published_events
-                if e["envelope"].event_type == "huleedu.els.excess.content.provisioned.v1"
+                if e["envelope"].event_type == topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
             ]
             assert len(excess_events) == len(failed_provisions), (
                 f"Expected {len(failed_provisions)} excess content events, found {len(excess_events)}"

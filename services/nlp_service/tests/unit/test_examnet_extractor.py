@@ -47,7 +47,7 @@ Detta är början på essän där studenten skriver sitt svar..."""
         assert name_result.value == "Anna Andersson"
         assert name_result.source_strategy == "examnet"
         assert name_result.confidence == 0.8
-        assert name_result.location_hint == "paragraph_1"
+        assert name_result.location_hint == "line_1"
 
         # Assert - Email extraction
         assert len(result.possible_emails) == 1
@@ -254,7 +254,7 @@ Essay content..."""
         # Assert - Name confidence and location
         name_result = result.possible_names[0]
         assert name_result.confidence == 0.8
-        assert name_result.location_hint == "paragraph_1"
+        assert name_result.location_hint == "line_1"
 
         # Assert - Email confidence and location
         email_result = result.possible_emails[0]

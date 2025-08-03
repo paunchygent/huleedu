@@ -125,7 +125,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic="huleedu.essay.spellcheck.completed.v1",
+            topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             event_envelope=envelope,
         )
 
@@ -180,7 +180,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic="huleedu.cj_assessment.completed.v1",
+            topic=topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             event_envelope=envelope,
         )
 
@@ -224,7 +224,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic="huleedu.els.batch.phase.outcome.v1",
+            topic=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             event_envelope=envelope,
         )
 

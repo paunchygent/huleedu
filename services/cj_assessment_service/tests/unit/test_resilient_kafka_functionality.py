@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 from aiokafka.errors import KafkaError
 from common_core import CircuitBreakerState
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -66,7 +67,7 @@ def test_event() -> EventEnvelope[CJAssessmentResultData]:
     """Test event envelope for CJ assessment completion events."""
     return EventEnvelope[CJAssessmentResultData](
         event_id=uuid4(),
-        event_type="huleedu.cj_assessment.completed.v1",
+        event_type=topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
         event_timestamp=datetime.now(timezone.utc),
         source_service="cj_assessment_service",
         correlation_id=uuid4(),
@@ -299,8 +300,8 @@ async def test_cj_assessment_specific_topics() -> None:
     try:
         # Common CJ Assessment Service topics
         topics = [
-            "huleedu.cj_assessment.completed.v1",
-            "huleedu.cj_assessment.failed.v1",
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED),
             "huleedu.cj_assessment.requested.v1",
             "huleedu.cj_assessment.progress.v1",
             "huleedu.batch.cj_assessment.phase.completed.v1",
@@ -385,7 +386,7 @@ async def test_expensive_llm_result_protection(
     try:
         # Simulate expensive assessment result (took 5 seconds to compute)
         expensive_assessment = EventEnvelope[CJAssessmentResultData](
-            event_type="huleedu.cj_assessment.completed.v1",
+            event_type=topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             event_timestamp=datetime.now(timezone.utc),
             source_service="cj_assessment_service",
             correlation_id=uuid4(),
@@ -402,7 +403,7 @@ async def test_expensive_llm_result_protection(
             ),
         )
 
-        topic = "huleedu.cj_assessment.completed.v1"
+        topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Mock Kafka outage during result publishing
         mock_kafka_bus.publish.side_effect = KafkaError("Kafka cluster unreachable")
@@ -514,7 +515,7 @@ async def test_multi_provider_assessment_scenarios(
 
         for provider, model, time_ms in provider_results:
             assessment_event = EventEnvelope[CJAssessmentResultData](
-                event_type="huleedu.cj_assessment.completed.v1",
+                event_type=topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
                 event_timestamp=datetime.now(timezone.utc),
                 source_service="cj_assessment_service",
                 correlation_id=uuid4(),
@@ -532,7 +533,7 @@ async def test_multi_provider_assessment_scenarios(
 
             try:
                 await resilient_publisher.publish(
-                    "huleedu.cj_assessment.completed.v1", assessment_event, f"batch_{provider}"
+                    topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED), assessment_event, f"batch_{provider}"
                 )
             except KafkaError:
                 pass  # Expected during circuit breaker testing
