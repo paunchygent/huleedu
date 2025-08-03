@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from common_core import Environment, LLMProviderType
+from common_core.event_enums import ProcessingEvent, topic_name
 from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,9 +30,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
 
     # Kafka topic names
-    CJ_ASSESSMENT_REQUEST_TOPIC: str = "huleedu.els.cj_assessment.requested.v1"
-    CJ_ASSESSMENT_COMPLETED_TOPIC: str = "huleedu.cj_assessment.completed.v1"
-    CJ_ASSESSMENT_FAILED_TOPIC: str = "huleedu.cj_assessment.failed.v1"
+    CJ_ASSESSMENT_REQUEST_TOPIC: str = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
+    CJ_ASSESSMENT_COMPLETED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
+    CJ_ASSESSMENT_FAILED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
 
     # External service URLs
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
@@ -86,7 +87,7 @@ class Settings(BaseSettings):
 
     # LLM callback configuration
     LLM_PROVIDER_CALLBACK_TOPIC: str = Field(
-        default="huleedu.llm_provider.comparison_result.v1",
+        default=topic_name(ProcessingEvent.LLM_COMPARISON_RESULT),
         description="Kafka topic for LLM comparison callbacks",
     )
 

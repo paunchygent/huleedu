@@ -72,7 +72,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.excess.content.provisioned.v1",
+            event_type=topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -95,7 +95,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type="huleedu.els.excess.content.provisioned.v1",
+            event_type=topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -132,7 +132,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -155,7 +155,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type="huleedu.els.batch.essays.ready.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -197,7 +197,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.batch.content.provisioning.completed.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -220,7 +220,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type="huleedu.els.batch.content.provisioning.completed.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -262,7 +262,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope for validation errors
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -285,7 +285,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type="huleedu.els.batch.validation.errors.v1",
+            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -326,7 +326,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.essay.slot.assigned.v1",
+            event_type=topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -347,7 +347,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="essay",
             aggregate_id=essay_id,
-            event_type="huleedu.els.essay.slot.assigned.v1",
+            event_type=topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -386,7 +386,7 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type="huleedu.els.batch.phase.outcome.v1",
+            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -409,7 +409,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type="huleedu.els.batch.phase.outcome.v1",
+            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity

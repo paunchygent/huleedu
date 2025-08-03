@@ -60,10 +60,10 @@ class BCSKafkaConsumer:
             event_type_ttls={
                 # SpellCheck completion events (24 hours - coordination requirements)
                 "SpellcheckResultDataV1": 86400,
-                "huleedu.essay.spellcheck.completed.v1": 86400,
+                topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED): 86400,
                 # CJ Assessment completion events (24 hours - coordination requirements)
                 "CJAssessmentCompletedV1": 86400,
-                "huleedu.cj_assessment.completed.v1": 86400,
+                topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED): 86400,
                 # AI Feedback completion events (24 hours - coordination requirements)
                 "huleedu.essay.aifeedback.completed.v1": 86400,
             },

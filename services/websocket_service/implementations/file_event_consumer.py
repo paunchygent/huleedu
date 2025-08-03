@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from aiokafka.errors import KafkaConnectionError
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from huleedu_service_libs.error_handling import (
     raise_connection_error,
@@ -172,11 +173,11 @@ class FileEventConsumer(FileEventConsumerProtocol):
             )
 
             # Route to appropriate handler based on event type
-            if envelope_data["event_type"] == "huleedu.file.batch.file.added.v1":
+            if envelope_data["event_type"] == topic_name(ProcessingEvent.BATCH_FILE_ADDED):
                 # Create event from the data field
                 added_event = BatchFileAddedV1(**envelope_data["data"])
                 await self.notification_handler.handle_batch_file_added(added_event)
-            elif envelope_data["event_type"] == "huleedu.file.batch.file.removed.v1":
+            elif envelope_data["event_type"] == topic_name(ProcessingEvent.BATCH_FILE_REMOVED):
                 # Create event from the data field
                 removed_event = BatchFileRemovedV1(**envelope_data["data"])
                 await self.notification_handler.handle_batch_file_removed(removed_event)

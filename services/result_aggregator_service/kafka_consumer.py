@@ -50,9 +50,9 @@ class ResultAggregatorKafkaConsumer:
         self.topics = [
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Add batch registration
             topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),  # Add slot assignment for traceability
-            "huleedu.els.batch.phase.outcome.v1",
-            "huleedu.essay.spellcheck.completed.v1",
-            "huleedu.cj_assessment.completed.v1",
+            topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             # Future topics to add when services are implemented:
             # "huleedu.essay.nlp.completed.v1",
             # "huleedu.essay.aifeedback.completed.v1",
@@ -196,7 +196,7 @@ class ResultAggregatorKafkaConsumer:
                     batch_envelope, BatchEssaysRegistered.model_validate(batch_envelope.data)
                 )
 
-            elif record.topic == "huleedu.els.batch.phase.outcome.v1":
+            elif record.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
                 phase_envelope = EventEnvelope[ELSBatchPhaseOutcomeV1].model_validate_json(
                     message_value_str
                 )
@@ -204,7 +204,7 @@ class ResultAggregatorKafkaConsumer:
                     phase_envelope, ELSBatchPhaseOutcomeV1.model_validate(phase_envelope.data)
                 )
 
-            elif record.topic == "huleedu.essay.spellcheck.completed.v1":
+            elif record.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
                 spell_envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(
                     message_value_str
                 )
@@ -212,7 +212,7 @@ class ResultAggregatorKafkaConsumer:
                     spell_envelope, SpellcheckResultDataV1.model_validate(spell_envelope.data)
                 )
 
-            elif record.topic == "huleedu.cj_assessment.completed.v1":
+            elif record.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
                 cj_envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(
                     message_value_str
                 )

@@ -37,9 +37,7 @@ class Settings(BaseSettings):
     GRACEFUL_TIMEOUT: int = 30
     KEEP_ALIVE_TIMEOUT: int = 5
 
-    # Kafka topic configurations for CJ Assessment integration (Sub-task 2.1.4)
-    KAFKA_TOPIC_CJ_INITIATE_COMMAND: str = "huleedu.els.cj_assessment.initiate.command.v1"
-    KAFKA_TOPIC_BATCH_PHASE_CONCLUDED: str = "huleedu.els.batch_phase.concluded.v1"
+    # Kafka consumer configuration
     KAFKA_CONSUMER_GROUP_ID: str = "batch-orchestrator-consumers"
 
     # Database configuration

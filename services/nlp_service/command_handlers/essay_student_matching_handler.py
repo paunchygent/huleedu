@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
 from huleedu_service_libs.error_handling import HuleEduError
@@ -78,7 +79,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process batch student matching requests
         """
-        return event_type == "huleedu.batch.student.matching.requested.v1"
+        return event_type == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
 
     async def handle(
         self,

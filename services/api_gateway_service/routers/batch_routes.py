@@ -12,6 +12,7 @@ from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.pipeline_models import PhaseName
@@ -113,7 +114,7 @@ async def request_pipeline_execution(
             from huleedu_service_libs.observability import inject_trace_context
 
             envelope = EventEnvelope[ClientBatchPipelineRequestV1](
-                event_type="huleedu.commands.batch.pipeline.v1",
+                event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
                 source_service="api_gateway_service",
                 correlation_id=correlation_id,
                 data=client_request,
@@ -126,15 +127,15 @@ async def request_pipeline_execution(
 
             # Publish using KafkaBus.publish method with EventEnvelope
             await kafka_bus.publish(
-                topic="huleedu.commands.batch.pipeline.v1",
+                topic=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
                 envelope=envelope,
                 key=batch_id,  # Partition by batch_id for ordering
             )
 
             # Record successful event publication
             metrics.events_published_total.labels(
-                topic="huleedu.commands.batch.pipeline.v1",
-                event_type="huleedu.commands.batch.pipeline.v1",
+                topic=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
+                event_type=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
             ).inc()
 
             # CRITICAL: Comprehensive logging for traceability
@@ -176,7 +177,7 @@ async def request_pipeline_execution(
             raise_kafka_publish_error(
                 service="api_gateway_service",
                 operation="request_pipeline_execution",
-                topic="huleedu.commands.batch.pipeline.v1",
+                topic=topic_name(ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST),
                 message=f"Failed to publish pipeline request: {str(e)}",
                 correlation_id=correlation_id,
                 batch_id=batch_id,

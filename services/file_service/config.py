@@ -49,11 +49,11 @@ class Settings(BaseSettings):
     VALIDATION_LOG_LEVEL: str = "INFO"
 
     # Kafka topic for validation failures (will be implemented with new enum)
-    ESSAY_VALIDATION_FAILED_TOPIC: str = "huleedu.file.essay.validation.failed.v1"
+    ESSAY_VALIDATION_FAILED_TOPIC: str = topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED)
 
     # File management event topics
-    BATCH_FILE_ADDED_TOPIC: str = "huleedu.file.batch.file.added.v1"
-    BATCH_FILE_REMOVED_TOPIC: str = "huleedu.file.batch.file.removed.v1"
+    BATCH_FILE_ADDED_TOPIC: str = topic_name(ProcessingEvent.BATCH_FILE_ADDED)
+    BATCH_FILE_REMOVED_TOPIC: str = topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(

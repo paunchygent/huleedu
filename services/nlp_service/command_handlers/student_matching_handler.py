@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import aiohttp
 from aiokafka import ConsumerRecord
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
@@ -79,7 +80,7 @@ class StudentMatchingHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process Phase 2 batch NLP initiate commands
         """
-        return event_type == "huleedu.batch.nlp.initiate.command.v1"
+        return event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
 
     async def handle(
         self,
