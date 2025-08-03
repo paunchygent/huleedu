@@ -51,6 +51,7 @@ class ServiceTestManager:
         ServiceEndpoint("file_service", 7001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("spellchecker_service", 8002, has_http_api=True, has_metrics=True),
         ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),
+        ServiceEndpoint("class_management_service", 5002, has_http_api=True, has_metrics=True),
     ]
 
     def __init__(self, auth_manager: Optional[AuthTestManager] = None):
@@ -151,6 +152,7 @@ class ServiceTestManager:
         user: Optional[AuthTestUser] = None,
         correlation_id: str | None = None,
         enable_cj_assessment: bool = False,
+        class_id: str | None = None,
     ) -> tuple[str, str]:
         """
         Create a test batch via BOS API using lean registration model.
@@ -208,6 +210,10 @@ class ServiceTestManager:
             "user_id": user.user_id,
             "enable_cj_assessment": enable_cj_assessment,
         }
+
+        # Add class_id if provided (triggers REGULAR batch flow)
+        if class_id is not None:
+            batch_request["class_id"] = class_id
 
         # Get authentication headers
         auth_headers = self.auth_manager.get_auth_headers(user)
@@ -397,6 +403,65 @@ class ServiceTestManager:
                         f"Content Service fetch failed: {response.status} - {error_text}",
                     )
 
+    async def make_request(
+        self,
+        method: str,
+        service: str,
+        path: str,
+        json: dict[str, Any] | None = None,
+        user: Optional[AuthTestUser] = None,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Make a generic HTTP request to a service.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            service: Service name (e.g., 'class_management_service')
+            path: URL path (e.g., '/api/v1/classes')
+            json: JSON body for request
+            user: Test user for authentication
+            correlation_id: Correlation ID for tracking
+
+        Returns:
+            JSON response data
+        """
+        endpoints = await self.get_validated_endpoints()
+
+        if service not in endpoints:
+            raise RuntimeError(f"{service} not available")
+
+        if user is None:
+            user = self.auth_manager.get_default_user()
+
+        service_base = endpoints[service]["base_url"]
+        auth_headers = self.auth_manager.get_auth_headers(user)
+
+        headers = {
+            **auth_headers,
+            "Content-Type": "application/json",
+        }
+
+        if correlation_id:
+            headers["X-Correlation-ID"] = correlation_id
+
+        async with aiohttp.ClientSession() as session:
+            async with session.request(
+                method=method,
+                url=f"{service_base}{path}",
+                json=json,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response:
+                response_data: dict[str, Any] = await response.json()
+
+                if response.status >= 400:
+                    raise RuntimeError(
+                        f"{service} request failed: {response.status} - {response_data}"
+                    )
+
+                return response_data
+
     def create_test_user(self, **kwargs) -> AuthTestUser:
         """Create a test user via the auth manager."""
         return self.auth_manager.create_test_user(**kwargs)
@@ -422,6 +487,7 @@ async def create_test_batch(
     user: Optional[AuthTestUser] = None,
     correlation_id: str | None = None,
     enable_cj_assessment: bool = False,
+    class_id: str | None = None,
 ) -> tuple[str, str]:
     """Convenience function that uses global service manager."""
     return await service_manager.create_batch(
@@ -430,6 +496,7 @@ async def create_test_batch(
         user,
         correlation_id,
         enable_cj_assessment,
+        class_id,
     )
 
 

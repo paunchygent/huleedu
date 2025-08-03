@@ -76,6 +76,9 @@ class AuthTestManager:
         # Create a default test user
         self._create_default_test_user()
 
+        # Test correlation ID for tracking
+        self._test_correlation_id = str(uuid.uuid4())
+
     def _create_default_test_user(self) -> None:
         """Create a default test user for convenience."""
         default_user = AuthTestUser(
@@ -194,6 +197,15 @@ class AuthTestManager:
         except jwt.InvalidTokenError as e:
             logger.warning(f"Invalid JWT token: {e}")
             return None
+
+    def get_correlation_id(self) -> str:
+        """
+        Get the test correlation ID for tracking events.
+
+        Returns:
+            str: Test correlation ID
+        """
+        return self._test_correlation_id
 
     def create_teacher_user(self, _class_designation: str = "Test Class") -> AuthTestUser:
         """Create a test teacher user with class context."""

@@ -563,7 +563,7 @@ Hello my name is leo! I like to play videogames on my freemtime wich helps  me s
 Prov: Exam SA21C: Love, Relationships and Society
 ec21004@harryda.se
 Antal ord: 515
-Focusing on Romantic Love is Bad for us 
+Focusing on Romantic Love is Bad for us
 
 The phenomenon Romantic Love has been a topic of discussion for centuries. May I offer a somewhat contreversiall opinion on this topic, romantic love consumes us to the point where it is indeed bad for us."""
 

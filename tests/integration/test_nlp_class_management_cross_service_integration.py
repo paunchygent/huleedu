@@ -45,13 +45,14 @@ from testcontainers.redis import RedisContainer
 # Import NLP service components (for DB schema)
 # Note: This test simulates NLP response without importing NLP service components
 # from services.nlp_service.models import Base as NlpBase  # Not needed for this test
-
 # Import Class Management service components
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
 from services.class_management_service.models_db import (
     Base as ClassManagementBase,
+)
+from services.class_management_service.models_db import (
     EssayStudentAssociation,
     Student,
     UserClass,
@@ -60,13 +61,13 @@ from services.class_management_service.models_db import (
 logger = create_service_logger("test.nlp_class_management_integration")
 
 
-from services.class_management_service.protocols import ClassRepositoryProtocol
 from services.class_management_service.api_models import (
     CreateClassRequest,
     CreateStudentRequest,
     UpdateClassRequest,
     UpdateStudentRequest,
 )
+from services.class_management_service.protocols import ClassRepositoryProtocol
 
 T = TypeVar("T", bound=UserClass, covariant=True)
 U = TypeVar("U", bound=Student, covariant=True)
@@ -302,7 +303,7 @@ class TestNLPClassManagementCrossServiceIntegration:
         # Prepare test essays with real content - essay IDs must be valid UUIDs
         essay_id_1 = str(uuid4())
         essay_id_2 = str(uuid4())
-        
+
         test_essays = [
             {
                 "essay_id": essay_id_1,
@@ -367,7 +368,9 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # Publish to Kafka
         await kafka_producer.send_and_wait(
             topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
-            request_envelope.model_dump(mode="json"),  # Use mode="json" to handle UUID serialization
+            request_envelope.model_dump(
+                mode="json"
+            ),  # Use mode="json" to handle UUID serialization
         )
 
         # Step 4: Simulate NLP processing and response
@@ -434,7 +437,9 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # Publish NLP response
         await kafka_producer.send_and_wait(
             topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
-            response_envelope.model_dump(mode="json"),  # Use mode="json" to handle UUID serialization
+            response_envelope.model_dump(
+                mode="json"
+            ),  # Use mode="json" to handle UUID serialization
         )
 
         # Step 5: Class Management handler processes the event
@@ -449,11 +454,11 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
 
         # Process the event with all required parameters
         mock_http_session = AsyncMock()
-        
+
         # Parse the envelope from the Kafka record (mimics real event processor)
         envelope_data = json.loads(kafka_record.value.decode("utf-8"))
         parsed_envelope: EventEnvelope = EventEnvelope.model_validate(envelope_data)
-        
+
         await cm_handler.handle(
             msg=kafka_record,
             envelope=parsed_envelope,
@@ -464,15 +469,7 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
 
         # Step 6: Verify associations were stored
         async with cm_session_factory() as session:
-            associations = (
-                (
-                    await session.execute(
-                        select(EssayStudentAssociation)
-                    )
-                )
-                .scalars()
-                .all()
-            )
+            associations = (await session.execute(select(EssayStudentAssociation))).scalars().all()
 
             assert len(associations) == 2
 
