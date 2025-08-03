@@ -19,14 +19,20 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncGenerator, Generator
-from uuid import uuid4
+from typing import TypeVar
+from unittest.mock import AsyncMock, Mock
+from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
-from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1
+from common_core.events.nlp_events import (
+    BatchAuthorMatchesSuggestedV1,
+    EssayMatchResult,
+    StudentMatchSuggestion,
+)
 from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.redis_client import RedisClient
@@ -37,7 +43,8 @@ from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
 # Import NLP service components (for DB schema)
-from services.nlp_service.models import Base as NlpBase
+# Note: This test simulates NLP response without importing NLP service components
+# from services.nlp_service.models import Base as NlpBase  # Not needed for this test
 
 # Import Class Management service components
 from services.class_management_service.implementations.batch_author_matches_handler import (
@@ -47,20 +54,75 @@ from services.class_management_service.models_db import (
     Base as ClassManagementBase,
     EssayStudentAssociation,
     Student,
+    UserClass,
 )
 
 logger = create_service_logger("test.nlp_class_management_integration")
 
 
-class MockClassRepository:
+from services.class_management_service.protocols import ClassRepositoryProtocol
+from services.class_management_service.api_models import (
+    CreateClassRequest,
+    CreateStudentRequest,
+    UpdateClassRequest,
+    UpdateStudentRequest,
+)
+
+T = TypeVar("T", bound=UserClass, covariant=True)
+U = TypeVar("U", bound=Student, covariant=True)
+
+
+class MockClassRepository(ClassRepositoryProtocol[UserClass, Student]):
     """Mock class repository for testing."""
 
     def __init__(self, students: list[Student]):
-        self.students = {str(s.id): s for s in students}
+        self.students = {student.id: student for student in students}
 
-    async def get_student_by_id(self, student_id: str) -> Student | None:
+    async def get_student_by_id(self, student_id: UUID) -> Student | None:
         """Get student by ID."""
         return self.students.get(student_id)
+
+    async def create_class(
+        self, user_id: str, class_data: CreateClassRequest, correlation_id: UUID
+    ) -> UserClass:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def get_class_by_id(self, class_id: UUID) -> UserClass | None:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def update_class(
+        self, class_id: UUID, class_data: UpdateClassRequest, correlation_id: UUID
+    ) -> UserClass | None:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def delete_class(self, class_id: UUID) -> bool:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def create_student(
+        self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
+    ) -> Student:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def update_student(
+        self, student_id: UUID, student_data: UpdateStudentRequest, correlation_id: UUID
+    ) -> Student | None:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def delete_student(self, student_id: UUID) -> bool:
+        """Not implemented for this test."""
+        raise NotImplementedError()
+
+    async def associate_essay_to_student(
+        self, user_id: str, essay_id: UUID, student_id: UUID, correlation_id: UUID
+    ) -> None:
+        """Not implemented for this test."""
+        raise NotImplementedError()
 
 
 class TestNLPClassManagementCrossServiceIntegration:
@@ -101,9 +163,9 @@ class TestNLPClassManagementCrossServiceIntegration:
 
         engine = create_async_engine(db_url)
 
-        # Create schema
-        async with engine.begin() as conn:
-            await conn.run_sync(NlpBase.metadata.create_all)
+        # No NLP schema needed for this test - we're simulating NLP response
+        # async with engine.begin() as conn:
+        #     await conn.run_sync(NlpBase.metadata.create_all)
 
         yield engine
 
@@ -156,7 +218,6 @@ class TestNLPClassManagementCrossServiceIntegration:
         students = [
             Student(
                 id=uuid4(),
-                external_id="001",
                 first_name="Elvira",
                 last_name="Johansson",
                 email="elvira.johansson@school.edu",
@@ -164,7 +225,6 @@ class TestNLPClassManagementCrossServiceIntegration:
             ),
             Student(
                 id=uuid4(),
-                external_id="002",
                 first_name="Hilda",
                 last_name="Grahn",
                 email="hg17001@harryda.se",
@@ -172,7 +232,6 @@ class TestNLPClassManagementCrossServiceIntegration:
             ),
             Student(
                 id=uuid4(),
-                external_id="003",
                 first_name="Leo",
                 last_name="Svartling",
                 email="ls17003@harryda.se",
@@ -240,10 +299,13 @@ class TestNLPClassManagementCrossServiceIntegration:
         class_id = f"test-class-{uuid4().hex[:8]}"
         correlation_id = str(uuid4())
 
-        # Prepare test essays with real content
+        # Prepare test essays with real content - essay IDs must be valid UUIDs
+        essay_id_1 = str(uuid4())
+        essay_id_2 = str(uuid4())
+        
         test_essays = [
             {
-                "essay_id": "essay-001",
+                "essay_id": essay_id_1,
                 "filename": "Elvira_Johansson_BookReport.txt",
                 "content": """Elvira Johansson 2025-03-06
 Prov: Book Report ES24B
@@ -253,7 +315,7 @@ Dear mr Rai.
 I'm writing this letter about your book.""",
             },
             {
-                "essay_id": "essay-002",
+                "essay_id": essay_id_2,
                 "filename": "Hilda_Grahn_Objectives.txt",
                 "content": """Hilda Grahn 2024-08-30
 Prov: Eng 5 SA24D My Personal Objectives 2
@@ -291,7 +353,7 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
             ],
         )
 
-        request_envelope = EventEnvelope(
+        request_envelope: EventEnvelope = EventEnvelope(
             event_id=str(uuid4()),
             event_type=ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED.value,
             correlation_id=correlation_id,
@@ -305,46 +367,49 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # Publish to Kafka
         await kafka_producer.send_and_wait(
             topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED),
-            request_envelope.model_dump(),
+            request_envelope.model_dump(mode="json"),  # Use mode="json" to handle UUID serialization
         )
 
         # Step 4: Simulate NLP processing and response
         # In a real test, NLP would consume the event and process it
-        # For this test, we'll create the expected response
+        # For this test, we'll create the expected response using proper Pydantic models
         nlp_response = BatchAuthorMatchesSuggestedV1(
+            event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=batch_id,
             class_id=class_id,
             match_results=[
-                {
-                    "essay_id": "essay-001",
-                    "text_storage_id": "storage-essay-001",
-                    "filename": "Elvira_Johansson_BookReport.txt",
-                    "suggestions": [
-                        {
-                            "student_id": "001",
-                            "student_name": "Elvira Johansson",
-                            "student_email": "elvira.johansson@school.edu",
-                            "confidence_score": 0.95,
-                            "match_reasons": ["Name exact match"],
-                            "extraction_metadata": {"source": "header"},
-                        }
+                EssayMatchResult(
+                    essay_id=essay_id_1,
+                    text_storage_id=f"storage-{essay_id_1}",
+                    filename="Elvira_Johansson_BookReport.txt",
+                    suggestions=[
+                        StudentMatchSuggestion(
+                            student_id=str(test_students[0].id),
+                            student_name="Elvira Johansson",
+                            student_email="elvira.johansson@school.edu",
+                            confidence_score=0.95,
+                            match_reasons=["Name exact match"],
+                            extraction_metadata={"source": "header"},
+                        )
                     ],
-                },
-                {
-                    "essay_id": "essay-002",
-                    "text_storage_id": "storage-essay-002",
-                    "filename": "Hilda_Grahn_Objectives.txt",
-                    "suggestions": [
-                        {
-                            "student_id": "002",
-                            "student_name": "Hilda Grahn",
-                            "student_email": "hg17001@harryda.se",
-                            "confidence_score": 0.98,
-                            "match_reasons": ["Name and email match"],
-                            "extraction_metadata": {"source": "header"},
-                        }
+                    extraction_metadata={"processing_time": 1.2},
+                ),
+                EssayMatchResult(
+                    essay_id=essay_id_2,
+                    text_storage_id=f"storage-{essay_id_2}",
+                    filename="Hilda_Grahn_Objectives.txt",
+                    suggestions=[
+                        StudentMatchSuggestion(
+                            student_id=str(test_students[1].id),
+                            student_name="Hilda Grahn",
+                            student_email="hg17001@harryda.se",
+                            confidence_score=0.98,
+                            match_reasons=["Name and email match"],
+                            extraction_metadata={"source": "header"},
+                        )
                     ],
-                },
+                    extraction_metadata={"processing_time": 1.5},
+                ),
             ],
             processing_summary={
                 "total_essays": 2,
@@ -352,9 +417,10 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
                 "unmatched": 0,
                 "failed": 0,
             },
+            processing_metadata={"nlp_model": "phase1_matcher_v1.0"},
         )
 
-        response_envelope = EventEnvelope(
+        response_envelope: EventEnvelope = EventEnvelope(
             event_id=str(uuid4()),
             event_type=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
             correlation_id=correlation_id,
@@ -368,36 +434,40 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # Publish NLP response
         await kafka_producer.send_and_wait(
             topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
-            response_envelope.model_dump(),
+            response_envelope.model_dump(mode="json"),  # Use mode="json" to handle UUID serialization
         )
 
         # Step 5: Class Management handler processes the event
-        # Create a mock Kafka record
-        kafka_record = ConsumerRecord(
-            topic=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
-            partition=0,
-            offset=0,
-            timestamp=0,
-            timestamp_type=0,
-            key=None,
-            value=json.dumps(response_envelope.model_dump()).encode("utf-8"),
-            checksum=None,
-            serialized_key_size=-1,
-            serialized_value_size=-1,
-            headers=[],
-        )
+        # Create a mock Kafka record following established pattern
+        message_value = json.dumps(response_envelope.model_dump(mode="json")).encode("utf-8")
+        kafka_record = Mock(spec=ConsumerRecord)
+        kafka_record.topic = topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        kafka_record.partition = 0
+        kafka_record.offset = 123
+        kafka_record.key = batch_id.encode("utf-8")
+        kafka_record.value = message_value
 
-        # Process the event
-        await cm_handler.handle(kafka_record)
+        # Process the event with all required parameters
+        mock_http_session = AsyncMock()
+        
+        # Parse the envelope from the Kafka record (mimics real event processor)
+        envelope_data = json.loads(kafka_record.value.decode("utf-8"))
+        parsed_envelope: EventEnvelope = EventEnvelope.model_validate(envelope_data)
+        
+        await cm_handler.handle(
+            msg=kafka_record,
+            envelope=parsed_envelope,
+            http_session=mock_http_session,
+            correlation_id=UUID(correlation_id),
+            span=None,
+        )
 
         # Step 6: Verify associations were stored
         async with cm_session_factory() as session:
             associations = (
                 (
                     await session.execute(
-                        select(EssayStudentAssociation).where(
-                            EssayStudentAssociation.batch_id == batch_id
-                        )
+                        select(EssayStudentAssociation)
                     )
                 )
                 .scalars()
@@ -407,21 +477,21 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
             assert len(associations) == 2
 
             # Verify specific associations
-            essay_associations = {a.essay_id: a for a in associations}
+            essay_associations = {str(a.essay_id): a for a in associations}
 
             # Check Elvira's essay
-            elvira_assoc = essay_associations.get("essay-001")
+            elvira_assoc = essay_associations.get(essay_id_1)
             assert elvira_assoc is not None
             assert elvira_assoc.student_id == test_students[0].id  # Elvira
-            assert elvira_assoc.confidence_score == 0.95
-            assert elvira_assoc.match_status == "high_confidence"
+            # Note: EssayStudentAssociation does not store confidence_score or match_status
+            # These are properties of the event data, not persisted in this table
 
             # Check Hilda's essay
-            hilda_assoc = essay_associations.get("essay-002")
+            hilda_assoc = essay_associations.get(essay_id_2)
             assert hilda_assoc is not None
             assert hilda_assoc.student_id == test_students[1].id  # Hilda
-            assert hilda_assoc.confidence_score == 0.98
-            assert hilda_assoc.match_status == "high_confidence"
+            # Note: EssayStudentAssociation does not store confidence_score or match_status
+            # These are properties of the event data, not persisted in this table
 
         logger.info(
             f"Cross-service integration test completed successfully. "

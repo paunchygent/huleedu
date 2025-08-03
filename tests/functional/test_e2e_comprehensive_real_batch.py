@@ -122,7 +122,9 @@ async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
 
         batch_ready_received = False
 
-        # Monitor for BatchEssaysReady event to ensure essays are stored before client request
+        # Monitor for batch readiness event based on Phase 1 flow
+        # GUEST batches (no class_id) use BatchContentProvisioningCompleted
+        # REGULAR batches (with class_id) use BatchEssaysReady after student matching
         async for message in consumer:
             try:
                 if hasattr(message, "value"):
@@ -137,7 +139,21 @@ async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
                     event_data = envelope_data.get("data", {})
                     event_correlation_id = envelope_data.get("correlation_id")
 
-                    # Check for BatchEssaysReady with the actual correlation ID from service
+                    # Check for BatchContentProvisioningCompleted (Phase 1 GUEST batch flow)
+                    if (
+                        message.topic == "huleedu.batch.content.provisioning.completed.v1"
+                        and event_correlation_id == actual_correlation_id
+                        and event_data.get("batch_id") == batch_id
+                    ):
+                        ready_count = event_data.get("provisioned_count", 0)
+                        print(
+                            f"📨 BatchContentProvisioningCompleted received: {ready_count} essays "
+                            "ready for processing (GUEST batch flow)",
+                        )
+                        batch_ready_received = True
+                        break
+
+                    # Also check for BatchEssaysReady (in case this is a REGULAR batch)
                     if (
                         message.topic == "huleedu.els.batch.essays.ready.v1"
                         and event_correlation_id == actual_correlation_id
@@ -146,7 +162,7 @@ async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
                         ready_count = len(event_data.get("ready_essays", []))
                         print(
                             f"📨 BatchEssaysReady received: {ready_count} essays "
-                            "ready for processing",
+                            "ready for processing (REGULAR batch flow)",
                         )
                         batch_ready_received = True
                         break
@@ -157,10 +173,11 @@ async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
 
         if not batch_ready_received:
             raise Exception(
-                "BatchEssaysReady event was not received - essays may not be processed by ELS",
+                "Neither BatchContentProvisioningCompleted nor BatchEssaysReady event was received - "
+                "essays may not be processed by ELS",
             )
 
-        # Give BOS a moment to process the BatchEssaysReady event
+        # Give BOS a moment to process the batch readiness event
         await asyncio.sleep(2)
         print("✅ Essays confirmed processed by ELS, BOS ready for client pipeline request")
 

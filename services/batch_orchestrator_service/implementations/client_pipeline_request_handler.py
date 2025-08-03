@@ -60,7 +60,8 @@ class ClientPipelineRequestHandler:
         try:
             # Parse and validate message envelope
             envelope = self._parse_message_envelope(msg)
-            request_data = envelope.data
+            # FIXED: Properly deserialize the data field following established pattern
+            request_data = ClientBatchPipelineRequestV1.model_validate(envelope.data)
 
             batch_id = request_data.batch_id
             requested_pipeline = request_data.requested_pipeline

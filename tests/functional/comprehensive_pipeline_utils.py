@@ -26,6 +26,7 @@ PIPELINE_TOPICS = {
     "essay_content_provisioned": topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
     "essay_validation_failed": topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED),
     "batch_ready": topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
+    "batch_content_provisioning_completed": topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),  # Phase 1 event
     "batch_spellcheck_initiate": topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
     "els_batch_phase_outcome": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
     "essay_spellcheck_completed": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
@@ -290,6 +291,12 @@ async def watch_pipeline_progression_with_consumer(
                                 # BatchValidationErrorsV1 events
                                 print(
                                     f"📨 1️⃣ ELS published BatchEssaysReady: {ready_count} ready",
+                                )
+                            elif message.topic == PIPELINE_TOPICS.get("batch_content_provisioning_completed"):
+                                # Phase 1 GUEST batch flow
+                                ready_count = event_data.get("provisioned_count", 0)
+                                print(
+                                    f"📨 1️⃣ ELS published BatchContentProvisioningCompleted: {ready_count} ready (GUEST flow)",
                                 )
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
                                 essays_to_process = event_data.get("essays_to_process", [])

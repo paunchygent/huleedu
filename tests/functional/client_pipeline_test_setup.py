@@ -37,18 +37,22 @@ async def create_test_batch_with_essays(
     expected_essay_count = len(essay_files)
 
     # CRITICAL: Create consumer FIRST before any batch operations
-    # This ensures the consumer is positioned and ready to receive BatchEssaysReady
+    # This ensures the consumer is positioned and ready to receive batch readiness events
     from tests.functional.comprehensive_pipeline_utils import create_comprehensive_kafka_manager
 
     kafka_manager = create_comprehensive_kafka_manager()
     batch_ready_received = False
     batch_id = None
 
+    # Monitor for batch readiness events (Phase 1 flow)
     async with kafka_manager.consumer(
         "batch_ready_wait",
-        ["huleedu.els.batch.essays.ready.v1"],
+        [
+            "huleedu.els.batch.essays.ready.v1",
+            "huleedu.batch.content.provisioning.completed.v1",  # Phase 1 GUEST batch event
+        ],
     ) as consumer:
-        print("⏳ Consumer positioned and ready to receive BatchEssaysReady events...")
+        print("⏳ Consumer positioned and ready to receive batch readiness events...")
 
         # Register batch for comprehensive testing
         batch_id, correlation_id = await register_comprehensive_batch(
@@ -65,7 +69,7 @@ async def create_test_batch_with_essays(
         )
         print(f"📚 Uploaded {expected_essay_count} essays")
 
-        print("⏳ Waiting for ELS to process essays (BatchEssaysReady event)...")
+        print("⏳ Waiting for ELS to process essays (batch readiness event)...")
 
         async for message in consumer:
             try:
@@ -81,7 +85,21 @@ async def create_test_batch_with_essays(
                     event_data = envelope_data.get("data", {})
                     event_correlation_id = envelope_data.get("correlation_id")
 
-                    # Check for BatchEssaysReady with our correlation ID
+                    # Check for BatchContentProvisioningCompleted (Phase 1 GUEST batch flow)
+                    if (
+                        message.topic == "huleedu.batch.content.provisioning.completed.v1"
+                        and event_correlation_id == correlation_id
+                        and event_data.get("batch_id") == batch_id
+                    ):
+                        ready_count = event_data.get("provisioned_count", 0)
+                        print(
+                            f"📨 BatchContentProvisioningCompleted received: {ready_count} essays "
+                            "ready for processing (GUEST batch flow)",
+                        )
+                        batch_ready_received = True
+                        break
+
+                    # Also check for BatchEssaysReady (in case this is a REGULAR batch)
                     if (
                         message.topic == "huleedu.els.batch.essays.ready.v1"
                         and event_correlation_id == correlation_id
@@ -90,7 +108,7 @@ async def create_test_batch_with_essays(
                         ready_count = len(event_data.get("ready_essays", []))
                         print(
                             f"📨 BatchEssaysReady received: {ready_count} essays "
-                            "ready for processing",
+                            "ready for processing (REGULAR batch flow)",
                         )
                         batch_ready_received = True
                         break
@@ -101,10 +119,11 @@ async def create_test_batch_with_essays(
 
     if not batch_ready_received:
         raise RuntimeError(
-            "BatchEssaysReady event was not received - essays may not be processed by ELS",
+            "Neither BatchContentProvisioningCompleted nor BatchEssaysReady event was received - "
+            "essays may not be processed by ELS",
         )
 
-    # Give BOS a moment to process the BatchEssaysReady event
+    # Give BOS a moment to process the batch readiness event
     await asyncio.sleep(2)
     print("✅ Essays confirmed processed by ELS and ready for pipeline requests")
 
