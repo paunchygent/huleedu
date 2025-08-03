@@ -1688,6 +1688,7 @@ dependencies = [
     "prometheus-client",
     "pydantic",
     "pydantic-settings",
+    "python-docx",
     "rapidfuzz",
     "redis",
     "sqlalchemy",

@@ -91,9 +91,7 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         return async_sessionmaker(database_engine, expire_on_commit=False)
 
     @pytest.fixture(autouse=True)
-    async def clean_database(
-        self, session_factory: async_sessionmaker[AsyncSession]
-    ) -> None:
+    async def clean_database(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """Clean the database before each test."""
         async with session_factory() as session:
             async with session.begin():

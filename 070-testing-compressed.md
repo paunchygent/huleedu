@@ -2,9 +2,9 @@
 description: 
 globs: 
 alwaysApply: true
-
-# 070 Testing and Quality Assurance
 ---
+# 070: Testing and Quality Assurance
+
 ## 1. Testing Pyramid
 - **Unit Tests**: Individual components in isolation (high coverage)
 - **Contract Tests**: **CRITICAL** - Verify Pydantic contracts between services

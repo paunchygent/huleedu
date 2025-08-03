@@ -65,9 +65,13 @@ class BatchContentProvisioningCompletedHandler:
         try:
             # Deserialize the message
             raw_message = msg.value.decode("utf-8")
-            envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
+            envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(
+                raw_message
+            )
 
-            content_completed_data = BatchContentProvisioningCompletedV1.model_validate(envelope.data)
+            content_completed_data = BatchContentProvisioningCompletedV1.model_validate(
+                envelope.data
+            )
             batch_id = content_completed_data.batch_id
 
             # Define async function to process within trace context
@@ -198,7 +202,7 @@ class BatchContentProvisioningCompletedHandler:
         except Exception as e:
             # Check if it's a JSON or Pydantic validation error
             from pydantic_core import ValidationError as PydanticValidationError
-            
+
             if isinstance(e, (json.JSONDecodeError, ValueError, PydanticValidationError)):
                 # Handle JSON and Pydantic validation errors specifically
                 self.logger.error(f"Failed to decode JSON message: {e}")
@@ -217,7 +221,9 @@ class BatchContentProvisioningCompletedHandler:
             correlation_id = None
             try:
                 raw_message = msg.value.decode("utf-8")
-                envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(raw_message)
+                envelope = EventEnvelope[BatchContentProvisioningCompletedV1].model_validate_json(
+                    raw_message
+                )
                 content_data = BatchContentProvisioningCompletedV1.model_validate(envelope.data)
                 batch_id = content_data.batch_id
                 correlation_id = envelope.correlation_id

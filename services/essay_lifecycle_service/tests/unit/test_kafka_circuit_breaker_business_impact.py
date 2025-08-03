@@ -208,7 +208,9 @@ class TestBatchCoordinationBusinessImpact:
                 correlation_id=correlation_id or test_uuid4(),
             )
 
-        event_publisher.publish_batch_content_provisioning_completed.side_effect = fail_with_external_error
+        event_publisher.publish_batch_content_provisioning_completed.side_effect = (
+            fail_with_external_error
+        )
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -251,7 +253,7 @@ class TestBatchCoordinationBusinessImpact:
         # Mock check_batch_completion to return the ready event during registration
         correlation_id = uuid4()
         mock_batch_tracker.check_batch_completion.return_value = (batch_ready_event, correlation_id)
-        
+
         # Mock get_batch_status to return batch info with user_id
         mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user_123"}
 
@@ -326,7 +328,9 @@ class TestBatchCoordinationBusinessImpact:
             )
 
         # Make only the batch content provisioning completed publishing fail
-        event_publisher.publish_batch_content_provisioning_completed.side_effect = fail_on_batch_ready
+        event_publisher.publish_batch_content_provisioning_completed.side_effect = (
+            fail_on_batch_ready
+        )
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -338,7 +342,7 @@ class TestBatchCoordinationBusinessImpact:
 
         # Mock batch tracker to assign a slot
         mock_batch_tracker.assign_slot_to_content.return_value = "essay_0"
-        
+
         # Mock get_batch_status to return batch info with user_id
         mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user_123"}
 

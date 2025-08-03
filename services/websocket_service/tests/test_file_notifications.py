@@ -130,7 +130,7 @@ class TestFileEventConsumer:
 
         def _create_message(event_type: str, data: dict) -> MagicMock:
             import json
-            
+
             message_data = {
                 "event_id": "550e8400-e29b-41d4-a716-446655440000",
                 "event_type": f"huleedu.{event_type}",  # Add huleedu prefix for proper routing
@@ -265,6 +265,7 @@ class TestFileEventConsumer:
 
         # Create message data with trace context metadata
         import json
+
         message_data = {
             "event_id": "550e8400-e29b-41d4-a716-446655440000",
             "event_type": "huleedu.file.batch.file.added.v1",
@@ -278,11 +279,9 @@ class TestFileEventConsumer:
                 "user_id": "user-789",
                 "timestamp": "2024-01-01T12:00:00Z",
             },
-            "metadata": {
-                "traceparent": "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"
-            },
+            "metadata": {"traceparent": "00-1234567890abcdef1234567890abcdef-1234567890abcdef-01"},
         }
-        
+
         msg = MagicMock(spec=ConsumerRecord)
         msg.value = json.dumps(message_data).encode("utf-8")
         msg.topic = "file.batch.file.added.v1"

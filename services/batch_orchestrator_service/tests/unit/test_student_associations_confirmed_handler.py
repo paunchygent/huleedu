@@ -7,12 +7,10 @@ student associations confirmation events and updating batch status.
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.validation_events import StudentAssociationsConfirmedV1
 from common_core.status_enums import BatchStatus
@@ -21,7 +19,6 @@ from huleedu_service_libs.error_handling import HuleEduError
 from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (
     StudentAssociationsConfirmedHandler,
 )
-from services.batch_orchestrator_service.models_db import Batch
 from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
 )

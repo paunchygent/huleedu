@@ -61,7 +61,9 @@ class StudentAssociationsConfirmedHandler:
         try:
             # Deserialize the message using established EventEnvelope pattern
             raw_message = msg.value.decode("utf-8")
-            envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
+            envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(
+                raw_message
+            )
             associations_data = StudentAssociationsConfirmedV1.model_validate(envelope.data)
 
             batch_id = associations_data.batch_id
@@ -191,11 +193,10 @@ class StudentAssociationsConfirmedHandler:
             else:
                 await process_student_associations()
 
-
         except Exception as e:
             # Check if it's a JSON or Pydantic validation error
             from pydantic_core import ValidationError as PydanticValidationError
-            
+
             if isinstance(e, (json.JSONDecodeError, ValueError, PydanticValidationError)):
                 # Handle JSON and Pydantic validation errors specifically
                 self.logger.error(f"Failed to decode JSON message: {e}")
@@ -211,7 +212,9 @@ class StudentAssociationsConfirmedHandler:
             correlation_id = None
             try:
                 raw_message = msg.value.decode("utf-8")
-                envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(raw_message)
+                envelope = EventEnvelope[StudentAssociationsConfirmedV1].model_validate_json(
+                    raw_message
+                )
                 associations_data = StudentAssociationsConfirmedV1.model_validate(envelope.data)
                 batch_id = associations_data.batch_id
                 correlation_id = envelope.correlation_id

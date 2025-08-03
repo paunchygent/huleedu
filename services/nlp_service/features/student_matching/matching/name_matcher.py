@@ -6,7 +6,7 @@ from rapidfuzz import fuzz
 
 from ..models import MatchingResult, MatchReason, NameComponents, StudentInfo
 from .base_matcher import BaseMatcher
-from .swedish_name_parser import SwedishNameParser
+from .simple_name_parser import SimpleNameParser
 
 
 class NameMatcher(BaseMatcher):
@@ -14,14 +14,16 @@ class NameMatcher(BaseMatcher):
 
     def __init__(
         self,
+        name_parser: SimpleNameParser | None = None,
         exact_confidence: float = 0.95,
         fuzzy_confidence: float = 0.75,
         partial_confidence: float = 0.85,
-        fuzzy_threshold: float = 0.7,
+        fuzzy_threshold: float = 0.6,
     ):
         """Initialize name matcher with confidence settings.
 
         Args:
+            name_parser: Name parser for parsing extracted names
             exact_confidence: Confidence score for exact name matches
             fuzzy_confidence: Confidence score for fuzzy name matches
             partial_confidence: Confidence score for first+last matches
@@ -32,7 +34,7 @@ class NameMatcher(BaseMatcher):
         self.fuzzy_confidence = fuzzy_confidence
         self.partial_confidence = partial_confidence
         self.fuzzy_threshold = fuzzy_threshold
-        self.name_parser = SwedishNameParser()
+        self.name_parser = name_parser or SimpleNameParser()
 
     async def match(
         self,

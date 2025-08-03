@@ -31,12 +31,12 @@ from services.batch_orchestrator_service.protocols import (
 
 class MockEventPublisherProvider(Provider):
     """Test provider for mocking BatchEventPublisherProtocol and BatchRepositoryProtocol."""
-    
+
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(self) -> BatchEventPublisherProtocol:
         """Provide mock batch event publisher for testing."""
         return AsyncMock(spec=BatchEventPublisherProtocol)
-    
+
     @provide(scope=Scope.APP)
     def provide_batch_repository(self) -> BatchRepositoryProtocol:
         """Provide mock batch repository for testing."""

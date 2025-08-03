@@ -20,6 +20,7 @@ dependencies = [
     "asyncpg",
     "alembic",
     "rapidfuzz",
+    "python-docx",  # For testing with real .docx essays
 ]
 
 [build-system]

@@ -32,17 +32,19 @@ class TestRedisBatchStateRepositoryBehavior:
         mock_client.setex = AsyncMock(return_value=True)
         mock_client.delete_key = AsyncMock(return_value=1)
         mock_client.scan_pattern = AsyncMock(return_value=[])
-        
+
         # Create mock pipeline for transaction operations
         mock_pipeline = AsyncMock()
         mock_pipeline.multi = lambda: None  # Sync method, no return
-        mock_pipeline.setex = lambda key, ttl, value: None  # Sync method, no return  
+        mock_pipeline.setex = lambda key, ttl, value: None  # Sync method, no return
         mock_pipeline.delete = lambda key: None  # Sync method, no return
-        mock_pipeline.execute = AsyncMock(return_value=[True, 1])  # Async method, returns transaction results
-        
+        mock_pipeline.execute = AsyncMock(
+            return_value=[True, 1]
+        )  # Async method, returns transaction results
+
         # Redis client returns the pipeline when creating transaction
         mock_client.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
-        
+
         return mock_client
 
     @pytest.fixture
@@ -91,8 +93,10 @@ class TestRedisBatchStateRepositoryBehavior:
 
         # Assert
         assert result is True
-        mock_redis_client.create_transaction_pipeline.assert_called_once_with(f"bcs:essay_state:{batch_id}:{essay_id}")
-        
+        mock_redis_client.create_transaction_pipeline.assert_called_once_with(
+            f"bcs:essay_state:{batch_id}:{essay_id}"
+        )
+
         # Get the pipeline that was returned and verify execute was called
         pipeline = mock_redis_client.create_transaction_pipeline.return_value
         pipeline.execute.assert_called_once()
@@ -390,7 +394,9 @@ class TestRedisBatchStateRepositoryBehavior:
         step_name = "nlp"
 
         # Arrange - Mock create_transaction_pipeline failure to simulate Redis unavailability
-        mock_redis_client.create_transaction_pipeline.side_effect = ConnectionError("Redis unavailable")
+        mock_redis_client.create_transaction_pipeline.side_effect = ConnectionError(
+            "Redis unavailable"
+        )
 
         # Act
         result = await repository.record_essay_step_completion(batch_id, essay_id, step_name, {})

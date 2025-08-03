@@ -229,7 +229,8 @@ async def test_invalid_enum_value_for_pipeline(client_with_mocks):
     error = response_json["error"]
     assert error["code"] == "VALIDATION_ERROR"
     assert (
-        "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'" in error["message"]
+        "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'"
+        in error["message"]
     )
 
     # Check validation error details

@@ -39,7 +39,9 @@ def mock_session_factory() -> Mock:
     """Mock session factory for tests."""
     # Create mock session with required methods
     session = AsyncMock(spec=AsyncSession)
-    session.scalar.return_value = None  # No existing associations by default (handler uses scalar, not get)
+    session.scalar.return_value = (
+        None  # No existing associations by default (handler uses scalar, not get)
+    )
     session.add = Mock()
     session.flush = AsyncMock()
     session.commit = AsyncMock()

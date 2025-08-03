@@ -26,17 +26,19 @@ class TestAtomicRedisOperations:
         mock_client.get = AsyncMock(return_value=None)  # No existing data
         mock_client.setex = AsyncMock(return_value=True)  # For fallback operations
         mock_client.delete_key = AsyncMock(return_value=1)  # For fallback operations
-        
+
         # Create mock pipeline for transaction operations
         mock_pipeline = AsyncMock()
         mock_pipeline.multi = lambda: None  # Sync method, no return
-        mock_pipeline.setex = lambda key, ttl, value: None  # Sync method, no return  
+        mock_pipeline.setex = lambda key, ttl, value: None  # Sync method, no return
         mock_pipeline.delete = lambda key: None  # Sync method, no return
-        mock_pipeline.execute = AsyncMock(return_value=[True, 1])  # Async method, returns transaction results
-        
+        mock_pipeline.execute = AsyncMock(
+            return_value=[True, 1]
+        )  # Async method, returns transaction results
+
         # Redis client returns the pipeline when creating transaction
         mock_client.create_transaction_pipeline = AsyncMock(return_value=mock_pipeline)
-        
+
         return mock_client
 
     @pytest.fixture
@@ -61,8 +63,10 @@ class TestAtomicRedisOperations:
         assert result is True
 
         # Verify transaction pipeline was created and executed
-        mock_redis_client.create_transaction_pipeline.assert_called_once_with(f"bcs:essay_state:{batch_id}:{essay_id}")
-        
+        mock_redis_client.create_transaction_pipeline.assert_called_once_with(
+            f"bcs:essay_state:{batch_id}:{essay_id}"
+        )
+
         # Get the pipeline that was returned and verify execute was called
         pipeline = mock_redis_client.create_transaction_pipeline.return_value
         pipeline.execute.assert_called_once()
@@ -80,13 +84,13 @@ class TestAtomicRedisOperations:
         mock_pipeline_1.setex = lambda key, ttl, value: None
         mock_pipeline_1.delete = lambda key: None
         mock_pipeline_1.execute = AsyncMock(return_value=None)  # First attempt fails
-        
+
         mock_pipeline_2 = AsyncMock()
         mock_pipeline_2.multi = lambda: None
         mock_pipeline_2.setex = lambda key, ttl, value: None
         mock_pipeline_2.delete = lambda key: None
         mock_pipeline_2.execute = AsyncMock(return_value=[True, 1])  # Second attempt succeeds
-        
+
         # Mock create_transaction_pipeline to return different pipelines for retries
         mock_redis_client.create_transaction_pipeline.side_effect = [
             mock_pipeline_1,

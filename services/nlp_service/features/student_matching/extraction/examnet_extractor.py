@@ -44,12 +44,48 @@ class ExamnetExtractor(BaseExtractor):
             self.logger.warning("No paragraphs found in text")
             return result
 
-        # Extract from first paragraph (expected to be student name)
+        # Extract from first paragraph - check first line specifically
         if paragraphs:
             first_para = paragraphs[0].strip()
 
-            # Look for a name-like pattern in the first paragraph
-            if self._looks_like_name(first_para):
+            # Split the first paragraph into lines
+            first_para_lines = first_para.split("\n")
+            if first_para_lines:
+                first_line = first_para_lines[0].strip()
+
+                # Check if first line contains a date pattern (indicating name + date format)
+                date_pattern = re.compile(r"\d{4}-\d{2}-\d{2}")
+                if date_pattern.search(first_line):
+                    # Extract the part before the date as the name
+                    name_part = date_pattern.split(first_line)[0].strip()
+                    if name_part and self._looks_like_name(name_part):
+                        result.possible_names.append(
+                            ExtractedIdentifier(
+                                value=name_part,
+                                source_strategy=self.name,
+                                confidence=0.85,  # High confidence for name + date pattern
+                                location_hint="line_1",
+                            )
+                        )
+                        self.logger.debug(f"Extracted name from first line: {name_part}")
+                # If no date, check if the entire first line looks like a name
+                elif self._looks_like_name(first_line):
+                    # Clean up any trailing numbers
+                    cleaned_name = self.number_suffix_pattern.sub("", first_line).strip()
+
+                    if cleaned_name and len(cleaned_name) > 2:
+                        result.possible_names.append(
+                            ExtractedIdentifier(
+                                value=cleaned_name,
+                                source_strategy=self.name,
+                                confidence=0.8,  # High confidence for first line
+                                location_hint="line_1",
+                            )
+                        )
+                        self.logger.debug(f"Extracted name from first line: {cleaned_name}")
+
+            # Also try the original logic for backward compatibility
+            if not result.possible_names and self._looks_like_name(first_para):
                 # Clean up any trailing numbers
                 cleaned_name = self.number_suffix_pattern.sub("", first_para).strip()
 
@@ -58,11 +94,27 @@ class ExamnetExtractor(BaseExtractor):
                         ExtractedIdentifier(
                             value=cleaned_name,
                             source_strategy=self.name,
-                            confidence=0.8,  # High confidence for first paragraph
+                            confidence=0.7,  # Lower confidence for full paragraph
                             location_hint="paragraph_1",
                         )
                     )
                     self.logger.debug(f"Extracted name from paragraph 1: {cleaned_name}")
+
+        # Also look for emails in the first paragraph (sometimes in header lines)
+        if paragraphs:
+            first_para_lines = paragraphs[0].split("\n")
+            for line_idx, line in enumerate(first_para_lines[:5]):  # Check first 5 lines
+                emails = self.email_pattern.findall(line)
+                for email in emails:
+                    result.possible_emails.append(
+                        ExtractedIdentifier(
+                            value=email.lower(),
+                            source_strategy=self.name,
+                            confidence=0.9,  # High confidence for emails
+                            location_hint=f"line_{line_idx + 1}",
+                        )
+                    )
+                    self.logger.debug(f"Extracted email from line {line_idx + 1}: {email}")
 
         # Look for emails in paragraphs 2-4
         for i, para in enumerate(paragraphs[1:4], start=2):
@@ -121,10 +173,9 @@ class ExamnetExtractor(BaseExtractor):
             if indicator in text_lower:
                 return False
 
-        # Should have at least one space (first and last name)
-        # But not too many (not a sentence)
+        # Check space count - allow single names (0 spaces) but not sentences
         space_count = text.count(" ")
-        if space_count < 1 or space_count > 4:
+        if space_count > 4:  # Too many spaces, probably a sentence
             return False
 
         # Each word should start with a capital letter (with some exceptions)
@@ -142,5 +193,5 @@ class ExamnetExtractor(BaseExtractor):
             if word and word[0].isupper():
                 name_words += 1
 
-        # At least 2 name-like words
-        return name_words >= 2
+        # At least 1 name-like word
+        return name_words >= 1

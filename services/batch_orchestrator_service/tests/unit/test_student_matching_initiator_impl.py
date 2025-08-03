@@ -260,12 +260,12 @@ class TestStudentMatchingInitiatorImpl:
 
         # Assert - Test actual behavior and side effects
         mock_event_publisher.publish_batch_event.assert_called_once()
-        
+
         # Verify the command data contains correct context
         call_args = mock_event_publisher.publish_batch_event.call_args
         envelope = call_args.kwargs["event_envelope"]
         command_data = envelope.data
-        
+
         # Test the actual behavioral outcomes
         assert command_data.class_id == "class_456"  # class_id from regular_batch_context
         assert len(command_data.essays_to_process) == 3  # len(sample_essays) = 3

@@ -137,9 +137,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         return async_sessionmaker(database_engine, expire_on_commit=False)
 
     @pytest.fixture(autouse=True)
-    async def clean_database(
-        self, session_factory: async_sessionmaker[AsyncSession]
-    ) -> None:
+    async def clean_database(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """Clean the database before each test for isolation."""
         async with session_factory() as session:
             async with session.begin():
@@ -369,7 +367,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         # In real flow, the envelope comes from parsing the Kafka message
         raw_message = consumer_msg.value.decode("utf-8")
         parsed_envelope: EventEnvelope = EventEnvelope.model_validate_json(raw_message)
-        
+
         mock_http_session = AsyncMock()
         result = await handler.handle(
             msg=consumer_msg,

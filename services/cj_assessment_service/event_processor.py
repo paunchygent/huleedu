@@ -150,7 +150,9 @@ async def _process_cj_assessment_impl(
     try:
         logger.info(f"Processing CJ assessment message: {msg.topic}:{msg.partition}:{msg.offset}")
 
-        request_event_data: ELS_CJAssessmentRequestV1 = ELS_CJAssessmentRequestV1.model_validate(envelope.data)
+        request_event_data: ELS_CJAssessmentRequestV1 = ELS_CJAssessmentRequestV1.model_validate(
+            envelope.data
+        )
 
         # Record queue latency metric if available
         if (
@@ -516,7 +518,9 @@ async def process_llm_result(
         callback_latency = (processing_started_at - envelope.event_timestamp).total_seconds()
 
         # Extract the comparison result data
-        comparison_result: LLMComparisonResultV1 = LLMComparisonResultV1.model_validate(envelope.data)
+        comparison_result: LLMComparisonResultV1 = LLMComparisonResultV1.model_validate(
+            envelope.data
+        )
 
         log_extra = {
             "correlation_id": str(envelope.correlation_id),

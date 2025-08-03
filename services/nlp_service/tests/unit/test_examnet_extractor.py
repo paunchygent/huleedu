@@ -1,8 +1,8 @@
 """
 Unit tests for ExamnetExtractor - test extraction behavior from exam.net format essays.
 
-Tests the core business logic of extracting student names and emails from the standardized 
-exam.net 4-paragraph header format. Follows behavioral testing patterns - testing actual 
+Tests the core business logic of extracting student names and emails from the standardized
+exam.net 4-paragraph header format. Follows behavioral testing patterns - testing actual
 extraction results, confidence scores, and edge cases, not log messages.
 """
 
@@ -55,11 +55,11 @@ Detta är början på essän där studenten skriver sitt svar..."""
         assert email_result.value == "anna.andersson@student.example.se"
         assert email_result.source_strategy == "examnet"
         assert email_result.confidence == 0.9
-        assert email_result.location_hint == "paragraph_3"
+        assert email_result.location_hint == "paragraph_2"
 
         # Assert - Metadata
         assert result.metadata["format_detected"] == "examnet"
-        assert result.metadata["paragraph_count"] == 6
+        assert result.metadata["paragraph_count"] == 4
 
     @pytest.mark.asyncio
     async def test_name_with_trailing_numbers_cleanup(self, extractor: ExamnetExtractor) -> None:
@@ -125,7 +125,9 @@ The climate crisis is a major challenge..."""
         assert result.possible_emails[0].value == "per.persson@eco.se"
 
     @pytest.mark.asyncio
-    async def test_name_detection_rejects_titles_and_assignments(self, extractor: ExamnetExtractor) -> None:
+    async def test_name_detection_rejects_titles_and_assignments(
+        self, extractor: ExamnetExtractor
+    ) -> None:
         """Test that titles and assignment text are not extracted as names."""
         # Arrange - Title/assignment text in first paragraph
         test_cases = [
@@ -187,7 +189,8 @@ Essay content..."""
         # Test empty text
         result_empty = await extractor.extract("")
         assert result_empty.is_empty()
-        assert result_empty.metadata["format_detected"] == "examnet"
+        # Empty input returns early without setting metadata
+        assert "format_detected" not in result_empty.metadata
 
         # Test whitespace only
         result_whitespace = await extractor.extract("   \n\n   ")
@@ -205,7 +208,7 @@ Essay content..."""
         text = """Johan Eriksson
 
 Course: Swedish
-Teacher: Test Teacher  
+Teacher: Test Teacher
 Johan.ERIKSSON@STUDENT.University.SE
 
 Essay content..."""
@@ -253,10 +256,10 @@ Essay content..."""
         assert name_result.confidence == 0.8
         assert name_result.location_hint == "paragraph_1"
 
-        # Assert - Email confidence and location  
+        # Assert - Email confidence and location
         email_result = result.possible_emails[0]
         assert email_result.confidence == 0.9
-        assert email_result.location_hint == "paragraph_3"
+        assert email_result.location_hint == "paragraph_2"
 
     @pytest.mark.asyncio
     async def test_no_email_in_header(self, extractor: ExamnetExtractor) -> None:
@@ -279,11 +282,13 @@ This is the essay content without any email addresses..."""
         assert len(result.possible_emails) == 0
 
     @pytest.mark.asyncio
-    async def test_extremely_long_first_paragraph_rejected(self, extractor: ExamnetExtractor) -> None:
+    async def test_extremely_long_first_paragraph_rejected(
+        self, extractor: ExamnetExtractor
+    ) -> None:
         """Test that very long first paragraphs (likely sentences) are rejected as names."""
         # Arrange - Very long first paragraph
         long_text = "This is a very long sentence that goes on and on and contains many words and phrases that make it clearly not a student name but rather the beginning of an essay or some other content"
-        
+
         text = f"""{long_text}
 
 Course: Literature
@@ -306,7 +311,7 @@ Essay continues..."""
         text = """Test Student
 
 Para 2
-Para 3  
+Para 3
 Para 4
 Para 5
 
@@ -317,7 +322,7 @@ Essay content..."""
 
         # Assert - Metadata should be populated
         assert result.metadata["format_detected"] == "examnet"
-        assert result.metadata["paragraph_count"] == 6
+        assert result.metadata["paragraph_count"] == 3
         # Original metadata should be preserved (though not used by examnet extractor)
 
     @pytest.mark.asyncio
@@ -326,13 +331,13 @@ Essay content..."""
         # Test cases that should NOT be recognized as names
         non_names = [
             "Essay: Climate Change",  # Contains colon
-            "Question 1?",           # Contains question mark
-            "Assignment (Part A)",   # Contains parentheses
-            "Answer.",               # Contains period
-            "Name,Address,Phone",    # Contains commas
-            "A B C D E F G",        # Too many space-separated parts
-            "SingleWord",           # No space (no first+last name)
-            "123 456",              # Only numbers
+            "Question 1?",  # Contains question mark
+            "Assignment (Part A)",  # Contains parentheses
+            "Answer.",  # Contains period
+            "Name,Address,Phone",  # Contains commas
+            "A B C D E F G",  # Too many space-separated parts
+            "SingleWord",  # No space (no first+last name)
+            "123 456",  # Only numbers
         ]
 
         for non_name in non_names:
@@ -349,7 +354,7 @@ Content..."""
         # Test cases that SHOULD be recognized as names
         valid_names = [
             "Anna Svensson",
-            "Lars Erik Johansson", 
+            "Lars Erik Johansson",
             "Maria de la Cruz",
             "Nils von Euler",
         ]
@@ -357,7 +362,7 @@ Content..."""
         for valid_name in valid_names:
             text = f"""{valid_name}
 
-Course info  
+Course info
 test@email.com
 
 Content..."""

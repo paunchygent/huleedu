@@ -88,7 +88,7 @@ class TestEventContractsV2:
         assert reconstructed.event_type == envelope.event_type
         assert reconstructed.source_service == envelope.source_service
         assert reconstructed.correlation_id == envelope.correlation_id
-        
+
         # Apply EventEnvelope pattern for data access
         essays_ready_data = BatchEssaysReady.model_validate(reconstructed.data)
         assert essays_ready_data.batch_id == event_data.batch_id

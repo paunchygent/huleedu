@@ -92,9 +92,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         return async_sessionmaker(database_engine, expire_on_commit=False)
 
     @pytest.fixture(autouse=True)
-    async def clean_database(
-        self, session_factory: async_sessionmaker[AsyncSession]
-    ) -> None:
+    async def clean_database(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """Clean the database before each test."""
         async with session_factory() as session:
             async with session.begin():
@@ -233,6 +231,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
 
         # Make the second student lookup fail
         call_count = 0
+
         def failing_get_student_by_id(student_id: UUID) -> Student | None:
             nonlocal call_count
             student_map = {student.id: student for student in test_students}

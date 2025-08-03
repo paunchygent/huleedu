@@ -37,8 +37,8 @@ from services.nlp_service.features.student_matching.matching.confidence_calculat
 from services.nlp_service.features.student_matching.matching.email_matcher import EmailMatcher
 from services.nlp_service.features.student_matching.matching.name_matcher import NameMatcher
 from services.nlp_service.features.student_matching.matching.roster_matcher import RosterMatcher
-from services.nlp_service.features.student_matching.matching.swedish_name_parser import (
-    SwedishNameParser,
+from services.nlp_service.features.student_matching.matching.simple_name_parser import (
+    SimpleNameParser,
 )
 from services.nlp_service.implementations.content_client_impl import DefaultContentClient
 from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
@@ -207,16 +207,14 @@ class NlpServiceProvider(Provider):
 
     # Matching components
     @provide(scope=Scope.APP)
-    def provide_swedish_name_parser(self) -> SwedishNameParser:
-        """Provide Swedish name parser."""
-        return SwedishNameParser()
+    def provide_simple_name_parser(self) -> SimpleNameParser:
+        """Provide simple name parser."""
+        return SimpleNameParser()
 
     @provide(scope=Scope.APP)
-    def provide_name_matcher(
-        self, name_parser: SwedishNameParser, settings: Settings
-    ) -> NameMatcher:
-        """Provide name matcher with Swedish support."""
-        return NameMatcher()
+    def provide_name_matcher(self, name_parser: SimpleNameParser) -> NameMatcher:
+        """Provide name matcher with simple, predictable parsing."""
+        return NameMatcher(name_parser=name_parser)
 
     @provide(scope=Scope.APP)
     def provide_email_matcher(self, settings: Settings) -> EmailMatcher:
