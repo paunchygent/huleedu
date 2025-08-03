@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
     EssayMatchResult,
@@ -29,7 +30,6 @@ def mock_settings() -> Settings:
     """Provide mock settings for testing."""
     settings = Mock(spec=Settings)
     settings.SERVICE_NAME = "nlp-service"
-    settings.ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC = "huleedu.nlp.batch.author.matches.suggested.v1"
     return settings
 
 
@@ -48,7 +48,7 @@ def nlp_event_publisher(
     return DefaultNlpEventPublisher(
         outbox_manager=mock_outbox_manager,
         source_service_name=mock_settings.SERVICE_NAME,
-        output_topic=mock_settings.ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC,
+        output_topic=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
     )
 
 

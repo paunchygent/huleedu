@@ -44,6 +44,111 @@ logger = get_logger(__name__)
 # Students: Alva Lemos, Amanda Frantz, Simon Pub, Tindra Cruz
 TEST_CLASS_ID = "550e8400-e29b-41d4-a716-446655440001"
 
+# All student names from essay files (properly capitalized)
+TEST_STUDENT_NAMES = [
+    "Alva Lemos",
+    "Amanda Frantz",
+    "Arve Bergström",
+    "Axel Karlsson",
+    "Cornelia Kardborn",
+    "Ebba Noren Bergsröm",
+    "Ebba Saviluoto",
+    "Edgar Gezelius",
+    "Elin Bogren",
+    "Ellie Rankin",
+    "Elvira Johansson",
+    "Emil Pihlman",
+    "Emil Zäll Jernberg",
+    "Emma Wüst",
+    "Erik Arvman",
+    "Figg Eriksson",
+    "Jagoda Struzik",
+    "Jonathan Hedqvist",
+    "Leon Gustavsson",
+    "Manuel Gren",
+    "Melek Özturk",
+    "Nelli Moilanen",
+    "Sam Höglund Öman",
+    "Stella Sellström",
+    "Vera Karlberg",
+    "Simon Pub",  # Capitalized from "simon pub"
+    "Tindra Cruz",  # Capitalized from "tindra cruz"
+]
+
+
+async def setup_test_class_with_roster(service_manager: ServiceTestManager, teacher_user) -> str:
+    """Create the pre-existing test class with all students from essay files."""
+    logger.info(f"🏫 Setting up test class with {len(TEST_STUDENT_NAMES)} students")
+
+    # Create the class - we'll use the TEST_CLASS_ID directly in the database
+    class_data = {
+        "name": "Book Report ES24B Test Class",
+        "course_codes": ["ENG5"]  # Must match CourseCode enum
+    }
+
+    # First, check if class already exists and delete it
+    try:
+        await service_manager.make_request(
+            "DELETE",
+            "class_management_service",
+            f"/v1/classes/{TEST_CLASS_ID}",
+            user=teacher_user
+        )
+        logger.info("Deleted existing test class")
+    except Exception:
+        # Class doesn't exist, which is fine
+        pass
+
+    # Create the class
+    try:
+        response = await service_manager.make_request(
+            "POST",
+            "class_management_service",
+            "/v1/classes/",
+            json=class_data,
+            user=teacher_user
+        )
+        created_class_id = response["id"]
+        logger.info(f"✅ Created class with ID: {created_class_id}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to create test class: {e}")
+
+    # Create all students and associate them with the class
+    for student_name in TEST_STUDENT_NAMES:
+        parts = student_name.rsplit(" ", 1)
+        if len(parts) == 2:
+            first_name, last_name = parts
+        else:
+            # Handle single name case
+            first_name = student_name
+            last_name = ""
+
+        student_data = {
+            "person_name": {
+                "first_name": first_name,
+                "last_name": last_name
+            },
+            "email": f"{first_name.lower().replace(' ', '.')}.{last_name.lower()}@test.edu" if last_name else f"{first_name.lower()}@test.edu",
+            "class_ids": [created_class_id]
+        }
+
+        try:
+            response = await service_manager.make_request(
+                "POST",
+                "class_management_service",
+                "/v1/classes/students",
+                json=student_data,
+                user=teacher_user
+            )
+            logger.debug(f"✅ Created student: {student_name}")
+        except Exception as e:
+            logger.warning(f"Failed to create student {student_name}: {e}")
+
+    logger.info(f"✅ Test class setup complete with {len(TEST_STUDENT_NAMES)} students")
+
+    # Return the actual class ID created
+    return created_class_id
+
 
 async def wait_for_student_matching_events(
     consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 60
@@ -267,10 +372,10 @@ async def test_comprehensive_real_batch_with_student_matching(
         correlation_id = str(uuid.uuid4())
         logger.info(f"🔍 Test correlation ID: {correlation_id}")
 
-        # PHASE 2 SPECIFIC: Use pre-existing test class with students
-        # This test class has 4 students enrolled: Alva Lemos, Amanda Frantz, Simon Pub, Tindra Cruz
-        class_id = TEST_CLASS_ID
-        logger.info(f"📝 Using pre-existing test class: {class_id}")
+        # PHASE 2 SPECIFIC: Create test class with students
+        logger.info("🏫 Setting up test class with students for Phase 2 flow")
+        class_id = await setup_test_class_with_roster(service_manager, teacher_user)
+        logger.info(f"📝 Using test class: {class_id}")
 
         # Register batch WITH class_id (triggers REGULAR flow)
         logger.info(f"📝 Registering REGULAR batch with class_id: {class_id}")

@@ -44,7 +44,7 @@ class DefaultClassManagementClient(ClassManagementClientProtocol):
         Raises:
             HuleEduError: On any failure to fetch roster
         """
-        url = f"{self.class_management_url}/classes/{class_id}/roster"
+        url = f"{self.class_management_url}/v1/classes/{class_id}/roster"
 
         logger.debug(
             f"Fetching class roster from URL: {url}",

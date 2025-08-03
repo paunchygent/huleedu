@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
@@ -44,8 +45,19 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 event_envelope.metadata = {}
             inject_trace_context(event_envelope.metadata)
 
-        # Determine topic (BOS uses event_type as topic)
-        topic = event_envelope.event_type
+        # Determine topic using the topic_name function to get the proper Kafka topic
+        # Convert event_type to ProcessingEvent enum and get the Kafka topic name
+        try:
+            processing_event = ProcessingEvent(event_envelope.event_type)
+            topic = topic_name(processing_event)
+        except ValueError:
+            # If event_type doesn't match any ProcessingEvent, use it as-is
+            logger.warning(
+                f"Event type '{event_envelope.event_type}' not found in ProcessingEvent enum, "
+                "using as topic name directly"
+            )
+            topic = event_envelope.event_type
+            
         aggregate_id = key or str(event_envelope.correlation_id)
         aggregate_type = self._determine_aggregate_type(event_envelope.event_type)
 

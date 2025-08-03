@@ -128,6 +128,18 @@ class BatchContentProvisioningCompletedHandler:
                             batch_id, BatchStatus.AWAITING_STUDENT_VALIDATION
                         )
 
+                        # Store essays from the event before attempting to retrieve them
+                        # This ensures essays are available for student matching
+                        if content_completed_data.essays_for_processing:
+                            await self.batch_repo.store_batch_essays(
+                                batch_id, content_completed_data.essays_for_processing
+                            )
+                            self.logger.info(
+                                f"Stored {len(content_completed_data.essays_for_processing)} "
+                                f"essays for REGULAR batch {batch_id}",
+                                extra={"correlation_id": str(envelope.correlation_id)},
+                            )
+
                         self.logger.info(
                             f"Initiating Phase 1 student matching for REGULAR batch {batch_id}",
                             extra={"correlation_id": str(envelope.correlation_id)},

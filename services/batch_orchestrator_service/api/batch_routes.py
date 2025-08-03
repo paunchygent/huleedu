@@ -40,7 +40,16 @@ async def register_batch(
 
     Accepts batch registration data and delegates to the batch processing service.
     """
-    correlation_id = uuid.uuid4()
+    # Extract correlation ID from headers, generate new one if not provided
+    correlation_header = request.headers.get("X-Correlation-ID")
+    if correlation_header:
+        try:
+            correlation_id = uuid.UUID(correlation_header)
+        except ValueError:
+            # Invalid UUID format, generate new one
+            correlation_id = uuid.uuid4()
+    else:
+        correlation_id = uuid.uuid4()
     try:
         raw_request_data = await request.get_json()
         if not raw_request_data:

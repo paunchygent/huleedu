@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from common_core.config_enums import Environment
+from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(BaseSettings):
@@ -27,12 +31,11 @@ class Settings(BaseSettings):
     CONSUMER_CLIENT_ID: str = "nlp-service-consumer"
     PRODUCER_CLIENT_ID: str = "nlp-service-producer"
 
-    # Kafka Topics
-    ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC: str = "essay.author.match.suggested.v1"
+    # Kafka Topics - REMOVED: Use topic_name() function instead of hardcoded topics
 
     # External Service URLs
-    CONTENT_SERVICE_URL: str = "http://content-service:8003"
-    CLASS_MANAGEMENT_SERVICE_URL: str = "http://class-management-service:8005"
+    CONTENT_SERVICE_URL: str = "http://content_service:8000"
+    CLASS_MANAGEMENT_SERVICE_URL: str = "http://class_management_service:5002"
 
     # Redis Configuration
     REDIS_URL: str = "redis://redis:6379"

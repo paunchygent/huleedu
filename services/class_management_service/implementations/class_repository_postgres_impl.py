@@ -29,6 +29,7 @@ from services.class_management_service.models_db import (
     EssayStudentAssociation,
     Student,
     UserClass,
+    class_student_association,
 )
 from services.class_management_service.protocols import (
     ClassRepositoryProtocol,
@@ -183,13 +184,17 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
                 )
                 session.add(new_student)
 
-                if student_data.class_ids:
-                    stmt = select(UserClass).where(UserClass.id.in_(student_data.class_ids))
-                    result = await session.execute(stmt)
-                    classes = result.scalars().all()
-                    new_student.classes.extend(classes)
-
+                # Flush first to get the student ID
                 await session.flush()
+                
+                if student_data.class_ids:
+                    # Use raw SQL to insert associations to avoid lazy loading issues
+                    for class_id in student_data.class_ids:
+                        association_stmt = class_student_association.insert().values(
+                            class_id=class_id,
+                            student_id=new_student.id
+                        )
+                        await session.execute(association_stmt)
 
                 # CRITICAL: Eager load classes relationship before session closes
                 await session.refresh(new_student, ["classes"])

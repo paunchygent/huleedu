@@ -114,9 +114,9 @@ class StudentMatchingInitiatorImpl(PipelinePhaseInitiatorProtocol):
                 extra={"correlation_id": str(correlation_id)},
             )
 
-            # Create event envelope
+            # Create event envelope with the full topic name as event_type
             envelope = EventEnvelope[BatchServiceStudentMatchingInitiateCommandDataV1](
-                event_type=ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND.value,
+                event_type=topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND),
                 source_service="batch_orchestrator_service",
                 correlation_id=correlation_id,
                 data=command_data,

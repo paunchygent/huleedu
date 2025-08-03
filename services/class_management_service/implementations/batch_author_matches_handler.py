@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import BatchAuthorMatchesSuggestedV1
 from huleedu_service_libs.error_handling import (
@@ -59,7 +60,7 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process batch author matches suggested events
         """
-        return event_type == "huleedu.nlp.batch.author.matches.suggested.v1"
+        return event_type == topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
 
     async def handle(
         self,

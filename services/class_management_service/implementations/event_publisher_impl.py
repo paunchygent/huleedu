@@ -38,9 +38,9 @@ class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):
     async def publish_class_event(self, event_envelope: EventEnvelope) -> None:
         """Publish a class management event using the outbox pattern."""
         try:
-            # Determine topic from event type
+            # The event_type should already be the topic name
             event_type = event_envelope.event_type
-            topic = topic_name(ProcessingEvent(event_type))
+            topic = event_type
 
             # Extract aggregate information
             aggregate_id = str(event_envelope.correlation_id)
@@ -138,7 +138,7 @@ class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):
                 aggregate_type="batch",
                 event_type=envelope.event_type,
                 event_data=envelope,
-                topic=topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED),
+                topic=envelope.event_type,  # event_type is already the topic name
             )
 
             logger.info(

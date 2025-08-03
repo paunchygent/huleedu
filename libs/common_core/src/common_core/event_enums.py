@@ -49,7 +49,9 @@ class ProcessingEvent(str, Enum):
     BATCH_FILE_ADDED = "batch.file.added"
     BATCH_FILE_REMOVED = "batch.file.removed"
     CLASS_CREATED = "class.created"
+    CLASS_UPDATED = "class.updated"
     STUDENT_CREATED = "student.created"
+    STUDENT_UPDATED = "student.updated"
     # -------------  Student validation workflow events  -------------#
     STUDENT_ASSOCIATIONS_CONFIRMED = "student.associations.confirmed"
     VALIDATION_TIMEOUT_PROCESSED = "validation.timeout.processed"
@@ -100,7 +102,9 @@ _TOPIC_MAPPING = {
     ProcessingEvent.BATCH_FILE_ADDED: "huleedu.file.batch.file.added.v1",
     ProcessingEvent.BATCH_FILE_REMOVED: "huleedu.file.batch.file.removed.v1",
     ProcessingEvent.CLASS_CREATED: "huleedu.class.created.v1",
+    ProcessingEvent.CLASS_UPDATED: "huleedu.class.updated.v1",
     ProcessingEvent.STUDENT_CREATED: "huleedu.class.student.created.v1",
+    ProcessingEvent.STUDENT_UPDATED: "huleedu.class.student.updated.v1",
     ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED: (
         "huleedu.class.student.associations.confirmed.v1"
     ),

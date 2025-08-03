@@ -74,6 +74,69 @@ async def create_class(
             return jsonify({"error": "Internal server error"}), 500
 
 
+@class_bp.route("/<class_id>/roster", methods=["GET"])
+@inject
+async def get_class_roster(
+    class_id: str,
+    service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
+) -> Response | tuple[Response, int]:
+    """Get the student roster for a class."""
+    user_id = request.headers.get("X-User-ID")
+    # Allow unauthenticated access for NLP service
+    
+    with metrics.http_request_duration_seconds.labels(
+        method="GET", endpoint=f"/v1/classes/{class_id}/roster"
+    ).time():
+        try:
+            class_uuid = uuid.UUID(class_id)
+            class_obj = await service.get_class_by_id(class_uuid)
+            
+            if not class_obj:
+                metrics.http_requests_total.labels(
+                    method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=404
+                ).inc()
+                metrics.api_errors_total.labels(
+                    endpoint=f"/v1/classes/{class_id}/roster", error_type="not_found"
+                ).inc()
+                return jsonify({"error": "Class not found"}), 404
+            
+            # Format roster for NLP service expectations
+            students = []
+            for student in class_obj.students:
+                students.append({
+                    "student_id": str(student.id),
+                    "first_name": student.first_name,
+                    "last_name": student.last_name,
+                    "full_legal_name": f"{student.first_name} {student.last_name}",
+                    "email": student.email if student.email else None
+                })
+            
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=200
+            ).inc()
+            
+            return jsonify({"students": students}), 200
+            
+        except ValueError:
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="bad_request"
+            ).inc()
+            return jsonify({"error": "Invalid class ID format"}), 400
+        except Exception as e:
+            logger.error(f"Error retrieving class roster: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="server_error"
+            ).inc()
+            return jsonify({"error": "Internal server error"}), 500
+
+
 @class_bp.route("/<class_id>", methods=["GET"])
 @inject
 async def get_class(
@@ -127,6 +190,69 @@ async def get_class(
             ).inc()
             metrics.api_errors_total.labels(
                 endpoint=f"/v1/classes/{class_id}", error_type="server_error"
+            ).inc()
+            return jsonify({"error": "Internal server error"}), 500
+
+
+@class_bp.route("/<class_id>/roster", methods=["GET"])
+@inject
+async def get_class_roster(
+    class_id: str,
+    service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
+) -> Response | tuple[Response, int]:
+    """Get the student roster for a class."""
+    user_id = request.headers.get("X-User-ID")
+    # Allow unauthenticated access for NLP service
+    
+    with metrics.http_request_duration_seconds.labels(
+        method="GET", endpoint=f"/v1/classes/{class_id}/roster"
+    ).time():
+        try:
+            class_uuid = uuid.UUID(class_id)
+            class_obj = await service.get_class_by_id(class_uuid)
+            
+            if not class_obj:
+                metrics.http_requests_total.labels(
+                    method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=404
+                ).inc()
+                metrics.api_errors_total.labels(
+                    endpoint=f"/v1/classes/{class_id}/roster", error_type="not_found"
+                ).inc()
+                return jsonify({"error": "Class not found"}), 404
+            
+            # Format roster for NLP service expectations
+            students = []
+            for student in class_obj.students:
+                students.append({
+                    "student_id": str(student.id),
+                    "first_name": student.first_name,
+                    "last_name": student.last_name,
+                    "full_legal_name": f"{student.first_name} {student.last_name}",
+                    "email": student.email if student.email else None
+                })
+            
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=200
+            ).inc()
+            
+            return jsonify({"students": students}), 200
+            
+        except ValueError:
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="bad_request"
+            ).inc()
+            return jsonify({"error": "Invalid class ID format"}), 400
+        except Exception as e:
+            logger.error(f"Error retrieving class roster: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="server_error"
             ).inc()
             return jsonify({"error": "Internal server error"}), 500
 
@@ -213,6 +339,69 @@ async def update_class(
             return jsonify({"error": "Internal server error"}), 500
 
 
+@class_bp.route("/<class_id>/roster", methods=["GET"])
+@inject
+async def get_class_roster(
+    class_id: str,
+    service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
+) -> Response | tuple[Response, int]:
+    """Get the student roster for a class."""
+    user_id = request.headers.get("X-User-ID")
+    # Allow unauthenticated access for NLP service
+    
+    with metrics.http_request_duration_seconds.labels(
+        method="GET", endpoint=f"/v1/classes/{class_id}/roster"
+    ).time():
+        try:
+            class_uuid = uuid.UUID(class_id)
+            class_obj = await service.get_class_by_id(class_uuid)
+            
+            if not class_obj:
+                metrics.http_requests_total.labels(
+                    method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=404
+                ).inc()
+                metrics.api_errors_total.labels(
+                    endpoint=f"/v1/classes/{class_id}/roster", error_type="not_found"
+                ).inc()
+                return jsonify({"error": "Class not found"}), 404
+            
+            # Format roster for NLP service expectations
+            students = []
+            for student in class_obj.students:
+                students.append({
+                    "student_id": str(student.id),
+                    "first_name": student.first_name,
+                    "last_name": student.last_name,
+                    "full_legal_name": f"{student.first_name} {student.last_name}",
+                    "email": student.email if student.email else None
+                })
+            
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=200
+            ).inc()
+            
+            return jsonify({"students": students}), 200
+            
+        except ValueError:
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=400
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="bad_request"
+            ).inc()
+            return jsonify({"error": "Invalid class ID format"}), 400
+        except Exception as e:
+            logger.error(f"Error retrieving class roster: {e}", exc_info=True)
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=f"/v1/classes/{class_id}/roster", error_type="server_error"
+            ).inc()
+            return jsonify({"error": "Internal server error"}), 500
+
+
 @class_bp.route("/<class_id>", methods=["DELETE"])
 @inject
 async def delete_class(
@@ -272,6 +461,7 @@ async def get_class_roster(
     metrics: FromDishka[CmsMetrics],
 ) -> Response | tuple[Response, int]:
     """Get the student roster for a class."""
+    user_id = request.headers.get("X-User-ID")
     # Allow unauthenticated access for NLP service
     
     with metrics.http_request_duration_seconds.labels(

@@ -138,16 +138,16 @@ class StudentMatchingCommandHandler:
                     from common_core.event_enums import ProcessingEvent, topic_name
                     from common_core.events.envelope import EventEnvelope
 
+                    # Get the correct topic name
+                    topic = topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
+                    
                     envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
-                        event_type="huleedu.els.batch.student.matching.requested.v1",
+                        event_type=topic,  # Use the correct topic name
                         source_service="essay_lifecycle_service",
                         correlation_id=correlation_id,
                         data=batch_matching_request,
                         metadata={},
                     )
-
-                    # Store in outbox for reliable delivery
-                    topic = topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
 
                     await self.outbox_manager.publish_to_outbox(
                         aggregate_id=batch_id,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Generic, Type
 
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.class_events import (
     ClassCreatedV1,
     ClassUpdatedV1,
@@ -67,7 +68,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             user_id=user_id,
         )
         envelope = EventEnvelope[ClassCreatedV1](
-            event_type="huleedu.class.created.v1",
+            event_type=topic_name(ProcessingEvent.CLASS_CREATED),
             source_service="class_management_service",
             correlation_id=correlation_id,
             data=event_data,
@@ -97,7 +98,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
                 correlation_id=correlation_id,
             )
             envelope = EventEnvelope[ClassUpdatedV1](
-                event_type="huleedu.class.updated.v1",
+                event_type=topic_name(ProcessingEvent.CLASS_UPDATED),
                 source_service="class_management_service",
                 correlation_id=correlation_id,
                 data=event_data,
@@ -125,7 +126,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             created_by_user_id=user_id,
         )
         envelope = EventEnvelope[StudentCreatedV1](
-            event_type="huleedu.student.created.v1",
+            event_type=topic_name(ProcessingEvent.STUDENT_CREATED),
             source_service="class_management_service",
             correlation_id=correlation_id,
             data=event_data,
@@ -166,7 +167,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
                 correlation_id=correlation_id,
             )
             envelope = EventEnvelope[StudentUpdatedV1](
-                event_type="huleedu.student.updated.v1",
+                event_type=topic_name(ProcessingEvent.STUDENT_UPDATED),
                 source_service="class_management_service",
                 correlation_id=correlation_id,
                 data=event_data,

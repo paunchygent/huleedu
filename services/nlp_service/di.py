@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from dishka import Provider, Scope, provide
+from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -260,7 +261,7 @@ class NlpServiceProvider(Provider):
         return DefaultNlpEventPublisher(
             outbox_manager=outbox_manager,
             source_service_name=settings.SERVICE_NAME,
-            output_topic=settings.ESSAY_AUTHOR_MATCH_SUGGESTED_TOPIC,
+            output_topic=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
         )
 
     # Command handlers
