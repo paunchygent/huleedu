@@ -42,6 +42,13 @@ from testcontainers.kafka import KafkaContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
+from services.class_management_service.api_models import (
+    CreateClassRequest,
+    CreateStudentRequest,
+    UpdateClassRequest,
+    UpdateStudentRequest,
+)
+
 # Import NLP service components (for DB schema)
 # Note: This test simulates NLP response without importing NLP service components
 # from services.nlp_service.models import Base as NlpBase  # Not needed for this test
@@ -57,17 +64,9 @@ from services.class_management_service.models_db import (
     Student,
     UserClass,
 )
+from services.class_management_service.protocols import ClassRepositoryProtocol
 
 logger = create_service_logger("test.nlp_class_management_integration")
-
-
-from services.class_management_service.api_models import (
-    CreateClassRequest,
-    CreateStudentRequest,
-    UpdateClassRequest,
-    UpdateStudentRequest,
-)
-from services.class_management_service.protocols import ClassRepositoryProtocol
 
 T = TypeVar("T", bound=UserClass, covariant=True)
 U = TypeVar("U", bound=Student, covariant=True)

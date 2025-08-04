@@ -300,7 +300,8 @@ async def watch_pipeline_progression_with_consumer(
                                 # Phase 1 GUEST batch flow
                                 ready_count = event_data.get("provisioned_count", 0)
                                 print(
-                                    f"📨 1️⃣ ELS published BatchContentProvisioningCompleted: {ready_count} ready (GUEST flow)",
+                                    f"📨 1️⃣ ELS published BatchContentProvisioningCompleted: "
+                                    f"{ready_count} ready (GUEST flow)",
                                 )
                             elif message.topic == PIPELINE_TOPICS["batch_spellcheck_initiate"]:
                                 essays_to_process = event_data.get("essays_to_process", [])

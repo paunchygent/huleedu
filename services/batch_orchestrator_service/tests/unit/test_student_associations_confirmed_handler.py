@@ -17,7 +17,7 @@ from common_core.events.validation_events import StudentAssociationsConfirmedV1
 from common_core.status_enums import BatchStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
-from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (
+from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (  # noqa: E501
     StudentAssociationsConfirmedHandler,
 )
 from services.batch_orchestrator_service.protocols import (
@@ -50,7 +50,7 @@ class TestStudentAssociationsConfirmedHandler:
 
     @pytest.fixture
     def valid_batch_dict(self) -> dict:
-        """Create a batch dict in AWAITING_STUDENT_VALIDATION status (matches repository contract)."""
+        """Create a batch dict in AWAITING_STUDENT_VALIDATION status."""
         return {
             "id": str(uuid4()),
             "correlation_id": str(uuid4()),

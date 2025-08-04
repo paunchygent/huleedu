@@ -173,8 +173,8 @@ async def test_comprehensive_real_batch_pipeline(clean_distributed_state):
 
         if not batch_ready_received:
             raise Exception(
-                "Neither BatchContentProvisioningCompleted nor BatchEssaysReady event was received - "
-                "essays may not be processed by ELS",
+                "Neither BatchContentProvisioningCompleted nor BatchEssaysReady event was "
+                "received - essays may not be processed by ELS",
             )
 
         # Give BOS a moment to process the batch readiness event

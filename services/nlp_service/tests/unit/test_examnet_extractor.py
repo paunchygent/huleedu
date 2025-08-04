@@ -287,7 +287,11 @@ This is the essay content without any email addresses..."""
     ) -> None:
         """Test that very long first paragraphs (likely sentences) are rejected as names."""
         # Arrange - Very long first paragraph
-        long_text = "This is a very long sentence that goes on and on and contains many words and phrases that make it clearly not a student name but rather the beginning of an essay or some other content"
+        long_text = (
+            "This is a very long sentence that goes on and on and contains many words "
+            "and phrases that make it clearly not a student name but rather the "
+            "beginning of an essay or some other content"
+        )
 
         text = f"""{long_text}
 

@@ -139,7 +139,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                                 )
                                 if not student:
                                     logger.warning(
-                                        f"Student {suggestion.student_id} not found, skipping suggestion",
+                                        f"Student {suggestion.student_id} not found, "
+                                        f"skipping suggestion",
                                         extra={
                                             "student_id": suggestion.student_id,
                                             "essay_id": essay_result.essay_id,
@@ -157,7 +158,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
 
                                 if existing_association:
                                     logger.info(
-                                        f"Association already exists for essay {essay_result.essay_id}, skipping",
+                                        f"Association already exists for essay "
+                                        f"{essay_result.essay_id}, skipping",
                                         extra={
                                             "essay_id": essay_result.essay_id,
                                             "existing_student_id": str(
@@ -185,7 +187,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                                 stored_count += 1
 
                                 logger.debug(
-                                    f"Created association: essay {essay_result.essay_id} -> student {suggestion.student_id}",
+                                    f"Created association: essay {essay_result.essay_id} -> "
+                                    f"student {suggestion.student_id}",
                                     extra={
                                         "essay_id": essay_result.essay_id,
                                         "student_id": suggestion.student_id,
@@ -216,7 +219,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                     await session.flush()
 
                     logger.info(
-                        f"Batch author matches processing completed for batch {match_data.batch_id}",
+                        f"Batch author matches processing completed for batch "
+                        f"{match_data.batch_id}",
                         extra={
                             "batch_id": match_data.batch_id,
                             "class_id": match_data.class_id,
@@ -236,7 +240,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
             raise
         except Exception as e:
             logger.error(
-                f"Error processing batch author matches for batch {match_data.batch_id if 'match_data' in locals() else 'unknown'}",
+                f"Error processing batch author matches for batch "
+                f"{match_data.batch_id if 'match_data' in locals() else 'unknown'}",
                 extra={
                     "error": str(e),
                     "correlation_id": str(correlation_id),

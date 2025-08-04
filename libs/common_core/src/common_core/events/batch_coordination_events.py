@@ -62,7 +62,10 @@ class BatchEssaysRegistered(BaseModel):
     # Class context for GUEST vs REGULAR batch determination
     class_id: str | None = Field(
         default=None,
-        description="Class ID for REGULAR batches requiring student matching, None for GUEST batches",
+        description=(
+            "Class ID for REGULAR batches requiring student matching, "
+            "None for GUEST batches"
+        ),
     )
 
 

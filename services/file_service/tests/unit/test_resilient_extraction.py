@@ -48,7 +48,10 @@ class TestResilientExtraction:
 
         # Create a file that will fail python-docx but should work with pandoc
         # Using a simple RTF format that pandoc can handle
-        rtf_content = b"{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} \\f0\\fs24 Test document content \\par}"
+        rtf_content = (
+            b"{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}} "
+            b"\\f0\\fs24 Test document content \\par}"
+        )
         file_name = "document.docx"
         correlation_id = uuid4()
 

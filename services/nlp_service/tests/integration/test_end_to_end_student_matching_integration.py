@@ -274,10 +274,17 @@ Antal ord: 607
 
 
 Dear mr Rai.
-I'm wrighting this letter to you because it can be interessting for you as an author to get som feedback and toughts for yor book. I think your novel (un)arranged marrige is okej. It was interresting to read how it can be in different cultures. And when you grow up wiyh a particular culture others can seem a bit wicked or wouldent be socialy exapteble in other countrys and cultures. However it was quite boring.
+I'm wrighting this letter to you because it can be interessting for you as an author to get som
+feedback and toughts for yor book. I think your novel (un)arranged marrige is okej. It was
+interresting to read how it can be in different cultures. And when you grow up wiyh a
+particular culture others can seem a bit wicked or wouldent be socialy exapteble in other
+countrys and cultures. However it was quite boring.
 
 
-The book is about Manjit- the maincharacter, who stuggles to be seeen as an iduvidual. And we get to follow his thougts and how he repons to the enviroment his in. All the hate he gets from his father and that he has no freedom or anything to say for him self. And that hes tying to find a way to get out of the arranged marrige."""
+The book is about Manjit- the maincharacter, who stuggles to be seeen as an iduvidual. And we
+get to follow his thougts and how he repons to the enviroment his in. All the hate he gets
+from his father and that he has no freedom or anything to say for him self. And that hes
+tying to find a way to get out of the arranged marrige."""
 
         correlation_id = uuid4()
 
@@ -309,10 +316,16 @@ Antal ord: 627
 Sam - (Un)arranged Marriage
 
 
-The book "(Un)arranged Marriage" is about a teenage boy from an Indian family that are living in England. Manny's family wants him to be a good Punjabi man and marry a girl of their choice at the age of seventeen. However, he doesn't want that and tries his hardest to avoid it. In this essay I am going to discuss the theme of expectations and the pressure Manny feels to live up to them, which I believe is a big and important subject in the book.
+The book "(Un)arranged Marriage" is about a teenage boy from an Indian family that are living
+in England. Manny's family wants him to be a good Punjabi man and marry a girl of their
+choice at the age of seventeen. However, he doesn't want that and tries his hardest to
+avoid it. In this essay I am going to discuss the theme of expectations and the pressure
+Manny feels to live up to them, which I believe is a big and important subject in the book.
 
 
-First off, I want to talk about how well I think the author managed to describe Manny's feelings and reactions to the pressure of his family. It was made clear that he didn't have a choice, that he couldn't just tell his family that he didn't want to."""
+First off, I want to talk about how well I think the author managed to describe Manny's
+feelings and reactions to the pressure of his family. It was made clear that he didn't have
+a choice, that he couldn't just tell his family that he didn't want to."""
 
         correlation_id = uuid4()
 
@@ -344,7 +357,11 @@ Antal ord: 472
 My Favorite Character
 
 
-Today i will be talking about my favorite charater in the book. And it's Junior. Junior is from a place called the rez. And through his years he got picked on because of his apperience and where he was from. I choose this character because I was also picked on at my old school because i was late into puperty, so they didn't treat me like they did with the others."""
+Today i will be talking about my favorite charater in the book. And it's Junior. Junior is
+from a place called the rez. And through his years he got picked on because of his
+apperience and where he was from. I choose this character because I was also picked on at
+my old school because i was late into puperty, so they didn't treat me like they did with
+the others."""
 
         correlation_id = uuid4()
 
@@ -378,8 +395,11 @@ Dear Mr. Melvin Burgess
 
     I read your book Junk and I would like to tell you what I thought of it.
 The topic of your book was about drugs and about being homeless.
-It took place in the 1980s in Bristol which is located in the South west of England. The story starts off quite innocently with introducing our two main characters.
-Later on in the book it is shown when both Gemma has turned to drugs and alcohol the more time that went by. She starts doing stronger and harder drugs which eventuallty led to a severe addiction. The same went for Tar."""
+It took place in the 1980s in Bristol which is located in the South west of England. The
+story starts off quite innocently with introducing our two main characters.
+Later on in the book it is shown when both Gemma has turned to drugs and alcohol the more
+time that went by. She starts doing stronger and harder drugs which eventuallty led to a
+severe addiction. The same went for Tar."""
 
         correlation_id = uuid4()
 
@@ -480,7 +500,9 @@ HG17001@harryda.se
 Antal ord: 226
 Hilda Grahn SA24D
 
-Hi! My name is Hilda Grahn and I live in Landvetter. I usually don´t speak english that much outside of school. I do watch Tiktok and some of the videos I watch are when people are speaking english."""
+Hi! My name is Hilda Grahn and I live in Landvetter. I usually don´t speak english that
+much outside of school. I do watch Tiktok and some of the videos I watch are when people
+are speaking english."""
 
         correlation_id = uuid4()
 
@@ -523,7 +545,10 @@ Prov: Eng 5 SA24D My Personal Objectives 2
 LS17003@harryda.se
 Antal ord: 252
 
-Hello my name is leo! I like to play videogames on my freemtime wich helps  me speak english alot. But id say that my main source of english is from my boxing training where my trainer doesnt know any swedish, so over there i only have conversations in english with everybody."""
+Hello my name is leo! I like to play videogames on my freemtime wich helps  me speak
+english alot. But id say that my main source of english is from my boxing training where
+my trainer doesnt know any swedish, so over there i only have conversations in english
+with everybody."""
 
         correlation_id = uuid4()
 
@@ -565,7 +590,9 @@ ec21004@harryda.se
 Antal ord: 515
 Focusing on Romantic Love is Bad for us
 
-The phenomenon Romantic Love has been a topic of discussion for centuries. May I offer a somewhat contreversiall opinion on this topic, romantic love consumes us to the point where it is indeed bad for us."""
+The phenomenon Romantic Love has been a topic of discussion for centuries. May I offer a
+somewhat contreversiall opinion on this topic, romantic love consumes us to the point where
+it is indeed bad for us."""
 
         correlation_id = uuid4()
 

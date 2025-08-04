@@ -64,20 +64,24 @@ class TestBatchKafkaConsumerBusinessLogic:
     @pytest.fixture
     def mock_batch_content_provisioning_completed_handler(self) -> AsyncMock:
         """Mock the BatchContentProvisioningCompletedHandler for Phase 1."""
-        from services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler import (
-            BatchContentProvisioningCompletedHandler,
+        from services.batch_orchestrator_service.implementations import (
+            batch_content_provisioning_completed_handler,
         )
 
-        return AsyncMock(spec=BatchContentProvisioningCompletedHandler)
+        return AsyncMock(
+            spec=batch_content_provisioning_completed_handler.BatchContentProvisioningCompletedHandler
+        )
 
     @pytest.fixture
     def mock_student_associations_confirmed_handler(self) -> AsyncMock:
         """Mock the StudentAssociationsConfirmedHandler for Phase 1."""
-        from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (
-            StudentAssociationsConfirmedHandler,
+        from services.batch_orchestrator_service.implementations import (
+            student_associations_confirmed_handler,
         )
 
-        return AsyncMock(spec=StudentAssociationsConfirmedHandler)
+        return AsyncMock(
+            spec=student_associations_confirmed_handler.StudentAssociationsConfirmedHandler
+        )
 
     @pytest.fixture
     def kafka_consumer(

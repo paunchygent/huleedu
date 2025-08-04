@@ -203,7 +203,8 @@ class TestNameMatcher:
         results = await matcher.match("Anna", roster_with_duplicate)
 
         # Assert - Single names may not match (too ambiguous), which is correct behavior
-        # Instead test with "Anna S" which should match both Anna Andersson and Anna Svensson fuzzily
+        # Instead test with "Anna S" which should match both Anna Andersson and Anna
+        # Svensson fuzzily
         results = await matcher.match("Anna S", roster_with_duplicate)
 
         if len(results) >= 2:
