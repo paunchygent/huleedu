@@ -15,9 +15,13 @@ ENV PYTHONUNBUFFERED=1 \
 # Set base WORKDIR for the application
 WORKDIR /app
 
-# Install curl for health checks and PDM globally in the image
-RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/* && \
+# Install curl for health checks and required system dependencies
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libmagic1 \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir pdm
 
 # Copy shared local dependencies first

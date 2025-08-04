@@ -16,6 +16,12 @@ from common_core.error_enums import FileValidationErrorCode
 from huleedu_service_libs.error_handling import HuleEduError
 from pypdf import PdfWriter
 
+from services.file_service.implementations.extraction_strategies import (
+    DocxExtractionStrategy,
+    ExtractionStrategy,
+    PdfExtractionStrategy,
+    TxtExtractionStrategy,
+)
 from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
 
 
@@ -25,7 +31,13 @@ class TestStrategyBasedExtractorIntegration:
     @pytest.fixture
     def extractor(self) -> StrategyBasedTextExtractor:
         """Create text extractor instance."""
-        return StrategyBasedTextExtractor()
+        strategies: dict[str, ExtractionStrategy] = {
+            ".txt": TxtExtractionStrategy(),
+            ".docx": DocxExtractionStrategy(),
+            ".pdf": PdfExtractionStrategy(),
+        }
+        
+        return StrategyBasedTextExtractor(validators=[], strategies=strategies)
 
     @pytest.fixture
     def correlation_id(self) -> UUID:
@@ -281,7 +293,13 @@ class TestLargeFileIntegration:
     @pytest.fixture
     def extractor(self) -> StrategyBasedTextExtractor:
         """Create text extractor instance."""
-        return StrategyBasedTextExtractor()
+        strategies: dict[str, ExtractionStrategy] = {
+            ".txt": TxtExtractionStrategy(),
+            ".docx": DocxExtractionStrategy(),
+            ".pdf": PdfExtractionStrategy(),
+        }
+        
+        return StrategyBasedTextExtractor(validators=[], strategies=strategies)
 
     @pytest.fixture
     def large_txt_content(self) -> bytes:

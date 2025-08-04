@@ -8,8 +8,10 @@ from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 import docx
+import pypandoc
 from huleedu_service_libs.error_handling import (
     raise_encrypted_file_error,
+    raise_text_extraction_failed,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 from pypdf import PdfReader
@@ -94,3 +96,61 @@ class PdfExtractionStrategy:
             return text
 
         return await asyncio.to_thread(_extract_pdf_sync)
+
+
+class PandocFallbackStrategy(ExtractionStrategy):
+    """Universal fallback strategy using pandoc for difficult or legacy files."""
+
+    async def extract(
+        self, file_content: bytes, file_name: str, correlation_id: UUID
+    ) -> str:
+        """Extracts text using pandoc, running the blocking call in a thread."""
+        logger.warning(
+            f"Using Pandoc fallback strategy for '{file_name}'.",
+            extra={"correlation_id": str(correlation_id)},
+        )
+        try:
+            # Let pandoc auto-detect the format from the buffer
+            return await asyncio.to_thread(
+                pypandoc.convert_text,
+                source=file_content,
+                to="plain",
+                format=None,
+                encoding="utf-8",
+            )
+        except Exception as e:
+            logger.critical(
+                f"Pandoc fallback failed for '{file_name}': {e}",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            # Raise the standard error after the final attempt fails
+            raise_text_extraction_failed(
+                service="file_service",
+                operation="extract_pandoc_fallback",
+                file_name=file_name,
+                message=f"All extraction strategies failed. Final error: {e}",
+                correlation_id=correlation_id,
+            )
+
+
+class ResilientDocxStrategy(ExtractionStrategy):
+    """A composite strategy that tries a primary strategy then falls back."""
+
+    def __init__(
+        self, primary_strategy: ExtractionStrategy, fallback_strategy: ExtractionStrategy
+    ):
+        self._primary = primary_strategy
+        self._fallback = fallback_strategy
+
+    async def extract(
+        self, file_content: bytes, file_name: str, correlation_id: UUID
+    ) -> str:
+        """Attempts the primary strategy, using the fallback on any failure."""
+        try:
+            return await self._primary.extract(file_content, file_name, correlation_id)
+        except Exception:  # The primary strategy already logs its specific error
+            logger.warning(
+                f"Primary strategy failed for '{file_name}', attempting fallback.",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            return await self._fallback.extract(file_content, file_name, correlation_id)

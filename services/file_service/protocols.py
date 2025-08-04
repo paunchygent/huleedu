@@ -16,6 +16,26 @@ from common_core.events.file_management_events import BatchFileAddedV1, BatchFil
 from common_core.status_enums import ProcessingStatus
 
 
+class FileValidatorProtocol(Protocol):
+    """Protocol for validating a file before extraction."""
+
+    async def validate(
+        self, file_name: str, file_content: bytes, correlation_id: UUID
+    ) -> None:
+        """
+        Validates a file and raises an error if it's invalid for processing.
+
+        Args:
+            file_name: The name of the file being validated.
+            file_content: The binary content of the file.
+            correlation_id: Request correlation ID for tracing.
+
+        Raises:
+            HuleEduError: If validation fails.
+        """
+        ...
+
+
 class ContentServiceClientProtocol(Protocol):
     """Protocol for HTTP client interactions with Content Service."""
 

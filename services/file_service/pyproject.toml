@@ -24,6 +24,8 @@ dependencies = [
     "huleedu-service-libs",
     "python-docx",
     "pypdf",
+    "python-magic",
+    "pypandoc",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +65,8 @@ module = [
     "dishka.*",
     "quart_dishka.*",
     "prometheus_client.*",
+    "magic.*",
+    "pypandoc.*",
 ]
 ignore_missing_imports = true
 

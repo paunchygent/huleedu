@@ -188,9 +188,52 @@ class ServiceImplementationsProvider(Provider):
         return DefaultEventPublisher(outbox_manager, settings)
 
     @provide(scope=Scope.APP)
-    def provide_text_extractor(self) -> TextExtractorProtocol:
-        """Provide strategy-based text extractor implementation."""
-        return StrategyBasedTextExtractor()
+    def provide_text_extractor(self, settings: Settings) -> TextExtractorProtocol:
+        """
+        Provide strategy-based text extractor with validation and resilience.
+
+        This provider constructs all necessary validators and strategies,
+        composes them for resilience, and injects them into the main
+        text extractor implementation.
+        """
+        # Import here to avoid circular dependencies
+        from services.file_service.implementations.extraction_strategies import (
+            DocxExtractionStrategy,
+            ExtractionStrategy,
+            PandocFallbackStrategy,
+            PdfExtractionStrategy,
+            ResilientDocxStrategy,
+            TxtExtractionStrategy,
+        )
+        from services.file_service.implementations.file_validators import (
+            MagicNumberValidator,
+            TemporaryFileValidator,
+        )
+
+        # 1. Instantiate all validators.
+        validators = [
+            TemporaryFileValidator(),
+            MagicNumberValidator(allowed_mime_types=settings.ALLOWED_MIME_TYPES),
+        ]
+
+        # 2. Instantiate and compose the extraction strategies.
+        # The primary DOCX strategy is wrapped in the resilient composer.
+        resilient_docx_strategy = ResilientDocxStrategy(
+            primary_strategy=DocxExtractionStrategy(),
+            fallback_strategy=PandocFallbackStrategy(),
+        )
+
+        # 3. Define the complete mapping from file extension to strategy.
+        # Both .doc and .docx will benefit from the resilient strategy.
+        strategies: dict[str, ExtractionStrategy] = {
+            ".txt": TxtExtractionStrategy(),
+            ".pdf": PdfExtractionStrategy(),
+            ".docx": resilient_docx_strategy,
+            ".doc": resilient_docx_strategy,
+        }
+
+        # 4. Construct the main extractor with all its dependencies.
+        return StrategyBasedTextExtractor(validators=validators, strategies=strategies)
 
     @provide(scope=Scope.APP)
     def provide_content_validator(self, settings: Settings) -> ContentValidatorProtocol:

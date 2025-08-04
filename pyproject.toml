@@ -151,6 +151,7 @@ module = [
     "models_db",      # Database models module without type stubs
     "yaml.*",       # PyYAML stubs
     "pypandoc.*",   # pypandoc lacks type stubs
+    "magic.*",      # python-magic lacks type stubs
     "fastapi.*",
     "starlette.*",
     "rich.*",       # Rich library for terminal formatting

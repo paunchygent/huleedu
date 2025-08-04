@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 from huleedu_service_libs.error_handling import (
@@ -11,66 +12,60 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.file_service.implementations.extraction_strategies import (
-    DocxExtractionStrategy,
     ExtractionStrategy,
-    PdfExtractionStrategy,
-    TxtExtractionStrategy,
 )
-from services.file_service.protocols import TextExtractorProtocol
+from services.file_service.protocols import (
+    FileValidatorProtocol,
+    TextExtractorProtocol,
+)
 
 logger = create_service_logger("file_service.text_extractor")
 
 
 class StrategyBasedTextExtractor(TextExtractorProtocol):
-    """Text extractor using Strategy pattern for multiple file types."""
+    """Extracts text by validating and then selecting a file-type strategy."""
 
-    def __init__(self) -> None:
-        """Initialize with supported extraction strategies."""
-        self._strategies: dict[str, ExtractionStrategy] = {
-            ".txt": TxtExtractionStrategy(),
-            ".docx": DocxExtractionStrategy(),
-            ".pdf": PdfExtractionStrategy(),
-        }
+    def __init__(
+        self,
+        validators: list[FileValidatorProtocol],
+        strategies: dict[str, ExtractionStrategy],
+    ):
+        self._validators = validators
+        self._strategies = strategies
+        logger.info(
+            f"Initialized with {len(validators)} validators "
+            f"and strategies for keys: {list(strategies.keys())}"
+        )
 
     async def extract_text(self, file_content: bytes, file_name: str, correlation_id: UUID) -> str:
-        """
-        Extract text using appropriate strategy based on file extension.
+        """First, run all validators, then select and execute the extraction strategy."""
+        # 1. Run all pre-validation checks sequentially
+        for validator in self._validators:
+            await validator.validate(file_name, file_content, correlation_id)
 
-        Args:
-            file_content: Raw file bytes
-            file_name: Original filename for type detection
-            correlation_id: Request correlation ID for tracing
+        logger.info(
+            f"All validators passed for '{file_name}'.",
+            extra={"correlation_id": str(correlation_id)},
+        )
 
-        Returns:
-            Extracted text content
-
-        Raises:
-            HuleEduError: If extraction fails or file type unsupported
-        """
-        # Extract file extension
-        parts = file_name.lower().split(".")
-        if len(parts) < 2:
-            raise_text_extraction_failed(
-                service="file_service",
-                operation="extract_text",
-                file_name=file_name,
-                message="File has no extension",
-                correlation_id=correlation_id,
-            )
-
-        file_ext = f".{parts[-1]}"
-        strategy = self._strategies.get(file_ext)
+        # 2. Select strategy based on file extension
+        file_extension = os.path.splitext(file_name)[1].lower()
+        strategy = self._strategies.get(file_extension)
 
         if not strategy:
-            supported = ", ".join(self._strategies.keys())
             raise_text_extraction_failed(
                 service="file_service",
-                operation="extract_text",
+                operation="select_strategy",
                 file_name=file_name,
-                message=f"Unsupported file type '{file_ext}'. Supported types: {supported}",
+                message=f"No extraction strategy found for file type '{file_extension}'.",
                 correlation_id=correlation_id,
             )
 
+        logger.info(
+            f"Using strategy '{type(strategy).__name__}' for '{file_name}'.",
+            extra={"correlation_id": str(correlation_id)},
+        )
+        
         try:
             return await strategy.extract(file_content, file_name, correlation_id)
         except HuleEduError:
@@ -88,5 +83,4 @@ class StrategyBasedTextExtractor(TextExtractorProtocol):
                 file_name=file_name,
                 message=f"Failed to extract text: {str(e)}",
                 correlation_id=correlation_id,
-                error_details=str(e),
             )
