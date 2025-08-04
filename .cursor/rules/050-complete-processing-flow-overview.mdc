@@ -86,12 +86,15 @@ AWAITING_CONTENT_VALIDATION
     ↓
 [REGULAR] AWAITING_STUDENT_VALIDATION  
     ↓
+[REGULAR] STUDENT_VALIDATION_COMPLETED*
+    ↓
 READY_FOR_PIPELINE_EXECUTION
     ↓  
 PIPELINE_IN_PROGRESS
     ↓
 COMPLETED
 ```
+* Planned refactor: Add intermediate state to prevent race conditions
 
 ### Content States (ELS perspective)
 ```
@@ -131,9 +134,11 @@ READY_FOR_PROCESSING
 
 ### Service Boundaries (DDD)
 - **BOS**: Owns batch metadata and class_id information
-- **ELS**: Owns essay content and processing state
+- **ELS**: Owns essay content and processing state (stateless during Phase 1*)
 - **NLP**: Stateless processing service
 - **Class Management**: Owns student roster and associations
+
+* Planned refactor: ELS to act as stateless event router during Phase 1
 
 ### Error Handling Philosophy
 - **Partial Success**: Batches can succeed with individual essay failures
