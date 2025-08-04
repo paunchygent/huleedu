@@ -7,6 +7,8 @@ The **Batch Orchestrator Service** is the central coordinator for the HuleEdu es
 Its key responsibilities include:
 
 * **Batch Lifecycle Management**: Create, configure, and manage the complete lifecycle of essay batches
+* **Batch Type Orchestration**: Determine GUEST (anonymous) vs REGULAR (class-based) batch processing flows
+* **Phase 1 Student Matching**: Coordinate student-essay association for REGULAR batches through NLP Service
 * **Batch Readiness Coordination**: Implement count-based aggregation pattern to track when all essays are ready for processing
 * **Pipeline Orchestration**: Coordinate processing phases across specialized services (spellcheck, NLP, AI feedback, etc.)
 * **Processing Decision Authority**: All processing initiation, retry, and failure handling decisions originate from BOS
@@ -19,13 +21,24 @@ BOS implements the **Count-Based Aggregation Pattern** as the central orchestrat
 
 ### Coordination Flow
 
-1. **Batch Creation**: BOS creates batch with internal essay ID slots and registers with ELS (`BatchEssaysRegistered`)
-2. **Content Coordination**: File Service provisions content to ELS for slot assignment
-3. **Readiness Notification**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`)
-4. **Essay Storage**: BOS stores ready essays in persistent PostgreSQL database, awaiting client pipeline requests
-5. **Client-Triggered Processing**: Client explicitly requests pipeline execution via HTTP API
-6. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS (`BatchSpellcheckInitiateCommand`)
-7. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
+#### Phase 0: Batch Setup
+1. **Batch Creation**: BOS creates batch with internal essay ID slots, storing `class_id` for REGULAR batches
+2. **Registration**: BOS registers batch with ELS (`BatchEssaysRegistered`)
+3. **Content Coordination**: File Service provisions content to ELS for slot assignment
+
+#### Phase 1: Content Readiness & Student Matching
+4. **Content Provisioning**: ELS notifies BOS when all slots are filled (`BatchContentProvisioningCompletedV1`)
+5. **Batch Type Decision**:
+   - **GUEST batches** (no class_id): Direct transition to READY_FOR_PIPELINE_EXECUTION
+   - **REGULAR batches** (has class_id): Initiate student matching workflow
+6. **Student Matching** (REGULAR only): BOS coordinates NLP Service to match essays to students
+7. **Human Validation** (REGULAR only): Class Management Service facilitates teacher review
+8. **Association Confirmation**: BOS receives confirmed student associations, transitions to ready state
+
+#### Phase 2: Pipeline Processing  
+9. **Client-Triggered Processing**: Client explicitly requests pipeline execution via HTTP API
+10. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS
+11. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
 
 ### Service Boundary Responsibilities
 

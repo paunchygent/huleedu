@@ -162,6 +162,8 @@ data: T_EventData
 
 **file_events.py**: `EssayContentProvisionedV1` (File Service → ELS)
 **batch_coordination_events.py**: `BatchEssaysRegistered`, `BatchEssaysReady` (BOS ↔ ELS), `ExcessContentProvisionedV1` (ELS → BOS)
+**nlp_events.py**: `BatchAuthorMatchesSuggestedV1` (NLP Service → Class Management), `StudentMatchSuggestion`, `EssayMatchResult`
+**cj_assessment_events.py**: `BatchCJAssessmentInitiatedV1`, `BatchCJAssessmentCompletedV1` (CJ Assessment Service events)
 
 ### 5.4. Service Models
 
@@ -203,8 +205,6 @@ data: T_EventData
 
 `UNKNOWN_ERROR`, `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `CONFIGURATION_ERROR`, `EXTERNAL_SERVICE_ERROR`, `KAFKA_PUBLISH_ERROR`, service-specific errors
 
-## 9. Future Event Files (Not Yet Implemented)
+## 9. Extension Points
 
-- `nlp_events.py`: NLP service event models
-- `cj_assessment_events.py`: CJ assessment event models
-- Additional specialized service events as services are implemented
+Additional specialized service event models can be added to `common_core/events/` as new services are developed, following the established patterns for event definitions, versioning, and service boundaries.

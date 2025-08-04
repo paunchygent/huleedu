@@ -1,7 +1,7 @@
 """NLP initiator implementation for batch processing.
 
-TODO: NLP Service is not yet implemented. This initiator publishes commands to Kafka
-topics that will be consumed once the NLP Service is built and wired up.
+Publishes NLP processing commands to Kafka topics consumed by the NLP Service.
+Supports both Phase 1 (student matching) and Phase 2 (text analysis) operations.
 """
 
 from __future__ import annotations
@@ -33,8 +33,8 @@ class NLPInitiatorImpl(NLPInitiatorProtocol):
     """
     Default implementation for initiating NLP operations.
 
-    TODO: NLP Service consumer is not yet implemented. Commands published by this
-    initiator will be queued until the NLP Service is built to consume them.
+    Publishes NLP commands to Kafka topics for consumption by the NLP Service.
+    Handles both Phase 1 student matching and Phase 2 text analysis workflows.
     """
 
     def __init__(
@@ -109,13 +109,11 @@ class NLPInitiatorImpl(NLPInitiatorProtocol):
             )
 
             # Publish NLP command
-            # TODO: Command will be queued until NLP Service is implemented
             await self.event_publisher.publish_batch_event(command_envelope)
 
             logger.info(
                 f"Published NLP initiate command for batch {batch_id}, "
-                f"event_id {command_envelope.event_id} "
-                f"(TODO: NLP Service not yet implemented to consume this)",
+                f"event_id {command_envelope.event_id}",
                 extra={"correlation_id": str(correlation_id)},
             )
 

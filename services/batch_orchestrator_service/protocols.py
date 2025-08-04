@@ -272,8 +272,8 @@ class NLPInitiatorProtocol(PipelinePhaseInitiatorProtocol, Protocol):
     Inherits from PipelinePhaseInitiatorProtocol for standardized interface,
     primarily for semantic grouping and potential future NLP-specific methods.
 
-    Note: NLP Service is not yet implemented - this initiator will publish
-    commands that will be consumed once the NLP Service is built.
+    Publishes commands to Kafka topics consumed by the NLP Service for both
+    Phase 1 student matching and Phase 2 text analysis operations.
     """
 
 

@@ -42,7 +42,7 @@ class BatchStudentMatchingRequestedV1(BaseEventData):
     Publisher: Essay Lifecycle Service (ELS)
     Consumer: NLP Service
     Topic: batch.student.matching.requested
-    Handler: NLP - BatchStudentMatchingHandler.handle_batch_student_matching()
+    Handler: NLP - StudentMatchingHandler.handle_batch_student_matching()
 
     Flow (REGULAR batches only):
     1. ELS receives BatchServiceStudentMatchingInitiateCommandDataV1 from BOS

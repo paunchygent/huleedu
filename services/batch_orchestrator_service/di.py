@@ -361,7 +361,7 @@ class PhaseInitiatorsProvider(Provider):
         """
         Provide NLP initiator implementation.
 
-        TODO: NLP Service is not yet implemented - commands will be queued.
+        Publishes commands to Kafka topics consumed by the NLP Service.
         """
         return NLPInitiatorImpl(event_publisher)
 
@@ -528,13 +528,13 @@ class InitiatorMapProvider(Provider):
         This map is central to the generic orchestration system,
         enabling type-safe dynamic dispatch based on PhaseName enum.
 
-        TODO: AI Feedback and NLP services are not yet implemented - their
-        commands will be queued until the services are built.
+        TODO: AI Feedback service is not yet implemented - commands will be queued.
+        NLP Service is implemented and consuming commands.
         """
         return {
             PhaseName.SPELLCHECK: spellcheck_initiator,
             PhaseName.CJ_ASSESSMENT: cj_assessment_initiator,
             PhaseName.AI_FEEDBACK: ai_feedback_initiator,  # TODO: Service not implemented
-            PhaseName.NLP: nlp_initiator,  # TODO: Service not implemented
+            PhaseName.NLP: nlp_initiator,  # Phase 2 text analysis
             PhaseName.STUDENT_MATCHING: student_matching_initiator,  # Phase 1 student matching
         }
