@@ -34,7 +34,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(240)  # 4 minute timeout for complete pipeline with mock LLM
-async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
+async def test_comprehensive_real_batch_pipeline(clean_distributed_state):
     """
     Test complete pipeline with real student essays through actual BOS orchestration.
 
@@ -48,10 +48,10 @@ async def test_comprehensive_real_batch_pipeline(verify_redis_is_pristine):
     Uses real student essays and follows actual event orchestration.
     Uses mock LLM for fast, cost-effective testing.
 
-    The verify_redis_is_pristine fixture ensures clean Redis state before test.
+    The clean_distributed_state fixture ensures clean Redis and Kafka state before test.
     """
-    # Diagnostic fixture ensures clean Redis state - just reference it
-    _ = verify_redis_is_pristine
+    # Fixture ensures clean distributed state
+    _ = clean_distributed_state
 
     # Initialize unique event factory for this test run
     event_factory = reset_test_event_factory()

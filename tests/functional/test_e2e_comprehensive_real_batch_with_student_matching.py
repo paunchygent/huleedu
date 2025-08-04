@@ -310,8 +310,8 @@ async def wait_for_batch_essays_ready(
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)  # 5 minute timeout for complete pipeline with student matching
 async def test_comprehensive_real_batch_with_student_matching(
-    verify_redis_is_pristine: Any,
-) -> None:  # verify_redis_is_pristine fixture ensures clean Redis state
+    clean_distributed_state: Any,
+) -> None:  # clean_distributed_state fixture ensures clean Redis and Kafka state
     """
     Test complete Phase 2 pipeline with student matching for REGULAR batches.
 
