@@ -18,7 +18,7 @@ from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import raise_resource_not_found
 
-from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
+from services.essay_lifecycle_service.domain_models import EssayState
 
 
 class SQLiteEssayCrudOperations:

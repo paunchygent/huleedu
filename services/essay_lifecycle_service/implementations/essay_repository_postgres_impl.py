@@ -30,9 +30,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.domain_models import EssayState as ConcreteEssayState
 from services.essay_lifecycle_service.models_db import Base, EssayStateDB
 from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
-from services.essay_lifecycle_service.state_store import EssayState as ConcreteEssayState
 
 if TYPE_CHECKING:
     from services.essay_lifecycle_service.protocols import EssayState

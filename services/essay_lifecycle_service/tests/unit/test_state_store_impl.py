@@ -15,7 +15,8 @@ from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
-from state_store import EssayState, SQLiteEssayStateStore
+from services.essay_lifecycle_service.domain_models import EssayState
+from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
 
 class TestSQLiteEssayStateStore:
@@ -246,7 +247,7 @@ class TestSQLiteEssayStateStore:
     async def test_create_essay_record_minimal(self, state_store: SQLiteEssayStateStore) -> None:
         """Test creating essay record with minimal parameters."""
         # Execute
-        essay_state = await state_store.create_essay_record(
+        created_essay = await state_store.create_essay_record(
             essay_id="test-essay", batch_id="test-batch"
         )
         # Update to desired status since create defaults to UPLOADED
@@ -259,6 +260,7 @@ class TestSQLiteEssayStateStore:
         essay_state = await state_store.get_essay_state("test-essay")
 
         # Verify
+        assert essay_state is not None
         assert essay_state.essay_id == "test-essay"
         assert essay_state.batch_id == "test-batch"
         assert essay_state.current_status == EssayStatus.READY_FOR_PROCESSING
@@ -274,7 +276,7 @@ class TestSQLiteEssayStateStore:
     async def test_essay_state_timeline_tracking(self, state_store: SQLiteEssayStateStore) -> None:
         """Test that essay state timeline is correctly tracked during updates."""
         # Create essay
-        essay_state = await state_store.create_essay_record(
+        created_essay = await state_store.create_essay_record(
             essay_id="timeline-test", batch_id="test-batch"
         )
         # Update to desired status since create defaults to UPLOADED
@@ -287,6 +289,7 @@ class TestSQLiteEssayStateStore:
         essay_state = await state_store.get_essay_state("timeline-test")
 
         # Verify initial timeline
+        assert essay_state is not None
         initial_timeline_length = len(essay_state.timeline)
         assert EssayStatus.READY_FOR_PROCESSING.value in essay_state.timeline
 

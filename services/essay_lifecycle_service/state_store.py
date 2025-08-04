@@ -25,7 +25,7 @@ from services.essay_lifecycle_service.implementations.database_schema_manager im
 from services.essay_lifecycle_service.implementations.essay_crud_operations import (
     SQLiteEssayCrudOperations,
 )
-from services.essay_lifecycle_service.implementations.essay_state_model import EssayState
+from services.essay_lifecycle_service.domain_models import EssayState
 from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
 
 if TYPE_CHECKING:
