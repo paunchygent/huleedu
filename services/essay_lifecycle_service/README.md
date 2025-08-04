@@ -29,7 +29,7 @@ ELS is a hybrid service combining a Kafka-based worker for asynchronous processi
 
 - **Primary Processing Engine**: A Kafka consumer worker (`worker_main.py`) handles events and commands.
 - **API Layer**: A Quart application (`app.py`) provides RESTful endpoints. It's served by Hypercorn.
-- **State Persistence**: The service uses a dual-repository pattern. **PostgreSQL** is the production database, implemented via `PostgreSQLEssayRepository`. For development and testing, an `SQLiteEssayStateStore` is used.
+- **State Persistence**: The service uses a three-tier repository pattern. **PostgreSQL** is the production database, implemented via `PostgreSQLEssayRepository`. For development and testing, a fast in-memory `MockEssayRepository` is used.
 - **Event Publishing**: Implements the **Transactional Outbox Pattern** for reliable event delivery. Events are stored in the `event_outbox` table within the same transaction as business logic, then published asynchronously by the Event Relay Worker.
 - **Dependency Injection**: Utilizes Dishka for managing dependencies. Providers in `di.py` supply implementations for protocols defined in `protocols.py`.
 - **Implementation Layer**: Business logic is cleanly separated in the `implementations/` directory, covering command handlers, event publishers, and repository logic.

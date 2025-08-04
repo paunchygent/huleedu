@@ -10,7 +10,6 @@ dependencies = [
     "quart",
     "hypercorn",
     "aiokafka",
-    "aiosqlite",
     "aiohttp",
     "python-dotenv",
     "huleedu-common-core",
@@ -79,7 +78,6 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "dishka.*",
-    "aiosqlite.*",
     "hypercorn.*",
     "aiokafka.*",
     "quart_dishka.*",
@@ -92,7 +90,6 @@ module = [
     "di",
     "protocols",
     "config",
-    "state_store",
     "core_logic",
     "event_router",
 ]

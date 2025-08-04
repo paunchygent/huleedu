@@ -43,20 +43,16 @@ class Settings(BaseSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
     BATCH_ORCHESTRATOR_SERVICE_URL: str = "http://batch_orchestrator_service:8000/v1"
 
-    # Repository Configuration (following BOS pattern)
+    # Repository Configuration (three-tier pattern)
     USE_MOCK_REPOSITORY: bool = True  # False in production
-
-    # SQLite Configuration (development/testing)
-    DATABASE_PATH: str = "./essay_lifecycle.db"
-    DATABASE_TIMEOUT: float = 30.0
-    DATABASE_POOL_SIZE: int = 20
 
     # PostgreSQL Configuration (production)
     DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
     DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
 
-    # PostgreSQL Connection Pool Settings
+    # PostgreSQL Connection Pool Settings  
+    DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 20
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour

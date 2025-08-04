@@ -47,7 +47,7 @@ class EssayRepositoryProtocol(Protocol):
 
     This follows the repository pattern established by BOS BatchRepositoryProtocol,
     providing an abstraction layer for essay state persistence that supports
-    both SQLite (development/testing) and PostgreSQL (production) implementations.
+    MockEssayRepository (development/testing) and PostgreSQL (production) implementations.
     """
 
     async def get_essay_state(self, essay_id: str) -> EssayState | None:

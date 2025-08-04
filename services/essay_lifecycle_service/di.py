@@ -98,7 +98,9 @@ from services.essay_lifecycle_service.protocols import (
     StudentAssociationHandler,
     TopicNamingProtocol,
 )
-from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
+from services.essay_lifecycle_service.implementations.mock_essay_repository import (
+    MockEssayRepository,
+)
 
 
 class CoreInfrastructureProvider(Provider):
@@ -235,16 +237,12 @@ class CoreInfrastructureProvider(Provider):
         """
         Provide essay repository implementation with environment-based selection.
 
-        Uses SQLite for development/testing and PostgreSQL for production,
-        following the same pattern as BOS BatchRepositoryProtocol.
+        Uses MockEssayRepository for development/testing and PostgreSQL for production,
+        following the three-tier repository pattern established in Phase 0-2.
         """
         if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
-            # Development/testing: use SQLite implementation
-            store = SQLiteEssayStateStore(
-                database_path=settings.DATABASE_PATH, timeout=settings.DATABASE_TIMEOUT
-            )
-            await store.initialize()
-            return store
+            # Development/testing: use fast in-memory mock implementation
+            return MockEssayRepository()
         else:
             # Production: use PostgreSQL implementation with database metrics
             postgres_repo = PostgreSQLEssayRepository(settings, database_metrics)
