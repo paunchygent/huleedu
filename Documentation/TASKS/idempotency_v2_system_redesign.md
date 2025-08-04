@@ -155,8 +155,8 @@ DEFAULT_EVENT_TYPE_TTLS = {
 
 **Redis Key Format Standardization**:
 
-- V1: `huleedu:events:seen:{hash}` (global namespace)
 - V2: `huleedu:idempotency:v2:{service}:{event_type}:{hash}` (service isolated)
+- No legacy patterns supported - V1 has been completely removed
 
 **TTL Matrix Implementation**:
 

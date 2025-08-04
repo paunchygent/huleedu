@@ -95,11 +95,21 @@ class DistributedStateManager:
         """
         # Atomic cleanup script that handles concurrent modifications
         atomic_cleanup_script = """
-            -- Use optimistic locking pattern with WATCH/MULTI/EXEC
-            local patterns = {'huleedu:idempotency:v2:*', 'pending_content:*'}
-            local batch_size = 100
+            -- Comprehensive cleanup for test isolation
+            -- NO LEGACY PATTERNS - only current V2 patterns
+            local patterns = {
+                'huleedu:idempotency:v2:*',     -- V2 idempotency keys
+                'pending_content:*',             -- File service temp storage
+                'ras:*',                         -- Result aggregator state
+                'bcs:*',                         -- Batch conductor state
+                'outbox:wake:*',                 -- Outbox notifications
+                'api:batch:*',                   -- API batch state
+                'llm_provider:*'                 -- LLM provider queues
+            }
+            
+            local batch_size = 1000  -- Increased for faster cleanup
             local total_deleted = 0
-
+            
             -- Clean up keys matching each pattern
             for _, pattern in ipairs(patterns) do
                 local cursor = 0
@@ -109,7 +119,7 @@ class DistributedStateManager:
                     )
                     cursor = tonumber(scan_result[1])
                     local keys = scan_result[2]
-
+                    
                     if #keys > 0 then
                         -- Delete batch atomically
                         local deleted = redis.call('DEL', unpack(keys))
@@ -117,11 +127,11 @@ class DistributedStateManager:
                     end
                 until cursor == 0
             end
-
+            
             -- Also clean up the pending content index key
             local index_deleted = redis.call('DEL', 'pending_content:index')
             total_deleted = total_deleted + index_deleted
-
+            
             return total_deleted
         """
 
@@ -199,12 +209,17 @@ class DistributedStateManager:
         - Tests should only process NEW events generated during the current test run
         """
         try:
-            # List of consumer groups to reset
+            # List of consumer groups to reset - ALL services
             consumer_groups = [
                 "essay-lifecycle-service-group-v1.0",
                 "result-aggregator-service-group-v1.0",
                 "spellchecker-service-group-v1.1",
                 "cj-assessment-service-group-v1.0",
+                "batch-orchestrator-service-group-v1.0",
+                "nlp-service-group-v1.0",
+                "class-management-service-group-v1.0",
+                "batch-conductor-service-group-v1.0",
+                "file-service-group-v1.0",
             ]
 
             for group in consumer_groups:
@@ -259,7 +274,7 @@ class DistributedStateManager:
         try:
             # Comprehensive Redis validation using SCAN for reliability
             verification_script = """
-            local pattern = 'huleedu:events:seen:*'
+            local pattern = 'huleedu:idempotency:v2:*'
             local cursor = 0
             local total_count = 0
             local sample_keys = {}

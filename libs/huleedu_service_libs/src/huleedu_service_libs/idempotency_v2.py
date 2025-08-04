@@ -9,13 +9,11 @@ Key Improvements:
 2. Configurable TTL per event type for optimal memory usage
 3. Comprehensive observability with structured logging
 4. Robust error handling with fail-open behavior
-5. Backward-compatible interface for seamless migration
-6. Enhanced debugging capabilities for production troubleshooting
+5. Enhanced debugging capabilities for production troubleshooting
 
 Based on research from:
 - Industry best practices from AWS, Google Cloud, Azure
 - Analysis of HuleEdu event architecture requirements
-- Root cause analysis of the original hash collision bug
 """
 
 from __future__ import annotations
@@ -55,7 +53,7 @@ DEFAULT_EVENT_TYPE_TTLS = {
 }
 
 # Default TTL for unknown event types
-DEFAULT_TTL_SECONDS = 86400  # 24 hours (backward compatibility)
+DEFAULT_TTL_SECONDS = 86400  # 24 hours
 
 # TTL for processing state (shorter to avoid blocking on crashes)
 DEFAULT_PROCESSING_TTL_SECONDS = 300  # 5 minutes

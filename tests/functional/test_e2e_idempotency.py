@@ -2,7 +2,7 @@
 End-to-End Idempotency Testing - Version 2.0
 
 Validates v2 idempotency behavior across service boundaries under various conditions.
-Tests both the new v2 API with service namespacing and the backward-compatible wrapper.
+Tests the v2 API with service namespacing and comprehensive error handling.
 
 Tests are organized into two categories:
 
@@ -313,8 +313,8 @@ def sample_batch_event() -> dict[str, Any]:
 class TestControlledIdempotencyScenarios:
     """E2E tests using controlled mock scenarios for v2 idempotency edge cases.
 
-    Tests both the new v2 API with IdempotencyConfig and the backward-compatible wrapper
-    to ensure seamless migration and proper functionality.
+    Tests the v2 API with IdempotencyConfig to ensure proper functionality
+    and service isolation.
     """
 
     async def test_v2_cross_service_isolation(
@@ -628,10 +628,3 @@ async def validate_v2_redis_key_pattern(event_data: dict[str, Any], service_name
     return expected_key
 
 
-# Backward compatibility function
-async def validate_redis_key_pattern(event_data: dict[str, Any]) -> str:
-    """Validate Redis key pattern generation for an event (backward compatibility)."""
-    event_bytes = json.dumps(event_data).encode("utf-8")
-    deterministic_id = generate_deterministic_event_id(event_bytes)
-    expected_key = f"huleedu:events:seen:{deterministic_id}"
-    return expected_key
