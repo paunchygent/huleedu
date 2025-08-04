@@ -370,3 +370,33 @@ Content..."""
             result = await extractor.extract(text)
             assert len(result.possible_names) == 1, f"Should extract '{valid_name}' as name"
             assert result.possible_names[0].value == valid_name
+
+    @pytest.mark.asyncio
+    async def test_lowercase_name_extraction(self, extractor: ExamnetExtractor) -> None:
+        """Test that lowercase names are recognized and extracted (case-insensitive recognition)."""
+        # Test cases that were previously failing
+        test_cases = [
+            ("tindra cruz", "tindra cruz"),  # Preserve original case
+            ("simon pub", "simon pub"),    # Preserve original case
+            ("anna andersson", "anna andersson"),
+            ("ERIK JOHANSSON", "ERIK JOHANSSON"),  # Also test all caps
+            ("Mixed Case Name", "Mixed Case Name"),  # Mixed case should still work
+        ]
+
+        for input_name, expected_output in test_cases:
+            # Arrange - Essay with lowercase name in first line
+            text = f"""{input_name} 2025-03-06
+Prov: Book Report ES24B
+Antal ord: 499
+
+Essay content starts here and continues..."""
+
+            # Act
+            result = await extractor.extract(text)
+
+            # Assert - Should extract name with original case preserved
+            assert len(result.possible_names) == 1, f"Should extract lowercase name: '{input_name}'"
+            assert result.possible_names[0].value == expected_output
+            assert result.possible_names[0].source_strategy == "examnet"
+            assert result.possible_names[0].confidence == 0.85  # Date pattern confidence
+            assert result.possible_names[0].location_hint == "line_1"

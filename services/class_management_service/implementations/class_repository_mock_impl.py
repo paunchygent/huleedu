@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from typing import Type, TypeVar, cast
+from typing import Any, Type, TypeVar, cast
 from uuid import UUID
 
 from common_core.domain_enums import Language
@@ -128,3 +128,9 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         if student_id in self.students:
             # In a real implementation, this would create an EssayStudentAssociation record
             pass
+
+    async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
+        """Get all student-essay associations for a batch."""
+        # Mock implementation returns empty list for now
+        # In a more complete mock, this would track associations by batch_id
+        return []

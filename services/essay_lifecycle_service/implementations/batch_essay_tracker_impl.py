@@ -125,6 +125,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             "user_id": batch_essays_registered.user_id,
             "correlation_id": str(correlation_id),  # Convert UUID to string for Redis storage
             "expected_count": len(batch_essays_registered.essay_ids),
+            "class_type": "REGULAR" if batch_essays_registered.class_id else "GUEST",
             "created_at": datetime.now().isoformat(),
         }
 
@@ -531,6 +532,11 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # NOTE: Validation failures are now handled via separate BatchValidationErrorsV1 events
         # following structured error handling principles. Legacy validation_failures field removed.
 
+        # Extract class_type from metadata with explicit validation
+        class_type = metadata.get("class_type")
+        if class_type not in ["GUEST", "REGULAR"]:
+            raise ValueError(f"Invalid or missing class_type in batch metadata: {class_type}")
+
         # Create clean BatchEssaysReady event with NO legacy validation fields
         ready_event = BatchEssaysReady(
             batch_id=batch_id,
@@ -546,7 +552,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             course_code=course_code,
             course_language=course_language,
             essay_instructions=metadata.get("essay_instructions", ""),
-            class_type="GUEST",  # Placeholder
+            class_type=class_type,
             teacher_first_name=None,
             teacher_last_name=None,
         )
@@ -568,10 +574,19 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         self._logger.info(
             f"Batch {batch_id} completed via Redis coordinator: "
-            f"{len(ready_essays)} essays ready for processing"
+            f"{len(ready_essays)} essays ready for processing, class_type: {class_type}"
         )
 
-        # Clean up Redis state
-        await self._batch_state.cleanup_batch(batch_id)
+        # Clean up Redis state only for GUEST batches
+        # REGULAR batches will be cleaned up after student association confirmation
+        if class_type == "GUEST":
+            await self._batch_state.cleanup_batch(batch_id)
+            self._logger.info(f"GUEST batch {batch_id} Redis state cleaned up after completion")
+        else:
+            self._logger.info(f"REGULAR batch {batch_id} Redis state preserved for student association confirmation")
 
         return ready_event, correlation_id
+
+    async def cleanup_batch(self, batch_id: str) -> None:
+        """Clean up Redis state for completed batch."""
+        await self._batch_state.cleanup_batch(batch_id)

@@ -141,10 +141,10 @@ class StudentAssociationsConfirmedHandler:
                         for assoc in associations_data.associations
                     ]
 
-                    # TODO: Implement method to store associations in batch repository
-                    # For now, we'll just log that we would store them
+                    # Student associations are stored in Class Management Service
+                    # BOS only needs to track state transition, not store the data
                     self.logger.info(
-                        f"Would store {len(stored_associations)} associations for batch {batch_id}",
+                        f"Received {len(stored_associations)} confirmed associations for batch {batch_id}",
                         extra={
                             "correlation_id": str(envelope.correlation_id),
                             "associations_sample": stored_associations[:3]

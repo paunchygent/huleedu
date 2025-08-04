@@ -60,6 +60,10 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
     ) -> None: ...
 
+    async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
+        """Get all student-essay associations for a batch."""
+        ...
+
 
 class ClassEventPublisherProtocol(Protocol):
     """Protocol for publishing class management-related events."""
@@ -128,6 +132,16 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
 
     async def delete_student(self, student_id: uuid.UUID) -> bool:
         """Delete a student by their ID."""
+        ...
+
+    async def get_batch_student_associations(self, batch_id: UUID) -> list[dict[str, Any]]:
+        """Retrieve student-essay association suggestions for teacher validation."""
+        ...
+
+    async def confirm_batch_student_associations(
+        self, batch_id: UUID, confirmations: dict[str, Any], correlation_id: UUID
+    ) -> dict[str, Any]:
+        """Process teacher confirmations and publish StudentAssociationsConfirmed event."""
         ...
 
 

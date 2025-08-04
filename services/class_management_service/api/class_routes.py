@@ -324,3 +324,5 @@ async def get_class_roster(
                 endpoint=f"/v1/classes/{class_id}/roster", error_type="server_error"
             ).inc()
             return jsonify({"error": "Internal server error"}), 500
+
+

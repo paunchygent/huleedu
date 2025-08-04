@@ -16,6 +16,7 @@ dependencies = [
     "huleedu-service-libs",
     "pydantic",
     "pydantic-settings",
+    "pypandoc",
     "sqlalchemy",
     "asyncpg",
     "alembic",

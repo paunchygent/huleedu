@@ -82,7 +82,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         metadata: dict[str, Any] = {}
         inject_trace_context(metadata)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="batch.author.matches.suggested.v1",
+            event_type=batch_event.event_name.value,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=batch_event,
@@ -145,7 +145,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
 
         # Create event envelope
         event_envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type="batch.author.matches.suggested.v1",
+            event_type=event_data.event_name.value,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=event_data,
@@ -161,7 +161,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             await self.outbox_manager.publish_to_outbox(
                 aggregate_type="batch",
                 aggregate_id=batch_id,
-                event_type="batch.author.matches.suggested.v1",
+                event_type=event_envelope.event_type,
                 event_data=event_envelope,
                 topic=self.output_topic,
             )

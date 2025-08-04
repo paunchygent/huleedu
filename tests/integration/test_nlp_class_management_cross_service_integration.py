@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncGenerator, Generator
-from typing import TypeVar
+from typing import Any, TypeVar
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
@@ -124,6 +124,10 @@ class MockClassRepository(ClassRepositoryProtocol[UserClass, Student]):
     ) -> None:
         """Not implemented for this test."""
         raise NotImplementedError()
+    
+    async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
+        """Get all student-essay associations for a batch."""
+        return []
 
 
 class TestNLPClassManagementCrossServiceIntegration:

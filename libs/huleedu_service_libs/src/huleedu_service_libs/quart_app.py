@@ -116,6 +116,22 @@ class HuleEduApp(Quart):
     service-specific consumer classes.
     """
 
+    relay_worker: Optional[Any] = None
+    """Event relay worker for outbox pattern implementation.
+
+    OPTIONAL: Used by services that implement the transactional outbox pattern
+    for reliable event delivery. Manages background processing of events
+    from the outbox table to Kafka.
+    """
+
+    relay_task: Optional[asyncio.Task[None]] = None
+    """Asyncio task for background event relay worker processing.
+
+    OPTIONAL: Used by services with outbox relay workers.
+    Enables graceful shutdown and task lifecycle management for
+    the event relay background process.
+    """
+
     def __init__(self, import_name: str, *args, **kwargs) -> None:
         """Initialize HuleEduApp with type-safe infrastructure attributes.
 
@@ -139,3 +155,5 @@ class HuleEduApp(Quart):
         self.tracer = None
         self.consumer_task = None
         self.kafka_consumer = None
+        self.relay_worker = None
+        self.relay_task = None

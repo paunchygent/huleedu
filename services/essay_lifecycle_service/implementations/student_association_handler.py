@@ -16,10 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from common_core.events.batch_coordination_events import BatchEssaysReady
-from common_core.metadata_models import (
-    EssayProcessingInputRefV1,
-    SystemProcessingMetadata,
-)
+from common_core.metadata_models import SystemProcessingMetadata
 from huleedu_service_libs.error_handling import raise_processing_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -153,16 +150,19 @@ class StudentAssociationHandler:
                         )
 
                     # Prepare BatchEssaysReady event
-                    # Get batch metadata from tracker
-                    ready_essays = []
-                    for essay_state in updated_essays:
-                        if essay_state.text_storage_id:
-                            ready_essays.append(
-                                EssayProcessingInputRefV1(
-                                    essay_id=essay_state.essay_id,
-                                    text_storage_id=essay_state.text_storage_id,
-                                )
-                            )
+                    # Get ALL ready essays from batch tracker (content provisioning already complete)
+                    batch_ready_result = await self.batch_tracker.check_batch_completion(batch_id)
+                    if not batch_ready_result:
+                        raise_processing_error(
+                            service="essay_lifecycle_service",
+                            operation="handle_student_associations_confirmed",
+                            message=f"Unable to get ready essays for batch {batch_id}",
+                            correlation_id=correlation_id,
+                            batch_id=batch_id,
+                        )
+                    
+                    batch_ready_event_from_tracker, _ = batch_ready_result
+                    ready_essays = batch_ready_event_from_tracker.ready_essays
 
                     # Create BatchEssaysReady event (only for REGULAR batches after associations)
                     from common_core.domain_enums import CourseCode, get_course_language
@@ -211,6 +211,11 @@ class StudentAssociationHandler:
                             "correlation_id": str(correlation_id),
                         },
                     )
+
+                    # Clean up Redis state for REGULAR batch after BatchEssaysReady publication
+                    # This completes the REGULAR batch lifecycle: content → associations → ready → cleanup
+                    await self.batch_tracker.cleanup_batch(batch_id)
+                    logger.info(f"REGULAR batch {batch_id} Redis state cleaned up after BatchEssaysReady publication")
 
                     # Update batch tracking to indicate associations complete
                     if ready_essays:

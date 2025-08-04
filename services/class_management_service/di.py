@@ -85,6 +85,11 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         return settings
+    
+    @provide(scope=Scope.APP)
+    def provide_service_name(self) -> str:
+        """Provide service name for outbox and other components."""
+        return settings.SERVICE_NAME
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
@@ -270,6 +275,8 @@ def create_container() -> AsyncContainer:
     # Store provider reference for cleanup
     global _service_provider
     _service_provider = ServiceProvider()
+    
+    from huleedu_service_libs.outbox import OutboxProvider
 
     return make_async_container(
         DatabaseProvider(),
@@ -277,6 +284,7 @@ def create_container() -> AsyncContainer:
         _service_provider,
         KafkaProvider(),
         MetricsProvider(),
+        OutboxProvider(),
     )
 
 

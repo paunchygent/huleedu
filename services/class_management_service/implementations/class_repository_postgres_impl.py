@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional, Type, TypeVar, cast
+from typing import Any, AsyncGenerator, Optional, Type, TypeVar, cast
 from uuid import UUID
 
 from common_core.domain_enums import CourseCode
@@ -344,6 +344,37 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             error_type = e.__class__.__name__
             self._record_error_metrics(error_type, operation)
             logger.error(f"Failed to associate essay to student: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
+
+    async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
+        """Get all student-essay associations for a batch."""
+        start_time = time.time()
+        operation = "get_batch_student_associations"
+        table = "essay_student_associations"
+        success = True
+
+        try:
+            async with self.session() as session:
+                # Query associations by batch_id
+                stmt = (
+                    select(EssayStudentAssociation)
+                    .join(Student)
+                    .where(EssayStudentAssociation.batch_id == batch_id)
+                    .order_by(EssayStudentAssociation.created_at.desc())
+                )
+                result = await session.execute(stmt)
+                associations = result.scalars().all()
+                return list(associations)
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(f"Failed to get batch student associations: {error_type}: {e}")
             raise
 
         finally:

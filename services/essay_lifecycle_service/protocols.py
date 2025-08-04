@@ -505,6 +505,10 @@ class BatchEssayTracker(Protocol):
         """
         ...
 
+    async def cleanup_batch(self, batch_id: str) -> None:
+        """Clean up Redis state for completed batch."""
+        ...
+
 
 class MetricsCollector(Protocol):
     """Protocol for collecting service metrics."""

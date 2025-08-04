@@ -124,6 +124,9 @@ class EssayStudentAssociation(Base):
     student_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
+    batch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
     created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
 

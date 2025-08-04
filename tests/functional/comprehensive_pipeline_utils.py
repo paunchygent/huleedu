@@ -312,7 +312,7 @@ async def watch_pipeline_progression_with_consumer(
                             elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
                                 spellcheck_completions += 1
                                 if spellcheck_completions == 1:
-                                    print("📨 📝 Spell checker processing essays...")
+                                    print("📨 📝 Spellchecker processing essays...")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 phase_name = event_data.get("phase_name")
                                 phase_status = event_data.get("phase_status")

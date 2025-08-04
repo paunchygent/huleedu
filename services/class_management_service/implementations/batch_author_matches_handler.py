@@ -25,6 +25,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from services.class_management_service.constants import NLP_SERVICE_SYSTEM_USER
 from services.class_management_service.models_db import EssayStudentAssociation
 from services.class_management_service.protocols import (
     ClassRepositoryProtocol,
@@ -60,7 +61,13 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process batch author matches suggested events
         """
-        return event_type == topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        # Handle standard event type formats:
+        # 1. Base enum value: "batch.author.matches.suggested"
+        # 2. Full topic name: "huleedu.batch.author.matches.suggested.v1"
+        return event_type in [
+            ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
+            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        ]
 
     async def handle(
         self,
@@ -168,7 +175,8 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                                 association = EssayStudentAssociation(
                                     essay_id=UUID(essay_result.essay_id),
                                     student_id=UUID(suggestion.student_id),
-                                    created_by_user_id="nlp_service_phase1",  # System user for NLP suggestions
+                                    batch_id=UUID(match_data.batch_id),  # Store batch_id for retrieval
+                                    created_by_user_id=NLP_SERVICE_SYSTEM_USER,
                                 )
 
                                 session.add(association)

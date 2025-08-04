@@ -142,6 +142,8 @@ class BatchProcessingServiceImpl:
             course_code=registration_data.course_code,
             essay_instructions=registration_data.essay_instructions,
             user_id=registration_data.user_id,
+            # Class context for GUEST vs REGULAR batch determination
+            class_id=registration_data.class_id,
         )
 
         # 4. Create EventEnvelope

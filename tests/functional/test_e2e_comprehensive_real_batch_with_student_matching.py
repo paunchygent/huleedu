@@ -440,15 +440,17 @@ async def test_comprehensive_real_batch_with_student_matching(
         # Now batch should be READY_FOR_PIPELINE_EXECUTION
         # Send client pipeline request
         logger.info("📤 Sending client pipeline request...")
-        await publish_client_pipeline_request(kafka_manager, batch_id, actual_correlation_id)
-        logger.info(f"📡 Published pipeline request with correlation: {actual_correlation_id}")
+        request_correlation_id = await publish_client_pipeline_request(
+            kafka_manager, batch_id, "cj_assessment", actual_correlation_id
+        )
+        logger.info(f"📡 Published cj_assessment pipeline request: {request_correlation_id}")
 
         # Watch pipeline progression (same as GUEST flow from here)
         logger.info("⏳ Watching pipeline progression...")
         final_event = await watch_pipeline_progression_with_consumer(
             consumer=consumer,
             batch_id=batch_id,
-            correlation_id=actual_correlation_id,
+            correlation_id=request_correlation_id,
             expected_essay_count=len(essay_files),
             timeout_seconds=120,
         )

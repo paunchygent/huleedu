@@ -180,7 +180,7 @@ class ExamnetExtractor(BaseExtractor):
         if space_count > 4:  # Too many spaces, probably a sentence
             return False
 
-        # Each word should start with a capital letter (with some exceptions)
+        # Check if words could be names (case-insensitive recognition)
         words = text.split()
         name_words = 0
 
@@ -191,8 +191,8 @@ class ExamnetExtractor(BaseExtractor):
             # Skip numbers
             if word.isdigit():
                 continue
-            # Check if word looks like a name (starts with capital)
-            if word and word[0].isupper():
+            # Check if word looks like a name (alphabetic, reasonable length)
+            if word and word.isalpha() and len(word) >= 2:
                 name_words += 1
 
         # At least 1 name-like word

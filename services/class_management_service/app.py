@@ -11,12 +11,14 @@ from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
 import services.class_management_service.startup_setup as startup_setup
+from services.class_management_service.api.batch_routes import batch_bp
 from services.class_management_service.api.class_routes import class_bp
 from services.class_management_service.api.health_routes import health_bp
 from services.class_management_service.api.student_routes import student_bp
 from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
 from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
+from huleedu_service_libs.outbox import EventRelayWorker
 
 # Configure logging first
 configure_service_logging("class-management-service", log_level=settings.LOG_LEVEL)
@@ -52,14 +54,17 @@ def create_app() -> HuleEduApp:
     # Integrate DI with Quart (must be done before registering blueprints)
     QuartDishka(app=app, container=app.container)
 
-    # Optional service-specific attributes for Kafka consumer
+    # Optional service-specific attributes for Kafka consumer and outbox relay
     app.consumer_task = None
     app.kafka_consumer = None
+    app.relay_worker = None
+    app.relay_task = None
 
     # Register Blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(class_bp, url_prefix="/v1/classes")
     app.register_blueprint(student_bp, url_prefix="/v1/classes")
+    app.register_blueprint(batch_bp, url_prefix="/v1/batches")
 
     return app
 
@@ -78,19 +83,25 @@ async def startup() -> None:
         # Setup metrics middleware
         setup_standard_service_metrics_middleware(app, "class_management")
 
-        # Get Kafka consumer from DI container and start it
+        # Get Kafka consumer and relay worker from DI container
         async with app.container() as request_container:
             app.kafka_consumer = await request_container.get(ClassManagementKafkaConsumer)
+            app.relay_worker = await request_container.get(EventRelayWorker)
 
         # Start consumer as background task
         assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
         app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
 
+        # Start outbox relay worker
+        assert app.relay_worker is not None, "Outbox relay worker must be initialized"
+        app.relay_task = asyncio.create_task(app.relay_worker.start())
+
         logger.info("Class Management Service started successfully")
         logger.info("Health endpoint: /healthz")
         logger.info("Metrics endpoint: /metrics")
-        logger.info("API endpoints: /v1/classes/")
+        logger.info("API endpoints: /v1/classes/, /v1/batches/")
         logger.info("Kafka consumer: running")
+        logger.info("Outbox relay worker: running")
 
     except Exception as e:
         logger.critical(f"Failed to start Class Management Service: {e}", exc_info=True)
@@ -113,6 +124,19 @@ async def shutdown() -> None:
                 await app.consumer_task
             except asyncio.CancelledError:
                 logger.info("Consumer task cancelled successfully")
+
+        # Stop outbox relay worker
+        if app.relay_worker:
+            logger.info("Stopping outbox relay worker...")
+            await app.relay_worker.stop()
+
+        # Cancel relay task
+        if app.relay_task and not app.relay_task.done():
+            app.relay_task.cancel()
+            try:
+                await app.relay_task
+            except asyncio.CancelledError:
+                logger.info("Relay task cancelled successfully")
 
         # Additional cleanup
         await startup_setup.shutdown_services()

@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import (
 from testcontainers.postgres import PostgresContainer
 
 from services.class_management_service.config import Settings
+from services.class_management_service.constants import NLP_SERVICE_SYSTEM_USER
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
@@ -239,7 +240,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
             assert association is not None
             assert association.essay_id == essay_id
             assert association.student_id == student.id
-            assert association.created_by_user_id == "nlp_service_phase1"
+            assert association.created_by_user_id == NLP_SERVICE_SYSTEM_USER
             assert association.created_at is not None
 
     @pytest.mark.integration
@@ -320,7 +321,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
                 association_result = await session.execute(association_stmt)
                 association = association_result.scalar_one_or_none()
                 assert association is not None
-                assert association.created_by_user_id == "nlp_service_phase1"
+                assert association.created_by_user_id == NLP_SERVICE_SYSTEM_USER
 
     @pytest.mark.integration
     @pytest.mark.asyncio
@@ -572,7 +573,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
             assert association is not None
             assert association.essay_id == essay_id
             assert association.student_id == student.id
-            assert association.created_by_user_id == "nlp_service_phase1"
+            assert association.created_by_user_id == NLP_SERVICE_SYSTEM_USER
             assert association.created_at is not None
 
             # Verify relationship to student exists

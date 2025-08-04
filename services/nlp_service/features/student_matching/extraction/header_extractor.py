@@ -174,12 +174,12 @@ class HeaderExtractor(BaseExtractor):
         if word_count > 6:  # Probably not a name if more than 6 words
             return False
 
-        # At least one word should start with a capital
+        # Check if words could be names (case-insensitive recognition)
         words = text.split()
-        has_capital = any(
-            word and word[0].isupper()
+        has_name_word = any(
+            word and word.isalpha() and len(word) >= 2
             for word in words
             if word.lower() not in ["av", "von", "de", "van", "der", "la", "el"]
         )
 
-        return has_capital
+        return has_name_word
