@@ -140,7 +140,7 @@ class StudentMatchingCommandHandler:
 
                     # Get the correct topic name
                     topic = topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
-                    
+
                     envelope = EventEnvelope[BatchStudentMatchingRequestedV1](
                         event_type=topic,  # Use the correct topic name
                         source_service="essay_lifecycle_service",

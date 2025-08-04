@@ -415,7 +415,9 @@ class TestBatchAuthorMatchesKafkaIntegration:
         batch_event = self.create_batch_event(test_students, essay_count=2)
         envelope = self.create_event_envelope(batch_event, correlation_id)
         kafka_msg = self.create_kafka_message(
-            envelope, topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED), batch_event.batch_id
+            envelope,
+            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
+            batch_event.batch_id,
         )
 
         mock_http_session = AsyncMock()

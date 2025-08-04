@@ -16,9 +16,7 @@ logger = create_service_logger("file_service.file_validators")
 class TemporaryFileValidator(FileValidatorProtocol):
     """Validates that a file is not a temporary 'owner' file created by MS Word."""
 
-    async def validate(
-        self, file_name: str, file_content: bytes, correlation_id: UUID
-    ) -> None:
+    async def validate(self, file_name: str, file_content: bytes, correlation_id: UUID) -> None:
         """Checks for the temporary file prefix '~$'.
 
         Raises:
@@ -46,9 +44,7 @@ class MagicNumberValidator(FileValidatorProtocol):
         self._allowed_mime_types = allowed_mime_types
         logger.info(f"MagicNumberValidator initialized for types: {allowed_mime_types}")
 
-    async def validate(
-        self, file_name: str, file_content: bytes, correlation_id: UUID
-    ) -> None:
+    async def validate(self, file_name: str, file_content: bytes, correlation_id: UUID) -> None:
         """Checks if the file's detected MIME type is in the allowed list.
 
         Raises:

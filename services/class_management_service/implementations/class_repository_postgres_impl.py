@@ -186,13 +186,12 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
                 # Flush first to get the student ID
                 await session.flush()
-                
+
                 if student_data.class_ids:
                     # Use raw SQL to insert associations to avoid lazy loading issues
                     for class_id in student_data.class_ids:
                         association_stmt = class_student_association.insert().values(
-                            class_id=class_id,
-                            student_id=new_student.id
+                            class_id=class_id, student_id=new_student.id
                         )
                         await session.execute(association_stmt)
 

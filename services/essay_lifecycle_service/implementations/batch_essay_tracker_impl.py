@@ -577,13 +577,17 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             f"{len(ready_essays)} essays ready for processing, class_type: {class_type}"
         )
 
-        # Clean up Redis state only for GUEST batches
-        # REGULAR batches will be cleaned up after student association confirmation
+        # NOTE: Redis cleanup moved to handler AFTER event publication
+        # GUEST batches: cleaned up in batch_coordination_handler after BatchContentProvisioningCompleted
+        # REGULAR batches: cleaned up in student_association_handler after BatchEssaysReady
         if class_type == "GUEST":
-            await self._batch_state.cleanup_batch(batch_id)
-            self._logger.info(f"GUEST batch {batch_id} Redis state cleaned up after completion")
+            self._logger.info(
+                f"GUEST batch {batch_id} Redis state will be cleaned up after event publication"
+            )
         else:
-            self._logger.info(f"REGULAR batch {batch_id} Redis state preserved for student association confirmation")
+            self._logger.info(
+                f"REGULAR batch {batch_id} Redis state preserved for student association confirmation"
+            )
 
         return ready_event, correlation_id
 

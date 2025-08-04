@@ -280,7 +280,9 @@ class TestDualEventPublishing:
 
         # Verify second call (error event)
         second_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
-        assert second_call.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        assert second_call.kwargs["event_type"] == topic_name(
+            ProcessingEvent.BATCH_VALIDATION_ERRORS
+        )
         assert second_call.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
 
     async def test_critical_failure_flag_in_error_summary(

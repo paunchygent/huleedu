@@ -83,16 +83,13 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
     # Create the class - we'll use the TEST_CLASS_ID directly in the database
     class_data = {
         "name": "Book Report ES24B Test Class",
-        "course_codes": ["ENG5"]  # Must match CourseCode enum
+        "course_codes": ["ENG5"],  # Must match CourseCode enum
     }
 
     # First, check if class already exists and delete it
     try:
         await service_manager.make_request(
-            "DELETE",
-            "class_management_service",
-            f"/v1/classes/{TEST_CLASS_ID}",
-            user=teacher_user
+            "DELETE", "class_management_service", f"/v1/classes/{TEST_CLASS_ID}", user=teacher_user
         )
         logger.info("Deleted existing test class")
     except Exception:
@@ -102,11 +99,7 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
     # Create the class
     try:
         response = await service_manager.make_request(
-            "POST",
-            "class_management_service",
-            "/v1/classes/",
-            json=class_data,
-            user=teacher_user
+            "POST", "class_management_service", "/v1/classes/", json=class_data, user=teacher_user
         )
         created_class_id = str(response["id"])
         logger.info(f"✅ Created class with ID: {created_class_id}")
@@ -124,12 +117,11 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
             last_name = ""
 
         student_data = {
-            "person_name": {
-                "first_name": first_name,
-                "last_name": last_name
-            },
-            "email": f"{first_name.lower().replace(' ', '.')}.{last_name.lower()}@test.edu" if last_name else f"{first_name.lower()}@test.edu",
-            "class_ids": [created_class_id]
+            "person_name": {"first_name": first_name, "last_name": last_name},
+            "email": f"{first_name.lower().replace(' ', '.')}.{last_name.lower()}@test.edu"
+            if last_name
+            else f"{first_name.lower()}@test.edu",
+            "class_ids": [created_class_id],
         }
 
         try:
@@ -138,7 +130,7 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
                 "class_management_service",
                 "/v1/classes/students",
                 json=student_data,
-                user=teacher_user
+                user=teacher_user,
             )
             logger.debug(f"✅ Created student: {student_name}")
         except Exception as e:

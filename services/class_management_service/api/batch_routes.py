@@ -36,36 +36,34 @@ async def get_batch_student_associations(
         try:
             batch_uuid = uuid.UUID(batch_id)
             associations = await service.get_batch_student_associations(batch_uuid)
-            
+
             metrics.http_requests_total.labels(
-                method="GET", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations", 
-                http_status=200
+                method="GET",
+                endpoint=f"/v1/batches/{batch_id}/student-associations",
+                http_status=200,
             ).inc()
-            
+
             return jsonify({"associations": associations}), 200
-            
+
         except ValueError:
             metrics.http_requests_total.labels(
-                method="GET", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations", 
-                http_status=400
+                method="GET",
+                endpoint=f"/v1/batches/{batch_id}/student-associations",
+                http_status=400,
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint=f"/v1/batches/{batch_id}/student-associations", 
-                error_type="bad_request"
+                endpoint=f"/v1/batches/{batch_id}/student-associations", error_type="bad_request"
             ).inc()
             return jsonify({"error": "Invalid batch ID format"}), 400
         except Exception as e:
             logger.error(f"Error retrieving batch student associations: {e}", exc_info=True)
             metrics.http_requests_total.labels(
-                method="GET", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations", 
-                http_status=500
+                method="GET",
+                endpoint=f"/v1/batches/{batch_id}/student-associations",
+                http_status=500,
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint=f"/v1/batches/{batch_id}/student-associations", 
-                error_type="server_error"
+                endpoint=f"/v1/batches/{batch_id}/student-associations", error_type="server_error"
             ).inc()
             return jsonify({"error": "Internal server error"}), 500
 
@@ -98,30 +96,30 @@ async def confirm_batch_student_associations(
         try:
             batch_uuid = uuid.UUID(batch_id)
             data = await request.get_json()
-            
+
             # Process confirmations
             result = await service.confirm_batch_student_associations(
                 batch_uuid, data, correlation_id
             )
-            
+
             metrics.http_requests_total.labels(
-                method="POST", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                http_status=200
+                method="POST",
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                http_status=200,
             ).inc()
-            
+
             return jsonify(result), 200
-            
+
         except ValueError as e:
             logger.warning(f"Invalid request format: {e}")
             metrics.http_requests_total.labels(
-                method="POST", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                http_status=400
+                method="POST",
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                http_status=400,
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                error_type="bad_request"
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                error_type="bad_request",
             ).inc()
             return jsonify({"error": "Invalid batch ID format"}), 400
         except HuleEduError as e:
@@ -134,9 +132,9 @@ async def confirm_batch_student_associations(
                 },
             )
             metrics.http_requests_total.labels(
-                method="POST", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                http_status=400
+                method="POST",
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                http_status=400,
             ).inc()
             metrics.api_errors_total.labels(
                 endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
@@ -146,12 +144,12 @@ async def confirm_batch_student_associations(
         except Exception as e:
             logger.error(f"Error confirming batch student associations: {e}", exc_info=True)
             metrics.http_requests_total.labels(
-                method="POST", 
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                http_status=500
+                method="POST",
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                http_status=500,
             ).inc()
             metrics.api_errors_total.labels(
-                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm", 
-                error_type="server_error"
+                endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
+                error_type="server_error",
             ).inc()
             return jsonify({"error": "Internal server error"}), 500

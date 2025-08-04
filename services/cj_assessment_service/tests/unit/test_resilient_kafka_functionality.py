@@ -533,7 +533,9 @@ async def test_multi_provider_assessment_scenarios(
 
             try:
                 await resilient_publisher.publish(
-                    topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED), assessment_event, f"batch_{provider}"
+                    topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+                    assessment_event,
+                    f"batch_{provider}",
                 )
             except KafkaError:
                 pass  # Expected during circuit breaker testing

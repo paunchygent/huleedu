@@ -57,7 +57,7 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
                 "using as topic name directly"
             )
             topic = event_envelope.event_type
-            
+
         aggregate_id = key or str(event_envelope.correlation_id)
         aggregate_type = self._determine_aggregate_type(event_envelope.event_type)
 
@@ -85,18 +85,25 @@ class DefaultBatchEventPublisherImpl(BatchEventPublisherProtocol):
 
     def _determine_aggregate_type(self, event_type: str) -> str:
         """Determine aggregate type from event type.
-        
+
         Now checks both the ProcessingEvent enum value and the full topic name
         to handle both patterns during transition.
         """
         event_lower = event_type.lower()
-        
+
         # Check for batch-related patterns in both enum values and topic names
         # Only match complete words/segments to avoid false positives
         batch_patterns = [
-            ".batch.", "batch.", ".spellcheck.", "spellcheck.",
-            ".cj_assessment.", "cj_assessment.", ".nlp.", "nlp.",
-            ".els.", "els."
+            ".batch.",
+            "batch.",
+            ".spellcheck.",
+            "spellcheck.",
+            ".cj_assessment.",
+            "cj_assessment.",
+            ".nlp.",
+            "nlp.",
+            ".els.",
+            "els.",
         ]
         if any(pattern in event_lower for pattern in batch_patterns):
             return "batch"

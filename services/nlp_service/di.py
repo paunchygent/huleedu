@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from dishka import Provider, Scope, provide
 from common_core.event_enums import ProcessingEvent, topic_name
+from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol

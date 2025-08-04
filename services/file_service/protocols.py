@@ -19,9 +19,7 @@ from common_core.status_enums import ProcessingStatus
 class FileValidatorProtocol(Protocol):
     """Protocol for validating a file before extraction."""
 
-    async def validate(
-        self, file_name: str, file_content: bytes, correlation_id: UUID
-    ) -> None:
+    async def validate(self, file_name: str, file_content: bytes, correlation_id: UUID) -> None:
         """
         Validates a file and raises an error if it's invalid for processing.
 

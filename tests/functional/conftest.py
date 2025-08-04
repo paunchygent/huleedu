@@ -4,7 +4,7 @@ Shared fixtures for functional tests.
 This includes diagnostic fixtures for deep testing of distributed system state.
 """
 
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
 
 import pytest
 import redis.asyncio as aioredis
@@ -65,5 +65,3 @@ async def get_redis_client() -> AsyncGenerator[aioredis.Redis, None]:
     finally:
         await client.aclose()
         logger.info("🔌 Diagnostic Redis client disconnected")
-
-

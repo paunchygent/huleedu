@@ -66,7 +66,7 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
         # 2. Full topic name: "huleedu.batch.author.matches.suggested.v1"
         return event_type in [
             ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED.value,
-            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+            topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
         ]
 
     async def handle(
@@ -175,7 +175,9 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                                 association = EssayStudentAssociation(
                                     essay_id=UUID(essay_result.essay_id),
                                     student_id=UUID(suggestion.student_id),
-                                    batch_id=UUID(match_data.batch_id),  # Store batch_id for retrieval
+                                    batch_id=UUID(
+                                        match_data.batch_id
+                                    ),  # Store batch_id for retrieval
                                     created_by_user_id=NLP_SERVICE_SYSTEM_USER,
                                 )
 

@@ -626,5 +626,3 @@ async def validate_v2_redis_key_pattern(event_data: dict[str, Any], service_name
     event_type = event_data.get("event_type", "unknown").replace(".", "_")
     expected_key = f"huleedu:idempotency:v2:{service_name}:{event_type}:{deterministic_id}"
     return expected_key
-
-

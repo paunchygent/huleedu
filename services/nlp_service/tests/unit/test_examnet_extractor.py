@@ -377,7 +377,7 @@ Content..."""
         # Test cases that were previously failing
         test_cases = [
             ("tindra cruz", "tindra cruz"),  # Preserve original case
-            ("simon pub", "simon pub"),    # Preserve original case
+            ("simon pub", "simon pub"),  # Preserve original case
             ("anna andersson", "anna andersson"),
             ("ERIK JOHANSSON", "ERIK JOHANSSON"),  # Also test all caps
             ("Mixed Case Name", "Mixed Case Name"),  # Mixed case should still work

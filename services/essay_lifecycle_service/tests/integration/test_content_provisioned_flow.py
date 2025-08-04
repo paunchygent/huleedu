@@ -359,7 +359,8 @@ class TestContentProvisionedFlow:
             excess_events = [
                 e
                 for e in published_events
-                if e["envelope"].event_type == topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
+                if e["envelope"].event_type
+                == topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
             ]
             assert len(excess_events) == len(failed_provisions), (
                 f"Expected {len(failed_provisions)} excess content events, found {len(excess_events)}"

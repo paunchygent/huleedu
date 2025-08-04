@@ -419,7 +419,9 @@ async def test_deterministic_event_id_generation(
     # Create two identical event payloads (same data content)
     event_data = {
         "event_id": str(uuid.uuid4()),  # Different UUID each time
-        "event_type": topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Fixed: correct event type
+        "event_type": topic_name(
+            ProcessingEvent.BATCH_ESSAYS_REGISTERED
+        ),  # Fixed: correct event type
         "event_timestamp": datetime.now(UTC).isoformat(),
         "source_service": "batch_orchestrator_service",
         "correlation_id": str(uuid.uuid4()),  # Different UUID each time

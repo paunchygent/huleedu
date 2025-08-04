@@ -17,7 +17,7 @@ from huleedu_service_libs.error_handling import HuleEduError
 from services.file_service.implementations.extraction_strategies import (
     DocxExtractionStrategy,
     ExtractionStrategy,
-    PdfExtractionStrategy, 
+    PdfExtractionStrategy,
     TxtExtractionStrategy,
 )
 from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
@@ -26,26 +26,28 @@ from services.file_service.implementations.text_extractor_impl import StrategyBa
 class TestStrategyBasedTextExtractor:
     """Test StrategyBasedTextExtractor implementation."""
 
-    def _create_extractor_with_mock_strategies(self) -> tuple[StrategyBasedTextExtractor, dict[str, Any]]:
+    def _create_extractor_with_mock_strategies(
+        self,
+    ) -> tuple[StrategyBasedTextExtractor, dict[str, Any]]:
         """Helper to create extractor with mocked strategies."""
         mock_txt_strategy = AsyncMock(spec=TxtExtractionStrategy)
         mock_docx_strategy = AsyncMock(spec=DocxExtractionStrategy)
         mock_pdf_strategy = AsyncMock(spec=PdfExtractionStrategy)
-        
+
         # Store mocks separately for test access
         mocks = {
             ".txt": mock_txt_strategy,
             ".docx": mock_docx_strategy,
             ".pdf": mock_pdf_strategy,
         }
-        
+
         # Type-annotated dict for the extractor
         strategies: dict[str, ExtractionStrategy] = {
             ".txt": mock_txt_strategy,
             ".docx": mock_docx_strategy,
             ".pdf": mock_pdf_strategy,
         }
-        
+
         extractor = StrategyBasedTextExtractor(validators=[], strategies=strategies)
         return extractor, mocks
 
@@ -159,18 +161,15 @@ class TestStrategyBasedTextExtractor:
 
         # Create extractor with mocked strategy that raises encrypted error
         mock_strategy = AsyncMock()
-        
+
         # Create a mock HuleEduError for encrypted file
         mock_error_detail = MagicMock()
         mock_error_detail.error_code = FileValidationErrorCode.ENCRYPTED_FILE_UNSUPPORTED
         mock_error = HuleEduError(mock_error_detail)
-        
+
         mock_strategy.extract.side_effect = mock_error
-        
-        extractor = StrategyBasedTextExtractor(
-            validators=[],
-            strategies={".pdf": mock_strategy}
-        )
+
+        extractor = StrategyBasedTextExtractor(validators=[], strategies={".pdf": mock_strategy})
 
         # When/Then
         with pytest.raises(HuleEduError) as exc_info:
@@ -192,11 +191,8 @@ class TestStrategyBasedTextExtractor:
         # Create extractor with mocked strategy that raises generic error
         mock_strategy = AsyncMock()
         mock_strategy.extract.side_effect = RuntimeError("Unexpected parsing error")
-        
-        extractor = StrategyBasedTextExtractor(
-            validators=[],
-            strategies={".docx": mock_strategy}
-        )
+
+        extractor = StrategyBasedTextExtractor(validators=[], strategies={".docx": mock_strategy})
 
         # When/Then
         with pytest.raises(HuleEduError) as exc_info:
@@ -221,11 +217,8 @@ class TestStrategyBasedTextExtractor:
         # Create extractor with mocked strategy
         mock_strategy = AsyncMock()
         mock_strategy.extract.return_value = expected_text
-        
-        extractor = StrategyBasedTextExtractor(
-            validators=[],
-            strategies={".pdf": mock_strategy}
-        )
+
+        extractor = StrategyBasedTextExtractor(validators=[], strategies={".pdf": mock_strategy})
 
         # When
         result: str = await extractor.extract_text(file_content, file_name, correlation_id)
@@ -240,23 +233,22 @@ class TestStrategyBasedTextExtractor:
         file_content: bytes = b"Test content"
         file_name: str = "test.txt"
         correlation_id: UUID = uuid4()
-        
+
         # Create mock validators
         mock_validator1 = AsyncMock()
         mock_validator2 = AsyncMock()
-        
+
         # Create mock strategy
         mock_strategy = AsyncMock()
         mock_strategy.extract.return_value = "Extracted text"
-        
+
         extractor = StrategyBasedTextExtractor(
-            validators=[mock_validator1, mock_validator2],
-            strategies={".txt": mock_strategy}
+            validators=[mock_validator1, mock_validator2], strategies={".txt": mock_strategy}
         )
-        
+
         # When
         await extractor.extract_text(file_content, file_name, correlation_id)
-        
+
         # Then
         mock_validator1.validate.assert_called_once_with(file_name, file_content, correlation_id)
         mock_validator2.validate.assert_called_once_with(file_name, file_content, correlation_id)
@@ -268,23 +260,22 @@ class TestStrategyBasedTextExtractor:
         file_content: bytes = b"Test content"
         file_name: str = "~$test.txt"  # Temporary file
         correlation_id: UUID = uuid4()
-        
+
         # Create mock validator that raises error
         mock_validator = AsyncMock()
         mock_error = HuleEduError(MagicMock())
         mock_validator.validate.side_effect = mock_error
-        
+
         # Create mock strategy that should not be called
         mock_strategy = AsyncMock()
-        
+
         extractor = StrategyBasedTextExtractor(
-            validators=[mock_validator],
-            strategies={".txt": mock_strategy}
+            validators=[mock_validator], strategies={".txt": mock_strategy}
         )
-        
+
         # When/Then
         with pytest.raises(HuleEduError):
             await extractor.extract_text(file_content, file_name, correlation_id)
-        
+
         # Strategy should not have been called
         mock_strategy.extract.assert_not_called()

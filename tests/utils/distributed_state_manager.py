@@ -106,10 +106,10 @@ class DistributedStateManager:
                 'api:batch:*',                   -- API batch state
                 'llm_provider:*'                 -- LLM provider queues
             }
-            
+
             local batch_size = 1000  -- Increased for faster cleanup
             local total_deleted = 0
-            
+
             -- Clean up keys matching each pattern
             for _, pattern in ipairs(patterns) do
                 local cursor = 0
@@ -119,7 +119,7 @@ class DistributedStateManager:
                     )
                     cursor = tonumber(scan_result[1])
                     local keys = scan_result[2]
-                    
+
                     if #keys > 0 then
                         -- Delete batch atomically
                         local deleted = redis.call('DEL', unpack(keys))
@@ -127,11 +127,11 @@ class DistributedStateManager:
                     end
                 until cursor == 0
             end
-            
+
             -- Also clean up the pending content index key
             local index_deleted = redis.call('DEL', 'pending_content:index')
             total_deleted = total_deleted + index_deleted
-            
+
             return total_deleted
         """
 

@@ -95,7 +95,9 @@ class TestTrueOutboxPatternCompliance:
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == essay_id
         assert call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
-        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        assert call_args.kwargs["topic"] == topic_name(
+            ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
+        )
 
         # Verify original Pydantic envelope is passed (not reconstructed dict)
         envelope = call_args.kwargs["event_data"]
@@ -164,7 +166,9 @@ class TestTrueOutboxPatternCompliance:
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
         assert call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
-        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)
+        assert call_args.kwargs["topic"] == topic_name(
+            ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
+        )
 
         # Verify original Pydantic envelope is passed
         envelope = call_args.kwargs["event_data"]

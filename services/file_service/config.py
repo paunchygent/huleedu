@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     MIN_CONTENT_LENGTH: int = 50
     MAX_CONTENT_LENGTH: int = 50000
     VALIDATION_LOG_LEVEL: str = "INFO"
-    
+
     # File validation settings
     ALLOWED_MIME_TYPES: set[str] = Field(
         default={
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
             "text/plain",  # .txt
             "application/pdf",  # .pdf
         },
-        description="Allowed MIME types for file validation"
+        description="Allowed MIME types for file validation",
     )
 
     # Kafka topic for validation failures (will be implemented with new enum)

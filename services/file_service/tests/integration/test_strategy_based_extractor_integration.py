@@ -36,7 +36,7 @@ class TestStrategyBasedExtractorIntegration:
             ".docx": DocxExtractionStrategy(),
             ".pdf": PdfExtractionStrategy(),
         }
-        
+
         return StrategyBasedTextExtractor(validators=[], strategies=strategies)
 
     @pytest.fixture
@@ -298,7 +298,7 @@ class TestLargeFileIntegration:
             ".docx": DocxExtractionStrategy(),
             ".pdf": PdfExtractionStrategy(),
         }
-        
+
         return StrategyBasedTextExtractor(validators=[], strategies=strategies)
 
     @pytest.fixture

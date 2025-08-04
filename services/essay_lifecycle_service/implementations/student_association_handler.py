@@ -160,7 +160,7 @@ class StudentAssociationHandler:
                             correlation_id=correlation_id,
                             batch_id=batch_id,
                         )
-                    
+
                     batch_ready_event_from_tracker, _ = batch_ready_result
                     ready_essays = batch_ready_event_from_tracker.ready_essays
 
@@ -215,7 +215,9 @@ class StudentAssociationHandler:
                     # Clean up Redis state for REGULAR batch after BatchEssaysReady publication
                     # This completes the REGULAR batch lifecycle: content → associations → ready → cleanup
                     await self.batch_tracker.cleanup_batch(batch_id)
-                    logger.info(f"REGULAR batch {batch_id} Redis state cleaned up after BatchEssaysReady publication")
+                    logger.info(
+                        f"REGULAR batch {batch_id} Redis state cleaned up after BatchEssaysReady publication"
+                    )
 
                     # Update batch tracking to indicate associations complete
                     if ready_essays:

@@ -184,18 +184,20 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         """Retrieve student-essay association suggestions for teacher validation."""
         # Query associations from repository
         associations = await self.repo.get_batch_student_associations(batch_id)
-        
+
         # Format associations for API response
         formatted_associations = []
         for assoc in associations:
-            formatted_associations.append({
-                "essay_id": str(assoc.essay_id),
-                "suggested_student_id": str(assoc.student_id),
-                "confidence_score": PHASE1_CONFIDENCE_SCORE,
-                "match_reasons": ["Name extracted from essay header"],
-                "created_at": assoc.created_at.isoformat()
-            })
-        
+            formatted_associations.append(
+                {
+                    "essay_id": str(assoc.essay_id),
+                    "suggested_student_id": str(assoc.student_id),
+                    "confidence_score": PHASE1_CONFIDENCE_SCORE,
+                    "match_reasons": ["Name extracted from essay header"],
+                    "created_at": assoc.created_at.isoformat(),
+                }
+            )
+
         return formatted_associations
 
     async def confirm_batch_student_associations(
@@ -205,28 +207,32 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         # Get class_id from the confirmations data or associations
         # The class_id should be provided in the confirmation request
         class_id = confirmations.get("class_id", str(uuid.uuid4()))
-        
+
         # Process confirmations
         confirmed_associations = []
         validation_summary = {
             "total_associations": len(confirmations.get("associations", [])),
             "confirmed": 0,
-            "rejected": 0
+            "rejected": 0,
         }
-        
+
         for assoc in confirmations.get("associations", []):
             if assoc.get("confirmed", False):
-                confirmed_associations.append({
-                    "essay_id": assoc["essay_id"],
-                    "student_id": assoc["student_id"],
-                    "confidence_score": PHASE1_CONFIDENCE_SCORE,
-                    "validation_method": "human",  # Using literal from event model
-                    "validated_by": confirmations.get("user_id", UNKNOWN_USER),  # Should be provided in request
-                })
+                confirmed_associations.append(
+                    {
+                        "essay_id": assoc["essay_id"],
+                        "student_id": assoc["student_id"],
+                        "confidence_score": PHASE1_CONFIDENCE_SCORE,
+                        "validation_method": "human",  # Using literal from event model
+                        "validated_by": confirmations.get(
+                            "user_id", UNKNOWN_USER
+                        ),  # Should be provided in request
+                    }
+                )
                 validation_summary["confirmed"] += 1
             else:
                 validation_summary["rejected"] += 1
-        
+
         # Publish StudentAssociationsConfirmed event
         await self.event_publisher.publish_student_associations_confirmed(
             batch_id=str(batch_id),
@@ -234,11 +240,11 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             associations=confirmed_associations,
             timeout_triggered=False,
             validation_summary=validation_summary,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
-        
+
         return {
             "status": "confirmed",
             "associations_confirmed": validation_summary["confirmed"],
-            "associations_rejected": validation_summary["rejected"]
+            "associations_rejected": validation_summary["rejected"],
         }

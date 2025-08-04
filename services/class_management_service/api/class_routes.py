@@ -273,14 +273,14 @@ async def get_class_roster(
 ) -> Response | tuple[Response, int]:
     """Get the student roster for a class."""
     # Allow unauthenticated access for NLP service
-    
+
     with metrics.http_request_duration_seconds.labels(
         method="GET", endpoint=f"/v1/classes/{class_id}/roster"
     ).time():
         try:
             class_uuid = uuid.UUID(class_id)
             class_obj = await service.get_class_by_id(class_uuid)
-            
+
             if not class_obj:
                 metrics.http_requests_total.labels(
                     method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=404
@@ -289,24 +289,26 @@ async def get_class_roster(
                     endpoint=f"/v1/classes/{class_id}/roster", error_type="not_found"
                 ).inc()
                 return jsonify({"error": "Class not found"}), 404
-            
+
             # Format roster for NLP service expectations
             students = []
             for student in class_obj.students:
-                students.append({
-                    "student_id": str(student.id),
-                    "first_name": student.first_name,
-                    "last_name": student.last_name,
-                    "full_legal_name": f"{student.first_name} {student.last_name}",
-                    "email": student.email if student.email else None
-                })
-            
+                students.append(
+                    {
+                        "student_id": str(student.id),
+                        "first_name": student.first_name,
+                        "last_name": student.last_name,
+                        "full_legal_name": f"{student.first_name} {student.last_name}",
+                        "email": student.email if student.email else None,
+                    }
+                )
+
             metrics.http_requests_total.labels(
                 method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=200
             ).inc()
-            
+
             return jsonify({"students": students}), 200
-            
+
         except ValueError:
             metrics.http_requests_total.labels(
                 method="GET", endpoint=f"/v1/classes/{class_id}/roster", http_status=400
@@ -324,5 +326,3 @@ async def get_class_roster(
                 endpoint=f"/v1/classes/{class_id}/roster", error_type="server_error"
             ).inc()
             return jsonify({"error": "Internal server error"}), 500
-
-

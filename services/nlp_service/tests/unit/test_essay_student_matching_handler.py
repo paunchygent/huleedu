@@ -172,7 +172,10 @@ class TestEssayStudentMatchingHandler:
         self, handler: EssayStudentMatchingHandler
     ) -> None:
         """Test handler recognizes correct event type."""
-        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)) is True
+        assert (
+            await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED))
+            is True
+        )
         assert await handler.can_handle("huleedu.essay.student.matching.requested.v1") is False
         assert await handler.can_handle("some.other.event.v1") is False
 

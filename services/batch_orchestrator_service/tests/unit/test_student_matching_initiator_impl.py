@@ -110,7 +110,9 @@ class TestStudentMatchingInitiatorImpl:
         # Verify the envelope
         envelope = call_args.kwargs["event_envelope"]
         assert isinstance(envelope, EventEnvelope)
-        assert envelope.event_type == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND)
+        assert envelope.event_type == topic_name(
+            ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND
+        )
         assert envelope.source_service == "batch_orchestrator_service"
         assert envelope.correlation_id == correlation_id
 

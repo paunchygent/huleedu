@@ -148,6 +148,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
+
+                        # Clean up Redis state for GUEST batches after event publication
+                        # REGULAR batches are cleaned up in student_association_handler
+                        if batch_ready_event.class_type == "GUEST":
+                            await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
+                            logger.info(
+                                f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after immediate BatchContentProvisioningCompleted publication"
+                            )
                     # Transaction commits here automatically
 
             return True
@@ -399,9 +407,16 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             session=session,
                         )
 
+                        # Clean up Redis state for GUEST batches after event publication
+                        # REGULAR batches are cleaned up in student_association_handler
+                        if batch_ready_event.class_type == "GUEST":
+                            await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
+                            logger.info(
+                                f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after BatchContentProvisioningCompleted publication"
+                            )
+
                         # NOTE: Batch tracker record must persist for pipeline duration
                         # Essays need batch_id for phase outcome coordination throughout spellcheck/CJ phases
-                        # Cleanup will happen at pipeline completion, not after content provisioning
 
                     # Transaction commits here
 
@@ -501,6 +516,14 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             correlation_id=publish_correlation_id,
                             session=session,
                         )
+
+                        # Clean up Redis state for GUEST batches after event publication
+                        # REGULAR batches are cleaned up in student_association_handler
+                        if batch_ready_event.class_type == "GUEST":
+                            await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
+                            logger.info(
+                                f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after validation failure BatchContentProvisioningCompleted publication"
+                            )
                         # Transaction commits here
 
             logger.info(

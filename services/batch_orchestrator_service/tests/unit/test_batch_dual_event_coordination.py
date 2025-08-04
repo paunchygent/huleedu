@@ -14,13 +14,13 @@ from uuid import uuid4
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import (
     BatchErrorSummary,
     BatchEssaysReady,
     BatchValidationErrorsV1,
     EssayValidationError,
 )
-from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,

@@ -65,7 +65,7 @@ class StrategyBasedTextExtractor(TextExtractorProtocol):
             f"Using strategy '{type(strategy).__name__}' for '{file_name}'.",
             extra={"correlation_id": str(correlation_id)},
         )
-        
+
         try:
             return await strategy.extract(file_content, file_name, correlation_id)
         except HuleEduError:

@@ -168,8 +168,14 @@ class TestBatchAuthorMatchesHandler:
     @pytest.mark.asyncio
     async def test_can_handle_correct_event_type(self, handler: BatchAuthorMatchesHandler) -> None:
         """Test handler recognizes correct event type."""
-        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)) is True
-        assert await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)) is False
+        assert (
+            await handler.can_handle(topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED))
+            is True
+        )
+        assert (
+            await handler.can_handle(topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED))
+            is False
+        )
         assert await handler.can_handle("some.other.event.v1") is False
 
     @pytest.mark.asyncio
