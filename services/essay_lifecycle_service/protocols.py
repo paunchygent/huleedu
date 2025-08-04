@@ -12,6 +12,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from common_core.domain_enums import ContentType, CourseCode, Language
+from common_core.event_enums import ProcessingEvent
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
@@ -30,6 +31,14 @@ class EssayState(Protocol):
     text_storage_id: str | None  # Added for student association handler
     created_at: Any  # datetime
     updated_at: Any  # datetime
+
+
+class TopicNamingProtocol(Protocol):
+    """Protocol for topic name generation following Clean Architecture principles."""
+
+    def get_topic_name(self, event: ProcessingEvent) -> str:
+        """Get topic name for given processing event."""
+        ...
 
 
 class EssayRepositoryProtocol(Protocol):

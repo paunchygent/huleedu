@@ -353,12 +353,15 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         # Check if batch is now complete after this failure
         return await self.check_batch_completion(batch_id)
 
-    async def check_batch_completion(self, batch_id: str) -> Any | None:  # BatchEssaysReady | None
+    async def check_batch_completion(self, batch_id: str) -> tuple[Any, UUID] | None:
         """
-        Check if batch is complete and return BatchEssaysReady event if so.
+        Check if batch is complete and return BatchEssaysReady event with correlation ID if so.
 
         This is used to check completion after validation failures or other events
         that might complete a batch.
+        
+        Returns:
+            tuple[BatchEssaysReady, UUID] if batch is complete, None otherwise
         """
         # Check if batch is complete using Redis coordinator
         batch_status = await self._batch_queries.get_batch_status(batch_id)

@@ -21,6 +21,7 @@ from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.essay_lifecycle_service.constants import MetadataKey
 from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
     BatchLifecyclePublisher,
 )
@@ -93,8 +94,8 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
 
             # Check if this essay was part of the specified phase
             processing_metadata = essay_state.processing_metadata
-            current_phase = processing_metadata.get("current_phase")
-            commanded_phases = processing_metadata.get("commanded_phases", [])
+            current_phase = processing_metadata.get(MetadataKey.CURRENT_PHASE)
+            commanded_phases = processing_metadata.get(MetadataKey.COMMANDED_PHASES, [])
 
             if current_phase != phase_name.value and phase_name.value not in commanded_phases:
                 logger.debug(

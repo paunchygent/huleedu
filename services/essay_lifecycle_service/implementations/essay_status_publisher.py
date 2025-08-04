@@ -17,6 +17,8 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
+from services.essay_lifecycle_service.constants import EssayDefaults
+
 if TYPE_CHECKING:
     from common_core.status_enums import EssayStatus
     from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -71,12 +73,12 @@ class EssayStatusPublisher:
         event_data = {
             "event_name": "essay.status.updated.v1",
             "entity_id": essay_id,
-            "entity_type": "essay",
+            "entity_type": EssayDefaults.ENTITY_TYPE,
             "parent_id": batch_id,
             "status": status.value,
             "system_metadata": SystemProcessingMetadata(
                 entity_id=essay_id,
-                entity_type="essay",
+                entity_type=EssayDefaults.ENTITY_TYPE,
                 parent_id=batch_id,
                 timestamp=datetime.now(UTC),
             ).model_dump(),
@@ -137,7 +139,7 @@ class EssayStatusPublisher:
                 message=f"Kafka publish failed: {kafka_error.__class__.__name__}",
                 correlation_id=correlation_id,
                 aggregate_id=str(essay_id),
-                aggregate_type="essay",
+                aggregate_type=EssayDefaults.ENTITY_TYPE,
                 event_type="essay.status.updated.v1",
                 topic=topic,
                 essay_id=essay_id,

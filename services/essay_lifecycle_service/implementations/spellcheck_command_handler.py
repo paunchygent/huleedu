@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from common_core.domain_enums import Language
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.essay_lifecycle_service.constants import MetadataKey
 from services.essay_lifecycle_service.essay_state_machine import (
     CMD_INITIATE_SPELLCHECK,
     EVT_SPELLCHECK_STARTED,
@@ -92,11 +93,11 @@ class SpellcheckCommandHandler:
                                 essay_machine.current_status,
                                 {
                                     "bos_command": "spellcheck_initiate",
-                                    "current_phase": "spellcheck",
-                                    "commanded_phases": list(
+                                    MetadataKey.CURRENT_PHASE: "spellcheck",
+                                    MetadataKey.COMMANDED_PHASES: list(
                                         set(
                                             essay_state_model.processing_metadata.get(
-                                                "commanded_phases", []
+                                                MetadataKey.COMMANDED_PHASES, []
                                             )
                                             + ["spellcheck"]
                                         )

@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.constants import get_els_phase_statuses
 from services.essay_lifecycle_service.domain_models import EssayState as ConcreteEssayState
 from services.essay_lifecycle_service.models_db import Base, EssayStateDB
 from services.essay_lifecycle_service.protocols import EssayRepositoryProtocol
@@ -801,27 +802,11 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
-        # Define phase mappings using correct enum values - MUST include ALL statuses for each phase
-        phase_status_mapping = {
-            "spellcheck": [
-                EssayStatus.AWAITING_SPELLCHECK,
-                EssayStatus.SPELLCHECKING_IN_PROGRESS,
-                EssayStatus.SPELLCHECKED_SUCCESS,
-                EssayStatus.SPELLCHECK_FAILED,
-            ],
-            "cj_assessment": [
-                EssayStatus.AWAITING_CJ_ASSESSMENT,
-                EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
-                EssayStatus.CJ_ASSESSMENT_SUCCESS,
-                EssayStatus.CJ_ASSESSMENT_FAILED,
-            ],
-        }
-
-        if phase_name not in phase_status_mapping:
-            self.logger.warning(f"Unknown phase: {phase_name}")
+        try:
+            phase_statuses = get_els_phase_statuses(phase_name)
+        except ValueError as e:
+            self.logger.warning(f"Unknown phase: {phase_name} - {e}")
             return []
-
-        phase_statuses = phase_status_mapping[phase_name]
 
         # Declare essays list once
         essays: list[EssayState] = []

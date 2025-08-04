@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from services.essay_lifecycle_service.config import Settings
     from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
+    from services.essay_lifecycle_service.protocols import TopicNamingProtocol
 
 logger = create_service_logger("essay_lifecycle_service.batch_lifecycle_publisher")
 
@@ -35,9 +36,11 @@ class BatchLifecyclePublisher:
         self,
         settings: Settings,
         outbox_manager: OutboxManager,
+        topic_naming: TopicNamingProtocol,
     ) -> None:
         self.settings = settings
         self.outbox_manager = outbox_manager
+        self.topic_naming = topic_naming
 
     def _get_topic_for_event_type(self, event_type: str) -> str:
         """Map event type to appropriate Kafka topic."""
@@ -67,12 +70,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -89,13 +92,13 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data
         # The relay worker will publish from outbox asynchronously
-        topic = topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED)
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.EXCESS_CONTENT_PROVISIONED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -127,12 +130,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -149,13 +152,13 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data
         # The relay worker will publish from outbox asynchronously
-        topic = topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_ESSAYS_READY),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -192,12 +195,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -214,13 +217,13 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data
         # The relay worker will publish from outbox asynchronously
-        topic = topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -258,12 +261,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope for validation errors
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -278,9 +281,9 @@ class BatchLifecyclePublisher:
             inject_trace_context(envelope.metadata)
 
         # TRUE OUTBOX PATTERN: Store validation error event in outbox
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
 
-        topic = topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)  # New topic for error events
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)  # New topic for error events
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
@@ -322,12 +325,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -339,7 +342,7 @@ class BatchLifecyclePublisher:
             inject_trace_context(envelope.metadata)
 
         # Try immediate Kafka publishing first
-        topic = topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED)
         essay_id = getattr(event_data, "essay_id", "unknown")
 
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
@@ -348,7 +351,7 @@ class BatchLifecyclePublisher:
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="essay",
             aggregate_id=essay_id,
-            event_type=topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -382,12 +385,12 @@ class BatchLifecyclePublisher:
         Raises:
             HuleEduError: If publishing fails to both Kafka and outbox would be needed
         """
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
         from common_core.events.envelope import EventEnvelope
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -404,13 +407,13 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data
         # The relay worker will publish from outbox asynchronously
-        topic = topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
+        topic = self.topic_naming.get_topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME)
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
+            event_type=self.topic_naming.get_topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity

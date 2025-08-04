@@ -52,14 +52,26 @@ def mock_outbox_manager() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_topic_naming() -> Mock:
+    """Provide mock topic naming."""
+    from services.essay_lifecycle_service.protocols import TopicNamingProtocol
+    mock = Mock(spec=TopicNamingProtocol)
+    # Set default return values for all common events
+    mock.get_topic_name.return_value = "test.topic.v1"
+    return mock
+
+
+@pytest.fixture
 def batch_lifecycle_publisher(
     mock_settings: Settings,
     mock_outbox_manager: AsyncMock,
+    mock_topic_naming: Mock,
 ) -> BatchLifecyclePublisher:
     """Provide BatchLifecyclePublisher instance."""
     return BatchLifecyclePublisher(
         settings=mock_settings,
         outbox_manager=mock_outbox_manager,
+        topic_naming=mock_topic_naming,
     )
 
 
@@ -117,8 +129,8 @@ class TestDualEventPublishing:
 
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
-        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        assert call_args.kwargs["event_type"] == "test.topic.v1"
+        assert call_args.kwargs["topic"] == "test.topic.v1"
 
         # Verify event envelope contains correct data
         envelope = call_args.kwargs["event_data"]
@@ -191,8 +203,8 @@ class TestDualEventPublishing:
 
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
-        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
-        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        assert call_args.kwargs["event_type"] == "test.topic.v1"
+        assert call_args.kwargs["topic"] == "test.topic.v1"
 
         # Verify event envelope contains correct data
         envelope = call_args.kwargs["event_data"]
@@ -275,15 +287,13 @@ class TestDualEventPublishing:
 
         # Verify first call (success event)
         first_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
-        assert first_call.kwargs["event_type"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
-        assert first_call.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_ESSAYS_READY)
+        assert first_call.kwargs["event_type"] == "test.topic.v1"
+        assert first_call.kwargs["topic"] == "test.topic.v1"
 
         # Verify second call (error event)
         second_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
-        assert second_call.kwargs["event_type"] == topic_name(
-            ProcessingEvent.BATCH_VALIDATION_ERRORS
-        )
-        assert second_call.kwargs["topic"] == topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        assert second_call.kwargs["event_type"] == "test.topic.v1"
+        assert second_call.kwargs["topic"] == "test.topic.v1"
 
     async def test_critical_failure_flag_in_error_summary(
         self,
@@ -340,18 +350,17 @@ class TestDualEventPublishing:
         assert envelope.data.error_summary.critical_failure is True
         assert envelope.data.error_summary.total_errors == 5
 
-    @patch("common_core.event_enums.topic_name")
     async def test_uses_topic_name_function(
         self,
-        mock_topic_name: Mock,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
         mock_outbox_manager: AsyncMock,
+        mock_topic_naming: Mock,
     ) -> None:
-        """Test that topic_name() function is used instead of hardcoded strings."""
+        """Test that topic naming service is used via dependency injection instead of global patching."""
         # Arrange
-        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.event_enums import ProcessingEvent
 
-        mock_topic_name.return_value = topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        mock_topic_naming.get_topic_name.return_value = "batch.validation.errors.v1"
 
         event_data = BatchValidationErrorsV1(
             batch_id="test-batch",
@@ -376,6 +385,6 @@ class TestDualEventPublishing:
         )
 
         # Assert
-        # topic_name is called twice: once for event_type in envelope, once for topic
-        assert mock_topic_name.call_count == 2
-        mock_topic_name.assert_any_call(ProcessingEvent.BATCH_VALIDATION_ERRORS)
+        # topic naming service is called twice: once for event_type in envelope, once for topic
+        assert mock_topic_naming.get_topic_name.call_count == 2
+        mock_topic_naming.get_topic_name.assert_any_call(ProcessingEvent.BATCH_VALIDATION_ERRORS)

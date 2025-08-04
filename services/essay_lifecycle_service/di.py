@@ -96,6 +96,7 @@ from services.essay_lifecycle_service.protocols import (
     ServiceResultHandler,
     SpecializedServiceRequestDispatcher,
     StudentAssociationHandler,
+    TopicNamingProtocol,
 )
 from services.essay_lifecycle_service.state_store import SQLiteEssayStateStore
 
@@ -270,13 +271,20 @@ class ServiceClientsProvider(Provider):
         return OutboxManager(outbox_repository, redis_client, settings)
 
     @provide(scope=Scope.APP)
+    def provide_topic_naming(self) -> TopicNamingProtocol:
+        """Provide topic naming implementation."""
+        from services.essay_lifecycle_service.implementations.topic_naming import DefaultTopicNaming
+        return DefaultTopicNaming()
+
+    @provide(scope=Scope.APP)
     def provide_batch_lifecycle_publisher(
         self,
         settings: Settings,
         outbox_manager: OutboxManager,
+        topic_naming: TopicNamingProtocol,
     ) -> BatchLifecyclePublisher:
         """Provide batch lifecycle publisher using TRUE OUTBOX PATTERN for transactional safety."""
-        return BatchLifecyclePublisher(settings, outbox_manager)
+        return BatchLifecyclePublisher(settings, outbox_manager, topic_naming)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:

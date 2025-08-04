@@ -63,8 +63,7 @@ class BatchEssaysRegistered(BaseModel):
     class_id: str | None = Field(
         default=None,
         description=(
-            "Class ID for REGULAR batches requiring student matching, "
-            "None for GUEST batches"
+            "Class ID for REGULAR batches requiring student matching, None for GUEST batches"
         ),
     )
 

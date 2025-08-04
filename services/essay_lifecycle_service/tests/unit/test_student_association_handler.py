@@ -170,8 +170,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -221,8 +245,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -259,8 +307,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return None for all essays (not found)
         mock_repository.get_essay_state.return_value = None
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act - Should not raise exception
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -294,8 +366,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -357,8 +453,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -429,8 +549,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
@@ -497,8 +641,32 @@ class TestStudentAssociationHandler:
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states[:3]
 
-        # Mock batch tracker to return status
+        # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
+        
+        # Create mock BatchEssaysReady event for check_batch_completion
+        from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+        mock_ready_event = BatchEssaysReady(
+            batch_id=event_data.batch_id,
+            ready_essays=[
+                EssayProcessingInputRefV1(
+                    essay_id=assoc.essay_id,
+                    text_storage_id=f"storage-{i}",
+                    student_name=f"Student {i}",
+                )
+                for i, assoc in enumerate(event_data.associations)
+            ],
+            metadata=SystemProcessingMetadata(
+                entity_id=event_data.batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+            ),
+            course_code=CourseCode.ENG5,
+            course_language="en",
+            essay_instructions="Test essay instructions",
+            class_type="REGULAR",
+        )
+        mock_batch_tracker.check_batch_completion.return_value = (mock_ready_event, correlation_id)
 
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
