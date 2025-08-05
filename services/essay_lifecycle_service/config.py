@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
     DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
 
-    # PostgreSQL Connection Pool Settings  
+    # PostgreSQL Connection Pool Settings
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 20
     DATABASE_POOL_PRE_PING: bool = True

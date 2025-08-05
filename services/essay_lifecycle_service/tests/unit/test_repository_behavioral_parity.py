@@ -16,14 +16,10 @@ from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.essay_lifecycle_service.constants import (
-    ELS_PHASE_STATUS_MAPPING,
     MetadataKey,
 )
 from services.essay_lifecycle_service.implementations.mock_essay_repository import (
     MockEssayRepository,
-)
-from services.essay_lifecycle_service.tests.unit.test_data_builders import (
-    EssayTestDataBuilder,
 )
 
 
@@ -36,7 +32,9 @@ class TestRepositoryBehavioralParity:
         return MockEssayRepository()
 
     @pytest.mark.asyncio
-    async def test_create_and_retrieve_essay_lifecycle(self, mock_repository: MockEssayRepository) -> None:
+    async def test_create_and_retrieve_essay_lifecycle(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test complete essay creation and retrieval lifecycle."""
         correlation_id = uuid4()
         essay_id = "lifecycle-test-essay"
@@ -287,7 +285,10 @@ class TestRepositoryBehavioralParity:
         }
 
         # First creation should succeed
-        was_created_1, essay_id_1 = await mock_repository.create_essay_state_with_content_idempotency(
+        (
+            was_created_1,
+            essay_id_1,
+        ) = await mock_repository.create_essay_state_with_content_idempotency(
             batch_id=batch_id,
             text_storage_id=text_storage_id,
             essay_data=essay_data,
@@ -303,7 +304,10 @@ class TestRepositoryBehavioralParity:
         assert created_essay.text_storage_id == text_storage_id
 
         # Second creation with same (batch_id, text_storage_id) should be idempotent
-        was_created_2, essay_id_2 = await mock_repository.create_essay_state_with_content_idempotency(
+        (
+            was_created_2,
+            essay_id_2,
+        ) = await mock_repository.create_essay_state_with_content_idempotency(
             batch_id=batch_id,
             text_storage_id=text_storage_id,
             essay_data={"internal_essay_id": "different-essay-id"},  # Different data
@@ -314,7 +318,10 @@ class TestRepositoryBehavioralParity:
         assert essay_id_2 == "idempotent-essay"  # Returns original essay_id
 
         # Third creation with different text_storage_id should succeed
-        was_created_3, essay_id_3 = await mock_repository.create_essay_state_with_content_idempotency(
+        (
+            was_created_3,
+            essay_id_3,
+        ) = await mock_repository.create_essay_state_with_content_idempotency(
             batch_id=batch_id,
             text_storage_id="different-text-456",
             essay_data={"internal_essay_id": "different-essay"},
@@ -325,7 +332,10 @@ class TestRepositoryBehavioralParity:
         assert essay_id_3 == "different-essay"
 
         # Fourth creation with different batch_id but same text_storage_id should succeed
-        was_created_4, essay_id_4 = await mock_repository.create_essay_state_with_content_idempotency(
+        (
+            was_created_4,
+            essay_id_4,
+        ) = await mock_repository.create_essay_state_with_content_idempotency(
             batch_id="different-batch",
             text_storage_id=text_storage_id,
             essay_data={"internal_essay_id": "cross-batch-essay"},
@@ -474,10 +484,17 @@ class TestRepositoryBehavioralParity:
         # Verify merged metadata
         updated_essay = await mock_repository.get_essay_state(essay_id)
         assert updated_essay is not None
-        assert updated_essay.processing_metadata["spellcheck_service_request_id"] == "req-123"  # Preserved
-        assert updated_essay.processing_metadata["cj_assessment_service_request_id"] == "cj-req-456"  # Added
+        assert (
+            updated_essay.processing_metadata["spellcheck_service_request_id"] == "req-123"
+        )  # Preserved
+        assert (
+            updated_essay.processing_metadata["cj_assessment_service_request_id"] == "cj-req-456"
+        )  # Added
         assert updated_essay.processing_metadata["processing_attempt_count"] == 3  # Updated
-        assert updated_essay.processing_metadata["last_error_message"] == "Temporary service unavailable"  # Preserved
+        assert (
+            updated_essay.processing_metadata["last_error_message"]
+            == "Temporary service unavailable"
+        )  # Preserved
 
     @pytest.mark.asyncio
     async def test_error_handling_consistency(self, mock_repository: MockEssayRepository) -> None:

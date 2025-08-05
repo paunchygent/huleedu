@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
@@ -131,6 +132,7 @@ def sample_batch_request() -> BatchStudentMatchingRequestedV1:
     return BatchStudentMatchingRequestedV1(
         batch_id="batch-123",
         class_id="class-456",
+        course_code=CourseCode.ENG5,
         essays_to_process=[
             EssayProcessingInputRefV1(
                 essay_id="essay-1",

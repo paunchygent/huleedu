@@ -58,10 +58,13 @@ class StudentAssociationHandler:
         """
         Process confirmed student associations from Class Management Service.
 
-        This completes Phase 1 for REGULAR batches by:
-        1. Updating each essay with its student association
-        2. Checking if all essays in batch have associations
-        3. Publishing BatchEssaysReady when complete
+        This handler acts as a stateless event router during Phase 1.
+        It simply publishes BatchEssaysReady for REGULAR batches after
+        associations are confirmed, without updating any essay state.
+
+        1. Retrieve ready essays from batch tracker
+        2. Create and publish BatchEssaysReady event
+        3. Clean up Redis state
         """
         batch_id = event_data.batch_id
 
@@ -81,64 +84,7 @@ class StudentAssociationHandler:
         async with self.session_factory() as session:
             async with session.begin():
                 try:
-                    # Process each association
-                    updated_essays = []
-
-                    for association in event_data.associations:
-                        essay_id = association.essay_id
-
-                        # Get current essay state
-                        essay_state = await self.repository.get_essay_state(essay_id)
-                        if essay_state is None:
-                            logger.error(
-                                f"Essay {essay_id} not found for student association update",
-                                extra={
-                                    "batch_id": batch_id,
-                                    "correlation_id": str(correlation_id),
-                                },
-                            )
-                            continue
-
-                        # Update essay with student association
-                        await self.repository.update_student_association(
-                            essay_id=essay_id,
-                            student_id=association.student_id,
-                            association_confirmed_at=association.validated_at,
-                            association_method=association.validation_method,
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-
-                        # Update processing metadata
-                        metadata_update = {
-                            "awaiting_student_association": False,
-                            "student_matching_phase": "completed",
-                            "student_id": association.student_id,
-                            "association_confidence": association.confidence_score,
-                            "association_method": association.validation_method,
-                            "validated_by": association.validated_by,
-                        }
-
-                        await self.repository.update_essay_processing_metadata(
-                            essay_id=essay_id,
-                            metadata_updates=metadata_update,
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-
-                        updated_essays.append(essay_state)
-
-                        logger.debug(
-                            f"Updated essay {essay_id} with student association",
-                            extra={
-                                "batch_id": batch_id,
-                                "student_id": association.student_id,
-                                "method": association.validation_method,
-                                "correlation_id": str(correlation_id),
-                            },
-                        )
-
-                    # Check if all essays in batch have associations
+                    # Retrieve batch status and ready essays
                     batch_status = await self.batch_tracker.get_batch_status(batch_id)
                     if not batch_status:
                         raise_processing_error(
@@ -165,16 +111,10 @@ class StudentAssociationHandler:
                     ready_essays = batch_ready_event_from_tracker.ready_essays
 
                     # Create BatchEssaysReady event (only for REGULAR batches after associations)
-                    from common_core.domain_enums import CourseCode, get_course_language
+                    from common_core.domain_enums import get_course_language
 
-                    # Get course code from first essay's metadata
-                    # (all essays in batch have same course)
-                    first_essay = updated_essays[0] if updated_essays else None
-                    course_code = CourseCode.ENG5  # Default, should get from batch context
-                    if first_essay and first_essay.processing_metadata:
-                        course_code_str = first_essay.processing_metadata.get("course_code", "ENG5")
-                        course_code = CourseCode(course_code_str)
-
+                    # Get course code from the event data
+                    course_code = event_data.course_code
                     course_language = get_course_language(course_code).value
 
                     batch_ready_event = BatchEssaysReady(
@@ -219,23 +159,11 @@ class StudentAssociationHandler:
                         f"REGULAR batch {batch_id} Redis state cleaned up after BatchEssaysReady publication"
                     )
 
-                    # Update batch tracking to indicate associations complete
-                    if ready_essays:
-                        await self.repository.update_essay_processing_metadata(
-                            essay_id=ready_essays[0].essay_id,
-                            metadata_updates={
-                                "batch_student_associations_complete": True,
-                                "associations_completed_at": datetime.now(UTC).isoformat(),
-                            },
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-
                     logger.info(
-                        f"Successfully processed student associations for batch {batch_id}",
+                        f"Successfully routed student associations for batch {batch_id} to BOS",
                         extra={
                             "batch_id": batch_id,
-                            "updated_essays": len(updated_essays),
+                            "ready_essays_count": len(ready_essays),
                             "correlation_id": str(correlation_id),
                         },
                     )

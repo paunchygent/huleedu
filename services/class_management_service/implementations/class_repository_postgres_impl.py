@@ -322,33 +322,6 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             duration = time.time() - start_time
             self._record_operation_metrics(operation, table, duration, success)
 
-    async def associate_essay_to_student(
-        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
-    ) -> None:
-        start_time = time.time()
-        operation = "associate_essay_to_student"
-        table = "essay_student_associations"
-        success = True
-
-        try:
-            async with self.session() as session:
-                association = EssayStudentAssociation(
-                    essay_id=essay_id, student_id=student_id, created_by_user_id=user_id
-                )
-                session.add(association)
-                await session.flush()
-
-        except Exception as e:
-            success = False
-            error_type = e.__class__.__name__
-            self._record_error_metrics(error_type, operation)
-            logger.error(f"Failed to associate essay to student: {error_type}: {e}")
-            raise
-
-        finally:
-            duration = time.time() - start_time
-            self._record_operation_metrics(operation, table, duration, success)
-
     async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
         """Get all student-essay associations for a batch."""
         start_time = time.time()

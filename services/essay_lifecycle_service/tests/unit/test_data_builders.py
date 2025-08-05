@@ -21,6 +21,8 @@ from services.essay_lifecycle_service.constants import (
 from services.essay_lifecycle_service.domain_models import EssayState
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
+)
+from services.essay_lifecycle_service.protocols import (
     EssayState as ProtocolEssayState,
 )
 
@@ -165,7 +167,7 @@ class EssayTestDataBuilder:
         ]
 
         cj_assessment_path = [
-            EssayStatus.READY_FOR_PROCESSING,  
+            EssayStatus.READY_FOR_PROCESSING,
             EssayStatus.AWAITING_CJ_ASSESSMENT,
             EssayStatus.CJ_ASSESSMENT_IN_PROGRESS,
         ]
@@ -189,25 +191,21 @@ class EssayTestDataBuilder:
             EssayStatus.SPELLCHECKING_IN_PROGRESS: spellcheck_path[:2],
             EssayStatus.SPELLCHECKED_SUCCESS: spellcheck_path,
             EssayStatus.SPELLCHECK_FAILED: spellcheck_path,
-
             # CJ Assessment progression
             EssayStatus.AWAITING_CJ_ASSESSMENT: [EssayStatus.READY_FOR_PROCESSING],
             EssayStatus.CJ_ASSESSMENT_IN_PROGRESS: cj_assessment_path[:2],
             EssayStatus.CJ_ASSESSMENT_SUCCESS: cj_assessment_path,
             EssayStatus.CJ_ASSESSMENT_FAILED: cj_assessment_path,
-
             # NLP progression
             EssayStatus.AWAITING_NLP: [EssayStatus.READY_FOR_PROCESSING],
             EssayStatus.NLP_IN_PROGRESS: nlp_path[:2],
             EssayStatus.NLP_SUCCESS: nlp_path,
             EssayStatus.NLP_FAILED: nlp_path,
-
             # AI Feedback progression
             EssayStatus.AWAITING_AI_FEEDBACK: [EssayStatus.READY_FOR_PROCESSING],
             EssayStatus.AI_FEEDBACK_IN_PROGRESS: ai_feedback_path[:2],
             EssayStatus.AI_FEEDBACK_SUCCESS: ai_feedback_path,
             EssayStatus.AI_FEEDBACK_FAILED: ai_feedback_path,
-
             # Other statuses
             EssayStatus.READY_FOR_PROCESSING: [],
             EssayStatus.ALL_PROCESSING_COMPLETED: [
@@ -263,7 +261,7 @@ class EssayTestDataBuilder:
 
         return essays
 
-    @staticmethod  
+    @staticmethod
     def create_realistic_essay_data(
         essay_id: str,
         batch_id: str,

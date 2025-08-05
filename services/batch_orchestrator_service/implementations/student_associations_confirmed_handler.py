@@ -46,11 +46,11 @@ class StudentAssociationsConfirmedHandler:
         1. Deserialize StudentAssociationsConfirmedV1 event
         2. Validate batch exists and is in correct state (AWAITING_STUDENT_VALIDATION)
         3. Store student associations for later use
-        4. Update batch status to READY_FOR_PIPELINE_EXECUTION
+        4. Update batch status to STUDENT_VALIDATION_COMPLETED
         5. Log completion of Phase 1 student matching
 
-        After this handler completes, the batch is ready to receive
-        ClientBatchPipelineRequestV1 and proceed with Phase 2 processing.
+        After this handler completes, the batch awaits BatchEssaysReady event
+        which will transition it to READY_FOR_PIPELINE_EXECUTION.
         """
         from huleedu_service_libs.observability import (
             get_tracer,
@@ -154,14 +154,16 @@ class StudentAssociationsConfirmedHandler:
                         },
                     )
 
-                    # Update batch status to READY_FOR_PIPELINE_EXECUTION
+                    # Update batch status to STUDENT_VALIDATION_COMPLETED
+                    # This intermediate state prevents race conditions where pipeline might
+                    # start before essays are actually stored by BatchEssaysReadyHandler
                     success = await self.batch_repo.update_batch_status(
-                        batch_id, BatchStatus.READY_FOR_PIPELINE_EXECUTION
+                        batch_id, BatchStatus.STUDENT_VALIDATION_COMPLETED
                     )
 
                     if success:
                         self.logger.info(
-                            f"Batch {batch_id} transitioned to READY_FOR_PIPELINE_EXECUTION",
+                            f"Batch {batch_id} transitioned to STUDENT_VALIDATION_COMPLETED",
                             extra={
                                 "correlation_id": str(envelope.correlation_id),
                                 "class_id": associations_data.class_id,

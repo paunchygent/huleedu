@@ -68,10 +68,14 @@ class TestMockRepositoryPerformance:
         )
 
         # Log performance metrics for visibility
-        print(f"Instantiation performance: mean={mean_time:.3f}ms, median={median_time:.3f}ms, max={max_time:.3f}ms, std={std_dev:.3f}ms")
+        print(
+            f"Instantiation performance: mean={mean_time:.3f}ms, median={median_time:.3f}ms, max={max_time:.3f}ms, std={std_dev:.3f}ms"
+        )
 
     @pytest.mark.asyncio
-    async def test_single_essay_create_performance(self, mock_repository: MockEssayRepository) -> None:
+    async def test_single_essay_create_performance(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test single essay creation performance is under 0.1ms."""
         iteration_count = 100
         creation_times = []
@@ -104,7 +108,9 @@ class TestMockRepositoryPerformance:
             f"Median creation time {median_time:.3f}ms exceeds target {self.CRUD_OPERATION_TARGET_MS}ms"
         )
 
-        print(f"Essay creation performance: mean={mean_time:.3f}ms, median={median_time:.3f}ms, max={max_time:.3f}ms")
+        print(
+            f"Essay creation performance: mean={mean_time:.3f}ms, median={median_time:.3f}ms, max={max_time:.3f}ms"
+        )
 
     @pytest.mark.asyncio
     async def test_essay_retrieval_performance(self, mock_repository: MockEssayRepository) -> None:
@@ -112,7 +118,7 @@ class TestMockRepositoryPerformance:
         # Pre-populate repository with test data
         correlation_id = uuid4()
         essay_ids = [f"perf-retrieve-{i}" for i in range(100)]
-        
+
         for essay_id in essay_ids:
             await mock_repository.create_essay_record(
                 essay_id=essay_id,
@@ -151,7 +157,7 @@ class TestMockRepositoryPerformance:
     async def test_essay_update_performance(self, mock_repository: MockEssayRepository) -> None:
         """Test essay update performance is under 0.1ms."""
         correlation_id = uuid4()
-        
+
         # Pre-populate repository
         essay_ids = [f"perf-update-{i}" for i in range(100)]
         for essay_id in essay_ids:
@@ -196,10 +202,10 @@ class TestMockRepositoryPerformance:
     async def test_batch_operation_performance(self, mock_repository: MockEssayRepository) -> None:
         """Test batch operations performance scales linearly."""
         correlation_id = uuid4()
-        
+
         # Test different batch sizes
         batch_sizes = [10, 50, 100]
-        
+
         for batch_size in batch_sizes:
             essay_data: list[dict[str, str | None]] = [
                 {
@@ -233,6 +239,7 @@ class TestMockRepositoryPerformance:
     @pytest.mark.asyncio
     async def test_concurrent_operation_performance(self) -> None:
         """Test concurrent operations performance scales appropriately."""
+
         # Use fresh repository for each concurrency test to avoid ID conflicts
         async def create_essay_with_fresh_repo(i: int, level: int) -> None:
             """Create a single essay concurrently with a fresh repository."""
@@ -246,15 +253,15 @@ class TestMockRepositoryPerformance:
 
         # Test scaling with different concurrency levels
         concurrency_levels = [10, 50, 100]
-        
+
         for num_concurrent in concurrency_levels:
             start_time = time.perf_counter()
-            
+
             # Execute concurrent operations with unique IDs per level
-            await asyncio.gather(*[
-                create_essay_with_fresh_repo(i, num_concurrent) for i in range(num_concurrent)
-            ])
-            
+            await asyncio.gather(
+                *[create_essay_with_fresh_repo(i, num_concurrent) for i in range(num_concurrent)]
+            )
+
             end_time = time.perf_counter()
             duration_s = end_time - start_time
             ops_per_second = num_concurrent / duration_s
@@ -273,17 +280,17 @@ class TestMockRepositoryPerformance:
     async def test_memory_usage_scaling(self, mock_repository: MockEssayRepository) -> None:
         """Test memory usage scales reasonably with essay count."""
         import tracemalloc
-        
+
         correlation_id = uuid4()
-        
+
         # Start memory tracking
         tracemalloc.start()
         baseline_memory = tracemalloc.get_traced_memory()[0]
-        
+
         # Create large number of essays to test memory scaling
         essay_count = 1000  # Reduced from 10,000 for test performance
         batch_size = 100
-        
+
         for batch_num in range(essay_count // batch_size):
             # Create simplified essay data for memory testing
             essay_data: list[dict[str, str | None]] = [
@@ -294,7 +301,7 @@ class TestMockRepositoryPerformance:
                 }
                 for i in range(batch_size)
             ]
-            
+
             await mock_repository.create_essay_records_batch(
                 essay_data=essay_data,
                 correlation_id=correlation_id,
@@ -303,11 +310,11 @@ class TestMockRepositoryPerformance:
         # Measure final memory usage
         _, peak_memory = tracemalloc.get_traced_memory()
         tracemalloc.stop()
-        
+
         # Calculate memory per essay
         memory_used_mb = (peak_memory - baseline_memory) / 1024 / 1024
         memory_per_essay_kb = (peak_memory - baseline_memory) / 1024 / essay_count
-        
+
         # Performance assertions - scaled for actual test size with realistic buffer
         # The target is 10MB for 10,000 essays, so for 1,000 essays we expect ~1MB
         # But add buffer for Python object overhead
@@ -316,7 +323,7 @@ class TestMockRepositoryPerformance:
             f"Memory usage {memory_used_mb:.2f}MB exceeds scaled target {scaled_target_mb:.2f}MB "
             f"for {essay_count} essays"
         )
-        
+
         # Memory per essay should be reasonable
         max_memory_per_essay_kb = 50  # 50KB per essay max
         assert memory_per_essay_kb < max_memory_per_essay_kb, (
@@ -329,7 +336,7 @@ class TestMockRepositoryPerformance:
     async def test_query_operation_performance(self, mock_repository: MockEssayRepository) -> None:
         """Test query operations (list, search) performance."""
         batch_id = "query-perf-batch"
-        
+
         # Create test data with phase distribution
         await EssayTestDataBuilder.create_batch_with_phase_distribution(
             repository=mock_repository,
@@ -378,17 +385,21 @@ class TestMockRepositoryPerformance:
             f"Status summary took {summary_duration_ms:.3f}ms, exceeds 1ms target"
         )
 
-        print(f"Query performance: list={list_duration_ms:.3f}ms, phase={phase_query_duration_ms:.3f}ms, summary={summary_duration_ms:.3f}ms")
+        print(
+            f"Query performance: list={list_duration_ms:.3f}ms, phase={phase_query_duration_ms:.3f}ms, summary={summary_duration_ms:.3f}ms"
+        )
 
     @pytest.mark.asyncio
-    async def test_constraint_simulation_performance(self, mock_repository: MockEssayRepository) -> None:
+    async def test_constraint_simulation_performance(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test constraint simulation does not significantly impact performance."""
         correlation_id = uuid4()
         batch_id = "constraint-perf-batch"
-        
+
         # Test idempotency constraint performance
         constraint_times = []
-        
+
         for i in range(50):
             text_storage_id = f"text-storage-{i}"
             essay_data = EssayTestDataBuilder.create_realistic_essay_data(
@@ -398,7 +409,10 @@ class TestMockRepositoryPerformance:
 
             # First creation (should succeed)
             start_time = time.perf_counter()
-            was_created, essay_id = await mock_repository.create_essay_state_with_content_idempotency(
+            (
+                was_created,
+                essay_id,
+            ) = await mock_repository.create_essay_state_with_content_idempotency(
                 batch_id=batch_id,
                 text_storage_id=text_storage_id,
                 essay_data=essay_data,
@@ -412,7 +426,10 @@ class TestMockRepositoryPerformance:
 
             # Second creation (should be idempotent)
             start_time = time.perf_counter()
-            was_created_2, essay_id_2 = await mock_repository.create_essay_state_with_content_idempotency(
+            (
+                was_created_2,
+                essay_id_2,
+            ) = await mock_repository.create_essay_state_with_content_idempotency(
                 batch_id=batch_id,
                 text_storage_id=text_storage_id,
                 essay_data=essay_data,
@@ -433,27 +450,29 @@ class TestMockRepositoryPerformance:
         assert mean_constraint_time < constraint_target_ms, (
             f"Mean constraint operation time {mean_constraint_time:.3f}ms exceeds {constraint_target_ms}ms"
         )
-        
-        print(f"Constraint simulation performance: mean={mean_constraint_time:.3f}ms, max={max_constraint_time:.3f}ms")
+
+        print(
+            f"Constraint simulation performance: mean={mean_constraint_time:.3f}ms, max={max_constraint_time:.3f}ms"
+        )
 
     def test_performance_improvement_validation(self) -> None:
         """Validate that MockEssayRepository achieves target performance improvements."""
         # This test documents the performance characteristics achieved
         # Performance validated through elimination of I/O operations
-        
+
         performance_targets = {
             "instantiation": f"<{self.INSTANTIATION_TARGET_MS}ms",
-            "crud_operations": f"<{self.CRUD_OPERATION_TARGET_MS}ms", 
+            "crud_operations": f"<{self.CRUD_OPERATION_TARGET_MS}ms",
             "batch_operations": f"<{self.BATCH_OPERATION_TARGET_MS}ms for 100 essays",
             "memory_usage": f"<{self.MEMORY_TARGET_MB}MB for 10,000 essays",
             "concurrent_ops": ">1000 ops/second",
         }
-        
+
         # Document targets achieved
         improvement_factor = "10-50x"  # Based on elimination of I/O operations
-        
+
         print(f"MockEssayRepository performance targets: {performance_targets}")
         print(f"Performance improvement through in-memory operations: {improvement_factor}")
-        
+
         # This test always passes but serves as documentation
         assert True, "Performance targets documented and validated by other tests"

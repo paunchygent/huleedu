@@ -66,6 +66,7 @@ class BatchServiceStudentMatchingInitiateCommandDataV1(BaseEventData):
 
     essays_to_process: list[EssayProcessingInputRefV1]
     class_id: str  # Class ID for roster lookup (always present for REGULAR batches)
+    course_code: CourseCode  # Course code from batch registration
 
 
 class BatchServiceNLPInitiateCommandDataV1(BaseEventData):

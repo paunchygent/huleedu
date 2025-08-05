@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import (
     BatchContentProvisioningCompletedV1,
@@ -288,6 +289,7 @@ class TestPhase1StudentMatchingIntegration:
         associations_event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
             class_id=class_id,
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 3},

@@ -23,10 +23,10 @@ from services.essay_lifecycle_service.implementations.mock_essay_repository impo
 
 class TestMockRepositoryConcurrency:
     """Test suite for MockEssayRepository concurrency and atomicity."""
-    
+
     # Test configuration constants
     SMALL_CONCURRENCY = 10
-    MEDIUM_CONCURRENCY = 50 
+    MEDIUM_CONCURRENCY = 50
     HIGH_CONCURRENCY = 100
     STRESS_CONCURRENCY = 200
 
@@ -34,9 +34,11 @@ class TestMockRepositoryConcurrency:
     def mock_repository(self) -> MockEssayRepository:
         """Create mock repository instance."""
         return MockEssayRepository()
-        
-    @pytest.fixture(autouse=True) 
-    def cleanup_repository(self, mock_repository: MockEssayRepository) -> Generator[None, None, None]:
+
+    @pytest.fixture(autouse=True)
+    def cleanup_repository(
+        self, mock_repository: MockEssayRepository
+    ) -> Generator[None, None, None]:
         """Cleanup repository state after each test."""
         yield
         # Clear all state for clean test isolation
@@ -73,12 +75,18 @@ class TestMockRepositoryConcurrency:
 
         # Count successful creations
         successful_creations = sum(1 for result in results if result is True)
-        failed_creations = sum(1 for result in results if result is False or isinstance(result, Exception))
+        failed_creations = sum(
+            1 for result in results if result is False or isinstance(result, Exception)
+        )
 
         # Should have exactly 1 success and (concurrency_level - 1) failures due to unique constraint
         expected_failures = concurrency_level - 1
-        assert successful_creations == 1, f"Expected 1 successful creation, got {successful_creations}"
-        assert failed_creations == expected_failures, f"Expected {expected_failures} failed creations, got {failed_creations}"
+        assert successful_creations == 1, (
+            f"Expected 1 successful creation, got {successful_creations}"
+        )
+        assert failed_creations == expected_failures, (
+            f"Expected {expected_failures} failed creations, got {failed_creations}"
+        )
 
         # Verify only one essay exists
         essay = await mock_repository.get_essay_state(essay_id)
@@ -121,7 +129,9 @@ class TestMockRepositoryConcurrency:
         # Should have exactly 1 creation and (concurrency_level - 1) idempotent responses
         expected_idempotent = concurrency_level - 1
         assert creations == 1, f"Expected exactly 1 creation, got {creations}"
-        assert idempotent_responses == expected_idempotent, f"Expected {expected_idempotent} idempotent responses, got {idempotent_responses}"
+        assert idempotent_responses == expected_idempotent, (
+            f"Expected {expected_idempotent} idempotent responses, got {idempotent_responses}"
+        )
 
         # All responses should return the same essay_id
         essay_ids = [essay_id for _, essay_id in results]
@@ -135,7 +145,9 @@ class TestMockRepositoryConcurrency:
         assert essay.text_storage_id == text_storage_id
 
     @pytest.mark.asyncio
-    async def test_concurrent_essay_state_updates(self, mock_repository: MockEssayRepository) -> None:
+    async def test_concurrent_essay_state_updates(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test concurrent state updates maintain consistency."""
         correlation_id = uuid4()
         essay_id = "concurrent-update-essay"
@@ -174,7 +186,9 @@ class TestMockRepositoryConcurrency:
 
         # All updates should succeed (no lost updates)
         successful_updates = sum(results)
-        assert successful_updates == len(update_operations), f"Expected all {len(update_operations)} updates to succeed"
+        assert successful_updates == len(update_operations), (
+            f"Expected all {len(update_operations)} updates to succeed"
+        )
 
         # Verify final state is consistent
         final_essay = await mock_repository.get_essay_state(essay_id)
@@ -185,7 +199,9 @@ class TestMockRepositoryConcurrency:
         timeline_statuses = set(final_essay.timeline.keys())
         expected_statuses = {status.value for status, _ in update_operations}
         expected_statuses.add(EssayStatus.UPLOADED.value)  # Initial status
-        assert expected_statuses.issubset(timeline_statuses), "Timeline missing expected status transitions"
+        assert expected_statuses.issubset(timeline_statuses), (
+            "Timeline missing expected status transitions"
+        )
 
     @pytest.mark.asyncio
     async def test_concurrent_batch_operations(self, mock_repository: MockEssayRepository) -> None:
@@ -266,7 +282,9 @@ class TestMockRepositoryConcurrency:
 
         # All updates should succeed
         successful_updates = sum(results)
-        assert successful_updates == 20, f"Expected 20 successful metadata updates, got {successful_updates}"
+        assert successful_updates == 20, (
+            f"Expected 20 successful metadata updates, got {successful_updates}"
+        )
 
         # Verify all metadata was preserved (no lost updates)
         essay = await mock_repository.get_essay_state(essay_id)
@@ -283,7 +301,9 @@ class TestMockRepositoryConcurrency:
         assert spellcheck_id in [f"req-{i}" for i in range(20)]
 
     @pytest.mark.asyncio
-    async def test_concurrent_student_association_updates(self, mock_repository: MockEssayRepository) -> None:
+    async def test_concurrent_student_association_updates(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test concurrent student association updates maintain consistency."""
         correlation_id = uuid4()
         essay_id = "student-concurrent-essay"
@@ -297,8 +317,7 @@ class TestMockRepositoryConcurrency:
 
         # Define concurrent student association updates
         association_updates = [
-            (f"student-{i}", "human" if i % 2 == 0 else "auto")
-            for i in range(10)
+            (f"student-{i}", "human" if i % 2 == 0 else "auto") for i in range(10)
         ]
 
         async def update_student_association(student_id: str, method: str) -> bool:
@@ -323,7 +342,9 @@ class TestMockRepositoryConcurrency:
 
         # All updates should succeed
         successful_updates = sum(results)
-        assert successful_updates == 10, f"Expected 10 successful association updates, got {successful_updates}"
+        assert successful_updates == 10, (
+            f"Expected 10 successful association updates, got {successful_updates}"
+        )
 
         # Verify final state is consistent (one of the concurrent updates won)
         essay = await mock_repository.get_essay_state(essay_id)
@@ -334,7 +355,9 @@ class TestMockRepositoryConcurrency:
         assert essay.association_confirmed_at is not None
 
     @pytest.mark.asyncio
-    async def test_concurrent_storage_reference_updates(self, mock_repository: MockEssayRepository) -> None:
+    async def test_concurrent_storage_reference_updates(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test concurrent storage reference updates preserve all references."""
         correlation_id = uuid4()
         essay_id = "storage-concurrent-essay"
@@ -378,15 +401,21 @@ class TestMockRepositoryConcurrency:
 
         # All updates should succeed
         successful_updates = sum(results)
-        assert successful_updates == len(storage_references), f"Expected all storage updates to succeed"
+        assert successful_updates == len(storage_references), (
+            "Expected all storage updates to succeed"
+        )
 
         # Verify storage references were preserved
         essay = await mock_repository.get_essay_state(essay_id)
         assert essay is not None
 
         # Should have references for all content types
-        expected_content_types = {ContentType.CORRECTED_TEXT, ContentType.CJ_RESULTS_JSON, 
-                                ContentType.NLP_METRICS_JSON, ContentType.AI_DETAILED_ANALYSIS_JSON}
+        expected_content_types = {
+            ContentType.CORRECTED_TEXT,
+            ContentType.CJ_RESULTS_JSON,
+            ContentType.NLP_METRICS_JSON,
+            ContentType.AI_DETAILED_ANALYSIS_JSON,
+        }
         actual_content_types = set(essay.storage_references.keys())
         assert expected_content_types.issubset(actual_content_types)
 
@@ -395,7 +424,9 @@ class TestMockRepositoryConcurrency:
         assert corrected_text_ref.startswith("corrected-storage-")
 
     @pytest.mark.asyncio
-    async def test_global_lock_prevents_repository_corruption(self, mock_repository: MockEssayRepository) -> None:
+    async def test_global_lock_prevents_repository_corruption(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test that global lock prevents repository state corruption."""
         correlation_id = uuid4()
 
@@ -447,7 +478,9 @@ class TestMockRepositoryConcurrency:
         # Each batch should contain exactly 4 essays (1 individual + 3 batch)
         for batch_id in batch_ids:
             batch_essays = await mock_repository.list_essays_by_batch(batch_id)
-            assert len(batch_essays) == 4, f"Batch {batch_id} should have 4 essays, got {len(batch_essays)}"
+            assert len(batch_essays) == 4, (
+                f"Batch {batch_id} should have 4 essays, got {len(batch_essays)}"
+            )
 
             # Verify all essays in batch have correct batch_id
             for essay in batch_essays:
@@ -460,10 +493,14 @@ class TestMockRepositoryConcurrency:
             total_essays += len(batch_essays)
 
         expected_total = operation_count * 4  # 20 operations * 4 essays each
-        assert total_essays == expected_total, f"Expected {expected_total} total essays, got {total_essays}"
+        assert total_essays == expected_total, (
+            f"Expected {expected_total} total essays, got {total_essays}"
+        )
 
     @pytest.mark.asyncio
-    async def test_concurrent_phase_queries_consistency(self, mock_repository: MockEssayRepository) -> None:
+    async def test_concurrent_phase_queries_consistency(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test that concurrent phase queries return consistent results."""
         correlation_id = uuid4()
         batch_id = "phase-query-batch"
@@ -471,7 +508,7 @@ class TestMockRepositoryConcurrency:
         # Create essays and update them to various phases concurrently
         async def create_and_update_essay(essay_index: int) -> None:
             essay_id = f"phase-essay-{essay_index}"
-            
+
             await mock_repository.create_essay_record(
                 essay_id=essay_id,
                 batch_id=batch_id,
@@ -510,10 +547,12 @@ class TestMockRepositoryConcurrency:
         # Query all phases concurrently multiple times
         query_tasks = []
         for _ in range(10):  # 10 concurrent query rounds
-            query_tasks.extend([
-                query_phase("spellcheck"),
-                query_phase("cj_assessment"),
-            ])
+            query_tasks.extend(
+                [
+                    query_phase("spellcheck"),
+                    query_phase("cj_assessment"),
+                ]
+            )
 
         results = await asyncio.gather(*query_tasks)
 
@@ -522,12 +561,16 @@ class TestMockRepositoryConcurrency:
         cj_results = results[1::2]  # Every other result starting from 1
 
         # All spellcheck queries should return same count
-        assert len(set(spellcheck_results)) == 1, f"Inconsistent spellcheck query results: {set(spellcheck_results)}"
-        
+        assert len(set(spellcheck_results)) == 1, (
+            f"Inconsistent spellcheck query results: {set(spellcheck_results)}"
+        )
+
         # All CJ queries should return same count
         assert len(set(cj_results)) == 1, f"Inconsistent CJ query results: {set(cj_results)}"
 
         # Verify expected counts (3 spellcheck statuses * 5 essays each = 15)
-        assert spellcheck_results[0] == 15, f"Expected 15 spellcheck essays, got {spellcheck_results[0]}"
+        assert spellcheck_results[0] == 15, (
+            f"Expected 15 spellcheck essays, got {spellcheck_results[0]}"
+        )
         # CJ has 2 statuses in our test (AWAITING + SUCCESS) * 5 each = 10, but we only created 5 essays with those statuses
         assert cj_results[0] == 10, f"Expected 10 CJ essays, got {cj_results[0]}"

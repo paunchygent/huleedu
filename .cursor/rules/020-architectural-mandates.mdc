@@ -69,16 +69,37 @@ def generate_deterministic_event_id(event_type: str, data: BaseModel) -> UUID:
     return uuid5(NAMESPACE_OID, content)
 ```
 
-## 5. CRITICAL COMPLIANCE CHECKLIST
+## 5. Phase 1 Student Matching Timeout Architecture
 
-### 5.1. Pre-Implementation Checklist
+### 5.1. Association Timeout Monitor (Class Management Service)
+- **Purpose**: Auto-confirms pending student-essay associations after 24-hour validation timeout
+- **Configuration**: `TIMEOUT_HOURS = 24`, `HIGH_CONFIDENCE_THRESHOLD = 0.7`, runs hourly
+- **High Confidence (≥0.7)**: Confirms association with original student using `TIMEOUT` validation method
+- **Low Confidence (<0.7)**: Creates UNKNOWN student with email `unknown.{class_id}@huleedu.system`
+- **Event Publishing**: Publishes `StudentAssociationsConfirmedV1` with `timeout_triggered=true`
+
+### 5.2. Database Schema Requirements
+```python
+# EssayStudentAssociation model MUST include:
+batch_id: UUID              # FK to batch - enables batch isolation
+class_id: UUID              # FK to class - enables UNKNOWN student creation  
+confidence_score: float     # NLP matching confidence for timeout decisions
+validation_status: str      # pending_validation/confirmed/timeout_confirmed
+validation_method: str      # human/timeout/auto
+validated_at: datetime      # When validation occurred
+validated_by: str          # Who/what validated (SYSTEM_TIMEOUT for timeouts)
+```
+
+## 6. CRITICAL COMPLIANCE CHECKLIST
+
+### 6.1. Pre-Implementation Checklist
 **Before writing any service code, verify:**
 - [ ] Service follows DDD bounded context principles
 - [ ] Service-specific architecture rule exists and is reviewed
 - [ ] Protocol interfaces defined in `protocols.py`
 - [ ] Dependency injection patterns planned with Dishka
 
-### 5.2. Service Library Compliance Checklist
+### 6.2. Service Library Compliance Checklist
 **MANDATORY - Zero tolerance for non-compliance:**
 [ ] huleedu-service-libs declared in pyproject.toml
 [ ] FORBIDDEN: Any import logging or from logging statements
@@ -87,7 +108,7 @@ def generate_deterministic_event_id(event_type: str, data: BaseModel) -> UUID:
 [ ] MUST: Kafka producers via the service library's KafkaBus class.
 [ ] MUST: Kafka consumers via a dedicated, service-specific class (e.g., BatchKafkaConsumer) that is constructed and managed by the DI container.
 
-### 5.3. Production Patterns Checklist (Sprint 1 Hardened)
+### 6.3. Production Patterns Checklist (Sprint 1 Hardened)
 **Battle-tested patterns from BOS - MANDATORY:**
 - [ ] Graceful shutdown with proper async resource cleanup
 - [ ] DI-managed `aiohttp.ClientSession` with configured timeouts
@@ -95,21 +116,21 @@ def generate_deterministic_event_id(event_type: str, data: BaseModel) -> UUID:
 - [ ] `/healthz` endpoint with consistent JSON response format
 - [ ] Startup errors use `logger.critical()` and `raise` (fail fast)
 
-### 5.4. HTTP Service Checklist
+### 6.4. HTTP Service Checklist
 **For Quart-based services:**
 - [ ] Blueprint pattern with `api/` directory structure
 - [ ] `startup_setup.py` with DI and metrics initialization
 - [ ] Service library metrics middleware configured
 - [ ] Standard health (`/healthz`) and metrics (`/metrics`) endpoints
 
-### 5.5. Worker Service Checklist
+### 6.5. Worker Service Checklist
 **For Kafka consumer services:**
 - [ ] Signal handling for SIGTERM/SIGINT in worker main
 - [ ] Event processor with protocol-based dependencies
 - [ ] Structured logging with correlation ID tracking
 - [ ] Manual offset commits after successful processing
 
-### 5.6. Pre-Deployment Checklist
+### 6.6. Pre-Deployment Checklist
 **Before container deployment:**
 - [ ] All tests pass (`pdm run pytest`)
 - [ ] Linting passes (`pdm run lint-all`)

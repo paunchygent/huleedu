@@ -8,11 +8,12 @@ student matching initiation commands from BOS and publishing to NLP.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from common_core.batch_service_models import BatchServiceStudentMatchingInitiateCommandDataV1
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
@@ -124,64 +125,35 @@ class TestStudentMatchingCommandHandler:
             entity_type="batch",
             parent_id=None,
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             essays_to_process=sample_essays,
         )
 
     @pytest.mark.asyncio
-    async def test_updates_essay_metadata_for_matching(
+    async def test_handler_is_stateless_during_phase1(
         self,
         handler: StudentMatchingCommandHandler,
         mock_repository: AsyncMock,
         mock_outbox_manager: AsyncMock,
         mock_session_factory: AsyncMock,
         command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
-        sample_essay_states: list[EssayStateDB],
     ) -> None:
-        """Test that handler updates essay metadata for student matching."""
+        """Test that handler operates statelessly during Phase 1 - no essay state updates."""
         # Arrange
         correlation_id = uuid4()
-        session = mock_session_factory.return_value.__aenter__.return_value
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Act
         await handler.handle_student_matching_command(command_data, correlation_id)
 
         # Assert
-        # Should get essay state for each essay
-        assert mock_repository.get_essay_state.call_count == len(command_data.essays_to_process)
+        # Handler should NOT access essay states during Phase 1
+        mock_repository.get_essay_state.assert_not_called()
 
-        # Should update metadata for each essay
-        expected_calls = []
-        for essay_ref in command_data.essays_to_process:
-            expected_calls.append(
-                call(
-                    essay_id=essay_ref.essay_id,
-                    metadata_updates={
-                        "awaiting_student_association": True,
-                        "student_matching_phase": "initiated",
-                        "class_id": command_data.class_id,
-                    },
-                    correlation_id=correlation_id,
-                    session=session,
-                )
-            )
+        # Handler should NOT update essay metadata during Phase 1
+        mock_repository.update_essay_processing_metadata.assert_not_called()
 
-        # Should also have one call for timeout tracking (first essay)
-        expected_calls.append(
-            call(
-                essay_id=command_data.essays_to_process[0].essay_id,
-                metadata_updates={
-                    "student_association_timeout_seconds": 86400,
-                    "student_association_timeout_set_at": "now",
-                },
-                correlation_id=correlation_id,
-                session=session,
-            )
-        )
-
-        mock_repository.update_essay_processing_metadata.assert_has_calls(expected_calls)
+        # Handler should still publish the event
+        mock_outbox_manager.publish_to_outbox.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_publishes_batch_student_matching_requested(
@@ -197,9 +169,6 @@ class TestStudentMatchingCommandHandler:
         # Arrange
         correlation_id = uuid4()
         session = mock_session_factory.return_value.__aenter__.return_value
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Act
         await handler.handle_student_matching_command(command_data, correlation_id)
@@ -240,15 +209,11 @@ class TestStudentMatchingCommandHandler:
         mock_outbox_manager: AsyncMock,
         mock_session_factory: AsyncMock,
         command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
-        sample_essay_states: list[EssayStateDB],
     ) -> None:
         """Test that handler uses outbox pattern for reliable event delivery."""
         # Arrange
         correlation_id = uuid4()
         session = mock_session_factory.return_value.__aenter__.return_value
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Act
         await handler.handle_student_matching_command(command_data, correlation_id)
@@ -263,92 +228,70 @@ class TestStudentMatchingCommandHandler:
         session.begin.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_handles_missing_essays_gracefully(
+    async def test_processes_all_commands_regardless_of_essay_existence(
         self,
         handler: StudentMatchingCommandHandler,
         mock_repository: AsyncMock,
         mock_outbox_manager: AsyncMock,
-        mock_session_factory: MagicMock,
         command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
     ) -> None:
-        """Test that handler continues processing when some essays are missing."""
+        """Test that handler processes commands without checking essay existence."""
         # Arrange
         correlation_id = uuid4()
 
-        # Mock repository to return None for all essays (not found)
-        mock_repository.get_essay_state.return_value = None
-
-        # Act - Should not raise exception
+        # Act - Should not raise exception regardless of essay existence
         await handler.handle_student_matching_command(command_data, correlation_id)
 
         # Assert
-        # Should have attempted to get each essay state
-        assert mock_repository.get_essay_state.call_count == len(command_data.essays_to_process)
+        # Handler should NOT check essay states during Phase 1
+        mock_repository.get_essay_state.assert_not_called()
 
-        # Should still publish the event even if essays are missing
+        # Should still publish the event
         mock_outbox_manager.publish_to_outbox.assert_called_once()
 
-        # Should only update metadata for timeout tracking (not for missing essays)
-        assert mock_repository.update_essay_processing_metadata.call_count == 1
-
-        # Verify the timeout tracking call
-        timeout_call = mock_repository.update_essay_processing_metadata.call_args
-        assert timeout_call.kwargs["essay_id"] == command_data.essays_to_process[0].essay_id
-        assert "student_association_timeout_seconds" in timeout_call.kwargs["metadata_updates"]
+        # Should NOT update any metadata during Phase 1
+        mock_repository.update_essay_processing_metadata.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sets_timeout_tracking_on_first_essay(
+    async def test_validates_command_data(
         self,
         handler: StudentMatchingCommandHandler,
-        mock_repository: AsyncMock,
-        mock_outbox_manager: AsyncMock,
-        mock_session_factory: AsyncMock,
-        command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
-        sample_essay_states: list[EssayStateDB],
+        sample_essays: list[EssayProcessingInputRefV1],
     ) -> None:
-        """Test that handler sets timeout tracking on the first essay."""
+        """Test that handler validates command data before processing."""
         # Arrange
         correlation_id = uuid4()
 
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
-
-        # Act
-        await handler.handle_student_matching_command(command_data, correlation_id)
-
-        # Assert
-        # Find the timeout tracking call
-        timeout_call = None
-        for call_obj in mock_repository.update_essay_processing_metadata.call_args_list:
-            if "student_association_timeout_seconds" in call_obj.kwargs.get("metadata_updates", {}):
-                timeout_call = call_obj
-                break
-
-        assert timeout_call is not None
-        assert timeout_call.kwargs["essay_id"] == command_data.essays_to_process[0].essay_id
-        assert (
-            timeout_call.kwargs["metadata_updates"]["student_association_timeout_seconds"] == 86400
+        # Create command with missing batch_id
+        invalid_command = BatchServiceStudentMatchingInitiateCommandDataV1(
+            event_name=ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND,
+            entity_id="",  # Empty batch_id should cause validation error
+            entity_type="batch",
+            parent_id=None,
+            class_id="class_456",
+            course_code=CourseCode.ENG5,
+            essays_to_process=sample_essays,
         )
-        assert (
-            timeout_call.kwargs["metadata_updates"]["student_association_timeout_set_at"] == "now"
-        )
+
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await handler.handle_student_matching_command(invalid_command, correlation_id)
+
+        error = exc_info.value
+        assert error.error_detail.service == "essay_lifecycle_service"
+        assert error.error_detail.operation == "handle_student_matching_command"
+        assert "Missing batch_id" in error.error_detail.message
 
     @pytest.mark.asyncio
     async def test_error_handling_and_rollback(
         self,
         handler: StudentMatchingCommandHandler,
-        mock_repository: AsyncMock,
         mock_outbox_manager: AsyncMock,
-        mock_session_factory: AsyncMock,
         command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
-        sample_essay_states: list[EssayStateDB],
     ) -> None:
         """Test that handler properly handles errors and maintains transaction integrity."""
         # Arrange
         correlation_id = uuid4()
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Mock outbox to raise an error
         mock_outbox_manager.publish_to_outbox.side_effect = Exception("Database error")
@@ -370,29 +313,21 @@ class TestStudentMatchingCommandHandler:
         handler: StudentMatchingCommandHandler,
         mock_repository: AsyncMock,
         mock_outbox_manager: AsyncMock,
-        mock_session_factory: MagicMock,
         command_data: BatchServiceStudentMatchingInitiateCommandDataV1,
-        sample_essay_states: list[EssayStateDB],
     ) -> None:
-        """Test that handler processes command successfully with all data."""
+        """Test that handler processes command successfully as a stateless router."""
         # Arrange
         correlation_id = uuid4()
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Act
         await handler.handle_student_matching_command(command_data, correlation_id)
 
         # Assert
-        # Verify all essays were processed
-        assert mock_repository.get_essay_state.call_count == len(command_data.essays_to_process)
+        # Handler should NOT access essay states during Phase 1
+        mock_repository.get_essay_state.assert_not_called()
 
-        # Verify metadata updates for each essay plus timeout tracking
-        assert (
-            mock_repository.update_essay_processing_metadata.call_count
-            == len(command_data.essays_to_process) + 1
-        )
+        # Handler should NOT update any metadata during Phase 1
+        mock_repository.update_essay_processing_metadata.assert_not_called()
 
         # Verify event was published
         mock_outbox_manager.publish_to_outbox.assert_called_once()

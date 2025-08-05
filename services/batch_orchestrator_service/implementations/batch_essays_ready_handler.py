@@ -10,6 +10,7 @@ from typing import Any
 
 from common_core.events.batch_coordination_events import BatchEssaysReady
 from common_core.events.envelope import EventEnvelope
+from common_core.status_enums import BatchStatus
 from huleedu_service_libs.error_handling import (
     raise_validation_error,
 )
@@ -39,14 +40,16 @@ class BatchEssaysReadyHandler:
         """
         Handle a BatchEssaysReady event by storing essays for later client-triggered processing.
 
-        SIMPLIFIED ARCHITECTURE:
-        ========================
-        This handler no longer automatically initiates pipeline processing.
-        Instead, it stores essay data for later use when clients trigger pipelines.
+        UPDATED ARCHITECTURE:
+        ====================
+        This handler stores essay data and transitions batch state based on type:
+        - GUEST batches: Already in READY_FOR_PIPELINE_EXECUTION (no action)
+        - REGULAR batches: Transition from STUDENT_VALIDATION_COMPLETED to READY
 
         1. Deserialize BatchEssaysReady event with essay content references
         2. Store essays in batch repository for later pipeline processing
-        3. Log that batch is ready and awaiting client trigger
+        3. Check batch status and transition if needed (REGULAR batches only)
+        4. Log that batch is ready and awaiting client trigger
         """
         from huleedu_service_libs.observability import (
             get_tracer,
@@ -142,6 +145,35 @@ class BatchEssaysReadyHandler:
                     self.logger.debug(
                         f"Essay storage completed for batch {batch_id}, success: {storage_success}",
                     )
+
+                    # Check current batch status and transition if needed
+                    batch_data = await self.batch_repo.get_batch_by_id(batch_id)
+                    if batch_data:
+                        current_status = batch_data.get("status")
+
+                        # For REGULAR batches coming from student validation
+                        if current_status == BatchStatus.STUDENT_VALIDATION_COMPLETED.value:
+                            state_success = await self.batch_repo.update_batch_status(
+                                batch_id, BatchStatus.READY_FOR_PIPELINE_EXECUTION
+                            )
+                            if state_success:
+                                self.logger.info(
+                                    f"REGULAR batch {batch_id} transitioned to "
+                                    "READY_FOR_PIPELINE_EXECUTION after receiving essays",
+                                    extra={"correlation_id": str(envelope.correlation_id)},
+                                )
+                        # For GUEST batches, already in READY state - no action needed
+                        elif current_status == BatchStatus.READY_FOR_PIPELINE_EXECUTION.value:
+                            self.logger.debug(
+                                f"GUEST batch {batch_id} already in "
+                                "READY_FOR_PIPELINE_EXECUTION state",
+                                extra={"correlation_id": str(envelope.correlation_id)},
+                            )
+                        else:
+                            self.logger.warning(
+                                f"Batch {batch_id} in unexpected state: {current_status}",
+                                extra={"correlation_id": str(envelope.correlation_id)},
+                            )
 
             # Check if envelope has trace context metadata and process accordingly
             if hasattr(envelope, "metadata") and envelope.metadata:

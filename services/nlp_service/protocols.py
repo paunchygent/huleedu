@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from aiohttp import ClientSession
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import EssayMatchResult, StudentMatchSuggestion
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -90,6 +91,7 @@ class NlpEventPublisherProtocol(Protocol):
         kafka_bus: KafkaPublisherProtocol,
         batch_id: str,
         class_id: str,
+        course_code: CourseCode,
         match_results: list[EssayMatchResult],
         processing_summary: dict[str, int],
         correlation_id: UUID,

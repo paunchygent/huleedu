@@ -25,6 +25,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
@@ -348,6 +349,7 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         matching_request = BatchStudentMatchingRequestedV1(
             batch_id=batch_id,
             class_id=class_id,
+            course_code=CourseCode.ENG5,
             essays_to_process=[
                 EssayProcessingInputRefV1(
                     essay_id=essay["essay_id"],
@@ -383,6 +385,7 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=batch_id,
             class_id=class_id,
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=essay_id_1,

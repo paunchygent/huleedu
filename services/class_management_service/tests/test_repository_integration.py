@@ -262,29 +262,6 @@ class TestRepositoryIntegration:
         assert retrieved_class is None
 
     @pytest.mark.asyncio
-    async def test_associate_essay_to_student_integration(
-        self, repository: PostgreSQLClassRepositoryImpl
-    ) -> None:
-        """Test essay-student association with real database."""
-        # Arrange - create a student
-        student_data = CreateStudentRequest(
-            person_name=PersonNameV1(first_name="Essay", last_name="Student"),
-            email="essay.student@example.com",
-        )
-        correlation_id = uuid.uuid4()
-        created_student = await repository.create_student("test-user", student_data, correlation_id)
-        essay_id = uuid.uuid4()
-
-        # Act - associate essay to student
-        await repository.associate_essay_to_student(
-            "test-user", essay_id, created_student.id, correlation_id
-        )
-
-        # Assert - verify association was created (would need to check association table)
-        # For now, just verify the operation completed without error
-        # In a full implementation, we'd query the association table
-
-    @pytest.mark.asyncio
     async def test_multiple_course_validation_with_database(
         self, repository: PostgreSQLClassRepositoryImpl
     ) -> None:

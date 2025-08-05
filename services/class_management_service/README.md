@@ -42,11 +42,13 @@ models_db.py           # SQLAlchemy models
 
 ## Events
 
-**Published**: `ClassCreatedV1`, `ClassUpdatedV1`, `StudentCreatedV1`, `StudentUpdatedV1`
+**Published**: `ClassCreatedV1`, `ClassUpdatedV1`, `StudentCreatedV1`, `StudentUpdatedV1`, `StudentAssociationsConfirmedV1`
 
 **Channels**:
 1. Kafka: Durable via EventEnvelope
 2. Redis: Real-time via `ws:{user_id}`
+
+**Consumed**: `BatchAuthorMatchesSuggestedV1` (Phase 1 student matching)
 
 ## Key Patterns
 
@@ -68,6 +70,23 @@ app.database_engine = engine  # Non-optional
 ```python
 if len(course_codes) > 1:
     raise MultipleCourseError(course_codes)
+```
+
+## Phase 1 Student Matching
+
+**Association Timeout Monitor**: Auto-confirms pending student-essay associations after 24 hours:
+- **High confidence (≥0.7)**: Confirms with original student
+- **Low confidence (<0.7)**: Creates UNKNOWN student with email `unknown.{class_id}@huleedu.system`
+- **Check interval**: Hourly
+- **Validation method**: `TIMEOUT`
+
+**Database Fields** (`EssayStudentAssociation`):
+```python
+batch_id: UUID              # FK to batch
+class_id: UUID              # FK to class
+confidence_score: float     # NLP matching confidence
+validation_status: str      # pending_validation/confirmed/rejected/timeout_confirmed
+validation_method: str      # human/timeout/auto
 ```
 
 ## Configuration

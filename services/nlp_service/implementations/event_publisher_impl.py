@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from common_core.event_enums import ProcessingEvent
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -74,6 +75,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             parent_id="single-essay-batch",  # Placeholder for individual essay
             batch_id="single-essay-batch",  # Placeholder for individual essay
             class_id="unknown",  # Not available in this context
+            course_code=CourseCode.ENG5,  # Default for legacy single-essay processing
             match_results=[match_result],
             processing_summary={"total_essays": 1, "matched": 1 if suggestions else 0},
         )
@@ -82,7 +84,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         metadata: dict[str, Any] = {}
         inject_trace_context(metadata)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type=batch_event.event_name.value,
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=batch_event,
@@ -95,7 +97,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             aggregate_type="essay",
             event_type=envelope.event_type,
             event_data=envelope,  # Pass original Pydantic envelope
-            topic=self.output_topic,
+            topic=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
         )
 
     async def publish_batch_author_match_results(
@@ -103,6 +105,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         kafka_bus: KafkaPublisherProtocol,
         batch_id: str,
         class_id: str,
+        course_code: CourseCode,
         match_results: list[EssayMatchResult],
         processing_summary: dict[str, int],
         correlation_id: UUID,
@@ -139,13 +142,14 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             parent_id=None,
             batch_id=batch_id,
             class_id=class_id,
+            course_code=course_code,
             match_results=match_results,
             processing_summary=processing_summary,
         )
 
         # Create event envelope
         event_envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
-            event_type=event_data.event_name.value,
+            event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=event_data,
@@ -163,7 +167,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                 aggregate_id=batch_id,
                 event_type=event_envelope.event_type,
                 event_data=event_envelope,
-                topic=self.output_topic,
+                topic=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             )
 
             logger.info(

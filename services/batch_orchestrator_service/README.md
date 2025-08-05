@@ -30,15 +30,16 @@ BOS implements the **Count-Based Aggregation Pattern** as the central orchestrat
 4. **Content Provisioning**: ELS notifies BOS when all slots are filled (`BatchContentProvisioningCompletedV1`)
 5. **Batch Type Decision**:
    - **GUEST batches** (no class_id): Direct transition to READY_FOR_PIPELINE_EXECUTION
-   - **REGULAR batches** (has class_id): Initiate student matching workflow
+   - **REGULAR batches** (has class_id): Transition to AWAITING_STUDENT_VALIDATION, initiate student matching
 6. **Student Matching** (REGULAR only): BOS coordinates NLP Service to match essays to students
-7. **Human Validation** (REGULAR only): Class Management Service facilitates teacher review
-8. **Association Confirmation**: BOS receives confirmed student associations, transitions to ready state
+7. **Human Validation** (REGULAR only): Class Management Service facilitates teacher review (24h timeout auto-confirms)
+8. **Association Confirmation**: BOS receives confirmed student associations (`StudentAssociationsConfirmedV1`), transitions to STUDENT_VALIDATION_COMPLETED
+9. **Essays Storage**: ELS stores essays with student data, publishes `BatchEssaysReady`, transitions to READY_FOR_PIPELINE_EXECUTION
 
 #### Phase 2: Pipeline Processing  
-9. **Client-Triggered Processing**: Client explicitly requests pipeline execution via HTTP API
-10. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS
-11. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
+10. **Client-Triggered Processing**: Client explicitly requests pipeline execution via HTTP API
+11. **Command Processing**: BOS generates commands with actual essay IDs and dispatches to ELS
+12. **Progress Monitoring**: BOS tracks progress across all processing phases and provides status to clients
 
 ### Service Boundary Responsibilities
 
@@ -117,12 +118,18 @@ Published to Kafka topics for downstream coordination:
 
 Consumed from Kafka for batch coordination:
 
+* **`huleedu.batch.content.provisioning.completed.v1`**:
+  * **Data**: `BatchContentProvisioningCompletedV1` when all content slots filled.
+  * **Handler**: `BatchContentProvisioningCompletedHandler` transitions GUEST batches to ready, initiates student matching for REGULAR batches.
+* **`huleedu.student.associations.confirmed.v1`**:
+  * **Data**: `StudentAssociationsConfirmedV1` with confirmed student-essay associations.
+  * **Handler**: `StudentAssociationsConfirmedHandler` transitions batch to STUDENT_VALIDATION_COMPLETED.
 * **`huleedu.els.batch.essays.ready.v1`**:
   * **Data**: `BatchEssaysReady` with ready essays including actual essay IDs and text_storage_ids.
-  * **Handler**: `BatchEssaysReadyHandler` stores essay metadata and storage references in persistent database and logs readiness, awaiting client pipeline trigger.
+  * **Handler**: `BatchEssaysReadyHandler` transitions to READY_FOR_PIPELINE_EXECUTION, stores essay metadata.
 * **`huleedu.els.batch_phase.outcome.v1`**:
   * **Data**: `ELSBatchPhaseOutcomeV1` detailing the results of a completed phase from ELS.
-  * **Handler**: `ELSBatchPhaseOutcomeHandler` processes the outcome and triggers the next pipeline phase. This is critical for dynamic orchestration.
+  * **Handler**: `ELSBatchPhaseOutcomeHandler` processes the outcome and triggers the next pipeline phase.
 
 ## Dependency Injection and Repository Architecture
 

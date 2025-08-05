@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -60,3 +61,4 @@ class BatchStudentMatchingRequestedV1(BaseEventData):
         description="All essays in batch requiring student matching"
     )
     class_id: str = Field(description="Class ID for roster lookup")
+    course_code: CourseCode = Field(description="Course code for the batch")

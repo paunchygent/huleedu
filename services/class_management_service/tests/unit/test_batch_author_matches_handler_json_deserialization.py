@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
@@ -106,6 +107,7 @@ def sample_batch_event() -> BatchAuthorMatchesSuggestedV1:
         event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
         batch_id=str(uuid4()),
         class_id=str(uuid4()),
+        course_code=CourseCode.ENG5,
         match_results=[
             EssayMatchResult(
                 essay_id=str(uuid4()),
@@ -342,6 +344,7 @@ class TestBatchAuthorMatchesHandlerJsonDeserialization:
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
             class_id=str(uuid4()),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(uuid4()),

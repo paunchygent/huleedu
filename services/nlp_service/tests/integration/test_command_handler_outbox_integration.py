@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
@@ -289,6 +290,7 @@ class TestCommandHandlerOutboxIntegration:
                 )
             ],
             class_id="test-class-456",
+            course_code=CourseCode.ENG5,
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
@@ -322,7 +324,7 @@ class TestCommandHandlerOutboxIntegration:
         # Verify event structure
         event = unpublished_events[0]
         assert event.aggregate_type == "batch"
-        assert event.event_type == "batch.author.matches.suggested.v1"
+        assert event.event_type == "huleedu.batch.author.matches.suggested.v1"
 
         # Verify event data contains expected structure
         event_data_dict = event.event_data
@@ -350,6 +352,7 @@ class TestCommandHandlerOutboxIntegration:
                 )
             ],
             class_id="test-class-999",
+            course_code=CourseCode.ENG5,
         )
 
         envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
@@ -400,6 +403,7 @@ class TestCommandHandlerOutboxIntegration:
                     )
                 ],
                 class_id="test-class-fail",
+                course_code=CourseCode.ENG5,
             )
 
             envelope: EventEnvelope[BatchStudentMatchingRequestedV1] = EventEnvelope(
@@ -438,7 +442,7 @@ class TestCommandHandlerOutboxIntegration:
             # Verify it's a batch event with failure information
             event = test_events[0]
             assert event.aggregate_type == "batch"
-            assert event.event_type == "batch.author.matches.suggested.v1"
+            assert event.event_type == "huleedu.batch.author.matches.suggested.v1"
 
             # Verify the event data contains failure information
             event_data_str = str(event.event_data)

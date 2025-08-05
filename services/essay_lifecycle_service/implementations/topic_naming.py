@@ -15,7 +15,7 @@ from services.essay_lifecycle_service.protocols import TopicNamingProtocol
 class DefaultTopicNaming(TopicNamingProtocol):
     """
     Production topic naming using common_core.event_enums.topic_name.
-    
+
     This implementation delegates to the centralized topic_name function
     while providing a clean interface for dependency injection.
     """

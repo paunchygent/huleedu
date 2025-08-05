@@ -44,7 +44,11 @@ alwaysApply: false
 - `UserClass`: Single course per class
 - `Student`: Email+user_id unique constraint
 - `class_student_association`: M2M
-- `EssayStudentAssociation`: Essay->Student
+- `EssayStudentAssociation`: Essay->Student with Phase 1 fields:
+  - `batch_id`, `class_id`: Batch and class references
+  - `confidence_score`: NLP matching confidence
+  - `validation_status`: pending_validation/confirmed/timeout_confirmed
+  - `validation_method`: human/timeout/auto
 
 **Repository Pattern**:
 ```python
@@ -65,9 +69,22 @@ class PostgreSQLClassRepositoryImpl:
 - Single course validation with custom exceptions
 - Alembic migrations for schema+data
 
+## Phase 1 Student Matching
+
+**Association Timeout Monitor** (`AssociationTimeoutMonitor`):
+- **Purpose**: Auto-confirms pending student-essay associations after 24 hours
+- **Configuration**: `TIMEOUT_HOURS = 24`, `HIGH_CONFIDENCE_THRESHOLD = 0.7`, runs hourly
+- **High Confidence (≥0.7)**: Confirms with original student, validation_method=`TIMEOUT`
+- **Low Confidence (<0.7)**: Creates UNKNOWN student with email `unknown.{class_id}@huleedu.system`
+- **Event Publishing**: `StudentAssociationsConfirmedV1` with `timeout_triggered=true`
+
+**Handler**: `BatchAuthorMatchesHandler` processes NLP match suggestions and stores associations
+
 ## Events & Configuration
 
-**Published Events**: `ClassCreatedV1`, `ClassUpdatedV1`, `StudentCreatedV1`, `StudentUpdatedV1`
+**Published Events**: `ClassCreatedV1`, `ClassUpdatedV1`, `StudentCreatedV1`, `StudentUpdatedV1`, `StudentAssociationsConfirmedV1`
+
+**Consumed Events**: `BatchAuthorMatchesSuggestedV1` (Phase 1 student matching)
 
 **Dual-Channel Publishing**:
 1. Kafka: Durable events via `KafkaBus`

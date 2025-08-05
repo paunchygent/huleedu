@@ -144,13 +144,15 @@ class TestContentProvisionedFlow:
 
             # Create smart mock topic naming for integration test that returns correct topic names
             from unittest.mock import Mock
+
+            from common_core.event_enums import topic_name
+
             from services.essay_lifecycle_service.protocols import TopicNamingProtocol
-            from common_core.event_enums import ProcessingEvent, topic_name
-            
+
             def smart_get_topic_name(event: ProcessingEvent) -> str:
                 """Smart mock that returns correct topic names based on ProcessingEvent."""
                 return topic_name(event)
-            
+
             mock_topic_naming = Mock(spec=TopicNamingProtocol)
             mock_topic_naming.get_topic_name.side_effect = smart_get_topic_name
 

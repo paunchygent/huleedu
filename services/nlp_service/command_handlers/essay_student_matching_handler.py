@@ -232,6 +232,7 @@ class EssayStudentMatchingHandler(CommandHandlerProtocol):
                     kafka_bus=self.kafka_bus,
                     batch_id=command_data.batch_id,
                     class_id=command_data.class_id,
+                    course_code=command_data.course_code,
                     match_results=match_results,
                     processing_summary=processing_summary,
                     correlation_id=correlation_id,

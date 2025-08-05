@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -94,7 +95,9 @@ class TestTrueOutboxPatternCompliance:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "essay"
         assert call_args.kwargs["aggregate_id"] == essay_id
-        assert call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
+        )
         assert call_args.kwargs["topic"] == topic_name(
             ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
         )
@@ -152,6 +155,7 @@ class TestTrueOutboxPatternCompliance:
             kafka_bus=mock_kafka_bus,
             batch_id=batch_id,
             class_id=class_id,
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary=processing_summary,
             correlation_id=correlation_id,
@@ -165,7 +169,9 @@ class TestTrueOutboxPatternCompliance:
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "batch"
         assert call_args.kwargs["aggregate_id"] == batch_id
-        assert call_args.kwargs["event_type"] == "batch.author.matches.suggested.v1"
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
+        )
         assert call_args.kwargs["topic"] == topic_name(
             ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
         )
@@ -249,6 +255,7 @@ class TestTrueOutboxPatternCompliance:
             kafka_bus=mock_kafka_bus,  # Accepted for interface compatibility
             batch_id="test-batch",
             class_id="test-class",
+            course_code=CourseCode.ENG5,
             match_results=[],
             processing_summary={"total_essays": 0, "matched": 0},
             correlation_id=correlation_id,

@@ -359,7 +359,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         This is used to check completion after validation failures or other events
         that might complete a batch.
-        
+
         Returns:
             tuple[BatchEssaysReady, UUID] if batch is complete, None otherwise
         """

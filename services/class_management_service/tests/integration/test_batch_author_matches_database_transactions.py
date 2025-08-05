@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
@@ -22,6 +23,7 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
+from common_core.status_enums import StudentAssociationStatus
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -35,7 +37,13 @@ from services.class_management_service.config import Settings
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
-from services.class_management_service.models_db import Base, EssayStudentAssociation, Student
+from services.class_management_service.models_db import (
+    Base,
+    Course,
+    EssayStudentAssociation,
+    Student,
+    UserClass,
+)
 
 
 class TestBatchAuthorMatchesDatabaseTransactions:
@@ -97,6 +105,8 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         async with session_factory() as session:
             async with session.begin():
                 await session.execute(text("TRUNCATE TABLE essay_student_associations CASCADE"))
+                await session.execute(text("TRUNCATE TABLE classes CASCADE"))
+                await session.execute(text("TRUNCATE TABLE courses CASCADE"))
 
     @pytest.fixture
     async def test_students(
@@ -137,6 +147,40 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         return students
 
     @pytest.fixture
+    async def test_course(self, session_factory: async_sessionmaker[AsyncSession]) -> Course:
+        """Create test course."""
+        course = Course(
+            id=uuid4(),
+            course_code=CourseCode.ENG5,
+            name="English 5",
+            language=Language.ENGLISH,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(course)
+
+        return course
+
+    @pytest.fixture
+    async def test_class(
+        self, session_factory: async_sessionmaker[AsyncSession], test_course: Course
+    ) -> UserClass:
+        """Create test class."""
+        user_class = UserClass(
+            id=uuid4(),
+            name="Test Class",
+            created_by_user_id="test_user",
+            course_id=test_course.id,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(user_class)
+
+        return user_class
+
+    @pytest.fixture
     def mock_class_repository(self, test_students: list[Student]) -> AsyncMock:
         """Mock repository returning test students."""
         repository = AsyncMock()
@@ -161,7 +205,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         )
 
     def create_batch_event(
-        self, test_students: list[Student], essay_count: int = 2
+        self, test_students: list[Student], test_class: UserClass, essay_count: int = 2
     ) -> BatchAuthorMatchesSuggestedV1:
         """Create test batch event."""
         match_results = []
@@ -189,7 +233,8 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         return BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary={
                 "total_essays": essay_count,
@@ -214,12 +259,13 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
         mock_class_repository: AsyncMock,
     ) -> None:
         """Test transaction behavior with partial batch failures."""
         # Arrange - Create event with multiple essays where one will fail
-        batch_event = self.create_batch_event(test_students, essay_count=3)
+        batch_event = self.create_batch_event(test_students, test_class, essay_count=3)
         envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
             event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
             event_timestamp=datetime.now(UTC),
@@ -270,6 +316,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test concurrent processing with real PostgreSQL."""
@@ -277,8 +324,8 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         events_count = 10
         tasks = []
 
-        for i in range(events_count):
-            batch_event = self.create_batch_event(test_students, essay_count=2)
+        for _ in range(events_count):
+            batch_event = self.create_batch_event(test_students, test_class, essay_count=2)
             envelope = EventEnvelope[BatchAuthorMatchesSuggestedV1](
                 event_type=topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED),
                 event_timestamp=datetime.now(UTC),
@@ -323,6 +370,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test transaction isolation with concurrent reads and writes."""
@@ -333,7 +381,8 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         batch_event1 = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),
@@ -359,7 +408,8 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         batch_event2 = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),  # Same essay ID
@@ -444,6 +494,7 @@ class TestBatchAuthorMatchesDatabaseTransactions:
         self,
         session_factory: async_sessionmaker[AsyncSession],
         test_students: list[Student],
+        test_class: UserClass,
     ) -> None:
         """Test explicit transaction commit and rollback behavior."""
         essay_id = uuid4()
@@ -455,7 +506,10 @@ class TestBatchAuthorMatchesDatabaseTransactions:
                 association = EssayStudentAssociation(
                     essay_id=essay_id,
                     student_id=student.id,
+                    batch_id=uuid4(),
+                    class_id=test_class.id,
                     created_by_user_id="test_commit",
+                    validation_status=StudentAssociationStatus.PENDING_VALIDATION.value,
                 )
                 session.add(association)
                 # Transaction commits automatically at end of context
@@ -478,7 +532,10 @@ class TestBatchAuthorMatchesDatabaseTransactions:
                     association = EssayStudentAssociation(
                         essay_id=rollback_essay_id,
                         student_id=student.id,
+                        batch_id=uuid4(),
+                        class_id=test_class.id,
                         created_by_user_id="test_rollback",
+                        validation_status=StudentAssociationStatus.PENDING_VALIDATION.value,
                     )
                     session.add(association)
                     # Force an exception to trigger rollback

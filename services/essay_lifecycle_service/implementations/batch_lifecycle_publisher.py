@@ -200,7 +200,9 @@ class BatchLifecyclePublisher:
 
         # Create event envelope
         envelope = EventEnvelope[Any](
-            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
+            event_type=self.topic_naming.get_topic_name(
+                ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED
+            ),
             source_service=self.settings.SERVICE_NAME,
             correlation_id=correlation_id or uuid4(),
             data=event_data,
@@ -217,13 +219,17 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Always use outbox for transactional safety
         # Store event in outbox within same transaction as business data
         # The relay worker will publish from outbox asynchronously
-        topic = self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED)
+        topic = self.topic_naming.get_topic_name(
+            ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED
+        )
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="batch",
             aggregate_id=batch_id,
-            event_type=self.topic_naming.get_topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED),
+            event_type=self.topic_naming.get_topic_name(
+                ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED
+            ),
             event_data=envelope,
             topic=topic,
             session=session,  # Pass session for transactional atomicity
@@ -283,7 +289,9 @@ class BatchLifecyclePublisher:
         # TRUE OUTBOX PATTERN: Store validation error event in outbox
         from common_core.event_enums import ProcessingEvent
 
-        topic = self.topic_naming.get_topic_name(ProcessingEvent.BATCH_VALIDATION_ERRORS)  # New topic for error events
+        topic = self.topic_naming.get_topic_name(
+            ProcessingEvent.BATCH_VALIDATION_ERRORS
+        )  # New topic for error events
         batch_id = getattr(event_data, "batch_id", "unknown")
 
         await self.outbox_manager.publish_to_outbox(

@@ -79,6 +79,7 @@ class BatchStatus(str, Enum):
     READY_FOR_PIPELINE_EXECUTION = "ready_for_pipeline_execution"
     PROCESSING_PIPELINES = "processing_pipelines"
     AWAITING_STUDENT_VALIDATION = "awaiting_student_validation"
+    STUDENT_VALIDATION_COMPLETED = "student_validation_completed"
     VALIDATION_TIMEOUT_PROCESSED = "validation_timeout_processed"
     COMPLETED_SUCCESSFULLY = "completed_successfully"
     COMPLETED_WITH_FAILURES = "completed_with_failures"
@@ -168,3 +169,31 @@ class CJBatchStateEnum(str, Enum):
     COMPLETED = "COMPLETED"  # Successfully processed
     FAILED = "FAILED"  # Processing failed
     CANCELLED = "CANCELLED"  # Manually stopped
+
+
+# --- Student Association Status ---
+class StudentAssociationStatus(str, Enum):
+    """Status of student-essay associations in Class Management Service."""
+
+    PENDING_VALIDATION = "pending_validation"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    TIMEOUT_CONFIRMED = "timeout_confirmed"
+    NO_MATCH = "no_match"
+
+
+class AssociationValidationMethod(str, Enum):
+    """Method by which a student association was validated."""
+
+    HUMAN = "human"
+    TIMEOUT = "timeout"
+    AUTO = "auto"
+
+
+class AssociationConfidenceLevel(str, Enum):
+    """Confidence level categories for student matching."""
+
+    HIGH = "high"  # > 0.9 confidence
+    MEDIUM = "medium"  # 0.7 - 0.9 confidence
+    LOW = "low"  # < 0.7 confidence
+    NO_MATCH = "no_match"  # No viable match found

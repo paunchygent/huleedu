@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.validation_events import StudentAssociationsConfirmedV1
@@ -69,7 +70,7 @@ class TestStudentAssociationsConfirmedHandler:
         valid_batch_dict: dict,
         sample_associations: dict[str, str],
     ) -> None:
-        """Test that handler updates batch to READY_FOR_PIPELINE_EXECUTION."""
+        """Test that handler updates batch to STUDENT_VALIDATION_COMPLETED."""
         # Arrange
         batch_id = valid_batch_dict["id"]
         correlation_id = uuid4()
@@ -77,6 +78,7 @@ class TestStudentAssociationsConfirmedHandler:
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=[],
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -104,7 +106,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         # Should update batch status
         mock_batch_repo.update_batch_status.assert_called_once_with(
-            batch_id, BatchStatus.READY_FOR_PIPELINE_EXECUTION
+            batch_id, BatchStatus.STUDENT_VALIDATION_COMPLETED
         )
 
     @pytest.mark.asyncio
@@ -121,7 +123,7 @@ class TestStudentAssociationsConfirmedHandler:
             "correlation_id": str(uuid4()),
             "name": "Test Batch Wrong Status",
             "description": "Test batch with wrong status",
-            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,  # Wrong status
+            "status": BatchStatus.STUDENT_VALIDATION_COMPLETED.value,  # Wrong status
             "class_id": "class_456",
             "total_essays": 3,
         }
@@ -129,6 +131,7 @@ class TestStudentAssociationsConfirmedHandler:
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_dict["id"],
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=[],
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -168,6 +171,7 @@ class TestStudentAssociationsConfirmedHandler:
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=[],
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -211,6 +215,7 @@ class TestStudentAssociationsConfirmedHandler:
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=[],  # Empty associations
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -249,6 +254,7 @@ class TestStudentAssociationsConfirmedHandler:
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=[],
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -271,7 +277,7 @@ class TestStudentAssociationsConfirmedHandler:
 
         # Second call - batch already processed
         processed_batch_dict = valid_batch_dict.copy()
-        processed_batch_dict["status"] = BatchStatus.READY_FOR_PIPELINE_EXECUTION.value
+        processed_batch_dict["status"] = BatchStatus.STUDENT_VALIDATION_COMPLETED.value
         mock_batch_repo.get_batch_by_id.return_value = processed_batch_dict
 
         await handler.handle_student_associations_confirmed(mock_msg)

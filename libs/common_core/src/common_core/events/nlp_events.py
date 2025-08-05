@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData
 
@@ -69,6 +70,7 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
     event_name: ProcessingEvent = ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED
     batch_id: str = Field(description="Batch identifier")
     class_id: str = Field(description="Class ID for which matching was performed")
+    course_code: CourseCode = Field(description="Course code for the batch")
     match_results: list[EssayMatchResult] = Field(
         description="Match results for all essays in batch"
     )

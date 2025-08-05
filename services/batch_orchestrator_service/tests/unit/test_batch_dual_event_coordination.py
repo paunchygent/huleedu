@@ -84,6 +84,14 @@ class TestBatchDualEventCoordination:
         batch_id = "test-batch-456"
         correlation_id = uuid4()
 
+        # Mock the batch data returned by get_batch_by_id
+        mock_batch_repo.get_batch_by_id.return_value = {
+            "id": batch_id,
+            "status": BatchStatus.STUDENT_VALIDATION_COMPLETED.value,
+        }
+        mock_batch_repo.store_batch_essays.return_value = True
+        mock_batch_repo.update_batch_status.return_value = True
+
         ready_essays = [
             EssayProcessingInputRefV1(
                 essay_id="essay-1",
@@ -265,6 +273,14 @@ class TestBatchDualEventCoordination:
         batch_id = "test-batch-dual"
         correlation_id = uuid4()
 
+        # Mock the batch data returned by get_batch_by_id
+        mock_batch_repo.get_batch_by_id.return_value = {
+            "id": batch_id,
+            "status": BatchStatus.STUDENT_VALIDATION_COMPLETED.value,
+        }
+        mock_batch_repo.store_batch_essays.return_value = True
+        mock_batch_repo.update_batch_status.return_value = True
+
         # Process success event
         success_event = BatchEssaysReady(
             batch_id=batch_id,
@@ -349,9 +365,11 @@ class TestBatchDualEventCoordination:
             batch_id, success_event.ready_essays
         )
 
-        # Error handler took no action (partial failure)
-        mock_batch_repo.update_batch_status.assert_not_called()
+        # Success handler also transitions status to READY_FOR_PIPELINE_EXECUTION
+        mock_batch_repo.update_batch_status.assert_called_once_with(
+            batch_id, BatchStatus.READY_FOR_PIPELINE_EXECUTION
+        )
 
         # No cross-contamination between handlers
         assert mock_batch_repo.store_batch_essays.call_count == 1
-        assert mock_batch_repo.update_batch_status.call_count == 0
+        assert mock_batch_repo.update_batch_status.call_count == 1  # Called by success handler only

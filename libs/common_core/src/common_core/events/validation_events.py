@@ -11,12 +11,13 @@ These events support the NLP Service Phase 1 student matching integration where:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from ..domain_enums import CourseCode
 from ..event_enums import ProcessingEvent
 from ..events.base_event_models import BaseEventData
+from ..status_enums import AssociationValidationMethod
 
 
 class StudentAssociation(BaseModel):
@@ -36,7 +37,7 @@ class StudentAssociationConfirmation(BaseModel):
     essay_id: str = Field(description="Essay identifier")
     student_id: str | None = Field(description="Student ID if matched, None if no match")
     confidence_score: float = Field(description="Match confidence score 0.0-1.0")
-    validation_method: Literal["human", "timeout", "auto"] = Field(
+    validation_method: AssociationValidationMethod = Field(
         description="How the association was validated"
     )
     validated_by: str | None = Field(
@@ -73,6 +74,9 @@ class StudentAssociationsConfirmedV1(BaseEventData):
     )
     batch_id: str = Field(description="Batch identifier")
     class_id: str = Field(description="Class identifier where associations were validated")
+    course_code: CourseCode = Field(
+        description="Course code for the batch (e.g., SV1, ENG5) - needed for downstream processing"
+    )
     associations: list[StudentAssociationConfirmation] = Field(
         description="All essay-student association confirmations"
     )

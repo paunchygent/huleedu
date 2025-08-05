@@ -20,6 +20,7 @@ from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.pipeline_models import PhaseName
+from common_core.status_enums import BatchStatus
 
 from libs.huleedu_service_libs.tests.idempotency_test_utils import AsyncConfirmationTestHelper
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
@@ -184,6 +185,11 @@ def mock_handlers() -> tuple[
     mock_phase_coordinator = AsyncMock()
     # Mock setup for repository essay storage operations
     mock_batch_repo.store_batch_essays.return_value = True
+    mock_batch_repo.get_batch_by_id.return_value = {
+        "id": "test-batch-id",
+        "status": BatchStatus.STUDENT_VALIDATION_COMPLETED.value,
+    }
+    mock_batch_repo.update_batch_status.return_value = True
     batch_essays_ready_handler = BatchEssaysReadyHandler(
         event_publisher=mock_event_publisher,
         batch_repo=mock_batch_repo,
@@ -260,7 +266,7 @@ class TestBOSIdempotencyBasic:
         assert len(redis_client.delete_calls) == 0
         set_call = redis_client.set_calls[0]
         assert set_call[0].startswith(
-            "huleedu:idempotency:v2:batch-service:huleedu_batch_essays_ready_v1:"
+            "huleedu:idempotency:v2:batch-service:huleedu_els_batch_essays_ready_v1:"
         )
         # v2 decorator stores JSON metadata, not just "1"
         import json

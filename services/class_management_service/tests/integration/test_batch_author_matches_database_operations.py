@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
@@ -35,7 +36,13 @@ from services.class_management_service.constants import NLP_SERVICE_SYSTEM_USER
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
-from services.class_management_service.models_db import Base, EssayStudentAssociation, Student
+from services.class_management_service.models_db import (
+    Base,
+    Course,
+    EssayStudentAssociation,
+    Student,
+    UserClass,
+)
 
 
 class TestBatchAuthorMatchesDatabaseOperations:
@@ -97,6 +104,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         async with session_factory() as session:
             async with session.begin():
                 await session.execute(text("TRUNCATE TABLE essay_student_associations CASCADE"))
+                await session.execute(text("TRUNCATE TABLE classes CASCADE"))
+                await session.execute(text("TRUNCATE TABLE courses CASCADE"))
 
     @pytest.fixture
     async def test_students(
@@ -137,6 +146,40 @@ class TestBatchAuthorMatchesDatabaseOperations:
         return students
 
     @pytest.fixture
+    async def test_course(self, session_factory: async_sessionmaker[AsyncSession]) -> Course:
+        """Create test course."""
+        course = Course(
+            id=uuid4(),
+            course_code=CourseCode.ENG5,
+            name="English 5",
+            language=Language.ENGLISH,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(course)
+
+        return course
+
+    @pytest.fixture
+    async def test_class(
+        self, session_factory: async_sessionmaker[AsyncSession], test_course: Course
+    ) -> UserClass:
+        """Create test class."""
+        user_class = UserClass(
+            id=uuid4(),
+            name="Test Class",
+            created_by_user_id="test_user",
+            course_id=test_course.id,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(user_class)
+
+        return user_class
+
+    @pytest.fixture
     def mock_class_repository(self, test_students: list[Student]) -> AsyncMock:
         """Mock repository returning test students."""
         repository = AsyncMock()
@@ -175,6 +218,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test successful creation of essay-student associations."""
@@ -194,7 +238,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),
@@ -249,6 +294,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test creation of multiple essay-student associations in one batch."""
@@ -279,7 +325,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary={"total_essays": 3, "matched": 3, "no_match": 0, "errors": 0},
         )
@@ -328,6 +375,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
     async def test_empty_batch_handling(
         self,
         handler: BatchAuthorMatchesHandler,
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test handling of empty batch with no match results."""
@@ -335,7 +383,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[],  # Empty results
             processing_summary={"total_essays": 0, "matched": 0, "no_match": 0, "errors": 0},
         )
@@ -374,6 +423,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
     async def test_essays_without_suggestions_skipped(
         self,
         handler: BatchAuthorMatchesHandler,
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test that essays without suggestions are skipped gracefully."""
@@ -381,7 +431,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(uuid4()),
@@ -430,6 +481,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test that only the highest confidence match is stored per essay (Phase 1 behavior)."""
@@ -457,7 +509,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),
@@ -509,6 +562,7 @@ class TestBatchAuthorMatchesDatabaseOperations:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test that association data persists correctly across transactions."""
@@ -528,7 +582,8 @@ class TestBatchAuthorMatchesDatabaseOperations:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),

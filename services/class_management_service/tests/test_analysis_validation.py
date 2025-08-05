@@ -157,7 +157,7 @@ class TestAnalysisValidation:
             "get_student_by_id",
             "update_student",
             "delete_student",
-            "associate_essay_to_student",
+            "get_batch_student_associations",
         }
 
         for method in expected_repo_methods:

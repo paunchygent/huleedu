@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.validation_events import (
@@ -86,6 +87,7 @@ class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):
         self,
         batch_id: str,
         class_id: str,
+        course_code: CourseCode,
         associations: list[dict[str, Any]],
         timeout_triggered: bool,
         validation_summary: dict[str, int],
@@ -110,6 +112,7 @@ class DefaultClassEventPublisherImpl(ClassEventPublisherProtocol):
             event = StudentAssociationsConfirmedV1(
                 batch_id=batch_id,
                 class_id=class_id,
+                course_code=course_code,
                 associations=association_models,
                 timeout_triggered=timeout_triggered,
                 validation_summary=validation_summary,

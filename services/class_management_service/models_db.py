@@ -10,6 +10,7 @@ from sqlalchemy import (
     JSON,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -125,10 +126,25 @@ class EssayStudentAssociation(Base):
         ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    class_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("classes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     created_by_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
 
+    # Add new fields from the task plan
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_reasons: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    validation_status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="pending_validation"
+    )
+    validated_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    validation_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Relationships
     student: Mapped["Student"] = relationship(back_populates="essay_associations")
+    user_class: Mapped["UserClass"] = relationship()
 
 
 class EventOutbox(Base):

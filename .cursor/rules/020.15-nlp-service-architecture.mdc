@@ -42,10 +42,10 @@ services/nlp_service/
 ### 2.2. Dual-Phase Responsibilities
 
 **Phase 1: Student Matching (Pre-readiness)**
-- Receives `BATCH_STUDENT_MATCHING_REQUESTED` from ELS
+- Receives `BatchStudentMatchingRequestedV1` from ELS
 - Extracts student identifiers from essay text
 - Matches against class roster
-- Returns `BATCH_AUTHOR_MATCHES_SUGGESTED` to Class Management
+- Returns `BatchAuthorMatchesSuggestedV1` to Class Management
 
 **Phase 2: Text Analysis (Post-readiness)**
 - Receives `BATCH_NLP_INITIATE_COMMAND` from ELS

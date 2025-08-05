@@ -106,6 +106,7 @@ class StudentMatchingInitiatorImpl(PipelinePhaseInitiatorProtocol):
                 entity_type="batch",
                 essays_to_process=essays_for_processing,
                 class_id=batch_context.class_id,
+                course_code=batch_context.course_code,
             )
 
             logger.info(

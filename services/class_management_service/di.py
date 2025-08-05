@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from services.class_management_service.config import Settings, settings
+from services.class_management_service.implementations.association_timeout_monitor import (
+    AssociationTimeoutMonitor,
+)
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
@@ -202,6 +205,18 @@ class ServiceProvider(Provider):
             event_publisher=publisher,
             user_class_type=UserClass,
             student_type=Student,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_timeout_monitor(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        event_publisher: ClassEventPublisherProtocol,
+    ) -> AssociationTimeoutMonitor:
+        """Provide association timeout monitor for auto-confirming pending associations."""
+        return AssociationTimeoutMonitor(
+            session_factory=session_factory,
+            event_publisher=event_publisher,
         )
 
     async def shutdown_resources(self) -> None:

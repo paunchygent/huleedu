@@ -2,7 +2,9 @@
 
 ## 🎯 Service Purpose
 
-ELS acts as a **slot assignment coordinator** and **command processor** in the essay processing pipeline, working in coordination with the **Batch Orchestrator Service (BOS)**. It manages essay slot assignment, processes batch commands using a formal state machine, and coordinates specialized service requests through event-driven architecture. Crucially, it reports phase completion outcomes back to BOS to enable dynamic pipeline orchestration.
+ELS acts as a **slot assignment coordinator** and **command processor** in the essay processing pipeline, working in coordination with the **Batch Orchestrator Service (BOS)**. It manages essay slot assignment, processes batch commands using a formal state machine, and coordinates specialized service requests through event-driven architecture. 
+
+**Phase 1 Behavior**: During student matching, ELS operates as a **stateless event router** - publishes events without updating essay states. **Phase 2+**: Normal stateful behavior resumes.
 
 ## 🔄 Batch Coordination Architecture
 
@@ -42,13 +44,16 @@ ELS participates in these communication patterns:
 - **Consumes from Kafka**:
   - **Batch Registration**: `BatchEssaysRegistered` from BOS.
   - **Content Provisioning**: `EssayContentProvisionedV1` and `EssayValidationFailedV1` from File Service.
-  - **Batch Commands**: `BatchService...InitiateCommandDataV1` (e.g., for spellcheck, cj_assessment) from BOS.
+  - **Phase 1 Commands**: `BatchServiceStudentMatchingInitiateCommandDataV1` from BOS (stateless routing).
+  - **Phase 1 Results**: `StudentAssociationsConfirmedV1` from Class Management (stateless routing).
+  - **Phase 2+ Commands**: `BatchService...InitiateCommandDataV1` (e.g., for spellcheck, cj_assessment) from BOS.
   - **Specialized Service Results**: `EssaySpellcheckCompleted`, `CJAssessmentCompleted`, etc.
 
 - **Publishes to Kafka**:
-  - **Batch Readiness**: `BatchEssaysReady` to BOS when all slots are filled.
-  - **Excess Content**: `ExcessContentProvisionedV1` to BOS for content overflow.
-  - **Service Requests**: `EssayLifecycleSpellcheckRequestV1` to specialized services.
+  - **Content Readiness**: `BatchContentProvisioningCompletedV1` to BOS when all slots are filled.
+  - **Phase 1 Requests**: `BatchStudentMatchingRequestedV1` to NLP Service (stateless).
+  - **Phase 1 Completion**: `BatchEssaysReady` to BOS after student associations confirmed.
+  - **Phase 2+ Service Requests**: `EssayLifecycleSpellcheckRequestV1` to specialized services.
   - **Phase Outcome (CRITICAL)**: `ELSBatchPhaseOutcomeV1` to BOS, reporting the result of a completed phase for an entire batch, enabling the next step in the dynamic pipeline.
   - **All events published via Transactional Outbox Pattern** for guaranteed delivery and consistency.
 

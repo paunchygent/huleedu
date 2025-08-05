@@ -107,7 +107,7 @@ class TestRepositoryAsyncSessionPatterns:
         assert hasattr(repo, "get_student_by_id")
         assert hasattr(repo, "update_student")
         assert hasattr(repo, "delete_student")
-        assert hasattr(repo, "associate_essay_to_student")
+        assert hasattr(repo, "get_batch_student_associations")
 
         # Verify session context manager exists (critical async pattern)
         assert hasattr(repo, "session")

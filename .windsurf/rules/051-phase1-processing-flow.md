@@ -1,6 +1,5 @@
 # Phase 1 Processing Flow - Student Matching Integration
 
-**Status:** COMPLETE - All services implemented and operational  
 **Purpose:** Pre-readiness student matching for REGULAR batches  
 **Scope:** Batch-level processing from content provisioning to association confirmation
 
@@ -47,7 +46,7 @@ Content → Student Matching → Validation → Ready
 
 **Key Handlers:**
 - `BatchContentProvisioningCompletedHandler`: Phase 1 entry point
-- `StudentAssociationsConfirmedHandler`: Phase 1 completion (not yet implemented)
+- `StudentAssociationsConfirmedHandler`: Phase 1 completion
 
 ### Essay Lifecycle Service (ELS)
 - **Command Processing**: Handles student matching initiation from BOS
@@ -55,8 +54,8 @@ Content → Student Matching → Validation → Ready
 - **Association Management**: Updates essays with confirmed student data
 
 **Key Handlers:**
-- `StudentMatchingCommandHandler`: Processes BOS commands
-- `StudentAssociationHandler`: Handles confirmed associations
+- `StudentMatchingCommandHandler`: Processes BOS commands (stateless routing)
+- `StudentAssociationHandler`: Handles confirmed associations (stateless routing)
 
 ### NLP Service
 - **Batch Processing**: Processes entire batch of essays in parallel
@@ -73,6 +72,7 @@ Content → Student Matching → Validation → Ready
 
 **Key Handler:**
 - `BatchAuthorMatchesHandler`: Processes NLP match suggestions
+- `AssociationTimeoutMonitor`: Auto-confirms associations after 24h timeout
 
 ## Critical Implementation Details
 
@@ -87,10 +87,8 @@ Content → Student Matching → Validation → Ready
 **BOS Batch States:**
 - `AWAITING_CONTENT_VALIDATION` → `AWAITING_STUDENT_VALIDATION` (REGULAR)
 - `AWAITING_CONTENT_VALIDATION` → `READY_FOR_PIPELINE_EXECUTION` (GUEST)
-- `AWAITING_STUDENT_VALIDATION` → `STUDENT_VALIDATION_COMPLETED` (after associations) *
-- `STUDENT_VALIDATION_COMPLETED` → `READY_FOR_PIPELINE_EXECUTION` (after essays stored) *
-
-* Note: Planned refactor to add intermediate state preventing race conditions
+- `AWAITING_STUDENT_VALIDATION` → `STUDENT_VALIDATION_COMPLETED` (after associations confirmed)
+- `STUDENT_VALIDATION_COMPLETED` → `READY_FOR_PIPELINE_EXECUTION` (after essays stored)
 
 **ELS Batch States:**
 - `CONTENT_PENDING` → `AWAITING_STUDENT_ASSOCIATIONS` → `ASSOCIATIONS_CONFIRMED`

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode
 from common_core.events.envelope import EventEnvelope
 
 from services.class_management_service.api_models import (
@@ -56,10 +57,6 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
 
     async def delete_student(self, student_id: uuid.UUID) -> bool: ...
 
-    async def associate_essay_to_student(
-        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
-    ) -> None: ...
-
     async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
         """Get all student-essay associations for a batch."""
         ...
@@ -76,6 +73,7 @@ class ClassEventPublisherProtocol(Protocol):
         self,
         batch_id: str,
         class_id: str,
+        course_code: CourseCode,
         associations: list[dict[str, Any]],
         timeout_triggered: bool,
         validation_summary: dict[str, int],

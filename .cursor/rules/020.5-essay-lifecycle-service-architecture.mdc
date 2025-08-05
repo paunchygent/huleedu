@@ -39,19 +39,23 @@ alwaysApply: false
 - **`batch_command_handlers.py`**: BOS command routing and event handlers
 - **`implementations/batch_command_handler_impl.py`**: Command processing logic
 - **`implementations/service_request_dispatcher.py`**: ELS → specialized service dispatch
-- **Pattern**: BOS command → essay state updates → specialized service requests
+- **Phase 1 Behavior**: Stateless event routing without essay state updates
+- **Phase 2+ Behavior**: Normal command processing with essay state updates
 
 ## 4. Event Integration
 
 ### 4.1. Consumed Events
 - `BATCH_ESSAYS_REGISTERED`: BOS slot registration
 - `ESSAY_CONTENT_PROVISIONED`: File Service content provisioning
-- `BATCH_SPELLCHECK_INITIATE_COMMAND`: BOS spellcheck commands
+- `BATCH_SERVICE_STUDENT_MATCHING_INITIATE_COMMAND`: Phase 1 student matching (stateless routing)
+- `STUDENT_ASSOCIATIONS_CONFIRMED`: Phase 1 completion (stateless routing)
+- `BATCH_SPELLCHECK_INITIATE_COMMAND`: Phase 2+ spellcheck commands
 
 ### 4.2. Published Events  
-- `BATCH_ESSAYS_READY`: Complete batch readiness notification
-- `EXCESS_CONTENT_PROVISIONED`: Content overflow notifications
-- `ESSAY_LIFECYCLE_SPELLCHECK_REQUEST`: Spellcheck requests to specialized services
+- `BATCH_CONTENT_PROVISIONING_COMPLETED`: Content readiness notification
+- `BATCH_STUDENT_MATCHING_REQUESTED`: Phase 1 NLP requests (stateless)
+- `BATCH_ESSAYS_READY`: Complete batch readiness after Phase 1
+- `ESSAY_LIFECYCLE_SPELLCHECK_REQUEST`: Phase 2+ spellcheck requests
 
 ## 5. Configuration
 

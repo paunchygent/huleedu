@@ -8,7 +8,7 @@ student associations confirmation events from Class Management Service.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -145,13 +145,14 @@ class TestStudentAssociationHandler:
             event_name=ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED,
             batch_id=str(uuid4()),
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=sample_associations,
             timeout_triggered=False,
             validation_summary={"human": 3},
         )
 
     @pytest.mark.asyncio
-    async def test_updates_essay_student_associations(
+    async def test_routes_associations_to_batch_essays_ready(
         self,
         handler: StudentAssociationHandler,
         mock_repository: AsyncMock,
@@ -162,19 +163,19 @@ class TestStudentAssociationHandler:
         sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler updates essay records with student associations."""
+        """Test that handler acts as stateless router, publishing BatchEssaysReady without updating essay state."""
         # Arrange
         correlation_id = uuid4()
-        session = mock_session_factory.return_value.__aenter__.return_value
 
         # Mock repository to return essay states
         mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -200,30 +201,13 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert
-        # Should update student associations for each essay
-        assert mock_repository.update_student_association.call_count == len(event_data.associations)
+        # Assert - ELS acts as stateless event router during Phase 1
+        # Should retrieve batch status to get ready essays
+        mock_batch_tracker.get_batch_status.assert_called_once_with(event_data.batch_id)
+        mock_batch_tracker.check_batch_completion.assert_called_once_with(event_data.batch_id)
 
-        expected_association_calls = []
-        for assoc in event_data.associations:
-            expected_association_calls.append(
-                call(
-                    essay_id=assoc.essay_id,
-                    student_id=assoc.student_id,
-                    association_confirmed_at=assoc.validated_at,
-                    association_method=assoc.validation_method,
-                    correlation_id=correlation_id,
-                    session=session,
-                )
-            )
-
-        mock_repository.update_student_association.assert_has_calls(expected_association_calls)
-
-        # Should update processing metadata for each essay
-        assert (
-            mock_repository.update_essay_processing_metadata.call_count
-            == len(event_data.associations) + 1
-        )
+        # Should clean up Redis state after successful routing
+        mock_batch_tracker.cleanup_batch.assert_called_once_with(event_data.batch_id)
 
     @pytest.mark.asyncio
     async def test_publishes_batch_essays_ready(
@@ -247,9 +231,10 @@ class TestStudentAssociationHandler:
 
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -296,22 +281,19 @@ class TestStudentAssociationHandler:
         mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
         mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
         event_data: StudentAssociationsConfirmedV1,
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler continues processing when some essays are missing."""
+        """Test that handler acts as stateless router even when essays might be missing."""
         # Arrange
         correlation_id = uuid4()
 
-        # Mock repository to return None for all essays (not found)
-        mock_repository.get_essay_state.return_value = None
-
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -337,40 +319,33 @@ class TestStudentAssociationHandler:
         # Act - Should not raise exception
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert
-        # Should have attempted to get each essay state
-        assert mock_repository.get_essay_state.call_count == len(event_data.associations)
-
-        # Should not update associations for missing essays
+        # Assert - ELS acts as stateless router, doesn't interact with repository
+        # Should not interact with essay repository during stateless routing
+        mock_repository.get_essay_state.assert_not_called()
         mock_repository.update_student_association.assert_not_called()
 
-        # Should still publish BatchEssaysReady (with empty essay list)
+        # Should still publish BatchEssaysReady via routing
         mock_batch_lifecycle_publisher.publish_batch_essays_ready.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_marks_batch_associations_complete(
+    async def test_cleans_up_redis_state_after_routing(
         self,
         handler: StudentAssociationHandler,
         mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
-        mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
         event_data: StudentAssociationsConfirmedV1,
-        sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler marks batch associations as complete in metadata."""
+        """Test that handler cleans up Redis state after successful event routing."""
         # Arrange
         correlation_id = uuid4()
 
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
-
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -396,21 +371,11 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert
-        # Find the call that marks batch associations complete
-        completion_call = None
-        for call_obj in mock_repository.update_essay_processing_metadata.call_args_list:
-            metadata = call_obj.kwargs.get("metadata_updates", {})
-            if "batch_student_associations_complete" in metadata:
-                completion_call = call_obj
-                break
+        # Assert - ELS should clean up Redis state after successful routing
+        mock_batch_tracker.cleanup_batch.assert_called_once_with(event_data.batch_id)
 
-        assert completion_call is not None
-        assert (
-            completion_call.kwargs["metadata_updates"]["batch_student_associations_complete"]
-            is True
-        )
-        assert "associations_completed_at" in completion_call.kwargs["metadata_updates"]
+        # Should not update any database state during stateless routing
+        mock_repository.update_essay_processing_metadata.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_handles_timeout_triggered_associations(
@@ -419,12 +384,10 @@ class TestStudentAssociationHandler:
         mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
         mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
         sample_associations: list[StudentAssociationConfirmation],
-        sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler properly handles timeout-triggered associations."""
+        """Test that handler routes timeout-triggered associations correctly."""
         # Arrange
         correlation_id = uuid4()
 
@@ -445,19 +408,18 @@ class TestStudentAssociationHandler:
             event_name=ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED,
             batch_id=str(uuid4()),
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=timeout_associations,
             timeout_triggered=True,
             validation_summary={"timeout": 3},
         )
 
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
-
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -483,34 +445,23 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert - Verify timeout associations are processed correctly
-        # Should still process associations normally
-        assert mock_repository.update_student_association.call_count == len(timeout_associations)
+        # Assert - ELS acts as stateless router regardless of validation method
+        # Should not update any database state
+        mock_repository.update_student_association.assert_not_called()
 
-        # Verify timeout method was used
-        for i, call_obj in enumerate(mock_repository.update_student_association.call_args_list):
-            assert call_obj.kwargs["association_method"] == "timeout"
-            assert call_obj.kwargs["student_id"] == timeout_associations[i].student_id
-
+        # Should still publish BatchEssaysReady via routing
         mock_batch_lifecycle_publisher.publish_batch_essays_ready.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_error_handling_for_missing_batch_status(
         self,
         handler: StudentAssociationHandler,
-        mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
-        mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
         event_data: StudentAssociationsConfirmedV1,
-        sample_essay_states: list[EssayStateDB],
     ) -> None:
         """Test that handler raises error when batch status is not found."""
         # Arrange
         correlation_id = uuid4()
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
 
         # Mock batch tracker to return None (not found)
         mock_batch_tracker.get_batch_status.return_value = None
@@ -530,30 +481,21 @@ class TestStudentAssociationHandler:
     async def test_uses_correct_course_code_and_language(
         self,
         handler: StudentAssociationHandler,
-        mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
         mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
         event_data: StudentAssociationsConfirmedV1,
-        sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler extracts course code from essay metadata correctly."""
+        """Test that handler uses course code from event data (not essay metadata)."""
         # Arrange
         correlation_id = uuid4()
 
-        # Set specific course code in essay metadata
-        for essay_state in sample_essay_states:
-            essay_state.processing_metadata = {"course_code": "ENG7"}
-
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states
-
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -579,12 +521,13 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert
+        # Assert - ELS uses course code from event data, not essay metadata
         call_args = mock_batch_lifecycle_publisher.publish_batch_essays_ready.call_args
         event_published = call_args.kwargs["event_data"]
 
-        assert event_published.course_code == CourseCode.ENG7
-        assert event_published.course_language == "en"  # ENG7 is English
+        # Should use course code from event data (ENG5), not essay metadata
+        assert event_published.course_code == CourseCode.ENG5
+        assert event_published.course_language == "en"  # ENG5 is English
 
     @pytest.mark.asyncio
     async def test_handles_mixed_validation_methods(
@@ -593,11 +536,9 @@ class TestStudentAssociationHandler:
         mock_repository: AsyncMock,
         mock_batch_tracker: AsyncMock,
         mock_batch_lifecycle_publisher: AsyncMock,
-        mock_session_factory: MagicMock,
-        sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler correctly processes mixed validation methods."""
+        """Test that handler routes events with mixed validation methods correctly."""
         # Arrange
         correlation_id = uuid4()
 
@@ -633,19 +574,18 @@ class TestStudentAssociationHandler:
             event_name=ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED,
             batch_id=str(uuid4()),
             class_id="class_456",
+            course_code=CourseCode.ENG5,
             associations=mixed_associations,
             timeout_triggered=False,
             validation_summary={"human": 1, "auto": 1, "timeout": 1},
         )
 
-        # Mock repository to return essay states
-        mock_repository.get_essay_state.side_effect = sample_essay_states[:3]
-
         # Mock batch tracker to return status and completion check
         mock_batch_tracker.get_batch_status.return_value = batch_status
-        
+
         # Create mock BatchEssaysReady event for check_batch_completion
         from common_core.metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+
         mock_ready_event = BatchEssaysReady(
             batch_id=event_data.batch_id,
             ready_essays=[
@@ -671,10 +611,9 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert
-        # Should process all associations regardless of method
-        assert mock_repository.update_student_association.call_count == 3
+        # Assert - ELS acts as stateless router regardless of validation methods
+        # Should not process individual associations in database
+        mock_repository.update_student_association.assert_not_called()
 
-        # Verify each association was processed with correct method
-        for i, call_obj in enumerate(mock_repository.update_student_association.call_args_list):
-            assert call_obj.kwargs["association_method"] == mixed_associations[i].validation_method
+        # Should still publish BatchEssaysReady via routing
+        mock_batch_lifecycle_publisher.publish_batch_essays_ready.assert_called_once()

@@ -122,13 +122,6 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             return True
         return False
 
-    async def associate_essay_to_student(
-        self, user_id: str, essay_id: uuid.UUID, student_id: uuid.UUID, correlation_id: UUID
-    ) -> None:
-        if student_id in self.students:
-            # In a real implementation, this would create an EssayStudentAssociation record
-            pass
-
     async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
         """Get all student-essay associations for a batch."""
         # Mock implementation returns empty list for now

@@ -18,16 +18,27 @@ from services.class_management_service.api.health_routes import health_bp
 from services.class_management_service.api.student_routes import student_bp
 from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
+from services.class_management_service.implementations.association_timeout_monitor import (
+    AssociationTimeoutMonitor,
+)
 from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
+
+
+# Extended app type for type safety
+class ClassManagementApp(HuleEduApp):
+    """Extended HuleEdu app with Class Management specific attributes."""
+
+    timeout_monitor: AssociationTimeoutMonitor | None = None
+
 
 # Configure logging first
 configure_service_logging("class-management-service", log_level=settings.LOG_LEVEL)
 logger = create_service_logger("cms.app")
 
 
-def create_app() -> HuleEduApp:
+def create_app() -> ClassManagementApp:
     """Create and configure the Class Management Service app with guaranteed infrastructure."""
-    app = HuleEduApp(__name__)
+    app = ClassManagementApp(__name__)
 
     # IMMEDIATE initialization - satisfies non-optional contract
     app.container = create_container()
@@ -59,6 +70,7 @@ def create_app() -> HuleEduApp:
     app.kafka_consumer = None
     app.relay_worker = None
     app.relay_task = None
+    app.timeout_monitor = None
 
     # Register Blueprints
     app.register_blueprint(health_bp)
@@ -83,10 +95,11 @@ async def startup() -> None:
         # Setup metrics middleware
         setup_standard_service_metrics_middleware(app, "class_management")
 
-        # Get Kafka consumer and relay worker from DI container
+        # Get Kafka consumer, relay worker, and timeout monitor from DI container
         async with app.container() as request_container:
             app.kafka_consumer = await request_container.get(ClassManagementKafkaConsumer)
             app.relay_worker = await request_container.get(EventRelayWorker)
+            app.timeout_monitor = await request_container.get(AssociationTimeoutMonitor)
 
         # Start consumer as background task
         assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
@@ -96,12 +109,17 @@ async def startup() -> None:
         assert app.relay_worker is not None, "Outbox relay worker must be initialized"
         app.relay_task = asyncio.create_task(app.relay_worker.start())
 
+        # Start timeout monitor
+        assert app.timeout_monitor is not None, "Timeout monitor must be initialized"
+        await app.timeout_monitor.start()
+
         logger.info("Class Management Service started successfully")
         logger.info("Health endpoint: /healthz")
         logger.info("Metrics endpoint: /metrics")
         logger.info("API endpoints: /v1/classes/, /v1/batches/")
         logger.info("Kafka consumer: running")
         logger.info("Outbox relay worker: running")
+        logger.info("Timeout monitor: running")
 
     except Exception as e:
         logger.critical(f"Failed to start Class Management Service: {e}", exc_info=True)
@@ -137,6 +155,11 @@ async def shutdown() -> None:
                 await app.relay_task
             except asyncio.CancelledError:
                 logger.info("Relay task cancelled successfully")
+
+        # Stop timeout monitor
+        if app.timeout_monitor:
+            logger.info("Stopping timeout monitor...")
+            await app.timeout_monitor.stop()
 
         # Additional cleanup
         await startup_setup.shutdown_services()

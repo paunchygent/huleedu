@@ -208,6 +208,13 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         # The class_id should be provided in the confirmation request
         class_id = confirmations.get("class_id", str(uuid.uuid4()))
 
+        # Get course_code from the class
+        user_class = await self.get_class_by_id(uuid.UUID(class_id))
+        if not user_class or not user_class.course:
+            raise ValueError(f"Class {class_id} not found or has no course associated")
+
+        course_code = user_class.course.course_code
+
         # Process confirmations
         confirmed_associations = []
         validation_summary = {
@@ -237,6 +244,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         await self.event_publisher.publish_student_associations_confirmed(
             batch_id=str(batch_id),
             class_id=class_id,
+            course_code=course_code,
             associations=confirmed_associations,
             timeout_triggered=False,
             validation_summary=validation_summary,

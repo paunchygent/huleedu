@@ -8,13 +8,13 @@ Tests the clean separation of success (BatchEssaysReady) and error
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
-from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent
 from common_core.events.batch_coordination_events import (
     BatchErrorSummary,
     BatchEssaysReady,
@@ -55,6 +55,7 @@ def mock_outbox_manager() -> AsyncMock:
 def mock_topic_naming() -> Mock:
     """Provide mock topic naming."""
     from services.essay_lifecycle_service.protocols import TopicNamingProtocol
+
     mock = Mock(spec=TopicNamingProtocol)
     # Set default return values for all common events
     mock.get_topic_name.return_value = "test.topic.v1"
@@ -358,7 +359,6 @@ class TestDualEventPublishing:
     ) -> None:
         """Test that topic naming service is used via dependency injection instead of global patching."""
         # Arrange
-        from common_core.event_enums import ProcessingEvent
 
         mock_topic_naming.get_topic_name.return_value = "batch.validation.errors.v1"
 

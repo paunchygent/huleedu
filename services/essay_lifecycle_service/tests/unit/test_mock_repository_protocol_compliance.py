@@ -21,7 +21,6 @@ from services.essay_lifecycle_service.implementations.mock_essay_repository impo
 )
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
-    EssayState as ProtocolEssayState,
 )
 
 
@@ -33,12 +32,14 @@ class TestMockRepositoryProtocolCompliance:
         """Create mock repository instance."""
         return MockEssayRepository()
 
-    def test_mock_repository_implements_protocol(self, mock_repository: MockEssayRepository) -> None:
+    def test_mock_repository_implements_protocol(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test that MockEssayRepository implements EssayRepositoryProtocol."""
         # Note: Cannot use isinstance with Protocol that's not @runtime_checkable
         # Instead verify that all required methods exist and are callable
-        assert hasattr(mock_repository, 'get_essay_state')
-        assert callable(getattr(mock_repository, 'get_essay_state'))
+        assert hasattr(mock_repository, "get_essay_state")
+        assert callable(mock_repository.get_essay_state)
 
     def test_all_protocol_methods_implemented(self) -> None:
         """Test that all protocol methods are implemented in MockEssayRepository."""
@@ -46,13 +47,14 @@ class TestMockRepositoryProtocolCompliance:
         protocol_methods = [
             name
             for name in dir(EssayRepositoryProtocol)
-            if not name.startswith("_") and hasattr(getattr(EssayRepositoryProtocol, name), "__call__")
+            if not name.startswith("_")
+            and callable(getattr(EssayRepositoryProtocol, name))
         ]
 
         mock_methods = [
             name
             for name in dir(MockEssayRepository)
-            if not name.startswith("_") and hasattr(getattr(MockEssayRepository, name), "__call__")
+            if not name.startswith("_") and callable(getattr(MockEssayRepository, name))
         ]
 
         # Verify all protocol methods are implemented
@@ -60,7 +62,7 @@ class TestMockRepositoryProtocolCompliance:
         assert not missing_methods, (
             f"Protocol methods not implemented in MockEssayRepository: {missing_methods}"
         )
-        
+
         # Log discovered method count for visibility
         assert len(protocol_methods) >= 15, (
             f"Expected at least 15 protocol methods, found {len(protocol_methods)}"
@@ -77,9 +79,13 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params), "Parameter count mismatch"
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
-            assert protocol_param.name == mock_param.name, f"Parameter name mismatch: {protocol_param.name} vs {mock_param.name}"
-            assert protocol_param.annotation == mock_param.annotation, f"Parameter annotation mismatch for {protocol_param.name}"
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
+            assert protocol_param.name == mock_param.name, (
+                f"Parameter name mismatch: {protocol_param.name} vs {mock_param.name}"
+            )
+            assert protocol_param.annotation == mock_param.annotation, (
+                f"Parameter annotation mismatch for {protocol_param.name}"
+            )
 
         # Check return type annotations
         assert protocol_sig.return_annotation == mock_sig.return_annotation
@@ -95,7 +101,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params), "Parameter count mismatch"
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -112,7 +118,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -129,7 +135,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -138,7 +144,7 @@ class TestMockRepositoryProtocolCompliance:
         # Both are compatible at runtime, so we allow this difference
         protocol_return = str(protocol_sig.return_annotation)
         mock_return = str(mock_sig.return_annotation)
-        
+
         if "list[EssayState]" in protocol_return and "list[ProtocolEssayState]" in mock_return:
             # This is acceptable - both represent the same entity
             pass
@@ -155,7 +161,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
 
@@ -172,7 +178,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
 
@@ -188,22 +194,26 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
 
     def test_create_essay_state_with_content_idempotency_signature(self) -> None:
         """Test create_essay_state_with_content_idempotency method signature compliance."""
-        protocol_sig = inspect.signature(EssayRepositoryProtocol.create_essay_state_with_content_idempotency)
-        mock_sig = inspect.signature(MockEssayRepository.create_essay_state_with_content_idempotency)
+        protocol_sig = inspect.signature(
+            EssayRepositoryProtocol.create_essay_state_with_content_idempotency
+        )
+        mock_sig = inspect.signature(
+            MockEssayRepository.create_essay_state_with_content_idempotency
+        )
 
         protocol_params = list(protocol_sig.parameters.values())[1:]
         mock_params = list(mock_sig.parameters.values())[1:]
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -231,7 +241,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -248,7 +258,7 @@ class TestMockRepositoryProtocolCompliance:
 
         assert len(protocol_params) == len(mock_params)
 
-        for protocol_param, mock_param in zip(protocol_params, mock_params):
+        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
             assert protocol_param.name == mock_param.name
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
@@ -256,7 +266,9 @@ class TestMockRepositoryProtocolCompliance:
         assert protocol_sig.return_annotation == mock_sig.return_annotation
 
     @pytest.mark.asyncio
-    async def test_method_return_types_compatibility(self, mock_repository: MockEssayRepository) -> None:
+    async def test_method_return_types_compatibility(
+        self, mock_repository: MockEssayRepository
+    ) -> None:
         """Test that method return types are compatible with protocol expectations."""
         # Test get_essay_state return type
         result = await mock_repository.get_essay_state("non-existent")
@@ -281,7 +293,7 @@ class TestMockRepositoryProtocolCompliance:
         assert isinstance(essays, list)
         assert len(essays) == 1
         # Note: Cannot use isinstance with Protocol. Check for required attributes instead.
-        assert all(hasattr(essay, 'essay_id') and hasattr(essay, 'batch_id') for essay in essays)
+        assert all(hasattr(essay, "essay_id") and hasattr(essay, "batch_id") for essay in essays)
 
         # Test get_batch_status_summary return type
         summary = await mock_repository.get_batch_status_summary("test-batch")
@@ -290,7 +302,10 @@ class TestMockRepositoryProtocolCompliance:
         assert all(isinstance(value, int) for value in summary.values())
 
         # Test create_essay_state_with_content_idempotency return type
-        was_created, returned_essay_id = await mock_repository.create_essay_state_with_content_idempotency(
+        (
+            was_created,
+            returned_essay_id,
+        ) = await mock_repository.create_essay_state_with_content_idempotency(
             batch_id="test-batch-2",
             text_storage_id="text-123",
             essay_data={"internal_essay_id": "test-essay-2"},
@@ -313,7 +328,7 @@ class TestMockRepositoryProtocolCompliance:
         mock_session = AsyncSession()
 
         # update_essay_state with session
-        essay = await mock_repository.create_essay_record(
+        await mock_repository.create_essay_record(
             essay_id="param-test", batch_id="param-batch", correlation_id=correlation_id
         )
 
@@ -342,23 +357,26 @@ class TestMockRepositoryProtocolCompliance:
         )
         assert isinstance(was_created, bool)
 
-    @pytest.mark.parametrize("method_name", [
-        "get_essay_state",
-        "update_essay_state", 
-        "update_essay_status_via_machine",
-        "create_essay_record",
-        "create_essay_records_batch",
-        "list_essays_by_batch",
-        "get_batch_status_summary",
-        "get_batch_summary_with_essays",
-        "get_essay_by_text_storage_id_and_batch_id",
-        "create_or_update_essay_state_for_slot_assignment",
-        "list_essays_by_batch_and_phase",
-        "create_essay_state_with_content_idempotency",
-        "get_session_factory",
-        "update_essay_processing_metadata",
-        "update_student_association",
-    ])
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "get_essay_state",
+            "update_essay_state",
+            "update_essay_status_via_machine",
+            "create_essay_record",
+            "create_essay_records_batch",
+            "list_essays_by_batch",
+            "get_batch_status_summary",
+            "get_batch_summary_with_essays",
+            "get_essay_by_text_storage_id_and_batch_id",
+            "create_or_update_essay_state_for_slot_assignment",
+            "list_essays_by_batch_and_phase",
+            "create_essay_state_with_content_idempotency",
+            "get_session_factory",
+            "update_essay_processing_metadata",
+            "update_student_association",
+        ],
+    )
     def test_required_method_present_and_callable(self, method_name: str) -> None:
         """Test that each required protocol method is present and callable."""
         assert hasattr(MockEssayRepository, method_name), (
@@ -377,21 +395,21 @@ class TestMockRepositoryProtocolCompliance:
 
         methods_without_docstrings = []
         methods_with_empty_docstrings = []
-        
+
         for method_name in public_methods:
             method = getattr(MockEssayRepository, method_name)
             if method.__doc__ is None:
                 methods_without_docstrings.append(method_name)
             elif len(method.__doc__.strip()) == 0:
                 methods_with_empty_docstrings.append(method_name)
-        
+
         assert not methods_without_docstrings, (
             f"Methods missing docstrings: {methods_without_docstrings}"
         )
         assert not methods_with_empty_docstrings, (
             f"Methods with empty docstrings: {methods_with_empty_docstrings}"
         )
-        
+
         # Verify we found the expected number of public methods
         assert len(public_methods) >= 15, (
             f"Expected at least 15 public methods, found {len(public_methods)}"

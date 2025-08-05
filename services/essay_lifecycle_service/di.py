@@ -61,6 +61,9 @@ from services.essay_lifecycle_service.implementations.future_services_command_ha
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
 )
+from services.essay_lifecycle_service.implementations.mock_essay_repository import (
+    MockEssayRepository,
+)
 from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
@@ -97,9 +100,6 @@ from services.essay_lifecycle_service.protocols import (
     SpecializedServiceRequestDispatcher,
     StudentAssociationHandler,
     TopicNamingProtocol,
-)
-from services.essay_lifecycle_service.implementations.mock_essay_repository import (
-    MockEssayRepository,
 )
 
 
@@ -272,6 +272,7 @@ class ServiceClientsProvider(Provider):
     def provide_topic_naming(self) -> TopicNamingProtocol:
         """Provide topic naming implementation."""
         from services.essay_lifecycle_service.implementations.topic_naming import DefaultTopicNaming
+
         return DefaultTopicNaming()
 
     @provide(scope=Scope.APP)

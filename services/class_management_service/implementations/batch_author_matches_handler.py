@@ -180,7 +180,11 @@ class BatchAuthorMatchesHandler(CommandHandlerProtocol):
                                     batch_id=UUID(
                                         match_data.batch_id
                                     ),  # Store batch_id for retrieval
+                                    class_id=UUID(match_data.class_id),
                                     created_by_user_id=NLP_SERVICE_SYSTEM_USER,
+                                    confidence_score=suggestion.confidence_score,
+                                    match_reasons=suggestion.match_reasons,
+                                    validation_status="pending_validation",
                                 )
 
                                 session.add(association)

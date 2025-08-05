@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
@@ -46,7 +47,13 @@ from services.class_management_service.event_processor import process_single_mes
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
-from services.class_management_service.models_db import Base, EssayStudentAssociation, Student
+from services.class_management_service.models_db import (
+    Base,
+    Course,
+    EssayStudentAssociation,
+    Student,
+    UserClass,
+)
 from services.class_management_service.protocols import CommandHandlerProtocol
 
 
@@ -142,6 +149,8 @@ class TestBatchAuthorMatchesKafkaIntegration:
         async with session_factory() as session:
             async with session.begin():
                 await session.execute(text("TRUNCATE TABLE essay_student_associations CASCADE"))
+                await session.execute(text("TRUNCATE TABLE classes CASCADE"))
+                await session.execute(text("TRUNCATE TABLE courses CASCADE"))
 
     @pytest.fixture
     async def redis_client(
@@ -195,6 +204,40 @@ class TestBatchAuthorMatchesKafkaIntegration:
                     session.add(student)
 
         return students
+
+    @pytest.fixture
+    async def test_course(self, session_factory: async_sessionmaker[AsyncSession]) -> Course:
+        """Create test course."""
+        course = Course(
+            id=uuid4(),
+            course_code=CourseCode.ENG5,
+            name="English 5",
+            language=Language.ENGLISH,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(course)
+
+        return course
+
+    @pytest.fixture
+    async def test_class(
+        self, session_factory: async_sessionmaker[AsyncSession], test_course: Course
+    ) -> UserClass:
+        """Create test class."""
+        user_class = UserClass(
+            id=uuid4(),
+            name="Test Class",
+            created_by_user_id="test_user",
+            course_id=test_course.id,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(user_class)
+
+        return user_class
 
     @pytest.fixture
     def mock_class_repository(self, test_students: list[Student]) -> AsyncMock:
@@ -258,7 +301,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
             await consumer.stop()
 
     def create_batch_event(
-        self, test_students: list[Student], essay_count: int = 2
+        self, test_students: list[Student], test_class: UserClass, essay_count: int = 2
     ) -> BatchAuthorMatchesSuggestedV1:
         """Create a batch author matches suggested event with test data."""
         match_results = []
@@ -291,7 +334,8 @@ class TestBatchAuthorMatchesKafkaIntegration:
         return BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary={
                 "total_essays": essay_count,
@@ -333,6 +377,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
         kafka_producer: AIOKafkaProducer,
         kafka_consumer: AIOKafkaConsumer,
@@ -340,7 +385,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         """Test complete Kafka event processing flow with real infrastructure."""
         # Arrange
         correlation_id = uuid4()
-        batch_event = self.create_batch_event(test_students, essay_count=3)
+        batch_event = self.create_batch_event(test_students, test_class, essay_count=3)
         envelope = self.create_event_envelope(batch_event, correlation_id)
 
         # Act - Send event through real Kafka
@@ -406,13 +451,14 @@ class TestBatchAuthorMatchesKafkaIntegration:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
-        redis_client: AtomicRedisClientProtocol,
+        redis_client: AtomicRedisClientProtocol,  # noqa: ARG002 # Fixture needed for setup
     ) -> None:
         """Test idempotency behavior with real Redis infrastructure."""
         # Arrange
         correlation_id = uuid4()
-        batch_event = self.create_batch_event(test_students, essay_count=2)
+        batch_event = self.create_batch_event(test_students, test_class, essay_count=2)
         envelope = self.create_event_envelope(batch_event, correlation_id)
         kafka_msg = self.create_kafka_message(
             envelope,
@@ -455,6 +501,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
     async def test_event_processor_routing_integration(
         self,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
         mock_class_repository: AsyncMock,
     ) -> None:
@@ -470,7 +517,7 @@ class TestBatchAuthorMatchesKafkaIntegration:
         }
 
         correlation_id = uuid4()
-        batch_event = self.create_batch_event(test_students, essay_count=1)
+        batch_event = self.create_batch_event(test_students, test_class, essay_count=1)
         envelope = self.create_event_envelope(batch_event, correlation_id)
         kafka_msg = self.create_kafka_message(
             envelope, topic_name(ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED)

@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import (
@@ -21,6 +22,7 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
+from common_core.status_enums import StudentAssociationStatus
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -34,7 +36,13 @@ from services.class_management_service.config import Settings
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
-from services.class_management_service.models_db import Base, EssayStudentAssociation, Student
+from services.class_management_service.models_db import (
+    Base,
+    Course,
+    EssayStudentAssociation,
+    Student,
+    UserClass,
+)
 
 
 class TestBatchAuthorMatchesDatabaseConstraints:
@@ -96,6 +104,42 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         async with session_factory() as session:
             async with session.begin():
                 await session.execute(text("TRUNCATE TABLE essay_student_associations CASCADE"))
+                await session.execute(text("TRUNCATE TABLE classes CASCADE"))
+                await session.execute(text("TRUNCATE TABLE courses CASCADE"))
+
+    @pytest.fixture
+    async def test_course(self, session_factory: async_sessionmaker[AsyncSession]) -> Course:
+        """Create test course."""
+        course = Course(
+            id=uuid4(),
+            course_code=CourseCode.ENG5,
+            name="English 5",
+            language=Language.ENGLISH,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(course)
+
+        return course
+
+    @pytest.fixture
+    async def test_class(
+        self, session_factory: async_sessionmaker[AsyncSession], test_course: Course
+    ) -> UserClass:
+        """Create test class."""
+        user_class = UserClass(
+            id=uuid4(),
+            name="Test Class",
+            created_by_user_id="test_user",
+            course_id=test_course.id,
+        )
+
+        async with session_factory() as session:
+            async with session.begin():
+                session.add(user_class)
+
+        return user_class
 
     @pytest.fixture
     async def test_students(
@@ -167,11 +211,13 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test that essay_id unique constraint is enforced by PostgreSQL."""
         # Arrange - Create existing association
         essay_id = uuid4()
+        batch_id = uuid4()
         existing_student = test_students[0]
 
         async with session_factory() as session:
@@ -179,7 +225,10 @@ class TestBatchAuthorMatchesDatabaseConstraints:
                 existing_association = EssayStudentAssociation(
                     essay_id=essay_id,
                     student_id=existing_student.id,
+                    batch_id=batch_id,
+                    class_id=test_class.id,
                     created_by_user_id="manual_test",
+                    validation_status=StudentAssociationStatus.PENDING_VALIDATION.value,
                 )
                 session.add(existing_association)
 
@@ -195,8 +244,9 @@ class TestBatchAuthorMatchesDatabaseConstraints:
 
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
-            batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            batch_id=str(batch_id),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(essay_id),
@@ -249,6 +299,7 @@ class TestBatchAuthorMatchesDatabaseConstraints:
     async def test_foreign_key_constraint_validation(
         self,
         handler: BatchAuthorMatchesHandler,
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
         mock_class_repository: AsyncMock,
     ) -> None:
@@ -268,7 +319,8 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(uuid4()),
@@ -316,6 +368,7 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         self,
         handler: BatchAuthorMatchesHandler,
         test_students: list[Student],
+        test_class: UserClass,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test that PostgreSQL correctly validates data types."""
@@ -333,7 +386,8 @@ class TestBatchAuthorMatchesDatabaseConstraints:
         batch_event = BatchAuthorMatchesSuggestedV1(
             event_name=ProcessingEvent.BATCH_AUTHOR_MATCHES_SUGGESTED,
             batch_id=str(uuid4()),
-            class_id=str(uuid4()),
+            class_id=str(test_class.id),
+            course_code=CourseCode.ENG5,
             match_results=[
                 EssayMatchResult(
                     essay_id=str(uuid4()),
@@ -376,6 +430,8 @@ class TestBatchAuthorMatchesDatabaseConstraints:
                 EssayStudentAssociation.student_id,
                 EssayStudentAssociation.created_by_user_id,
                 EssayStudentAssociation.created_at,
+                EssayStudentAssociation.batch_id,
+                EssayStudentAssociation.class_id,
             )
             result_set = await session.execute(stmt)
             association = result_set.fetchone()
@@ -386,3 +442,5 @@ class TestBatchAuthorMatchesDatabaseConstraints:
             assert isinstance(association[2], UUID)  # student_id
             assert isinstance(association[3], str)  # created_by_user_id
             assert association[4] is not None  # created_at timestamp
+            assert isinstance(association[5], UUID)  # batch_id
+            assert isinstance(association[6], UUID)  # class_id
