@@ -18,6 +18,10 @@ The platform is divided into services by bounded context. Each microservice owns
 
 Microservices communicate primarily through asynchronous events via a Kafka message bus. Cross-service interactions are decoupled using Kafka topics (with a standardized event schema), minimizing the need for direct synchronous calls between services.
 
+The platform implements a **dual-phase processing architecture**:
+- **Phase 1 (Pre-readiness)**: Student matching for REGULAR batches via event routing
+- **Phase 2+ (Pipeline Processing)**: Multi-phase essay analysis with stateful coordination
+
 #### Explicit Data Contracts
 
 All inter-service communication models (event payloads, API request/response schemas) are defined as versioned Pydantic models in a shared `common_core` library. A standardized `EventEnvelope` wrapper is used for all Kafka events to provide metadata (timestamps, origin, schema version, correlation IDs, etc.) and ensure compatibility across services.
@@ -109,23 +113,67 @@ A Quart-based HTTP service for binary content storage and retrieval. It handles 
 
 ### File Service
 
-A Quart-based HTTP service (port 7001) that handles file uploads and content ingestion workflow using a **Strategy Pattern** for multi-format text extraction. The service accepts multipart file uploads via `POST /v1/files/batch` and supports `.txt`, `.docx`, and `.pdf` files with extensible architecture for additional formats. Each uploaded file undergoes strategic text extraction (UTF-8 decoding, python-docx parsing, or pypdf processing), content validation, and reliable storage via the Content Service. The service implements a **TRUE Outbox Pattern** for guaranteed event delivery, where all events are stored in the outbox database table first, then asynchronously published to Kafka by a dedicated relay worker for transactional safety. It serves as the entry point for essay data with comprehensive error handling including encrypted PDF detection and structured error reporting.
+A Quart-based HTTP service (port 7001) that handles file uploads and content ingestion workflow using a **Strategy Pattern** for multi-format text extraction. The service accepts multipart file uploads via `POST /v1/files/batch` and supports `.txt`, `.docx`, and `.pdf` files with extensible architecture for additional formats. Each uploaded file undergoes strategic text extraction (UTF-8 decoding, python-docx parsing, or pypdf processing), content validation, and reliable storage via the Content Service. 
+
+The service implements a **TRUE Outbox Pattern** with its own PostgreSQL database for guaranteed event delivery, where all events are stored in the outbox database table first, then asynchronously published to Kafka by a dedicated relay worker for transactional safety. It serves as the entry point for essay data with comprehensive error handling including encrypted PDF detection and structured error reporting.
 
 ### Essay Lifecycle Service (ELS)
 
-A hybrid service with both an HTTP API (port 6001) and a Kafka event consumer component. ELS maintains the state of each essay through the processing pipeline using a formal state machine. It defines an `EssayStateMachine` (via the `transitions` library) that governs allowed state transitions (e.g., from `content_provisioned` to `spellcheck_completed` to `cj_completed`, etc.).
+A hybrid service with both an HTTP API (port 8000) and a Kafka event consumer component that manages essay processing coordination and state management. ELS operates in two distinct modes depending on the processing phase.
 
-The service receives commands and events to advance essay state: for example, it consumes a `BatchSpellcheckInitiateCommand` event to start spell checking all essays in a batch, and later emits an `EssaySpellcheckCompleted` event when an essay's spellcheck phase is done. ELS also exposes HTTP endpoints for querying or updating essay state if needed (and for internal coordination with Batch Orchestrator).
+**Phase 1 Behavior (Student Matching):**
+- Acts as a **stateless event router** - publishes events without updating essay states
+- Receives `BatchServiceStudentMatchingInitiateCommandDataV1` from BOS, routes to NLP Service
+- Receives `StudentAssociationsConfirmedV1` from CMS, publishes `BatchEssaysReady` to BOS
+- No essay state changes during Phase 1 to prevent race conditions
 
-For persistence, it uses a relational database to store essay metadata and state (SQLite in development, PostgreSQL in production), accessed via SQLAlchemy. ELS ensures exactly-once state transitions and acts as the source of truth for an essay's progress through the pipeline.
+**Phase 2+ Behavior (Pipeline Processing):**
+- **Stateful operation** using formal `EssayStateMachine` (via `transitions` library)
+- Manages essay state transitions through processing phases
+- Receives batch commands (e.g., `BatchSpellcheckInitiateCommand`) and updates essay states
+- Coordinates with specialized services (Spellchecker, CJ Assessment, etc.)
+
+**Core Architecture:**
+- **Slot Assignment**: Coordinates content provisioning with batch slot management
+- **Command Processing**: Routes BOS commands to appropriate services
+- **State Management**: Uses mock repository implementation similar to BOS architecture
+- **Event Publishing**: Implements transactional outbox pattern for guaranteed delivery
+
+**Key Features:**
+
+* **Dual Mode Operation**: Stateless routing (Phase 1) vs stateful processing (Phase 2+)
+* **Batch Coordination**: Tracks batch readiness and essay provisioning
+* **Pipeline Orchestration**: Manages multi-phase essay processing workflows
+* **Race Condition Prevention**: Stateless Phase 1 prevents premature state transitions
 
 ### Batch Orchestrator Service (BOS)
 
-A Quart-based HTTP service (port 5001) that coordinates processing at the batch level. A "batch" represents a collection of essays (e.g., a class assignment submission batch) to be processed together. BOS provides APIs to register a new batch and to initiate processing on a batch (triggering the pipeline of analysis phases for all essays in that batch).
+A Quart-based HTTP service (port 5000) that coordinates processing at the batch level and implements the **batch type decision logic** for GUEST vs REGULAR processing flows. BOS serves as the central orchestrator that routes batches through appropriate processing pipelines based on batch characteristics.
 
-When a client (or the API Gateway) requests a batch pipeline execution via BOS, the BOS will consult the Batch Conductor Service to determine the correct sequence of phases based on the current state of the batch and system configuration. BOS then issues commands to the Essay Lifecycle Service (e.g., instruct ELS to start spellchecking all essays in the batch) and listens for phase completion events on Kafka. In essence, BOS is the central orchestrator that drives the multi-phase essay analysis workflow, orchestrating between ELS and various processing services.
+**Batch Type Decision Logic:**
+- **GUEST Batches** (no class_id): Skip Phase 1 student matching → direct to pipeline processing
+- **REGULAR Batches** (has class_id): Require Phase 1 student matching → human validation → pipeline processing
 
-BOS does not perform heavy processing itself; it issues commands and reacts to events, maintaining batch-level context and progress.
+**Processing Flow:**
+1. **Content Readiness**: Receives `BatchContentProvisioningCompletedV1` from ELS
+2. **Batch Type Decision**: Examines batch context to determine GUEST vs REGULAR flow
+3. **Phase 1 Coordination** (REGULAR only): Initiates student matching via `BatchServiceStudentMatchingInitiateCommandDataV1`
+4. **Validation Completion**: Processes `StudentAssociationsConfirmedV1` events, transitions to `STUDENT_VALIDATION_COMPLETED`
+5. **Pipeline Readiness**: Transitions to `READY_FOR_PIPELINE_EXECUTION` after essays stored
+6. **Phase 2+ Orchestration**: Coordinates multi-phase processing with specialized services
+
+**State Machine:**
+- `AWAITING_CONTENT_VALIDATION` → `AWAITING_STUDENT_VALIDATION` (REGULAR) / `READY_FOR_PIPELINE_EXECUTION` (GUEST)
+- `AWAITING_STUDENT_VALIDATION` → `STUDENT_VALIDATION_COMPLETED`
+- `STUDENT_VALIDATION_COMPLETED` → `READY_FOR_PIPELINE_EXECUTION`
+
+**Key Features:**
+
+* **Batch Type Routing**: Intelligent GUEST vs REGULAR flow determination
+* **Phase 1 Coordination**: Manages student matching workflow for REGULAR batches
+* **State Management**: Implements race condition prevention via intermediate states
+* **Dynamic Pipeline**: Consults Batch Conductor Service for phase sequencing
+* **Event-Driven**: Reacts to completion events to advance batch processing
 
 ### Batch Conductor Service (BCS)
 
@@ -157,11 +205,11 @@ A Kafka consumer microservice (no public HTTP API) dedicated to spelling and gra
 
 ### Comparative Judgment (CJ) Assessment Service
 
-A Kafka-driven service (with optional HTTP endpoints for health checks on port 9095) that performs AI-assisted comparative judgment of essays. In comparative judgment, essays are evaluated by comparing them in pairs. This service uses Large Language Model (LLM) APIs to generate pairwise comparisons or scores between essays in a batch. It listens on a Kafka topic (e.g. `huleedu.commands.cj_assess.v1`) for commands to assess a batch or a pair of essays. Internally, the CJ service interacts with the LLM Provider Service (described below) to obtain AI-generated judgments in a resilient way. It may break a large task (ranking a whole batch of essays) into many pairwise comparison queries to the LLM provider. The service collates the results (e.g. which essays won comparisons) and from these produces a ranked list or scores for all essays in the batch. Once comparative assessment for the batch is complete, it emits a `BatchComparativeJudgmentCompleted` event with the outcome (e.g. relative rankings or scores for each essay). This event can then be used by other components (Result Aggregator or BOS) to finalize the batch results. The CJ Assessment Service uses a PostgreSQL database to store intermediate results and ensure consistency (especially since LLM calls may be slow or need retries). Metrics and health endpoints are available (on `/metrics` and `/healthz`) for monitoring. This service enables automated scoring or ranking of essays using AI, providing the core of the grading or feedback mechanism.
+A Kafka-driven service (with optional HTTP endpoints for health checks on port 9090) that performs AI-assisted comparative judgment of essays. In comparative judgment, essays are evaluated by comparing them in pairs. This service uses Large Language Model (LLM) APIs to generate pairwise comparisons or scores between essays in a batch. It listens on a Kafka topic (e.g. `huleedu.commands.cj_assess.v1`) for commands to assess a batch or a pair of essays. Internally, the CJ service interacts with the LLM Provider Service (described below) to obtain AI-generated judgments in a resilient way. It may break a large task (ranking a whole batch of essays) into many pairwise comparison queries to the LLM provider. The service collates the results (e.g. which essays won comparisons) and from these produces a ranked list or scores for all essays in the batch. Once comparative assessment for the batch is complete, it emits a `BatchComparativeJudgmentCompleted` event with the outcome (e.g. relative rankings or scores for each essay). This event can then be used by other components (Result Aggregator or BOS) to finalize the batch results. The CJ Assessment Service uses a PostgreSQL database to store intermediate results and ensure consistency (especially since LLM calls may be slow or need retries). Metrics and health endpoints are available (on `/metrics` and `/healthz`) for monitoring. This service enables automated scoring or ranking of essays using AI, providing the core of the grading or feedback mechanism.
 
 **Key Features:**
 
-* **Port**: 9095 (HTTP endpoints for health checks)
+* **Port**: 9090 (HTTP endpoints for health checks and metrics)
 * **Event-Driven**: Listens on Kafka topic `huleedu.commands.cj_assess.v1`
 * **AI Integration**: Uses LLM Provider Service for pairwise comparisons
 * **Data Persistence**: PostgreSQL database for storing intermediate results
@@ -179,7 +227,7 @@ A Kafka-driven service (with optional HTTP endpoints for health checks on port 9
 
 ### LLM Provider Service
 
-A specialized Quart-based HTTP service (port 8090) that acts as a gateway and queue for calls to external Large Language Model providers. Multiple services in the platform (especially the CJ Assessment and future AI-driven services) need to call external AI APIs (like OpenAI, Anthropic, etc.). Instead of each service handling these calls (which can be slow or have rate limits), the LLM Provider Service centralizes this function. It exposes endpoints such as `POST /api/v1/comparison` to submit a comparison or other AI request. Requests are queued (in Redis) and processed asynchronously to handle high load and avoid hitting external API limits. The service implements circuit breakers and fallback strategies: if one AI provider is down or returns errors, it can switch to an alternative provider or degrade gracefully. Clients (like the CJ service) receive an immediate acknowledgment (HTTP 202 Accepted with a queue ID) and can poll `/api/v1/status/{queue_id}` or `/api/v1/results/{queue_id}` to get the result once ready. This design gives resilience to the AI calls and decouples the rest of the system from external API latency or failures.
+A specialized Quart-based HTTP service (port 8080) that acts as a gateway and queue for calls to external Large Language Model providers. Multiple services in the platform (especially the CJ Assessment and future AI-driven services) need to call external AI APIs (like OpenAI, Anthropic, etc.). Instead of each service handling these calls (which can be slow or have rate limits), the LLM Provider Service centralizes this function. It exposes endpoints such as `POST /api/v1/comparison` to submit a comparison or other AI request. Requests are queued (in Redis) and processed asynchronously to handle high load and avoid hitting external API limits. The service implements circuit breakers and fallback strategies: if one AI provider is down or returns errors, it can switch to an alternative provider or degrade gracefully. Clients (like the CJ service) receive an immediate acknowledgment (HTTP 202 Accepted with a queue ID) and can poll `/api/v1/status/{queue_id}` or `/api/v1/results/{queue_id}` to get the result once ready. This design gives resilience to the AI calls and decouples the rest of the system from external API latency or failures.
 
 The LLM Provider Service supports multiple AI providers (OpenAI, Anthropic, Google PaLM, OpenRouter, etc.) through a unified interface, and does no caching of responses (each request passes through to preserve the psychometric validity of CJ assessments). It uses Redis both for queuing requests and as a short-term results store. This service is critical for any AI-driven feature in HuleEdu, ensuring those features are robust and scalable.
 
@@ -204,20 +252,52 @@ The LLM Provider Service supports multiple AI providers (OpenAI, Anthropic, Goog
 * Load balancing across multiple AI providers
 * Graceful degradation when providers are unavailable
 
-### Class Management Service (CMS)
+### NLP Service
 
-A Quart-based HTTP CRUD service (port 5002) that manages metadata about classes, students, and their enrollment relationships. It serves as the authoritative source for user domain data: which classes exist, which students belong to which class, etc. Other services (like the API Gateway or any feature that needs student info) rely on CMS for querying class/student info. It provides REST endpoints under `/v1/classes` and `/v1/students` for creating, reading, updating, and deleting these records. For instance, an admin could create a new class and assign students to it via this service's API. The service uses a PostgreSQL database to persist class and student information. All access to class/student data from other parts of the system goes through this service (directly or via the API Gateway), ensuring a single source of truth. This microservice illustrates the platform's domain separation: educational administrative data is handled separately from essay processing data.
+A Kafka-driven worker service that operates in dual phases for both student matching and text analysis. This service handles batch-level processing with parallel execution and partial failure handling. The service uses PostgreSQL database for outbox pattern implementation to ensure reliable event delivery.
+
+**Phase 1: Student Matching (Pre-readiness)**
+- Receives `BatchStudentMatchingRequestedV1` events from ELS
+- Extracts student identifiers from essay text using multiple strategies (Exam.net format, header patterns, email anchors)
+- Matches extracted names against class rosters using fuzzy matching algorithms  
+- Returns `BatchAuthorMatchesSuggestedV1` events to Class Management Service with confidence scores
+
+**Phase 2: Text Analysis (Post-readiness)**
+- Receives `BatchNLPInitiateCommandV1` events from ELS
+- Performs linguistic analysis on essays (readability, complexity, features)
+- Returns analysis results for downstream processing
 
 **Key Features:**
 
-* **Authoritative Source**: Serves as the single source of truth for user domain data
-* **Data Management**:
-  * Tracks which classes exist
-  * Manages student enrollments
-* **REST API**:
-  * `/v1/classes` - Manage class records
-  * `/v1/students` - Manage student records
-* **Database**: PostgreSQL for persistent storage
+* **Dual-Phase Architecture**: Student matching (Phase 1) + text analysis (Phase 2)
+* **Batch Processing**: Processes entire batches with parallel execution (asyncio.Semaphore(10))
+* **Extraction Pipeline**: Multiple text extraction strategies with confidence thresholds
+* **Language Support**: Swedish name patterns and multi-language text analysis
+* **Partial Failure Handling**: Continues processing with failed essays marked appropriately
+* **Performance**: <100ms per essay, <10s for 30-essay batches, max 100 essays per batch
+
+### Class Management Service (CMS)
+
+A Quart-based HTTP CRUD service (port 5002) that manages metadata about classes, students, and their enrollment relationships. It serves as the authoritative source for user domain data and handles Phase 1 student matching validation.
+
+**Core Responsibilities:**
+- Class and student enrollment management via REST API (`/v1/classes`, `/v1/students`)
+- Phase 1 student matching: receives NLP suggestions via `BatchAuthorMatchesSuggestedV1` events
+- Association timeout monitoring: auto-confirms pending associations after 24 hours
+
+**Phase 1 Student Matching:**
+- **Association Timeout Monitor**: Auto-confirms pending student-essay associations after 24-hour timeout
+- **High Confidence (≥0.7)**: Confirms association with original student using `TIMEOUT` validation method
+- **Low Confidence (<0.7)**: Creates UNKNOWN student with email `unknown.{class_id}@huleedu.system`
+- **Database Fields**: `batch_id`, `class_id`, `confidence_score`, `validation_status`, `validation_method`
+
+**Key Features:**
+
+* **Authoritative Source**: Single source of truth for user domain data
+* **Phase 1 Integration**: Processes NLP student matching suggestions
+* **Automated Validation**: 24-hour timeout with confidence-based decision logic
+* **REST API**: Full CRUD operations for classes and students
+* **Database**: PostgreSQL with Phase 1 association tracking fields
 
 ### Result Aggregator Service (RAS)
 
@@ -248,7 +328,7 @@ A FastAPI-based gateway service (port 4001) that serves as the unified entry poi
 
 ### WebSocket Service
 
-A dedicated service for managing persistent WebSocket connections with clients. It works in conjunction with the API Gateway to provide real-time updates on essay processing status.
+A dedicated service (port 8080) for managing persistent WebSocket connections with clients. It works in conjunction with the API Gateway to provide real-time updates on essay processing status.
 
 **Key Features:**
 
@@ -295,16 +375,18 @@ HuleEdu leverages a modern Python-based tech stack and tooling:
 
 ### Database Solutions
 
-#### PostgreSQL
+#### Database Architecture Pattern
 
-* Primary production database
-* Used for services requiring robust data storage
-* Handles Class Management, Result Aggregator, and CJ service data
+**All HuleEdu services follow a consistent database pattern:**
 
-#### SQLite
+* **Production**: PostgreSQL with service-specific databases
+* **Development/Testing**: Mock repository implementations (in-memory)
+* **No SQLite**: Services do not use SQLite in any environment
 
-* Default for development environments
-* Simplifies local development setup
+**Services with Databases:**
+
+* **PostgreSQL Production Databases**: Class Management, Result Aggregator, CJ Assessment, File Service (outbox), NLP Service (outbox), Essay Lifecycle Service
+* **Mock Repository Pattern**: All services use mock implementations for development and testing that follow the same interface contracts as production PostgreSQL implementations
 
 ### ORM & Database Access
 
@@ -531,16 +613,17 @@ This command starts the Docker Compose stack defined in `docker-compose.yml`. It
 
 * Content Service
 * File Service
-* ELS (Event Logging Service)
-* BOS (Batch Orchestration Service)
-* BCS (Batch Coordination Service)
+* Essay Lifecycle Service (ELS)
+* Batch Orchestrator Service (BOS)
+* Batch Conductor Service (BCS)
+* NLP Service (dual-phase student matching + text analysis)
 * Spellchecker Service
 * CJ (Comparative Judgment) Service
 * LLM Provider Service
-* CMS (Class Management Service)
-* RAS (Result Aggregator Service)
-* API Gateway
-* And other supporting services
+* Class Management Service (CMS)
+* Result Aggregator Service (RAS)
+* API Gateway Service
+* WebSocket Service
 
 ### Verifying the Deployment
 
@@ -553,9 +636,11 @@ Once started, services run in the background (detached mode). You can verify the
    ```
 
 2. Accessing health endpoints:
-   * BOS: `http://localhost:5001/healthz`
-   * API Gateway: `http://localhost:8000/health`
-   * (Ports may vary based on configuration)
+   * BOS: `http://localhost:5000/healthz`
+   * ELS: `http://localhost:8000/healthz`
+   * API Gateway: `http://localhost:4001/health`
+   * Content Service: `http://localhost:8001/healthz`
+   * File Service: `http://localhost:7001/healthz`
 
 ### Interacting with the System
 
@@ -707,13 +792,26 @@ While no formal contribution guide is included here, the following practices are
 
 ## Current Status of Implementation
 
-As of now, all core microservices of the HuleEdu platform have been implemented and integrated into a functioning whole. The system is capable of ingesting a batch of essays and executing a full analysis pipeline on them.
+All core microservices of the HuleEdu platform have been implemented and integrated into a functioning system. The platform supports both anonymous (GUEST) and class-based (REGULAR) essay processing workflows with comprehensive student matching and automated validation capabilities.
 
 ### Major Achievements
 
+#### Phase 1 Student Matching Architecture
+
+The platform implements a sophisticated **pre-readiness student matching system** for REGULAR batches:
+- **NLP Service**: Dual-phase architecture supporting both student matching and text analysis
+- **Association Timeout Monitor**: 24-hour auto-confirmation with confidence-based decision logic
+- **UNKNOWN Student System**: Creates placeholder students for low-confidence matches
+- **Race Condition Prevention**: Intermediate `STUDENT_VALIDATION_COMPLETED` state prevents premature pipeline execution
+
+#### Batch Type Differentiation
+
+**GUEST Batches**: Anonymous processing that bypasses student matching for immediate pipeline execution
+**REGULAR Batches**: Class-based processing with complete Phase 1 student matching workflow
+
 #### Dynamic Pipeline Orchestration
 
-The multi-phase processing pipeline (file upload → content storage → spell check → comparative judgment → aggregation) is fully operational. The Batch Orchestrator and Batch Conductor services work in tandem to support dynamic sequencing of phases.
+The multi-phase processing pipeline supports both batch types with intelligent routing. The Batch Orchestrator and Batch Conductor services work in tandem to support dynamic sequencing of phases based on batch characteristics.
 
 #### Observability
 
@@ -750,9 +848,9 @@ While the core backend is in place, several additional services and features are
 
 A microservice that will generate individualized feedback for student essays using AI (LLM-based). This service would take an essay (after spellchecking, perhaps) and produce formative feedback (comments on grammar, structure, content relevance, etc.). It will likely use the LLM Provider Service to call an AI model with a prompt to generate feedback, and then emit an event with the feedback results. This service will add an “AI feedback” phase to the processing pipeline, complementing the comparative judgment score with qualitative feedback for the student.
 
-### NLP Metrics Service (Planned)
+### Enhanced NLP Analytics (Planned)
 
-A microservice focused on computing various Natural Language Processing metrics on each essay. This could include readability scores, vocabulary complexity, sentence length variance, plagiarism detection, and other analytics. By having a dedicated service, these computationally intensive analyses can be done in parallel with other phases if appropriate. The output (various metrics and flags per essay) would be consumed by the Result Aggregator and made available in the final report.
+Extensions to the existing NLP Service to compute additional linguistic metrics on essays. The current NLP Service handles Phase 1 student matching and basic Phase 2 text analysis. Planned enhancements include readability scores, vocabulary complexity analysis, sentence length variance, and plagiarism detection. These computationally intensive analyses would extend the existing Phase 2 text analysis capabilities, with results consumed by the Result Aggregator for comprehensive reporting.
 
 ### User Management Service (Planned)
 
