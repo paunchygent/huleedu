@@ -121,7 +121,7 @@ async def confirm_batch_student_associations(
                 endpoint=f"/v1/batches/{batch_id}/student-associations/confirm",
                 error_type="bad_request",
             ).inc()
-            return jsonify({"error": "Invalid batch ID format"}), 400
+            return jsonify({"error": str(e)}), 400
         except HuleEduError as e:
             logger.warning(
                 f"Class management error during association confirmation: {e.error_detail.message}",

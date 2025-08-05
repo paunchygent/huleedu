@@ -204,9 +204,13 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         self, batch_id: uuid.UUID, confirmations: dict[str, Any], correlation_id: uuid.UUID
     ) -> dict[str, Any]:
         """Process teacher confirmations and publish StudentAssociationsConfirmed event."""
-        # Get class_id from the confirmations data or associations
-        # The class_id should be provided in the confirmation request
-        class_id = confirmations.get("class_id", str(uuid.uuid4()))
+        # First, get existing associations to derive the class_id
+        existing_associations = await self.repo.get_batch_student_associations(batch_id)
+        if not existing_associations:
+            raise ValueError(f"No associations found for batch {batch_id}")
+        
+        # All associations for a batch belong to the same class, so get class_id from the first one
+        class_id = str(existing_associations[0].class_id)
 
         # Get course_code from the class
         user_class = await self.get_class_by_id(uuid.UUID(class_id))

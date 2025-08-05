@@ -48,16 +48,29 @@ The codebase employs a custom DI framework (Dishka) to invert dependencies and f
 
 Services use Pydantic `BaseSettings` classes (in each service's `config.py`) to load configuration from environment variables (with support for `.env` files in development). This centralizes configuration (e.g. database URLs, API keys, service ports) and makes services twelve-factor compliant. No configuration values are hard-coded; all are injected via environment or configuration files.
 
-#### Centralized Logging & Observability
+#### Comprehensive Observability Stack
 
-A shared logging utility (`huleedu_service_libs.logging_utils`) provides structured logging for all services. Logs include correlation IDs flowing through event metadata and request headers, enabling traceability across service boundaries.
+HuleEdu implements a production-grade observability architecture with multiple integrated components:
 
-Each service avoids using the standard logging module directly and instead uses the centralized logger to ensure a uniform format. In addition, every service exposes:
+**Core Observability Libraries** (`huleedu_service_libs`):
+* **Structured Logging**: `logging_utils` with `configure_service_logging()` and `create_service_logger()`
+* **Distributed Tracing**: OpenTelemetry-based tracing with Jaeger backend and W3C Trace Context propagation
+* **Metrics Collection**: Prometheus-format metrics via `metrics_middleware` with standard service metrics
+* **Health Monitoring**: `database.health_checks` with `DatabaseHealthChecker` for dependency monitoring
+* **Error Handling**: Structured error system using `HuleEduError` with automatic OpenTelemetry span recording
 
-* `/healthz` endpoint for health checks
-* `/metrics` endpoint for Prometheus scraping
+**Infrastructure Stack** (Docker Compose):
+* **Grafana** (port 3000): Dashboards and visualization
+* **Prometheus** (port 9091): Metrics collection and alerting  
+* **Jaeger** (port 16686): Distributed tracing UI
+* **Loki** (port 3100): Log aggregation with Promtail
+* **Alertmanager** (port 9094): Alert routing and management
 
-This contributes to a consistent observability stack.
+**Standard Service Integration**:
+* `/healthz` endpoints with dependency checks and structured responses
+* `/metrics` endpoints with Prometheus-format service and business metrics
+* Automatic correlation ID propagation across all telemetry (logs, traces, metrics)
+* Circuit breaker metrics and database connection pool monitoring
 
 ## Monorepo Structure
 
@@ -227,7 +240,11 @@ A Kafka-driven service (with optional HTTP endpoints for health checks on port 9
 
 ### LLM Provider Service
 
-A specialized Quart-based HTTP service (port 8080) that acts as a gateway and queue for calls to external Large Language Model providers. Multiple services in the platform (especially the CJ Assessment and future AI-driven services) need to call external AI APIs (like OpenAI, Anthropic, etc.). Instead of each service handling these calls (which can be slow or have rate limits), the LLM Provider Service centralizes this function. It exposes endpoints such as `POST /api/v1/comparison` to submit a comparison or other AI request. Requests are queued (in Redis) and processed asynchronously to handle high load and avoid hitting external API limits. The service implements circuit breakers and fallback strategies: if one AI provider is down or returns errors, it can switch to an alternative provider or degrade gracefully. Clients (like the CJ service) receive an immediate acknowledgment (HTTP 202 Accepted with a queue ID) and can poll `/api/v1/status/{queue_id}` or `/api/v1/results/{queue_id}` to get the result once ready. This design gives resilience to the AI calls and decouples the rest of the system from external API latency or failures.
+A specialized Quart-based HTTP service (port 8080) that acts as a gateway and queue for calls to external Large Language Model providers. Multiple services in the platform (especially the CJ Assessment and future AI-driven services) need to call external AI APIs (like OpenAI, Anthropic, etc.). Instead of each service handling these calls (which can be slow or have rate limits), the LLM Provider Service centralizes this function. 
+
+**Event-Driven Architecture**: The service follows HuleEdu's event-driven patterns - consumer services make HTTP requests with a `callback_topic` parameter specifying where completion events should be published. For immediate results, the service returns HTTP 200 with the response. For queued requests (when providers are at capacity), it returns HTTP 202 and publishes `LLMComparisonResultV1` events to the specified Kafka topic when processing completes.
+
+**Resilience Features**: Requests are queued in Redis and processed asynchronously. The service implements circuit breakers and fallback strategies - if one AI provider fails, it switches to alternative providers. The Redis-based queue survives provider outages and service restarts, ensuring reliable AI request processing without requiring consumers to poll for results.
 
 The LLM Provider Service supports multiple AI providers (OpenAI, Anthropic, Google PaLM, OpenRouter, etc.) through a unified interface, and does no caching of responses (each request passes through to preserve the psychometric validity of CJ assessments). It uses Redis both for queuing requests and as a short-term results store. This service is critical for any AI-driven feature in HuleEdu, ensuring those features are robust and scalable.
 
@@ -242,9 +259,9 @@ The LLM Provider Service supports multiple AI providers (OpenAI, Anthropic, Goog
 
 **API Endpoints:**
 
-* `POST /api/v1/comparison` - Submit AI comparison request
-* `GET /api/v1/status/{queue_id}` - Check request status
-* `GET /api/v1/results/{queue_id}` - Retrieve results
+* `POST /api/v1/comparison` - Submit AI comparison request with `callback_topic` for event-driven completion notification
+* `GET /api/v1/status/{queue_id}` - Operational monitoring endpoint (production consumers use Kafka events)
+* `GET /api/v1/results/{queue_id}` - Operational monitoring endpoint (production consumers use Kafka events)
 
 **Resilience Features:**
 
@@ -813,15 +830,23 @@ The platform implements a sophisticated **pre-readiness student matching system*
 
 The multi-phase processing pipeline supports both batch types with intelligent routing. The Batch Orchestrator and Batch Conductor services work in tandem to support dynamic sequencing of phases based on batch characteristics.
 
-#### Observability
+#### Production Observability Implementation
 
-The observability stack is implemented uniformly across services:
+The comprehensive observability stack provides full visibility into the distributed system:
 
-* **Metrics**: Endpoints (at `/metrics`) export service-specific metrics such as request rates, event processing times, and queue lengths, which can be collected by Prometheus.
-* **Health Checks**: Endpoints (`/healthz`) are in place for orchestration tools or load balancers to detect unhealthy instances.
-* **Structured Logging**: Logging is structured (JSON logs or key-value pairs) and includes important identifiers (e.g., `batch_id`, `essay_id`, `correlation_id`) to make it possible to trace a single essay’s journey through the microservices by searching aggregated logs.
+* **Distributed Tracing**: OpenTelemetry with Jaeger backend enables end-to-end request tracing across service boundaries with W3C Trace Context propagation
+* **Metrics Collection**: Prometheus scrapes standardized `/metrics` endpoints with service-specific metrics (HTTP requests, Kafka processing, database connections, circuit breaker states)
+* **Health Monitoring**: `/healthz` endpoints include dependency checks using `DatabaseHealthChecker` for comprehensive service health assessment  
+* **Structured Logging**: JSON-formatted logs with automatic correlation ID propagation enable tracing individual essays through the complete processing pipeline
+* **Error Observability**: `HuleEduError` system automatically records exceptions to OpenTelemetry spans with full context and correlation tracking
 
-This readiness in observability is important for both debugging during development and for future production monitoring.
+**Infrastructure Components**:
+* **Grafana**: Centralized dashboards and alerting interface
+* **Prometheus**: Metrics storage with alerting rules via Alertmanager
+* **Jaeger**: Distributed tracing UI for request flow analysis
+* **Loki + Promtail**: Log aggregation and correlation with metrics/traces
+
+This production-grade observability enables effective debugging, performance optimization, and operational monitoring across the microservice ecosystem.
 
 #### Deployment and Containerization
 
