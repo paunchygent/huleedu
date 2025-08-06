@@ -213,51 +213,82 @@ class FileRepositoryProtocol(Protocol):
     """
     Protocol for File Service repository operations.
 
-    Currently minimal as File Service is primarily stateless, but provides
-    extensibility for future features like file processing history tracking.
+    Manages file upload tracking with user attribution for audit trails,
+    debugging, and notification support.
     """
 
-    async def record_file_processing(
+    async def create_file_upload(
         self,
         file_upload_id: str,
         batch_id: str,
-        file_name: str,
-        status: ProcessingStatus,
-        metadata: dict[str, Any] | None = None,
+        user_id: str,
+        filename: str,
+        file_size_bytes: int | None = None,
+        correlation_id: UUID | None = None,
     ) -> None:
         """
-        Record file processing event (optional - for future use).
+        Create a new file upload record with user attribution.
 
         Args:
             file_upload_id: Unique identifier for the file upload
             batch_id: Associated batch identifier
-            file_name: Original file name
-            status: Processing status
-            metadata: Optional metadata about the processing
-
-        Note:
-            This is a placeholder for future functionality. File Service
-            currently operates statelessly but may need to track processing
-            history or metrics in the future.
+            user_id: User who uploaded the file
+            filename: Original file name
+            file_size_bytes: Size of the file in bytes
+            correlation_id: Request correlation ID for tracing
         """
         ...
 
-    async def get_processing_history(
+    async def get_file_upload(
+        self,
+        file_upload_id: str,
+    ) -> dict[str, Any] | None:
+        """
+        Retrieve file upload record by ID.
+
+        Args:
+            file_upload_id: Unique identifier for the file upload
+
+        Returns:
+            File upload record with user_id and metadata, or None if not found
+        """
+        ...
+
+    async def update_file_processing_status(
+        self,
+        file_upload_id: str,
+        status: ProcessingStatus,
+        raw_file_storage_id: str | None = None,
+        text_storage_id: str | None = None,
+        validation_error_code: str | None = None,
+        validation_error_message: str | None = None,
+    ) -> None:
+        """
+        Update the processing status of a file upload.
+
+        Args:
+            file_upload_id: Unique identifier for the file upload
+            status: New processing status
+            raw_file_storage_id: Storage ID for raw file (if stored)
+            text_storage_id: Storage ID for extracted text (if stored)
+            validation_error_code: Error code if validation failed
+            validation_error_message: Error message if validation failed
+        """
+        ...
+
+    async def get_batch_uploads(
         self,
         batch_id: str,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """
-        Retrieve file processing history for a batch (optional - for future use).
+        Retrieve all file uploads for a batch.
 
         Args:
             batch_id: Batch identifier to query
             limit: Maximum number of records to return
 
         Returns:
-            List of processing history records
-
-        Note:
-            This is a placeholder for future functionality.
+            List of file upload records with user attribution
         """
         ...

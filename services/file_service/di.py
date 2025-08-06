@@ -24,10 +24,11 @@ from services.file_service.implementations.content_service_client_impl import (
     DefaultContentServiceClient,
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
-from services.file_service.implementations.file_repository_impl import MinimalFileRepository
+from services.file_service.implementations.file_repository_impl import FileRepository
 from services.file_service.implementations.outbox_manager import OutboxManager
 from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
 from services.file_service.metrics import METRICS
+from services.file_service.notification_projector import FileServiceNotificationProjector
 from services.file_service.protocols import (
     BatchStateValidatorProtocol,
     ContentServiceClientProtocol,
@@ -165,8 +166,8 @@ class ServiceImplementationsProvider(Provider):
         self,
         engine: AsyncEngine,
     ) -> FileRepositoryProtocol:
-        """Provide minimal file repository implementation."""
-        return MinimalFileRepository(engine)
+        """Provide file repository implementation with user attribution."""
+        return FileRepository(engine)
 
     @provide(scope=Scope.APP)
     def provide_outbox_manager(
@@ -183,9 +184,16 @@ class ServiceImplementationsProvider(Provider):
         self,
         outbox_manager: OutboxManager,
         settings: Settings,
+        notification_projector: FileServiceNotificationProjector,
+        file_repository: FileRepositoryProtocol,
     ) -> EventPublisherProtocol:
-        """Provide event publisher implementation using TRUE OUTBOX PATTERN."""
-        return DefaultEventPublisher(outbox_manager, settings)
+        """Provide event publisher implementation using TRUE OUTBOX PATTERN with notification projection."""
+        return DefaultEventPublisher(
+            outbox_manager=outbox_manager,
+            settings=settings,
+            notification_projector=notification_projector,
+            file_repository=file_repository,
+        )
 
     @provide(scope=Scope.APP)
     def provide_text_extractor(self, settings: Settings) -> TextExtractorProtocol:
@@ -251,3 +259,11 @@ class ServiceImplementationsProvider(Provider):
     ) -> BatchStateValidatorProtocol:
         """Provide batch state validator implementation."""
         return BOSBatchStateValidator(http_session, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_notification_projector(
+        self,
+        kafka_publisher: KafkaPublisherProtocol,
+    ) -> FileServiceNotificationProjector:
+        """Provide notification projector for teacher notifications."""
+        return FileServiceNotificationProjector(kafka_publisher)

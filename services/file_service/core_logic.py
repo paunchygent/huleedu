@@ -26,6 +26,7 @@ from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
     EventPublisherProtocol,
+    FileRepositoryProtocol,
     TextExtractorProtocol,
 )
 
@@ -43,6 +44,7 @@ async def process_single_file_upload(
     content_client: ContentServiceClientProtocol,
     event_publisher: EventPublisherProtocol,
     metrics: dict[str, Any] | None = None,
+    file_repository: FileRepositoryProtocol | None = None,
 ) -> dict[str, Any]:
     """
     Process a single file upload within a batch using pre-emptive raw storage.
@@ -96,6 +98,14 @@ async def process_single_file_upload(
             f"Stored raw file blob for {file_name}, raw_file_storage_id: {raw_file_storage_id}",
             extra={"correlation_id": str(main_correlation_id)},
         )
+
+        # Update file upload record with raw storage ID
+        if file_repository:
+            await file_repository.update_file_processing_status(
+                file_upload_id=file_upload_id,
+                status=ProcessingStatus.IN_PROGRESS,
+                raw_file_storage_id=raw_file_storage_id,
+            )
     except Exception as storage_error:
         logger.error(
             f"Failed to store raw file blob for {file_name}: {storage_error}",
@@ -138,6 +148,15 @@ async def process_single_file_upload(
             f"Published EssayValidationFailedV1 for raw storage failure: {file_name}",
             extra={"correlation_id": str(main_correlation_id)},
         )
+
+        # Update file upload record with failure status
+        if file_repository:
+            await file_repository.update_file_processing_status(
+                file_upload_id=file_upload_id,
+                status=ProcessingStatus.FAILED,
+                validation_error_code=FileValidationErrorCode.RAW_STORAGE_FAILED.value,
+                validation_error_message=str(storage_error),
+            )
 
         # Record metric for raw storage failure
         file_ext = file_name.split(".")[-1].lower() if "." in file_name else "unknown"

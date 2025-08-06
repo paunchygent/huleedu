@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import uuid
 
 from common_core.events.envelope import EventEnvelope
@@ -11,7 +12,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.file_service.config import Settings
 from services.file_service.implementations.outbox_manager import OutboxManager
-from services.file_service.protocols import EventPublisherProtocol
+from services.file_service.protocols import EventPublisherProtocol, FileRepositoryProtocol
+
+if TYPE_CHECKING:
+    from services.file_service.notification_projector import FileServiceNotificationProjector
 
 logger = create_service_logger("file_service.implementations.event_publisher")
 
@@ -23,9 +27,13 @@ class DefaultEventPublisher(EventPublisherProtocol):
         self,
         outbox_manager: OutboxManager,
         settings: Settings,
+        notification_projector: FileServiceNotificationProjector | None = None,
+        file_repository: FileRepositoryProtocol | None = None,
     ):
         self.outbox_manager = outbox_manager
         self.settings = settings
+        self.notification_projector = notification_projector
+        self.file_repository = file_repository
 
     async def publish_essay_content_provisioned(
         self,
@@ -117,6 +125,19 @@ class DefaultEventPublisher(EventPublisherProtocol):
             },
         )
 
+        # Also project to teacher notification if projector is available
+        # For validation failures, we need to look up the user_id from the file upload record
+        if self.notification_projector and self.file_repository:
+            file_upload = await self.file_repository.get_file_upload(event_data.file_upload_id)
+            if file_upload and file_upload.get("user_id"):
+                await self.notification_projector.handle_essay_validation_failed(
+                    event_data, file_upload["user_id"]
+                )
+            else:
+                logger.warning(
+                    f"Could not send validation failure notification - no user_id found for file_upload_id: {event_data.file_upload_id}"
+                )
+
     async def publish_batch_file_added_v1(
         self,
         event_data: BatchFileAddedV1,
@@ -163,6 +184,11 @@ class DefaultEventPublisher(EventPublisherProtocol):
             },
         )
 
+        # Also project to teacher notification if projector is available
+        # BatchFileAddedV1 already has user_id field
+        if self.notification_projector:
+            await self.notification_projector.handle_batch_file_added(event_data)
+
     async def publish_batch_file_removed_v1(
         self,
         event_data: BatchFileRemovedV1,
@@ -208,3 +234,8 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 "topic": topic,
             },
         )
+
+        # Also project to teacher notification if projector is available
+        # BatchFileRemovedV1 already has user_id field
+        if self.notification_projector:
+            await self.notification_projector.handle_batch_file_removed(event_data)

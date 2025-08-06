@@ -454,110 +454,92 @@ class NotificationHandler(NotificationHandlerProtocol):
 
 **Next Priority**: Implement notification projectors for remaining services following established Class Management pattern.
 
-**Implementation Order**: File Service → Batch Orchestrator → Result Aggregator → Assessment Services (based on user workflow criticality)
+**Implementation Order**: File Service → Assessment Services (via ELS) → Batch Orchestrator → Result Aggregator (RAS is most complex - emits phase events for AI Feedback Service coordination)
 
-### File Service Projector (NEXT - 2 notifications)
+### File Service Projector ✅ COMPLETED
 
-**Priority**: HIGH - File upload feedback is critical for teacher workflow
+**Implementation**: Direct invocation pattern matching Class Management Service
 
-**Target Notifications**:
-- `batch_files_uploaded` → STANDARD priority (file upload completion)
-- `batch_validation_failed` → IMMEDIATE priority (blocks processing workflow)
-
-**Implementation Pattern** (following Class Management):
 ```python
 # services/file_service/notification_projector.py
 class FileServiceNotificationProjector:
-    def __init__(self, kafka_bus: KafkaBusProtocol):
-        self.kafka_bus = kafka_bus
-
-    async def handle_batch_files_uploaded(self, event: BatchFilesUploadedV1) -> None:
-        """Project batch upload completion to teacher notification - STANDARD priority."""
-        notification = TeacherNotificationRequestedV1(
-            teacher_id=event.user_id,  # Direct from file upload event
-            notification_type="batch_files_uploaded",
-            category=WebSocketEventCategory.FILE_MANAGEMENT,
-            priority=NotificationPriority.STANDARD,
-            payload={
-                "batch_id": event.batch_id,
-                "file_count": len(event.files),
-                "upload_status": "completed"
-            },
-            correlation_id=event.correlation_id,
-            batch_id=event.batch_id,
-        )
-        await self.kafka_bus.publish_event(notification)
-
-    async def handle_batch_validation_failed(self, event: BatchValidationFailedV1) -> None:
-        """Project validation failure to teacher notification - IMMEDIATE priority."""
-        notification = TeacherNotificationRequestedV1(
-            teacher_id=event.user_id,  # Direct from validation event
-            notification_type="batch_validation_failed", 
-            category=WebSocketEventCategory.SYSTEM_ALERTS,
-            priority=NotificationPriority.IMMEDIATE,
-            payload={
-                "batch_id": event.batch_id,
-                "validation_errors": event.error_details,
-                "action_required": True
-            },
-            action_required=True,
-            correlation_id=event.correlation_id,
-            batch_id=event.batch_id,
-        )
-        await self.kafka_bus.publish_event(notification)
+    async def handle_batch_file_added(self, event: BatchFileAddedV1) -> None:
+        # Direct user_id from event → STANDARD priority
+        await self.kafka_publisher.publish(envelope)
+    
+    async def handle_batch_file_removed(self, event: BatchFileRemovedV1) -> None:
+        # Direct user_id from event → STANDARD priority
+        
+    async def handle_essay_validation_failed(self, event: EssayValidationFailedV1, user_id: str) -> None:
+        # user_id from file_uploads table lookup → IMMEDIATE priority
 ```
 
-**Required Investigation**:
-1. File Service domain event structure - verify `user_id` availability in upload/validation events
-2. File Service DI container setup - pattern for injecting notification projector  
-3. File Service event publisher integration points
-4. File Service test patterns for behavioral validation
+**Architecture Decision**: Option 2 - Persistent user attribution in `file_uploads` table
+- Migration: `20250106_0001_add_file_uploads_table.py` (NOT YET APPLIED)
+- Repository: `FileRepository` with full CRUD operations
+- Integration: `DefaultEventPublisher` directly calls projector after outbox (same as Class Management)
 
-### File Service Implementation Plan
+**Key Pattern Difference**: File Service stores user_id in database for:
+- Audit trail compliance
+- Retry resilience (user context preserved)
+- Validation failure notifications (EssayValidationFailedV1 lacks user_id)
 
-**Step 1: Domain Event Analysis**
-- Examine `common_core.events.file_management_events` for existing event structure
-- Verify `user_id` field availability in `BatchFileAddedV1`, `BatchFileRemovedV1` events
-- Check validation-related events for error detail structure
+**Status**: 6/6 unit tests passing, migration pending application
 
-**Step 2: Service Architecture Study**  
-- Read `services/file_service/README.md` for service boundaries and responsibilities
-- Analyze `services/file_service/di.py` for dependency injection patterns
-- Study `services/file_service/implementations/` for event publishing integration points
+### Assessment Services (SECOND - 3 notifications via ELS)
 
-**Step 3: Projector Implementation**
-- Create `services/file_service/notification_projector.py` following Class Management pattern
-- Wire into DI container with `provide_notification_projector()` method
-- Integrate into service implementation for event publishing
+**Priority**: HIGH - ELS already aggregates essay-level results into batch outcomes
 
-**Step 4: Behavioral Testing**
-- Create `services/file_service/tests/unit/test_notification_projector.py`
-- Test notification projection to correct priority levels (STANDARD/IMMEDIATE)
-- Test teacher ID resolution patterns (direct from events vs repository lookup)
-- Edge cases: missing data, publishing errors, validation failure scenarios
-- Follow Rule 075: behavioral outcomes, not implementation details
+**Current State**: 
+- ✅ Essay-level events exist: `SpellcheckResultDataV1`, `CJAssessmentCompletedV1`, `AIFeedbackResultDataV1`
+- ✅ ELS aggregates into `ELSBatchPhaseOutcomeV1` events  
+- ❌ Missing notification projector to convert `ELSBatchPhaseOutcomeV1` to teacher notifications
 
-**Next Session Goals**:
-1. File Service codebase analysis and domain event structure understanding
-2. Notification projector implementation with proper teacher ID resolution
-3. DI integration following established patterns
-4. Comprehensive behavioral test suite creation
-5. Verification of notification flow from File Service through WebSocket to Redis
+**Target Notifications**:
+- `batch_spellcheck_completed` → LOW priority (spellcheck phase complete)
+- `batch_cj_assessment_completed` → STANDARD priority (CJ assessment phase complete)  
+- `batch_ai_feedback_completed` → STANDARD priority (AI feedback phase complete)
 
-### Batch Orchestrator (3 notifications)  
-- `batch_processing_started` → STANDARD
-- `batch_processing_completed` → HIGH  
-- `batch_processing_failed` → IMMEDIATE
+**Implementation Pattern**: 
+- ELS notification projector listens to `ELSBatchPhaseOutcomeV1` events
+- Maps phase names to specific notification types
+- Requires batch repository lookup for teacher_id resolution
 
-### Result Aggregator (3 notifications)
-- `batch_results_ready` → HIGH
-- `batch_export_completed` → STANDARD
-- `batch_analysis_available` → STANDARD
+### Batch Orchestrator (THIRD - 3 notifications)  
 
-### Assessment Services (3 notifications)
-- `batch_spellcheck_completed` → LOW
-- `batch_cj_assessment_completed` → STANDARD  
-- `batch_ai_feedback_completed` → STANDARD
+**Current State**:
+- ✅ ELS publishes batch lifecycle events: `BatchContentProvisioningCompletedV1`, `ELSBatchPhaseOutcomeV1`
+- ❌ Missing notification projector to convert lifecycle events to teacher notifications
+
+**Target Notifications**:
+- `batch_processing_started` → STANDARD (triggered by `BatchContentProvisioningCompletedV1`)
+- `batch_processing_completed` → HIGH (triggered by final `ELSBatchPhaseOutcomeV1`)
+- `batch_processing_failed` → IMMEDIATE (triggered by failed `ELSBatchPhaseOutcomeV1`)
+
+### Result Aggregator (LAST - Results Events + 3 notifications)
+
+**Status**: ❌ BLOCKED - No event emission capability, depends on all other services
+
+**Critical Architecture**: RAS emits **results completion events** for service coordination with AI Feedback Service
+
+**Missing Implementation**:
+- RAS consumes events but doesn't emit results completion or aggregation completion events
+- CJ Assessment pipeline completion handling not yet implemented  
+- Results completion events needed for AI Feedback Service dependency chain
+- Needs event emission added for both service coordination AND teacher notifications
+
+**Results Completion Events** (Service Coordination):
+- `spellcheck_results_completed` / `spellcheck_results_partially_completed` → AI Feedback dependency  
+- `cj_assessment_results_completed` / `cj_assessment_results_partially_completed` → AI Feedback dependency
+- `nlp_results_completed` / `nlp_results_partially_completed` → AI Feedback dependency
+- `grammar_results_completed` / `grammar_results_partially_completed` → AI Feedback dependency
+
+**Teacher Notification Events**:
+- `batch_results_ready` → HIGH priority (when all assessment results aggregated and available)
+- `batch_export_completed` → STANDARD priority (export operations completed)
+- `batch_analysis_available` → STANDARD priority (analysis reports ready for viewing)
+
+**AI Feedback Service Dependency**: AI Feedback listens to RAS results completion events, collects curated assessment data from RAS, creates dynamic feedback prompts for LLM Provider Service
 
 ## Implementation Checklist
 
@@ -570,9 +552,9 @@ class FileServiceNotificationProjector:
 - [x] Refactor WebSocket to consume only notifications ✅ COMPLETED
 - [x] Remove all internal event handling from WebSocket ✅ COMPLETED
 - [x] Implement idempotency testing with behavioral methodology ✅ COMPLETED
-- [ ] Implement File Service projector
-- [ ] Implement Batch Orchestrator projector
-- [ ] Implement Result Aggregator projector
-- [ ] Implement Assessment Services projectors
+- [ ] Implement File Service projector (FIRST - has direct user_id events)
+- [ ] Implement Assessment Services projectors (SECOND - ELS batch aggregation via ELSBatchPhaseOutcomeV1)  
+- [ ] Implement Batch Orchestrator projector (THIRD - lifecycle events from ELS)
+- [ ] Implement Result Aggregator projector (LAST - needs event emission capability added)
 - [ ] End-to-end integration test
 - [ ] Update service READMEs

@@ -19,6 +19,7 @@ from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
     EventPublisherProtocol,
+    FileRepositoryProtocol,
     TextExtractorProtocol,
 )
 
@@ -34,6 +35,7 @@ async def upload_batch_files(
     content_client: FromDishka[ContentServiceClientProtocol],
     event_publisher: FromDishka[EventPublisherProtocol],
     batch_validator: FromDishka[BatchStateValidatorProtocol],
+    file_repository: FromDishka[FileRepositoryProtocol],
     metrics: FromDishka[dict[str, Any]],
 ) -> Response | tuple[Response, int]:
     """
@@ -98,6 +100,17 @@ async def upload_batch_files(
             if file_storage and file_storage.filename:
                 file_content = file_storage.read()
                 file_upload_id = str(uuid.uuid4())  # Generate unique tracking ID
+
+                # Create file upload record with user attribution
+                await file_repository.create_file_upload(
+                    file_upload_id=file_upload_id,
+                    batch_id=batch_id,
+                    user_id=user_id,
+                    filename=file_storage.filename,
+                    file_size_bytes=len(file_content),
+                    correlation_id=main_correlation_id,
+                )
+
                 # Pass all required injected dependencies to process_single_file_upload
                 task = asyncio.create_task(
                     process_single_file_upload(
@@ -111,6 +124,7 @@ async def upload_batch_files(
                         content_client=content_client,
                         event_publisher=event_publisher,
                         metrics=metrics,
+                        file_repository=file_repository,
                     ),
                 )
                 tasks.append(task)
@@ -192,6 +206,7 @@ async def add_files_to_batch(
     content_client: FromDishka[ContentServiceClientProtocol],
     event_publisher: FromDishka[EventPublisherProtocol],
     batch_validator: FromDishka[BatchStateValidatorProtocol],
+    file_repository: FromDishka[FileRepositoryProtocol],
     metrics: FromDishka[dict[str, Any]],
 ) -> Response | tuple[Response, int]:
     """
@@ -259,6 +274,16 @@ async def add_files_to_batch(
                     {"file_upload_id": file_upload_id, "filename": file_storage.filename}
                 )
 
+                # Create file upload record with user attribution
+                await file_repository.create_file_upload(
+                    file_upload_id=file_upload_id,
+                    batch_id=batch_id,
+                    user_id=user_id,
+                    filename=file_storage.filename,
+                    file_size_bytes=len(file_content),
+                    correlation_id=main_correlation_id,
+                )
+
                 # Pass all required injected dependencies to process_single_file_upload
                 task = asyncio.create_task(
                     process_single_file_upload(
@@ -272,6 +297,7 @@ async def add_files_to_batch(
                         content_client=content_client,
                         event_publisher=event_publisher,
                         metrics=metrics,
+                        file_repository=file_repository,
                     ),
                 )
                 tasks.append(task)
