@@ -22,6 +22,7 @@ from services.class_management_service.constants import PHASE1_CONFIDENCE_SCORE,
 from services.class_management_service.models_db import Student, UserClass
 
 # Import the type variables from protocols to ensure they match
+from services.class_management_service.notification_projector import NotificationProjector
 from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
     ClassManagementServiceProtocol,
@@ -40,11 +41,13 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         event_publisher: ClassEventPublisherProtocol,
         user_class_type: Type[T],
         student_type: Type[U],
+        notification_projector: NotificationProjector | None = None,
     ) -> None:
         self.repo = repo
         self.event_publisher = event_publisher
         self._user_class_type = user_class_type
         self._student_type = student_type
+        self.notification_projector = notification_projector
         # Verify at runtime that the types match
         if not issubclass(user_class_type, UserClass):
             raise TypeError(
@@ -75,6 +78,10 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             data=event_data,
         )
         await self.event_publisher.publish_class_event(envelope)
+        
+        # Also project to teacher notification if projector is available
+        if self.notification_projector:
+            await self.notification_projector.handle_class_created(event_data)
 
         return new_class  # Type is preserved as T
 
@@ -133,6 +140,10 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             data=event_data,
         )
         await self.event_publisher.publish_class_event(envelope)
+        
+        # Also project to teacher notification if projector is available
+        if self.notification_projector:
+            await self.notification_projector.handle_student_created(event_data)
 
         return new_student  # Type is preserved as U
 

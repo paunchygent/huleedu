@@ -4,6 +4,36 @@
 
 Implement a clean notification projection pattern that separates internal service events from teacher-facing notifications. Each service owns its notification decisions through dedicated projectors, and the WebSocket service becomes a simple notification router.
 
+## ✅ PHASE 1 COMPLETED: Infrastructure & Class Management Integration
+
+### Implemented Components
+```python
+# TeacherNotificationRequestedV1 in common_core/events/notification_events.py
+class TeacherNotificationRequestedV1(BaseModel):
+    teacher_id: str  # Explicit teacher routing
+    notification_type: str  # One of 15 defined types
+    category: WebSocketEventCategory  # UI grouping
+    priority: NotificationPriority  # 5-tier: CRITICAL/IMMEDIATE/HIGH/STANDARD/LOW
+    payload: Dict[str, Any]  # Type-specific data
+    action_required: bool = False
+    deadline_timestamp: Optional[datetime] = None
+    correlation_id: str  # Links to originating event
+    batch_id: Optional[str] = None
+    class_id: Optional[str] = None
+
+# NotificationProjector in class_management_service/notification_projector.py
+- handle_class_created() → STANDARD priority
+- handle_student_created() → LOW priority (fetches teacher via class_id)
+- handle_validation_timeout_processed() → IMMEDIATE priority
+- handle_student_associations_confirmed() → HIGH priority (fetches teacher via class_id)
+```
+
+### Key Lessons Learned
+1. **Platform is TEACHER-CENTRIC**: No student accounts, all notifications go to teachers
+2. **User Resolution Pattern**: Events with class_id require repository lookup for teacher_id
+3. **Trust Boundary**: WebSocket trusts teacher_id in notifications (services are trusted)
+4. **Event Categories**: Critical for UI grouping and filtering
+
 ## Core Problem
 
 The WebSocket service currently attempts to consume internal domain events, but:
@@ -70,179 +100,23 @@ The WebSocket service currently attempts to consume internal domain events, but:
 
 ## Implementation Guide
 
-### Step 1: Create Notification Event Contract
+### Step 1: Create Notification Event Contract ✅ COMPLETED
 
-Location: `libs/common_core/src/common_core/events/notification_events.py`
+Created `TeacherNotificationRequestedV1` in `libs/common_core/src/common_core/events/notification_events.py` with teacher_id routing, 5-tier priority system (CRITICAL/IMMEDIATE/HIGH/STANDARD/LOW), type-specific payload, action tracking with deadlines, and correlation IDs. Added to `event_enums.py` with topic mapping `"huleedu.notification.teacher.requested.v1"`.
 
-```python
-from __future__ import annotations
+### Step 2: Implement Service Projectors ✅ COMPLETED (Class Management)
 
-from datetime import datetime
-from typing import Any, Dict, Optional
+Implemented `NotificationProjector` in `/services/class_management_service/notification_projector.py` with 4 handlers:
+- `handle_class_created()` → STANDARD priority (direct user_id)
+- `handle_student_created()` → LOW priority (fetches teacher via class_id lookup)
+- `handle_validation_timeout_processed()` → IMMEDIATE priority (direct user_id)
+- `handle_student_associations_confirmed()` → HIGH priority (fetches teacher via class_id lookup)
 
-from pydantic import BaseModel, Field
+Key pattern: Events without user_id require repository lookup via class_id to resolve teacher_id. Wired into DI container and service implementation with `notification_projector` parameter.
 
-from common_core.websocket_enums import NotificationCategory, NotificationPriority
+### Step 3: Wire Projectors in Services ✅ COMPLETED (Class Management)
 
-
-class TeacherNotificationRequestedV1(BaseModel):
-    """
-    Teacher notification event for WebSocket delivery.
-    
-    This is the ONLY event type consumed by WebSocket service.
-    Each service publishes this event when teachers need to be notified.
-    """
-    
-    # Routing
-    teacher_id: str = Field(..., description="Teacher to notify")
-    
-    # Notification metadata
-    notification_type: str = Field(..., description="One of the 15 defined types")
-    category: NotificationCategory = Field(..., description="UI category for grouping")
-    priority: NotificationPriority = Field(..., description="Delivery priority")
-    
-    # Content
-    payload: Dict[str, Any] = Field(..., description="Type-specific notification data")
-    
-    # Action tracking
-    action_required: bool = Field(default=False, description="Teacher action needed")
-    deadline_timestamp: Optional[datetime] = Field(None, description="Action deadline")
-    
-    # Correlation
-    correlation_id: str = Field(..., description="Links to originating event")
-    batch_id: Optional[str] = Field(None, description="Related batch if applicable")
-    class_id: Optional[str] = Field(None, description="Related class if applicable")
-    
-    # Timestamp
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-```
-
-### Step 2: Implement Service Projectors
-
-#### Template: `services/{service_name}/notification_projector.py`
-
-```python
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from common_core.events.notification_events import TeacherNotificationRequestedV1
-from common_core.websocket_enums import NotificationCategory, NotificationPriority
-from huleedu_service_libs.logging_utils import create_service_logger
-
-if TYPE_CHECKING:
-    from .protocols import EventPublisherProtocol, RepositoryProtocol
-
-logger = create_service_logger("notification_projector")
-
-
-class NotificationProjector:
-    """Projects internal service events to teacher notifications."""
-    
-    def __init__(
-        self,
-        repository: RepositoryProtocol,
-        publisher: EventPublisherProtocol,
-    ) -> None:
-        self.repository = repository
-        self.publisher = publisher
-    
-    async def handle_internal_event(self, event: InternalEventType) -> None:
-        """Map internal event to teacher notification if needed."""
-        
-        # 1. Determine if teacher needs notification
-        if not self._should_notify_teacher(event):
-            return
-        
-        # 2. Fetch teacher context
-        teacher_id = await self._get_teacher_id(event)
-        if not teacher_id:
-            logger.warning(f"No teacher found for event {event.event_id}")
-            return
-        
-        # 3. Build notification payload
-        payload = self._build_notification_payload(event)
-        
-        # 4. Publish notification event
-        notification = TeacherNotificationRequestedV1(
-            teacher_id=teacher_id,
-            notification_type="specific_notification_type",
-            category=NotificationCategory.APPROPRIATE_CATEGORY,
-            priority=NotificationPriority.APPROPRIATE_PRIORITY,
-            payload=payload,
-            action_required=False,
-            correlation_id=event.event_id,
-            batch_id=event.batch_id if hasattr(event, "batch_id") else None,
-        )
-        
-        await self.publisher.publish(notification)
-        
-        logger.info(
-            f"Published teacher notification",
-            extra={
-                "teacher_id": teacher_id,
-                "notification_type": notification.notification_type,
-                "correlation_id": event.event_id,
-            }
-        )
-    
-    def _should_notify_teacher(self, event: InternalEventType) -> bool:
-        """Determine if this event warrants teacher notification."""
-        # Service-specific logic
-        return True
-    
-    async def _get_teacher_id(self, event: InternalEventType) -> Optional[str]:
-        """Resolve teacher ID from event context."""
-        # Service-specific resolution
-        # Example: fetch from repository based on batch_id
-        entity = await self.repository.get(event.entity_id)
-        return entity.teacher_id if entity else None
-    
-    def _build_notification_payload(self, event: InternalEventType) -> Dict[str, Any]:
-        """Build safe, UI-ready payload."""
-        return {
-            # Only include what UI needs
-            # Filter sensitive data
-            # Format for display
-        }
-```
-
-### Step 3: Wire Projectors in Services
-
-#### Update DI Container (`services/{service_name}/di.py`)
-
-```python
-from .notification_projector import NotificationProjector
-
-class NotificationProvider(Provider):
-    scope = Scope.APP
-    
-    @provide
-    def provide_notification_projector(
-        self,
-        repository: RepositoryProtocol,
-        publisher: EventPublisherProtocol,
-    ) -> NotificationProjector:
-        return NotificationProjector(repository, publisher)
-```
-
-#### Update Event Processor to Call Projector
-
-```python
-class EventProcessor:
-    def __init__(
-        self,
-        # ... existing deps
-        notification_projector: NotificationProjector,
-    ):
-        self.notification_projector = notification_projector
-    
-    async def handle_internal_event(self, event: InternalEvent) -> None:
-        # ... existing business logic
-        
-        # Project to notification if needed
-        await self.notification_projector.handle_internal_event(event)
-```
+Added `NotificationProjector` to DI container in `services/class_management_service/di.py` with `provide_notification_projector()` method. Injected into `ClassManagementServiceImpl` constructor with optional parameter. Service calls projector after publishing domain events: `await self.notification_projector.handle_class_created(event_data)`.
 
 ### Step 4: Update WebSocket Service
 
@@ -310,39 +184,13 @@ class Settings:
 4. **Result Aggregator Service** - Results delivery
 5. **Assessment Services** - Progress tracking
 
-## Testing Strategy
+## Testing Strategy ✅ COMPLETED (Class Management)
 
-### Unit Tests
-```python
-async def test_notification_projector_maps_event():
-    """Test that internal events map to correct notifications."""
-    projector = NotificationProjector(mock_repo, mock_publisher)
-    
-    internal_event = SomeInternalEvent(...)
-    await projector.handle_internal_event(internal_event)
-    
-    mock_publisher.publish.assert_called_once()
-    notification = mock_publisher.publish.call_args[0][0]
-    assert notification.notification_type == "expected_type"
-    assert notification.teacher_id == "expected_teacher"
-```
-
-### Integration Tests
-```python
-async def test_end_to_end_notification_flow():
-    """Test: Internal Event → Projector → Notification → WebSocket."""
-    # Trigger internal event
-    # Verify notification published
-    # Verify WebSocket receives and routes
-```
-
-### Security Tests
-```python
-async def test_teacher_authorization():
-    """Ensure only authorized teacher receives notifications."""
-    # Test that projector validates teacher ownership
-    # Test that wrong teacher_id is rejected
-```
+Created comprehensive behavioral tests in `/services/class_management_service/tests/unit/test_notification_projector.py` with 8 test cases covering:
+- Event projection to correct priority levels (STANDARD/LOW/IMMEDIATE/HIGH)
+- Teacher ID resolution via repository lookups for events without user_id
+- Edge cases: missing class IDs, non-existent classes, publishing errors
+- 100% pass rate following test creation methodology rule 075
 
 ## WebSocket Service Refactoring Requirements
 
@@ -560,3 +408,63 @@ Ensure DI container only provides simplified handlers without internal event dep
 ✅ **Do**: Filter and format data for UI consumption
 ✅ **Do**: Use single notification event type
 ✅ **Do**: Maintain clear separation of concerns
+
+## PHASE 2: WebSocket Service Refactoring (PENDING)
+
+### Required Changes
+```python
+# REMOVE: All internal event handling
+- services/websocket_service/implementations/file_event_consumer.py
+- services/websocket_service/implementations/file_notification_handler.py
+- services/websocket_service/implementations/user_notification_handler.py (if exists)
+
+# CREATE: Single notification consumer
+services/websocket_service/implementations/notification_event_consumer.py:
+  - Subscribe ONLY to: topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+  - Single handler: handle_teacher_notification()
+  - Just forward to Redis: publish_user_notification(event.teacher_id, ...)
+```
+
+### WebSocket Becomes Pure Router
+- NO business logic
+- NO event filtering
+- NO authorization (trusts teacher_id from services)
+- ONLY forwards notifications to correct Redis channel
+
+## PHASE 3: Remaining Service Projectors (PENDING)
+
+### File Service (2 notifications)
+- `batch_upload_started` → STANDARD
+- `batch_upload_completed` → HIGH
+
+### Batch Orchestrator (3 notifications)  
+- `batch_processing_started` → STANDARD
+- `batch_processing_completed` → HIGH
+- `batch_processing_failed` → IMMEDIATE
+
+### Result Aggregator (3 notifications)
+- `batch_results_ready` → HIGH
+- `batch_export_completed` → STANDARD
+- `batch_analysis_available` → STANDARD
+
+### Assessment Services (3 notifications)
+- `spellcheck_completed` → LOW
+- `cj_assessment_completed` → STANDARD
+- `ai_feedback_completed` → STANDARD
+
+## Implementation Checklist
+
+- [x] Create TeacherNotificationRequestedV1 event
+- [x] Add to event_enums.py with topic mapping
+- [x] Update websocket_enums.py with 5-tier priorities
+- [x] Implement Class Management notification projector
+- [x] Wire projector into Class Management DI
+- [x] Create comprehensive behavioral tests
+- [ ] Refactor WebSocket to consume only notifications
+- [ ] Remove all internal event handling from WebSocket
+- [ ] Implement File Service projector
+- [ ] Implement Batch Orchestrator projector
+- [ ] Implement Result Aggregator projector
+- [ ] Implement Assessment Services projectors
+- [ ] End-to-end integration test
+- [ ] Update service READMEs

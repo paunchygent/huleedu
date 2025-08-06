@@ -46,6 +46,7 @@ from services.class_management_service.metrics import (
     setup_class_management_database_monitoring,
 )
 from services.class_management_service.models_db import Student, UserClass
+from services.class_management_service.notification_projector import NotificationProjector
 from services.class_management_service.protocols import (
     ClassEventPublisherProtocol,
     ClassManagementServiceProtocol,
@@ -199,12 +200,14 @@ class ServiceProvider(Provider):
         self,
         repo: ClassRepositoryProtocol[UserClass, Student],
         publisher: ClassEventPublisherProtocol,
+        notification_projector: NotificationProjector,
     ) -> ClassManagementServiceProtocol[UserClass, Student]:
         return ClassManagementServiceImpl[UserClass, Student](
             repo=repo,
             event_publisher=publisher,
             user_class_type=UserClass,
             student_type=Student,
+            notification_projector=notification_projector,
         )
 
     @provide(scope=Scope.APP)
@@ -216,6 +219,18 @@ class ServiceProvider(Provider):
         """Provide association timeout monitor for auto-confirming pending associations."""
         return AssociationTimeoutMonitor(
             session_factory=session_factory,
+            event_publisher=event_publisher,
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_notification_projector(
+        self,
+        class_repository: ClassRepositoryProtocol[UserClass, Student],
+        event_publisher: ClassEventPublisherProtocol,
+    ) -> NotificationProjector:
+        """Provide notification projector for teacher notifications."""
+        return NotificationProjector(
+            class_repository=class_repository,
             event_publisher=event_publisher,
         )
 

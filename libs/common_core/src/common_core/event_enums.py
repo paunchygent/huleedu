@@ -55,6 +55,8 @@ class ProcessingEvent(str, Enum):
     # -------------  Student validation workflow events  -------------#
     STUDENT_ASSOCIATIONS_CONFIRMED = "student.associations.confirmed"
     VALIDATION_TIMEOUT_PROCESSED = "validation.timeout.processed"
+    # -------------  Teacher notification events  -------------#
+    TEACHER_NOTIFICATION_REQUESTED = "teacher.notification.requested"
     # -------------  Generic -------------#
     PROCESSING_STARTED = "processing.started"
     PROCESSING_CONCLUDED = "processing.concluded"
@@ -109,6 +111,7 @@ _TOPIC_MAPPING = {
         "huleedu.class.student.associations.confirmed.v1"
     ),
     ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED: "huleedu.class.validation.timeout.processed.v1",
+    ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED: "huleedu.notification.teacher.requested.v1",
     ProcessingEvent.ESSAY_SLOT_ASSIGNED: "huleedu.els.essay.slot.assigned.v1",
     # LLM Provider events
     ProcessingEvent.LLM_REQUEST_STARTED: "huleedu.llm_provider.request_started.v1",
