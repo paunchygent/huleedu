@@ -60,6 +60,24 @@ class Settings(BaseSettings):
     DEFAULT_LANGUAGE: str = "en"
     ENABLE_CORRECTION_LOGGING: bool = True
     CORRECTION_LOG_OUTPUT_DIR: str = "data/corrected_essays"
+    DATA_DIR: str = "./data"  # Base directory for spell checker data files
+
+    # Parallel Processing Configuration
+    ENABLE_PARALLEL_PROCESSING: bool = Field(
+        default=True, description="Enable parallel word correction processing"
+    )
+    MAX_CONCURRENT_CORRECTIONS: int = Field(
+        default=10, description="Maximum concurrent word corrections (semaphore limit)"
+    )
+    SPELLCHECK_BATCH_SIZE: int = Field(
+        default=100, description="Maximum words per batch for parallel processing"
+    )
+    PARALLEL_TIMEOUT_SECONDS: float = Field(
+        default=5.0, description="Timeout per word correction in seconds"
+    )
+    PARALLEL_PROCESSING_MIN_WORDS: int = Field(
+        default=5, description="Minimum words to trigger parallel processing"
+    )
 
     # Environment-specific overrides (for containerized deployments)
     L2_EXTERNAL_DATA_PATH: str | None = None  # Override for mounted volumes

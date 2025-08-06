@@ -233,9 +233,9 @@ class EssayStateMachine:
         # The state is set on the model by the transitions library
         return EssayStatus(getattr(self, "state", self._current_status.value))
 
-    def trigger(self, trigger_name: str) -> bool:
+    def trigger_event(self, trigger_name: str) -> bool:
         """
-        Trigger a state transition.
+        Trigger a state transition event.
 
         Args:
             trigger_name: Name of the trigger to fire
@@ -313,19 +313,19 @@ class EssayStateMachine:
     # Convenience methods for common operations
     def cmd_initiate_spellcheck(self) -> bool:
         """Convenience method to initiate spellcheck."""
-        return self.trigger(CMD_INITIATE_SPELLCHECK)
+        return self.trigger_event(CMD_INITIATE_SPELLCHECK)
 
     def cmd_initiate_ai_feedback(self) -> bool:
         """Convenience method to initiate AI feedback."""
-        return self.trigger(CMD_INITIATE_AI_FEEDBACK)
+        return self.trigger_event(CMD_INITIATE_AI_FEEDBACK)
 
     def cmd_initiate_cj_assessment(self) -> bool:
         """Convenience method to initiate CJ assessment."""
-        return self.trigger(CMD_INITIATE_CJ_ASSESSMENT)
+        return self.trigger_event(CMD_INITIATE_CJ_ASSESSMENT)
 
     def cmd_mark_pipeline_complete(self) -> bool:
         """Convenience method to mark pipeline complete."""
-        return self.trigger(CMD_MARK_PIPELINE_COMPLETE)
+        return self.trigger_event(CMD_MARK_PIPELINE_COMPLETE)
 
     def __str__(self) -> str:
         """String representation of the state machine."""

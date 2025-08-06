@@ -22,6 +22,8 @@ from sqlalchemy.exc import (
     DatabaseError,
     IntegrityError,
     OperationalError,
+)
+from sqlalchemy.exc import (
     TimeoutError as SQLTimeoutError,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -132,7 +134,7 @@ class TestTimeoutMonitorErrorHandling:
     ) -> None:
         """Test handling of database timeout during query execution."""
         # Mock database timeout error with proper exception chain
-        original_error = Exception("Query timeout exceeded")  
+        original_error = Exception("Query timeout exceeded")
         timeout_error = SQLTimeoutError("Query timeout exceeded", None, original_error)
         mock_session.execute.side_effect = timeout_error
 
@@ -293,7 +295,9 @@ class TestTimeoutMonitorErrorHandling:
 
         # Mock serialization error during event publishing
         serialization_error = TypeError("Object of type 'MagicMock' is not JSON serializable")
-        mock_event_publisher.publish_student_associations_confirmed.side_effect = serialization_error
+        mock_event_publisher.publish_student_associations_confirmed.side_effect = (
+            serialization_error
+        )
 
         # Act - should handle error gracefully
         await timeout_monitor._check_and_process_timeouts()
@@ -336,11 +340,11 @@ class TestTimeoutMonitorErrorHandling:
         # Note: create_mock_association expects float, so we'll modify after creation
         association_1 = self.create_mock_association()
         association_1.confidence_score = None  # None confidence
-        
+
         invalid_associations = [
             association_1,
             self.create_mock_association(confidence_score=-0.5),  # Negative confidence
-            self.create_mock_association(confidence_score=1.5),   # > 1.0 confidence
+            self.create_mock_association(confidence_score=1.5),  # > 1.0 confidence
         ]
 
         # Set up query result
@@ -363,7 +367,7 @@ class TestTimeoutMonitorErrorHandling:
         mock_event_publisher: AsyncMock,
     ) -> None:
         """Test handling when class is not found during UNKNOWN student creation."""
-        # Create low confidence association  
+        # Create low confidence association
         association = self.create_mock_association(confidence_score=0.3)
 
         # Set up query results
@@ -375,7 +379,7 @@ class TestTimeoutMonitorErrorHandling:
         mock_result_2.scalar_one_or_none.return_value = None
 
         # Mock class not found - implementation handles this gracefully by skipping class relationship
-        mock_result_3 = MagicMock() 
+        mock_result_3 = MagicMock()
         mock_result_3.scalar_one_or_none.return_value = None  # Class not found
 
         mock_session.execute.side_effect = [mock_result_1, mock_result_2, mock_result_3]
@@ -419,7 +423,9 @@ class TestTimeoutMonitorErrorHandling:
                 raise RuntimeError("Publishing failed for batch 1")
             # Second batch succeeds
 
-        mock_event_publisher.publish_student_associations_confirmed.side_effect = event_publish_side_effect
+        mock_event_publisher.publish_student_associations_confirmed.side_effect = (
+            event_publish_side_effect
+        )
 
         # Act - should process both batches, handle first batch error gracefully
         await timeout_monitor._check_and_process_timeouts()
@@ -537,7 +543,9 @@ class TestTimeoutMonitorErrorHandling:
         mock_session.execute.return_value = mock_result
 
         # Mock event publishing failure
-        mock_event_publisher.publish_student_associations_confirmed.side_effect = RuntimeError("Event failed")
+        mock_event_publisher.publish_student_associations_confirmed.side_effect = RuntimeError(
+            "Event failed"
+        )
 
         # Act - error should be handled gracefully with context logging
         await timeout_monitor._check_and_process_timeouts()
@@ -562,7 +570,9 @@ class TestTimeoutMonitorErrorHandling:
         mock_session.execute.return_value = mock_result
 
         # Mock any error during batch processing
-        mock_event_publisher.publish_student_associations_confirmed.side_effect = Exception("Any error")
+        mock_event_publisher.publish_student_associations_confirmed.side_effect = Exception(
+            "Any error"
+        )
 
         # Act
         await timeout_monitor._check_and_process_timeouts()
@@ -639,7 +649,9 @@ class TestTimeoutMonitorErrorHandling:
             correlation_ids.append(kwargs.get("correlation_id"))
             raise RuntimeError("Publishing failed")
 
-        mock_event_publisher.publish_student_associations_confirmed.side_effect = capture_correlation_id
+        mock_event_publisher.publish_student_associations_confirmed.side_effect = (
+            capture_correlation_id
+        )
 
         # Act
         await timeout_monitor._check_and_process_timeouts()

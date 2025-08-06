@@ -29,6 +29,7 @@ from services.spellchecker_service.protocols import (
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
+from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
@@ -68,6 +69,8 @@ class TestProcessSingleMessage:
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,
             http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
         # Act - The real algorithm will run, which is the correct behavior
@@ -220,6 +223,8 @@ class TestProcessSingleMessage:
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,  # This will fail
             http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
         # Act - Process message, expecting spell logic to fail during storage
@@ -379,6 +384,8 @@ class TestProcessSingleMessage:
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,
             http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
         # Act - Process message, expecting publisher to fail

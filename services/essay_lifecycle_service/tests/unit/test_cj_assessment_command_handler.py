@@ -138,7 +138,7 @@ class TestCJAssessmentCommandHandler:
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
         ) as mock_state_machine_class:
             mock_machine = MagicMock()
-            mock_machine.trigger.return_value = True
+            mock_machine.trigger_event.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
             mock_state_machine_class.return_value = mock_machine
 
@@ -175,9 +175,9 @@ class TestCJAssessmentCommandHandler:
             )
 
             # Verify trigger calls (initial + started event)
-            assert mock_machine.trigger.call_count == 2
-            mock_machine.trigger.assert_any_call(CMD_INITIATE_CJ_ASSESSMENT)
-            mock_machine.trigger.assert_any_call(EVT_CJ_ASSESSMENT_STARTED)
+            assert mock_machine.trigger_event.call_count == 2
+            mock_machine.trigger_event.assert_any_call(CMD_INITIATE_CJ_ASSESSMENT)
+            mock_machine.trigger_event.assert_any_call(EVT_CJ_ASSESSMENT_STARTED)
 
             # Verify request dispatching
             mock_request_dispatcher.dispatch_cj_assessment_requests.assert_called_once_with(
@@ -211,7 +211,7 @@ class TestCJAssessmentCommandHandler:
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
         ) as mock_state_machine_class:
             mock_machine = MagicMock()
-            mock_machine.trigger.return_value = False  # Transition fails
+            mock_machine.trigger_event.return_value = False  # Transition fails
             mock_state_machine_class.return_value = mock_machine
 
             # Execute
@@ -220,7 +220,7 @@ class TestCJAssessmentCommandHandler:
             )
 
             # Verify state machine was attempted
-            mock_machine.trigger.assert_called_once_with(CMD_INITIATE_CJ_ASSESSMENT)
+            mock_machine.trigger_event.assert_called_once_with(CMD_INITIATE_CJ_ASSESSMENT)
 
             # Verify no repository update or dispatch for failed transition
             mock_repository.update_essay_status_via_machine.assert_not_called()
@@ -293,7 +293,7 @@ class TestCJAssessmentCommandHandler:
             mock_machines = []
             for _ in range(4):
                 mock_machine = MagicMock()
-                mock_machine.trigger.return_value = True  # All succeed
+                mock_machine.trigger_event.return_value = True  # All succeed
                 mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
                 mock_machines.append(mock_machine)
 
@@ -354,7 +354,7 @@ class TestCJAssessmentCommandHandler:
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
         ) as mock_state_machine_class:
             mock_machine = MagicMock()
-            mock_machine.trigger.return_value = True
+            mock_machine.trigger_event.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
             mock_state_machine_class.return_value = mock_machine
 
@@ -415,7 +415,7 @@ class TestCJAssessmentCommandHandler:
             mock_machines = []
             for _ in range(4):
                 mock_machine = MagicMock()
-                mock_machine.trigger.return_value = True  # All succeed
+                mock_machine.trigger_event.return_value = True  # All succeed
                 mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
                 mock_machines.append(mock_machine)
 
@@ -477,7 +477,7 @@ class TestCJAssessmentCommandHandler:
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
         ) as mock_state_machine_class:
             mock_machine = MagicMock()
-            mock_machine.trigger.return_value = True
+            mock_machine.trigger_event.return_value = True
             mock_machine.current_status = EssayStatus.AWAITING_CJ_ASSESSMENT
             mock_state_machine_class.return_value = mock_machine
 

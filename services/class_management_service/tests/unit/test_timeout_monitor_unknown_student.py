@@ -101,9 +101,7 @@ class TestTimeoutMonitorUnknownStudent:
         mock_user_class.id = class_id
 
         # Call the method directly
-        await timeout_monitor._get_or_create_unknown_student(
-            mock_session, class_id
-        )
+        await timeout_monitor._get_or_create_unknown_student(mock_session, class_id)
 
         # Verify the Student object was created with correct attributes
         mock_session.add.assert_called_once()
@@ -134,9 +132,7 @@ class TestTimeoutMonitorUnknownStudent:
         mock_session.execute.return_value = mock_result
 
         # Call the method
-        result = await timeout_monitor._get_or_create_unknown_student(
-            mock_session, class_id
-        )
+        result = await timeout_monitor._get_or_create_unknown_student(mock_session, class_id)
 
         # Verify no new student was created
         mock_session.add.assert_not_called()
@@ -154,17 +150,14 @@ class TestTimeoutMonitorUnknownStudent:
         class_id_2 = uuid4()
 
         # Create associations for different classes
-        assoc_class_1 = self.create_mock_association(
-            class_id=class_id_1, confidence_score=0.3
-        )
-        assoc_class_2 = self.create_mock_association(
-            class_id=class_id_2, confidence_score=0.3
-        )
+        assoc_class_1 = self.create_mock_association(class_id=class_id_1, confidence_score=0.3)
+        assoc_class_2 = self.create_mock_association(class_id=class_id_2, confidence_score=0.3)
 
         # Set up mock for first check - associations from both classes
         mock_result_1 = MagicMock()
         mock_result_1.unique.return_value.scalars.return_value.all.return_value = [
-            assoc_class_1, assoc_class_2
+            assoc_class_1,
+            assoc_class_2,
         ]
 
         # Mock no existing UNKNOWN students (would create new ones)
@@ -173,7 +166,13 @@ class TestTimeoutMonitorUnknownStudent:
 
         # Set up results for each class processing
         # First: get associations, then UNKNOWN check for class 1, then UNKNOWN check for class 2
-        mock_session.execute.side_effect = [mock_result_1, mock_result_2, mock_result_2, mock_result_2, mock_result_2]
+        mock_session.execute.side_effect = [
+            mock_result_1,
+            mock_result_2,
+            mock_result_2,
+            mock_result_2,
+            mock_result_2,
+        ]
 
         # Act
         await timeout_monitor._check_and_process_timeouts()
@@ -229,6 +228,7 @@ class TestTimeoutMonitorUnknownStudent:
 
         # Simulate actual behavior: when low confidence found, it updates student_id
         call_count = 0
+
         def execute_side_effect(stmt: Any) -> MagicMock:
             nonlocal call_count
             call_count += 1
@@ -366,6 +366,7 @@ class TestTimeoutMonitorUnknownStudent:
 
         # Simulate behavior: update all associations to use UNKNOWN student
         call_count = 0
+
         def execute_side_effect(stmt: Any) -> MagicMock:
             nonlocal call_count
             call_count += 1

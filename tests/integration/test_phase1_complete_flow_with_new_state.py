@@ -81,7 +81,7 @@ class MockBatchContext:
         self.batch_id = batch_id
         self.user_id = user_id
         self.status = status
-    
+
     # Delegate attribute access to the registration object
     def __getattr__(self, name: str) -> Any:
         return getattr(self._registration, name)
@@ -240,16 +240,18 @@ class TestPhase1CompleteFlowWithNewState:
         """Create student matching initiator with mocked publisher."""
         # Mock the event publisher protocol
         mock_publisher_protocol = AsyncMock(spec=BatchEventPublisherProtocol)
-        
-        async def publish_batch_event(event_envelope: Any, key: str | None = None, session: Any | None = None) -> None:
+
+        async def publish_batch_event(
+            event_envelope: Any, key: str | None = None, session: Any | None = None
+        ) -> None:
             # Extract the command data from the envelope
             await mock_event_publisher.publish_event(
-                topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND), 
-                event_envelope.data
+                topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND),
+                event_envelope.data,
             )
-        
+
         mock_publisher_protocol.publish_batch_event.side_effect = publish_batch_event
-        
+
         return StudentMatchingInitiatorImpl(event_publisher=mock_publisher_protocol)
 
     @pytest.fixture
@@ -357,7 +359,10 @@ class TestPhase1CompleteFlowWithNewState:
 
         # Verify state transition to AWAITING_STUDENT_VALIDATION
         assert len(mock_batch_repo.status_updates) == 1
-        assert mock_batch_repo.status_updates[0] == (batch_id, BatchStatus.AWAITING_STUDENT_VALIDATION)
+        assert mock_batch_repo.status_updates[0] == (
+            batch_id,
+            BatchStatus.AWAITING_STUDENT_VALIDATION,
+        )
 
         # Verify student matching was initiated with course_code
         assert len(mock_event_publisher.published_events) == 1
@@ -472,7 +477,7 @@ class TestPhase1CompleteFlowWithNewState:
         stored_essays = await mock_batch_repo.get_batch_essays(batch_id)
         assert stored_essays is not None
         assert len(stored_essays) == 3
-        assert all(hasattr(essay, 'essay_id') for essay in stored_essays)
+        assert all(hasattr(essay, "essay_id") for essay in stored_essays)
 
     @pytest.mark.asyncio
     async def test_guest_batch_bypasses_student_validation(
@@ -620,7 +625,9 @@ class TestPhase1CompleteFlowWithNewState:
             # Create mock Kafka message
             kafka_msg = MockKafkaMessage(envelope)
 
-            await content_provisioning_handler.handle_batch_content_provisioning_completed(kafka_msg)
+            await content_provisioning_handler.handle_batch_content_provisioning_completed(
+                kafka_msg
+            )
 
             # Verify course code in student matching command
             assert len(mock_event_publisher.published_events) == 1
@@ -711,6 +718,7 @@ class TestPhase1CompleteFlowWithNewState:
 
         # Create envelope for associations event
         from datetime import UTC, datetime
+
         associations_envelope = EventEnvelope[StudentAssociationsConfirmedV1](
             event_id=uuid4(),
             event_type=topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED),

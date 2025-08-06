@@ -20,6 +20,7 @@ from services.spellchecker_service.protocols import (
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
+from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
 
 
 class MockRedisClient:
@@ -154,4 +155,6 @@ def real_spell_logic(
     return DefaultSpellLogic(
         result_store=result_store,
         http_session=mock_boundary_services[0],
+        whitelist=MockWhitelist(),
+        parallel_processor=create_mock_parallel_processor(),
     )

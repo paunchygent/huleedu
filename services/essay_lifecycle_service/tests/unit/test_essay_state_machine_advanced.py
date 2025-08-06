@@ -53,27 +53,27 @@ class TestEssayStateMachineMultiPhaseWorkflows:
         machine = EssayStateMachine("multi-phase-1", EssayStatus.READY_FOR_PROCESSING)
 
         # Phase 1: Spellcheck
-        assert machine.trigger(CMD_INITIATE_SPELLCHECK)
+        assert machine.trigger_event(CMD_INITIATE_SPELLCHECK)
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
-        assert machine.trigger(EVT_SPELLCHECK_STARTED)
+        assert machine.trigger_event(EVT_SPELLCHECK_STARTED)
         assert machine.current_status == EssayStatus.SPELLCHECKING_IN_PROGRESS
 
-        assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+        assert machine.trigger_event(EVT_SPELLCHECK_SUCCEEDED)
         assert machine.current_status == EssayStatus.SPELLCHECKED_SUCCESS
 
         # Phase 2: AI Feedback
-        assert machine.trigger(CMD_INITIATE_AI_FEEDBACK)
+        assert machine.trigger_event(CMD_INITIATE_AI_FEEDBACK)
         assert machine.current_status == EssayStatus.AWAITING_AI_FEEDBACK
 
-        assert machine.trigger(EVT_AI_FEEDBACK_STARTED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_STARTED)
         assert machine.current_status == EssayStatus.AI_FEEDBACK_IN_PROGRESS
 
-        assert machine.trigger(EVT_AI_FEEDBACK_SUCCEEDED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_SUCCEEDED)
         assert machine.current_status == EssayStatus.AI_FEEDBACK_SUCCESS
 
         # Phase 3: Complete
-        assert machine.trigger(CMD_MARK_PIPELINE_COMPLETE)
+        assert machine.trigger_event(CMD_MARK_PIPELINE_COMPLETE)
         assert machine.current_status == EssayStatus.ALL_PROCESSING_COMPLETED
 
     def test_spellcheck_to_cj_assessment_to_completion(self) -> None:
@@ -82,18 +82,18 @@ class TestEssayStateMachineMultiPhaseWorkflows:
 
         # Phase 1: Spellcheck (abbreviated)
         assert machine.cmd_initiate_spellcheck()
-        assert machine.trigger(EVT_SPELLCHECK_STARTED)
-        assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+        assert machine.trigger_event(EVT_SPELLCHECK_STARTED)
+        assert machine.trigger_event(EVT_SPELLCHECK_SUCCEEDED)
         assert machine.current_status == EssayStatus.SPELLCHECKED_SUCCESS
 
         # Phase 2: CJ Assessment
         assert machine.cmd_initiate_cj_assessment()
         assert machine.current_status == EssayStatus.AWAITING_CJ_ASSESSMENT
 
-        assert machine.trigger(EVT_CJ_ASSESSMENT_STARTED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_STARTED)
         assert machine.current_status == EssayStatus.CJ_ASSESSMENT_IN_PROGRESS
 
-        assert machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_SUCCEEDED)
         assert machine.current_status == EssayStatus.CJ_ASSESSMENT_SUCCESS
 
         # Phase 3: Complete
@@ -106,18 +106,18 @@ class TestEssayStateMachineMultiPhaseWorkflows:
 
         # Spellcheck phase
         assert machine.cmd_initiate_spellcheck()
-        assert machine.trigger(EVT_SPELLCHECK_STARTED)
-        assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+        assert machine.trigger_event(EVT_SPELLCHECK_STARTED)
+        assert machine.trigger_event(EVT_SPELLCHECK_SUCCEEDED)
 
         # AI Feedback phase
         assert machine.cmd_initiate_ai_feedback()
-        assert machine.trigger(EVT_AI_FEEDBACK_STARTED)
-        assert machine.trigger(EVT_AI_FEEDBACK_SUCCEEDED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_STARTED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_SUCCEEDED)
 
         # CJ Assessment phase
         assert machine.cmd_initiate_cj_assessment()
-        assert machine.trigger(EVT_CJ_ASSESSMENT_STARTED)
-        assert machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_STARTED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_SUCCEEDED)
 
         # Completion
         assert machine.cmd_mark_pipeline_complete()
@@ -132,11 +132,11 @@ class TestEssayStateMachineEdgeCases:
         machine = EssayStateMachine("multiple-triggers", EssayStatus.READY_FOR_PROCESSING)
 
         # First trigger should succeed
-        assert machine.trigger(CMD_INITIATE_SPELLCHECK) is True
+        assert machine.trigger_event(CMD_INITIATE_SPELLCHECK) is True
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
         # Second trigger should fail (already transitioned)
-        assert machine.trigger(CMD_INITIATE_SPELLCHECK) is False
+        assert machine.trigger_event(CMD_INITIATE_SPELLCHECK) is False
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
     def test_trigger_name_validation(self) -> None:
@@ -160,9 +160,9 @@ class TestEssayStateMachineEdgeCases:
         assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
 
         # After valid transition
-        machine.trigger(CMD_INITIATE_SPELLCHECK)
+        machine.trigger_event(CMD_INITIATE_SPELLCHECK)
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
         # After invalid transition attempt
-        machine.trigger("INVALID_TRIGGER")
+        machine.trigger_event("INVALID_TRIGGER")
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK  # Should remain unchanged

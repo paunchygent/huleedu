@@ -23,6 +23,10 @@ services/spellchecker_service/data/corrected_essays
 data/corrected_essays
 test_uploads/
 
+# Large data files
+services/spellchecker_service/data/cross-verified-database.csv.gz
+services/spellchecker_service/data/*.csv.gz
+
 # Local development stores and caches
 .local_*
 services/*/.local_*

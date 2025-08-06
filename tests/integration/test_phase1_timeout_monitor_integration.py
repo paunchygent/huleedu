@@ -3,7 +3,7 @@ Integration tests for AssociationTimeoutMonitor 24-hour timeout behavior.
 
 Tests the timeout monitor's core functionality with real database operations:
 - 24-hour timeout trigger with time manipulation
-- High confidence auto-confirmation (≥0.7)  
+- High confidence auto-confirmation (≥0.7)
 - Low confidence UNKNOWN student creation (<0.7)
 - Multiple batch isolation and processing
 - Cross-service event propagation
@@ -21,11 +21,19 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode, Language
-from common_core.status_enums import AssociationValidationMethod
-from common_core.events.validation_events import StudentAssociationConfirmation, StudentAssociationsConfirmedV1
 from common_core.events.envelope import EventEnvelope
+from common_core.events.validation_events import (
+    StudentAssociationConfirmation,
+    StudentAssociationsConfirmedV1,
+)
+from common_core.status_enums import AssociationValidationMethod
 from sqlalchemy import select, text, update
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from testcontainers.postgres import PostgresContainer
 
 from services.class_management_service.implementations.association_timeout_monitor import (
@@ -43,7 +51,7 @@ from services.class_management_service.models_db import (
 
 class BatchTestData:
     """Test data container for batch setup."""
-    
+
     def __init__(
         self,
         batch_id: UUID,
@@ -61,16 +69,16 @@ class BatchTestData:
 
 class MockEventPublisher:
     """Mock event publisher that tracks published events for verification."""
-    
+
     def __init__(self):
         self.published_events: list[StudentAssociationsConfirmedV1] = []
         self.publish_calls: list[dict[str, Any]] = []
         self.class_events: list[EventEnvelope] = []
-    
+
     async def publish_class_event(self, event_envelope: EventEnvelope) -> None:
         """Mock implementation for ClassEventPublisherProtocol compliance."""
         self.class_events.append(event_envelope)
-    
+
     async def publish_student_associations_confirmed(
         self,
         batch_id: str,
@@ -94,7 +102,7 @@ class MockEventPublisher:
             )
             for assoc in associations
         ]
-        
+
         # Create the event object for verification
         event = StudentAssociationsConfirmedV1(
             batch_id=batch_id,
@@ -104,17 +112,19 @@ class MockEventPublisher:
             timeout_triggered=timeout_triggered,
             validation_summary=validation_summary,
         )
-        
+
         self.published_events.append(event)
-        self.publish_calls.append({
-            "batch_id": batch_id,
-            "class_id": class_id,
-            "course_code": course_code,
-            "associations": associations,
-            "timeout_triggered": timeout_triggered,
-            "validation_summary": validation_summary,
-            "correlation_id": correlation_id,
-        })
+        self.publish_calls.append(
+            {
+                "batch_id": batch_id,
+                "class_id": class_id,
+                "course_code": course_code,
+                "associations": associations,
+                "timeout_triggered": timeout_triggered,
+                "validation_summary": validation_summary,
+                "correlation_id": correlation_id,
+            }
+        )
 
 
 class TestTimeoutMonitorIntegration:
@@ -143,11 +153,11 @@ class TestTimeoutMonitorIntegration:
     async def engine(self, database_url: str) -> AsyncGenerator[AsyncEngine, None]:
         """Create async engine connected to test database."""
         engine = create_async_engine(database_url, echo=False)
-        
+
         # Create all tables
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        
+
         try:
             yield engine
         finally:
@@ -178,7 +188,7 @@ class TestTimeoutMonitorIntegration:
 
     @pytest.fixture
     async def timeout_monitor(
-        self, 
+        self,
         session_factory: async_sessionmaker[AsyncSession],
         mock_event_publisher: MockEventPublisher,
     ) -> AssociationTimeoutMonitor:
@@ -189,7 +199,7 @@ class TestTimeoutMonitorIntegration:
         )
 
     async def create_test_course_and_class(
-        self, 
+        self,
         session: AsyncSession,
         course_code: CourseCode = CourseCode.ENG5,
         class_name: str = "Test Class",
@@ -203,7 +213,7 @@ class TestTimeoutMonitorIntegration:
         )
         session.add(course)
         await session.flush()
-        
+
         # Create class
         user_class = UserClass(
             name=class_name,
@@ -212,11 +222,11 @@ class TestTimeoutMonitorIntegration:
         )
         session.add(user_class)
         await session.flush()
-        
+
         return course, user_class
 
     async def create_test_students(
-        self, 
+        self,
         session: AsyncSession,
         user_class: UserClass,
         count: int = 3,
@@ -235,7 +245,7 @@ class TestTimeoutMonitorIntegration:
             student.classes.append(user_class)
             session.add(student)
             students.append(student)
-        
+
         await session.flush()
         return students
 
@@ -261,7 +271,7 @@ class TestTimeoutMonitorIntegration:
         )
         session.add(association)
         await session.flush()
-        
+
         # Update timestamp directly in database to simulate old association
         # Use timezone-naive datetime to match database schema (TIMESTAMP WITHOUT TIME ZONE)
         old_timestamp = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours_old)
@@ -271,7 +281,7 @@ class TestTimeoutMonitorIntegration:
             .values(created_at=old_timestamp)
         )
         await session.commit()
-        
+
         # Refresh the object to get updated timestamp
         await session.refresh(association)
         return association
@@ -287,17 +297,17 @@ class TestTimeoutMonitorIntegration:
         course, user_class = await self.create_test_course_and_class(
             session, course_code=course_code
         )
-        
+
         # Create students
         students = await self.create_test_students(session, user_class, count=4)
-        
+
         # Create batch
         batch_id = uuid4()
-        
+
         # Create associations with different confidence scores
         associations = []
         confidence_scores = [0.9, 0.8, 0.5, 0.3]  # 2 high, 2 low
-        
+
         for i, confidence in enumerate(confidence_scores):
             association = await self.create_association_with_old_timestamp(
                 session=session,
@@ -308,7 +318,7 @@ class TestTimeoutMonitorIntegration:
                 hours_old=hours_old,
             )
             associations.append(association)
-        
+
         return BatchTestData(
             batch_id=batch_id,
             course=course,
@@ -326,7 +336,7 @@ class TestTimeoutMonitorIntegration:
     ):
         """
         Test that associations older than 24 hours are found and processed.
-        
+
         Creates associations at various ages and verifies only those ≥24 hours
         are processed by the timeout monitor.
         """
@@ -335,15 +345,15 @@ class TestTimeoutMonitorIntegration:
             _, user_class = await self.create_test_course_and_class(session)
             students = await self.create_test_students(session, user_class, count=4)
             batch_id = uuid4()
-            
+
             # Create associations with different ages
             ages_and_expectations = [
                 (23, False),  # 23 hours - should NOT be processed
-                (24, True),   # 24 hours exactly - should be processed
-                (25, True),   # 25 hours - should be processed
-                (48, True),   # 48 hours - should be processed
+                (24, True),  # 24 hours exactly - should be processed
+                (25, True),  # 25 hours - should be processed
+                (48, True),  # 48 hours - should be processed
             ]
-            
+
             associations = []
             for i, (hours_old, should_process) in enumerate(ages_and_expectations):
                 association = await self.create_association_with_old_timestamp(
@@ -355,10 +365,10 @@ class TestTimeoutMonitorIntegration:
                     hours_old=hours_old,
                 )
                 associations.append((association, should_process))
-        
+
         # Run timeout processing
         await timeout_monitor._check_and_process_timeouts()
-        
+
         # Verify results
         async with session_factory() as session:
             for association, should_process in associations:
@@ -369,18 +379,21 @@ class TestTimeoutMonitorIntegration:
                     )
                 )
                 updated_association = result.scalar_one()
-                
+
                 if should_process:
                     # Should be confirmed
                     assert updated_association.validation_status == "confirmed"
-                    assert updated_association.validation_method == AssociationValidationMethod.TIMEOUT.value
+                    assert (
+                        updated_association.validation_method
+                        == AssociationValidationMethod.TIMEOUT.value
+                    )
                     assert updated_association.validated_by == "SYSTEM_TIMEOUT"
                     assert updated_association.validated_at is not None
                 else:
                     # Should still be pending
                     assert updated_association.validation_status == "pending_validation"
                     assert updated_association.validated_at is None
-        
+
         # Verify event was published for processed associations (3 out of 4)
         assert len(mock_event_publisher.published_events) == 1
         event = mock_event_publisher.published_events[0]
@@ -397,7 +410,7 @@ class TestTimeoutMonitorIntegration:
     ):
         """
         Test that associations with ≥0.7 confidence are confirmed with original student.
-        
+
         Creates associations with various high confidence scores and verifies
         they are all confirmed with their original student IDs.
         """
@@ -406,17 +419,19 @@ class TestTimeoutMonitorIntegration:
             batch_data = await self.setup_batch_with_mixed_confidence_associations(
                 session, course_code=CourseCode.ENG7
             )
-            
+
             # Filter to only high confidence associations for this test
             high_confidence_associations = [
-                assoc for assoc in batch_data.associations 
-                if assoc.confidence_score is not None and assoc.confidence_score >= HIGH_CONFIDENCE_THRESHOLD
+                assoc
+                for assoc in batch_data.associations
+                if assoc.confidence_score is not None
+                and assoc.confidence_score >= HIGH_CONFIDENCE_THRESHOLD
             ]
             original_student_ids = [assoc.student_id for assoc in high_confidence_associations]
-        
+
         # Run timeout processing
         await timeout_monitor._check_and_process_timeouts()
-        
+
         # Verify high confidence associations were confirmed with original students
         async with session_factory() as session:
             for i, association in enumerate(high_confidence_associations):
@@ -426,25 +441,32 @@ class TestTimeoutMonitorIntegration:
                     )
                 )
                 updated_association = result.scalar_one()
-                
+
                 # Should be confirmed with original student
                 assert updated_association.validation_status == "confirmed"
                 assert updated_association.student_id == original_student_ids[i]
-                assert updated_association.confidence_score is not None and updated_association.confidence_score >= HIGH_CONFIDENCE_THRESHOLD
-                assert updated_association.validation_method == AssociationValidationMethod.TIMEOUT.value
+                assert (
+                    updated_association.confidence_score is not None
+                    and updated_association.confidence_score >= HIGH_CONFIDENCE_THRESHOLD
+                )
+                assert (
+                    updated_association.validation_method
+                    == AssociationValidationMethod.TIMEOUT.value
+                )
                 assert updated_association.validated_by == "SYSTEM_TIMEOUT"
                 assert updated_association.validated_at is not None
-        
+
         # Verify published event contains high confidence associations with original data
         assert len(mock_event_publisher.published_events) == 1
         event = mock_event_publisher.published_events[0]
-        
+
         # Find high confidence associations in published event
         high_conf_event_assocs = [
-            assoc for assoc in event.associations 
+            assoc
+            for assoc in event.associations
             if assoc.confidence_score >= HIGH_CONFIDENCE_THRESHOLD
         ]
-        
+
         assert len(high_conf_event_assocs) == len(high_confidence_associations)
         for assoc_data in high_conf_event_assocs:
             assert assoc_data.validation_method == AssociationValidationMethod.TIMEOUT
@@ -460,7 +482,7 @@ class TestTimeoutMonitorIntegration:
     ):
         """
         Test that associations with <0.7 confidence create UNKNOWN student per class.
-        
+
         Creates low confidence associations and verifies UNKNOWN students are
         created with proper attributes and class associations.
         """
@@ -469,36 +491,38 @@ class TestTimeoutMonitorIntegration:
             batch_data = await self.setup_batch_with_mixed_confidence_associations(
                 session, course_code=CourseCode.ENG5
             )
-            
+
             # Filter to only low confidence associations for verification
             low_confidence_associations = [
-                assoc for assoc in batch_data.associations 
-                if assoc.confidence_score is not None and assoc.confidence_score < HIGH_CONFIDENCE_THRESHOLD
+                assoc
+                for assoc in batch_data.associations
+                if assoc.confidence_score is not None
+                and assoc.confidence_score < HIGH_CONFIDENCE_THRESHOLD
             ]
             class_id = batch_data.user_class.id
-        
+
         # Run timeout processing
         await timeout_monitor._check_and_process_timeouts()
-        
+
         # Verify UNKNOWN student was created
         async with session_factory() as session:
             # Find UNKNOWN student for this class
             result = await session.execute(
                 select(Student).where(
-                    (Student.first_name == "UNKNOWN") &
-                    (Student.last_name == "STUDENT") &
-                    (Student.email == f"unknown.{class_id}@huleedu.system") &
-                    (Student.classes.any(UserClass.id == class_id))
+                    (Student.first_name == "UNKNOWN")
+                    & (Student.last_name == "STUDENT")
+                    & (Student.email == f"unknown.{class_id}@huleedu.system")
+                    & (Student.classes.any(UserClass.id == class_id))
                 )
             )
             unknown_student = result.scalar_one()
-            
+
             # Verify UNKNOWN student properties
             assert unknown_student.first_name == "UNKNOWN"
             assert unknown_student.last_name == "STUDENT"
             assert unknown_student.email == f"unknown.{class_id}@huleedu.system"
             assert unknown_student.created_by_user_id == "SYSTEM_TIMEOUT"
-            
+
             # Verify low confidence associations were updated to UNKNOWN student
             for association in low_confidence_associations:
                 assoc_result = await session.execute(
@@ -507,22 +531,22 @@ class TestTimeoutMonitorIntegration:
                     )
                 )
                 updated_association = assoc_result.scalar_one()
-                
+
                 assert updated_association.validation_status == "confirmed"
                 assert updated_association.student_id == unknown_student.id
-                assert updated_association.validation_method == AssociationValidationMethod.TIMEOUT.value
+                assert (
+                    updated_association.validation_method
+                    == AssociationValidationMethod.TIMEOUT.value
+                )
                 assert updated_association.validated_by == "SYSTEM_TIMEOUT"
-        
+
         # Verify published event contains UNKNOWN student associations
         assert len(mock_event_publisher.published_events) == 1
         event = mock_event_publisher.published_events[0]
-        
+
         # Find low confidence associations in published event (now with confidence_score=0.0)
-        unknown_assocs = [
-            assoc for assoc in event.associations 
-            if assoc.confidence_score == 0.0
-        ]
-        
+        unknown_assocs = [assoc for assoc in event.associations if assoc.confidence_score == 0.0]
+
         assert len(unknown_assocs) == len(low_confidence_associations)
         for assoc_data in unknown_assocs:
             assert assoc_data.validation_method == AssociationValidationMethod.TIMEOUT
@@ -538,7 +562,7 @@ class TestTimeoutMonitorIntegration:
     ):
         """
         Test that multiple batches with different classes timeout independently.
-        
+
         Creates multiple batches with different course codes and verifies each
         batch is processed independently with proper isolation.
         """
@@ -549,57 +573,57 @@ class TestTimeoutMonitorIntegration:
                 CourseCode.ENG7,
                 CourseCode.SV3,
             ]
-            
+
             batch_data_list = []
             for course_code in batch_configs:
                 batch_data = await self.setup_batch_with_mixed_confidence_associations(
                     session, course_code=course_code, hours_old=30
                 )
                 batch_data_list.append(batch_data)
-            
+
             # Commit all test data to ensure it's visible to timeout monitor
             await session.commit()
-        
+
         # Run timeout processing (should process all batches)
         await timeout_monitor._check_and_process_timeouts()
-        
+
         # Verify each batch was processed independently
         assert len(mock_event_publisher.published_events) == 3
-        
+
         # Verify each event corresponds to correct batch and course
         published_batch_ids = {event.batch_id for event in mock_event_publisher.published_events}
         expected_batch_ids = {str(batch_data.batch_id) for batch_data in batch_data_list}
         assert published_batch_ids == expected_batch_ids
-        
+
         for event in mock_event_publisher.published_events:
             # Find corresponding batch data
-            batch_data = next(
-                bd for bd in batch_data_list 
-                if str(bd.batch_id) == event.batch_id
-            )
-            
+            batch_data = next(bd for bd in batch_data_list if str(bd.batch_id) == event.batch_id)
+
             # Verify event data matches batch
             assert event.course_code == batch_data.course.course_code
             assert event.class_id == str(batch_data.user_class.id)
             assert event.timeout_triggered is True
             assert len(event.associations) == 4  # All 4 associations per batch
-        
+
         # Verify UNKNOWN students created per class (not shared across batches)
         async with session_factory() as session:
             for batch_data in batch_data_list:
                 # Count UNKNOWN students for this class
                 result = await session.execute(
                     select(Student).where(
-                        (Student.first_name == "UNKNOWN") &
-                        (Student.last_name == "STUDENT") &
-                        (Student.classes.any(UserClass.id == batch_data.user_class.id))
+                        (Student.first_name == "UNKNOWN")
+                        & (Student.last_name == "STUDENT")
+                        & (Student.classes.any(UserClass.id == batch_data.user_class.id))
                     )
                 )
                 unknown_students = result.scalars().all()
-                
+
                 # Should be exactly 1 UNKNOWN student per class
                 assert len(unknown_students) == 1
-                assert unknown_students[0].email == f"unknown.{batch_data.user_class.id}@huleedu.system"
+                assert (
+                    unknown_students[0].email
+                    == f"unknown.{batch_data.user_class.id}@huleedu.system"
+                )
 
     @pytest.mark.asyncio
     async def test_timeout_event_propagation(
@@ -610,7 +634,7 @@ class TestTimeoutMonitorIntegration:
     ):
         """
         Test that StudentAssociationsConfirmedV1 events contain proper cross-service data.
-        
+
         Verifies published events have all required fields for downstream
         services including proper course_code propagation and correlation IDs.
         """
@@ -619,25 +643,25 @@ class TestTimeoutMonitorIntegration:
             batch_data = await self.setup_batch_with_mixed_confidence_associations(
                 session, course_code=CourseCode.ENG7, hours_old=30
             )
-        
+
         # Run timeout processing
         await timeout_monitor._check_and_process_timeouts()
-        
+
         # Verify event structure and data
         assert len(mock_event_publisher.published_events) == 1
         event = mock_event_publisher.published_events[0]
-        
+
         # Verify core event fields
         assert event.batch_id == str(batch_data.batch_id)
         assert event.class_id == str(batch_data.user_class.id)
         assert event.course_code == CourseCode.ENG7
         assert event.timeout_triggered is True
-        
+
         # Verify validation summary
         assert "confirmed" in event.validation_summary
         assert event.validation_summary["confirmed"] == 4  # All 4 associations
         assert event.validation_summary["rejected"] == 0
-        
+
         # Verify association data completeness
         assert len(event.associations) == 4
         for assoc_data in event.associations:
@@ -648,12 +672,12 @@ class TestTimeoutMonitorIntegration:
             assert assoc_data.validation_method is not None
             assert assoc_data.validated_by is not None
             assert assoc_data.validated_at is not None
-            
+
             # Timeout-specific values
             assert assoc_data.validation_method == AssociationValidationMethod.TIMEOUT
             assert assoc_data.validated_by == "SYSTEM_TIMEOUT"
             assert assoc_data.validated_at is not None
-        
+
         # Verify publish call included correlation_id
         assert len(mock_event_publisher.publish_calls) == 1
         publish_call = mock_event_publisher.publish_calls[0]

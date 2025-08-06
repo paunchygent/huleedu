@@ -100,7 +100,7 @@ class CJAssessmentCommandHandler:
                         )
 
                         # Attempt to trigger the transition for initiating CJ assessment
-                        if essay_machine.trigger(CMD_INITIATE_CJ_ASSESSMENT):
+                        if essay_machine.trigger_event(CMD_INITIATE_CJ_ASSESSMENT):
                             # Persist the new state from the machine
                             await self.repository.update_essay_status_via_machine(
                                 essay_id,
@@ -210,7 +210,7 @@ class CJAssessmentCommandHandler:
                                         },
                                     )
 
-                                    if essay_machine.trigger(EVT_CJ_ASSESSMENT_STARTED):
+                                    if essay_machine.trigger_event(EVT_CJ_ASSESSMENT_STARTED):
                                         await self.repository.update_essay_status_via_machine(
                                             essay_ref.essay_id,
                                             essay_machine.current_status,

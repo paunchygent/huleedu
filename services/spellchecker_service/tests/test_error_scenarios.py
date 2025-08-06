@@ -45,6 +45,7 @@ from services.spellchecker_service.protocols import (
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
 )
+from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
 
 
 class TestErrorCategorizationBusinessLogic:
@@ -187,7 +188,10 @@ class TestRealBusinessLogicWithBoundaryMocks:
     def real_spell_logic(self, boundary_mocks: dict[str, AsyncMock]) -> DefaultSpellLogic:
         """Create real spell logic with mocked boundaries."""
         return DefaultSpellLogic(
-            result_store=boundary_mocks["result_store"], http_session=boundary_mocks["http_session"]
+            result_store=boundary_mocks["result_store"],
+            http_session=boundary_mocks["http_session"],
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
     def create_valid_kafka_message(self, correlation_id: UUID) -> ConsumerRecord:

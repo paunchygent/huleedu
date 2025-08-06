@@ -33,7 +33,7 @@ class TestEssayStateMachineAIFeedbackWorkflow:
         """Test initiating AI feedback from SPELLCHECKED_SUCCESS."""
         machine = EssayStateMachine("ai-feedback-test", EssayStatus.SPELLCHECKED_SUCCESS)
 
-        success = machine.trigger(CMD_INITIATE_AI_FEEDBACK)
+        success = machine.trigger_event(CMD_INITIATE_AI_FEEDBACK)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_AI_FEEDBACK
 
@@ -42,27 +42,27 @@ class TestEssayStateMachineAIFeedbackWorkflow:
         machine = EssayStateMachine("ai-complete", EssayStatus.SPELLCHECKED_SUCCESS)
 
         # Initiate AI feedback
-        assert machine.trigger(CMD_INITIATE_AI_FEEDBACK)
+        assert machine.trigger_event(CMD_INITIATE_AI_FEEDBACK)
         assert machine.current_status == EssayStatus.AWAITING_AI_FEEDBACK
 
         # Start processing
-        assert machine.trigger(EVT_AI_FEEDBACK_STARTED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_STARTED)
         assert machine.current_status == EssayStatus.AI_FEEDBACK_IN_PROGRESS
 
         # Complete successfully
-        assert machine.trigger(EVT_AI_FEEDBACK_SUCCEEDED)
+        assert machine.trigger_event(EVT_AI_FEEDBACK_SUCCEEDED)
         assert machine.current_status == EssayStatus.AI_FEEDBACK_SUCCESS
 
     def test_ai_feedback_failure_scenarios(self) -> None:
         """Test AI feedback failure scenarios."""
         # Failure from in-progress
         machine1 = EssayStateMachine("ai-fail-progress", EssayStatus.AI_FEEDBACK_IN_PROGRESS)
-        assert machine1.trigger(EVT_AI_FEEDBACK_FAILED)
+        assert machine1.trigger_event(EVT_AI_FEEDBACK_FAILED)
         assert machine1.current_status == EssayStatus.AI_FEEDBACK_FAILED
 
         # Failure from awaiting
         machine2 = EssayStateMachine("ai-fail-awaiting", EssayStatus.AWAITING_AI_FEEDBACK)
-        assert machine2.trigger(EVT_AI_FEEDBACK_FAILED)
+        assert machine2.trigger_event(EVT_AI_FEEDBACK_FAILED)
         assert machine2.current_status == EssayStatus.AI_FEEDBACK_FAILED
 
 
@@ -73,7 +73,7 @@ class TestEssayStateMachineCJAssessmentWorkflow:
         """Test CJ assessment initiation from SPELLCHECKED_SUCCESS."""
         machine = EssayStateMachine("cj-from-spell", EssayStatus.SPELLCHECKED_SUCCESS)
 
-        success = machine.trigger(CMD_INITIATE_CJ_ASSESSMENT)
+        success = machine.trigger_event(CMD_INITIATE_CJ_ASSESSMENT)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_CJ_ASSESSMENT
 
@@ -81,7 +81,7 @@ class TestEssayStateMachineCJAssessmentWorkflow:
         """Test CJ assessment initiation from AI_FEEDBACK_SUCCESS."""
         machine = EssayStateMachine("cj-from-ai", EssayStatus.AI_FEEDBACK_SUCCESS)
 
-        success = machine.trigger(CMD_INITIATE_CJ_ASSESSMENT)
+        success = machine.trigger_event(CMD_INITIATE_CJ_ASSESSMENT)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_CJ_ASSESSMENT
 
@@ -90,23 +90,23 @@ class TestEssayStateMachineCJAssessmentWorkflow:
         machine = EssayStateMachine("cj-complete", EssayStatus.AWAITING_CJ_ASSESSMENT)
 
         # Start assessment
-        assert machine.trigger(EVT_CJ_ASSESSMENT_STARTED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_STARTED)
         assert machine.current_status == EssayStatus.CJ_ASSESSMENT_IN_PROGRESS
 
         # Complete successfully
-        assert machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED)
+        assert machine.trigger_event(EVT_CJ_ASSESSMENT_SUCCEEDED)
         assert machine.current_status == EssayStatus.CJ_ASSESSMENT_SUCCESS
 
     def test_cj_assessment_failure_scenarios(self) -> None:
         """Test CJ assessment failure scenarios."""
         # Failure from in-progress
         machine1 = EssayStateMachine("cj-fail-progress", EssayStatus.CJ_ASSESSMENT_IN_PROGRESS)
-        assert machine1.trigger(EVT_CJ_ASSESSMENT_FAILED)
+        assert machine1.trigger_event(EVT_CJ_ASSESSMENT_FAILED)
         assert machine1.current_status == EssayStatus.CJ_ASSESSMENT_FAILED
 
         # Failure from awaiting
         machine2 = EssayStateMachine("cj-fail-awaiting", EssayStatus.AWAITING_CJ_ASSESSMENT)
-        assert machine2.trigger(EVT_CJ_ASSESSMENT_FAILED)
+        assert machine2.trigger_event(EVT_CJ_ASSESSMENT_FAILED)
         assert machine2.current_status == EssayStatus.CJ_ASSESSMENT_FAILED
 
 
@@ -117,7 +117,7 @@ class TestEssayStateMachineNLPWorkflow:
         """Test NLP initiation from SPELLCHECKED_SUCCESS."""
         machine = EssayStateMachine("nlp-from-spell", EssayStatus.SPELLCHECKED_SUCCESS)
 
-        success = machine.trigger(CMD_INITIATE_NLP)
+        success = machine.trigger_event(CMD_INITIATE_NLP)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_NLP
 
@@ -125,7 +125,7 @@ class TestEssayStateMachineNLPWorkflow:
         """Test NLP initiation from AI_FEEDBACK_SUCCESS."""
         machine = EssayStateMachine("nlp-from-ai", EssayStatus.AI_FEEDBACK_SUCCESS)
 
-        success = machine.trigger(CMD_INITIATE_NLP)
+        success = machine.trigger_event(CMD_INITIATE_NLP)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_NLP
 
@@ -134,11 +134,11 @@ class TestEssayStateMachineNLPWorkflow:
         machine = EssayStateMachine("nlp-complete", EssayStatus.AWAITING_NLP)
 
         # Start processing
-        assert machine.trigger(EVT_NLP_STARTED)
+        assert machine.trigger_event(EVT_NLP_STARTED)
         assert machine.current_status == EssayStatus.NLP_IN_PROGRESS
 
         # Complete successfully
-        assert machine.trigger(EVT_NLP_SUCCEEDED)
+        assert machine.trigger_event(EVT_NLP_SUCCEEDED)
         assert machine.current_status == EssayStatus.NLP_SUCCESS
 
 
@@ -149,7 +149,7 @@ class TestEssayStateMachinePipelineCompletion:
         """Test marking complete from SPELLCHECKED_SUCCESS."""
         machine = EssayStateMachine("complete-spell", EssayStatus.SPELLCHECKED_SUCCESS)
 
-        success = machine.trigger(CMD_MARK_PIPELINE_COMPLETE)
+        success = machine.trigger_event(CMD_MARK_PIPELINE_COMPLETE)
         assert success is True
         assert machine.current_status == EssayStatus.ALL_PROCESSING_COMPLETED
 
@@ -163,7 +163,7 @@ class TestEssayStateMachinePipelineCompletion:
 
         for state in success_states:
             machine = EssayStateMachine(f"complete-{state.value}", state)
-            success = machine.trigger(CMD_MARK_PIPELINE_COMPLETE)
+            success = machine.trigger_event(CMD_MARK_PIPELINE_COMPLETE)
             assert success is True
             assert machine.current_status == EssayStatus.ALL_PROCESSING_COMPLETED
 
@@ -186,6 +186,6 @@ class TestEssayStateMachineCriticalFailure:
 
         for state in test_states:
             machine = EssayStateMachine(f"critical-{state.value}", state)
-            success = machine.trigger(EVT_CRITICAL_FAILURE)
+            success = machine.trigger_event(EVT_CRITICAL_FAILURE)
             assert success is True
             assert machine.current_status == EssayStatus.ESSAY_CRITICAL_FAILURE

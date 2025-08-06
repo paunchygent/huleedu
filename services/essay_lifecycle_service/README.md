@@ -241,7 +241,7 @@ essay_machine = EssayStateMachine(
     initial_status=essay_state_model.current_status
 )
 
-if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+if essay_machine.trigger_event(CMD_INITIATE_SPELLCHECK):
     # Success path - persist state and dispatch
     await self.repository.update_essay_status_via_machine(...)
 else:
@@ -269,7 +269,7 @@ Batch processing patterns for efficient coordination:
 successfully_transitioned_essays = []
 for essay_ref in command_data.essays_to_process:
     # Process state transitions first
-    if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+    if essay_machine.trigger_event(CMD_INITIATE_SPELLCHECK):
         successfully_transitioned_essays.append(essay_ref)
 
 # Then dispatch all at once

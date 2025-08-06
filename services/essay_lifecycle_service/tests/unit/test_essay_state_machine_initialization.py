@@ -69,7 +69,7 @@ class TestEssayStateMachineSpellcheckWorkflow:
         machine = EssayStateMachine("spellcheck-test", EssayStatus.READY_FOR_PROCESSING)
 
         # Valid transition: READY_FOR_PROCESSING -> AWAITING_SPELLCHECK
-        success = machine.trigger(CMD_INITIATE_SPELLCHECK)
+        success = machine.trigger_event(CMD_INITIATE_SPELLCHECK)
         assert success is True
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
@@ -77,7 +77,7 @@ class TestEssayStateMachineSpellcheckWorkflow:
         """Test starting spellcheck from AWAITING_SPELLCHECK."""
         machine = EssayStateMachine("spellcheck-start", EssayStatus.AWAITING_SPELLCHECK)
 
-        success = machine.trigger(EVT_SPELLCHECK_STARTED)
+        success = machine.trigger_event(EVT_SPELLCHECK_STARTED)
         assert success is True
         assert machine.current_status == EssayStatus.SPELLCHECKING_IN_PROGRESS
 
@@ -85,7 +85,7 @@ class TestEssayStateMachineSpellcheckWorkflow:
         """Test successful spellcheck completion."""
         machine = EssayStateMachine("spellcheck-success", EssayStatus.SPELLCHECKING_IN_PROGRESS)
 
-        success = machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+        success = machine.trigger_event(EVT_SPELLCHECK_SUCCEEDED)
         assert success is True
         assert machine.current_status == EssayStatus.SPELLCHECKED_SUCCESS
 
@@ -93,7 +93,7 @@ class TestEssayStateMachineSpellcheckWorkflow:
         """Test spellcheck failure from in progress."""
         machine = EssayStateMachine("spellcheck-fail", EssayStatus.SPELLCHECKING_IN_PROGRESS)
 
-        success = machine.trigger(EVT_SPELLCHECK_FAILED)
+        success = machine.trigger_event(EVT_SPELLCHECK_FAILED)
         assert success is True
         assert machine.current_status == EssayStatus.SPELLCHECK_FAILED
 
@@ -101,7 +101,7 @@ class TestEssayStateMachineSpellcheckWorkflow:
         """Test spellcheck failure from awaiting state."""
         machine = EssayStateMachine("spellcheck-fail-early", EssayStatus.AWAITING_SPELLCHECK)
 
-        success = machine.trigger(EVT_SPELLCHECK_FAILED)
+        success = machine.trigger_event(EVT_SPELLCHECK_FAILED)
         assert success is True
         assert machine.current_status == EssayStatus.SPELLCHECK_FAILED
 
@@ -110,13 +110,13 @@ class TestEssayStateMachineSpellcheckWorkflow:
         machine = EssayStateMachine("complete-spellcheck", EssayStatus.READY_FOR_PROCESSING)
 
         # Phase 1: Initiate spellcheck
-        assert machine.trigger(CMD_INITIATE_SPELLCHECK)
+        assert machine.trigger_event(CMD_INITIATE_SPELLCHECK)
         assert machine.current_status == EssayStatus.AWAITING_SPELLCHECK
 
         # Phase 2: Start processing
-        assert machine.trigger(EVT_SPELLCHECK_STARTED)
+        assert machine.trigger_event(EVT_SPELLCHECK_STARTED)
         assert machine.current_status == EssayStatus.SPELLCHECKING_IN_PROGRESS
 
         # Phase 3: Complete successfully
-        assert machine.trigger(EVT_SPELLCHECK_SUCCEEDED)
+        assert machine.trigger_event(EVT_SPELLCHECK_SUCCEEDED)
         assert machine.current_status == EssayStatus.SPELLCHECKED_SUCCESS

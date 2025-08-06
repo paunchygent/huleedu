@@ -47,8 +47,7 @@ class TestMockRepositoryProtocolCompliance:
         protocol_methods = [
             name
             for name in dir(EssayRepositoryProtocol)
-            if not name.startswith("_")
-            and callable(getattr(EssayRepositoryProtocol, name))
+            if not name.startswith("_") and callable(getattr(EssayRepositoryProtocol, name))
         ]
 
         mock_methods = [

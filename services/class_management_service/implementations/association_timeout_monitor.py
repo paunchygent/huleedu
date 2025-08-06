@@ -129,7 +129,9 @@ class AssociationTimeoutMonitor:
             try:
                 # Find associations pending for more than 24 hours
                 # Use timezone-naive datetime to match database schema (TIMESTAMP WITHOUT TIME ZONE)
-                timeout_threshold = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=TIMEOUT_HOURS)
+                timeout_threshold = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+                    hours=TIMEOUT_HOURS
+                )
 
                 stmt = (
                     select(EssayStudentAssociation)

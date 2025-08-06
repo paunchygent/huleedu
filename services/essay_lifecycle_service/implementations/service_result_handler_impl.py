@@ -135,7 +135,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 )
 
             # Attempt state transition
-            if state_machine.trigger(trigger):
+            if state_machine.trigger_event(trigger):
                 # START UNIT OF WORK
                 async with self.session_factory() as session:
                     async with session.begin():
@@ -308,7 +308,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         )
 
                         # Attempt state transition
-                        if state_machine.trigger(EVT_CJ_ASSESSMENT_SUCCEEDED):
+                        if state_machine.trigger_event(EVT_CJ_ASSESSMENT_SUCCEEDED):
                             # Preserve existing commanded_phases metadata
                             existing_commanded_phases = essay_state.processing_metadata.get(
                                 "commanded_phases", []
@@ -497,7 +497,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         )
 
                         # Attempt state transition
-                        if state_machine.trigger(EVT_CJ_ASSESSMENT_FAILED):
+                        if state_machine.trigger_event(EVT_CJ_ASSESSMENT_FAILED):
                             await self.repository.update_essay_status_via_machine(
                                 essay_state.essay_id,
                                 state_machine.current_status,

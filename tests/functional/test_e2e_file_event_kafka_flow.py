@@ -305,18 +305,50 @@ class TestEndToEndFileEventKafkaFlow:
         test_batch_id = await self.create_batch_via_bos(http_session, test_user_id)
         print(f"✓ Batch created: {test_batch_id}")
 
-        # First upload a file
+        # First upload a file and capture the file_upload_id from Kafka event
         print("\nUploading file to delete...")
         upload_result = await self.upload_file_to_batch(
             http_session, test_batch_id, test_user_id, "file_to_delete.pdf"
         )
-        file_upload_id = upload_result.get("file_upload_id")
-        if not file_upload_id:
-            raise Exception("No file_upload_id in upload result")
-        print(f"✓ File uploaded: {file_upload_id}")
+        print(f"✓ File upload accepted: {upload_result['message']}")
 
-        # Wait a bit for upload event to process
-        await asyncio.sleep(2)
+        # Wait for upload event and extract file_upload_id from Kafka
+        upload_kafka_messages = []
+        
+        async def collect_upload_kafka_messages():
+            try:
+                async for msg in kafka_consumer:
+                    if msg.topic == "huleedu.file.batch.file.added.v1":
+                        envelope = msg.value
+                        event_data = envelope.get("data", {})
+                        if event_data.get("batch_id") == test_batch_id:
+                            print("✓ Upload Kafka message received")
+                            upload_kafka_messages.append(msg)
+                            break
+            except asyncio.CancelledError:
+                pass
+
+        upload_kafka_task = asyncio.create_task(collect_upload_kafka_messages())
+        await asyncio.sleep(5)  # Wait for event propagation
+        upload_kafka_task.cancel()
+        
+        try:
+            await upload_kafka_task
+        except asyncio.CancelledError:
+            pass
+
+        # Extract file_upload_id from Kafka event
+        if not upload_kafka_messages:
+            raise Exception("No upload Kafka message received")
+            
+        envelope = upload_kafka_messages[0].value
+        event_data = envelope.get("data", {})
+        file_upload_id = event_data.get("file_upload_id")
+        
+        if not file_upload_id:
+            raise Exception("No file_upload_id in Kafka event")
+            
+        print(f"✓ File uploaded with ID: {file_upload_id}")
 
         # Subscribe to Redis with proper channel format and confirmation
         pubsub = redis_client.pubsub()

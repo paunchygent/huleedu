@@ -117,7 +117,7 @@ class TestTimeoutMonitorAssociationProcessing:
     ) -> None:
         """Test that associations under 24 hours are not processed."""
         # Create association at 23 hours old
-        association = self.create_mock_association(hours_old=23)
+        self.create_mock_association(hours_old=23)
 
         # Set up query to return empty (no associations meet criteria)
         mock_result = MagicMock()
@@ -322,14 +322,10 @@ class TestTimeoutMonitorAssociationProcessing:
 
         # Create mixed confidence associations
         high_conf_assoc = self.create_mock_association(
-            batch_id=batch_id,
-            class_id=class_id,
-            confidence_score=0.9
+            batch_id=batch_id, class_id=class_id, confidence_score=0.9
         )
         low_conf_assoc = self.create_mock_association(
-            batch_id=batch_id,
-            class_id=class_id,
-            confidence_score=0.4
+            batch_id=batch_id, class_id=class_id, confidence_score=0.4
         )
 
         # Create existing UNKNOWN student that will be used for low confidence
@@ -340,7 +336,8 @@ class TestTimeoutMonitorAssociationProcessing:
         # First query: get associations
         mock_result_1 = MagicMock()
         mock_result_1.unique.return_value.scalars.return_value.all.return_value = [
-            high_conf_assoc, low_conf_assoc
+            high_conf_assoc,
+            low_conf_assoc,
         ]
 
         # Second query: check for UNKNOWN student (found existing)
@@ -377,9 +374,15 @@ class TestTimeoutMonitorAssociationProcessing:
 
         # Create multiple associations
         associations = [
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.8),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.9),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.3),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.8
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.9
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.3
+            ),
         ]
 
         # Create existing UNKNOWN student that will be used for low confidence

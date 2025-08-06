@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:d215a8aa36c7f0b2266cd71d68c4acdd02cb48dd953fa79378b2cd8c551ec3f5"
+content_hash = "sha256:4df69b08a3d90e15fd5a1df33679fdf47dd2dedaf06735a116308d8975b06d97"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -134,6 +134,20 @@ files = [
     {file = "aiokafka-0.12.0-cp313-cp313-win32.whl", hash = "sha256:63875fed922c8c7cf470d9b2a82e1b76b4a1baf2ae62e07486cf516fd09ff8f2"},
     {file = "aiokafka-0.12.0-cp313-cp313-win_amd64.whl", hash = "sha256:bdc0a83eb386d2384325d6571f8ef65b4cfa205f8d1c16d7863e8d10cacd995a"},
     {file = "aiokafka-0.12.0.tar.gz", hash = "sha256:62423895b866f95b5ed8d88335295a37cc5403af64cb7cb0e234f88adc2dff94"},
+]
+
+[[package]]
+name = "aioresponses"
+version = "0.7.8"
+summary = "Mock out requests made by ClientSession from aiohttp package"
+groups = ["dev"]
+dependencies = [
+    "aiohttp<4.0.0,>=3.3.0",
+    "packaging>=22.0",
+]
+files = [
+    {file = "aioresponses-0.7.8-py2.py3-none-any.whl", hash = "sha256:b73bd4400d978855e55004b23a3a84cb0f018183bcf066a85ad392800b5b9a94"},
+    {file = "aioresponses-0.7.8.tar.gz", hash = "sha256:b861cdfe5dc58f3b8afac7b0a6973d5d7b2cb608dd0f6253d16b8ee8eaf6df11"},
 ]
 
 [[package]]
@@ -630,6 +644,7 @@ summary = "Code coverage measurement for Python"
 groups = ["monorepo-tools"]
 dependencies = [
     "coverage==7.10.2",
+    "coverage==7.10.2",
     "tomli; python_full_version <= \"3.11.0a6\"",
 ]
 files = [
@@ -782,6 +797,7 @@ requires_python = ">=3.10"
 summary = "Cute DI framework with scopes and agreeable API"
 groups = ["dev"]
 dependencies = [
+    "dishka==1.6.0",
     "dishka==1.6.0",
 ]
 files = [
@@ -1073,6 +1089,7 @@ requires_python = ">=3.7"
 summary = "Google API client core library"
 groups = ["dev"]
 dependencies = [
+    "google-api-core==2.25.1",
     "google-api-core==2.25.1",
     "grpcio-status<2.0.0,>=1.33.2",
     "grpcio-status<2.0.0,>=1.49.1; python_version >= \"3.11\"",
@@ -2590,6 +2607,7 @@ groups = ["dev"]
 dependencies = [
     "bcrypt>=3.1.0",
     "passlib==1.7.4",
+    "passlib==1.7.4",
 ]
 files = [
     {file = "passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1"},
@@ -3024,6 +3042,7 @@ groups = ["dev"]
 dependencies = [
     "email-validator>=2.0.0",
     "pydantic==2.11.7",
+    "pydantic==2.11.7",
 ]
 files = [
     {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
@@ -3261,6 +3280,7 @@ groups = ["dev"]
 dependencies = [
     "cryptography>=3.4.0",
     "python-jose==3.5.0",
+    "python-jose==3.5.0",
 ]
 files = [
     {file = "python_jose-3.5.0-py2.py3-none-any.whl", hash = "sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771"},
@@ -3471,6 +3491,7 @@ summary = "Python client for Redis database and key-value store"
 groups = ["dev"]
 dependencies = [
     "hiredis>=3.2.0",
+    "redis==6.2.0",
     "redis==6.2.0",
 ]
 files = [
@@ -3718,6 +3739,7 @@ groups = ["dev"]
 dependencies = [
     "greenlet>=1",
     "sqlalchemy==2.0.42",
+    "sqlalchemy==2.0.42",
 ]
 files = [
     {file = "sqlalchemy-2.0.42-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:c34100c0b7ea31fbc113c124bcf93a53094f8951c7bf39c45f39d327bad6d1e7"},
@@ -3815,6 +3837,7 @@ summary = "Python library for throwaway instances of anything that can run in a 
 groups = ["monorepo-tools"]
 dependencies = [
     "redis",
+    "testcontainers==4.12.0",
     "testcontainers==4.12.0",
 ]
 files = [
@@ -3946,6 +3969,7 @@ dependencies = [
     "httptools>=0.6.3",
     "python-dotenv>=0.13",
     "pyyaml>=5.1",
+    "uvicorn==0.35.0",
     "uvicorn==0.35.0",
     "uvloop>=0.15.1; (sys_platform != \"cygwin\" and sys_platform != \"win32\") and platform_python_implementation != \"PyPy\"",
     "watchfiles>=0.13",

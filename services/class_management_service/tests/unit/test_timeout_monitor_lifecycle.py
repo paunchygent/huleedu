@@ -69,9 +69,7 @@ class TestTimeoutMonitorLifecycle:
         )
 
     @pytest.mark.asyncio
-    async def test_start_monitor_success(
-        self, timeout_monitor: AssociationTimeoutMonitor
-    ) -> None:
+    async def test_start_monitor_success(self, timeout_monitor: AssociationTimeoutMonitor) -> None:
         """Test that monitor starts successfully and creates background task."""
         # Verify initial state
         assert not timeout_monitor._running
@@ -109,9 +107,7 @@ class TestTimeoutMonitorLifecycle:
         await timeout_monitor.stop()
 
     @pytest.mark.asyncio
-    async def test_stop_monitor_success(
-        self, timeout_monitor: AssociationTimeoutMonitor
-    ) -> None:
+    async def test_stop_monitor_success(self, timeout_monitor: AssociationTimeoutMonitor) -> None:
         """Test that monitor stops cleanly."""
         # Start monitor
         await timeout_monitor.start()
@@ -182,7 +178,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_sleep
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete
@@ -206,6 +205,7 @@ class TestTimeoutMonitorLifecycle:
 
         # Configure mock sleep to stop monitor after second call (allowing for error recovery)
         call_count = 0
+
         async def stop_after_two_sleeps(*args: object) -> None:
             nonlocal call_count
             call_count += 1
@@ -215,7 +215,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_two_sleeps
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete
@@ -263,7 +266,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_sleep
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete
@@ -327,7 +333,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_sleep
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete
@@ -343,6 +352,7 @@ class TestTimeoutMonitorLifecycle:
         self, timeout_monitor: AssociationTimeoutMonitor, mock_sleep: AsyncMock
     ) -> None:
         """Test that monitor calls sleep with correct interval."""
+
         # Configure mock sleep to stop monitor after first call
         async def stop_after_sleep(seconds: float) -> None:
             # Verify the correct sleep interval is used
@@ -352,7 +362,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_sleep
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete
@@ -402,7 +415,10 @@ class TestTimeoutMonitorLifecycle:
         mock_sleep.side_effect = stop_after_sleep
 
         # Start monitor with mocked sleep
-        with patch('services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep', mock_sleep):
+        with patch(
+            "services.class_management_service.implementations.association_timeout_monitor.asyncio.sleep",
+            mock_sleep,
+        ):
             await timeout_monitor.start()
 
             # Wait for monitor task to complete

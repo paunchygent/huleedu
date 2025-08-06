@@ -268,39 +268,311 @@ class EssayStateMachine:
 
 ### 4. Configuration and Architecture Issues
 
-#### 4.1 No Parallel Processing Configuration
+#### 4.1 Parallel Processing for Spellchecker Service [COMPREHENSIVE PLAN]
 
 **Problem Description:**
-Services lack configuration options for parallel processing limits, batch sizes, or concurrency controls.
+The spellchecker service processes words sequentially, with individual word corrections taking 100-477ms. For a batch of 27 essays, this creates significant blocking time. While L2 dictionary caching has been implemented (✅ COMPLETED), the core spell checking algorithm still blocks the event loop during PySpellChecker corrections.
 
-**Affected Files:**
-```
-services/spellchecker_service/config.py:
-- Missing: PARALLEL_WORD_LIMIT, BATCH_SIZE, MAX_CONCURRENT_CORRECTIONS
+**Current Bottleneck:**
+```python
+# services/spellchecker_service/core_logic.py:490
+for token_text in tokens:
+    if word_pattern.fullmatch(token_text):
+        if original_word in misspelled_words:
+            # SYNCHRONOUS CALL - blocks event loop for 100-477ms
+            corrected_word = spell_checker.correction(original_word.lower())
 ```
 
-**Recommended Addition:**
+**Architectural Analysis:**
+- **GIL Consideration**: PySpellChecker uses C extensions that release GIL, making true parallelism achievable
+- **Memory Impact**: ~50-100MB additional for thread pool and word batches
+- **Complexity**: HIGH - requires careful async orchestration and error handling
+- **Expected Performance Gain**: 50-70% reduction in spellcheck phase (from current ~35s to 10-15s)
+
+**DETAILED IMPLEMENTATION PLAN:**
+
+##### Step 1: Configuration Layer (2 hours)
+**File:** `services/spellchecker_service/config.py`
+
 ```python
 class Settings(BaseSettings):
     # ... existing settings ...
     
     # Parallel Processing Configuration
-    SPELLCHECK_BATCH_SIZE: int = Field(
-        default=100, 
-        description="Number of words to process in parallel"
-    )
-    MAX_CONCURRENT_CORRECTIONS: int = Field(
-        default=10,
-        description="Maximum concurrent spell corrections"
-    )
     ENABLE_PARALLEL_PROCESSING: bool = Field(
         default=True,
         description="Enable parallel word processing"
     )
+    SPELLCHECK_BATCH_SIZE: int = Field(
+        default=100,
+        description="Number of words to process in parallel batch"
+    )
+    MAX_CONCURRENT_CORRECTIONS: int = Field(
+        default=10,
+        description="Maximum concurrent spell corrections (semaphore limit)"
+    )
+    PARALLEL_TIMEOUT_SECONDS: float = Field(
+        default=5.0,
+        description="Timeout per word correction in seconds"
+    )
+    PARALLEL_PROCESSING_MIN_WORDS: int = Field(
+        default=5,
+        description="Minimum words to trigger parallel processing"
+    )
 ```
 
-**Priority:** MEDIUM  
-**Effort Estimate:** 1 day
+##### Step 2: Parallel Correction Engine (6-8 hours)
+**File:** `services/spellchecker_service/core_logic.py` (new function)
+
+```python
+async def parallel_correct_words(
+    words_with_indices: list[tuple[int, str, int]],  # (token_idx, word, optimal_distance)
+    spell_checker_d1: Any,  # Cached SpellChecker instance (distance=1)
+    spell_checker_d2: Any,  # Cached SpellChecker instance (distance=2)
+    max_concurrent: int,
+    timeout_seconds: float,
+    essay_id: str | None = None,
+) -> dict[int, tuple[str, float]]:  # Returns {token_idx: (corrected_word, time_taken)}
+    """
+    Correct multiple words in parallel using thread pool executor.
+    
+    Uses asyncio.to_thread() to run CPU-intensive corrections in thread pool,
+    releasing GIL and achieving true parallelism with PySpellChecker's C extensions.
+    """
+    import time
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def correct_single_word(
+        token_idx: int, 
+        word: str, 
+        optimal_distance: int
+    ) -> tuple[int, str, float]:
+        """Correct a single word with timeout and error handling."""
+        async with semaphore:
+            start_time = time.time()
+            try:
+                # Select appropriate spell checker based on distance
+                spell_checker = spell_checker_d1 if optimal_distance == 1 else spell_checker_d2
+                
+                # Run correction in thread pool with timeout
+                corrected = await asyncio.wait_for(
+                    asyncio.to_thread(spell_checker.correction, word.lower()),
+                    timeout=timeout_seconds
+                )
+                
+                time_taken = time.time() - start_time
+                
+                if time_taken > 0.1:  # Log slow corrections
+                    logger.warning(
+                        f"Essay {essay_id}: Slow parallel correction: '{word}' -> "
+                        f"'{corrected}' took {time_taken:.3f}s (distance={optimal_distance})",
+                        extra={
+                            "essay_id": essay_id,
+                            "word": word,
+                            "correction_time_seconds": time_taken,
+                            "edit_distance": optimal_distance,
+                        }
+                    )
+                
+                return (token_idx, corrected or word, time_taken)
+                
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"Essay {essay_id}: Timeout correcting '{word}' after {timeout_seconds}s",
+                    extra={"essay_id": essay_id, "word": word, "timeout_seconds": timeout_seconds}
+                )
+                return (token_idx, word, timeout_seconds)  # Return original on timeout
+                
+            except Exception as e:
+                logger.error(
+                    f"Essay {essay_id}: Error correcting '{word}': {e}",
+                    exc_info=True,
+                    extra={"essay_id": essay_id, "word": word}
+                )
+                return (token_idx, word, 0.0)  # Return original on error
+    
+    # Create correction tasks for all words
+    tasks = [
+        correct_single_word(idx, word, distance)
+        for idx, word, distance in words_with_indices
+    ]
+    
+    # Execute all corrections concurrently
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Process results and handle exceptions
+    corrections = {}
+    for result in results:
+        if isinstance(result, tuple) and len(result) == 3:
+            token_idx, corrected_word, time_taken = result
+            corrections[token_idx] = (corrected_word, time_taken)
+        elif isinstance(result, Exception):
+            logger.error(f"Essay {essay_id}: Task exception: {result}", exc_info=result)
+    
+    return corrections
+```
+
+##### Step 3: Algorithm Refactoring (4-6 hours)
+**File:** `services/spellchecker_service/core_logic.py` (modify lines 474-549)
+
+Replace the sequential correction loop with:
+
+```python
+# Prepare words for correction with their optimal distances
+words_to_correct = []
+for i, token_text in enumerate(tokens):
+    if word_pattern.fullmatch(token_text):
+        original_word = words_to_check[word_idx_counter]
+        if original_word in misspelled_words:
+            optimal_distance = get_adaptive_edit_distance(original_word)
+            words_to_correct.append((i, original_word, optimal_distance))
+        word_idx_counter += 1
+
+# Decision: Parallel vs Sequential Processing
+use_parallel = (
+    settings.ENABLE_PARALLEL_PROCESSING and
+    len(words_to_correct) >= settings.PARALLEL_PROCESSING_MIN_WORDS
+)
+
+if use_parallel:
+    logger.info(
+        f"{log_prefix}Using parallel processing for {len(words_to_correct)} words",
+        extra={**log_extra, "words_to_correct": len(words_to_correct)}
+    )
+    
+    # Process in batches if necessary
+    all_corrections = {}
+    for batch_start in range(0, len(words_to_correct), settings.SPELLCHECK_BATCH_SIZE):
+        batch_end = min(batch_start + settings.SPELLCHECK_BATCH_SIZE, len(words_to_correct))
+        batch = words_to_correct[batch_start:batch_end]
+        
+        logger.debug(
+            f"{log_prefix}Processing batch {batch_start//settings.SPELLCHECK_BATCH_SIZE + 1}, "
+            f"words {batch_start}-{batch_end}",
+            extra={**log_extra, "batch_size": len(batch)}
+        )
+        
+        batch_corrections = await parallel_correct_words(
+            batch,
+            _spellchecker_cache[cache_key_d1],
+            _spellchecker_cache[cache_key_d2],
+            settings.MAX_CONCURRENT_CORRECTIONS,
+            settings.PARALLEL_TIMEOUT_SECONDS,
+            essay_id,
+        )
+        all_corrections.update(batch_corrections)
+    
+    # Apply corrections to tokens
+    correction_times = []
+    for token_idx, (corrected_word, time_taken) in all_corrections.items():
+        original_word = tokens[token_idx]
+        # Preserve case logic here...
+        final_corrected_tokens[token_idx] = apply_case_preservation(corrected_word, original_word)
+        correction_times.append(time_taken)
+        
+else:
+    # Fallback to sequential processing (existing code)
+    logger.info(
+        f"{log_prefix}Using sequential processing for {len(words_to_correct)} words",
+        extra={**log_extra, "words_to_correct": len(words_to_correct)}
+    )
+    # ... existing sequential correction code ...
+```
+
+##### Step 4: Metrics and Monitoring (2-3 hours)
+**File:** `services/spellchecker_service/metrics.py` (new metrics)
+
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Parallel processing metrics
+parallel_corrections_total = Counter(
+    'spellchecker_parallel_corrections_total',
+    'Total number of parallel spell corrections',
+    ['status']  # success, timeout, error
+)
+
+parallel_batch_size = Histogram(
+    'spellchecker_parallel_batch_size',
+    'Size of parallel correction batches',
+    buckets=[1, 5, 10, 25, 50, 100, 200, 500]
+)
+
+parallel_correction_duration = Histogram(
+    'spellchecker_parallel_correction_duration_seconds',
+    'Time taken for parallel word corrections',
+    buckets=[0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0]
+)
+
+concurrent_corrections_gauge = Gauge(
+    'spellchecker_concurrent_corrections_active',
+    'Number of corrections currently being processed'
+)
+```
+
+##### Step 5: Testing Strategy (4-6 hours)
+
+**Unit Tests:**
+```python
+# tests/test_parallel_corrections.py
+async def test_parallel_correction_basic():
+    """Test basic parallel correction functionality."""
+    
+async def test_parallel_correction_timeout_handling():
+    """Test that timeouts are handled gracefully."""
+    
+async def test_parallel_correction_error_recovery():
+    """Test error handling in parallel corrections."""
+    
+async def test_parallel_vs_sequential_consistency():
+    """Verify parallel and sequential produce same results."""
+    
+async def test_parallel_batch_processing():
+    """Test batch size limits and processing."""
+```
+
+**Integration Tests:**
+```python
+# tests/integration/test_parallel_performance.py
+async def test_parallel_performance_improvement():
+    """Verify parallel processing improves performance."""
+    
+async def test_parallel_memory_usage():
+    """Monitor memory usage during parallel processing."""
+    
+async def test_parallel_with_various_configurations():
+    """Test different configuration combinations."""
+```
+
+**Load Tests:**
+- Process 100 essays concurrently
+- Monitor resource usage
+- Verify no memory leaks
+- Check timeout rates
+
+##### Step 6: Rollout Strategy
+
+1. **Feature Flag Control**: Use `ENABLE_PARALLEL_PROCESSING` to control rollout
+2. **Gradual Rollout**:
+   - Start with `MAX_CONCURRENT_CORRECTIONS=2` in staging
+   - Monitor metrics for 24 hours
+   - Gradually increase to 5, then 10
+3. **Rollback Plan**: Set `ENABLE_PARALLEL_PROCESSING=False` to revert immediately
+
+**Priority:** HIGH (after async foundation is solid)  
+**Total Effort Estimate:** 20-29 hours (3-4 days of focused development)
+
+**Risk Assessment:**
+- **Complexity Risk**: HIGH - Async orchestration is complex
+- **Performance Risk**: LOW - Feature flag allows instant rollback
+- **Memory Risk**: MEDIUM - Needs monitoring for thread pool growth
+- **Debugging Risk**: MEDIUM - Parallel execution harder to debug
+
+**Prerequisites for Implementation:**
+1. ✅ L2 Dictionary Caching (COMPLETED)
+2. Comprehensive understanding of asyncio patterns
+3. Load testing environment setup
+4. Monitoring infrastructure ready
 
 ## Implementation Roadmap
 

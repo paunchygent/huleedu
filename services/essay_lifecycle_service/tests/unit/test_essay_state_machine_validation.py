@@ -38,7 +38,7 @@ class TestEssayStateMachineInvalidTransitions:
         ]
 
         for trigger in invalid_triggers:
-            success = machine.trigger(trigger)
+            success = machine.trigger_event(trigger)
             assert success is False
             # Status should remain unchanged
             assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
@@ -56,7 +56,7 @@ class TestEssayStateMachineInvalidTransitions:
         ]
 
         for trigger in invalid_triggers:
-            success = machine.trigger(trigger)
+            success = machine.trigger_event(trigger)
             assert success is False
             assert machine.current_status == EssayStatus.ALL_PROCESSING_COMPLETED
 
@@ -64,7 +64,7 @@ class TestEssayStateMachineInvalidTransitions:
         """Test handling of non-existent triggers."""
         machine = EssayStateMachine("nonexistent", EssayStatus.READY_FOR_PROCESSING)
 
-        success = machine.trigger("INVALID_TRIGGER_FOR_STATE")
+        success = machine.trigger_event("INVALID_TRIGGER_FOR_STATE")
         assert success is False
         assert machine.current_status == EssayStatus.READY_FOR_PROCESSING
 
@@ -99,7 +99,7 @@ class TestEssayStateMachineCanTrigger:
         assert machine.can_trigger(EVT_SPELLCHECK_STARTED) is False
 
         # After initiating spellcheck
-        machine.trigger(CMD_INITIATE_SPELLCHECK)
+        machine.trigger_event(CMD_INITIATE_SPELLCHECK)
         assert machine.can_trigger(CMD_INITIATE_SPELLCHECK) is False
         assert machine.can_trigger(EVT_SPELLCHECK_STARTED) is True
 

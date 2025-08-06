@@ -86,7 +86,7 @@ class SpellcheckCommandHandler:
                         )
 
                         # Attempt to trigger the transition for initiating spellcheck
-                        if essay_machine.trigger(CMD_INITIATE_SPELLCHECK):
+                        if essay_machine.trigger_event(CMD_INITIATE_SPELLCHECK):
                             # Persist the new state from the machine
                             await self.repository.update_essay_status_via_machine(
                                 essay_id,
@@ -177,7 +177,7 @@ class SpellcheckCommandHandler:
                                         initial_status=essay_state_model.current_status,
                                     )
 
-                                    if essay_machine.trigger(EVT_SPELLCHECK_STARTED):
+                                    if essay_machine.trigger_event(EVT_SPELLCHECK_STARTED):
                                         await self.repository.update_essay_status_via_machine(
                                             essay_ref.essay_id,
                                             essay_machine.current_status,

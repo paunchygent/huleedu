@@ -24,6 +24,7 @@ from services.spellchecker_service.protocols import (
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
 )
+from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
@@ -66,6 +67,8 @@ class TestEventContractCompliance:
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,
             http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
         # Act - Process message using real spell checking with NEW signature
@@ -136,6 +139,8 @@ class TestEventContractCompliance:
         real_spell_logic = DefaultSpellLogic(
             result_store=mock_result_store,
             http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
         )
 
         # Act - Process message using real spell checking with NEW signature

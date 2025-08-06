@@ -208,7 +208,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
         existing_associations = await self.repo.get_batch_student_associations(batch_id)
         if not existing_associations:
             raise ValueError(f"No associations found for batch {batch_id}")
-        
+
         # All associations for a batch belong to the same class, so get class_id from the first one
         class_id = str(existing_associations[0].class_id)
 

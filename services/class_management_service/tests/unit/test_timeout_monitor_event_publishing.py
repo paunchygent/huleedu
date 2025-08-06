@@ -362,12 +362,20 @@ class TestTimeoutMonitorEventPublishing:
 
         # Act - call twice to verify different correlation IDs
         await timeout_monitor._check_and_process_timeouts()
-        first_correlation_id = mock_event_publisher.publish_student_associations_confirmed.call_args.kwargs["correlation_id"]
+        first_correlation_id = (
+            mock_event_publisher.publish_student_associations_confirmed.call_args.kwargs[
+                "correlation_id"
+            ]
+        )
 
         # Reset and call again
         mock_event_publisher.reset_mock()
         await timeout_monitor._check_and_process_timeouts()
-        second_correlation_id = mock_event_publisher.publish_student_associations_confirmed.call_args.kwargs["correlation_id"]
+        second_correlation_id = (
+            mock_event_publisher.publish_student_associations_confirmed.call_args.kwargs[
+                "correlation_id"
+            ]
+        )
 
         # Assert different correlation IDs generated
         assert first_correlation_id != second_correlation_id
@@ -440,11 +448,21 @@ class TestTimeoutMonitorEventPublishing:
 
         # Create batch with 5 associations - 2 high confidence, 3 low confidence
         associations = [
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.9),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.8),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.5),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.3),
-            self.create_mock_association(batch_id=batch_id, class_id=class_id, confidence_score=0.1),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.9
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.8
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.5
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.3
+            ),
+            self.create_mock_association(
+                batch_id=batch_id, class_id=class_id, confidence_score=0.1
+            ),
         ]
 
         # Mock UNKNOWN student for low confidence associations

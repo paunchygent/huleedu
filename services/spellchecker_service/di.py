@@ -34,13 +34,21 @@ from services.spellchecker_service.implementations.spell_logic_impl import (
 from services.spellchecker_service.implementations.spell_repository_postgres_impl import (
     PostgreSQLSpellcheckRepository,
 )
+from services.spellchecker_service.implementations.whitelist_impl import (
+    DefaultWhitelist,
+)
+from services.spellchecker_service.implementations.parallel_processor_impl import (
+    DefaultParallelProcessor,
+)
 from services.spellchecker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spellchecker_service.metrics import setup_spell_checker_database_monitoring
 from services.spellchecker_service.protocols import (
     ContentClientProtocol,
+    ParallelProcessorProtocol,
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
+    WhitelistProtocol,
 )
 from services.spellchecker_service.repository_protocol import SpellcheckRepositoryProtocol
 
@@ -71,6 +79,16 @@ class SpellCheckerServiceProvider(Provider):
         from opentelemetry import trace
 
         return trace.get_tracer("spellchecker_service")
+
+    @provide(scope=Scope.APP)
+    def provide_whitelist(self, settings: Settings) -> WhitelistProtocol:
+        """Provide whitelist for spell checking (loaded once at startup)."""
+        return DefaultWhitelist(settings)
+
+    @provide(scope=Scope.APP)
+    def provide_parallel_processor(self) -> ParallelProcessorProtocol:
+        """Provide parallel processor for word corrections."""
+        return DefaultParallelProcessor()
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
@@ -174,14 +192,20 @@ class SpellCheckerServiceProvider(Provider):
         self,
         result_store: ResultStoreProtocol,
         http_session: ClientSession,
+        whitelist: WhitelistProtocol,
+        parallel_processor: ParallelProcessorProtocol,
     ) -> SpellLogicProtocol:
         """Provide spell logic implementation."""
-        return DefaultSpellLogic(result_store=result_store, http_session=http_session)
+        return DefaultSpellLogic(
+            result_store=result_store,
+            http_session=http_session,
+            whitelist=whitelist,
+            parallel_processor=parallel_processor,
+        )
 
     @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(
         self,
-        settings: Settings,
     ) -> SpellcheckEventPublisherProtocol:
         """Provide spellcheck event publisher implementation."""
         return DefaultSpellcheckEventPublisher(
