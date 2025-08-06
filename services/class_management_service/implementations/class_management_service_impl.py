@@ -78,7 +78,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             data=event_data,
         )
         await self.event_publisher.publish_class_event(envelope)
-        
+
         # Also project to teacher notification if projector is available
         if self.notification_projector:
             await self.notification_projector.handle_class_created(event_data)
@@ -140,7 +140,7 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             data=event_data,
         )
         await self.event_publisher.publish_class_event(envelope)
-        
+
         # Also project to teacher notification if projector is available
         if self.notification_projector:
             await self.notification_projector.handle_student_created(event_data)

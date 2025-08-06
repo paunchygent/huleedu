@@ -22,7 +22,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Add the new enum value to batch_status_enum
     op.execute(
-        "ALTER TYPE batch_status_enum ADD VALUE IF NOT EXISTS 'student_validation_completed' AFTER 'awaiting_student_validation'"
+        "ALTER TYPE batch_status_enum ADD VALUE IF NOT EXISTS "
+        "'student_validation_completed' AFTER 'awaiting_student_validation'"
     )
 
 

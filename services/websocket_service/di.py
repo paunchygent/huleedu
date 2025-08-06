@@ -8,19 +8,19 @@ from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import REGISTRY, CollectorRegistry
 
 from services.websocket_service.config import Settings, settings
-from services.websocket_service.implementations.file_event_consumer import FileEventConsumer
-from services.websocket_service.implementations.file_notification_handler import (
-    FileNotificationHandler,
-)
 from services.websocket_service.implementations.jwt_validator import JWTValidator
 from services.websocket_service.implementations.message_listener import RedisMessageListener
+from services.websocket_service.implementations.notification_event_consumer import (
+    NotificationEventConsumer,
+)
+from services.websocket_service.implementations.notification_handler import NotificationHandler
 from services.websocket_service.implementations.websocket_manager import WebSocketManager
 from services.websocket_service.metrics import WebSocketMetrics
 from services.websocket_service.protocols import (
-    FileEventConsumerProtocol,
-    FileNotificationHandlerProtocol,
     JWTValidatorProtocol,
     MessageListenerProtocol,
+    NotificationEventConsumerProtocol,
+    NotificationHandlerProtocol,
     WebSocketManagerProtocol,
 )
 
@@ -82,21 +82,21 @@ class WebSocketServiceProvider(Provider):
         return WebSocketMetrics(registry=registry)
 
     @provide(scope=Scope.APP)
-    def provide_file_notification_handler(
+    def provide_notification_handler(
         self, redis_client: AtomicRedisClientProtocol
-    ) -> FileNotificationHandlerProtocol:
-        """Provide file notification handler."""
-        return FileNotificationHandler(redis_client=redis_client)
+    ) -> NotificationHandlerProtocol:
+        """Provide teacher notification handler."""
+        return NotificationHandler(redis_client=redis_client)
 
     @provide(scope=Scope.APP)
-    def provide_file_event_consumer(
+    def provide_notification_event_consumer(
         self,
         config: Settings,
-        notification_handler: FileNotificationHandlerProtocol,
+        notification_handler: NotificationHandlerProtocol,
         redis_client: AtomicRedisClientProtocol,
-    ) -> FileEventConsumerProtocol:
-        """Provide file event consumer for Kafka consumption."""
-        return FileEventConsumer(
+    ) -> NotificationEventConsumerProtocol:
+        """Provide teacher notification event consumer for Kafka consumption."""
+        return NotificationEventConsumer(
             settings=config,
             notification_handler=notification_handler,
             redis_client=redis_client,

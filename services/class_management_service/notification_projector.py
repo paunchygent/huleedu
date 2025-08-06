@@ -6,7 +6,6 @@ Projects internal class management events to teacher notifications.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
 from uuid import uuid4
 
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -67,11 +66,12 @@ class NotificationProjector:
         if not event.class_ids:
             logger.warning(f"No class IDs for student creation: {event.student_id}")
             return
-            
+
         # Use the first class_id from the list
         from uuid import UUID
+
         class_id = UUID(event.class_ids[0])
-        
+
         # Need to fetch class to get teacher_id
         class_entity = await self.class_repository.get_class_by_id(class_id)
         if not class_entity:
@@ -88,7 +88,10 @@ class NotificationProjector:
                 "student_name": f"{event.first_name} {event.last_name}",
                 "class_id": str(class_id),
                 "class_designation": class_entity.class_designation,
-                "message": f"Student '{event.first_name} {event.last_name}' added to class '{class_entity.class_designation}'",
+                "message": (
+                    f"Student '{event.first_name} {event.last_name}' "
+                    f"added to class '{class_entity.class_designation}'"
+                ),
             },
             action_required=False,
             correlation_id=str(event.event_id) if hasattr(event, "event_id") else event.student_id,
@@ -112,7 +115,10 @@ class NotificationProjector:
                 "batch_id": event.batch_id,
                 "auto_confirmed_count": auto_confirmed_count,
                 "timeout_hours": event.timeout_hours,
-                "message": f"Validation timeout: {auto_confirmed_count} student matches auto-confirmed after {event.timeout_hours} hours",
+                "message": (
+                    f"Validation timeout: {auto_confirmed_count} student matches "
+                    f"auto-confirmed after {event.timeout_hours} hours"
+                ),
                 "auto_confirmed_associations": [
                     {
                         "essay_id": assoc.essay_id,
@@ -134,13 +140,14 @@ class NotificationProjector:
         self, event: StudentAssociationsConfirmedV1
     ) -> None:
         """Project manual student confirmations to teacher notification.
-        
+
         Note: This event doesn't have user_id, so we need to fetch it from the class.
         """
         confirmed_count = len(event.associations)
-        
+
         # Get teacher_id from class
         from uuid import UUID
+
         class_entity = await self.class_repository.get_class_by_id(UUID(event.class_id))
         if not class_entity:
             logger.warning(f"No class found for associations confirmation: {event.class_id}")
@@ -175,7 +182,6 @@ class NotificationProjector:
 
         await self._publish_notification(notification)
 
-
     async def _publish_notification(self, notification: TeacherNotificationRequestedV1) -> None:
         """Publish notification event to Kafka."""
         try:
@@ -192,7 +198,7 @@ class NotificationProjector:
             await self.event_publisher.publish_class_event(envelope)
 
             logger.info(
-                f"Published teacher notification",
+                "Published teacher notification",
                 extra={
                     "teacher_id": notification.teacher_id,
                     "notification_type": notification.notification_type,

@@ -63,7 +63,8 @@ class TestMockRepositoryConstraints:
     async def test_content_idempotency_constraint_with_non_null_storage_id(
         self, mock_repository: MockEssayRepository
     ) -> None:
-        """Test that content idempotency constraint works correctly when text_storage_id is not null."""
+        """Test that content idempotency constraint works correctly when
+        text_storage_id is not null."""
         correlation_id = uuid4()
         batch_id = "constraint-batch"
         text_storage_id = "unique-text-storage"
@@ -160,7 +161,8 @@ class TestMockRepositoryConstraints:
     async def test_partial_constraint_allows_multiple_null_storage_ids(
         self, mock_repository: MockEssayRepository
     ) -> None:
-        """Test that partial constraint correctly allows multiple essays with null text_storage_id in same batch."""
+        """Test that partial constraint correctly allows multiple essays with
+        null text_storage_id in same batch."""
         correlation_id = uuid4()
         batch_id = "null-text-batch"
 
@@ -192,7 +194,8 @@ class TestMockRepositoryConstraints:
     async def test_partial_constraint_handles_mixed_null_and_non_null_values(
         self, mock_repository: MockEssayRepository
     ) -> None:
-        """Test that partial constraint correctly handles mixed NULL and non-NULL text_storage_id values in same batch."""
+        """Test that partial constraint correctly handles mixed NULL and
+        non-NULL text_storage_id values in same batch."""
         correlation_id = uuid4()
         batch_id = "mixed-text-batch"
 
@@ -322,7 +325,7 @@ class TestMockRepositoryConstraints:
             {"essay_id": "unique-essay", "batch_id": "batch-1", "entity_type": "essay"},
         ]
 
-        with pytest.raises(Exception):  # Should raise constraint violation
+        with pytest.raises(ValueError):  # Should raise constraint violation
             await mock_repository.create_essay_records_batch(
                 essay_data=duplicate_essay_data,
                 correlation_id=correlation_id,
@@ -349,7 +352,8 @@ class TestMockRepositoryConstraints:
     async def test_constraint_isolation_ensures_cross_batch_independence(
         self, mock_repository: MockEssayRepository
     ) -> None:
-        """Test that content idempotency constraints maintain proper isolation across different batches."""
+        """Test that content idempotency constraints maintain proper isolation
+        across different batches."""
         correlation_id = uuid4()
 
         # Create essays with same text_storage_id in different batches

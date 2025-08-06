@@ -125,7 +125,7 @@ async def default_perform_spell_check_algorithm(
                 total_corrections += 1
 
                 # Adjust positions for subsequent replacements
-                diff = len(replacement) - len(original)
+                len(replacement) - len(original)
                 for future_match in matches[matches.index(match) + 1 :]:
                     if future_match.start() > start:
                         # This is a hack to adjust the position, but re.Match is immutable
@@ -134,7 +134,8 @@ async def default_perform_spell_check_algorithm(
 
     l2_time = time.time() - l2_start
     logger.info(
-        f"{log_prefix}L2 corrections completed: {len(l2_corrections)} corrections in {l2_time:.3f}s",
+        f"{log_prefix}L2 corrections completed: {len(l2_corrections)} "
+        f"corrections in {l2_time:.3f}s",
         extra={
             **log_extra,
             "l2_corrections_count": len(l2_corrections),

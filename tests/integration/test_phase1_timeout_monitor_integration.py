@@ -90,7 +90,8 @@ class MockEventPublisher:
         correlation_id: UUID,
     ) -> None:
         """Mock implementation that tracks published events."""
-        # Convert dict associations to StudentAssociationConfirmation objects for proper event structure
+        # Convert dict associations to StudentAssociationConfirmation objects
+        # for proper event structure
         association_confirmations = [
             StudentAssociationConfirmation(
                 essay_id=assoc["essay_id"],

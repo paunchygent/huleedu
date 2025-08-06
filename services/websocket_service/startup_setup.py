@@ -22,12 +22,12 @@ except ImportError:
 
 from services.websocket_service.config import settings
 from services.websocket_service.di import WebSocketServiceProvider
-from services.websocket_service.protocols import FileEventConsumerProtocol
+from services.websocket_service.protocols import NotificationEventConsumerProtocol
 
 logger = create_service_logger("websocket.startup")
 
 # Global references for service management
-kafka_consumer_instance: FileEventConsumerProtocol | None = None
+kafka_consumer_instance: NotificationEventConsumerProtocol | None = None
 consumer_task: asyncio.Task | None = None
 
 
@@ -78,7 +78,7 @@ async def start_kafka_consumer(container: Any) -> None:
     try:
         async with container() as request_container:
             # Get Kafka consumer from DI container
-            kafka_consumer_instance = await request_container.get(FileEventConsumerProtocol)
+            kafka_consumer_instance = await request_container.get(NotificationEventConsumerProtocol)
 
             # Start Kafka consumer as background task
             consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())

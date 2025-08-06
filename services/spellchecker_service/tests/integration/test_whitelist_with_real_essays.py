@@ -97,7 +97,7 @@ class TestWhitelistIntegration:
         whitelist_load_time = 2.0  # Approximated from logs
 
         # Track overall statistics with proper typing
-        total_stats: Dict[str, Any] = {
+        {
             "total_essays": len(real_essays),
             "total_l2_corrections": 0,
             "total_whitelist_hits": 0,
@@ -106,7 +106,7 @@ class TestWhitelistIntegration:
             "time_per_essay_without_whitelist": 0.0,
             "whitelisted_words": set(),
         }
-        
+
         # Extract typed variables for mypy
         total_l2_corrections: int = 0
         total_whitelist_hits: int = 0
@@ -153,9 +153,7 @@ class TestWhitelistIntegration:
             essay_count += 1
             total_l2_corrections += essay_stats["l2_corrections"]
             total_whitelist_hits += essay_stats["whitelist_hits"]
-            total_pyspell_corrections += (
-                corrections_with_wl - essay_stats["l2_corrections"]
-            )
+            total_pyspell_corrections += corrections_with_wl - essay_stats["l2_corrections"]
             time_per_essay_with_whitelist += time_with_whitelist
             time_per_essay_without_whitelist += time_without_whitelist
             whitelisted_words.update(essay_stats["whitelisted_words"])
@@ -205,16 +203,14 @@ class TestWhitelistIntegration:
         print(f"  Time WITH whitelist (including 2s load): {scaled_time_with_wl:.1f}s")
         print(f"  Time WITHOUT whitelist: {scaled_time_without_wl:.1f}s")
         print(f"  Total time saved: {scaled_time_without_wl - scaled_time_with_wl:.1f}s")
-        print(
-            f"  Performance improvement: "
-            f"{((scaled_time_without_wl - scaled_time_with_wl) / scaled_time_without_wl * 100):.1f}%"
+        improvement_pct = (
+            (scaled_time_without_wl - scaled_time_with_wl) / scaled_time_without_wl * 100
         )
+        print(f"  Performance improvement: {improvement_pct:.1f}%")
 
         print("\nAccuracy Impact:")
         print(f"  {scaled_whitelist:,} false positive corrections avoided")
-        print(
-            f"  Unique whitelisted words found in sample: {len(whitelisted_words)}"
-        )
+        print(f"  Unique whitelisted words found in sample: {len(whitelisted_words)}")
 
         # Assertions
         assert total_whitelist_hits > 0, (

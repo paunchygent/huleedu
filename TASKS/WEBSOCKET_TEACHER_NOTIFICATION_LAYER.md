@@ -409,37 +409,144 @@ Ensure DI container only provides simplified handlers without internal event dep
 ✅ **Do**: Use single notification event type
 ✅ **Do**: Maintain clear separation of concerns
 
-## PHASE 2: WebSocket Service Refactoring (PENDING)
+## ✅ PHASE 2 COMPLETED: WebSocket Service Refactoring
 
-### Required Changes
+### Implemented Components ✅ COMPLETED
 ```python
-# REMOVE: All internal event handling
-- services/websocket_service/implementations/file_event_consumer.py
-- services/websocket_service/implementations/file_notification_handler.py
-- services/websocket_service/implementations/user_notification_handler.py (if exists)
+# NEW: notification_event_consumer.py
+class NotificationEventConsumer(NotificationEventConsumerProtocol):
+    - Consumes ONLY: topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+    - Idempotent processing with huleedu_service_libs.idempotency_v2
+    - Single handler: handle_teacher_notification()
+    - Graceful Redis failure resilience
 
-# CREATE: Single notification consumer
-services/websocket_service/implementations/notification_event_consumer.py:
-  - Subscribe ONLY to: topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
-  - Single handler: handle_teacher_notification()
-  - Just forward to Redis: publish_user_notification(event.teacher_id, ...)
+# NEW: notification_handler.py  
+class NotificationHandler(NotificationHandlerProtocol):
+    - Pure forwarder: NO business logic, NO authorization
+    - Forwards to Redis: publish_user_notification(event.teacher_id, ...)
+    - Trusts teacher_id from services (trusted boundary)
+    - Structured error handling with observability stack
 ```
 
-### WebSocket Becomes Pure Router
-- NO business logic
-- NO event filtering
-- NO authorization (trusts teacher_id from services)
-- ONLY forwards notifications to correct Redis channel
+### Key Architecture Achievements ✅ COMPLETED
+- **Pure Router**: WebSocket service has NO business logic, NO event filtering  
+- **Single Event Type**: Consumes only `TeacherNotificationRequestedV1` events
+- **Idempotency Protection**: Redis-backed duplicate detection with graceful degradation
+- **Clean Separation**: Internal domain events completely separated from notifications
+
+### Comprehensive Testing ✅ COMPLETED  
+- **59/59 tests passing**: Full WebSocket service test coverage
+- **8 idempotency tests**: Both happy path (Redis working) and resilience path (Redis failures)
+- **Behavioral testing methodology**: Rule 075 compliance - tests outcomes, not implementation details
+- **Integration tests**: End-to-end notification flow from Kafka to Redis
+
+### Lessons Learned ✅ COMPLETED
+1. **Test Behavioral Outcomes**: Verify handler called/not called, not Redis call patterns
+2. **Idempotency Resilience**: System gracefully degrades when Redis fails - continues processing  
+3. **Implementation vs Behavior**: Rule 075 - test actual behavior and side effects, avoid fragile implementation testing
+4. **Architecture Validation**: WebSocket service successfully transformed to pure notification router
 
 ## PHASE 3: Remaining Service Projectors (PENDING)
 
-### File Service (2 notifications)
-- `batch_upload_started` → STANDARD
-- `batch_upload_completed` → HIGH
+## ULTRATHINK: Next Phase Analysis
+
+**Current State**: WebSocket service refactoring complete - pure notification router consuming only `TeacherNotificationRequestedV1` events with comprehensive idempotency testing.
+
+**Next Priority**: Implement notification projectors for remaining services following established Class Management pattern.
+
+**Implementation Order**: File Service → Batch Orchestrator → Result Aggregator → Assessment Services (based on user workflow criticality)
+
+### File Service Projector (NEXT - 2 notifications)
+
+**Priority**: HIGH - File upload feedback is critical for teacher workflow
+
+**Target Notifications**:
+- `batch_files_uploaded` → STANDARD priority (file upload completion)
+- `batch_validation_failed` → IMMEDIATE priority (blocks processing workflow)
+
+**Implementation Pattern** (following Class Management):
+```python
+# services/file_service/notification_projector.py
+class FileServiceNotificationProjector:
+    def __init__(self, kafka_bus: KafkaBusProtocol):
+        self.kafka_bus = kafka_bus
+
+    async def handle_batch_files_uploaded(self, event: BatchFilesUploadedV1) -> None:
+        """Project batch upload completion to teacher notification - STANDARD priority."""
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=event.user_id,  # Direct from file upload event
+            notification_type="batch_files_uploaded",
+            category=WebSocketEventCategory.FILE_MANAGEMENT,
+            priority=NotificationPriority.STANDARD,
+            payload={
+                "batch_id": event.batch_id,
+                "file_count": len(event.files),
+                "upload_status": "completed"
+            },
+            correlation_id=event.correlation_id,
+            batch_id=event.batch_id,
+        )
+        await self.kafka_bus.publish_event(notification)
+
+    async def handle_batch_validation_failed(self, event: BatchValidationFailedV1) -> None:
+        """Project validation failure to teacher notification - IMMEDIATE priority."""
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=event.user_id,  # Direct from validation event
+            notification_type="batch_validation_failed", 
+            category=WebSocketEventCategory.SYSTEM_ALERTS,
+            priority=NotificationPriority.IMMEDIATE,
+            payload={
+                "batch_id": event.batch_id,
+                "validation_errors": event.error_details,
+                "action_required": True
+            },
+            action_required=True,
+            correlation_id=event.correlation_id,
+            batch_id=event.batch_id,
+        )
+        await self.kafka_bus.publish_event(notification)
+```
+
+**Required Investigation**:
+1. File Service domain event structure - verify `user_id` availability in upload/validation events
+2. File Service DI container setup - pattern for injecting notification projector  
+3. File Service event publisher integration points
+4. File Service test patterns for behavioral validation
+
+### File Service Implementation Plan
+
+**Step 1: Domain Event Analysis**
+- Examine `common_core.events.file_management_events` for existing event structure
+- Verify `user_id` field availability in `BatchFileAddedV1`, `BatchFileRemovedV1` events
+- Check validation-related events for error detail structure
+
+**Step 2: Service Architecture Study**  
+- Read `services/file_service/README.md` for service boundaries and responsibilities
+- Analyze `services/file_service/di.py` for dependency injection patterns
+- Study `services/file_service/implementations/` for event publishing integration points
+
+**Step 3: Projector Implementation**
+- Create `services/file_service/notification_projector.py` following Class Management pattern
+- Wire into DI container with `provide_notification_projector()` method
+- Integrate into service implementation for event publishing
+
+**Step 4: Behavioral Testing**
+- Create `services/file_service/tests/unit/test_notification_projector.py`
+- Test notification projection to correct priority levels (STANDARD/IMMEDIATE)
+- Test teacher ID resolution patterns (direct from events vs repository lookup)
+- Edge cases: missing data, publishing errors, validation failure scenarios
+- Follow Rule 075: behavioral outcomes, not implementation details
+
+**Next Session Goals**:
+1. File Service codebase analysis and domain event structure understanding
+2. Notification projector implementation with proper teacher ID resolution
+3. DI integration following established patterns
+4. Comprehensive behavioral test suite creation
+5. Verification of notification flow from File Service through WebSocket to Redis
 
 ### Batch Orchestrator (3 notifications)  
 - `batch_processing_started` → STANDARD
-- `batch_processing_completed` → HIGH
+- `batch_processing_completed` → HIGH  
 - `batch_processing_failed` → IMMEDIATE
 
 ### Result Aggregator (3 notifications)
@@ -448,9 +555,9 @@ services/websocket_service/implementations/notification_event_consumer.py:
 - `batch_analysis_available` → STANDARD
 
 ### Assessment Services (3 notifications)
-- `spellcheck_completed` → LOW
-- `cj_assessment_completed` → STANDARD
-- `ai_feedback_completed` → STANDARD
+- `batch_spellcheck_completed` → LOW
+- `batch_cj_assessment_completed` → STANDARD  
+- `batch_ai_feedback_completed` → STANDARD
 
 ## Implementation Checklist
 
@@ -460,8 +567,9 @@ services/websocket_service/implementations/notification_event_consumer.py:
 - [x] Implement Class Management notification projector
 - [x] Wire projector into Class Management DI
 - [x] Create comprehensive behavioral tests
-- [ ] Refactor WebSocket to consume only notifications
-- [ ] Remove all internal event handling from WebSocket
+- [x] Refactor WebSocket to consume only notifications ✅ COMPLETED
+- [x] Remove all internal event handling from WebSocket ✅ COMPLETED
+- [x] Implement idempotency testing with behavioral methodology ✅ COMPLETED
 - [ ] Implement File Service projector
 - [ ] Implement Batch Orchestrator projector
 - [ ] Implement Result Aggregator projector

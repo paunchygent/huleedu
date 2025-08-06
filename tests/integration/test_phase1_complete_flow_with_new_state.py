@@ -38,14 +38,14 @@ from common_core.status_enums import AssociationValidationMethod, BatchStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
-from services.batch_orchestrator_service.implementations.batch_content_provisioning_completed_handler import (
-    BatchContentProvisioningCompletedHandler,
+from services.batch_orchestrator_service.implementations import (
+    batch_content_provisioning_completed_handler as batch_provisioning_handler,
+)
+from services.batch_orchestrator_service.implementations import (
+    student_associations_confirmed_handler as student_assoc_handler,
 )
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
-)
-from services.batch_orchestrator_service.implementations.student_associations_confirmed_handler import (
-    StudentAssociationsConfirmedHandler,
 )
 from services.batch_orchestrator_service.implementations.student_matching_initiator_impl import (
     StudentMatchingInitiatorImpl,
@@ -55,6 +55,10 @@ from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
     PipelinePhaseInitiatorProtocol,
 )
+
+# Type aliases for cleaner function signatures
+ContentProvisioningHandler = batch_provisioning_handler.BatchContentProvisioningCompletedHandler
+StudentAssocHandler = student_assoc_handler.StudentAssociationsConfirmedHandler
 
 
 class MockBatchContext:
@@ -259,12 +263,12 @@ class TestPhase1CompleteFlowWithNewState:
         self,
         mock_batch_repo: MockBatchRepository,
         student_matching_initiator: StudentMatchingInitiatorImpl,
-    ) -> BatchContentProvisioningCompletedHandler:
+    ) -> ContentProvisioningHandler:
         """Create content provisioning handler."""
         phase_initiators: dict[PhaseName, PipelinePhaseInitiatorProtocol] = {
             PhaseName.STUDENT_MATCHING: student_matching_initiator
         }
-        return BatchContentProvisioningCompletedHandler(
+        return batch_provisioning_handler.BatchContentProvisioningCompletedHandler(
             batch_repo=mock_batch_repo,
             phase_initiators_map=phase_initiators,
         )
@@ -272,9 +276,9 @@ class TestPhase1CompleteFlowWithNewState:
     @pytest.fixture
     def student_associations_handler(
         self, mock_batch_repo: MockBatchRepository
-    ) -> StudentAssociationsConfirmedHandler:
+    ) -> StudentAssocHandler:
         """Create student associations handler."""
-        return StudentAssociationsConfirmedHandler(batch_repo=mock_batch_repo)
+        return student_assoc_handler.StudentAssociationsConfirmedHandler(batch_repo=mock_batch_repo)
 
     @pytest.fixture
     def batch_essays_ready_handler(
@@ -293,8 +297,8 @@ class TestPhase1CompleteFlowWithNewState:
         self,
         mock_batch_repo: MockBatchRepository,
         mock_event_publisher: MockEventPublisher,
-        content_provisioning_handler: BatchContentProvisioningCompletedHandler,
-        student_associations_handler: StudentAssociationsConfirmedHandler,
+        content_provisioning_handler: ContentProvisioningHandler,
+        student_associations_handler: StudentAssocHandler,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
     ):
         """
@@ -484,7 +488,7 @@ class TestPhase1CompleteFlowWithNewState:
         self,
         mock_batch_repo: MockBatchRepository,
         mock_event_publisher: MockEventPublisher,
-        content_provisioning_handler: BatchContentProvisioningCompletedHandler,
+        content_provisioning_handler: ContentProvisioningHandler,
     ):
         """
         Test GUEST batch bypasses student validation and new state.
@@ -563,8 +567,8 @@ class TestPhase1CompleteFlowWithNewState:
         self,
         mock_batch_repo: MockBatchRepository,
         mock_event_publisher: MockEventPublisher,
-        content_provisioning_handler: BatchContentProvisioningCompletedHandler,
-        student_associations_handler: StudentAssociationsConfirmedHandler,
+        content_provisioning_handler: ContentProvisioningHandler,
+        student_associations_handler: StudentAssocHandler,
         batch_essays_ready_handler: BatchEssaysReadyHandler,
     ):
         """Test course code propagates correctly through entire event chain."""
@@ -693,7 +697,7 @@ class TestPhase1CompleteFlowWithNewState:
     async def test_essays_not_accessible_before_ready_state(
         self,
         mock_batch_repo: MockBatchRepository,
-        student_associations_handler: StudentAssociationsConfirmedHandler,
+        student_associations_handler: StudentAssocHandler,
     ):
         """Verify essays are not accessible before READY_FOR_PIPELINE_EXECUTION."""
         # Setup batch

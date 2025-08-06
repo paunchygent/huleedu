@@ -166,7 +166,8 @@ class TestPySpellCheckerPerformance:
             has_special = "Yes" if ("-" in word or "'" in word) else "No"
             print(f"{word:<20} {len(word):<8} {has_special:<10} {selected_distance:<20}")
 
-            # Verify that function returns valid distances (behavior test, not implementation detail)
+            # Verify that function returns valid distances
+            # (behavior test, not implementation detail)
             assert selected_distance in [1, 2], f"{word} should get a valid distance (1 or 2)"
 
             # Verify that special characters always get distance=1 (important for performance)

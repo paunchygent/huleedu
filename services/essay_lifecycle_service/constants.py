@@ -64,11 +64,12 @@ def get_els_phase_statuses(phase_name: PhaseName | str) -> list[EssayStatus]:
     if isinstance(phase_name, str):
         try:
             phase_name = PhaseName(phase_name)
-        except ValueError:
+        except ValueError as err:
             available_phases = list(ELS_PHASE_STATUS_MAPPING.keys())
             raise ValueError(
-                f"Unknown phase '{phase_name}'. ELS-coordinated phases: {[p.value for p in available_phases]}"
-            )
+                f"Unknown phase '{phase_name}'. "
+                f"ELS-coordinated phases: {[p.value for p in available_phases]}"
+            ) from err
 
     if phase_name not in ELS_PHASE_STATUS_MAPPING:
         available_phases = list(ELS_PHASE_STATUS_MAPPING.keys())

@@ -8,7 +8,7 @@ We use aioresponses to simulate HTTP responses and test actual error handling be
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 from uuid import uuid4
 
 import aiohttp

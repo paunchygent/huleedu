@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from ..core_logic import default_perform_spell_check_algorithm
+
 # Removed HTTP implementation tests - they were testing internal details
 
 

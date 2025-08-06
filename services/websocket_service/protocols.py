@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, AsyncIterator, Protocol
 
 from aiokafka import ConsumerRecord
-from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from common_core.events.notification_events import TeacherNotificationRequestedV1
 
 
 class WebSocketManagerProtocol(Protocol):
@@ -86,14 +86,15 @@ class KafkaConsumerProtocol(Protocol):
         ...
 
 
-class FileEventConsumerProtocol(Protocol):
+class NotificationEventConsumerProtocol(Protocol):
     """
-    Protocol for consuming file management events from Kafka.
+    Protocol for consuming teacher notification events from Kafka.
+    This is the ONLY consumer the WebSocket service should have.
     """
 
     async def start_consumer(self) -> None:
         """
-        Start consuming file events from Kafka topics.
+        Start consuming teacher notification events from Kafka.
         This should run indefinitely until stopped.
         """
         ...
@@ -106,25 +107,21 @@ class FileEventConsumerProtocol(Protocol):
 
     async def process_message(self, msg: ConsumerRecord) -> bool:
         """
-        Process a single Kafka message containing file events.
+        Process a single Kafka message containing a teacher notification event.
         Returns True if message was processed successfully, False otherwise.
         """
         ...
 
 
-class FileNotificationHandlerProtocol(Protocol):
+class NotificationHandlerProtocol(Protocol):
     """
-    Protocol for handling file events and converting them to notifications.
+    Protocol for handling teacher notifications.
+    This is a pure forwarder with NO business logic.
     """
 
-    async def handle_batch_file_added(self, event: BatchFileAddedV1) -> None:
+    async def handle_teacher_notification(self, event: TeacherNotificationRequestedV1) -> None:
         """
-        Handle BatchFileAddedV1 event and publish notification to Redis.
-        """
-        ...
-
-    async def handle_batch_file_removed(self, event: BatchFileRemovedV1) -> None:
-        """
-        Handle BatchFileRemovedV1 event and publish notification to Redis.
+        Handle TeacherNotificationRequestedV1 event and publish to Redis.
+        The service trusts the teacher_id in the event (services are trusted).
         """
         ...

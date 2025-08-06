@@ -378,7 +378,8 @@ class TestTimeoutMonitorErrorHandling:
         mock_result_2 = MagicMock()
         mock_result_2.scalar_one_or_none.return_value = None
 
-        # Mock class not found - implementation handles this gracefully by skipping class relationship
+        # Mock class not found - implementation handles this gracefully
+        # by skipping class relationship
         mock_result_3 = MagicMock()
         mock_result_3.scalar_one_or_none.return_value = None  # Class not found
 

@@ -1,8 +1,9 @@
 """
-Kafka consumer for file management events in WebSocket Service.
+Kafka consumer for teacher notification events in WebSocket Service.
 
-Consumes file events from Kafka and publishes notifications to Redis
-for real-time WebSocket delivery.
+This is the ONLY consumer the WebSocket service should have.
+It consumes TeacherNotificationRequestedV1 events and forwards them
+to Redis for WebSocket delivery.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from aiokafka.errors import KafkaConnectionError
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
+from common_core.events.notification_events import TeacherNotificationRequestedV1
 from huleedu_service_libs.error_handling import (
     raise_connection_error,
     raise_initialization_failed,
@@ -29,26 +30,26 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.websocket_service.config import Settings
 from services.websocket_service.protocols import (
-    FileEventConsumerProtocol,
-    FileNotificationHandlerProtocol,
     KafkaConsumerProtocol,
+    NotificationEventConsumerProtocol,
+    NotificationHandlerProtocol,
 )
 
-logger = create_service_logger("websocket.file_event_consumer")
+logger = create_service_logger("websocket.notification_event_consumer")
 
 
-class FileEventConsumer(FileEventConsumerProtocol):
-    """Kafka consumer for file management events."""
+class NotificationEventConsumer(NotificationEventConsumerProtocol):
+    """Kafka consumer for teacher notification events."""
 
     def __init__(
         self,
         settings: Settings,
-        notification_handler: FileNotificationHandlerProtocol,
+        notification_handler: NotificationHandlerProtocol,
         redis_client: AtomicRedisClientProtocol,
         kafka_consumer_factory: Callable[..., KafkaConsumerProtocol] | None = None,
         tracer: Tracer | None = None,
     ) -> None:
-        """Initialize the file event consumer."""
+        """Initialize the notification event consumer."""
         self.settings = settings
         self.notification_handler = notification_handler
         self.redis_client = redis_client
@@ -57,11 +58,8 @@ class FileEventConsumer(FileEventConsumerProtocol):
         self.consumer: KafkaConsumerProtocol | None = None
         self.should_stop = False
 
-        # Topics to consume
-        self.topics = [
-            self.settings.BATCH_FILE_ADDED_TOPIC,
-            self.settings.BATCH_FILE_REMOVED_TOPIC,
-        ]
+        # Single topic: teacher notification events only
+        self.topics = [topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)]
 
         # Create idempotency configuration
         idempotency_config = IdempotencyConfig(
@@ -81,10 +79,10 @@ class FileEventConsumer(FileEventConsumerProtocol):
         self.process_message_idempotently = process_message_idempotently
 
     async def start_consumer(self) -> None:
-        """Start consuming file events from Kafka."""
+        """Start consuming teacher notification events from Kafka."""
         try:
             logger.info(
-                "Starting Kafka consumer for file events",
+                "Starting Kafka consumer for teacher notification events",
                 extra={
                     "topics": self.topics,
                     "group_id": self.settings.KAFKA_CONSUMER_GROUP,
@@ -113,7 +111,7 @@ class FileEventConsumer(FileEventConsumerProtocol):
                     await self.consumer.commit()
                 except Exception as e:
                     logger.error(
-                        f"Error processing message: {e}",
+                        f"Error processing notification message: {e}",
                         exc_info=True,
                         extra={
                             "topic": msg.topic,
@@ -154,49 +152,55 @@ class FileEventConsumer(FileEventConsumerProtocol):
             logger.info("Kafka consumer stopped")
 
     async def process_message(self, msg: ConsumerRecord) -> bool:
-        """Process a single Kafka message containing file events."""
+        """Process a single Kafka message containing a teacher notification event."""
         try:
             # Parse raw message bytes to EventEnvelope
             raw_message = msg.value.decode("utf-8")
-            envelope_data = json.loads(raw_message)  # Still need for trace context extraction
+            envelope_data = json.loads(raw_message)
 
             # Extract trace context if present
             if envelope_data.get("metadata"):
                 extract_trace_context(envelope_data["metadata"])
 
             logger.info(
-                f"Processing file event: {envelope_data['event_type']}",
+                "Processing teacher notification event",
                 extra={
                     "event_id": envelope_data.get("event_id"),
                     "correlation_id": envelope_data.get("correlation_id"),
+                    "event_type": envelope_data.get("event_type"),
                 },
             )
 
-            # Route to appropriate handler based on event type
-            if envelope_data["event_type"] == topic_name(ProcessingEvent.BATCH_FILE_ADDED):
-                # Create event from the data field
-                added_event = BatchFileAddedV1(**envelope_data["data"])
-                await self.notification_handler.handle_batch_file_added(added_event)
-            elif envelope_data["event_type"] == topic_name(ProcessingEvent.BATCH_FILE_REMOVED):
-                # Create event from the data field
-                removed_event = BatchFileRemovedV1(**envelope_data["data"])
-                await self.notification_handler.handle_batch_file_removed(removed_event)
-            else:
+            # Verify this is a teacher notification event
+            if envelope_data["event_type"] != topic_name(
+                ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED
+            ):
                 logger.warning(
-                    f"Unknown event type: {envelope_data['event_type']}",
+                    f"Unexpected event type on notification topic: {envelope_data['event_type']}",
                     extra={"event_id": envelope_data.get("event_id")},
                 )
                 return False
 
+            # Create TeacherNotificationRequestedV1 from the data field
+            notification_event = TeacherNotificationRequestedV1(**envelope_data["data"])
+
+            # Forward to notification handler (which just publishes to Redis)
+            await self.notification_handler.handle_teacher_notification(notification_event)
+
             logger.info(
-                f"Successfully processed file event: {envelope_data['event_type']}",
-                extra={"event_id": envelope_data.get("event_id")},
+                "Successfully forwarded teacher notification",
+                extra={
+                    "event_id": envelope_data.get("event_id"),
+                    "teacher_id": notification_event.teacher_id,
+                    "notification_type": notification_event.notification_type,
+                    "priority": notification_event.priority,
+                },
             )
             return True
 
         except Exception as e:
             logger.error(
-                f"Error processing file event: {e}",
+                f"Error processing teacher notification event: {e}",
                 exc_info=True,
                 extra={
                     "topic": msg.topic,

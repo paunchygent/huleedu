@@ -473,7 +473,8 @@ class TestTimeoutMonitorEventPublishing:
         mock_result_1 = MagicMock()
         mock_result_1.unique.return_value.scalars.return_value.all.return_value = associations
 
-        # For low confidence associations, need to mock UNKNOWN student query (called once per low-confidence association)
+        # For low confidence associations, need to mock UNKNOWN student query
+        # (called once per low-confidence association)
         # There are 3 low confidence associations, so 3 calls to check for UNKNOWN student
         mock_result_unknown = MagicMock()
         mock_result_unknown.scalar_one_or_none.return_value = existing_unknown

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-
-from unittest.mock import MagicMock
 
 from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.implementations.parallel_processor_impl import (
@@ -91,10 +90,12 @@ class TestParallelPerformanceVerification:
 
             # Results should be identical
             assert sequential_result == parallel_result, (
-                f"Results differ for essay {i}: sequential='{sequential_result}', parallel='{parallel_result}'"
+                f"Results differ for essay {i}: sequential='{sequential_result}', "
+                f"parallel='{parallel_result}'"
             )
             assert sequential_count == parallel_count, (
-                f"Correction counts differ for essay {i}: sequential={sequential_count}, parallel={parallel_count}"
+                f"Correction counts differ for essay {i}: sequential={sequential_count}, "
+                f"parallel={parallel_count}"
             )
 
     @pytest.mark.asyncio
@@ -158,7 +159,7 @@ class TestParallelPerformanceVerification:
 
         # Log performance metrics
         improvement_ratio = sequential_time / parallel_time if parallel_time > 0 else 1
-        print(f"\nPerformance Results:")
+        print("\nPerformance Results:")
         print(f"Sequential time: {sequential_time:.4f}s")
         print(f"Parallel time: {parallel_time:.4f}s")
         print(f"Improvement ratio: {improvement_ratio:.2f}x")
@@ -189,7 +190,10 @@ class TestParallelPerformanceVerification:
         )
 
         # Test text with proper names that should be whitelisted
-        test_text = "Ponyboy Curtis lives in Tulsa with his brothers Stockholm and Copenhagen are beautiful cities."
+        test_text = (
+            "Ponyboy Curtis lives in Tulsa with his brothers "
+            "Stockholm and Copenhagen are beautiful cities."
+        )
 
         result, corrections = await default_perform_spell_check_algorithm(
             text=test_text,
@@ -209,7 +213,7 @@ class TestParallelPerformanceVerification:
         assert "Stockholm" in result  # Should be whitelisted
         assert "Copenhagen" in result  # Should be whitelisted
 
-        print(f"\nWhitelist Test Results:")
+        print("\nWhitelist Test Results:")
         print(f"Original: {test_text}")
         print(f"Corrected: {result}")
         print(f"Corrections: {corrections}")

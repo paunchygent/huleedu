@@ -25,6 +25,9 @@ from services.spellchecker_service.implementations.content_client_impl import (
 from services.spellchecker_service.implementations.event_publisher_impl import (
     DefaultSpellcheckEventPublisher,
 )
+from services.spellchecker_service.implementations.parallel_processor_impl import (
+    DefaultParallelProcessor,
+)
 from services.spellchecker_service.implementations.result_store_impl import (
     DefaultResultStore,
 )
@@ -36,9 +39,6 @@ from services.spellchecker_service.implementations.spell_repository_postgres_imp
 )
 from services.spellchecker_service.implementations.whitelist_impl import (
     DefaultWhitelist,
-)
-from services.spellchecker_service.implementations.parallel_processor_impl import (
-    DefaultParallelProcessor,
 )
 from services.spellchecker_service.kafka_consumer import SpellCheckerKafkaConsumer
 from services.spellchecker_service.metrics import setup_spell_checker_database_monitoring

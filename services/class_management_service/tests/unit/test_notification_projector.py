@@ -34,14 +34,14 @@ if TYPE_CHECKING:
 def mock_class_repository() -> AsyncMock:
     """Mock class repository for tests."""
     repository = AsyncMock()
-    
+
     # Default: class exists with teacher
     mock_class = Mock()
     mock_class.id = uuid4()
     mock_class.user_id = "teacher-123"
     mock_class.class_designation = "Advanced English"
     repository.get_class_by_id.return_value = mock_class
-    
+
     return repository
 
 
@@ -60,7 +60,7 @@ def notification_projector(
 ) -> NotificationProjector:
     """Create notification projector with mocked dependencies."""
     from services.class_management_service.notification_projector import NotificationProjector
-    
+
     return NotificationProjector(
         class_repository=mock_class_repository,
         event_publisher=mock_event_publisher,
@@ -91,10 +91,10 @@ class TestClassCreatedProjection:
         # Assert - verify EventEnvelope was published
         mock_event_publisher.publish_class_event.assert_called_once()
         envelope = mock_event_publisher.publish_class_event.call_args[0][0]
-        
+
         assert isinstance(envelope, EventEnvelope)
         assert envelope.source_service == "class_management_service"
-        
+
         # Extract and verify the notification data
         notification = envelope.data
         assert isinstance(notification, TeacherNotificationRequestedV1)
@@ -104,7 +104,7 @@ class TestClassCreatedProjection:
         assert notification.priority == NotificationPriority.STANDARD
         assert notification.action_required is False
         assert notification.class_id == "class-456"
-        
+
         # Verify payload content
         assert notification.payload["class_id"] == "class-456"
         assert notification.payload["class_designation"] == "Mathematics 101"
@@ -133,17 +133,17 @@ class TestStudentCreatedProjection:
             class_ids=[class_id],
             created_by_user_id="teacher-123",
         )
-        
+
         # Act
         await notification_projector.handle_student_created(event)
-        
+
         # Assert - verify class was fetched
         mock_class_repository.get_class_by_id.assert_called_once_with(UUID(class_id))
-        
+
         # Verify notification was published
         mock_event_publisher.publish_class_event.assert_called_once()
         envelope = mock_event_publisher.publish_class_event.call_args[0][0]
-        
+
         notification = envelope.data
         assert isinstance(notification, TeacherNotificationRequestedV1)
         assert notification.teacher_id == "teacher-123"
@@ -151,7 +151,7 @@ class TestStudentCreatedProjection:
         assert notification.category == WebSocketEventCategory.CLASS_MANAGEMENT
         assert notification.priority == NotificationPriority.LOW
         assert notification.action_required is False
-        
+
         # Verify payload
         assert notification.payload["student_id"] == "student-123"
         assert notification.payload["student_name"] == "Jane Doe"
@@ -173,10 +173,10 @@ class TestStudentCreatedProjection:
             class_ids=[],  # Empty class list
             created_by_user_id="teacher-789",
         )
-        
+
         # Act
         await notification_projector.handle_student_created(event)
-        
+
         # Assert - no notification published
         mock_event_publisher.publish_class_event.assert_not_called()
 
@@ -190,7 +190,7 @@ class TestStudentCreatedProjection:
         """Test that student creation with non-existent class doesn't create notification."""
         # Arrange
         mock_class_repository.get_class_by_id.return_value = None  # Class doesn't exist
-        
+
         event = StudentCreatedV1(
             student_id="student-789",
             first_name="Alice",
@@ -199,10 +199,10 @@ class TestStudentCreatedProjection:
             class_ids=[str(uuid4())],
             created_by_user_id="teacher-456",
         )
-        
+
         # Act
         await notification_projector.handle_student_created(event)
-        
+
         # Assert - no notification published
         mock_event_publisher.publish_class_event.assert_not_called()
 
@@ -220,7 +220,7 @@ class TestValidationTimeoutProcessedProjection:
         # Arrange
         batch_id = str(uuid4())
         from datetime import UTC, datetime
-        
+
         event = ValidationTimeoutProcessedV1(
             event_name=ProcessingEvent.VALIDATION_TIMEOUT_PROCESSED,
             batch_id=batch_id,
@@ -249,14 +249,14 @@ class TestValidationTimeoutProcessedProjection:
             guest_class_id=None,
             processing_timestamp=datetime.now(UTC),
         )
-        
+
         # Act
         await notification_projector.handle_validation_timeout_processed(event)
-        
+
         # Assert
         mock_event_publisher.publish_class_event.assert_called_once()
         envelope = mock_event_publisher.publish_class_event.call_args[0][0]
-        
+
         notification = envelope.data
         assert isinstance(notification, TeacherNotificationRequestedV1)
         assert notification.teacher_id == "teacher-555"
@@ -265,12 +265,15 @@ class TestValidationTimeoutProcessedProjection:
         assert notification.priority == NotificationPriority.IMMEDIATE
         assert notification.action_required is False  # Already auto-confirmed
         assert notification.batch_id == batch_id
-        
+
         # Verify payload
         assert notification.payload["auto_confirmed_count"] == 2
         assert notification.payload["timeout_hours"] == 24
         assert len(notification.payload["auto_confirmed_associations"]) == 2
-        assert notification.payload["auto_confirmed_associations"][0]["student_name"] == "Erik Andersson"
+        assert (
+            notification.payload["auto_confirmed_associations"][0]["student_name"]
+            == "Erik Andersson"
+        )
 
 
 class TestStudentAssociationsConfirmedProjection:
@@ -287,7 +290,7 @@ class TestStudentAssociationsConfirmedProjection:
         # Arrange
         batch_id = str(uuid4())
         class_id = str(uuid4())
-        
+
         event = StudentAssociationsConfirmedV1(
             event_name=ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED,
             batch_id=batch_id,
@@ -319,17 +322,17 @@ class TestStudentAssociationsConfirmedProjection:
             timeout_triggered=False,
             validation_summary={"human": 2, "timeout": 1},
         )
-        
+
         # Act
         await notification_projector.handle_student_associations_confirmed(event)
-        
+
         # Assert - verify class was fetched for teacher_id
         mock_class_repository.get_class_by_id.assert_called_once_with(UUID(class_id))
-        
+
         # Verify notification was published
         mock_event_publisher.publish_class_event.assert_called_once()
         envelope = mock_event_publisher.publish_class_event.call_args[0][0]
-        
+
         notification = envelope.data
         assert isinstance(notification, TeacherNotificationRequestedV1)
         assert notification.teacher_id == "teacher-123"  # From mock class
@@ -339,13 +342,13 @@ class TestStudentAssociationsConfirmedProjection:
         assert notification.action_required is False
         assert notification.batch_id == batch_id
         assert notification.class_id == class_id
-        
+
         # Verify payload
         assert notification.payload["confirmed_count"] == 3
         assert notification.payload["timeout_triggered"] is False
         assert notification.payload["validation_summary"] == {"human": 2, "timeout": 1}
         assert len(notification.payload["associations"]) == 3
-        
+
         # Verify association details
         first_assoc = notification.payload["associations"][0]
         assert first_assoc["essay_id"] == "essay-1"
@@ -362,7 +365,7 @@ class TestStudentAssociationsConfirmedProjection:
         """Test that associations confirmed with non-existent class doesn't create notification."""
         # Arrange
         mock_class_repository.get_class_by_id.return_value = None  # Class doesn't exist
-        
+
         event = StudentAssociationsConfirmedV1(
             event_name=ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED,
             batch_id=str(uuid4()),
@@ -372,10 +375,10 @@ class TestStudentAssociationsConfirmedProjection:
             timeout_triggered=True,
             validation_summary={},
         )
-        
+
         # Act
         await notification_projector.handle_student_associations_confirmed(event)
-        
+
         # Assert - no notification published
         mock_event_publisher.publish_class_event.assert_not_called()
 
@@ -392,14 +395,14 @@ class TestNotificationPublishingError:
         """Test that publishing errors are propagated for proper error handling."""
         # Arrange
         mock_event_publisher.publish_class_event.side_effect = Exception("Kafka connection failed")
-        
+
         event = ClassCreatedV1(
             class_id="class-999",
             class_designation="Test Class",
             course_codes=[CourseCode.ENG5],
             user_id="teacher-999",
         )
-        
+
         # Act & Assert
         with pytest.raises(Exception, match="Kafka connection failed"):
             await notification_projector.handle_class_created(event)
