@@ -33,7 +33,7 @@ class TestParallelCorrections:
         processor = DefaultParallelProcessor()
         processor.max_concurrent = 1
         processor.timeout_seconds = 5.0
-        
+
         results = await processor.process_corrections_parallel(
             words_to_correct=words_to_correct,
             spell_checker_cache=spell_checker_cache,
@@ -60,7 +60,9 @@ class TestParallelCorrections:
             from spellchecker import SpellChecker
 
             from services.spellchecker_service.core_logic import _spellchecker_cache
-            from services.spellchecker_service.implementations.parallel_processor_impl import DefaultParallelProcessor
+            from services.spellchecker_service.implementations.parallel_processor_impl import (
+                DefaultParallelProcessor,
+            )
 
             _spellchecker_cache["en_d1"] = SpellChecker(language="en", distance=1)
             _spellchecker_cache["en_d2"] = SpellChecker(language="en", distance=2)
@@ -119,11 +121,13 @@ class TestParallelCorrections:
             from spellchecker import SpellChecker
 
             from services.spellchecker_service.core_logic import _spellchecker_cache
-            from services.spellchecker_service.implementations.parallel_processor_impl import DefaultParallelProcessor
+            from services.spellchecker_service.implementations.parallel_processor_impl import (
+                DefaultParallelProcessor,
+            )
 
             _spellchecker_cache["en_d1"] = SpellChecker(language="en", distance=1)
             _spellchecker_cache["en_d2"] = SpellChecker(language="en", distance=2)
-            
+
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
@@ -160,11 +164,13 @@ class TestParallelCorrections:
             from spellchecker import SpellChecker
 
             from services.spellchecker_service.core_logic import _spellchecker_cache
-            from services.spellchecker_service.implementations.parallel_processor_impl import DefaultParallelProcessor
+            from services.spellchecker_service.implementations.parallel_processor_impl import (
+                DefaultParallelProcessor,
+            )
 
             _spellchecker_cache["en_d1"] = SpellChecker(language="en", distance=1)
             _spellchecker_cache["en_d2"] = SpellChecker(language="en", distance=2)
-            
+
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
@@ -198,11 +204,13 @@ class TestParallelCorrections:
             from spellchecker import SpellChecker
 
             from services.spellchecker_service.core_logic import _spellchecker_cache
-            from services.spellchecker_service.implementations.parallel_processor_impl import DefaultParallelProcessor
+            from services.spellchecker_service.implementations.parallel_processor_impl import (
+                DefaultParallelProcessor,
+            )
 
             _spellchecker_cache["en_d1"] = SpellChecker(language="en", distance=1)
             _spellchecker_cache["en_d2"] = SpellChecker(language="en", distance=2)
-            
+
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 

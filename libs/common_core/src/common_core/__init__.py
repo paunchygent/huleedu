@@ -89,6 +89,11 @@ from .status_enums import (
     QueueStatus,
     ValidationStatus,
 )
+from .websocket_enums import (
+    NotificationPriority,
+    WebSocketConnectionState,
+    WebSocketEventCategory,
+)
 
 __all__ = [
     # Status Enums
@@ -124,6 +129,10 @@ __all__ = [
     # Config Enums
     "Environment",
     "LLMProviderType",
+    # WebSocket Enums
+    "WebSocketEventCategory",
+    "NotificationPriority",
+    "WebSocketConnectionState",
     # Metadata Models
     "SystemProcessingMetadata",
     "StorageReferenceMetadata",

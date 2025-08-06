@@ -314,7 +314,7 @@ class TestEndToEndFileEventKafkaFlow:
 
         # Wait for upload event and extract file_upload_id from Kafka
         upload_kafka_messages = []
-        
+
         async def collect_upload_kafka_messages():
             try:
                 async for msg in kafka_consumer:
@@ -331,7 +331,7 @@ class TestEndToEndFileEventKafkaFlow:
         upload_kafka_task = asyncio.create_task(collect_upload_kafka_messages())
         await asyncio.sleep(5)  # Wait for event propagation
         upload_kafka_task.cancel()
-        
+
         try:
             await upload_kafka_task
         except asyncio.CancelledError:
@@ -340,14 +340,14 @@ class TestEndToEndFileEventKafkaFlow:
         # Extract file_upload_id from Kafka event
         if not upload_kafka_messages:
             raise Exception("No upload Kafka message received")
-            
+
         envelope = upload_kafka_messages[0].value
         event_data = envelope.get("data", {})
         file_upload_id = event_data.get("file_upload_id")
-        
+
         if not file_upload_id:
             raise Exception("No file_upload_id in Kafka event")
-            
+
         print(f"✓ File uploaded with ID: {file_upload_id}")
 
         # Subscribe to Redis with proper channel format and confirmation

@@ -9,7 +9,7 @@ This test processes actual student essays to demonstrate:
 
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Set
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,8 +96,8 @@ class TestWhitelistIntegration:
         # Measure whitelist loading time (one-time cost)
         whitelist_load_time = 2.0  # Approximated from logs
 
-        # Track overall statistics
-        total_stats = {
+        # Track overall statistics with proper typing
+        total_stats: Dict[str, Any] = {
             "total_essays": len(real_essays),
             "total_l2_corrections": 0,
             "total_whitelist_hits": 0,
@@ -106,6 +106,14 @@ class TestWhitelistIntegration:
             "time_per_essay_without_whitelist": 0.0,
             "whitelisted_words": set(),
         }
+        
+        # Extract typed variables for mypy
+        total_l2_corrections: int = 0
+        total_whitelist_hits: int = 0
+        total_pyspell_corrections: int = 0
+        time_per_essay_with_whitelist: float = 0.0
+        time_per_essay_without_whitelist: float = 0.0
+        whitelisted_words: Set[str] = set()
 
         # Process each essay once to get average times
         essay_count = 0
@@ -143,14 +151,14 @@ class TestWhitelistIntegration:
 
             # Update total statistics
             essay_count += 1
-            total_stats["total_l2_corrections"] += essay_stats["l2_corrections"]
-            total_stats["total_whitelist_hits"] += essay_stats["whitelist_hits"]
-            total_stats["total_pyspell_corrections"] += (
+            total_l2_corrections += essay_stats["l2_corrections"]
+            total_whitelist_hits += essay_stats["whitelist_hits"]
+            total_pyspell_corrections += (
                 corrections_with_wl - essay_stats["l2_corrections"]
             )
-            total_stats["time_per_essay_with_whitelist"] += time_with_whitelist
-            total_stats["time_per_essay_without_whitelist"] += time_without_whitelist
-            total_stats["whitelisted_words"].update(essay_stats["whitelisted_words"])
+            time_per_essay_with_whitelist += time_with_whitelist
+            time_per_essay_without_whitelist += time_without_whitelist
+            whitelisted_words.update(essay_stats["whitelisted_words"])
 
             # Print essay statistics
             print(f"  L2 corrections: {essay_stats['l2_corrections']}")
@@ -160,8 +168,8 @@ class TestWhitelistIntegration:
             print(f"  Time without whitelist: {time_without_whitelist:.3f}s")
 
         # Calculate averages
-        avg_time_with_wl = total_stats["time_per_essay_with_whitelist"] / essay_count
-        avg_time_without_wl = total_stats["time_per_essay_without_whitelist"] / essay_count
+        avg_time_with_wl = time_per_essay_with_whitelist / essay_count
+        avg_time_without_wl = time_per_essay_without_whitelist / essay_count
 
         # Scale up to 10,000 essays
         ESSAYS_AT_SCALE = 10000
@@ -169,9 +177,9 @@ class TestWhitelistIntegration:
         scaled_time_without_wl = avg_time_without_wl * ESSAYS_AT_SCALE
 
         # Scale up correction counts
-        avg_l2_per_essay = total_stats["total_l2_corrections"] / essay_count
-        avg_whitelist_per_essay = total_stats["total_whitelist_hits"] / essay_count
-        avg_pyspell_per_essay = total_stats["total_pyspell_corrections"] / essay_count
+        avg_l2_per_essay = total_l2_corrections / essay_count
+        avg_whitelist_per_essay = total_whitelist_hits / essay_count
+        avg_pyspell_per_essay = total_pyspell_corrections / essay_count
 
         scaled_l2 = int(avg_l2_per_essay * ESSAYS_AT_SCALE)
         scaled_whitelist = int(avg_whitelist_per_essay * ESSAYS_AT_SCALE)
@@ -205,11 +213,11 @@ class TestWhitelistIntegration:
         print("\nAccuracy Impact:")
         print(f"  {scaled_whitelist:,} false positive corrections avoided")
         print(
-            f"  Unique whitelisted words found in sample: {len(total_stats['whitelisted_words'])}"
+            f"  Unique whitelisted words found in sample: {len(whitelisted_words)}"
         )
 
         # Assertions
-        assert total_stats["total_whitelist_hits"] > 0, (
+        assert total_whitelist_hits > 0, (
             "Should have found at least some whitelisted words in real essays"
         )
 
@@ -223,24 +231,27 @@ class TestWhitelistIntegration:
     ) -> Dict[str, Any]:
         """Analyze the corrections made to identify L2, whitelist, and pyspell contributions."""
 
-        stats = {
-            "l2_corrections": 0,
-            "whitelist_hits": 0,
-            "whitelisted_words": set(),
-        }
+        # Use typed variables to avoid mypy object type issues
+        l2_corrections = 0
+        whitelist_hits = 0
+        whitelisted_words_set: Set[str] = set()
 
         # Count L2 corrections
         words = original_text.split()
         for word in words:
             word_lower = word.lower().strip('.,!?;:"')
             if word_lower in l2_dictionary:
-                stats["l2_corrections"] += 1
+                l2_corrections += 1
 
         # Find whitelisted words
         for word in words:
             word_clean = word.strip('.,!?;:"')
             if whitelist.is_whitelisted(word_clean):
-                stats["whitelist_hits"] += 1
-                stats["whitelisted_words"].add(word_clean)
+                whitelist_hits += 1
+                whitelisted_words_set.add(word_clean)
 
-        return stats
+        return {
+            "l2_corrections": l2_corrections,
+            "whitelist_hits": whitelist_hits,
+            "whitelisted_words": whitelisted_words_set,
+        }

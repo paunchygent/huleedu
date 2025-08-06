@@ -11,7 +11,9 @@ from typing import Any, Dict, Tuple
 import pytest
 from spellchecker import SpellChecker
 
-from services.spellchecker_service.implementations.parallel_processor_impl import get_adaptive_edit_distance
+from services.spellchecker_service.implementations.parallel_processor_impl import (
+    get_adaptive_edit_distance,
+)
 
 
 def time_correction(spell_checker: SpellChecker, word: str) -> Tuple[str | None, float]:
@@ -166,10 +168,12 @@ class TestPySpellCheckerPerformance:
 
             # Verify that function returns valid distances (behavior test, not implementation detail)
             assert selected_distance in [1, 2], f"{word} should get a valid distance (1 or 2)"
-            
+
             # Verify that special characters always get distance=1 (important for performance)
             if "-" in word or "'" in word:
-                assert selected_distance == 1, f"{word} with special chars should get distance=1 for performance"
+                assert selected_distance == 1, (
+                    f"{word} with special chars should get distance=1 for performance"
+                )
 
 
 if __name__ == "__main__":

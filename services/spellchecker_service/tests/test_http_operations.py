@@ -8,7 +8,7 @@ We use aioresponses to simulate HTTP responses and test actual error handling be
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, AsyncIterator
 from uuid import uuid4
 
 import aiohttp
@@ -26,7 +26,7 @@ class TestHTTPOperationsBehavior:
     """Test the behavior of HTTP operations, not implementation details."""
 
     @pytest.fixture
-    async def client_session(self):
+    async def client_session(self) -> AsyncIterator[aiohttp.ClientSession]:
         """Create a real aiohttp session for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
@@ -334,9 +334,7 @@ class TestHTTPOperationsBehavior:
             assert isinstance(result, str)
 
     @pytest.mark.asyncio
-    async def test_store_handles_large_content(
-        self, client_session: aiohttp.ClientSession
-    ) -> None:
+    async def test_store_handles_large_content(self, client_session: aiohttp.ClientSession) -> None:
         """Test that large content can be stored successfully."""
         # Arrange
         content_service_url = "http://content-service"

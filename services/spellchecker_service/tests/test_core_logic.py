@@ -43,7 +43,3 @@ class TestDefaultImplementations:
             corrections_count >= 2
         )  # Should count at least the corrections made by real implementation
         # Note: Exact count may vary based on pyspellchecker behavior and L2 dictionary availability
-
-
-
-

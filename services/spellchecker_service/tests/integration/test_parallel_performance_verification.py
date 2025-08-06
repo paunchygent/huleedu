@@ -8,6 +8,8 @@ from uuid import uuid4
 
 import pytest
 
+from unittest.mock import MagicMock
+
 from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
@@ -24,7 +26,7 @@ class TestParallelPerformanceVerification:
     def l2_errors(self) -> dict[str, str]:
         """Load L2 error dictionary for testing."""
         return load_l2_errors(
-            Path(__file__).parent.parent.parent / "data" / "l2-swedish-learner-errors.csv",
+            str(Path(__file__).parent.parent.parent / "data" / "l2-swedish-learner-errors.csv"),
             filter_entries=False,
         )
 
@@ -75,7 +77,7 @@ class TestParallelPerformanceVerification:
                 min_words_for_parallel=999,  # Ensure sequential mode
             )
 
-            # Parallel processing  
+            # Parallel processing
             parallel_result, parallel_count = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
@@ -88,12 +90,12 @@ class TestParallelPerformanceVerification:
             )
 
             # Results should be identical
-            assert (
-                sequential_result == parallel_result
-            ), f"Results differ for essay {i}: sequential='{sequential_result}', parallel='{parallel_result}'"
-            assert (
-                sequential_count == parallel_count
-            ), f"Correction counts differ for essay {i}: sequential={sequential_count}, parallel={parallel_count}"
+            assert sequential_result == parallel_result, (
+                f"Results differ for essay {i}: sequential='{sequential_result}', parallel='{parallel_result}'"
+            )
+            assert sequential_count == parallel_count, (
+                f"Correction counts differ for essay {i}: sequential={sequential_count}, parallel={parallel_count}"
+            )
 
     @pytest.mark.asyncio
     async def test_performance_improvement_measurement(
@@ -105,16 +107,19 @@ class TestParallelPerformanceVerification:
     ) -> None:
         """Measure and verify performance improvement with parallel processing."""
         # Create a longer text to ensure parallel processing kicks in
-        long_text = " ".join([
-            "This tset contains many erors that need corection.",
-            "The studnet wrote adn intresting paper about litreature.",
-            "Ponyboy is teh main charcter in The Outsiders.",
-            "Stockholm is beutiful wiht many museums and galeries.",
-            "Scientfic experiments show facinating results for anaylsis.",
-            "The algorythm can proces multiple words simulatneously.",
-            "Performace improvements are measurable in real aplications.",
-            "Concurency helps reduc processing time signifcantly.",
-        ] * 3)  # Repeat to ensure enough words for parallel processing
+        long_text = " ".join(
+            [
+                "This tset contains many erors that need corection.",
+                "The studnet wrote adn intresting paper about litreature.",
+                "Ponyboy is teh main charcter in The Outsiders.",
+                "Stockholm is beutiful wiht many museums and galeries.",
+                "Scientfic experiments show facinating results for anaylsis.",
+                "The algorythm can proces multiple words simulatneously.",
+                "Performace improvements are measurable in real aplications.",
+                "Concurency helps reduc processing time signifcantly.",
+            ]
+            * 3
+        )  # Repeat to ensure enough words for parallel processing
 
         correlation_id = uuid4()
 
@@ -155,7 +160,7 @@ class TestParallelPerformanceVerification:
         improvement_ratio = sequential_time / parallel_time if parallel_time > 0 else 1
         print(f"\nPerformance Results:")
         print(f"Sequential time: {sequential_time:.4f}s")
-        print(f"Parallel time: {parallel_time:.4f}s")  
+        print(f"Parallel time: {parallel_time:.4f}s")
         print(f"Improvement ratio: {improvement_ratio:.2f}x")
         print(f"Corrections made: {sequential_count}")
 
@@ -175,10 +180,11 @@ class TestParallelPerformanceVerification:
         if not whitelist_data_dir.exists():
             pytest.skip("Whitelist data not available for testing")
 
-        whitelist = DefaultWhitelist(str(whitelist_data_dir))
+        mock_settings = MagicMock()
+        whitelist = DefaultWhitelist(mock_settings)
         parallel_processor = DefaultParallelProcessor()
         l2_errors = load_l2_errors(
-            Path(__file__).parent.parent.parent / "data" / "l2-swedish-learner-errors.csv",
+            str(Path(__file__).parent.parent.parent / "data" / "l2-swedish-learner-errors.csv"),
             filter_entries=False,
         )
 
@@ -198,11 +204,11 @@ class TestParallelPerformanceVerification:
 
         # Verify that proper names were preserved
         assert "Ponyboy" in result  # Should be whitelisted
-        assert "Curtis" in result   # Should be whitelisted  
-        assert "Tulsa" in result    # Should be whitelisted
-        assert "Stockholm" in result # Should be whitelisted
-        assert "Copenhagen" in result # Should be whitelisted
-        
+        assert "Curtis" in result  # Should be whitelisted
+        assert "Tulsa" in result  # Should be whitelisted
+        assert "Stockholm" in result  # Should be whitelisted
+        assert "Copenhagen" in result  # Should be whitelisted
+
         print(f"\nWhitelist Test Results:")
         print(f"Original: {test_text}")
         print(f"Corrected: {result}")

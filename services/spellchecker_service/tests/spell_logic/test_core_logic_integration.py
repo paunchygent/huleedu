@@ -121,7 +121,7 @@ class TestCoreLogicIntegration:
         # The algorithm should correct some misspellings, but exact corrections may vary
         assert corrections_count >= 2  # At least some corrections expected
         assert corrected_text != text  # Text should be changed
-        
+
         # Verify the text is still readable and improved
         assert "well-" in corrected_text  # Hyphenated structure preserved
         assert len(corrected_text) > 0
@@ -221,7 +221,7 @@ class TestCoreLogicIntegration:
         assert "containns" not in corrected_text
         assert "errrors" not in corrected_text
         assert "misstakes" not in corrected_text
-        
+
         # Verify text is still coherent and readable
         assert "spellchecker" in corrected_text.lower()  # Key words preserved
 

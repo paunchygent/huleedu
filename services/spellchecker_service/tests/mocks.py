@@ -30,7 +30,7 @@ class MockWhitelist(WhitelistProtocol):
 
 def create_mock_parallel_processor() -> ParallelProcessorProtocol:
     """Create a mock parallel processor for tests.
-    
+
     Returns:
         Mock parallel processor that returns empty corrections dict
     """
