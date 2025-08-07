@@ -12,6 +12,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.result_events import BatchAssessmentCompletedV1, BatchResultsReadyV1
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
 
@@ -243,4 +244,36 @@ class OutboxManagerProtocol(Protocol):
 
     async def notify_relay_worker(self) -> None:
         """Notify relay worker of new events in outbox."""
+        ...
+
+
+class EventPublisherProtocol(Protocol):
+    """Protocol for publishing domain events from Result Aggregator Service."""
+
+    async def publish_batch_results_ready(
+        self,
+        event_data: BatchResultsReadyV1,
+        correlation_id: UUID,
+    ) -> None:
+        """
+        Publish BatchResultsReadyV1 event when all phases complete.
+
+        Args:
+            event_data: The batch results ready event data
+            correlation_id: Correlation ID for event tracking
+        """
+        ...
+
+    async def publish_batch_assessment_completed(
+        self,
+        event_data: BatchAssessmentCompletedV1,
+        correlation_id: UUID,
+    ) -> None:
+        """
+        Publish BatchAssessmentCompletedV1 event when CJ assessment completes.
+
+        Args:
+            event_data: The batch assessment completed event data
+            correlation_id: Correlation ID for event tracking
+        """
         ...

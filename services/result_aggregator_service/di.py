@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import AsyncIterator, cast
 
 import aiohttp
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
+from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol, PostgreSQLOutboxRepository
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, RedisClientProtocol
+from huleedu_service_libs.protocols import (
+    AtomicRedisClientProtocol,
+    KafkaPublisherProtocol,
+    RedisClientProtocol,
+)
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -34,6 +42,9 @@ from services.result_aggregator_service.implementations.cache_manager_impl impor
 from services.result_aggregator_service.implementations.event_processor_impl import (
     EventProcessorImpl,
 )
+from services.result_aggregator_service.implementations.event_publisher_impl import (
+    ResultEventPublisher,
+)
 from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 from services.result_aggregator_service.implementations.security_impl import SecurityServiceImpl
 from services.result_aggregator_service.implementations.state_store_redis_impl import (
@@ -50,6 +61,7 @@ from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
     CacheManagerProtocol,
     EventProcessorProtocol,
+    EventPublisherProtocol,
     OutboxManagerProtocol,
     SecurityServiceProtocol,
     StateStoreProtocol,
@@ -114,6 +126,41 @@ class CoreInfrastructureProvider(Provider):
     def provide_collector_registry(self) -> CollectorRegistry:
         """Provide the default Prometheus collector registry."""
         return REGISTRY
+
+    @provide
+    async def provide_kafka_bus(self, settings: Settings) -> AsyncIterator[KafkaBus]:
+        """Provide KafkaBus instance for event publishing."""
+        kafka_bus = KafkaBus(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            client_id=f"{settings.SERVICE_NAME}-publisher",
+        )
+        await kafka_bus.start()
+        try:
+            yield kafka_bus
+        finally:
+            await kafka_bus.stop()
+
+    @provide
+    def provide_circuit_breaker(self, settings: Settings) -> CircuitBreaker:
+        """Provide circuit breaker for Kafka publisher resilience."""
+        return CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=timedelta(seconds=30),
+            expected_exception=Exception,
+            name="kafka_publisher_circuit",
+        )
+
+    @provide
+    def provide_kafka_publisher(
+        self, kafka_bus: KafkaBus, circuit_breaker: CircuitBreaker, settings: Settings
+    ) -> KafkaPublisherProtocol:
+        """Provide resilient Kafka publisher with circuit breaker pattern."""
+        return ResilientKafkaPublisher(
+            delegate=kafka_bus,
+            circuit_breaker=circuit_breaker,
+            fallback_handler=None,
+            retry_interval=30,
+        )
 
 
 class DatabaseProvider(Provider):
@@ -242,6 +289,22 @@ class ServiceProvider(Provider):
         # Cast RedisClientProtocol to AtomicRedisClientProtocol as they are compatible
         atomic_redis = cast(AtomicRedisClientProtocol, redis_client)
         return OutboxManager(outbox_repository, atomic_redis, settings)
+
+    @provide
+    def provide_event_publisher(
+        self,
+        outbox_manager: OutboxManagerProtocol,
+        settings: Settings,
+    ) -> EventPublisherProtocol:
+        """Provide event publisher for Result Aggregator Service.
+        
+        Note: NotificationProjector will be added in Session 3.1.
+        """
+        return ResultEventPublisher(
+            outbox_manager=outbox_manager,
+            settings=settings,
+            notification_projector=None,  # Will be added in Session 3.1
+        )
 
 
 # Export all providers

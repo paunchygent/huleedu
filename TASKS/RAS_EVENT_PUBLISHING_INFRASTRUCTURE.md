@@ -4,11 +4,13 @@
 
 Complete RAS transformation from pure consumer to full event-driven service with publishing capabilities. This unblocks teacher result notifications in the WebSocket layer and enables downstream services (AI Feedback) to consume batch completion events.
 
-**Status**: 🔴 BLOCKED - Required for WEBSOCKET_TEACHER_NOTIFICATION_LAYER.md Phase 3B
+**Status**: 🟡 IN PROGRESS - Phase 1 (Outbox) Complete, Phase 2 (Publishing) Ready
 
 **Dependencies**: 
 - Blocks: `/TASKS/WEBSOCKET_TEACHER_NOTIFICATION_LAYER.md` - Result completion notifications
 - Enables: Future AI Feedback Service consumption of results
+
+**Session 1.1 Completed**: ✅ Transactional outbox pattern implemented with 7/7 tests passing
 
 ## Current State Analysis
 
@@ -33,120 +35,286 @@ Complete RAS transformation from pure consumer to full event-driven service with
 
 ## Implementation Phases
 
-### PHASE 1: Transactional Outbox Pattern (2 sessions)
+### PHASE 1: Transactional Outbox Pattern ✅ COMPLETED
 
-**Rule References**:
-- `.cursor/rules/042.1-transactional-outbox-pattern.mdc` - Pattern specification
-- `.cursor/rules/048-structured-error-handling-standards.mdc` - Error handling
-- `.cursor/rules/085-database-migration-standards.mdc` - Migration standards
+**Implementation**: Session 1.1 completed successfully with full transactional outbox pattern.
 
-#### Session 1.1: Core Outbox Implementation
 ```python
-# Files to create (follow existing patterns):
+# Implemented files:
 services/result_aggregator_service/
 ├── implementations/
-│   ├── outbox_manager.py          # Copy pattern from file_service
-│   └── event_publisher_impl.py    # Copy pattern from class_management_service
-├── models_db.py                   # Add EventOutbox model
-└── alembic/versions/
-    └── YYYYMMDD_add_event_outbox.py
+│   └── outbox_manager.py          # ✅ Direct copy from file_service pattern
+├── models_db.py                   # ✅ EventOutbox model added (11 columns, 3 indexes)
+├── alembic/versions/
+│   └── 20250807_1411_dd059078c9c5_add_event_outbox_table_for_reliable_.py  # ✅
+└── protocols.py                   # ✅ OutboxManagerProtocol added
 
-# Reference implementations:
-- /services/file_service/implementations/outbox_manager.py
-- /services/class_management_service/implementations/outbox_manager.py
-- /services/file_service/models_db.py (EventOutbox table)
+# DI Integration (di.py):
+- PostgreSQLOutboxRepository provided in DatabaseProvider
+- OutboxManager provided in ServiceProvider with Redis + OutboxRepo dependencies
+
+# Database verification:
+Table: event_outbox (result_aggregator DB, port 5436)
+Indexes: ix_event_outbox_unpublished, ix_event_outbox_aggregate_id
 ```
 
-#### Session 1.2: Outbox Testing
-**Rule**: `.cursor/rules/075-test-creation-methodology.mdc`
+**Tests**: 7/7 unit tests passing for OutboxManager covering all scenarios including error handling, Redis notifications, and transactional guarantees.
+
+### PHASE 2: Event Publishing Infrastructure ✅ PARTIALLY COMPLETED
+
+#### Session 2.1 & 2.2 ✅ COMPLETED
+
+**Implemented**: ResultEventPublisher with TRUE OUTBOX PATTERN, event contracts in common_core.
 
 ```python
-# Test files to create:
-tests/
-├── unit/
-│   ├── test_outbox_manager.py
-│   └── test_event_publisher.py
-└── integration/
-    └── test_outbox_pattern_integration.py
+# services/result_aggregator_service/implementations/event_publisher_impl.py
+class ResultEventPublisher:
+    async def publish_batch_results_ready(self, event_data: BatchResultsReadyV1, correlation_id: UUID):
+        envelope = EventEnvelope[BatchResultsReadyV1](...)
+        await self.outbox_manager.publish_to_outbox(...)  # TRUE OUTBOX
+        if self.notification_projector:
+            await self.notification_projector.handle_batch_results_ready(event_data)  # CANONICAL
 
-# Test scenarios:
-1. Transactional guarantee (event + business data)
-2. Retry mechanism on Kafka failures
-3. Idempotency with duplicate processing
-4. Outbox processor background task
+# libs/common_core/src/common_core/events/result_events.py
+class BatchResultsReadyV1(ProcessingUpdate):  # Inherits system_metadata
+    batch_id: str; user_id: str; total_essays: int; completed_essays: int
+    phase_results: dict[str, PhaseResultSummary]; overall_status: BatchStatus
+
+# DI wiring in di.py:
+provide_kafka_bus() -> KafkaBus with lifecycle
+provide_circuit_breaker() -> CircuitBreaker(failure_threshold=5, recovery_timeout=30s)
+provide_kafka_publisher() -> ResilientKafkaPublisher(delegate=kafka_bus, circuit_breaker)
+provide_event_publisher() -> ResultEventPublisher(outbox_manager, settings, None)
+
+# 12 unit tests passing: test_event_publisher.py
 ```
 
-### PHASE 2: Event Publishing Infrastructure (3 sessions)
+#### Session 2.3: Publishing Integration
 
-**Rule References**:
-- `.cursor/rules/050-python-coding-standards.mdc` - Coding standards
-- `.cursor/rules/071-observability-core-patterns.mdc` - Observability
-- `.cursor/rules/081-pdm-dependency-management.mdc` - Dependencies
+**Implementation Requirements**: Wire EventPublisher into EventProcessorImpl at two critical integration points.
 
-#### Session 2.1: Publisher Implementation
+##### Integration Point 1: Batch Phase Outcome Handler (Line 130-184)
+
+**File**: `services/result_aggregator_service/implementations/event_processor_impl.py`
+
 ```python
-# DI Provider updates:
-services/result_aggregator_service/di.py:
-  + provide_kafka_publisher() -> KafkaPublisherProtocol
-  + provide_outbox_manager() -> OutboxManager
-  + provide_event_publisher() -> EventPublisherProtocol
+# Add after line 14 (imports):
+from services.result_aggregator_service.protocols import EventPublisherProtocol
 
-# Protocol additions:
-services/result_aggregator_service/protocols.py:
-  + EventPublisherProtocol
-  + OutboxManagerProtocol
+# Update __init__ to inject EventPublisher:
+def __init__(
+    self,
+    batch_repository: BatchRepositoryProtocol,
+    state_store: StateStoreProtocol,
+    cache_manager: CacheManagerProtocol,
+    event_publisher: EventPublisherProtocol,  # NEW
+):
+    self.event_publisher = event_publisher  # NEW
+
+# Add after line 177 (after cache invalidation):
+# Check if all phases complete for batch
+batch = await self.batch_repository.get_batch(data.batch_id)
+if batch and await self._check_batch_completion(batch):
+    # Calculate phase summaries from batch data
+    phase_results = self._calculate_phase_results(batch)
+    
+    # Create BatchResultsReadyV1 event
+    from common_core.events.result_events import BatchResultsReadyV1
+    from common_core.metadata_models import SystemProcessingMetadata
+    
+    system_metadata = SystemProcessingMetadata(
+        entity_id=batch.batch_id,
+        entity_type="batch",
+        processing_stage=ProcessingStage.COMPLETED,
+    )
+    
+    event = BatchResultsReadyV1(
+        event_name=ProcessingEvent.BATCH_RESULTS_READY,
+        status=BatchStatus.COMPLETED_SUCCESSFULLY,
+        system_metadata=system_metadata,
+        batch_id=batch.batch_id,
+        user_id=batch.user_id,
+        total_essays=batch.total_essay_count,
+        completed_essays=batch.processed_essay_count,
+        phase_results=phase_results,
+        overall_status=self._determine_overall_status(batch),
+        processing_duration_seconds=self._calculate_duration(batch),
+    )
+    
+    await self.event_publisher.publish_batch_results_ready(
+        event, envelope.correlation_id
+    )
+    
+    logger.info(
+        "Published BatchResultsReadyV1 event",
+        batch_id=batch.batch_id,
+        user_id=batch.user_id,
+    )
+
+# Helper methods to add:
+async def _check_batch_completion(self, batch: BatchResult) -> bool:
+    """Check if all configured phases are complete."""
+    # Implementation: Check batch.phase_statuses against expected phases
+    pass
+
+def _calculate_phase_results(self, batch: BatchResult) -> dict:
+    """Calculate phase result summaries from batch data."""
+    # Implementation: Transform batch.phase_statuses to PhaseResultSummary dict
+    pass
+
+def _determine_overall_status(self, batch: BatchResult) -> BatchStatus:
+    """Determine overall batch status from phase results."""
+    # Implementation: Logic to determine COMPLETED_SUCCESSFULLY vs COMPLETED_WITH_FAILURES
+    pass
+
+def _calculate_duration(self, batch: BatchResult) -> float:
+    """Calculate total processing duration."""
+    # Implementation: batch.completed_at - batch.created_at in seconds
+    pass
 ```
 
-#### Session 2.2: Event Contracts
-```python
-# New events in common_core:
-libs/common_core/src/common_core/events/result_events.py:
-  + BatchResultsReadyV1          # All phases complete
-  + BatchAssessmentCompletedV1   # CJ assessment done
-  + BatchPartialResultsV1        # Progressive updates
+##### Integration Point 2: CJ Assessment Completed Handler (Line 288-347)
 
-# Event registration:
-libs/common_core/src/common_core/event_enums.py:
-  + BATCH_RESULTS_READY = "batch_results_ready"
-  + BATCH_ASSESSMENT_COMPLETED = "batch_assessment_completed"
-  + BATCH_PARTIAL_RESULTS = "batch_partial_results"
+```python
+# Add after line 331 (after cache invalidation):
+# Get batch info for user_id
+batch = await self.batch_repository.get_batch(batch_id)
+if batch:
+    # Create BatchAssessmentCompletedV1 event
+    from common_core.events.result_events import BatchAssessmentCompletedV1
+    from common_core.metadata_models import SystemProcessingMetadata
+    
+    system_metadata = SystemProcessingMetadata(
+        entity_id=batch_id,
+        entity_type="batch",
+        processing_stage=ProcessingStage.COMPLETED,
+    )
+    
+    event = BatchAssessmentCompletedV1(
+        event_name=ProcessingEvent.BATCH_ASSESSMENT_COMPLETED,
+        status=BatchStatus.COMPLETED_SUCCESSFULLY,
+        system_metadata=system_metadata,
+        batch_id=batch_id,
+        user_id=batch.user_id,
+        assessment_job_id=data.cj_assessment_job_id,
+        rankings_summary=data.rankings,  # Thin event - just summary
+    )
+    
+    await self.event_publisher.publish_batch_assessment_completed(
+        event, envelope.correlation_id
+    )
+    
+    logger.info(
+        "Published BatchAssessmentCompletedV1 event",
+        batch_id=batch_id,
+        assessment_job_id=data.cj_assessment_job_id,
+        rankings_count=len(data.rankings),
+    )
 ```
 
-#### Session 2.3: Publishing Tests
+##### DI Container Update
+
 ```python
-# Integration tests:
-tests/integration/test_event_publishing.py:
-  - test_batch_completion_publishes_event()
-  - test_assessment_completion_publishes_event()
-  - test_partial_results_publishing()
-  - test_event_envelope_structure()
+# In services/result_aggregator_service/di.py:
+# Update provide_event_processor to inject EventPublisher:
+@provide
+def provide_event_processor(
+    self,
+    batch_repository: BatchRepositoryProtocol,
+    state_store: StateStoreProtocol,
+    cache_manager: CacheManagerProtocol,
+    event_publisher: EventPublisherProtocol,  # NEW
+) -> EventProcessorProtocol:
+    return EventProcessorImpl(
+        batch_repository, 
+        state_store, 
+        cache_manager,
+        event_publisher,  # NEW
+    )
+```
+
+##### Test Requirements
+
+```python
+# tests/unit/result_aggregator_service/test_event_processor_integration.py
+# Test batch completion detection logic
+# Test event creation with correct data mapping
+# Test publisher invocation with proper correlation_id
+# Mock EventPublisher to verify correct method calls
 ```
 
 ### PHASE 3: Notification Projection Pattern (1 session)
 
-**Rule Reference**: `.cursor/rules/030-event-driven-architecture-eda-standards.mdc`
+**CANONICAL PATTERN**: Direct notification projector invocation after domain event (NO Kafka round-trip)
 
 #### Session 3.1: Notification Projector
+
 ```python
-# Create notification projector:
+# Implementation pattern from file_service:
 services/result_aggregator_service/notification_projector.py
 
-class NotificationProjector:
+from common_core.events.notification_events import TeacherNotificationRequestedV1
+from common_core.websocket_enums import NotificationPriority, WebSocketEventCategory
+
+class ResultNotificationProjector:
     """Projects result events to teacher notifications."""
     
-    async def handle_batch_results_ready(self, event: BatchResultsReadyV1):
-        # Project to TeacherNotificationRequestedV1
-        # Priority: HIGH (important completion)
-        # Category: PROCESSING_RESULTS
+    def __init__(self, kafka_publisher: KafkaPublisherProtocol):
+        self.kafka_publisher = kafka_publisher
+    
+    async def handle_batch_results_ready(self, event: BatchResultsReadyV1) -> None:
+        """Project batch completion to high-priority teacher notification."""
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=event.user_id,
+            notification_type="batch_results_ready",
+            category=WebSocketEventCategory.PROCESSING_RESULTS,
+            priority=NotificationPriority.IMMEDIATE,  # Important completion
+            payload={
+                "batch_id": event.batch_id,
+                "total_essays": event.total_essays,
+                "completed_essays": event.completed_essays,
+                "overall_status": event.overall_status.value,
+                "message": f"Batch {event.batch_id} processing complete. {event.completed_essays}/{event.total_essays} essays processed successfully.",
+                "phase_summaries": self._summarize_phases(event.phase_results)
+            },
+            action_required=True,  # Teacher should review results
+            correlation_id=str(event.correlation_id),
+            batch_id=event.batch_id
+        )
         
-    async def handle_batch_assessment_completed(self, event: BatchAssessmentCompletedV1):
-        # Project to TeacherNotificationRequestedV1
-        # Priority: STANDARD
-        # Category: PROCESSING_RESULTS
-
-# Reference implementations:
-- /services/class_management_service/notification_projector.py
-- /services/batch_orchestrator_service/notification_projector.py
+        # Publish directly to WebSocket service via Kafka
+        envelope = EventEnvelope[TeacherNotificationRequestedV1](
+            event_type=topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED),
+            source_service="result_aggregator_service",
+            correlation_id=UUID(notification.correlation_id),
+            data=notification
+        )
+        
+        await self.kafka_publisher.publish(
+            topic=topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED),
+            envelope=envelope,
+            key=event.user_id  # Partition by teacher
+        )
+    
+    async def handle_batch_assessment_completed(self, event: BatchAssessmentCompletedV1) -> None:
+        """Project CJ assessment completion to teacher notification."""
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=event.user_id,
+            notification_type="batch_assessment_completed",
+            category=WebSocketEventCategory.PROCESSING_RESULTS,
+            priority=NotificationPriority.STANDARD,
+            payload={
+                "batch_id": event.batch_id,
+                "assessment_job_id": event.assessment_job_id,
+                "message": f"Comparative judgment assessment completed for batch {event.batch_id}",
+                "rankings_available": len(event.rankings_summary) > 0
+            },
+            action_required=False,
+            correlation_id=str(event.correlation_id),
+            batch_id=event.batch_id
+        )
+        
+        await self._publish_notification(notification)
 ```
 
 ### PHASE 4: CJ Assessment Service Enhancements (2 sessions)
@@ -197,40 +365,50 @@ services/cj_assessment_service/api/result_routes.py:
    - Allows on-demand detail fetching
 ```
 
-## Implementation Patterns
+## Critical Implementation Patterns
 
-### Pattern 1: Outbox with Dishka DI
+### TRUE OUTBOX PATTERN (Mandatory)
+
 ```python
-# From file_service/di.py:
+# ALWAYS store in DB first, relay worker publishes asynchronously
+await self.outbox_manager.publish_to_outbox(
+    aggregate_type="batch",
+    aggregate_id=event.batch_id,
+    event_type=envelope.event_type,
+    event_data=envelope,  # Pass original Pydantic envelope
+    topic=topic_name(ProcessingEvent.BATCH_RESULTS_READY)
+)
+# NEVER direct Kafka publishing from business logic
+```
+
+### CANONICAL NOTIFICATION PATTERN
+
+```python
+# Direct projector invocation after domain event (NO Kafka round-trip)
+async def publish_batch_results_ready(self, event_data, correlation_id):
+    # 1. Store domain event in outbox
+    await self.outbox_manager.publish_to_outbox(...)
+    
+    # 2. Directly invoke notification projector 
+    if self.notification_projector:
+        await self.notification_projector.handle_batch_results_ready(event_data)
+```
+
+### DI WIRING PATTERN
+
+```python
+# From working services - exact pattern to copy:
 @provide(scope=Scope.APP)
-async def provide_outbox_manager(
-    engine: AsyncEngine,
-    kafka_publisher: KafkaPublisherProtocol,
-) -> OutboxManager:
-    return OutboxManager(engine, kafka_publisher)
-```
+def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
+    return PostgreSQLOutboxRepository(engine)
 
-### Pattern 2: Event Publishing
-```python
-# From class_management_service/implementations/event_publisher_impl.py:
-async def publish_result_event(self, event: BatchResultsReadyV1):
-    envelope = EventEnvelope(
-        event_type=topic_name(ProcessingEvent.BATCH_RESULTS_READY),
-        data=event,
-        source_service="result_aggregator_service",
-    )
-    await self.outbox_manager.publish_to_outbox(
-        aggregate_id=event.batch_id,
-        event_data=envelope,
-    )
-```
+@provide(scope=Scope.APP) 
+def provide_kafka_publisher(self, ...) -> KafkaPublisherProtocol:
+    return ResilientKafkaPublisher(kafka_bus, circuit_breaker)
 
-### Pattern 3: Notification Projection
-```python
-# Direct invocation pattern (no Kafka round-trip):
-if event_type == "batch_results_ready":
-    await self.notification_projector.handle_batch_results_ready(event)
-    # Internally publishes TeacherNotificationRequestedV1
+@provide(scope=Scope.APP)
+def provide_event_publisher(self, outbox_manager, settings, notification_projector):
+    return ResultEventPublisher(outbox_manager, settings, notification_projector)
 ```
 
 ## Testing Strategy
@@ -351,19 +529,36 @@ from huleedu_service_libs.error_handling import (
 
 ## Next Session Focus
 
-**Session 1.1: Implement Transactional Outbox Pattern**
-1. Copy outbox pattern from file_service
-2. Add EventOutbox model to models_db.py
-3. Create database migration
-4. Implement OutboxManager
-5. Add DI providers
-6. Basic unit tests
+**Session 2.1: Implement Event Publisher** (Ready to start)
+
+1. **Create ResultEventPublisher**:
+   - Copy pattern from `file_service/implementations/event_publisher_impl.py`
+   - Implement `publish_batch_results_ready()` and `publish_batch_assessment_completed()`
+   - Use OutboxManager for TRUE OUTBOX PATTERN
+
+2. **Wire Kafka Publisher in DI**:
+   - Add `provide_kafka_publisher()` using `ResilientKafkaPublisher`
+   - Add `provide_event_publisher()` with dependencies
+   - Update imports for `huleedu_service_libs.kafka.resilient_kafka_bus`
+
+3. **Create Basic Event Contracts** (temporary):
+   - Stub out `BatchResultsReadyV1` and `BatchAssessmentCompletedV1` locally
+   - Full common_core implementation in Session 2.2
+
+4. **Unit Tests**:
+   - Test event envelope structure
+   - Test outbox integration
+   - Mock notification projector
 
 ## Related Documentation
 
 - **Blocked Task**: `/TASKS/WEBSOCKET_TEACHER_NOTIFICATION_LAYER.md#phase-3b`
 - **Architecture Rules**: See rule references in each phase
-- **Reference Services**: 
-  - `/services/file_service/` (outbox pattern)
-  - `/services/class_management_service/` (event publishing)
-  - `/services/batch_orchestrator_service/` (notification projection)
+- **Reference Services**:
+  - `/services/file_service/` (outbox pattern ✅ STUDIED)
+  - `/services/class_management_service/` (event publishing pattern)
+  - `/services/essay_lifecycle_service/` (batch lifecycle publisher pattern)
+- **Shared Libraries**:
+  - `huleedu_service_libs.kafka` - ResilientKafkaPublisher
+  - `huleedu_service_libs.outbox` - PostgreSQLOutboxRepository ✅ USED
+  - `huleedu_service_libs.protocols` - KafkaPublisherProtocol
