@@ -7,6 +7,9 @@ verifying the TRUE OUTBOX PATTERN implementation.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
+# Import protocols for type annotations
+from typing import Any, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -19,62 +22,82 @@ from common_core.events.result_events import (
 )
 from common_core.status_enums import BatchStatus
 from common_core.websocket_enums import NotificationPriority, WebSocketEventCategory
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 from services.result_aggregator_service.notification_projector import ResultNotificationProjector
 
 
-class MockOutboxRepository:
-    """Mock outbox repository for testing."""
+class MockOutboxRepositoryWithData:
+    """Mock outbox repository with test data access."""
 
     def __init__(self) -> None:
         self.stored_events: list[dict] = []
+        self.mock = AsyncMock(spec=OutboxRepositoryProtocol)
 
-    async def add_event(
-        self,
-        aggregate_type: str,
-        aggregate_id: str,
-        event_type: str,
-        event_data: dict,
-        topic: str,
-    ) -> None:
-        """Mock storing event in outbox."""
-        self.stored_events.append({
-            "aggregate_type": aggregate_type,
-            "aggregate_id": aggregate_id,
-            "event_type": event_type,
-            "event_data": event_data,
-            "topic": topic,
-        })
+        async def add_event_impl(
+            aggregate_id: str,
+            aggregate_type: str,
+            event_type: str,
+            event_data: dict,
+            topic: str,
+            **kwargs: Any,
+        ) -> Any:
+            """Mock storing event in outbox."""
+            self.stored_events.append(
+                {
+                    "aggregate_type": aggregate_type,
+                    "aggregate_id": aggregate_id,
+                    "event_type": event_type,
+                    "event_data": event_data,
+                    "topic": topic,
+                }
+            )
 
-    async def get_unpublished_events(self, limit: int = 100) -> list[dict]:
-        """Mock getting unpublished events."""
-        return self.stored_events[:limit]
+        async def get_unpublished_events_impl(limit: int = 100, **kwargs: Any) -> list[dict]:
+            """Mock getting unpublished events."""
+            return self.stored_events[:limit]
+
+        self.mock.add_event.side_effect = add_event_impl
+        self.mock.get_unpublished_events.side_effect = get_unpublished_events_impl
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate to the mock object."""
+        return getattr(self.mock, name)
 
 
-class MockAtomicRedisClient:
-    """Mock atomic Redis client for testing."""
+class MockRedisClientWithData:
+    """Mock Redis client with test data access."""
 
     def __init__(self) -> None:
         self.notifications_sent: list[str] = []
+        self.mock = AsyncMock(spec=AtomicRedisClientProtocol)
 
-    async def lpush(self, _key: str, value: str) -> int:
-        """Mock Redis LPUSH for notifications."""
-        self.notifications_sent.append(value)
-        return 1
+        async def lpush_impl(key: str, *values: str) -> int:
+            """Mock Redis LPUSH for notifications."""
+            for value in values:
+                self.notifications_sent.append(value)
+            return len(values)
+
+        self.mock.lpush.side_effect = lpush_impl
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate to the mock object."""
+        return getattr(self.mock, name)
 
 
 @pytest.fixture
-def mock_outbox_repository() -> MockOutboxRepository:
+def mock_outbox_repository() -> MockOutboxRepositoryWithData:
     """Provide mock outbox repository."""
-    return MockOutboxRepository()
+    return MockOutboxRepositoryWithData()
 
 
 @pytest.fixture
-def mock_redis_client() -> MockAtomicRedisClient:
+def mock_redis_client() -> MockRedisClientWithData:
     """Provide mock atomic Redis client."""
-    return MockAtomicRedisClient()
+    return MockRedisClientWithData()
 
 
 @pytest.fixture
@@ -85,14 +108,14 @@ def settings() -> Settings:
 
 @pytest.fixture
 def outbox_manager(
-    mock_outbox_repository: MockOutboxRepository,
-    mock_redis_client: MockAtomicRedisClient,
+    mock_outbox_repository: MockOutboxRepositoryWithData,
+    mock_redis_client: MockRedisClientWithData,
     settings: Settings,
 ) -> OutboxManager:
     """Provide OutboxManager with mocked dependencies."""
     return OutboxManager(
-        outbox_repository=mock_outbox_repository,
-        redis_client=mock_redis_client,
+        outbox_repository=cast(OutboxRepositoryProtocol, mock_outbox_repository),
+        redis_client=cast(AtomicRedisClientProtocol, mock_redis_client),
         settings=settings,
     )
 
@@ -112,6 +135,9 @@ def notification_projector(
 @pytest.fixture
 def sample_batch_results_ready_event() -> BatchResultsReadyV1:
     """Provide sample BatchResultsReadyV1 event."""
+    from common_core.metadata_models import SystemProcessingMetadata
+    from common_core.status_enums import ProcessingStage
+
     return BatchResultsReadyV1(
         batch_id="integration-batch-123",
         user_id="integration-teacher-456",
@@ -134,8 +160,14 @@ def sample_batch_results_ready_event() -> BatchResultsReadyV1:
                 processing_time_seconds=180.2,
             ),
         },
-        overall_status=BatchStatus.COMPLETED,
+        overall_status=BatchStatus.COMPLETED_SUCCESSFULLY,
         processing_duration_seconds=188.0,
+        status=BatchStatus.COMPLETED_SUCCESSFULLY,
+        system_metadata=SystemProcessingMetadata(
+            entity_id="integration-batch-123",
+            entity_type="batch",
+            processing_stage=ProcessingStage.COMPLETED,
+        ),
         event_timestamp=datetime.now(timezone.utc),
     )
 
@@ -143,6 +175,9 @@ def sample_batch_results_ready_event() -> BatchResultsReadyV1:
 @pytest.fixture
 def sample_batch_assessment_completed_event() -> BatchAssessmentCompletedV1:
     """Provide sample BatchAssessmentCompletedV1 event."""
+    from common_core.metadata_models import SystemProcessingMetadata
+    from common_core.status_enums import ProcessingStage
+
     return BatchAssessmentCompletedV1(
         batch_id="integration-batch-789",
         user_id="integration-teacher-101",
@@ -154,6 +189,12 @@ def sample_batch_assessment_completed_event() -> BatchAssessmentCompletedV1:
             {"essay_id": "essay4", "rank": 4, "score": 0.71},
         ],
         correlation_id=uuid4(),
+        status=BatchStatus.COMPLETED_SUCCESSFULLY,
+        system_metadata=SystemProcessingMetadata(
+            entity_id="integration-batch-789",
+            entity_type="batch",
+            processing_stage=ProcessingStage.COMPLETED,
+        ),
         event_timestamp=datetime.now(timezone.utc),
     )
 
@@ -161,13 +202,15 @@ def sample_batch_assessment_completed_event() -> BatchAssessmentCompletedV1:
 @pytest.mark.asyncio
 async def test_batch_results_ready_end_to_end_flow(
     notification_projector: ResultNotificationProjector,
-    mock_outbox_repository: MockOutboxRepository,
-    mock_redis_client: MockAtomicRedisClient,
+    mock_outbox_repository: MockOutboxRepositoryWithData,
+    mock_redis_client: MockRedisClientWithData,
     sample_batch_results_ready_event: BatchResultsReadyV1,
 ) -> None:
     """Test complete flow from BatchResultsReadyV1 event to outbox storage."""
     # Act
-    await notification_projector.handle_batch_results_ready(sample_batch_results_ready_event)
+    await notification_projector.handle_batch_results_ready(
+        sample_batch_results_ready_event, uuid4()
+    )
 
     # Assert outbox storage
     assert len(mock_outbox_repository.stored_events) == 1
@@ -198,7 +241,7 @@ async def test_batch_results_ready_end_to_end_flow(
     assert payload["batch_id"] == "integration-batch-123"
     assert payload["total_essays"] == 15
     assert payload["completed_essays"] == 15
-    assert payload["overall_status"] == BatchStatus.COMPLETED.value
+    assert payload["overall_status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
     assert payload["processing_duration_seconds"] == 188.0
     assert "integration-batch-123 processing completed with 15/15 essays" in payload["message"]
 
@@ -220,13 +263,15 @@ async def test_batch_results_ready_end_to_end_flow(
 @pytest.mark.asyncio
 async def test_batch_assessment_completed_end_to_end_flow(
     notification_projector: ResultNotificationProjector,
-    mock_outbox_repository: MockOutboxRepository,
-    mock_redis_client: MockAtomicRedisClient,
+    mock_outbox_repository: MockOutboxRepositoryWithData,
+    mock_redis_client: MockRedisClientWithData,
     sample_batch_assessment_completed_event: BatchAssessmentCompletedV1,
 ) -> None:
     """Test complete flow from BatchAssessmentCompletedV1 event to outbox storage."""
     # Act
-    await notification_projector.handle_batch_assessment_completed(sample_batch_assessment_completed_event)
+    await notification_projector.handle_batch_assessment_completed(
+        sample_batch_assessment_completed_event, uuid4()
+    )
 
     # Assert outbox storage
     assert len(mock_outbox_repository.stored_events) == 1
@@ -258,7 +303,10 @@ async def test_batch_assessment_completed_end_to_end_flow(
     assert payload["assessment_job_id"] == "integration-job-202"
     assert payload["rankings_available"] is True
     assert payload["rankings_count"] == 4
-    assert "Comparative judgment assessment completed for batch integration-batch-789" in payload["message"]
+    assert (
+        "Comparative judgment assessment completed for batch integration-batch-789"
+        in payload["message"]
+    )
 
     # Verify Redis notification was sent for relay worker wake-up
     assert len(mock_redis_client.notifications_sent) == 1
@@ -268,14 +316,18 @@ async def test_batch_assessment_completed_end_to_end_flow(
 @pytest.mark.asyncio
 async def test_multiple_notifications_stored_separately(
     notification_projector: ResultNotificationProjector,
-    mock_outbox_repository: MockOutboxRepository,
+    mock_outbox_repository: MockOutboxRepositoryWithData,
     sample_batch_results_ready_event: BatchResultsReadyV1,
     sample_batch_assessment_completed_event: BatchAssessmentCompletedV1,
 ) -> None:
     """Test that multiple notifications are stored separately in outbox."""
     # Act - Process both events
-    await notification_projector.handle_batch_results_ready(sample_batch_results_ready_event)
-    await notification_projector.handle_batch_assessment_completed(sample_batch_assessment_completed_event)
+    await notification_projector.handle_batch_results_ready(
+        sample_batch_results_ready_event, uuid4()
+    )
+    await notification_projector.handle_batch_assessment_completed(
+        sample_batch_assessment_completed_event, uuid4()
+    )
 
     # Assert - Two separate events stored
     assert len(mock_outbox_repository.stored_events) == 2
@@ -297,8 +349,7 @@ async def test_multiple_notifications_stored_separately(
 
 @pytest.mark.asyncio
 async def test_outbox_manager_failure_propagation(
-    mock_outbox_repository: MockOutboxRepository,
-    mock_redis_client: MockAtomicRedisClient,
+    mock_redis_client: MockRedisClientWithData,
     settings: Settings,
     sample_batch_results_ready_event: BatchResultsReadyV1,
 ) -> None:
@@ -309,7 +360,7 @@ async def test_outbox_manager_failure_propagation(
 
     outbox_manager = OutboxManager(
         outbox_repository=failing_repo,
-        redis_client=mock_redis_client,
+        redis_client=cast(AtomicRedisClientProtocol, mock_redis_client),
         settings=settings,
     )
 
@@ -320,18 +371,22 @@ async def test_outbox_manager_failure_propagation(
 
     # Act & Assert - Exception should be propagated
     with pytest.raises(Exception, match="Database connection failed"):
-        await notification_projector.handle_batch_results_ready(sample_batch_results_ready_event)
+        await notification_projector.handle_batch_results_ready(
+            sample_batch_results_ready_event, uuid4()
+        )
 
 
 @pytest.mark.asyncio
 async def test_true_outbox_pattern_compliance(
     notification_projector: ResultNotificationProjector,
-    mock_outbox_repository: MockOutboxRepository,
+    mock_outbox_repository: MockOutboxRepositoryWithData,
     sample_batch_results_ready_event: BatchResultsReadyV1,
 ) -> None:
     """Test compliance with TRUE OUTBOX PATTERN requirements."""
     # Act
-    await notification_projector.handle_batch_results_ready(sample_batch_results_ready_event)
+    await notification_projector.handle_batch_results_ready(
+        sample_batch_results_ready_event, uuid4()
+    )
 
     # Assert TRUE OUTBOX PATTERN compliance
     assert len(mock_outbox_repository.stored_events) == 1

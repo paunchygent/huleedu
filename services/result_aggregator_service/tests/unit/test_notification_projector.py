@@ -36,7 +36,9 @@ class TestResultNotificationProjector:
         return Settings()
 
     @pytest.fixture
-    def projector(self, mock_outbox_manager: AsyncMock, settings: Settings) -> ResultNotificationProjector:
+    def projector(
+        self, mock_outbox_manager: AsyncMock, settings: Settings
+    ) -> ResultNotificationProjector:
         """Provide notification projector instance."""
         return ResultNotificationProjector(
             outbox_manager=mock_outbox_manager,
@@ -72,9 +74,7 @@ class TestResultNotificationProjector:
             processing_duration_seconds=125.7,
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(
-                entity_id="batch-123",
-                entity_type="batch",
-                service_name="result_aggregator_service"
+                entity_id="batch-123", entity_type="batch", service_name="result_aggregator_service"
             ),
             event_timestamp=datetime.now(timezone.utc),
         )
@@ -94,9 +94,7 @@ class TestResultNotificationProjector:
             correlation_id=uuid4(),
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(
-                entity_id="batch-123",
-                entity_type="batch",
-                service_name="result_aggregator_service"
+                entity_id="batch-123", entity_type="batch", service_name="result_aggregator_service"
             ),
             event_timestamp=datetime.now(timezone.utc),
         )
@@ -121,7 +119,9 @@ class TestResultNotificationProjector:
         # Verify outbox parameters
         assert call_args[1]["aggregate_type"] == "teacher_notification"
         assert call_args[1]["aggregate_id"] == "teacher-456"
-        assert call_args[1]["event_type"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+        assert call_args[1]["event_type"] == topic_name(
+            ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED
+        )
         assert call_args[1]["topic"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
 
         # Verify envelope structure
@@ -164,12 +164,14 @@ class TestResultNotificationProjector:
         mock_outbox_manager: AsyncMock,
         sample_batch_assessment_completed_event: BatchAssessmentCompletedV1,
     ) -> None:
-        """Test that batch assessment completed event creates correct standard-priority notification."""
+        """Test batch assessment completed event creates correct standard-priority notification."""
         # Arrange
         correlation_id = uuid4()
 
         # Act
-        await projector.handle_batch_assessment_completed(sample_batch_assessment_completed_event, correlation_id)
+        await projector.handle_batch_assessment_completed(
+            sample_batch_assessment_completed_event, correlation_id
+        )
 
         # Assert
         mock_outbox_manager.publish_to_outbox.assert_called_once()
@@ -178,7 +180,9 @@ class TestResultNotificationProjector:
         # Verify outbox parameters
         assert call_args[1]["aggregate_type"] == "teacher_notification"
         assert call_args[1]["aggregate_id"] == "teacher-101"
-        assert call_args[1]["event_type"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+        assert call_args[1]["event_type"] == topic_name(
+            ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED
+        )
         assert call_args[1]["topic"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
 
         # Verify envelope structure
@@ -220,9 +224,7 @@ class TestResultNotificationProjector:
             correlation_id=uuid4(),
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(
-                entity_id="batch-123",
-                entity_type="batch",
-                service_name="result_aggregator_service"
+                entity_id="batch-123", entity_type="batch", service_name="result_aggregator_service"
             ),
             event_timestamp=datetime.now(timezone.utc),
         )
@@ -274,7 +276,9 @@ class TestResultNotificationProjector:
         if priority_level == "batch_results_ready":
             await projector.handle_batch_results_ready(sample_batch_results_ready_event, uuid4())
         else:
-            await projector.handle_batch_assessment_completed(sample_batch_assessment_completed_event, uuid4())
+            await projector.handle_batch_assessment_completed(
+                sample_batch_assessment_completed_event, uuid4()
+            )
 
         # Assert
         call_args = mock_outbox_manager.publish_to_outbox.call_args
@@ -301,9 +305,7 @@ class TestResultNotificationProjector:
             processing_duration_seconds=60.0,
             status=BatchStatus.COMPLETED_SUCCESSFULLY,
             system_metadata=SystemProcessingMetadata(
-                entity_id="batch-123",
-                entity_type="batch",
-                service_name="result_aggregator_service"
+                entity_id="batch-123", entity_type="batch", service_name="result_aggregator_service"
             ),
             event_timestamp=datetime.now(timezone.utc),
         )
@@ -343,7 +345,9 @@ class TestResultNotificationProjector:
         mock_outbox_manager.reset_mock()
 
         # Test batch assessment completed message
-        await projector.handle_batch_assessment_completed(sample_batch_assessment_completed_event, uuid4())
+        await projector.handle_batch_assessment_completed(
+            sample_batch_assessment_completed_event, uuid4()
+        )
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         envelope = call_args[1]["event_data"]
         notification = envelope.data

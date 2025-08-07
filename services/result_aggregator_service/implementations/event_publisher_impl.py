@@ -142,4 +142,6 @@ class ResultEventPublisher:
         # CANONICAL NOTIFICATION PATTERN: Direct invocation after domain event
         # No Kafka round-trip - immediate teacher notification
         if self.notification_projector:
-            await self.notification_projector.handle_batch_assessment_completed(event_data, correlation_id)
+            await self.notification_projector.handle_batch_assessment_completed(
+                event_data, correlation_id
+            )

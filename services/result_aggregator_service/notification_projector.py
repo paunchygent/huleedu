@@ -39,7 +39,9 @@ class ResultNotificationProjector:
         self.outbox_manager = outbox_manager
         self.settings = settings
 
-    async def handle_batch_results_ready(self, event: BatchResultsReadyV1, correlation_id: UUID) -> None:
+    async def handle_batch_results_ready(
+        self, event: BatchResultsReadyV1, correlation_id: UUID
+    ) -> None:
         """Project batch completion to high-priority teacher notification.
 
         Creates TeacherNotificationRequestedV1 and stores in outbox for reliable delivery.
@@ -66,7 +68,10 @@ class ResultNotificationProjector:
                     }
                     for phase_name, summary in event.phase_results.items()
                 },
-                "message": f"Batch {event.batch_id} processing completed with {event.completed_essays}/{event.total_essays} essays",
+                "message": (
+                    f"Batch {event.batch_id} processing completed with "
+                    f"{event.completed_essays}/{event.total_essays} essays"
+                ),
             },
             action_required=False,
             correlation_id=str(correlation_id),
@@ -86,7 +91,9 @@ class ResultNotificationProjector:
             },
         )
 
-    async def handle_batch_assessment_completed(self, event: BatchAssessmentCompletedV1, correlation_id: UUID) -> None:
+    async def handle_batch_assessment_completed(
+        self, event: BatchAssessmentCompletedV1, correlation_id: UUID
+    ) -> None:
         """Project CJ assessment completion to teacher notification.
 
         Creates TeacherNotificationRequestedV1 and stores in outbox for reliable delivery.

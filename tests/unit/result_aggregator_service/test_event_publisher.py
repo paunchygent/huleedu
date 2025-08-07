@@ -6,6 +6,7 @@ and CANONICAL NOTIFICATION PATTERN.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, create_autospec
 from uuid import uuid4
 
@@ -34,7 +35,7 @@ class TestResultEventPublisher:
     """Tests for ResultEventPublisher implementation."""
 
     @pytest.fixture
-    def mock_outbox_manager(self) -> AsyncMock:
+    def mock_outbox_manager(self) -> Any:
         """Create mock outbox manager."""
         mock = create_autospec(OutboxManagerProtocol, spec_set=True)
         mock.publish_to_outbox = AsyncMock()
@@ -42,7 +43,7 @@ class TestResultEventPublisher:
         return mock
 
     @pytest.fixture
-    def mock_notification_projector(self) -> AsyncMock:
+    def mock_notification_projector(self) -> Any:
         """Create mock notification projector."""
         mock = create_autospec(ResultNotificationProjector, spec_set=True)
         mock.handle_batch_results_ready = AsyncMock()

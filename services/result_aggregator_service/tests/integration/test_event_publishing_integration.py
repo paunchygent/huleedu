@@ -108,7 +108,7 @@ async def test_batch_results_ready_published_when_all_phases_complete(
     mock_batch_repository.update_batch_phase_completed = AsyncMock()
 
     # Create phase outcome event
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
         event_type="huleedu.els.batch.phase_outcome.v1",
         source_service="essay_lifecycle_service",
         correlation_id=correlation_id,
@@ -183,7 +183,7 @@ async def test_batch_results_ready_not_published_when_phases_incomplete(
     mock_batch_repository.update_batch_phase_completed = AsyncMock()
 
     # Create phase outcome event
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
         event_type="huleedu.els.batch.phase_outcome.v1",
         source_service="essay_lifecycle_service",
         correlation_id=correlation_id,
@@ -236,7 +236,7 @@ async def test_batch_assessment_completed_published_on_cj_completion(
         {"els_essay_id": "essay_2", "rank": 3, "score": 0.75},
     ]
 
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
         event_type="huleedu.cj.assessment.completed.v1",
         source_service="cj_assessment_service",
         correlation_id=correlation_id,
@@ -326,7 +326,7 @@ async def test_batch_results_ready_with_partial_failures(
     mock_batch_repository.update_batch_phase_completed = AsyncMock()
 
     # Create phase outcome event
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[ELSBatchPhaseOutcomeV1] = EventEnvelope(
         event_type="huleedu.els.batch.phase_outcome.v1",
         source_service="essay_lifecycle_service",
         correlation_id=correlation_id,
@@ -385,7 +385,7 @@ async def test_correlation_id_propagation(
     mock_batch_repository.update_essay_cj_assessment_result = AsyncMock()
 
     # Create CJ assessment completed event with specific correlation_id
-    envelope = EventEnvelope(
+    envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
         event_type="huleedu.cj.assessment.completed.v1",
         source_service="cj_assessment_service",
         correlation_id=correlation_id,
