@@ -61,6 +61,40 @@ The WebSocket service currently attempts to consume internal domain events, but:
    - Owns authorization and filtering logic
    - Validates teacher relationships
 
+### Canonical Pattern: Direct Invocation (NO Kafka Round-trip)
+
+**MANDATORY**: All notification projectors MUST use direct invocation pattern to avoid Kafka round-trips and ensure immediate notifications.
+
+```python
+# CANONICAL PATTERN - services/*/implementations/event_publisher_impl.py
+async def publish_domain_event(self, event_data, correlation_id):
+    # Step 1: Publish domain event for service coordination
+    await self.outbox_manager.publish_to_outbox(event_data)
+    
+    # Step 2: DIRECTLY invoke notification projector (NO Kafka consumption)
+    if self.notification_projector:
+        # Option A: Event has user_id directly
+        await self.notification_projector.handle_event(event_data)
+        
+        # Option B: Resolve user_id from repository
+        user_id = await self.resolve_user_id(event_data)
+        if user_id:
+            await self.notification_projector.handle_event(event_data, user_id)
+```
+
+**Benefits**:
+- ✅ Immediate notifications (no Kafka delay)
+- ✅ No duplicate processing concerns
+- ✅ Simpler testing (mock projector directly)
+- ✅ Service owns notification decisions
+
+**Anti-pattern to AVOID**:
+```python
+# ❌ NEVER create separate Kafka consumers for notifications
+# ❌ NEVER consume your own events back from Kafka
+# ❌ This adds latency and complexity
+```
+
 ## Teacher Notification Catalog (15 Events)
 
 ### CRITICAL Priority (24-hour deadline)
@@ -458,52 +492,66 @@ class NotificationHandler(NotificationHandlerProtocol):
 
 ### File Service Projector ✅ COMPLETED
 
-**Implementation**: Direct invocation pattern matching Class Management Service
-
+Implemented direct invocation pattern in `/services/file_service/implementations/event_publisher_impl.py`:
 ```python
-# services/file_service/notification_projector.py
-class FileServiceNotificationProjector:
-    async def handle_batch_file_added(self, event: BatchFileAddedV1) -> None:
-        # Direct user_id from event → STANDARD priority
-        await self.kafka_publisher.publish(envelope)
+# CANONICAL PATTERN IMPLEMENTATION
+async def publish_batch_file_added_v1(self, event_data, correlation_id):
+    # Step 1: Domain event via outbox
+    await self.outbox_manager.publish_to_outbox(event_data)
     
-    async def handle_batch_file_removed(self, event: BatchFileRemovedV1) -> None:
-        # Direct user_id from event → STANDARD priority
-        
-    async def handle_essay_validation_failed(self, event: EssayValidationFailedV1, user_id: str) -> None:
-        # user_id from file_uploads table lookup → IMMEDIATE priority
+    # Step 2: Direct notification (NO Kafka round-trip)
+    if self.notification_projector:
+        await self.notification_projector.handle_batch_file_added(event_data)
+
+async def publish_essay_validation_failed(self, event_data, correlation_id):
+    # Step 1: Domain event via outbox
+    await self.outbox_manager.publish_to_outbox(event_data)
+    
+    # Step 2: Direct notification with user_id lookup
+    if self.notification_projector and self.file_repository:
+        file_upload = await self.file_repository.get_file_upload(event_data.file_upload_id)
+        if file_upload and file_upload.get("user_id"):
+            await self.notification_projector.handle_essay_validation_failed(
+                event_data, file_upload["user_id"]
+            )
 ```
 
-**Architecture Decision**: Option 2 - Persistent user attribution in `file_uploads` table
-- Migration: `20250106_0001_add_file_uploads_table.py` (NOT YET APPLIED)
-- Repository: `FileRepository` with full CRUD operations
-- Integration: `DefaultEventPublisher` directly calls projector after outbox (same as Class Management)
+**Persistent Attribution**: Migration `f3ce45362241` - `file_uploads` table stores `user_id` for validation failures.
 
-**Key Pattern Difference**: File Service stores user_id in database for:
-- Audit trail compliance
-- Retry resilience (user context preserved)
-- Validation failure notifications (EssayValidationFailedV1 lacks user_id)
+**Test Coverage**: 19/19 tests passing across unit, integration, and E2E.
 
-**Status**: 6/6 unit tests passing, migration pending application
-
-### Assessment Services (SECOND - 3 notifications via ELS)
+### Assessment Services via ELS (NEXT - 3 notifications)
 
 **Priority**: HIGH - ELS already aggregates essay-level results into batch outcomes
 
 **Current State**: 
 - ✅ Essay-level events exist: `SpellcheckResultDataV1`, `CJAssessmentCompletedV1`, `AIFeedbackResultDataV1`
 - ✅ ELS aggregates into `ELSBatchPhaseOutcomeV1` events  
-- ❌ Missing notification projector to convert `ELSBatchPhaseOutcomeV1` to teacher notifications
+- ❌ Missing notification projector using CANONICAL PATTERN
 
 **Target Notifications**:
 - `batch_spellcheck_completed` → LOW priority (spellcheck phase complete)
 - `batch_cj_assessment_completed` → STANDARD priority (CJ assessment phase complete)  
 - `batch_ai_feedback_completed` → STANDARD priority (AI feedback phase complete)
 
-**Implementation Pattern**: 
-- ELS notification projector listens to `ELSBatchPhaseOutcomeV1` events
-- Maps phase names to specific notification types
-- Requires batch repository lookup for teacher_id resolution
+**Implementation Pattern (CANONICAL - Direct Invocation)**: 
+```python
+# In ELS when publishing ELSBatchPhaseOutcomeV1
+async def publish_phase_outcome(self, outcome_event, correlation_id):
+    # Step 1: Domain event for Batch Orchestrator
+    await self.outbox_manager.publish_to_outbox(outcome_event)
+    
+    # Step 2: Direct notification (NO Kafka round-trip!)
+    if self.notification_projector:
+        batch = await self.batch_repository.get_batch(outcome_event.batch_id)
+        if batch and batch.teacher_id:
+            await self.notification_projector.handle_phase_outcome(
+                outcome_event, 
+                teacher_id=batch.teacher_id
+            )
+```
+
+**Key Difference from File Service**: Dynamic teacher_id lookup from batch context (no persistent storage)
 
 ### Batch Orchestrator (THIRD - 3 notifications)  
 
@@ -549,12 +597,12 @@ class FileServiceNotificationProjector:
 - [x] Implement Class Management notification projector
 - [x] Wire projector into Class Management DI
 - [x] Create comprehensive behavioral tests
-- [x] Refactor WebSocket to consume only notifications ✅ COMPLETED
-- [x] Remove all internal event handling from WebSocket ✅ COMPLETED
-- [x] Implement idempotency testing with behavioral methodology ✅ COMPLETED
-- [ ] Implement File Service projector (FIRST - has direct user_id events)
-- [ ] Implement Assessment Services projectors (SECOND - ELS batch aggregation via ELSBatchPhaseOutcomeV1)  
-- [ ] Implement Batch Orchestrator projector (THIRD - lifecycle events from ELS)
-- [ ] Implement Result Aggregator projector (LAST - needs event emission capability added)
-- [ ] End-to-end integration test
-- [ ] Update service READMEs
+- [x] Refactor WebSocket to consume only notifications
+- [x] Remove all internal event handling from WebSocket
+- [x] Implement idempotency testing with behavioral methodology
+- [x] Implement File Service projector with persistent user attribution
+- [ ] Implement ELS notification projector for assessment phases
+- [ ] Implement Batch Orchestrator projector (lifecycle events from ELS)
+- [ ] Implement Result Aggregator projector (needs event emission capability added)
+- [ ] End-to-end integration test with all services
+- [ ] Update service READMEs with notification capabilities

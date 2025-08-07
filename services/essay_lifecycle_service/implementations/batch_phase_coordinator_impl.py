@@ -13,6 +13,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from services.essay_lifecycle_service.notification_projector import ELSNotificationProjector
 
 from common_core.domain_enums import ContentType
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
@@ -44,11 +45,13 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
         batch_lifecycle_publisher: BatchLifecyclePublisher,
         batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
+        notification_projector: ELSNotificationProjector | None = None,
     ) -> None:
         self.repository = repository
         self.batch_lifecycle_publisher = batch_lifecycle_publisher
         self.batch_tracker = batch_tracker
         self.session_factory = session_factory
+        self.notification_projector = notification_projector
 
     async def check_batch_completion(
         self,
@@ -316,6 +319,23 @@ class DefaultBatchPhaseCoordinator(BatchPhaseCoordinator):
             correlation_id=correlation_id,
             session=session,
         )
+
+        # CANONICAL PATTERN: Direct notification projector invocation (NO Kafka round-trip)
+        if self.notification_projector:
+            # Resolve teacher_id from batch context
+            batch_status_dict = await self.batch_tracker.get_batch_status(batch_id)
+            teacher_id = batch_status_dict.get("user_id") if batch_status_dict else None
+            if teacher_id:
+                await self.notification_projector.handle_phase_outcome(outcome_event, teacher_id)
+            else:
+                logger.warning(
+                    f"Could not send phase outcome notification - no teacher_id found for batch: {batch_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "phase_name": phase_name.value,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
 
         # If this is the final phase (CJ Assessment), schedule delayed cleanup
         if phase_name == PhaseName.CJ_ASSESSMENT:

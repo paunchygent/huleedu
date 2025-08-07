@@ -87,6 +87,7 @@ from services.essay_lifecycle_service.implementations.spellcheck_command_handler
     SpellcheckCommandHandler,
 )
 from services.essay_lifecycle_service.metrics import setup_essay_lifecycle_database_monitoring
+from services.essay_lifecycle_service.notification_projector import ELSNotificationProjector
 from services.essay_lifecycle_service.protocols import (
     BatchCommandHandler,
     BatchCoordinationHandler,
@@ -284,6 +285,14 @@ class ServiceClientsProvider(Provider):
     ) -> BatchLifecyclePublisher:
         """Provide batch lifecycle publisher using TRUE OUTBOX PATTERN for transactional safety."""
         return BatchLifecyclePublisher(settings, outbox_manager, topic_naming)
+
+    @provide(scope=Scope.APP)
+    def provide_notification_projector(
+        self,
+        kafka_publisher: KafkaPublisherProtocol,
+    ) -> ELSNotificationProjector:
+        """Provide notification projector for teacher notifications."""
+        return ELSNotificationProjector(kafka_publisher)
 
     @provide(scope=Scope.APP)
     def provide_metrics_collector(self, registry: CollectorRegistry) -> MetricsCollector:
@@ -515,10 +524,11 @@ class BatchCoordinationProvider(Provider):
         batch_lifecycle_publisher: BatchLifecyclePublisher,
         batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
+        notification_projector: ELSNotificationProjector,
     ) -> BatchPhaseCoordinator:
-        """Provide batch phase coordinator implementation with direct publisher injection."""
+        """Provide batch phase coordinator implementation with notification projector."""
         return DefaultBatchPhaseCoordinator(
-            repository, batch_lifecycle_publisher, batch_tracker, session_factory
+            repository, batch_lifecycle_publisher, batch_tracker, session_factory, notification_projector
         )
 
     @provide(scope=Scope.APP)

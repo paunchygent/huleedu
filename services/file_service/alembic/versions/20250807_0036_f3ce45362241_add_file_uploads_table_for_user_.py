@@ -1,10 +1,12 @@
 """Add file_uploads table for user attribution
 
-Revision ID: 20250106_0001
-Revises: 20250725_0001
-Create Date: 2025-01-06 10:00:00.000000
+Revision ID: f3ce45362241
+Revises: 0001
+Create Date: 2025-08-07 00:36:24.456572
 
 """
+
+from __future__ import annotations
 
 from typing import Sequence, Union
 
@@ -12,9 +14,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+
 # revision identifiers, used by Alembic.
-revision: str = "20250106_0001"
-down_revision: Union[str, None] = "20250725_0001"
+revision: str = "f3ce45362241"
+down_revision: Union[str, None] = "0001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
