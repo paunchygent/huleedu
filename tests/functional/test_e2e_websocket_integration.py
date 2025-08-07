@@ -5,7 +5,7 @@ Tests the full notification pipeline that was missing from previous E2E tests:
 TeacherNotificationRequestedV1 → Kafka → WebSocket Service → Redis → Test Subscriber
 
 This extends the existing E2E test framework to include WebSocket service integration,
-validating the complete notification delivery pipeline across all 9 notification types.
+validating the complete notification delivery pipeline across all 12 notification types.
 """
 
 from __future__ import annotations
@@ -72,7 +72,10 @@ def _build_file_service_notification(
                 "filename": base_data["filename"],
                 "validation_error": "FILE_CORRUPTED",
                 "error_message": "File cannot be read/processed",
-                "message": f"File '{base_data['filename']}' failed validation: File cannot be read/processed",
+                "message": (
+                    f"File '{base_data['filename']}' failed validation: "
+                    "File cannot be read/processed"
+                ),
             },
         },
     }
@@ -222,7 +225,9 @@ def _build_els_notification(
                 "success_count": 8,
                 "failed_count": 2,
                 "total_count": 10,
-                "message": "CJ assessment completed for batch: 8 of 10 essays completed successfully",
+                "message": (
+                    "CJ assessment completed for batch: 8 of 10 essays completed successfully"
+                ),
             },
         },
     }
@@ -240,7 +245,68 @@ def _build_els_notification(
     )
 
 
-# Complete test cases for all 10 notification types across 4 services
+def _build_ras_notification(
+    notification_type: str, base_data: dict
+) -> TeacherNotificationRequestedV1:
+    """Build Result Aggregator Service TeacherNotificationRequestedV1 event."""
+    payload_map = {
+        "batch_results_ready": {
+            "category": WebSocketEventCategory.PROCESSING_RESULTS,
+            "priority": NotificationPriority.HIGH,
+            "action_required": False,
+            "payload": {
+                "batch_id": base_data["batch_id"],
+                "total_essays": 15,
+                "completed_essays": 15,
+                "overall_status": "completed_successfully",
+                "processing_duration_seconds": 180.5,
+                "phase_results": {
+                    "spellcheck": {
+                        "status": "completed_successfully",
+                        "completed_count": 15,
+                        "failed_count": 0,
+                        "processing_time_seconds": 45.2,
+                    },
+                    "cj_assessment": {
+                        "status": "completed_successfully",
+                        "completed_count": 15,
+                        "failed_count": 0,
+                        "processing_time_seconds": 135.3,
+                    },
+                },
+                "message": "Batch batch-123 processing completed with 15/15 essays",
+            },
+        },
+        "batch_assessment_completed": {
+            "category": WebSocketEventCategory.PROCESSING_RESULTS,
+            "priority": NotificationPriority.STANDARD,
+            "action_required": False,
+            "payload": {
+                "batch_id": base_data["batch_id"],
+                "assessment_job_id": "cj-job-456",
+                "rankings_available": True,
+                "rankings_count": 15,
+                "message": (
+                    f"Comparative judgment assessment completed for batch {base_data['batch_id']}"
+                ),
+            },
+        },
+    }
+
+    config = payload_map[notification_type]
+    return TeacherNotificationRequestedV1(
+        teacher_id=base_data["teacher_id"],
+        notification_type=notification_type,
+        category=config["category"],
+        priority=config["priority"],
+        payload=config["payload"],
+        action_required=config["action_required"],
+        correlation_id=base_data["correlation_id"],
+        batch_id=base_data["batch_id"],
+    )
+
+
+# Complete test cases for all 12 notification types across 5 services
 E2E_WEBSOCKET_TEST_CASES = [
     # File Service (3 notifications)
     (
@@ -326,6 +392,23 @@ E2E_WEBSOCKET_TEST_CASES = [
         False,
         {"first_phase": "spellcheck", "total_phases": 2},
     ),
+    # Result Aggregator Service (2 notifications)
+    (
+        "ras",
+        "batch_results_ready",
+        "high",
+        "processing_results",
+        False,
+        {"total_essays": 15, "completed_essays": 15, "overall_status": "completed_successfully"},
+    ),
+    (
+        "ras",
+        "batch_assessment_completed",
+        "standard",
+        "processing_results",
+        False,
+        {"assessment_job_id": "cj-job-456", "rankings_available": True, "rankings_count": 15},
+    ),
 ]
 
 
@@ -392,7 +475,7 @@ class TestCompleteWebSocketServiceIntegration:
         """
         Test complete notification pipeline: Kafka → WebSocket Service → Redis.
 
-        This parameterized test covers all 9 notification types across all services,
+        This parameterized test covers all 12 notification types across all services,
         validating the complete end-to-end flow that was missing from previous tests.
         """
         # Arrange - Generate test data
@@ -412,6 +495,7 @@ class TestCompleteWebSocketServiceIntegration:
             "class": _build_class_management_notification,
             "els": _build_els_notification,
             "bos": _build_bos_notification,
+            "ras": _build_ras_notification,
         }
         notification = notification_builders[service](notification_type, base_data)
 
@@ -465,20 +549,25 @@ class TestCompleteWebSocketServiceIntegration:
         """
         Test that WebSocket service correctly processes all priority levels end-to-end.
 
-        Validates priority distribution across all 9 notification types:
-        - LOW: 2 types (student_added_to_class, batch_spellcheck_completed)
-        - STANDARD: 4 types (file uploads/removals, class_created, batch_cj_assessment_completed)
-        - HIGH: 1 type (student_associations_confirmed)
+        Validates priority distribution across all 12 notification types:
+        - LOW: 3 types (student_added_to_class, batch_spellcheck_completed,
+          batch_processing_started)
+        - STANDARD: 5 types (file uploads/removals, class_created,
+          batch_cj_assessment_completed, batch_assessment_completed)
+        - HIGH: 2 types (student_associations_confirmed, batch_results_ready)
         - IMMEDIATE: 2 types (batch_validation_failed, validation_timeout_processed)
         """
         priority_test_cases = [
             ("low", "student_added_to_class", "class"),
             ("low", "batch_spellcheck_completed", "els"),
+            ("low", "batch_processing_started", "bos"),
             ("standard", "batch_files_uploaded", "file"),
             ("standard", "batch_file_removed", "file"),
             ("standard", "class_created", "class"),
             ("standard", "batch_cj_assessment_completed", "els"),
+            ("standard", "batch_assessment_completed", "ras"),
             ("high", "student_associations_confirmed", "class"),
+            ("high", "batch_results_ready", "ras"),
             ("immediate", "batch_validation_failed", "file"),
             ("immediate", "validation_timeout_processed", "class"),
         ]
@@ -499,6 +588,8 @@ class TestCompleteWebSocketServiceIntegration:
                 "file": _build_file_service_notification,
                 "class": _build_class_management_notification,
                 "els": _build_els_notification,
+                "bos": _build_bos_notification,
+                "ras": _build_ras_notification,
             }
             notification = notification_builders[service](notification_type, base_data)
 
@@ -517,7 +608,8 @@ class TestCompleteWebSocketServiceIntegration:
 
             notification_data = json.loads(message["data"])
             assert notification_data["data"]["priority"] == expected_priority, (
-                f"WebSocket service should preserve {expected_priority} priority for {notification_type}"
+                f"WebSocket service should preserve {expected_priority} priority "
+                f"for {notification_type}"
             )
 
             # Clean up
@@ -543,6 +635,9 @@ class TestCompleteWebSocketServiceIntegration:
             ("student_associations_confirmed", "class", False),
             ("batch_spellcheck_completed", "els", False),
             ("batch_cj_assessment_completed", "els", False),
+            ("batch_processing_started", "bos", False),
+            ("batch_results_ready", "ras", False),
+            ("batch_assessment_completed", "ras", False),
         ]
 
         for notification_type, service, expected_action_required in action_test_cases:
@@ -561,6 +656,8 @@ class TestCompleteWebSocketServiceIntegration:
                 "file": _build_file_service_notification,
                 "class": _build_class_management_notification,
                 "els": _build_els_notification,
+                "bos": _build_bos_notification,
+                "ras": _build_ras_notification,
             }
             notification = notification_builders[service](notification_type, base_data)
 
@@ -579,7 +676,8 @@ class TestCompleteWebSocketServiceIntegration:
 
             notification_data = json.loads(message["data"])
             assert notification_data["data"]["action_required"] == expected_action_required, (
-                f"WebSocket service should preserve action_required={expected_action_required} for {notification_type}"
+                f"WebSocket service should preserve "
+                f"action_required={expected_action_required} for {notification_type}"
             )
 
             # Clean up
@@ -626,7 +724,8 @@ class TestCompleteWebSocketServiceIntegration:
         message_2 = await pubsub.get_message(timeout=5.0)
 
         # Idempotency test - either no second message or system gracefully handles duplicates
-        # The key requirement is that the WebSocket service doesn't crash and handles duplicates correctly
+        # The key requirement is that the WebSocket service doesn't crash and handles
+        # duplicates correctly
         if message_2 is not None:
             # If a second message arrived, it should be identical (graceful duplicate handling)
             msg_1_data = json.loads(message_1["data"])

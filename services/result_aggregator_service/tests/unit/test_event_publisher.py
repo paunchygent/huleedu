@@ -100,7 +100,7 @@ class TestResultEventPublisher:
         event_publisher: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
         mock_notification_projector: AsyncMock,
-    ):
+    ) -> None:
         """Test publishing BatchResultsReadyV1 event with notification projection."""
         # Arrange
         correlation_id = uuid4()
@@ -152,14 +152,16 @@ class TestResultEventPublisher:
         assert envelope.data == event_data
 
         # Assert - Verify CANONICAL NOTIFICATION PATTERN
-        mock_notification_projector.handle_batch_results_ready.assert_called_once_with(event_data)
+        mock_notification_projector.handle_batch_results_ready.assert_called_once_with(
+            event_data, correlation_id
+        )
 
     @pytest.mark.asyncio
     async def test_publish_batch_results_ready_without_notification(
         self,
         event_publisher_without_projector: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
-    ):
+    ) -> None:
         """Test publishing BatchResultsReadyV1 event without notification projector."""
         # Arrange
         correlation_id = uuid4()
@@ -191,7 +193,7 @@ class TestResultEventPublisher:
         event_publisher: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
         mock_notification_projector: AsyncMock,
-    ):
+    ) -> None:
         """Test publishing BatchAssessmentCompletedV1 event with notification projection."""
         # Arrange
         correlation_id = uuid4()
@@ -230,7 +232,7 @@ class TestResultEventPublisher:
 
         # Assert - Verify CANONICAL NOTIFICATION PATTERN
         mock_notification_projector.handle_batch_assessment_completed.assert_called_once_with(
-            event_data
+            event_data, correlation_id
         )
 
     @pytest.mark.asyncio
@@ -238,7 +240,7 @@ class TestResultEventPublisher:
         self,
         event_publisher_without_projector: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
-    ):
+    ) -> None:
         """Test publishing BatchAssessmentCompletedV1 event without notification projector."""
         # Arrange
         correlation_id = uuid4()
@@ -283,7 +285,7 @@ class TestResultEventPublisher:
         user_id: str,
         total_essays: int,
         completed_essays: int,
-    ):
+    ) -> None:
         """Test publishing with various batch data scenarios."""
         # Arrange
         correlation_id = uuid4()
@@ -307,14 +309,16 @@ class TestResultEventPublisher:
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args[1]["aggregate_id"] == batch_id
-        mock_notification_projector.handle_batch_results_ready.assert_called_once_with(event_data)
+        mock_notification_projector.handle_batch_results_ready.assert_called_once_with(
+            event_data, correlation_id
+        )
 
     @pytest.mark.asyncio
     async def test_trace_context_injection(
         self,
         event_publisher: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
-    ):
+    ) -> None:
         """Test that trace context is injected into event metadata."""
         # Arrange
         correlation_id = uuid4()
@@ -348,7 +352,7 @@ class TestResultEventPublisher:
         self,
         event_publisher: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
-    ):
+    ) -> None:
         """Test that outbox manager failures propagate correctly."""
         # Arrange
         correlation_id = uuid4()
@@ -378,7 +382,7 @@ class TestResultEventPublisher:
         event_publisher: ResultEventPublisher,
         mock_outbox_manager: AsyncMock,
         mock_notification_projector: AsyncMock,
-    ):
+    ) -> None:
         """Test that notification projector failures don't affect outbox pattern."""
         # Arrange
         correlation_id = uuid4()

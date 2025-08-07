@@ -2,9 +2,9 @@
 
 ## Service Identity
 - **Port**: 4003 (API), 9096 (metrics)
-- **Purpose**: Materialized view layer for aggregated results
-- **Pattern**: CQRS - write via Kafka, read via REST API
-- **Stack**: HuleEduApp, PostgreSQL, Kafka consumer, Redis cache
+- **Purpose**: Event aggregation, publishing, and materialized view layer
+- **Pattern**: Event aggregation with transactional outbox and notification projection
+- **Stack**: HuleEduApp, PostgreSQL, Kafka consumer + publisher, Redis cache
 
 ## Architecture
 
@@ -15,9 +15,10 @@ api/
   batch_routes.py       # Batch query endpoints
 worker_main.py         # Kafka consumer entry point
 event_processor.py     # Message processing logic
+notification_projector.py # Teacher notification projections
 protocols.py           # BatchRepositoryProtocol, CacheManagerProtocol
-di.py                  # Dishka providers
-models_db.py          # SQLAlchemy models
+di.py                  # Dishka providers with outbox pattern
+models_db.py          # SQLAlchemy models + event_outbox
 ```
 
 ## API Endpoints
@@ -33,7 +34,7 @@ models_db.py          # SQLAlchemy models
 - `essay_results`: Essay-level results per phase
 - Optimized indexes: (user_id, batch_id), status fields
 
-## Kafka Consumer
+## Kafka Integration
 
 **Subscribes to**:
 - `huleedu.els.batch.registered.v1`: Creates initial batch
@@ -41,10 +42,16 @@ models_db.py          # SQLAlchemy models
 - `huleedu.essay.spellcheck.completed.v1`: Spell check results
 - `huleedu.cj_assessment.completed.v1`: CJ rankings
 
+**Publishes**:
+- `huleedu.batch.results.ready.v1`: All processing phases complete (HIGH priority)
+- `huleedu.batch.assessment.completed.v1`: CJ assessment done (STANDARD priority)
+- `huleedu.notification.teacher.requested.v1`: Via notification projector
+
 **Features**:
-- Redis idempotency
-- DLQ support
-- Manual commit pattern
+- Transactional outbox pattern for reliable event publishing
+- Redis idempotency with 24-hour TTL
+- Direct notification projector invocation (no Kafka round-trip)
+- DLQ support with manual commit pattern
 
 ## Cache Strategy
 
@@ -55,6 +62,15 @@ models_db.py          # SQLAlchemy models
 - Fail-open pattern
 
 ## Key Patterns
+
+**Outbox with Notification Projection**:
+```python
+# Canonical pattern: Store first, then direct invocation
+async def publish_batch_results_ready(event, correlation_id):
+    await self.outbox_manager.publish_to_outbox(...)  # Store first
+    if self.notification_projector:  # Direct invocation, no Kafka round-trip
+        await self.notification_projector.handle_batch_results_ready(event, correlation_id)
+```
 
 **HuleEduApp with Kafka**:
 ```python
@@ -115,9 +131,11 @@ pdm run mypy services/result_aggregator_service/
 
 ## Status
 
-✅ Production ready with:
-- Type-safe HuleEduApp contract
-- Resilient Kafka consumer
-- Active cache invalidation
-- 78/78 tests passing
+✅ Production ready with event publishing capabilities:
+- Event aggregation and republishing via transactional outbox
+- Teacher notification projector with direct invocation pattern
+- Type-safe HuleEduApp contract with Kafka consumer + publisher
+- Resilient event processing with Redis idempotency
+- Active cache invalidation via Redis SETs
+- 78/78 tests passing with outbox pattern validation
 - 0 MyPy errors

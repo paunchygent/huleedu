@@ -16,7 +16,11 @@ The platform is divided into services by bounded context. Each microservice owns
 
 #### Event-Driven Architecture (EDA)
 
-Microservices communicate primarily through asynchronous events via a Kafka message bus. Cross-service interactions are decoupled using Kafka topics (with a standardized event schema), minimizing the need for direct synchronous calls between services.
+Microservices communicate through asynchronous events via Kafka with a clean three-layer separation:
+
+**Internal Domain Events**: Service-to-service coordination only, never consumed by WebSocket service
+**Teacher Notification Events**: Single `TeacherNotificationRequestedV1` event type for all teacher notifications
+**Notification Projectors**: Each service owns notification decisions through dedicated projectors using canonical direct invocation pattern (no Kafka round-trip)
 
 The platform implements a **dual-phase processing architecture**:
 
@@ -329,16 +333,15 @@ A Quart-based HTTP CRUD service (port 5002) that manages metadata about classes,
 
 ### Result Aggregator Service (RAS)
 
-A hybrid service (Kafka consumer with an internal HTTP interface on port 4003) responsible for aggregating and materializing the results of essay processing for fast retrieval.
+A hybrid service (Kafka consumer + publisher with HTTP API on port 4003) that aggregates results and coordinates service communication through event publishing.
 
 **Key Features:**
 
-- **Event Processing**: Listens to all completion events on Kafka
-- **Data Storage**: Maintains materialized views in PostgreSQL
-- **API Endpoint**: `GET /internal/v1/batches/{batch_id}/status` - Returns comprehensive status and results
-- **CQRS Pattern**: Separates command (write) and query (read) operations
-- **Performance**: Uses Redis caching for frequent queries
-- **Security**: Implements service-to-service authentication
+- **Event Aggregation**: Consumes completion events from processing services
+- **Event Publishing**: Publishes batch completion and assessment events via transactional outbox
+- **Teacher Notifications**: Projects result events to teacher notifications using direct projector invocation
+- **Query API**: Provides optimized access to batch and essay results
+- **Cache Management**: Redis-based optimization with active invalidation
 
 ### API Gateway Service
 
@@ -356,13 +359,14 @@ A FastAPI-based gateway service (port 4001) that serves as the unified entry poi
 
 ### WebSocket Service
 
-A dedicated service (port 8080) for managing persistent WebSocket connections with clients. It works in conjunction with the API Gateway to provide real-time updates on essay processing status.
+A pure notification router (port 8080) that manages persistent WebSocket connections and delivers teacher notifications through a clean architectural pattern.
 
 **Key Features:**
 
-- **Real-Time Updates**: Pushes status changes to clients as they happen.
-- **Scalability**: Designed to handle a large number of concurrent connections.
-- **Integration**: Listens to internal Kafka events to know when to notify clients.
+- **Pure Notification Router**: Consumes only `TeacherNotificationRequestedV1` events, never internal domain events
+- **Teacher-Centric**: All notifications routed to teachers with proper authorization validation
+- **Real-Time Delivery**: Immediate teacher feedback via Kafka → WebSocket → Redis pipeline
+- **Clean Separation**: No business logic, trusts service-validated teacher_id in notification events
 
 ## Technology Stack
 
@@ -820,7 +824,7 @@ While no formal contribution guide is included here, the following practices are
 
 ## Current Status of Implementation
 
-All core microservices of the HuleEdu platform have been implemented and integrated into a functioning system. The platform supports both anonymous (GUEST) and class-based (REGULAR) essay processing workflows with comprehensive student matching and automated validation capabilities.
+All core microservices of the HuleEdu platform have been implemented and integrated into a functioning system. The platform supports both anonymous (GUEST) and class-based (REGULAR) essay processing workflows with comprehensive student matching, automated validation, and real-time teacher notifications.
 
 ### Major Achievements
 
@@ -852,6 +856,15 @@ The comprehensive observability stack provides full visibility into the distribu
 - **Structured Logging**: JSON-formatted logs with automatic correlation ID propagation enable tracing individual essays through the complete processing pipeline
 - **Error Observability**: `HuleEduError` system automatically records exceptions to OpenTelemetry spans with full context and correlation tracking
 
+#### Teacher Notification Architecture
+
+Implemented clean notification projection pattern with complete E2E integration:
+
+- **Separation of Concerns**: Internal domain events separate from teacher-facing notifications
+- **Service Ownership**: Each service owns notification decisions through dedicated projectors
+- **Canonical Pattern**: Direct projector invocation (no Kafka round-trip) for immediate notifications
+- **Complete Integration**: 100% E2E test coverage with Kafka→WebSocket→Redis pipeline validation
+
 **Infrastructure Components**:
 - **Grafana**: Centralized dashboards and alerting interface
 - **Prometheus**: Metrics storage with alerting rules via Alertmanager
@@ -859,6 +872,16 @@ The comprehensive observability stack provides full visibility into the distribu
 - **Loki + Promtail**: Log aggregation and correlation with metrics/traces
 
 This production-grade observability enables effective debugging, performance optimization, and operational monitoring across the microservice ecosystem.
+
+#### WebSocket Teacher Notification Layer
+
+Complete teacher notification system with clean architectural separation:
+
+- **15 Notification Types**: Covering all critical, immediate, high, standard, and low priority events across services
+- **Service Projectors**: Class Management, File Service, Essay Lifecycle, Batch Orchestrator, and Result Aggregator services each own their notification decisions
+- **Canonical Pattern**: Direct projector invocation ensures immediate teacher feedback without Kafka round-trip delays
+- **E2E Validation**: 100% test coverage of complete Kafka→WebSocket→Redis pipeline with all notification types
+- **Clean Separation**: WebSocket service is pure notification router, consuming only teacher notification events, never internal domain events
 
 #### Deployment and Containerization
 
@@ -897,27 +920,23 @@ Currently, user and authentication concerns (beyond class/student relationships)
 
 A modern web frontend (likely built with Svelte) is planned to allow educators and students to interact with HuleEdu. Through the frontend, teachers could upload batches of essays, track processing progress in real time, and review results (scores, feedback) once ready. Students might use it to submit assignments and view feedback. The frontend will communicate exclusively with the API Gateway service. Development of the UI will focus on providing a clean user experience and real-time updates via WebSockets (for example, to show a teacher a live status of their batch processing: “spellchecking 10/30 essays completed…”).
 
-### WebSocket Live Updates (Planned)
-
-Alongside the Svelte app, the full utilization of WebSockets through the API Gateway is a near-term goal. This involves finalizing a publish/subscribe mechanism (likely using Redis or Kafka streams) so that when internal events occur (e.g. an essay’s analysis completes or a batch finishes a phase), a message is pushed to any connected frontends. This real-time capability will set HuleEdu apart from batch systems that only offer polling, making the experience more interactive.
-
-### Online CJ Assessment Calibration System (Planned)
+### CJ Assessment Calibration System (Planned)
 
 As the platform relies on AI for scoring (CJ Assessment Service), we are implementing an integrated online check-and-balance system that operates within the CJ Assessment Pipeline itself. This system employs machine learning algorithms similar to traditional Automated Essay Scoring (AES) random forest models to continuously validate and calibrate AI-generated judgments in real-time. The calibration system is directly linked to the NLP Service, which continuously analyzes essays and is intermittently retrained on the growing corpus of submitted student essays using established AES text metrics and essay quality markers.
 
-Unlike traditional offline analytics approaches, this online system provides immediate feedback during the assessment process, flagging potential anomalies (such as essays that appear inconsistent with their assigned rankings) and generating adjustment factors that can be applied in real-time. The system produces calibration reports and reliability metrics that can be fed back into the scoring algorithm or presented to instructors for review, ensuring continuous improvement of assessment accuracy and maintaining trust in the AI-generated results.
+Unlike traditional offline analytics approaches, this online system provides immediate feedback during the assessment process, flagging potential anomalies (such as essays that appear inconsistent with their assigned rankings) and generating adjustment factors that can be applied by Result Aggregator Service The system produces calibration reports and reliability metrics that can be fed back into the scoring algorithm or presented to instructors for review, ensuring continuous improvement of assessment accuracy and maintaining trust in the AI-generated results.
 
-Additional Pipeline Phases – Beyond Spellcheck, CJ, and AI feedback, other analysis phases can
-be incorporated into the pipeline. For example, an “NLP Enrichment” phase might annotate
+### Additional Pipeline Phases - NLP Phase and AI Feedback
 
-essays with part-of-speech tags or entity recognition (if needed for educational feedback), or a
-“Peer Comparison” phase might compare a student’s essay to a repository of past essays to
-give relative feedback. The architecture is built to accommodate new phases relatively easily by
+Beyond Spellcheck, CJ, and AI feedback, other analysis phases can
+be incorporated into the pipeline. For example, an NLP Phase will extract additional metrics from the essays, such as readability scores, vocabulary complexity analysis, sentence length variance, and plagiarism detection. These computationally intensive analyses would extend the existing Phase 2 text analysis capabilities, with results consumed by the Result Aggregator for comprehensive reporting and downstream use by Client-> Teacher-> Student. and the planned AI Feedback Service (TASKS/AI_FEEDBACK_SERVICE_IMPLEMENTATION.md)
+
+ The architecture is built to accommodate new phases relatively easily by
 adding new services and defining their events/contracts, so the roadmap is open-ended about
-integrating more AI/NLP capabilities as the product evolves.
-Scaling and Performance – As usage grows, certain components may need to be scaled out or
+integrating more AI/NLP capabilities as the product evolves. Scaling and Performance – As usage grows, certain components may need to be scaled out or
 refactored. Future work will include performance optimizations such as: using Kafka consumer
 groups to allow multiple instances of worker services (Spellchecker, CJ, etc.) to share load; scaling the API Gateway and other HTTP services horizontally behind a load balancer; optimizing
+
 database interactions (adding indexes, caching frequently accessed data in RAS or CMS); and
 possibly partitioning Kafka topics by class or school if needed to handle very large volumes.
 While this is not a single feature, it is a continuous effort that will accompany the addition of

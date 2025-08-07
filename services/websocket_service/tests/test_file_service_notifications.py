@@ -127,7 +127,9 @@ class TestFileServiceNotifications:
                 "filename": "invalid_essay.txt",
                 "validation_error": "INVALID_FORMAT",
                 "error_message": "File format is not supported. Expected: TXT, DOCX, PDF",
-                "message": "File 'invalid_essay.txt' failed validation: File format is not supported",
+                "message": (
+                    "File 'invalid_essay.txt' failed validation: File format is not supported"
+                ),
             },
             action_required=True,
             correlation_id="corr-validation-fail",

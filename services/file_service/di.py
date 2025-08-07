@@ -187,7 +187,10 @@ class ServiceImplementationsProvider(Provider):
         notification_projector: FileServiceNotificationProjector,
         file_repository: FileRepositoryProtocol,
     ) -> EventPublisherProtocol:
-        """Provide event publisher implementation using TRUE OUTBOX PATTERN with notification projection."""
+        """
+        Provide event publisher implementation using TRUE OUTBOX PATTERN with
+        notification projection.
+        """
         return DefaultEventPublisher(
             outbox_manager=outbox_manager,
             settings=settings,

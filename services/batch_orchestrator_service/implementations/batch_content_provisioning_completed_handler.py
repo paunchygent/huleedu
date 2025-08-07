@@ -184,7 +184,8 @@ class BatchContentProvisioningCompletedHandler:
                         # GUEST batch: Mark as ready (pipeline still requires client trigger)
                         self.logger.info(
                             f"GUEST batch {batch_id} content provisioning completed. "
-                            "Updating status to READY_FOR_PIPELINE_EXECUTION (awaiting client trigger)",
+                            "Updating status to READY_FOR_PIPELINE_EXECUTION "
+                            "(awaiting client trigger)",
                             extra={"correlation_id": str(envelope.correlation_id)},
                         )
 

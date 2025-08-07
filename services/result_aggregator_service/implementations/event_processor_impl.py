@@ -411,7 +411,7 @@ class EventProcessorImpl(EventProcessorProtocol):
                     user_id=batch.user_id,
                     assessment_job_id=data.cj_assessment_job_id,
                     rankings_summary=rankings_summary,
-                    status=BatchStatus.COMPLETED_SUCCESSFULLY,  # Required by ProcessingUpdate base class
+                    status=BatchStatus.COMPLETED_SUCCESSFULLY,  # Required by ProcessingUpdate
                     system_metadata=SystemProcessingMetadata(
                         entity_id=batch_id,
                         entity_type="batch",

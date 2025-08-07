@@ -135,7 +135,8 @@ class DefaultEventPublisher(EventPublisherProtocol):
                 )
             else:
                 logger.warning(
-                    f"Could not send validation failure notification - no user_id found for file_upload_id: {event_data.file_upload_id}"
+                    f"Could not send validation failure notification - no user_id found "
+                    f"for file_upload_id: {event_data.file_upload_id}"
                 )
 
     async def publish_batch_file_added_v1(

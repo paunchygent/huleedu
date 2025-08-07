@@ -14,7 +14,7 @@ from services.result_aggregator_service.implementations.outbox_manager import Ou
 
 
 @pytest.fixture
-def mock_outbox_repository():
+def mock_outbox_repository() -> AsyncMock:
     """Mock outbox repository."""
     mock = AsyncMock()
     mock.add_event = AsyncMock(return_value=uuid4())
@@ -22,7 +22,7 @@ def mock_outbox_repository():
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> AsyncMock:
     """Mock Redis client."""
     mock = AsyncMock()
     mock.lpush = AsyncMock()
@@ -30,13 +30,15 @@ def mock_redis_client():
 
 
 @pytest.fixture
-def settings():
+def settings() -> Settings:
     """Test settings."""
     return Settings()
 
 
 @pytest.fixture
-def outbox_manager(mock_outbox_repository, mock_redis_client, settings):
+def outbox_manager(
+    mock_outbox_repository: AsyncMock, mock_redis_client: AsyncMock, settings: Settings
+) -> OutboxManager:
     """Create OutboxManager instance with mocked dependencies."""
     return OutboxManager(
         outbox_repository=mock_outbox_repository,
@@ -50,8 +52,11 @@ class TestOutboxManager:
 
     @pytest.mark.asyncio
     async def test_publish_to_outbox_success(
-        self, outbox_manager, mock_outbox_repository, mock_redis_client
-    ):
+        self,
+        outbox_manager: OutboxManager,
+        mock_outbox_repository: AsyncMock,
+        mock_redis_client: AsyncMock,
+    ) -> None:
         """Test successful event publication to outbox."""
         # Arrange
         correlation_id = uuid4()
@@ -93,8 +98,8 @@ class TestOutboxManager:
 
     @pytest.mark.asyncio
     async def test_publish_to_outbox_with_partition_key(
-        self, outbox_manager, mock_outbox_repository
-    ):
+        self, outbox_manager: OutboxManager, mock_outbox_repository: AsyncMock
+    ) -> None:
         """Test event publication with custom partition key in metadata."""
         # Arrange
         correlation_id = uuid4()
@@ -120,7 +125,9 @@ class TestOutboxManager:
         assert call_args.kwargs["event_key"] == "custom-key"
 
     @pytest.mark.asyncio
-    async def test_publish_to_outbox_no_repository(self, mock_redis_client, settings):
+    async def test_publish_to_outbox_no_repository(
+        self, mock_redis_client: AsyncMock, settings: Settings
+    ) -> None:
         """Test error when outbox repository is not configured."""
         # Arrange
         outbox_manager = OutboxManager(
@@ -149,7 +156,9 @@ class TestOutboxManager:
         assert "Outbox repository not configured" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_publish_to_outbox_invalid_event_data(self, outbox_manager):
+    async def test_publish_to_outbox_invalid_event_data(
+        self, outbox_manager: OutboxManager
+    ) -> None:
         """Test error when event data is not a Pydantic model."""
         # Arrange
         invalid_event_data = {"not": "a pydantic model"}
@@ -167,7 +176,9 @@ class TestOutboxManager:
         assert "Failed to store event in outbox" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_notify_relay_worker_success(self, outbox_manager, mock_redis_client):
+    async def test_notify_relay_worker_success(
+        self, outbox_manager: OutboxManager, mock_redis_client: AsyncMock
+    ) -> None:
         """Test successful relay worker notification."""
         # Act
         await outbox_manager.notify_relay_worker()
@@ -179,8 +190,8 @@ class TestOutboxManager:
 
     @pytest.mark.asyncio
     async def test_notify_relay_worker_failure_does_not_raise(
-        self, outbox_manager, mock_redis_client
-    ):
+        self, outbox_manager: OutboxManager, mock_redis_client: AsyncMock
+    ) -> None:
         """Test that relay worker notification failure doesn't raise exception."""
         # Arrange
         mock_redis_client.lpush.side_effect = Exception("Redis error")
@@ -192,7 +203,9 @@ class TestOutboxManager:
         mock_redis_client.lpush.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_publish_to_outbox_repository_error(self, outbox_manager, mock_outbox_repository):
+    async def test_publish_to_outbox_repository_error(
+        self, outbox_manager: OutboxManager, mock_outbox_repository: AsyncMock
+    ) -> None:
         """Test error handling when repository fails."""
         # Arrange
         mock_outbox_repository.add_event.side_effect = Exception("Database error")
