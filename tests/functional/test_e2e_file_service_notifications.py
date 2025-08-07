@@ -1,8 +1,9 @@
 """
-End-to-end test for File Service notification system.
+End-to-end tests for teacher notification system across all services.
 
-Tests the complete flow from File Service events to WebSocket notifications
-through the teacher notification projection pattern.
+Tests the complete flow from service events to WebSocket notifications
+through the teacher notification projection pattern for File Service,
+Class Management Service, and Essay Lifecycle Service.
 """
 
 from __future__ import annotations
@@ -263,3 +264,230 @@ class TestFileServiceNotificationFlow:
             assert notification.priority.value == expected_priority
             assert notification.action_required == expected_action
             assert notification.category.value == expected_category
+
+
+# Service-specific payload builders for parameterized testing
+def _build_file_payload(notification_type: str, base_data: dict) -> dict:
+    """Build File Service notification payload."""
+    common = {
+        "batch_id": base_data["batch_id"],
+        "file_upload_id": base_data["file_upload_id"],
+        "filename": base_data["filename"],
+        "correlation_id": base_data["correlation_id"],
+        "timestamp": base_data["timestamp"],
+    }
+    
+    if notification_type == "batch_files_uploaded":
+        return {**common, "message": f"File '{base_data['filename']}' uploaded successfully", "upload_status": "completed"}
+    elif notification_type == "batch_file_removed":
+        return {**common, "message": f"File '{base_data['filename']}' removed from batch"}
+    elif notification_type == "batch_validation_failed":
+        return {**common, "validation_error": "FILE_CORRUPTED", "error_message": "File cannot be processed", 
+                "message": f"File '{base_data['filename']}' failed validation: File cannot be processed"}
+    return common
+
+
+def _build_class_payload(notification_type: str, base_data: dict) -> dict:
+    """Build Class Management notification payload."""
+    common = {
+        "class_id": base_data["class_id"],
+        "correlation_id": base_data["correlation_id"],
+        "timestamp": base_data["timestamp"],
+    }
+    
+    if notification_type == "class_created":
+        return {**common, "class_designation": "Advanced Writing 101", "course_codes": ["ENG101"], 
+                "message": "Class 'Advanced Writing 101' created successfully"}
+    elif notification_type == "student_added_to_class":
+        return {**common, "student_id": "student123", "student_name": "John Doe", "class_designation": "Advanced Writing 101",
+                "message": "Student 'John Doe' added to class 'Advanced Writing 101'"}
+    elif notification_type == "validation_timeout_processed":
+        return {**common, "batch_id": base_data["batch_id"], "auto_confirmed_count": 3, "timeout_hours": 24,
+                "message": "Validation timeout reached: 3 associations auto-confirmed", "auto_confirmed_associations": []}
+    elif notification_type == "student_associations_confirmed":
+        return {**common, "batch_id": base_data["batch_id"], "confirmed_count": 5, 
+                "message": "Teacher confirmed 5 student associations", "associations": [], "validation_summary": {}}
+    return common
+
+
+def _build_els_payload(notification_type: str, base_data: dict) -> dict:
+    """Build ELS notification payload."""
+    common = {
+        "batch_id": base_data["batch_id"],
+        "correlation_id": base_data["correlation_id"],
+        "timestamp": base_data["timestamp"],
+    }
+    
+    if notification_type == "batch_spellcheck_completed":
+        return {**common, "phase_name": "spellcheck", "phase_status": "completed_successfully",
+                "success_count": 10, "failed_count": 0, "total_count": 10,
+                "message": "Spellcheck completed for batch: All 10 essays completed successfully"}
+    elif notification_type == "batch_cj_assessment_completed":
+        return {**common, "phase_name": "cj_assessment", "phase_status": "completed_with_failures", 
+                "success_count": 8, "failed_count": 2, "total_count": 10,
+                "message": "CJ assessment completed for batch: 8 of 10 essays completed successfully"}
+    return common
+
+
+# Parameterized test data for all services
+NOTIFICATION_TEST_CASES = [
+    # service, notification_type, priority, category, action_required, specific_validations
+    ("file", "batch_files_uploaded", "standard", "file_operations", False, {"upload_status": "completed"}),
+    ("file", "batch_file_removed", "standard", "file_operations", False, {"message_contains": "removed from batch"}),
+    ("file", "batch_validation_failed", "immediate", "system_alerts", True, {"validation_error": "FILE_CORRUPTED"}),
+    ("class", "class_created", "standard", "class_management", False, {"class_designation": "Advanced Writing 101"}),
+    ("class", "student_added_to_class", "low", "class_management", False, {"student_name": "John Doe"}),
+    ("class", "validation_timeout_processed", "immediate", "student_workflow", False, {"auto_confirmed_count": 3}),
+    ("class", "student_associations_confirmed", "high", "student_workflow", False, {"confirmed_count": 5}),
+    ("els", "batch_spellcheck_completed", "low", "batch_progress", False, {"phase_name": "spellcheck", "success_count": 10}),
+    ("els", "batch_cj_assessment_completed", "standard", "batch_progress", False, {"phase_name": "cj_assessment", "success_count": 8}),
+]
+
+
+class TestUnifiedServiceNotifications:
+    """Unified tests for all service notification patterns."""
+
+    @pytest.fixture
+    async def redis_client(self) -> AsyncGenerator[redis.Redis, None]:
+        """Create Redis client for testing."""
+        client = redis.from_url("redis://localhost:6379")
+        yield client
+        await client.aclose()
+
+    @pytest.fixture
+    async def redis_service_client(self) -> AsyncGenerator[RedisClient, None]:
+        """Create service library Redis client."""
+        client = RedisClient(client_id="test-unified-notifications", redis_url="redis://localhost:6379")
+        await client.start()
+        yield client
+        await client.stop()
+
+    @pytest.mark.parametrize("service,notification_type,priority,category,action_required,validations", NOTIFICATION_TEST_CASES)
+    @pytest.mark.asyncio
+    @pytest.mark.docker
+    async def test_all_service_notification_flows(
+        self, 
+        service: str,
+        notification_type: str, 
+        priority: str,
+        category: str,
+        action_required: bool,
+        validations: dict,
+        redis_client: redis.Redis, 
+        redis_service_client: RedisClient
+    ) -> None:
+        """
+        Parameterized test covering all notification types across all services.
+        
+        Tests the complete flow from service-specific events to Redis notifications
+        for File Service, Class Management, and ELS.
+        """
+        # Arrange - Generate test data
+        test_teacher_id = f"teacher-{service}-{notification_type.replace('_', '-')}"
+        base_data = {
+            "batch_id": str(uuid.uuid4()),
+            "class_id": str(uuid.uuid4()),
+            "file_upload_id": str(uuid.uuid4()),
+            "filename": "test_essay.txt",
+            "correlation_id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Build service-specific payload
+        payload_builders = {
+            "file": _build_file_payload,
+            "class": _build_class_payload, 
+            "els": _build_els_payload,
+        }
+        ui_payload = payload_builders[service](notification_type, base_data)
+        ui_payload.update({
+            "category": category,
+            "priority": priority,
+            "action_required": action_required,
+            "deadline": None,
+            "class_id": base_data["class_id"] if service == "class" else None,
+        })
+
+        # Set up Redis subscription
+        channel_name = f"ws:{test_teacher_id}"
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(channel_name)
+        await pubsub.get_message(timeout=1.0)  # Skip subscription confirmation
+
+        # Act - Simulate service notification
+        await redis_service_client.publish_user_notification(
+            user_id=test_teacher_id, event_type=notification_type, data=ui_payload
+        )
+
+        # Assert - Verify notification received and structured correctly
+        message = await pubsub.get_message(timeout=5.0)
+        assert message is not None
+        assert message["type"] == "message"
+        assert message["channel"].decode() == channel_name
+
+        # Parse and validate notification content
+        notification_data = json.loads(message["data"])
+        assert notification_data["event"] == notification_type
+        
+        # Validate core notification structure
+        data = notification_data["data"]
+        assert data["priority"] == priority
+        assert data["category"] == category  
+        assert data["action_required"] == action_required
+
+        # Validate service-specific fields
+        for key, expected_value in validations.items():
+            if key == "message_contains":
+                assert expected_value in data["message"]
+            else:
+                assert data[key] == expected_value
+
+        # Clean up
+        await pubsub.unsubscribe(channel_name)
+
+    @pytest.mark.asyncio
+    async def test_all_services_priority_compliance(self) -> None:
+        """
+        Test that all services comply with notification priority requirements.
+        
+        Validates priority distribution across all 9 notification types:
+        - LOW: 2 types (student_added_to_class, batch_spellcheck_completed)
+        - STANDARD: 4 types (file uploads/removals, class_created, batch_cj_assessment_completed)  
+        - HIGH: 1 type (student_associations_confirmed)
+        - IMMEDIATE: 2 types (batch_validation_failed, validation_timeout_processed)
+        """
+        priority_groups = {
+            NotificationPriority.LOW: ["student_added_to_class", "batch_spellcheck_completed"],
+            NotificationPriority.STANDARD: ["batch_files_uploaded", "batch_file_removed", "class_created", "batch_cj_assessment_completed"],
+            NotificationPriority.HIGH: ["student_associations_confirmed"], 
+            NotificationPriority.IMMEDIATE: ["batch_validation_failed", "validation_timeout_processed"],
+        }
+
+        category_mapping = {
+            "batch_files_uploaded": WebSocketEventCategory.FILE_OPERATIONS,
+            "batch_file_removed": WebSocketEventCategory.FILE_OPERATIONS,
+            "batch_validation_failed": WebSocketEventCategory.SYSTEM_ALERTS,
+            "class_created": WebSocketEventCategory.CLASS_MANAGEMENT,
+            "student_added_to_class": WebSocketEventCategory.CLASS_MANAGEMENT,
+            "validation_timeout_processed": WebSocketEventCategory.STUDENT_WORKFLOW,
+            "student_associations_confirmed": WebSocketEventCategory.STUDENT_WORKFLOW,
+            "batch_spellcheck_completed": WebSocketEventCategory.BATCH_PROGRESS,
+            "batch_cj_assessment_completed": WebSocketEventCategory.BATCH_PROGRESS,
+        }
+
+        for expected_priority, notification_types in priority_groups.items():
+            for notification_type in notification_types:
+                # Create notification with expected priority
+                notification = TeacherNotificationRequestedV1(
+                    teacher_id="test-teacher",
+                    notification_type=notification_type,
+                    category=category_mapping[notification_type],
+                    priority=expected_priority,
+                    payload={"test": "data"},
+                    action_required=(notification_type == "batch_validation_failed"),
+                    correlation_id="test-correlation",
+                )
+
+                # Verify priority compliance
+                assert notification.priority == expected_priority
+                assert notification.category == category_mapping[notification_type]

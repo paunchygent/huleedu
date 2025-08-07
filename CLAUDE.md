@@ -41,6 +41,7 @@
 - Update relevant task documents per `.cursor/rules/090-documentation-standards.mdc`
 - Never create files in root - follow folder patterns
 - All code changes require tests (run and verified)
+- Never lint style issues manually before having run format-all and/or lint-fix --unsafe-fixes
 - Always run typecheck-all from root after creating a test or implementing new code
 ```
 
