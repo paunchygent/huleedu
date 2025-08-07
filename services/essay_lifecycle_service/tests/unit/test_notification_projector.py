@@ -58,7 +58,10 @@ class TestELSNotificationProjector:
         )
 
     async def test_spellcheck_completion_notification_published(
-        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock, sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1
+        self,
+        notification_projector: ELSNotificationProjector,
+        mock_kafka_publisher: AsyncMock,
+        sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that spellcheck completion results in LOW priority notification being published."""
         teacher_id = "teacher-123"
@@ -90,7 +93,10 @@ class TestELSNotificationProjector:
         assert "All 2 essays completed successfully" in payload["message"]
 
     async def test_cj_assessment_completion_notification_published(
-        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock, sample_cj_assessment_outcome: ELSBatchPhaseOutcomeV1
+        self,
+        notification_projector: ELSNotificationProjector,
+        mock_kafka_publisher: AsyncMock,
+        sample_cj_assessment_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that CJ assessment completion results in STANDARD priority notification being published."""
         teacher_id = "teacher-456"
@@ -143,7 +149,10 @@ class TestELSNotificationProjector:
         mock_kafka_publisher.publish.assert_not_called()
 
     async def test_kafka_publish_failure_raises_exception(
-        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock, sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1
+        self,
+        notification_projector: ELSNotificationProjector,
+        mock_kafka_publisher: AsyncMock,
+        sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that Kafka publishing failures are properly handled."""
         # Configure mock to raise exception
@@ -156,7 +165,10 @@ class TestELSNotificationProjector:
             await notification_projector.handle_phase_outcome(sample_spellcheck_outcome, teacher_id)
 
     async def test_teacher_id_included_in_notification(
-        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock, sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1
+        self,
+        notification_projector: ELSNotificationProjector,
+        mock_kafka_publisher: AsyncMock,
+        sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that provided teacher_id is correctly included in notification."""
         teacher_id = "specific-teacher-999"
@@ -174,7 +186,10 @@ class TestELSNotificationProjector:
         assert call_args.kwargs["key"] == teacher_id
 
     async def test_correlation_id_preserved_in_notification(
-        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock, sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1
+        self,
+        notification_projector: ELSNotificationProjector,
+        mock_kafka_publisher: AsyncMock,
+        sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that correlation_id from original event is preserved in notification."""
         teacher_id = "teacher-correlation"

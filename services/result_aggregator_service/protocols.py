@@ -16,7 +16,7 @@ from common_core.events.result_events import BatchAssessmentCompletedV1, BatchRe
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
 
-from services.result_aggregator_service.models_db import BatchResult
+from services.result_aggregator_service.models_db import BatchResult, EssayResult
 
 
 class BatchRepositoryProtocol(Protocol):
@@ -102,6 +102,10 @@ class BatchRepositoryProtocol(Protocol):
         text_storage_id: Optional[str] = None,
     ) -> None:
         """Update essay with file_upload_id for traceability."""
+        ...
+
+    async def get_batch_essays(self, batch_id: str) -> List["EssayResult"]:
+        """Get all essays for a batch."""
         ...
 
 

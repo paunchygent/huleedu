@@ -30,11 +30,13 @@ def _json_serializer(obj):
         return str(obj)
     if isinstance(obj, datetime):
         return obj.isoformat()
-    raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 
 # Service-specific payload builders for complete E2E testing
-def _build_file_service_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
+def _build_file_service_notification(
+    notification_type: str, base_data: dict
+) -> TeacherNotificationRequestedV1:
     """Build File Service TeacherNotificationRequestedV1 event."""
     payload_map = {
         "batch_files_uploaded": {
@@ -88,7 +90,9 @@ def _build_file_service_notification(notification_type: str, base_data: dict) ->
     )
 
 
-def _build_class_management_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
+def _build_class_management_notification(
+    notification_type: str, base_data: dict
+) -> TeacherNotificationRequestedV1:
     """Build Class Management TeacherNotificationRequestedV1 event."""
     payload_map = {
         "class_created": {
@@ -155,7 +159,9 @@ def _build_class_management_notification(notification_type: str, base_data: dict
     )
 
 
-def _build_bos_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
+def _build_bos_notification(
+    notification_type: str, base_data: dict
+) -> TeacherNotificationRequestedV1:
     """Build Batch Orchestrator Service TeacherNotificationRequestedV1 event."""
     payload_map = {
         "batch_processing_started": {
@@ -186,7 +192,9 @@ def _build_bos_notification(notification_type: str, base_data: dict) -> TeacherN
     )
 
 
-def _build_els_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
+def _build_els_notification(
+    notification_type: str, base_data: dict
+) -> TeacherNotificationRequestedV1:
     """Build Essay Lifecycle Service TeacherNotificationRequestedV1 event."""
     payload_map = {
         "batch_spellcheck_completed": {
@@ -235,22 +243,89 @@ def _build_els_notification(notification_type: str, base_data: dict) -> TeacherN
 # Complete test cases for all 10 notification types across 4 services
 E2E_WEBSOCKET_TEST_CASES = [
     # File Service (3 notifications)
-    ("file", "batch_files_uploaded", "standard", "file_operations", False, {"upload_status": "completed"}),
-    ("file", "batch_file_removed", "standard", "file_operations", False, {"message_contains": "removed from batch"}),
-    ("file", "batch_validation_failed", "immediate", "system_alerts", True, {"validation_error": "FILE_CORRUPTED"}),
-
+    (
+        "file",
+        "batch_files_uploaded",
+        "standard",
+        "file_operations",
+        False,
+        {"upload_status": "completed"},
+    ),
+    (
+        "file",
+        "batch_file_removed",
+        "standard",
+        "file_operations",
+        False,
+        {"message_contains": "removed from batch"},
+    ),
+    (
+        "file",
+        "batch_validation_failed",
+        "immediate",
+        "system_alerts",
+        True,
+        {"validation_error": "FILE_CORRUPTED"},
+    ),
     # Class Management Service (4 notifications)
-    ("class", "class_created", "standard", "class_management", False, {"class_designation": "Advanced Writing 101"}),
-    ("class", "student_added_to_class", "low", "class_management", False, {"student_name": "John Doe"}),
-    ("class", "validation_timeout_processed", "immediate", "student_workflow", False, {"auto_confirmed_count": 3}),
-    ("class", "student_associations_confirmed", "high", "student_workflow", False, {"confirmed_count": 5}),
-
+    (
+        "class",
+        "class_created",
+        "standard",
+        "class_management",
+        False,
+        {"class_designation": "Advanced Writing 101"},
+    ),
+    (
+        "class",
+        "student_added_to_class",
+        "low",
+        "class_management",
+        False,
+        {"student_name": "John Doe"},
+    ),
+    (
+        "class",
+        "validation_timeout_processed",
+        "immediate",
+        "student_workflow",
+        False,
+        {"auto_confirmed_count": 3},
+    ),
+    (
+        "class",
+        "student_associations_confirmed",
+        "high",
+        "student_workflow",
+        False,
+        {"confirmed_count": 5},
+    ),
     # Essay Lifecycle Service (2 notifications)
-    ("els", "batch_spellcheck_completed", "low", "batch_progress", False, {"phase_name": "spellcheck", "success_count": 10}),
-    ("els", "batch_cj_assessment_completed", "standard", "batch_progress", False, {"phase_name": "cj_assessment", "success_count": 8}),
-
+    (
+        "els",
+        "batch_spellcheck_completed",
+        "low",
+        "batch_progress",
+        False,
+        {"phase_name": "spellcheck", "success_count": 10},
+    ),
+    (
+        "els",
+        "batch_cj_assessment_completed",
+        "standard",
+        "batch_progress",
+        False,
+        {"phase_name": "cj_assessment", "success_count": 8},
+    ),
     # Batch Orchestrator Service (1 notification)
-    ("bos", "batch_processing_started", "low", "batch_progress", False, {"first_phase": "spellcheck", "total_phases": 2}),
+    (
+        "bos",
+        "batch_processing_started",
+        "low",
+        "batch_progress",
+        False,
+        {"first_phase": "spellcheck", "total_phases": 2},
+    ),
 ]
 
 
@@ -294,10 +369,13 @@ class TestCompleteWebSocketServiceIntegration:
         await kafka_producer.send(
             topic=topic,
             value=envelope.model_dump(),
-            key=notification.teacher_id.encode('utf-8'),  # Encode key as bytes
+            key=notification.teacher_id.encode("utf-8"),  # Encode key as bytes
         )
 
-    @pytest.mark.parametrize("service,notification_type,priority,category,action_required,validations", E2E_WEBSOCKET_TEST_CASES)
+    @pytest.mark.parametrize(
+        "service,notification_type,priority,category,action_required,validations",
+        E2E_WEBSOCKET_TEST_CASES,
+    )
     @pytest.mark.asyncio
     @pytest.mark.docker
     async def test_complete_websocket_notification_pipeline(
@@ -349,7 +427,9 @@ class TestCompleteWebSocketServiceIntegration:
 
         # Assert - Verify WebSocket service processed and forwarded to Redis
         message = await pubsub.get_message(timeout=15.0)  # Extended timeout for service processing
-        assert message is not None, f"WebSocket service should have processed {notification_type} notification"
+        assert message is not None, (
+            f"WebSocket service should have processed {notification_type} notification"
+        )
         assert message["type"] == "message"
         assert message["channel"].decode() == channel_name
 
@@ -361,12 +441,16 @@ class TestCompleteWebSocketServiceIntegration:
         data = notification_data["data"]
         assert data["priority"] == priority, f"Priority mismatch for {notification_type}"
         assert data["category"] == category, f"Category mismatch for {notification_type}"
-        assert data["action_required"] == action_required, f"Action required mismatch for {notification_type}"
+        assert data["action_required"] == action_required, (
+            f"Action required mismatch for {notification_type}"
+        )
 
         # Validate service-specific fields
         for key, expected_value in validations.items():
             if key == "message_contains":
-                assert expected_value in data["message"], f"Message should contain '{expected_value}'"
+                assert expected_value in data["message"], (
+                    f"Message should contain '{expected_value}'"
+                )
             else:
                 assert data[key] == expected_value, f"Field {key} should be {expected_value}"
 

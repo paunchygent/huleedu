@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from common_core.error_enums import ErrorCode
+from common_core.events.result_events import (
+    BatchAssessmentCompletedV1,
+    BatchResultsReadyV1,
+    PhaseResultSummary,
+)
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.error_handling import (
     create_error_detail_with_context,
@@ -15,6 +22,7 @@ from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
     CacheManagerProtocol,
     EventProcessorProtocol,
+    EventPublisherProtocol,
     StateStoreProtocol,
 )
 
@@ -39,11 +47,13 @@ class EventProcessorImpl(EventProcessorProtocol):
         batch_repository: BatchRepositoryProtocol,
         state_store: StateStoreProtocol,
         cache_manager: CacheManagerProtocol,
+        event_publisher: EventPublisherProtocol,
     ):
         """Initialize the event processor."""
         self.batch_repository = batch_repository
         self.state_store = state_store
         self.cache_manager = cache_manager
+        self.event_publisher = event_publisher
 
     async def process_batch_registered(
         self, envelope: "EventEnvelope[BatchEssaysRegistered]", data: "BatchEssaysRegistered"
@@ -175,6 +185,56 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             # Invalidate cache
             await self.state_store.invalidate_batch(data.batch_id)
+
+            # Check if all phases are complete and publish event if so
+            if await self._check_batch_completion(data.batch_id):
+                # Get batch to get user_id
+                batch = await self.batch_repository.get_batch(data.batch_id)
+                if batch:
+                    # Calculate phase results and overall status
+                    phase_results = await self._calculate_phase_results(data.batch_id)
+                    overall_status = self._determine_overall_status(phase_results)
+                    duration = await self._calculate_duration(data.batch_id)
+
+                    # Get total essays from batch
+                    essays = await self.batch_repository.get_batch_essays(data.batch_id)
+                    total_essays = len(essays)
+                    completed_essays = sum(
+                        1
+                        for e in essays
+                        if e.spellcheck_status == ProcessingStage.COMPLETED
+                        or e.cj_assessment_status == ProcessingStage.COMPLETED
+                    )
+
+                    # Create and publish BatchResultsReadyV1 event
+                    event_data = BatchResultsReadyV1(
+                        batch_id=data.batch_id,
+                        user_id=batch.user_id,
+                        total_essays=total_essays,
+                        completed_essays=completed_essays,
+                        phase_results=phase_results,
+                        overall_status=overall_status,
+                        processing_duration_seconds=duration,
+                        status=overall_status,  # Required by ProcessingUpdate base class
+                        system_metadata=SystemProcessingMetadata(
+                            entity_id=data.batch_id,
+                            entity_type="batch",
+                            parent_id=None,
+                            event="results_ready",
+                        ),
+                    )
+
+                    await self.event_publisher.publish_batch_results_ready(
+                        event_data=event_data,
+                        correlation_id=envelope.correlation_id,
+                    )
+
+                    logger.info(
+                        "Published BatchResultsReadyV1 event for completed batch",
+                        batch_id=data.batch_id,
+                        user_id=batch.user_id,
+                        overall_status=overall_status.value,
+                    )
 
             logger.info(
                 "Batch phase outcome processed successfully",
@@ -330,6 +390,49 @@ class EventProcessorImpl(EventProcessorProtocol):
             # Invalidate cache
             await self.state_store.invalidate_batch(batch_id)
 
+            # Publish BatchAssessmentCompletedV1 event
+            # Get batch to get user_id
+            batch = await self.batch_repository.get_batch(batch_id)
+            if batch:
+                # Create thin rankings summary (only essential data)
+                rankings_summary = [
+                    {
+                        "essay_id": ranking.get("els_essay_id"),
+                        "rank": ranking.get("rank"),
+                        "score": ranking.get("score"),
+                    }
+                    for ranking in data.rankings
+                    if ranking.get("els_essay_id")
+                ]
+
+                # Create and publish BatchAssessmentCompletedV1 event
+                event_data = BatchAssessmentCompletedV1(
+                    batch_id=batch_id,
+                    user_id=batch.user_id,
+                    assessment_job_id=data.cj_assessment_job_id,
+                    rankings_summary=rankings_summary,
+                    status=BatchStatus.COMPLETED_SUCCESSFULLY,  # Required by ProcessingUpdate base class
+                    system_metadata=SystemProcessingMetadata(
+                        entity_id=batch_id,
+                        entity_type="batch",
+                        parent_id=None,
+                        event="assessment_completed",
+                    ),
+                )
+
+                await self.event_publisher.publish_batch_assessment_completed(
+                    event_data=event_data,
+                    correlation_id=envelope.correlation_id,
+                )
+
+                logger.info(
+                    "Published BatchAssessmentCompletedV1 event",
+                    batch_id=batch_id,
+                    user_id=batch.user_id,
+                    assessment_job_id=data.cj_assessment_job_id,
+                    rankings_count=len(rankings_summary),
+                )
+
             logger.info(
                 "CJ assessment results processed successfully",
                 batch_id=batch_id,
@@ -345,3 +448,98 @@ class EventProcessorImpl(EventProcessorProtocol):
                 exc_info=True,
             )
             raise
+
+    async def _check_batch_completion(self, batch_id: str) -> bool:
+        """Check if all phases are complete for a batch."""
+        batch = await self.batch_repository.get_batch(batch_id)
+        if not batch:
+            return False
+
+        # Check if all essays have been processed for both phases
+        essays = await self.batch_repository.get_batch_essays(batch_id)
+        if not essays:
+            return False
+
+        # Check spellcheck phase
+        spellcheck_complete = all(
+            essay.spellcheck_status in [ProcessingStage.COMPLETED, ProcessingStage.FAILED]
+            for essay in essays
+        )
+
+        # Check CJ assessment phase
+        cj_complete = all(
+            essay.cj_assessment_status in [ProcessingStage.COMPLETED, ProcessingStage.FAILED]
+            for essay in essays
+        )
+
+        # Both phases must be complete
+        return spellcheck_complete and cj_complete
+
+    async def _calculate_phase_results(self, batch_id: str) -> dict[str, PhaseResultSummary]:
+        """Calculate phase result summaries for a batch."""
+        essays = await self.batch_repository.get_batch_essays(batch_id)
+
+        # Calculate spellcheck phase results
+        spellcheck_completed = sum(
+            1 for e in essays if e.spellcheck_status == ProcessingStage.COMPLETED
+        )
+        spellcheck_failed = sum(1 for e in essays if e.spellcheck_status == ProcessingStage.FAILED)
+
+        # Calculate CJ assessment phase results
+        cj_completed = sum(1 for e in essays if e.cj_assessment_status == ProcessingStage.COMPLETED)
+        cj_failed = sum(1 for e in essays if e.cj_assessment_status == ProcessingStage.FAILED)
+
+        # Calculate processing times if available
+        spellcheck_times = [e.spellcheck_completed_at for e in essays if e.spellcheck_completed_at]
+        spellcheck_duration = None
+        if spellcheck_times:
+            batch = await self.batch_repository.get_batch(batch_id)
+            if batch and batch.processing_started_at:
+                spellcheck_duration = (
+                    max(spellcheck_times) - batch.processing_started_at
+                ).total_seconds()
+
+        cj_times = [e.cj_assessment_completed_at for e in essays if e.cj_assessment_completed_at]
+        cj_duration = None
+        if cj_times:
+            batch = await self.batch_repository.get_batch(batch_id)
+            if batch and batch.processing_started_at:
+                cj_duration = (max(cj_times) - batch.processing_started_at).total_seconds()
+
+        return {
+            "spellcheck": PhaseResultSummary(
+                phase_name="spellcheck",
+                status="completed" if spellcheck_failed == 0 else "completed_with_failures",
+                completed_count=spellcheck_completed,
+                failed_count=spellcheck_failed,
+                processing_time_seconds=spellcheck_duration,
+            ),
+            "cj_assessment": PhaseResultSummary(
+                phase_name="cj_assessment",
+                status="completed" if cj_failed == 0 else "completed_with_failures",
+                completed_count=cj_completed,
+                failed_count=cj_failed,
+                processing_time_seconds=cj_duration,
+            ),
+        }
+
+    def _determine_overall_status(
+        self, phase_results: dict[str, PhaseResultSummary]
+    ) -> BatchStatus:
+        """Determine overall batch status from phase results."""
+        has_failures = any(phase.failed_count > 0 for phase in phase_results.values())
+
+        if has_failures:
+            return BatchStatus.COMPLETED_WITH_FAILURES
+        return BatchStatus.COMPLETED_SUCCESSFULLY
+
+    async def _calculate_duration(self, batch_id: str) -> float:
+        """Calculate total processing duration for a batch."""
+        batch = await self.batch_repository.get_batch(batch_id)
+        if not batch or not batch.processing_started_at:
+            return 0.0
+
+        # Use completed_at if available, otherwise use current time
+        end_time = batch.processing_completed_at or datetime.now(timezone.utc)
+        duration = (end_time - batch.processing_started_at).total_seconds()
+        return max(0.0, duration)  # Ensure non-negative

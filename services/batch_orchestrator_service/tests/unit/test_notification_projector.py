@@ -34,7 +34,9 @@ def mock_event_publisher() -> Mock:
 
 
 @pytest.fixture
-def notification_projector(mock_batch_repo: Mock, mock_event_publisher: Mock) -> NotificationProjector:
+def notification_projector(
+    mock_batch_repo: Mock, mock_event_publisher: Mock
+) -> NotificationProjector:
     """Create notification projector with mock dependencies."""
     return NotificationProjector(mock_batch_repo, mock_event_publisher)
 

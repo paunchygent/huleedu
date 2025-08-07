@@ -55,6 +55,7 @@ from services.result_aggregator_service.metrics import (
     ResultAggregatorMetrics,
     setup_result_aggregator_database_monitoring,
 )
+from services.result_aggregator_service.notification_projector import ResultNotificationProjector
 from services.result_aggregator_service.protocols import (
     BatchOrchestratorClientProtocol,
     BatchQueryServiceProtocol,
@@ -240,9 +241,10 @@ class ServiceProvider(Provider):
         batch_repository: BatchRepositoryProtocol,
         state_store: StateStoreProtocol,
         cache_manager: CacheManagerProtocol,
+        event_publisher: EventPublisherProtocol,
     ) -> EventProcessorProtocol:
         """Provide event processor implementation."""
-        return EventProcessorImpl(batch_repository, state_store, cache_manager)
+        return EventProcessorImpl(batch_repository, state_store, cache_manager, event_publisher)
 
     @provide
     def provide_bos_data_transformer(self) -> BOSDataTransformer:
@@ -291,19 +293,35 @@ class ServiceProvider(Provider):
         return OutboxManager(outbox_repository, atomic_redis, settings)
 
     @provide
+    def provide_notification_projector(
+        self,
+        outbox_manager: OutboxManagerProtocol,
+        settings: Settings,
+    ) -> ResultNotificationProjector:
+        """Provide notification projector for teacher notifications.
+
+        Uses TRUE OUTBOX PATTERN for reliable notification delivery.
+        """
+        return ResultNotificationProjector(
+            outbox_manager=outbox_manager,
+            settings=settings,
+        )
+
+    @provide
     def provide_event_publisher(
         self,
         outbox_manager: OutboxManagerProtocol,
         settings: Settings,
+        notification_projector: ResultNotificationProjector,
     ) -> EventPublisherProtocol:
         """Provide event publisher for Result Aggregator Service.
-        
-        Note: NotificationProjector will be added in Session 3.1.
+
+        Now includes notification projector for teacher notifications.
         """
         return ResultEventPublisher(
             outbox_manager=outbox_manager,
             settings=settings,
-            notification_projector=None,  # Will be added in Session 3.1
+            notification_projector=notification_projector,
         )
 
 

@@ -528,7 +528,11 @@ class BatchCoordinationProvider(Provider):
     ) -> BatchPhaseCoordinator:
         """Provide batch phase coordinator implementation with notification projector."""
         return DefaultBatchPhaseCoordinator(
-            repository, batch_lifecycle_publisher, batch_tracker, session_factory, notification_projector
+            repository,
+            batch_lifecycle_publisher,
+            batch_tracker,
+            session_factory,
+            notification_projector,
         )
 
     @provide(scope=Scope.APP)

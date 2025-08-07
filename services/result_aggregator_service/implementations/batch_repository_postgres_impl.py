@@ -451,3 +451,57 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 exc_info=True,
             )
             raise
+
+    async def get_batch_essays(self, batch_id: str) -> List[EssayResult]:
+        """Get all essays for a batch.
+
+        Args:
+            batch_id: The batch ID to get essays for
+
+        Returns:
+            List of EssayResult objects for the batch
+        """
+        start_time = time.perf_counter()
+
+        try:
+            async with self._get_session() as session:
+                # Query essays for the batch
+                result = await session.execute(
+                    select(EssayResult)
+                    .where(EssayResult.batch_id == batch_id)
+                    .order_by(EssayResult.essay_id)
+                )
+                essays = result.scalars().all()
+
+                duration = time.perf_counter() - start_time
+                self._record_operation_metrics(
+                    operation="get_batch_essays",
+                    table="essay_results",
+                    duration=duration,
+                    success=True,
+                )
+
+                self.logger.debug(
+                    "Retrieved batch essays",
+                    batch_id=batch_id,
+                    essay_count=len(essays),
+                )
+
+                return list(essays)
+
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            self._record_operation_metrics(
+                operation="get_batch_essays",
+                table="essay_results",
+                duration=duration,
+                success=False,
+            )
+            self._record_error_metrics(type(e).__name__, "get_batch_essays")
+            self.logger.error(
+                "Failed to get batch essays",
+                batch_id=batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise

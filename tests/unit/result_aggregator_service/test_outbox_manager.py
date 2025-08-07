@@ -49,7 +49,9 @@ class TestOutboxManager:
     """Test suite for OutboxManager."""
 
     @pytest.mark.asyncio
-    async def test_publish_to_outbox_success(self, outbox_manager, mock_outbox_repository, mock_redis_client):
+    async def test_publish_to_outbox_success(
+        self, outbox_manager, mock_outbox_repository, mock_redis_client
+    ):
         """Test successful event publication to outbox."""
         # Arrange
         correlation_id = uuid4()
@@ -90,7 +92,9 @@ class TestOutboxManager:
         )
 
     @pytest.mark.asyncio
-    async def test_publish_to_outbox_with_partition_key(self, outbox_manager, mock_outbox_repository):
+    async def test_publish_to_outbox_with_partition_key(
+        self, outbox_manager, mock_outbox_repository
+    ):
         """Test event publication with custom partition key in metadata."""
         # Arrange
         correlation_id = uuid4()
@@ -174,7 +178,9 @@ class TestOutboxManager:
         )
 
     @pytest.mark.asyncio
-    async def test_notify_relay_worker_failure_does_not_raise(self, outbox_manager, mock_redis_client):
+    async def test_notify_relay_worker_failure_does_not_raise(
+        self, outbox_manager, mock_redis_client
+    ):
         """Test that relay worker notification failure doesn't raise exception."""
         # Arrange
         mock_redis_client.lpush.side_effect = Exception("Redis error")

@@ -87,7 +87,7 @@ class ResultEventPublisher:
         # CANONICAL NOTIFICATION PATTERN: Direct invocation after domain event
         # No Kafka round-trip - immediate teacher notification
         if self.notification_projector:
-            await self.notification_projector.handle_batch_results_ready(event_data)
+            await self.notification_projector.handle_batch_results_ready(event_data, correlation_id)
 
     async def publish_batch_assessment_completed(
         self,
@@ -96,7 +96,7 @@ class ResultEventPublisher:
     ) -> None:
         """
         Publish BatchAssessmentCompletedV1 event when CJ assessment completes.
-        
+
         Uses TRUE OUTBOX PATTERN - stores in DB first, relay worker publishes async.
         """
         from common_core.event_enums import ProcessingEvent, topic_name
@@ -142,4 +142,4 @@ class ResultEventPublisher:
         # CANONICAL NOTIFICATION PATTERN: Direct invocation after domain event
         # No Kafka round-trip - immediate teacher notification
         if self.notification_projector:
-            await self.notification_projector.handle_batch_assessment_completed(event_data)
+            await self.notification_projector.handle_batch_assessment_completed(event_data, correlation_id)

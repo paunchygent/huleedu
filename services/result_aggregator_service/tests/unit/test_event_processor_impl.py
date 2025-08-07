@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -47,6 +47,7 @@ class MockDIProvider(Provider):
         self.mock_batch_repo = AsyncMock(spec=BatchRepositoryProtocol)
         self.mock_state_store = AsyncMock(spec=StateStoreProtocol)
         self.mock_cache_manager = AsyncMock(spec=CacheManagerProtocol)
+        self.mock_event_publisher = AsyncMock()  # Mock event publisher
 
     @provide(scope=Scope.REQUEST)
     def provide_batch_repo(self) -> BatchRepositoryProtocol:
@@ -64,17 +65,24 @@ class MockDIProvider(Provider):
         return self.mock_cache_manager
 
     @provide(scope=Scope.REQUEST)
+    def provide_event_publisher(self) -> Any:
+        """Provide mock event publisher."""
+        return self.mock_event_publisher
+
+    @provide(scope=Scope.REQUEST)
     def provide_event_processor(
         self,
         batch_repository: BatchRepositoryProtocol,
         state_store: StateStoreProtocol,
         cache_manager: CacheManagerProtocol,
+        event_publisher: Any,
     ) -> EventProcessorProtocol:
         """Provide the real EventProcessorImpl with mocked dependencies."""
         return EventProcessorImpl(
             batch_repository=batch_repository,
             state_store=state_store,
             cache_manager=cache_manager,
+            event_publisher=event_publisher,
         )
 
 
