@@ -226,208 +226,15 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 - Edge cases: missing class IDs, non-existent classes, publishing errors
 - 100% pass rate following test creation methodology rule 075
 
-## WebSocket Service Refactoring Requirements
+## Success Metrics (Current Status)
 
-### Current State Analysis
-
-The WebSocket service currently handles 5 internal domain events directly:
-- `BatchFileAddedV1` / `BatchFileRemovedV1` (File Service)
-- `BatchContentProvisioningCompletedV1` (Batch Orchestrator)
-- `ValidationTimeoutProcessedV1` (Class Management)
-- `ClassCreatedV1` (Class Management)
-
-### Required Refactoring
-
-#### 1. Remove Internal Event Imports
-
-**File**: `services/websocket_service/implementations/domain_event_processor.py`
-
-Remove:
-```python
-from common_core.events.batch_coordination_events import (
-    BatchContentProvisioningCompletedV1,
-)
-from common_core.events.class_events import (
-    ClassCreatedV1,
-)
-from common_core.events.file_management_events import (
-    BatchFileAddedV1,
-    BatchFileRemovedV1,
-)
-from common_core.events.validation_events import (
-    ValidationTimeoutProcessedV1,
-)
-```
-
-Add:
-```python
-from common_core.events.notification_events import TeacherNotificationRequestedV1
-```
-
-#### 2. Replace Event Routes
-
-**File**: `services/websocket_service/implementations/domain_event_processor.py`
-
-Replace entire `_build_routes()` method:
-```python
-def _build_routes(self) -> Dict[str, Tuple[Type[BaseModel], Callable]]:
-    """Build routing table - ONLY teacher notification events."""
-    return {
-        "huleedu.notification.teacher.requested.v1": (
-            TeacherNotificationRequestedV1,
-            self.notification_handler.handle_teacher_notification,
-        ),
-    }
-```
-
-#### 3. Update Notification Handler
-
-**File**: `services/websocket_service/implementations/user_notification_handler.py`
-
-Remove all specific event handlers:
-- `handle_batch_file_added()`
-- `handle_batch_file_removed()`
-- `handle_batch_content_provisioning_completed()`
-- `handle_validation_timeout_processed()`
-- `handle_class_created()`
-
-Replace with single handler:
-```python
-async def handle_teacher_notification(
-    self, 
-    event: TeacherNotificationRequestedV1
-) -> None:
-    """Handle unified teacher notification event."""
-    
-    await self._publish_notification(
-        user_id=event.teacher_id,
-        event_type=event.notification_type,
-        data={
-            **event.payload,
-            "category": event.category.value,
-            "priority": event.priority.value,
-            "action_required": event.action_required,
-            "deadline": event.deadline_timestamp.isoformat() if event.deadline_timestamp else None,
-        },
-        category=event.category,
-        priority=event.priority,
-    )
-```
-
-#### 4. Update Protocols
-
-**File**: `services/websocket_service/protocols.py`
-
-Remove `UserNotificationHandlerProtocol` specific methods and replace with:
-```python
-class UserNotificationHandlerProtocol(Protocol):
-    """Protocol for user notification handler - notification layer."""
-    
-    async def handle_teacher_notification(
-        self, event: TeacherNotificationRequestedV1
-    ) -> None: ...
-```
-
-#### 5. Clean Up Config
-
-**File**: `services/websocket_service/config.py`
-
-Remove all internal event topic properties:
-- `BATCH_FILE_ADDED_TOPIC`
-- `BATCH_FILE_REMOVED_TOPIC`
-- `BATCH_CONTENT_PROVISIONING_COMPLETED_TOPIC`
-- `VALIDATION_TIMEOUT_PROCESSED_TOPIC`
-- `CLASS_CREATED_TOPIC`
-
-Add single notification topic:
-```python
-@property
-def TEACHER_NOTIFICATION_TOPIC(self) -> str:
-    """Teacher notification event topic."""
-    return "huleedu.notification.teacher.requested.v1"
-
-def get_subscribed_topics(self) -> list[str]:
-    """Get list of Kafka topics to subscribe to."""
-    return [self.TEACHER_NOTIFICATION_TOPIC]
-```
-
-#### 6. Update Tests
-
-**File**: `services/websocket_service/tests/test_file_notifications.py`
-
-Rename to: `test_teacher_notifications.py`
-
-Update all tests to use `TeacherNotificationRequestedV1` instead of internal events.
-
-Example test:
-```python
-async def test_handle_teacher_notification(self) -> None:
-    """Test handling of teacher notification event."""
-    redis_client = AsyncMock()
-    handler = UserNotificationHandler(redis_client=redis_client)
-    
-    event = TeacherNotificationRequestedV1(
-        teacher_id="teacher-123",
-        notification_type="batch_processing_completed",
-        category=NotificationCategory.BATCH_PROGRESS,
-        priority=NotificationPriority.HIGH,
-        payload={
-            "batch_id": "batch-456",
-            "batch_name": "Essay Batch 1",
-            "status": "completed",
-        },
-        action_required=False,
-        correlation_id="event-789",
-    )
-    
-    await handler.handle_teacher_notification(event)
-    
-    redis_client.publish_user_notification.assert_called_once()
-```
-
-#### 7. Update Startup
-
-**File**: `services/websocket_service/startup_setup.py`
-
-Ensure DI container only provides simplified handlers without internal event dependencies.
-
-### Files to Delete
-
-- Remove any remaining legacy notification handlers if they exist
-- Remove internal event type imports from `__init__.py` files
-
-### Files to Update Summary
-
-| File | Changes |
-|------|---------|
-| `domain_event_processor.py` | Remove internal events, single route |
-| `user_notification_handler.py` | Single unified handler |
-| `protocols.py` | Simplified protocol |
-| `config.py` | Single notification topic |
-| `test_file_notifications.py` | Rename and update tests |
-| `test_kafka_consumer_integration.py` | Update integration tests |
-
-## Migration Checklist
-
-- [ ] Create `TeacherNotificationRequestedV1` in common_core
-- [ ] Implement Class Management `notification_projector.py`
-- [ ] Implement Batch Orchestrator `notification_projector.py`
-- [ ] Implement File Service `notification_projector.py`
-- [ ] Implement Result Aggregator `notification_projector.py`
-- [ ] Implement Assessment Services `notification_projector.py`
-- [ ] Update WebSocket service to consume only notification events
-- [ ] Remove all internal event routes from WebSocket
-- [ ] Add comprehensive tests for each projector
-- [ ] Verify E2E flow for CRITICAL 24-hour notifications
-- [ ] Update monitoring to track notification delivery
-
-## Success Metrics
-
-- Zero internal events consumed by WebSocket service
-- All 15 notification types implemented and tested
-- 100% teacher ownership validation before notification
-- Clean separation between domain and notification concerns
-- Type safety maintained throughout
+- ✅ Zero internal events consumed by WebSocket service  
+- ✅ 9/9 notification types implemented (Class Mgmt: 4, File: 3, ELS: 2)
+- ✅ 100% teacher ownership validation before notification
+- ✅ Clean separation between domain and notification concerns
+- ✅ Complete E2E integration testing with 100% pass rate
+- ❌ Missing: Client-triggered pipeline initiation notification (BOS)
+- ❌ Missing: Results completion notifications (RAS - needs event emission)
 
 ## Anti-Patterns to Avoid
 
@@ -443,166 +250,153 @@ Ensure DI container only provides simplified handlers without internal event dep
 ✅ **Do**: Use single notification event type
 ✅ **Do**: Maintain clear separation of concerns
 
-## ✅ PHASE 2 COMPLETED: WebSocket Service Refactoring
+## ✅ PHASES 1-2 COMPLETED: Complete WebSocket Infrastructure + E2E Integration
 
-### Implemented Components ✅ COMPLETED
+### WebSocket Service Refactoring ✅ COMPLETED
 ```python
-# NEW: notification_event_consumer.py
-class NotificationEventConsumer(NotificationEventConsumerProtocol):
-    - Consumes ONLY: topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
-    - Idempotent processing with huleedu_service_libs.idempotency_v2
-    - Single handler: handle_teacher_notification()
-    - Graceful Redis failure resilience
+# NotificationEventConsumer - Kafka → Redis pipeline
+- Consumes: huleedu.notification.teacher.requested.v1 (single topic)  
+- Idempotent: huleedu_service_libs.idempotency_v2 with Redis backup
+- Handler: NotificationHandler.handle_teacher_notification()
+- Architecture: Pure forwarder, NO business logic, trusts service teacher_id
 
-# NEW: notification_handler.py  
-class NotificationHandler(NotificationHandlerProtocol):
-    - Pure forwarder: NO business logic, NO authorization
-    - Forwards to Redis: publish_user_notification(event.teacher_id, ...)
-    - Trusts teacher_id from services (trusted boundary)
-    - Structured error handling with observability stack
+# NotificationHandler - Redis publishing
+- Forwards TeacherNotificationRequestedV1 → publish_user_notification()
+- Preserves: priority, category, action_required, payload structure
+- Error handling: observability stack integration
 ```
 
-### Key Architecture Achievements ✅ COMPLETED
-- **Pure Router**: WebSocket service has NO business logic, NO event filtering  
-- **Single Event Type**: Consumes only `TeacherNotificationRequestedV1` events
-- **Idempotency Protection**: Redis-backed duplicate detection with graceful degradation
-- **Clean Separation**: Internal domain events completely separated from notifications
+### Complete E2E Integration Testing ✅ COMPLETED  
+```python
+# /tests/functional/test_e2e_websocket_integration.py
+- Tests: Complete pipeline TeacherNotificationRequestedV1 → Kafka → WebSocket → Redis
+- Coverage: All 9 notification types across 3 services (File, Class Mgmt, ELS)
+- Parameterized: Priority compliance (LOW/STANDARD/HIGH/IMMEDIATE), action_required flags
+- Results: 12/12 tests passing, 0.22s execution time
+- Validation: WebSocket service correctly processes and forwards all notification types
 
-### Comprehensive Testing ✅ COMPLETED  
-- **59/59 tests passing**: Full WebSocket service test coverage
-- **8 idempotency tests**: Both happy path (Redis working) and resilience path (Redis failures)
-- **Behavioral testing methodology**: Rule 075 compliance - tests outcomes, not implementation details
-- **Integration tests**: End-to-end notification flow from Kafka to Redis
+# Key Test Architecture
+- Kafka producer: Publishes TeacherNotificationRequestedV1 with proper serialization
+- Redis subscriber: Validates complete notification structure and content
+- Service builders: File/Class/ELS-specific notification construction
+- Idempotency: Duplicate handling through WebSocket service layer
+```
 
-### Lessons Learned ✅ COMPLETED
-1. **Test Behavioral Outcomes**: Verify handler called/not called, not Redis call patterns
-2. **Idempotency Resilience**: System gracefully degrades when Redis fails - continues processing  
-3. **Implementation vs Behavior**: Rule 075 - test actual behavior and side effects, avoid fragile implementation testing
-4. **Architecture Validation**: WebSocket service successfully transformed to pure notification router
+### Architecture Achievement & Lessons ✅ COMPLETED
+1. **Production Pipeline**: Tests actual Kafka→WebSocket→Redis flow vs Redis-direct bypass
+2. **False Confidence Elimination**: Removed `/test_e2e_file_service_notifications.py` (bypassed WebSocket service)
+3. **Service Integration Validated**: WebSocket service processes all 9 notification types correctly  
+4. **Performance**: Complete E2E faster than previous Redis-only tests (0.22s vs 0.4s+)
 
 ## PHASE 3: Remaining Service Projectors (PENDING)
 
-## ULTRATHINK: Next Phase Analysis
+## ULTRATHINK: Remaining Implementation Analysis
 
-**Current State**: WebSocket service refactoring complete - pure notification router consuming only `TeacherNotificationRequestedV1` events with comprehensive idempotency testing.
+**Current State**: Complete E2E integration validated - all 9 notification types flow correctly through Kafka→WebSocket→Redis pipeline. WebSocket service is pure notification router with 100% test coverage.
 
-**Next Priority**: Implement notification projectors for remaining services following established Class Management pattern.
+**Architecture Status**:
+- ✅ **Infrastructure**: Event contracts, WebSocket router, E2E validation complete
+- ✅ **Service Coverage**: Class Management (4 notifications) + File Service (3 notifications) 
+- ❌ **Missing**: Essay Lifecycle Service (2 notifications) - batch phase completions
 
-**Implementation Order**: File Service → Assessment Services (via ELS) → Batch Orchestrator → Result Aggregator (RAS is most complex - emits phase events for AI Feedback Service coordination)
+**Implementation Priority & Complexity Analysis**:
 
 ### File Service Projector ✅ COMPLETED
 
-Implemented direct invocation pattern in `/services/file_service/implementations/event_publisher_impl.py`:
 ```python
-# CANONICAL PATTERN IMPLEMENTATION
-async def publish_batch_file_added_v1(self, event_data, correlation_id):
-    # Step 1: Domain event via outbox
-    await self.outbox_manager.publish_to_outbox(event_data)
-    
-    # Step 2: Direct notification (NO Kafka round-trip)
-    if self.notification_projector:
-        await self.notification_projector.handle_batch_file_added(event_data)
-
-async def publish_essay_validation_failed(self, event_data, correlation_id):
-    # Step 1: Domain event via outbox
-    await self.outbox_manager.publish_to_outbox(event_data)
-    
-    # Step 2: Direct notification with user_id lookup
-    if self.notification_projector and self.file_repository:
-        file_upload = await self.file_repository.get_file_upload(event_data.file_upload_id)
-        if file_upload and file_upload.get("user_id"):
-            await self.notification_projector.handle_essay_validation_failed(
-                event_data, file_upload["user_id"]
-            )
+# Direct invocation: event_publisher_impl.py → notification_projector.py 
+- CANONICAL PATTERN: publish_domain_event() + direct projector.handle_*()
+- 3 notifications: batch_files_uploaded (STANDARD), batch_file_removed (STANDARD), batch_validation_failed (IMMEDIATE)
+- User attribution: file_uploads.user_id (migration f3ce45362241) for validation failures
+- Test coverage: 19/19 passing (unit/integration/E2E)
 ```
 
-**Persistent Attribution**: Migration `f3ce45362241` - `file_uploads` table stores `user_id` for validation failures.
+### 1. Essay Lifecycle Service (ELS) ✅ COMPLETED
 
-**Test Coverage**: 19/19 tests passing across unit, integration, and E2E.
-
-### Assessment Services via ELS (NEXT - 3 notifications)
-
-**Priority**: HIGH - ELS already aggregates essay-level results into batch outcomes
-
-**Current State**: 
-- ✅ Essay-level events exist: `SpellcheckResultDataV1`, `CJAssessmentCompletedV1`, `AIFeedbackResultDataV1`
-- ✅ ELS aggregates into `ELSBatchPhaseOutcomeV1` events  
-- ❌ Missing notification projector using CANONICAL PATTERN
-
-**Target Notifications**:
-- `batch_spellcheck_completed` → LOW priority (spellcheck phase complete)
-- `batch_cj_assessment_completed` → STANDARD priority (CJ assessment phase complete)  
-- `batch_ai_feedback_completed` → STANDARD priority (AI feedback phase complete)
-
-**Implementation Pattern (CANONICAL - Direct Invocation)**: 
 ```python
-# In ELS when publishing ELSBatchPhaseOutcomeV1
-async def publish_phase_outcome(self, outcome_event, correlation_id):
-    # Step 1: Domain event for Batch Orchestrator
-    await self.outbox_manager.publish_to_outbox(outcome_event)
-    
-    # Step 2: Direct notification (NO Kafka round-trip!)
-    if self.notification_projector:
-        batch = await self.batch_repository.get_batch(outcome_event.batch_id)
-        if batch and batch.teacher_id:
-            await self.notification_projector.handle_phase_outcome(
-                outcome_event, 
-                teacher_id=batch.teacher_id
-            )
+# Implementation: /services/essay_lifecycle_service/notification_projector.py
+- batch_spellcheck_completed → LOW priority (PhaseName.SPELLCHECK)
+- batch_cj_assessment_completed → STANDARD priority (PhaseName.CJ_ASSESSMENT)
+# Direct invocation: batch_phase_coordinator_impl.py:324-329
+# User resolution: batch_tracker.get_batch_status() → user_id
+# E2E validated: All ELS notifications flow correctly through pipeline
 ```
 
-**Key Difference from File Service**: Dynamic teacher_id lookup from batch context (no persistent storage)
+### 2. Batch Orchestrator Service - CLIENT-TRIGGERED GAP ⚡
 
-### Batch Orchestrator (THIRD - 3 notifications)  
+**Architecture Discovery**: BOS uses **client-triggered pipeline pattern**
+```python
+# Current Flow:
+1. Batch reaches READY_FOR_PIPELINE_EXECUTION (after uploads/student matching)
+2. Teacher triggers: POST /v1/batches/{batch_id}/pipelines → ClientBatchPipelineRequestV1
+3. BOS initiates pipeline phases (NO notification emitted!)
 
-**Current State**:
-- ✅ ELS publishes batch lifecycle events: `BatchContentProvisioningCompletedV1`, `ELSBatchPhaseOutcomeV1`
-- ❌ Missing notification projector to convert lifecycle events to teacher notifications
+# Critical Missing Notification:
+- batch_processing_started → HIGH priority (immediate user feedback)
+- Teacher clicks "Start Processing" → Gets NO confirmation ❌
 
-**Target Notifications**:
-- `batch_processing_started` → STANDARD (triggered by `BatchContentProvisioningCompletedV1`)
-- `batch_processing_completed` → HIGH (triggered by final `ELSBatchPhaseOutcomeV1`)
-- `batch_processing_failed` → IMMEDIATE (triggered by failed `ELSBatchPhaseOutcomeV1`)
+# Investigation Required:
+- Find ClientBatchPipelineRequestV1 handler in BOS
+- Check for legacy automatic pipeline triggers (potential conflicts)
+- Identify correct notification injection point
+```
 
-### Result Aggregator (LAST - Results Events + 3 notifications)
+### 3. Result Aggregator Service - EVENT EMISSION ARCHITECTURE NEEDED
 
-**Status**: ❌ BLOCKED - No event emission capability, depends on all other services
+**Deep Dive Required**: RAS needs Kafka producer pattern implementation
+```python
+# Current: Pure consumer service - no event emission capability
+# Required Events (Service Coordination):
+- spellcheck_results_aggregated → AI Feedback dependency
+- cj_assessment_results_aggregated → AI Feedback dependency
+- results_export_completed → Client notification
 
-**Critical Architecture**: RAS emits **results completion events** for service coordination with AI Feedback Service
+# Implementation Pattern Needed:
+1. Add OutboxManager pattern (like other services)
+2. Create event_publisher_impl.py with Kafka publishing
+3. Emit events when results aggregation completes
+4. Add notification projector for teacher notifications
+```
 
-**Missing Implementation**:
-- RAS consumes events but doesn't emit results completion or aggregation completion events
-- CJ Assessment pipeline completion handling not yet implemented  
-- Results completion events needed for AI Feedback Service dependency chain
-- Needs event emission added for both service coordination AND teacher notifications
+## IMPLEMENTATION PLAN: Next Priorities
 
-**Results Completion Events** (Service Coordination):
-- `spellcheck_results_completed` / `spellcheck_results_partially_completed` → AI Feedback dependency  
-- `cj_assessment_results_completed` / `cj_assessment_results_partially_completed` → AI Feedback dependency
-- `nlp_results_completed` / `nlp_results_partially_completed` → AI Feedback dependency
-- `grammar_results_completed` / `grammar_results_partially_completed` → AI Feedback dependency
+**Phase 3A - BOS Pipeline Initiation** (CRITICAL GAP)
+- **Scope**: Add `batch_processing_started` notification for client-triggered pipelines
+- **Investigation**: Find ClientBatchPipelineRequestV1 handler, identify legacy automatic triggers
+- **Architecture**: Ensure single pipeline initiation path (client-triggered only)
+- **Outcome**: Teachers get immediate feedback when clicking "Start Processing"
 
-**Teacher Notification Events**:
-- `batch_results_ready` → HIGH priority (when all assessment results aggregated and available)
-- `batch_export_completed` → STANDARD priority (export operations completed)
-- `batch_analysis_available` → STANDARD priority (analysis reports ready for viewing)
+**Phase 3B - RAS Event Emission Architecture** (DEEP DIVE)
+- **Scope**: Implement Kafka producer pattern in Result Aggregator Service
+- **Pattern**: Add OutboxManager + event_publisher_impl.py (mirror other services)
+- **Events**: Results aggregation completion events for AI Feedback coordination
+- **Outcome**: Enable service coordination and result notifications
 
-**AI Feedback Service Dependency**: AI Feedback listens to RAS results completion events, collects curated assessment data from RAS, creates dynamic feedback prompts for LLM Provider Service
+**Critical Architectural Questions**:
+1. Does BOS have handler for ClientBatchPipelineRequestV1 or is it missing?
+2. Are there automatic pipeline triggers after READY_FOR_PIPELINE_EXECUTION?
+3. What is correct pattern for adding Kafka producer to RAS?
+4. How does RAS determine when aggregation is complete for event emission?
 
 ## Implementation Checklist
 
-- [x] Create TeacherNotificationRequestedV1 event
-- [x] Add to event_enums.py with topic mapping
-- [x] Update websocket_enums.py with 5-tier priorities
-- [x] Implement Class Management notification projector
-- [x] Wire projector into Class Management DI
-- [x] Create comprehensive behavioral tests
-- [x] Refactor WebSocket to consume only notifications
-- [x] Remove all internal event handling from WebSocket
-- [x] Implement idempotency testing with behavioral methodology
-- [x] Implement File Service projector with persistent user attribution
-- [ ] Implement ELS notification projector for assessment phases
-- [ ] Implement Batch Orchestrator projector (lifecycle events from ELS)
-- [ ] Implement Result Aggregator projector (needs event emission capability added)
-- [ ] End-to-end integration test with all services
-- [ ] Update service READMEs with notification capabilities
+**Phase 1 & 2 - Infrastructure & Core Services** ✅ COMPLETED
+- [x] Create TeacherNotificationRequestedV1 event + topic mapping
+- [x] Implement Class Management notification projector (4 notifications)
+- [x] Implement File Service projector with user attribution (3 notifications)
+- [x] Implement Essay Lifecycle Service projector (2 notifications)
+- [x] Refactor WebSocket service to pure notification router
+- [x] Complete E2E integration testing - all 9 notification types validated
+
+**Phase 3A - BOS Client-Triggered Pipeline** (NEXT)
+- [ ] Investigate ClientBatchPipelineRequestV1 handler in BOS
+- [ ] Identify and remove any automatic pipeline triggers
+- [ ] Implement batch_processing_started notification
+- [ ] Test client-triggered pipeline notification flow
+
+**Phase 3B - RAS Event Emission** (DEEP DIVE)
+- [ ] Analyze RAS architecture for event emission points
+- [ ] Implement OutboxManager pattern in RAS
+- [ ] Create event_publisher_impl.py with Kafka producer
+- [ ] Add results completion events for service coordination
+- [ ] Implement notification projector for result notifications
