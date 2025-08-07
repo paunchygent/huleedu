@@ -3,16 +3,15 @@
 Tests behavioral outcomes rather than implementation details following Rule 075.
 """
 
-from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
+
 from services.essay_lifecycle_service.notification_projector import ELSNotificationProjector
 
 

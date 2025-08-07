@@ -51,7 +51,7 @@ async def test_handle_batch_processing_started_single_phase(
     correlation_id = uuid4()
     requested_pipeline = "spellcheck"
     resolved_pipeline = [PhaseName.SPELLCHECK]
-    
+
     # Act
     await notification_projector.handle_batch_processing_started(
         batch_id=batch_id,
@@ -60,15 +60,15 @@ async def test_handle_batch_processing_started_single_phase(
         user_id=user_id,
         correlation_id=correlation_id,
     )
-    
+
     # Assert
     mock_event_publisher.publish_batch_event.assert_called_once()
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
-    
+
     assert envelope.event_type == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
     assert envelope.source_service == "batch_orchestrator_service"
-    
+
     notification: TeacherNotificationRequestedV1 = envelope.data
     assert notification.teacher_id == user_id
     assert notification.notification_type == "batch_processing_started"
@@ -77,7 +77,7 @@ async def test_handle_batch_processing_started_single_phase(
     assert notification.batch_id == batch_id
     assert notification.correlation_id == str(correlation_id)
     assert notification.action_required is False
-    
+
     # Check payload
     payload = notification.payload
     assert payload["batch_id"] == batch_id
@@ -104,7 +104,7 @@ async def test_handle_batch_processing_started_multi_phase(
         PhaseName.CJ_ASSESSMENT,
         PhaseName.AI_FEEDBACK,
     ]
-    
+
     # Act
     await notification_projector.handle_batch_processing_started(
         batch_id=batch_id,
@@ -113,14 +113,14 @@ async def test_handle_batch_processing_started_multi_phase(
         user_id=user_id,
         correlation_id=correlation_id,
     )
-    
+
     # Assert
     mock_event_publisher.publish_batch_event.assert_called_once()
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
-    
+
     notification: TeacherNotificationRequestedV1 = envelope.data
-    
+
     # Check payload for multi-phase pipeline
     payload = notification.payload
     assert payload["resolved_pipeline"] == ["spellcheck", "cj_assessment", "ai_feedback"]
@@ -141,7 +141,7 @@ async def test_handle_batch_processing_started_empty_pipeline(
     correlation_id = uuid4()
     requested_pipeline = "unknown"
     resolved_pipeline: list[PhaseName] = []  # Empty pipeline
-    
+
     # Act
     await notification_projector.handle_batch_processing_started(
         batch_id=batch_id,
@@ -150,14 +150,14 @@ async def test_handle_batch_processing_started_empty_pipeline(
         user_id=user_id,
         correlation_id=correlation_id,
     )
-    
+
     # Assert
     mock_event_publisher.publish_batch_event.assert_called_once()
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
-    
+
     notification: TeacherNotificationRequestedV1 = envelope.data
-    
+
     # Check payload handles empty pipeline gracefully
     payload = notification.payload
     assert payload["resolved_pipeline"] == []
@@ -178,10 +178,10 @@ async def test_notification_publish_failure_does_not_raise(
     correlation_id = uuid4()
     requested_pipeline = "spellcheck"
     resolved_pipeline = [PhaseName.SPELLCHECK]
-    
+
     # Make the publisher raise an exception
     mock_event_publisher.publish_batch_event.side_effect = Exception("Kafka connection failed")
-    
+
     # Act - should not raise
     await notification_projector.handle_batch_processing_started(
         batch_id=batch_id,
@@ -190,7 +190,7 @@ async def test_notification_publish_failure_does_not_raise(
         user_id=user_id,
         correlation_id=correlation_id,
     )
-    
+
     # Assert - publisher was called but exception was caught
     mock_event_publisher.publish_batch_event.assert_called_once()
 
@@ -207,7 +207,7 @@ async def test_notification_correct_priority_and_category(
     correlation_id = uuid4()
     requested_pipeline = "cj_assessment"
     resolved_pipeline = [PhaseName.CJ_ASSESSMENT]
-    
+
     # Act
     await notification_projector.handle_batch_processing_started(
         batch_id=batch_id,
@@ -216,14 +216,14 @@ async def test_notification_correct_priority_and_category(
         user_id=user_id,
         correlation_id=correlation_id,
     )
-    
+
     # Assert
     mock_event_publisher.publish_batch_event.assert_called_once()
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
-    
+
     notification: TeacherNotificationRequestedV1 = envelope.data
-    
+
     # Per spec: batch_processing_started is LOW priority, BATCH_PROGRESS category
     assert notification.priority == NotificationPriority.LOW
     assert notification.category == WebSocketEventCategory.BATCH_PROGRESS

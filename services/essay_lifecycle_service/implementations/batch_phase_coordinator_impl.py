@@ -13,6 +13,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from services.essay_lifecycle_service.notification_projector import ELSNotificationProjector
 
 from common_core.domain_enums import ContentType

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import AsyncGenerator
 
 import pytest
@@ -74,7 +74,7 @@ def _build_file_service_notification(notification_type: str, base_data: dict) ->
             },
         },
     }
-    
+
     config = payload_map[notification_type]
     return TeacherNotificationRequestedV1(
         teacher_id=base_data["teacher_id"],
@@ -140,7 +140,7 @@ def _build_class_management_notification(notification_type: str, base_data: dict
             },
         },
     }
-    
+
     config = payload_map[notification_type]
     return TeacherNotificationRequestedV1(
         teacher_id=base_data["teacher_id"],
@@ -172,7 +172,7 @@ def _build_bos_notification(notification_type: str, base_data: dict) -> TeacherN
             },
         },
     }
-    
+
     config = payload_map[notification_type]
     return TeacherNotificationRequestedV1(
         teacher_id=base_data["teacher_id"],
@@ -218,7 +218,7 @@ def _build_els_notification(notification_type: str, base_data: dict) -> TeacherN
             },
         },
     }
-    
+
     config = payload_map[notification_type]
     return TeacherNotificationRequestedV1(
         teacher_id=base_data["teacher_id"],
@@ -238,17 +238,17 @@ E2E_WEBSOCKET_TEST_CASES = [
     ("file", "batch_files_uploaded", "standard", "file_operations", False, {"upload_status": "completed"}),
     ("file", "batch_file_removed", "standard", "file_operations", False, {"message_contains": "removed from batch"}),
     ("file", "batch_validation_failed", "immediate", "system_alerts", True, {"validation_error": "FILE_CORRUPTED"}),
-    
+
     # Class Management Service (4 notifications)
     ("class", "class_created", "standard", "class_management", False, {"class_designation": "Advanced Writing 101"}),
     ("class", "student_added_to_class", "low", "class_management", False, {"student_name": "John Doe"}),
     ("class", "validation_timeout_processed", "immediate", "student_workflow", False, {"auto_confirmed_count": 3}),
     ("class", "student_associations_confirmed", "high", "student_workflow", False, {"confirmed_count": 5}),
-    
+
     # Essay Lifecycle Service (2 notifications)
     ("els", "batch_spellcheck_completed", "low", "batch_progress", False, {"phase_name": "spellcheck", "success_count": 10}),
     ("els", "batch_cj_assessment_completed", "standard", "batch_progress", False, {"phase_name": "cj_assessment", "success_count": 8}),
-    
+
     # Batch Orchestrator Service (1 notification)
     ("bos", "batch_processing_started", "low", "batch_progress", False, {"first_phase": "spellcheck", "total_phases": 2}),
 ]
@@ -313,7 +313,7 @@ class TestCompleteWebSocketServiceIntegration:
     ) -> None:
         """
         Test complete notification pipeline: Kafka → WebSocket Service → Redis.
-        
+
         This parameterized test covers all 9 notification types across all services,
         validating the complete end-to-end flow that was missing from previous tests.
         """
@@ -380,7 +380,7 @@ class TestCompleteWebSocketServiceIntegration:
     ) -> None:
         """
         Test that WebSocket service correctly processes all priority levels end-to-end.
-        
+
         Validates priority distribution across all 9 notification types:
         - LOW: 2 types (student_added_to_class, batch_spellcheck_completed)
         - STANDARD: 4 types (file uploads/removals, class_created, batch_cj_assessment_completed)
@@ -446,7 +446,7 @@ class TestCompleteWebSocketServiceIntegration:
     ) -> None:
         """
         Test WebSocket service correctly handles action_required flags end-to-end.
-        
+
         Verifies that only batch_validation_failed notifications require teacher action.
         """
         action_test_cases = [
@@ -508,7 +508,7 @@ class TestCompleteWebSocketServiceIntegration:
     ) -> None:
         """
         Test WebSocket service idempotency through complete Kafka integration.
-        
+
         Verifies that duplicate TeacherNotificationRequestedV1 events are handled
         correctly without duplicating Redis notifications.
         """
@@ -540,7 +540,7 @@ class TestCompleteWebSocketServiceIntegration:
 
         # Wait for potential duplicate (should not arrive due to idempotency)
         message_2 = await pubsub.get_message(timeout=5.0)
-        
+
         # Idempotency test - either no second message or system gracefully handles duplicates
         # The key requirement is that the WebSocket service doesn't crash and handles duplicates correctly
         if message_2 is not None:

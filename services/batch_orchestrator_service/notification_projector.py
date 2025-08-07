@@ -44,17 +44,17 @@ class NotificationProjector:
         correlation_id: UUID,
     ) -> None:
         """Project batch processing start to teacher notification.
-        
+
         Called ONLY from ClientPipelineRequestHandler when teacher explicitly
-        triggers pipeline via "Start Processing" button. Provides immediate 
+        triggers pipeline via "Start Processing" button. Provides immediate
         feedback that their action was received and processing has begun.
         """
         # Convert resolved pipeline to human-readable format
         pipeline_phases = [phase.value for phase in resolved_pipeline]
-        
+
         # Determine the first phase being initiated
         first_phase = pipeline_phases[0] if pipeline_phases else "unknown"
-        
+
         # Create notification with immediate feedback
         notification = TeacherNotificationRequestedV1(
             teacher_id=user_id,
@@ -75,7 +75,7 @@ class NotificationProjector:
         )
 
         await self._publish_notification(notification)
-        
+
         logger.info(
             "Published batch_processing_started notification",
             extra={

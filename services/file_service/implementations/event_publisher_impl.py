@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import uuid
+from typing import TYPE_CHECKING
 
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1

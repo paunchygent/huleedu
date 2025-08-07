@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Optional
+from uuid import UUID, uuid4
 
 from common_core.status_enums import BatchStatus, ProcessingStage
 from sqlalchemy import (
@@ -14,10 +15,12 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -170,3 +173,101 @@ class EssayResult(Base):
         Index("idx_essay_cj_status", "cj_assessment_status"),
         UniqueConstraint("batch_id", "essay_id", name="uq_batch_essay"),
     )
+
+
+class EventOutbox(Base):
+    """
+    Event outbox table for reliable event publishing using Transactional Outbox Pattern.
+
+    This table stores events that need to be published to Kafka, ensuring
+    that database updates and event publications are atomic. Events are
+    written to this table in the same transaction as business logic updates.
+
+    Based on huleedu_service_libs.outbox.models.EventOutbox template.
+    """
+
+    __tablename__ = "event_outbox"
+
+    # Primary key
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        nullable=False,
+        comment="Unique identifier for the outbox entry",
+    )
+
+    # Aggregate tracking
+    aggregate_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+        comment="ID of the aggregate (batch_id, essay_id) that generated this event",
+    )
+    aggregate_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        comment="Type of aggregate (batch, essay) for categorization",
+    )
+
+    # Event details
+    event_type: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Type/topic of the event (e.g., huleedu.ras.batch.results.ready.v1)",
+    )
+    event_data: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="The complete event data as JSON (EventEnvelope)",
+    )
+    event_key: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Kafka message key for partitioning",
+    )
+
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
+    )
+
+    # Processing state
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.current_timestamp(),
+        comment="When the event was created",
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="When the event was successfully published to Kafka",
+    )
+
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Number of publish attempts",
+    )
+    last_error: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Last error message if publishing failed",
+    )
+
+    def __repr__(self) -> str:
+        """String representation of EventOutbox."""
+        return (
+            f"<EventOutbox("
+            f"id={self.id}, "
+            f"aggregate_id={self.aggregate_id}, "
+            f"event_type={self.event_type}, "
+            f"published_at={self.published_at}"
+            f")>"
+        )

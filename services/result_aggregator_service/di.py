@@ -8,7 +8,8 @@ import aiohttp
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol, PostgreSQLOutboxRepository
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
 from prometheus_client import REGISTRY, CollectorRegistry
@@ -33,6 +34,7 @@ from services.result_aggregator_service.implementations.cache_manager_impl impor
 from services.result_aggregator_service.implementations.event_processor_impl import (
     EventProcessorImpl,
 )
+from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 from services.result_aggregator_service.implementations.security_impl import SecurityServiceImpl
 from services.result_aggregator_service.implementations.state_store_redis_impl import (
     StateStoreRedisImpl,
@@ -48,6 +50,7 @@ from services.result_aggregator_service.protocols import (
     BatchRepositoryProtocol,
     CacheManagerProtocol,
     EventProcessorProtocol,
+    OutboxManagerProtocol,
     SecurityServiceProtocol,
     StateStoreProtocol,
 )
@@ -145,6 +148,11 @@ class DatabaseProvider(Provider):
             engine=engine, service_name=settings.SERVICE_NAME
         )
 
+    @provide
+    def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
+        """Provide outbox repository for transactional outbox pattern."""
+        return PostgreSQLOutboxRepository(engine)
+
 
 # RepositoryProvider removed - batch repository is now provided in DatabaseProvider
 
@@ -222,6 +230,18 @@ class ServiceProvider(Provider):
             internal_api_key=settings.INTERNAL_API_KEY,
             allowed_service_ids=settings.ALLOWED_SERVICE_IDS,
         )
+
+    @provide
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: RedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManagerProtocol:
+        """Provide outbox manager for reliable event publishing."""
+        # Cast RedisClientProtocol to AtomicRedisClientProtocol as they are compatible
+        atomic_redis = cast(AtomicRedisClientProtocol, redis_client)
+        return OutboxManager(outbox_repository, atomic_redis, settings)
 
 
 # Export all providers

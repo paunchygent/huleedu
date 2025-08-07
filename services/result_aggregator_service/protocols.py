@@ -216,3 +216,31 @@ class BatchOrchestratorClientProtocol(Protocol):
     async def get_pipeline_state(self, batch_id: str) -> Optional[Dict[str, Any]]:
         """Get pipeline state from BOS for batch consistency fallback."""
         ...
+
+
+class OutboxManagerProtocol(Protocol):
+    """Protocol for managing transactional outbox pattern."""
+
+    async def publish_to_outbox(
+        self,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        event_data: Any,  # EventEnvelope[Any]
+        topic: str,
+    ) -> None:
+        """
+        Store event in outbox for reliable delivery.
+
+        Args:
+            aggregate_type: Type of aggregate (e.g., "batch", "essay")
+            aggregate_id: ID of the aggregate that produced the event
+            event_type: Type of event being published
+            event_data: Complete event envelope to publish
+            topic: Kafka topic to publish to
+        """
+        ...
+
+    async def notify_relay_worker(self) -> None:
+        """Notify relay worker of new events in outbox."""
+        ...

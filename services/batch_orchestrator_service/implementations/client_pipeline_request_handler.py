@@ -27,7 +27,7 @@ logger = create_service_logger("bos.handlers.client_pipeline_request")
 
 class ClientPipelineRequestHandler:
     """Handler for ClientBatchPipelineRequestV1 events from API Gateway.
-    
+
     CRITICAL: This is the ONLY entry point for pipeline initiation.
     Pipelines are NEVER auto-triggered - always require explicit teacher action.
     """
@@ -50,7 +50,7 @@ class ClientPipelineRequestHandler:
         Process ClientBatchPipelineRequestV1 message from API Gateway.
 
         Coordinates pipeline resolution with BCS and initiates the resolved pipeline.
-        
+
         Flow: Teacher clicks "Start Processing" → API Gateway → This handler → Pipeline starts
 
         Args:
@@ -275,12 +275,12 @@ class ClientPipelineRequestHandler:
                                 "correlation_id": correlation_id,
                             },
                         )
-                        
+
                         # CRITICAL UX: Notify teacher their "Start Processing" action succeeded
                         if self.notification_projector:
                             # Get user_id from batch context for teacher notification
                             user_id = batch_context.user_id if batch_context else None
-                            
+
                             if user_id:
                                 await self.notification_projector.handle_batch_processing_started(
                                     batch_id=batch_id,
