@@ -90,6 +90,7 @@ from services.batch_orchestrator_service.metrics import (
     get_circuit_breaker_metrics,
     get_database_metrics,
 )
+from services.batch_orchestrator_service.notification_projector import NotificationProjector
 from services.batch_orchestrator_service.protocols import (
     AIFeedbackInitiatorProtocol,
     BatchConductorClientProtocol,
@@ -449,14 +450,26 @@ class EventHandlingProvider(Provider):
         return ELSBatchPhaseOutcomeHandler(phase_coordinator)
 
     @provide(scope=Scope.APP)
+    def provide_notification_projector(
+        self,
+        batch_repo: BatchRepositoryProtocol,
+        event_publisher: BatchEventPublisherProtocol,
+    ) -> NotificationProjector:
+        """Provide notification projector for teacher notifications."""
+        return NotificationProjector(batch_repo, event_publisher)
+
+    @provide(scope=Scope.APP)
     def provide_client_pipeline_request_handler(
         self,
         bcs_client: BatchConductorClientProtocol,
         batch_repo: BatchRepositoryProtocol,
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
+        notification_projector: NotificationProjector,
     ) -> ClientPipelineRequestHandler:
         """Provide ClientBatchPipelineRequest message handler."""
-        return ClientPipelineRequestHandler(bcs_client, batch_repo, phase_coordinator)
+        return ClientPipelineRequestHandler(
+            bcs_client, batch_repo, phase_coordinator, notification_projector
+        )
 
     @provide(scope=Scope.APP)
     def provide_student_associations_confirmed_handler(

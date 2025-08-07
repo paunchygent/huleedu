@@ -4,6 +4,8 @@
 
 Implement a clean notification projection pattern that separates internal service events from teacher-facing notifications. Each service owns its notification decisions through dedicated projectors, and the WebSocket service becomes a simple notification router.
 
+**Latest Update (2025-08-07)**: BOS notification projector implemented - teachers now receive immediate feedback when triggering pipeline execution. Architecture validated: clean client-triggered design with no automatic pipeline triggers.
+
 ## ✅ PHASE 1 COMPLETED: Infrastructure & Class Management Integration
 
 ### Implemented Components
@@ -229,11 +231,11 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 ## Success Metrics (Current Status)
 
 - ✅ Zero internal events consumed by WebSocket service  
-- ✅ 9/9 notification types implemented (Class Mgmt: 4, File: 3, ELS: 2)
+- ✅ 10/10 notification types implemented (Class Mgmt: 4, File: 3, ELS: 2, BOS: 1)
 - ✅ 100% teacher ownership validation before notification
 - ✅ Clean separation between domain and notification concerns
-- ✅ Complete E2E integration testing with 100% pass rate
-- ❌ Missing: Client-triggered pipeline initiation notification (BOS)
+- ✅ Complete E2E integration testing with 100% pass rate (13/13 tests)
+- ✅ Client-triggered pipeline initiation notification implemented (BOS)
 - ❌ Missing: Results completion notifications (RAS - needs event emission)
 
 ## Anti-Patterns to Avoid
@@ -266,13 +268,34 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 - Error handling: observability stack integration
 ```
 
+### Batch Orchestrator Service Notification ✅ COMPLETED
+
+**Implementation Details**:
+- **File**: `/services/batch_orchestrator_service/notification_projector.py`
+- **Trigger Point**: `ClientPipelineRequestHandler` line 279-291
+- **Pattern**: Direct projector invocation (no Kafka round-trip)
+- **Priority**: LOW (progress tracking notification)
+- **Category**: BATCH_PROGRESS
+- **Payload**: Includes requested/resolved pipeline, first phase, total phases
+- **User Resolution**: Direct from `batch_context.user_id`
+
+**Architecture Validation**:
+```python
+# Key findings from investigation:
+1. ClientBatchPipelineRequestV1 is the ONLY pipeline trigger
+2. NO automatic pipeline triggers exist anywhere
+3. BatchEssaysReady handler ONLY stores essays (never initiates)
+4. READY_FOR_PIPELINE_EXECUTION requires explicit client action
+5. Comments added to prevent future confusion
+```
+
 ### Complete E2E Integration Testing ✅ COMPLETED  
 ```python
 # /tests/functional/test_e2e_websocket_integration.py
 - Tests: Complete pipeline TeacherNotificationRequestedV1 → Kafka → WebSocket → Redis
-- Coverage: All 9 notification types across 3 services (File, Class Mgmt, ELS)
+- Coverage: All 10 notification types across 4 services (File, Class Mgmt, ELS, BOS)
 - Parameterized: Priority compliance (LOW/STANDARD/HIGH/IMMEDIATE), action_required flags
-- Results: 12/12 tests passing, 0.22s execution time
+- Results: 13/13 tests passing, 0.23s execution time
 - Validation: WebSocket service correctly processes and forwards all notification types
 
 # Key Test Architecture
@@ -322,23 +345,23 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 # E2E validated: All ELS notifications flow correctly through pipeline
 ```
 
-### 2. Batch Orchestrator Service - CLIENT-TRIGGERED GAP ⚡
+### 2. Batch Orchestrator Service ✅ COMPLETED
 
-**Architecture Discovery**: BOS uses **client-triggered pipeline pattern**
+**Implementation**: `/services/batch_orchestrator_service/notification_projector.py`
 ```python
-# Current Flow:
-1. Batch reaches READY_FOR_PIPELINE_EXECUTION (after uploads/student matching)
-2. Teacher triggers: POST /v1/batches/{batch_id}/pipelines → ClientBatchPipelineRequestV1
-3. BOS initiates pipeline phases (NO notification emitted!)
+# Notification Flow:
+1. Teacher clicks "Start Processing" → POST /v1/batches/{batch_id}/pipelines
+2. API Gateway → ClientBatchPipelineRequestV1 → Kafka
+3. BOS ClientPipelineRequestHandler processes request
+4. Pipeline initiated via phase_coordinator
+5. NotificationProjector.handle_batch_processing_started() called directly
+6. TeacherNotificationRequestedV1 published with LOW priority
 
-# Critical Missing Notification:
-- batch_processing_started → HIGH priority (immediate user feedback)
-- Teacher clicks "Start Processing" → Gets NO confirmation ❌
-
-# Investigation Required:
-- Find ClientBatchPipelineRequestV1 handler in BOS
-- Check for legacy automatic pipeline triggers (potential conflicts)
-- Identify correct notification injection point
+# Key Architecture Findings:
+- ✅ ClientBatchPipelineRequestV1 handler exists and is the ONLY pipeline trigger
+- ✅ NO automatic pipeline triggers found (clean client-controlled design)
+- ✅ Notification injected at optimal point (line 279-291 in handler)
+- ✅ Comments added for clarity on client-triggered pattern
 ```
 
 ### 3. Result Aggregator Service - EVENT EMISSION ARCHITECTURE NEEDED
@@ -360,11 +383,12 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 
 ## IMPLEMENTATION PLAN: Next Priorities
 
-**Phase 3A - BOS Pipeline Initiation** (CRITICAL GAP)
-- **Scope**: Add `batch_processing_started` notification for client-triggered pipelines
-- **Investigation**: Find ClientBatchPipelineRequestV1 handler, identify legacy automatic triggers
-- **Architecture**: Ensure single pipeline initiation path (client-triggered only)
-- **Outcome**: Teachers get immediate feedback when clicking "Start Processing"
+**Phase 3A - BOS Pipeline Initiation** ✅ COMPLETED
+- **Scope**: Added `batch_processing_started` notification for client-triggered pipelines
+- **Investigation**: Confirmed ClientBatchPipelineRequestV1 handler is sole pipeline trigger
+- **Architecture**: Clean single pipeline initiation path maintained (client-triggered only)
+- **Outcome**: Teachers now get immediate feedback when clicking "Start Processing"
+- **Tests**: 5 unit tests + 1 E2E test passing, full typecheck validation
 
 **Phase 3B - RAS Event Emission Architecture** (DEEP DIVE)
 - **Scope**: Implement Kafka producer pattern in Result Aggregator Service
@@ -388,11 +412,12 @@ Created comprehensive behavioral tests in `/services/class_management_service/te
 - [x] Refactor WebSocket service to pure notification router
 - [x] Complete E2E integration testing - all 9 notification types validated
 
-**Phase 3A - BOS Client-Triggered Pipeline** (NEXT)
-- [ ] Investigate ClientBatchPipelineRequestV1 handler in BOS
-- [ ] Identify and remove any automatic pipeline triggers
-- [ ] Implement batch_processing_started notification
-- [ ] Test client-triggered pipeline notification flow
+**Phase 3A - BOS Client-Triggered Pipeline** ✅ COMPLETED
+- [x] Investigated ClientBatchPipelineRequestV1 handler in BOS
+- [x] Confirmed NO automatic pipeline triggers exist (clean design)
+- [x] Implemented batch_processing_started notification with projector pattern
+- [x] Added strategic comments for client-triggered clarity
+- [x] Tested with 5 unit tests + E2E integration test
 
 **Phase 3B - RAS Event Emission** (DEEP DIVE)
 - [ ] Analyze RAS architecture for event emission points

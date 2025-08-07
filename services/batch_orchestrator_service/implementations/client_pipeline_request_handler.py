@@ -15,6 +15,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.pipeline_models import PhaseName, ProcessingPipelineState
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.batch_orchestrator_service.notification_projector import NotificationProjector
 from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
     BatchRepositoryProtocol,
@@ -25,24 +26,32 @@ logger = create_service_logger("bos.handlers.client_pipeline_request")
 
 
 class ClientPipelineRequestHandler:
-    """Handler for ClientBatchPipelineRequestV1 events from API Gateway."""
+    """Handler for ClientBatchPipelineRequestV1 events from API Gateway.
+    
+    CRITICAL: This is the ONLY entry point for pipeline initiation.
+    Pipelines are NEVER auto-triggered - always require explicit teacher action.
+    """
 
     def __init__(
         self,
         bcs_client: BatchConductorClientProtocol,
         batch_repo: BatchRepositoryProtocol,
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
+        notification_projector: NotificationProjector | None = None,
     ) -> None:
         """Initialize with required dependencies."""
         self.bcs_client = bcs_client
         self.batch_repo = batch_repo
         self.phase_coordinator = phase_coordinator
+        self.notification_projector = notification_projector
 
     async def handle_client_pipeline_request(self, msg: Any) -> None:
         """
         Process ClientBatchPipelineRequestV1 message from API Gateway.
 
         Coordinates pipeline resolution with BCS and initiates the resolved pipeline.
+        
+        Flow: Teacher clicks "Start Processing" → API Gateway → This handler → Pipeline starts
 
         Args:
             msg: Kafka message containing ClientBatchPipelineRequestV1 event
@@ -106,7 +115,7 @@ class ClientPipelineRequestHandler:
                         )
                         raise ValueError(error_msg)
 
-                    # Validate batch is ready for pipeline execution
+                    # Guard: Ensure batch is ready (prevents premature triggers)
                     batch_data = await self.batch_repo.get_batch_by_id(batch_id)
                     if not batch_data:
                         error_msg = f"Batch data not found: {batch_id}"
@@ -266,6 +275,26 @@ class ClientPipelineRequestHandler:
                                 "correlation_id": correlation_id,
                             },
                         )
+                        
+                        # CRITICAL UX: Notify teacher their "Start Processing" action succeeded
+                        if self.notification_projector:
+                            # Get user_id from batch context for teacher notification
+                            user_id = batch_context.user_id if batch_context else None
+                            
+                            if user_id:
+                                await self.notification_projector.handle_batch_processing_started(
+                                    batch_id=batch_id,
+                                    requested_pipeline=requested_pipeline,
+                                    resolved_pipeline=resolved_pipeline,
+                                    user_id=user_id,
+                                    correlation_id=correlation_id,
+                                )
+                            else:
+                                logger.warning(
+                                    f"No user_id found in batch context for batch {batch_id}, "
+                                    "skipping notification",
+                                    extra={"batch_id": batch_id, "correlation_id": correlation_id},
+                                )
                     except Exception as e:
                         error_msg = (
                             f"Failed to initiate resolved pipeline for batch {batch_id}: {e}"

@@ -155,6 +155,37 @@ def _build_class_management_notification(notification_type: str, base_data: dict
     )
 
 
+def _build_bos_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
+    """Build Batch Orchestrator Service TeacherNotificationRequestedV1 event."""
+    payload_map = {
+        "batch_processing_started": {
+            "category": WebSocketEventCategory.BATCH_PROGRESS,
+            "priority": NotificationPriority.LOW,
+            "action_required": False,
+            "payload": {
+                "batch_id": base_data["batch_id"],
+                "requested_pipeline": "spellcheck",
+                "resolved_pipeline": ["spellcheck", "cj_assessment"],
+                "first_phase": "spellcheck",
+                "total_phases": 2,
+                "message": "Processing started: Initiating spellcheck phase",
+            },
+        },
+    }
+    
+    config = payload_map[notification_type]
+    return TeacherNotificationRequestedV1(
+        teacher_id=base_data["teacher_id"],
+        notification_type=notification_type,
+        category=config["category"],
+        priority=config["priority"],
+        payload=config["payload"],
+        action_required=config["action_required"],
+        correlation_id=base_data["correlation_id"],
+        batch_id=base_data["batch_id"],
+    )
+
+
 def _build_els_notification(notification_type: str, base_data: dict) -> TeacherNotificationRequestedV1:
     """Build Essay Lifecycle Service TeacherNotificationRequestedV1 event."""
     payload_map = {
@@ -201,7 +232,7 @@ def _build_els_notification(notification_type: str, base_data: dict) -> TeacherN
     )
 
 
-# Complete test cases for all 9 notification types across 3 services
+# Complete test cases for all 10 notification types across 4 services
 E2E_WEBSOCKET_TEST_CASES = [
     # File Service (3 notifications)
     ("file", "batch_files_uploaded", "standard", "file_operations", False, {"upload_status": "completed"}),
@@ -217,6 +248,9 @@ E2E_WEBSOCKET_TEST_CASES = [
     # Essay Lifecycle Service (2 notifications)
     ("els", "batch_spellcheck_completed", "low", "batch_progress", False, {"phase_name": "spellcheck", "success_count": 10}),
     ("els", "batch_cj_assessment_completed", "standard", "batch_progress", False, {"phase_name": "cj_assessment", "success_count": 8}),
+    
+    # Batch Orchestrator Service (1 notification)
+    ("bos", "batch_processing_started", "low", "batch_progress", False, {"first_phase": "spellcheck", "total_phases": 2}),
 ]
 
 
@@ -247,7 +281,7 @@ class TestCompleteWebSocketServiceIntegration:
         notification: TeacherNotificationRequestedV1,
     ) -> None:
         """Publish TeacherNotificationRequestedV1 to Kafka for WebSocket service consumption."""
-        envelope = EventEnvelope(
+        envelope: EventEnvelope = EventEnvelope(
             event_id=uuid.uuid4(),
             event_type=topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED),
             event_timestamp=notification.timestamp,
@@ -299,6 +333,7 @@ class TestCompleteWebSocketServiceIntegration:
             "file": _build_file_service_notification,
             "class": _build_class_management_notification,
             "els": _build_els_notification,
+            "bos": _build_bos_notification,
         }
         notification = notification_builders[service](notification_type, base_data)
 

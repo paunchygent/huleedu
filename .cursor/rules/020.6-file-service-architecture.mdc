@@ -1,212 +1,196 @@
 ---
-description: Defines the File Service, a Quart-based microservice for file uploads. Details the batch upload API, async processing workflow, and Kafka event publishing. Uses protocol-based DI.
-globs: 
+description: File Service - Stateful file upload service with PostgreSQL persistence, user attribution, and teacher notification projection
 alwaysApply: false
 ---
 # 020.6: File Service Architecture
 
-## 1. Service Identity
+## Service Identity
 - **Package**: `huleedu-file-service`
 - **Port**: 7001 (HTTP API), 9094 (Prometheus)
-- **Stack**: Quart, aiohttp, Hypercorn, aiokafka
-- **Purpose**: File upload and content provisioning service
-- **Architecture**: Blueprint-based API with Kafka event publishing
+- **Stack**: Quart, SQLAlchemy (async), PostgreSQL, aiokafka, Dishka DI
+- **Purpose**: Stateful file upload service with persistence and notification projection
+- **Database**: PostgreSQL with file_uploads table for user attribution
 
-## 2. Service Structure **BLUEPRINT PATTERN**
+## Service Structure (STATEFUL BLUEPRINT PATTERN)
 
-### 2.1. Directory Structure
+### Directory Structure
 ```
 services/file_service/
-├── app.py                     # Lean Quart application (setup, DI, Blueprint registration)
-├── startup_setup.py           # DI initialization, metrics creation, service lifecycle
-├── api/                       # Blueprint API routes directory
-│   ├── __init__.py
-│   ├── health_routes.py       # /healthz, /metrics endpoints
-│   └── file_routes.py         # /v1/files endpoints
-├── config.py                  # Pydantic settings
+├── app.py                     # Quart app with Blueprint registration
+├── startup_setup.py           # DI initialization, DB setup, lifecycle hooks
+├── api/                       # Blueprint API routes
+│   ├── file_routes.py         # /v1/files endpoints with user context
+│   └── health_routes.py       # /healthz, /metrics endpoints
+├── models_db.py               # SQLAlchemy models (FileUpload)
+├── implementations/           
+│   ├── file_repository_impl.py    # Database operations for file tracking
+│   ├── event_publisher_impl.py    # Outbox-based event publishing
+│   └── text_extractor_impl.py     # Strategy-based text extraction
+├── notification_projector.py  # Teacher notification projection (3 types)
 ├── protocols.py               # Service behavioral contracts
-├── di.py                      # Dishka dependency injection providers
-├── core_logic.py              # File processing workflow logic
-├── text_processing.py         # Text extraction and student info parsing
-├── hypercorn_config.py        # Hypercorn server configuration
-├── pyproject.toml
-├── Dockerfile
-├── README.md
+├── di.py                      # Dishka providers with DB engine
+├── alembic/                   # Database migrations
+│   └── versions/              
+│       └── 20250806_add_file_uploads_table.py
 └── tests/
 ```
 
-### 2.2. Blueprint Implementation
-- **app.py**: Lean setup focused on Blueprint registration and startup/shutdown hooks
-- **startup_setup.py**: DI container initialization, metrics creation using app context pattern
-- **api/health_routes.py**: Standard health and metrics endpoints
-- **api/file_routes.py**: File upload and batch processing endpoints
-- **Dependencies**: Injected via Dishka with protocol-based abstractions
+## Stateful Architecture
 
-## 3. API Specification
+### Database Model (`models_db.py`)
+```python
+class FileUpload(Base):
+    __tablename__ = "file_uploads"
+    
+    # Primary identifiers
+    id: UUID (primary key)
+    file_upload_id: str (unique)
+    batch_id: str (indexed)
+    user_id: str (indexed)  # Teacher attribution
+    
+    # File metadata
+    filename: str
+    file_size_bytes: int
+    
+    # Storage references
+    raw_file_storage_id: str
+    text_storage_id: str
+    
+    # Processing status
+    processing_status: str  # PENDING/COMPLETED/FAILED
+    validation_error_code: str
+```
 
-### 3.1. Endpoints
+### Repository Pattern (`file_repository_impl.py`)
+- **Create**: Store file upload record with user_id
+- **Update**: Update processing status and storage IDs
+- **Query**: Get uploads by batch_id, user_id
+- **Delete**: Soft delete with status update
 
-#### POST /v1/files/batch
-- Batch file upload for essay processing
-- **Request**: Multipart form with `batch_id` and `files[]`
-- **Response**: `{"message": "...", "batch_id": "...", "correlation_id": "..."}`
-- **Status**: 202 (accepted), 400 (validation error), 500 (processing error)
-- **Processing**: Concurrent file processing with asyncio.create_task
-- **Blueprint**: file_routes.py
+## Teacher Notification Projection
 
-#### GET /healthz
-- Health check endpoint
-- **Response**: `{"status": "ok", "message": "File Service is healthy"}`
-- **Status**: 200 (healthy), 503 (unhealthy)
-- **Blueprint**: health_routes.py
+### Notification Projector (`notification_projector.py`)
+Implements 3 teacher notifications:
 
-#### GET /metrics
-- Prometheus metrics endpoint
-- **Response**: Metrics in Prometheus format
-- **Status**: 200 (success), 500 (error)
-- **Blueprint**: health_routes.py
+1. **batch_files_uploaded**: After successful upload
+   - Priority: STANDARD
+   - Category: FILE_OPERATIONS
+   - Triggered: After FileUploadCompletedV1 event
 
-## 4. Processing Implementation
+2. **batch_file_removed**: When file deleted
+   - Priority: STANDARD  
+   - Category: FILE_OPERATIONS
+   - Triggered: Direct invocation after repository delete
 
-### 4.1. Text Processing - Strategy Pattern Implementation
-- **Architecture**: Strategy Pattern with pluggable extraction strategies
-- **Supported Formats**: .txt (UTF-8), .docx (python-docx), .pdf (pypdf)
-- **Error Handling**: Structured errors with specific codes (ENCRYPTED_FILE_UNSUPPORTED)
-- **Async Processing**: All strategies use asyncio.to_thread for blocking operations
-- **Extensibility**: New file formats added via strategy registration
+3. **batch_validation_failed**: On validation errors
+   - Priority: IMMEDIATE
+   - Category: SYSTEM_ALERTS
+   - Triggered: After BatchValidationErrorsV1 event
 
-### 4.2. Workflow Logic (core_logic.py)
-- **Content Storage**: Integration with Content Service via HTTP (returns `text_storage_id`)
-- **Content Integrity**: MD5 hash calculation and file size tracking
-- **Event Publishing**: `EssayContentProvisionedV1` events to Kafka
-- **Correlation Tracking**: End-to-end traceability
+### Projection Pattern
+```python
+# Direct invocation (no Kafka round-trip):
+await notification_projector.handle_file_upload_completed(event)
+# Publishes TeacherNotificationRequestedV1 to Kafka
+```
 
-## 5. Integration Points
+## API Endpoints
 
-### 5.1. Dependencies
-- **Content Service**: HTTP POST for content storage
-- **Kafka**: Event publishing for EssayContentReady events
-- **Prometheus**: Metrics collection and exposure
+### POST /v1/files/batch
+- **Auth**: JWT required (extracts user_id)
+- **Process**:
+  1. Extract user_id from JWT token
+  2. Create FileUpload records with user attribution
+  3. Process files concurrently
+  4. Update DB with processing results
+  5. Publish domain events
+  6. Project teacher notifications
+- **Response**: 202 Accepted with batch_id
 
-### 5.2. Event Publishing
-- **Topic**: `huleedu.file.essay.content.provisioned.v1`
-- **Event Type**: `EssayContentProvisionedV1` from `common_core.events.file_events`
-- **Data**: `batch_id`, `original_file_name`, `text_storage_id`, `file_size_bytes`, `content_md5_hash`
-- **Serialization**: `json.dumps(envelope.model_dump(mode="json"))` for UUID handling
+### GET /v1/files/batch/{batch_id}
+- **Auth**: JWT required (validates ownership)
+- **Returns**: File upload records for batch
+- **Security**: Only returns files for authenticated user
 
-## 6. Configuration
+## Event Architecture
 
-### 6.1. Environment Variables
-- `FILE_SERVICE_HTTP_PORT`: HTTP server port (default: 7001)
-- `FILE_SERVICE_PROMETHEUS_PORT`: Metrics port (default: 9094)
-- `FILE_SERVICE_KAFKA_BOOTSTRAP_SERVERS`: Kafka connection string
-- `FILE_SERVICE_CONTENT_SERVICE_URL`: Content Service endpoint
-- `FILE_SERVICE_LOG_LEVEL`: Logging level (default: INFO)
-- `ENV_TYPE`: Environment type (development, docker, etc.)
+### Domain Events Published
+- `FileUploadCompletedV1`: After successful processing
+- `BatchValidationErrorsV1`: On validation failures
+- `EssayContentProvisionedV1`: Legacy event for BOS
 
-### 6.2. Dependencies
-- `quart`: Async web framework
-- `hypercorn`: ASGI server
-- `aiokafka`: Kafka client for event publishing
-- `aiohttp`: HTTP client for Content Service integration
-- `dishka`, `quart-dishka`: Dependency injection
-- `huleedu-common-core`: Shared models and events
-- `huleedu-service-libs`: Logging utilities
+### Notification Events
+- `TeacherNotificationRequestedV1`: Via notification projector
 
-## 7. Protocol Abstractions
+## Database Configuration
 
-### 7.1. Defined Protocols
-- **ContentServiceClientProtocol**: Content storage operations
-- **EventPublisherProtocol**: Kafka event publishing
-- **TextExtractorProtocol**: Strategy-based text extraction interface
-- **ExtractionStrategy**: Base protocol for individual file format strategies
+### Connection
+- **URL**: `postgresql+asyncpg://user:pass@file_service_db:5432/huledu_file_service`
+- **Pool**: 5 connections, 10 overflow
+- **Engine**: SQLAlchemy async with asyncpg
 
-### 7.2. Implementation Classes
-- **DefaultContentServiceClient**: HTTP-based content storage
-- **DefaultEventPublisher**: Kafka event publishing with Transactional Outbox Pattern
-- **StrategyBasedTextExtractor**: Multi-format text extraction orchestrator
-- **TxtExtractionStrategy**: UTF-8 text file processing
-- **DocxExtractionStrategy**: Microsoft Word document processing
-- **PdfExtractionStrategy**: PDF processing with encryption detection
+### Migrations
+```bash
+# From service directory:
+pdm run alembic upgrade head
+```
 
-## 8. Deployment
+## Dependency Injection (`di.py`)
 
-### 8.1. Docker Configuration
-- **Base Image**: `python:3.11-slim`
-- **Package Manager**: PDM
-- **Dependencies**: Content Service, Kafka
-- **Health Check**: `/healthz` endpoint
-- **Port Exposure**: 7001 (HTTP), 9094 (Prometheus)
+### Key Providers
+```python
+@provide(scope=Scope.APP)
+async def provide_database_engine() -> AsyncEngine:
+    # PostgreSQL connection with pooling
 
-### 8.2. Development Commands
-- `pdm run start`: Production server with Hypercorn
-- `pdm run dev`: Development server with debug mode (port 7001)
+@provide(scope=Scope.REQUEST)  
+async def provide_file_repository() -> FileRepositoryProtocol:
+    # Repository with DB session management
 
-## 9. Production Implementation Standards
+@provide(scope=Scope.APP)
+def provide_notification_projector() -> NotificationProjector:
+    # Projector with event publisher
+```
 
-### 9.1. Mandatory Production Patterns
-- **MUST** implement graceful shutdown with proper async resource cleanup
-- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
-- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
-- **MUST** implement `/healthz` with consistent JSON response format
-- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+## Testing
 
-## 10. Monitoring and Logging
+### Database Tests
+- **Unit**: Mock repository with in-memory implementation
+- **Integration**: TestContainers PostgreSQL
+- **E2E**: Full stack with real database
 
-### 9.1. Logging
-- **Utility**: `huleedu_service_libs.logging_utils` (centralized)
-- **Levels**: INFO for operations, WARNING for non-txt files, ERROR for failures
-- **Correlation IDs**: Tracked throughout file processing workflow
-- **Context**: File names, batch IDs, essay IDs, processing stages
+### Test Coverage
+- Repository operations: 95%
+- Notification projection: 100%
+- API endpoints: 91%
 
-### 9.2. Metrics
-- **Request Counts**: HTTP requests by method, endpoint, status
-- **Request Duration**: Response time measurements
-- **File Processing**: Upload counts, processing success/failure rates
-- **Endpoint**: `/metrics` (Prometheus format)
+## Production Patterns
 
-## 10. Security Considerations
+✅ **IMPLEMENTED**:
+- Stateful with PostgreSQL persistence
+- User attribution on all operations
+- Teacher notification projection
+- Transactional outbox for events
+- Database connection pooling
+- Comprehensive error handling
 
-### 10.1. Current Implementation
-- No authentication (internal service)
-- No file size limits (walking skeleton)
-- No content scanning
-- Non-root user in container
+❌ **NOT YET**:
+- File versioning
+- Soft delete with audit trail
+- File content deduplication
+- S3/blob storage integration
 
-### 10.2. Future Enhancements
-- File size and type validation
-- Virus scanning integration
-- Authentication for external access
-- Rate limiting
+## Key Changes from Stateless
 
-## 11. Limitations and Future Work
+1. **Added PostgreSQL**: Full persistence layer
+2. **User Attribution**: All files tracked to teacher_id
+3. **Notification Projection**: Direct teacher notifications
+4. **Repository Pattern**: Clean data access layer
+5. **Database Migrations**: Alembic for schema management
 
-### 11.1. Current Implementation Status
-- ✅ Multi-format support (.txt, .docx, .pdf)
-- ✅ Strategy Pattern architecture for extensibility
-- ✅ Comprehensive error handling with structured codes
-- ✅ Async processing with correlation ID tracking
-- ✅ 91% test coverage including integration tests
-- ❌ Student info extraction (deferred to NLP Service)
-- ❌ Advanced file validation rules
+## Security & Validation
 
-### 11.2. Architectural Evolution
-- ✅ **Strategy Pattern**: Completed - enables easy addition of new formats
-- ✅ **Transactional Outbox**: Implemented for reliable event delivery
-- 🔄 **Student Extraction**: Moved to dedicated NLP Service for proper separation
-- 📋 **Future Formats**: Additional formats (.doc, .rtf) via strategy addition
-- 📋 **Enhanced Validation**: Business rule validation beyond technical extraction
-
-## 12. Critical Implementation Notes
-
-### 12.1. UUID Serialization
-- **CRITICAL**: Must use `json.dumps(envelope.model_dump(mode="json"))` for Kafka events
-- **REASON**: UUID objects are not JSON serializable without mode="json"
-
-### 12.2. File Reading
-- **CRITICAL**: Quart file storage uses synchronous `.read()` method
-- **PATTERN**: `file_content = file_storage.read()` (NOT await)
-
-### 12.3. Port Management
-- **CRITICAL**: Ensure unique port allocation in docker-compose.yml
-- **CURRENT**: HTTP=7001, Prometheus=9094 (avoid Kafka's 9092)
+- **JWT Required**: All endpoints need authentication
+- **User Isolation**: Teachers only see their own files
+- **Validation Codes**: Structured error reporting
+- **Status Tracking**: Complete processing audit trail

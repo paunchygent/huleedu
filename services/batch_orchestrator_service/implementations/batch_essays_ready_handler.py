@@ -40,6 +40,9 @@ class BatchEssaysReadyHandler:
         """
         Handle a BatchEssaysReady event by storing essays for later client-triggered processing.
 
+        CRITICAL: This handler ONLY stores essays - it NEVER initiates pipeline processing.
+        Pipeline MUST be explicitly triggered by teacher via ClientBatchPipelineRequestV1.
+
         UPDATED ARCHITECTURE:
         ====================
         This handler stores essay data and transitions batch state based on type:
