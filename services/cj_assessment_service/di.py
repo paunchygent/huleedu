@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import aiohttp
 from aiokafka.errors import KafkaError
@@ -47,9 +48,10 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
-    OutboxRepositoryProtocol,
     RetryManagerProtocol,
 )
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
+from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
 
 
 class CJAssessmentServiceProvider(Provider):
@@ -221,14 +223,23 @@ class CJAssessmentServiceProvider(Provider):
         """Provide service name for OutboxProvider dependency."""
         return settings.SERVICE_NAME
     @provide(scope=Scope.APP)
-    def provide_event_publisher(
+    def provide_outbox_manager(
         self,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for transactional event publishing."""
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_event_publisher(
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
     ) -> CJEventPublisherProtocol:
-        """Provide event publisher with outbox pattern for transactional safety."""
-        return CJEventPublisherImpl(outbox_repository, redis_client, settings)
+        """Provide event publisher with outbox manager for transactional safety."""
+        return CJEventPublisherImpl(outbox_manager, settings)
 
     # Batch processing modules with clean architecture
     @provide(scope=Scope.APP)

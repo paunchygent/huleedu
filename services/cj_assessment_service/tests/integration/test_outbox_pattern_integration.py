@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
+import asyncio
 
 import pytest
 from common_core.events.envelope import EventEnvelope
@@ -21,18 +22,17 @@ from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
+from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.redis_client import RedisClient
-from services.cj_assessment_service.protocols import (
-    CJEventPublisherProtocol,
-    OutboxRepositoryProtocol,
-)
+from services.cj_assessment_service.protocols import CJEventPublisherProtocol
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 
 
 class OutboxIntegrationTestProvider(Provider):
@@ -95,18 +95,24 @@ class OutboxIntegrationTestProvider(Provider):
         return self._kafka_bus
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(
+    def provide_outbox_manager(
         self,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for transactional event publishing."""
+        from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
+        return OutboxManager(outbox_repository, redis_client, settings)
+
+    @provide(scope=Scope.APP)
+    def provide_event_publisher(
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
     ) -> CJEventPublisherProtocol:
         """Provide event publisher."""
-        return CJEventPublisherImpl(
-            outbox_repository=outbox_repository,
-            redis_client=redis_client,
-            settings=settings,
-        )
+        return CJEventPublisherImpl(outbox_manager, settings)
 
     @provide(scope=Scope.APP)
     def provide_outbox_settings(self) -> OutboxSettings:
@@ -140,6 +146,32 @@ class OutboxIntegrationTestProvider(Provider):
 @pytest.mark.integration
 class TestOutboxPatternIntegration:
     """Integration tests for the transactional outbox pattern."""
+
+    async def wait_for_condition(
+        self,
+        condition: Callable[[], bool],
+        timeout: float = 2.0,
+        interval: float = 0.05,
+    ) -> None:
+        """Wait for a condition to become true with timeout."""
+        start_time = asyncio.get_event_loop().time()
+        while not condition():
+            if asyncio.get_event_loop().time() - start_time > timeout:
+                raise TimeoutError(f"Condition not met within {timeout} seconds")
+            await asyncio.sleep(interval)
+
+    @pytest.fixture(autouse=True)
+    async def cleanup_database(self, postgres_engine: AsyncEngine) -> AsyncGenerator[None, None]:
+        """Clean outbox table before and after each test to prevent contamination."""
+        # Clean before test
+        async with postgres_engine.begin() as conn:
+            await conn.execute(delete(EventOutbox))
+        
+        yield
+        
+        # Clean after test
+        async with postgres_engine.begin() as conn:
+            await conn.execute(delete(EventOutbox))
 
     @pytest.fixture
     def test_settings(self) -> Settings:
@@ -356,12 +388,6 @@ class TestOutboxPatternIntegration:
                 assert outbox_event.published_at is None
 
                 # Verify Redis notification was sent
-                print(f"DEBUG TEST: mock_redis_client id={id(mock_redis_client)}, type={type(mock_redis_client)}")
-                print(f"DEBUG TEST: mock_redis_client.lpush.call_args_list={mock_redis_client.lpush.call_args_list}")
-                
-                # Check if event publisher contains the redis client we expect
-                print(f"DEBUG TEST: event_publisher.redis_client id={id(event_publisher.redis_client)}, type={type(event_publisher.redis_client)}")
-                
                 mock_redis_client.lpush.assert_called_with("outbox:wake:cj_assessment_service", "1")
 
     async def test_relay_worker_processes_outbox_events(
@@ -425,20 +451,28 @@ class TestOutboxPatternIntegration:
                 unpublished_events = result.scalars().all()
                 assert len(unpublished_events) == 1
 
-                # Process batch manually (simulating relay worker)
-                await relay_worker._process_batch()
+                # Start relay worker and process events
+                await relay_worker.start()
 
-                # Verify processing completed
+                try:
+                    # Wait for relay worker to process the event
+                    await self.wait_for_condition(
+                        lambda: len(mock_kafka_bus.published_events) > 0,
+                        timeout=3.0,
+                    )
 
-                # Verify Kafka publication
-                assert len(mock_kafka_bus.published_events) == 1
-                published_event = mock_kafka_bus.published_events[0]
-                assert published_event["topic"] == "processing.cj.assessment.completed.v1"
-                assert published_event["key"] == str(cj_batch_id)
+                    # Verify Kafka publication
+                    assert len(mock_kafka_bus.published_events) == 1
+                    published_event = mock_kafka_bus.published_events[0]
+                    assert published_event["topic"] == "processing.cj.assessment.completed.v1"
+                    assert published_event["key"] == str(cj_batch_id)
 
-                # Verify event marked as published in outbox
-                await session.refresh(unpublished_events[0])
-                assert unpublished_events[0].published_at is not None
+                    # Verify event marked as published in outbox
+                    await session.refresh(unpublished_events[0])
+                    assert unpublished_events[0].published_at is not None
+
+                finally:
+                    await relay_worker.stop()
 
     async def test_outbox_transactional_consistency(
         self,
@@ -570,16 +604,26 @@ class TestOutboxPatternIntegration:
                 unpublished_events = result.scalars().all()
                 assert len(unpublished_events) == 5
 
-                # Process batch
-                await relay_worker._process_batch()
+                # Start relay worker and process events
+                await relay_worker.start()
 
-                # Verify all processed
-                assert len(mock_kafka_bus.published_events) == 5
+                try:
+                    # Wait for relay worker to process all events
+                    await self.wait_for_condition(
+                        lambda: len(mock_kafka_bus.published_events) >= 5,
+                        timeout=5.0,
+                    )
 
-                # Verify all marked as published
-                for event in unpublished_events:
-                    await session.refresh(event)
-                    assert event.published_at is not None
+                    # Verify all processed
+                    assert len(mock_kafka_bus.published_events) == 5
+
+                    # Verify all marked as published
+                    for event in unpublished_events:
+                        await session.refresh(event)
+                        assert event.published_at is not None
+
+                finally:
+                    await relay_worker.stop()
 
     async def test_event_with_custom_partition_key(
         self,
@@ -645,8 +689,19 @@ class TestOutboxPatternIntegration:
 
                 assert outbox_event.event_key == "custom-partition-key"
 
-                # Process and verify Kafka publication uses custom key
-                await relay_worker._process_batch()
+                # Start relay worker and process events
+                await relay_worker.start()
 
-                assert len(mock_kafka_bus.published_events) == 1
-                assert mock_kafka_bus.published_events[0]["key"] == "custom-partition-key"
+                try:
+                    # Wait for relay worker to process the event
+                    await self.wait_for_condition(
+                        lambda: len(mock_kafka_bus.published_events) > 0,
+                        timeout=3.0,
+                    )
+
+                    # Process and verify Kafka publication uses custom key
+                    assert len(mock_kafka_bus.published_events) == 1
+                    assert mock_kafka_bus.published_events[0]["key"] == "custom-partition-key"
+
+                finally:
+                    await relay_worker.stop()

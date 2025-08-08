@@ -14,8 +14,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.config import Settings
-    from services.cj_assessment_service.protocols import OutboxRepositoryProtocol
-    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+    from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
 
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
@@ -25,10 +24,9 @@ logger = create_service_logger("cj_assessment_service.event_publisher")
 class CJEventPublisherImpl(CJEventPublisherProtocol):
     """Implementation of CJEventPublisherProtocol using TRUE OUTBOX PATTERN."""
 
-    def __init__(self, outbox_repository: OutboxRepositoryProtocol, redis_client: AtomicRedisClientProtocol, settings: Settings) -> None:
-        """Initialize event publisher with outbox repository for transactional safety."""
-        self.outbox_repository = outbox_repository
-        self.redis_client = redis_client
+    def __init__(self, outbox_manager: OutboxManager, settings: Settings) -> None:
+        """Initialize event publisher with outbox manager for transactional safety."""
+        self.outbox_manager = outbox_manager
         self.settings = settings
 
     async def publish_assessment_completed(
@@ -53,24 +51,14 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         if hasattr(completion_data, "data") and hasattr(completion_data.data, "entity_id"):
             aggregate_id = str(completion_data.data.entity_id)
 
-        # Store in outbox for transactional safety (TRUE OUTBOX PATTERN)
-        await self.outbox_repository.add_event(
-            aggregate_id=aggregate_id,
+        # Store in outbox using OutboxManager (TRUE OUTBOX PATTERN)
+        await self.outbox_manager.publish_to_outbox(
             aggregate_type="cj_batch",
+            aggregate_id=aggregate_id,
             event_type=self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC,
-            event_data=completion_data.model_dump(mode='json'),  # Convert EventEnvelope to JSON-serializable dict
+            event_data=completion_data,  # Pass original EventEnvelope to OutboxManager
             topic=self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC,
-            event_key=aggregate_id,
         )
-
-        # Wake up the relay worker via Redis notification
-        try:
-            redis_key = f"outbox:wake:{self.settings.SERVICE_NAME}"
-            await self.redis_client.lpush(redis_key, "1")
-            logger.debug("Relay worker notified via Redis")
-        except Exception as e:
-            # Log but don't fail - the relay worker will still poll eventually
-            logger.warning(f"Failed to notify relay worker via Redis: {e}")
         
         logger.info(
             "CJ assessment completion event stored in outbox",
@@ -103,24 +91,14 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
         if hasattr(failure_data, "data") and hasattr(failure_data.data, "entity_id"):
             aggregate_id = str(failure_data.data.entity_id)
 
-        # Store in outbox for transactional safety (TRUE OUTBOX PATTERN)
-        await self.outbox_repository.add_event(
-            aggregate_id=aggregate_id,
+        # Store in outbox using OutboxManager (TRUE OUTBOX PATTERN)
+        await self.outbox_manager.publish_to_outbox(
             aggregate_type="cj_batch",
+            aggregate_id=aggregate_id,
             event_type=self.settings.CJ_ASSESSMENT_FAILED_TOPIC,
-            event_data=failure_data.model_dump(mode='json'),  # Convert EventEnvelope to JSON-serializable dict
+            event_data=failure_data,  # Pass original EventEnvelope to OutboxManager
             topic=self.settings.CJ_ASSESSMENT_FAILED_TOPIC,
-            event_key=aggregate_id,
         )
-
-        # Wake up the relay worker via Redis notification
-        try:
-            redis_key = f"outbox:wake:{self.settings.SERVICE_NAME}"
-            await self.redis_client.lpush(redis_key, "1")
-            logger.debug("Relay worker notified via Redis")
-        except Exception as e:
-            # Log but don't fail - the relay worker will still poll eventually
-            logger.warning(f"Failed to notify relay worker via Redis: {e}")
         
         logger.info(
             "CJ assessment failure event stored in outbox",
