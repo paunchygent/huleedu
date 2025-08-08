@@ -11,10 +11,9 @@ Create Date: 2025-08-08 12:32:20.233209
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
-
 
 # revision identifiers, used by Alembic.
 revision: str = "6339b06566ce"
@@ -101,7 +100,7 @@ def upgrade() -> None:
     )
 
     # Create indexes for efficient querying
-    
+
     # Index for polling unpublished events (partial index)
     op.create_index(
         "ix_event_outbox_unpublished",
@@ -110,7 +109,7 @@ def upgrade() -> None:
         unique=False,
         postgresql_where=sa.text("published_at IS NULL"),
     )
-    
+
     # Index for looking up events by aggregate
     op.create_index(
         "ix_event_outbox_aggregate",
@@ -118,7 +117,7 @@ def upgrade() -> None:
         ["aggregate_type", "aggregate_id"],
         unique=False,
     )
-    
+
     # Index for monitoring/debugging by event type
     op.create_index(
         "ix_event_outbox_event_type",
@@ -134,6 +133,6 @@ def downgrade() -> None:
     op.drop_index("ix_event_outbox_event_type", table_name="event_outbox")
     op.drop_index("ix_event_outbox_aggregate", table_name="event_outbox")
     op.drop_index("ix_event_outbox_unpublished", table_name="event_outbox")
-    
+
     # Drop table
     op.drop_table("event_outbox")

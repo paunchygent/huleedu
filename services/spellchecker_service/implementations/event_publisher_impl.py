@@ -19,9 +19,9 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
     """Default implementation using TRUE OUTBOX PATTERN for transactional safety."""
 
     def __init__(
-        self, 
-        kafka_event_type: str, 
-        source_service_name: str, 
+        self,
+        kafka_event_type: str,
+        source_service_name: str,
         kafka_output_topic: str,
         outbox_manager: OutboxManager,
     ) -> None:

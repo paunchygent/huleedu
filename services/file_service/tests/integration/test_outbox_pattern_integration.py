@@ -189,8 +189,10 @@ class TestOutboxPatternIntegration(TestFileServiceOutboxPatternIntegration):
                     published_event = mock_kafka_publisher.published_events[0]
                     # Topic comes from the database column, not event data
                     # The relay worker reads it from EventOutbox.topic field
-                    assert published_event.get("topic") == "file.essay.validation.failed.v1" or \
-                           unpublished_events[0].topic == "file.essay.validation.failed.v1"
+                    assert (
+                        published_event.get("topic") == "file.essay.validation.failed.v1"
+                        or unpublished_events[0].topic == "file.essay.validation.failed.v1"
+                    )
 
                     # Verify event marked as published in outbox
                     await db_session.refresh(unpublished_events[0])

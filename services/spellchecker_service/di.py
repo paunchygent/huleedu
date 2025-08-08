@@ -11,8 +11,17 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.outbox import OutboxRepositoryProtocol, PostgreSQLOutboxRepository, EventRelayWorker, OutboxSettings
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol, RedisClientProtocol
+from huleedu_service_libs.outbox import (
+    EventRelayWorker,
+    OutboxRepositoryProtocol,
+    OutboxSettings,
+    PostgreSQLOutboxRepository,
+)
+from huleedu_service_libs.protocols import (
+    AtomicRedisClientProtocol,
+    KafkaPublisherProtocol,
+    RedisClientProtocol,
+)
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
@@ -153,8 +162,10 @@ class SpellCheckerServiceProvider(Provider):
         return redis_client
 
     @provide(scope=Scope.APP)
-    async def provide_base_redis_client(self, atomic_redis_client: AtomicRedisClientProtocol) -> RedisClientProtocol:
-        """Provide Redis client as RedisClientProtocol for components that only need basic Redis operations."""
+    async def provide_base_redis_client(
+        self, atomic_redis_client: AtomicRedisClientProtocol
+    ) -> RedisClientProtocol:
+        """Provide Redis client as RedisClientProtocol for basic operations."""
         return atomic_redis_client
 
     @provide(scope=Scope.APP)
@@ -212,7 +223,7 @@ class SpellCheckerServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def provide_outbox_repository(
-        self, 
+        self,
         engine: AsyncEngine,
     ) -> OutboxRepositoryProtocol:
         """Provide outbox repository for transactional event storage."""
@@ -256,7 +267,7 @@ class SpellCheckerServiceProvider(Provider):
             batch_size=100,
             max_retries=5,
         )
-        
+
         return EventRelayWorker(
             outbox_repository=outbox_repo,
             kafka_bus=kafka_bus,

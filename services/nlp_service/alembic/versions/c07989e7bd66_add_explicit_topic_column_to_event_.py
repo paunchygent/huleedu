@@ -5,15 +5,14 @@ Revises: 4d0dba8c7053
 Create Date: 2025-08-08 11:39:26.804164
 
 Migration to add explicit topic column to event_outbox table for better performance
-and consistency with CJ Assessment Service pattern. Extracts topic from existing 
+and consistency with CJ Assessment Service pattern. Extracts topic from existing
 JSON event_data and creates indexed column for efficient queries.
 """
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c07989e7bd66"
@@ -24,7 +23,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add explicit topic column and migrate data from JSON."""
-    
+
     # Step 1: Add topic column as nullable initially
     op.add_column(
         "event_outbox",
@@ -40,8 +39,8 @@ def upgrade() -> None:
     # Use PostgreSQL JSON extraction to get topic from event_data
     op.execute(
         """
-        UPDATE event_outbox 
-        SET topic = event_data->>'topic' 
+        UPDATE event_outbox
+        SET topic = event_data->>'topic'
         WHERE topic IS NULL AND event_data->>'topic' IS NOT NULL
         """
     )
@@ -50,9 +49,9 @@ def upgrade() -> None:
     # This handles edge cases where old records might not have topic embedded
     op.execute(
         """
-        UPDATE event_outbox 
+        UPDATE event_outbox
         SET topic = COALESCE(
-            event_data->>'topic', 
+            event_data->>'topic',
             'huleedu.nlp.unknown.v1'
         )
         WHERE topic IS NULL
@@ -88,7 +87,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove explicit topic column and restore original indexes."""
-    
+
     # Step 1: Restore original unpublished index
     op.drop_index("ix_event_outbox_unpublished_topic", table_name="event_outbox")
     op.create_index(
@@ -98,11 +97,11 @@ def downgrade() -> None:
         unique=False,
         postgresql_where=sa.text("published_at IS NULL"),
     )
-    
+
     # Step 2: Drop topic-specific index
     op.drop_index("ix_event_outbox_topic", table_name="event_outbox")
-    
+
     # Step 3: Drop the topic column
-    # Note: This will lose the explicit topic data, but it should still be 
+    # Note: This will lose the explicit topic data, but it should still be
     # available in the JSON event_data field
     op.drop_column("event_outbox", "topic")

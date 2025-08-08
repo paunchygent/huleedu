@@ -103,7 +103,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             # Start consumer as background task
             assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
             app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
-            
+
             # Start relay worker as background task
             assert app.relay_worker is not None, "Relay worker must be initialized"
             await app.relay_worker.start()
@@ -127,7 +127,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             if app.relay_worker:
                 logger.info("Stopping EventRelayWorker...")
                 await app.relay_worker.stop()
-            
+
             # Stop Kafka consumer
             if app.kafka_consumer:
                 logger.info("Stopping Kafka consumer...")

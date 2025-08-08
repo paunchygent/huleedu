@@ -344,7 +344,7 @@ class TestBoundaryFailureScenarios:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                )
+            )
 
             # Should handle each error type gracefully
             assert result is True

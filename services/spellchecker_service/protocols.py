@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from aiohttp import ClientSession  # Changed from placeholder
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 # Import concrete types instead of placeholders if they are stable
 

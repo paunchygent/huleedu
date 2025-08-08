@@ -234,9 +234,8 @@ class BatchKafkaConsumer:
             elif msg.topic == topic_name(ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED):
                 # Handle Phase 1 content provisioning completion from ELS
                 await (
-                    self.batch_content_provisioning_completed_handler.handle_batch_content_provisioning_completed(
-                        msg
-                    )
+                    self.batch_content_provisioning_completed_handler
+                    .handle_batch_content_provisioning_completed(msg)
                 )
 
             elif msg.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
@@ -258,9 +257,8 @@ class BatchKafkaConsumer:
 
             elif msg.topic == topic_name(ProcessingEvent.STUDENT_ASSOCIATIONS_CONFIRMED):
                 await (
-                    self.student_associations_confirmed_handler.handle_student_associations_confirmed(
-                        msg
-                    )
+                    self.student_associations_confirmed_handler
+                    .handle_student_associations_confirmed(msg)
                 )
             else:
                 logger.warning(f"Received message from unknown topic: {msg.topic}")

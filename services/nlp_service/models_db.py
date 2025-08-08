@@ -136,7 +136,7 @@ class EventOutbox(Base):
         nullable=True,
         comment="Optional key for Kafka partitioning",
     )
-    
+
     # Kafka targeting
     topic: Mapped[str] = mapped_column(
         String(255),
@@ -176,8 +176,10 @@ class EventOutbox(Base):
         # Topic-aware index for unpublished events (relay worker efficiency)
         Index(
             "ix_event_outbox_unpublished_topic",
-            "published_at", "topic", "created_at",
-            postgresql_where=text("published_at IS NULL")
+            "published_at",
+            "topic",
+            "created_at",
+            postgresql_where=text("published_at IS NULL"),
         ),
         # Topic index for filtering and queries
         Index("ix_event_outbox_topic", "topic"),

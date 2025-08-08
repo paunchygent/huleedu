@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
@@ -21,7 +20,9 @@ from common_core.metadata_models import StorageReferenceMetadata, SystemProcessi
 from common_core.status_enums import EssayStatus, ProcessingStage
 
 from services.spellchecker_service.config import Settings
-from services.spellchecker_service.implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
+from services.spellchecker_service.implementations.event_publisher_impl import (
+    DefaultSpellcheckEventPublisher,
+)
 from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 
 
@@ -47,7 +48,7 @@ def event_publisher(
     """Create event publisher with mocked dependencies for TRUE OUTBOX PATTERN testing."""
     return DefaultSpellcheckEventPublisher(
         kafka_event_type="huleedu.essay.spellcheck.completed.v1",
-        source_service_name="spell-checker-service", 
+        source_service_name="spell-checker-service",
         kafka_output_topic="huleedu.essay.spellcheck.completed.v1",
         outbox_manager=mock_outbox_manager,
     )

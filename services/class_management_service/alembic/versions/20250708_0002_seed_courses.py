@@ -26,10 +26,8 @@ def upgrade() -> None:
     course_code_enum = postgresql.ENUM(
         "ENG5", "ENG6", "ENG7", "SV1", "SV2", "SV3", name="course_code_enum", create_type=False
     )
-    language_enum = postgresql.ENUM(
-        "en", "sv", name="language_enum", create_type=False
-    )
-    
+    language_enum = postgresql.ENUM("en", "sv", name="language_enum", create_type=False)
+
     # Create courses table reference for bulk insert
     courses_table = sa.table(
         "courses",

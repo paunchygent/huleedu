@@ -30,10 +30,17 @@ from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from services.spellchecker_service.config import Settings
-from services.spellchecker_service.implementations.event_publisher_impl import DefaultSpellcheckEventPublisher
+from services.spellchecker_service.implementations.event_publisher_impl import (
+    DefaultSpellcheckEventPublisher,
+)
 from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 from services.spellchecker_service.protocols import SpellcheckEventPublisherProtocol
 
@@ -44,13 +51,13 @@ async def temp_database_engine() -> AsyncGenerator[AsyncEngine, None]:
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test_spellchecker.db"
         database_url = f"sqlite+aiosqlite:///{db_path}"
-        
+
         engine = create_async_engine(database_url, echo=False)
-        
+
         # Create tables
         async with engine.begin() as conn:
             await conn.run_sync(EventOutbox.metadata.create_all)
-        
+
         try:
             yield engine
         finally:
@@ -187,7 +194,9 @@ class TestSpellcheckerOutboxPatternIntegration:
             await asyncio.sleep(interval)
 
     @pytest.fixture(autouse=True)
-    async def cleanup_database(self, temp_database_engine: AsyncEngine) -> AsyncGenerator[None, None]:
+    async def cleanup_database(
+        self, temp_database_engine: AsyncEngine
+    ) -> AsyncGenerator[None, None]:
         """Clean outbox table before and after each test to prevent contamination."""
         # Clean before test
         async with temp_database_engine.begin() as conn:

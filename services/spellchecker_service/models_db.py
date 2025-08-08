@@ -19,6 +19,7 @@ from typing import Any, List
 
 # Import shared enum to avoid drift across services
 from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
+
 # Removed import of EventOutbox - using local definition for proper SQLAlchemy inheritance
 from sqlalchemy import (
     JSON,
