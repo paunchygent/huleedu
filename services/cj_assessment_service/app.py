@@ -16,6 +16,7 @@ import asyncio
 
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
@@ -74,12 +75,16 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
         pool_recycle=settings.DATABASE_POOL_RECYCLE,
     )
-    app.container = make_async_container(CJAssessmentServiceProvider(engine=app.database_engine))
+    app.container = make_async_container(
+        CJAssessmentServiceProvider(engine=app.database_engine),
+        OutboxProvider(),  # Provides environment-aware outbox settings and EventRelayWorker
+    )
     app.extensions = {}
 
     # Optional service-specific attributes (preserve existing patterns)
     app.consumer_task = None
     app.kafka_consumer = None
+    app.relay_worker = None
 
     # Setup dependency injection
     QuartDishka(app=app, container=app.container)
@@ -102,9 +107,15 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             # Setup metrics middleware (per Rule 020.4.4)
             setup_standard_service_metrics_middleware(app, "cj_assessment")
 
-            # Get Kafka consumer from DI container and start it
+            # Get dependencies from DI container and start them
             async with app.container() as request_container:
                 app.kafka_consumer = await request_container.get(CJAssessmentKafkaConsumer)
+                app.relay_worker = await request_container.get(EventRelayWorker)
+
+            # Start EventRelayWorker for outbox pattern
+            assert app.relay_worker is not None, "EventRelayWorker must be initialized"
+            await app.relay_worker.start()
+            logger.info("EventRelayWorker started for outbox pattern")
 
             # Start consumer as background task
             assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
@@ -123,6 +134,12 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     async def cleanup() -> None:
         """Application cleanup tasks including Kafka consumer shutdown."""
         try:
+            # Stop EventRelayWorker
+            if app.relay_worker:
+                logger.info("Stopping EventRelayWorker...")
+                await app.relay_worker.stop()
+                logger.info("EventRelayWorker stopped")
+
             # Stop Kafka consumer
             if app.kafka_consumer:
                 logger.info("Stopping Kafka consumer...")

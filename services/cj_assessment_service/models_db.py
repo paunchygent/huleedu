@@ -278,3 +278,104 @@ class CJBatchState(Base):
         back_populates="batch_state",
         lazy="joined",  # Always load with state
     )
+
+
+class EventOutbox(Base):
+    """
+    Event outbox table for reliable event publishing using Transactional Outbox Pattern.
+
+    This table stores events that need to be published to Kafka, ensuring
+    that database updates and event publications are atomic. Events are
+    written to this table in the same transaction as business logic updates.
+
+    Following the File Service pattern with explicit topic column for better
+    query performance and clarity.
+    """
+
+    __tablename__ = "event_outbox"
+
+    # Primary key
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False,
+        comment="Unique identifier for the outbox entry",
+    )
+
+    # Aggregate tracking
+    aggregate_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+        comment="ID of the aggregate (batch_id, cj_batch_id) that generated this event",
+    )
+    aggregate_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        comment="Type of aggregate (cj_batch, grade_projection) for categorization",
+    )
+
+    # Event details
+    event_type: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Type/topic of the event (e.g., cj.assessment.completed.v1)",
+    )
+    event_data: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="The complete event data as JSON (EventEnvelope)",
+    )
+    event_key: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Kafka message key for partitioning",
+    )
+
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
+    )
+
+    # Processing state
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+        comment="When the event was created",
+    )
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="When the event was successfully published to Kafka",
+    )
+
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="Number of publish attempts",
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Last error message if publishing failed",
+    )
+
+    def __repr__(self) -> str:
+        """String representation of EventOutbox."""
+        return (
+            f"<EventOutbox("
+            f"id={self.id}, "
+            f"aggregate_id={self.aggregate_id}, "
+            f"event_type={self.event_type}, "
+            f"topic={self.topic}, "
+            f"published_at={self.published_at}"
+            f")>"
+        )

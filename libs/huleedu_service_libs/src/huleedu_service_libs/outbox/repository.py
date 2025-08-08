@@ -193,6 +193,7 @@ class PostgreSQLOutboxRepository:
             event_type=event_type,
             event_data=event_data_with_topic,
             event_key=event_key,
+            topic=event_data_with_topic["topic"],
         )
         session.add(outbox_event)
         await session.flush()  # Get the ID but don't commit yet

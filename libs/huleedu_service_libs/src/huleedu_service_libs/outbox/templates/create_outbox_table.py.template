@@ -63,13 +63,19 @@ def upgrade() -> None:
             "event_data",
             postgresql.JSON(astext_type=sa.Text()),
             nullable=False,
-            comment="JSON payload containing the full event envelope including topic",
+            comment="JSON payload containing the full event envelope",
         ),
         sa.Column(
             "event_key",
             sa.String(255),
             nullable=True,
             comment="Optional key for Kafka partitioning",
+        ),
+        sa.Column(
+            "topic",
+            sa.String(255),
+            nullable=False,
+            comment="Kafka topic to publish to",
         ),
         sa.Column(
             "created_at",

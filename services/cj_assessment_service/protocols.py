@@ -6,6 +6,7 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
 from uuid import UUID
 
@@ -294,4 +295,50 @@ class BatchRetryProcessorProtocol(Protocol):
         max_tokens_override: int | None = None,
     ) -> "BatchSubmissionResult | None":
         """Process all remaining failed comparisons at end of batch."""
+        ...
+
+
+class OutboxRepositoryProtocol(Protocol):
+    """Protocol for outbox repository operations following TRUE OUTBOX PATTERN."""
+
+    async def add_event(
+        self,
+        aggregate_id: str,
+        aggregate_type: str,
+        event_type: str,
+        event_data: dict[str, Any],
+        topic: str,
+        event_key: str | None = None,
+        session: AsyncSession | None = None,
+    ) -> UUID:
+        """Add event to outbox within current transaction for atomic consistency.
+        
+        Args:
+            aggregate_id: ID of the aggregate this event relates to
+            aggregate_type: Type of aggregate (e.g., 'cj_batch', 'grade_projection')
+            event_type: Type of the event (e.g., 'cj.assessment.completed.v1')
+            event_data: The event payload (must be JSON-serializable)
+            topic: Kafka topic name for publishing
+            event_key: Optional key for Kafka partitioning
+            session: Optional AsyncSession for transaction sharing
+            
+        Returns:
+            UUID: The ID of the created outbox event
+        """
+        ...
+
+    async def get_unpublished_events(self, limit: int = 100) -> list[Any]:
+        """Get unpublished events for relay worker processing."""
+        ...
+
+    async def mark_event_published(self, event_id: UUID) -> None:
+        """Mark event as successfully published to Kafka."""
+        ...
+
+
+class AtomicRedisClientProtocol(Protocol):
+    """Protocol for Redis client operations."""
+
+    async def lpush(self, key: str, value: str) -> int:
+        """Push value to Redis list for relay worker notification."""
         ...

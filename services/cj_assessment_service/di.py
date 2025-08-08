@@ -11,7 +11,8 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
+from huleedu_service_libs.outbox import OutboxProvider
+from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
@@ -46,6 +47,7 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
     LLMProviderProtocol,
+    OutboxRepositoryProtocol,
     RetryManagerProtocol,
 )
 
@@ -136,7 +138,7 @@ class CJAssessmentServiceProvider(Provider):
         return kafka_publisher
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         """Provide Redis client for idempotency operations."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis",
@@ -215,13 +217,18 @@ class CJAssessmentServiceProvider(Provider):
         return ContentClientImpl(session, settings, retry_manager)
 
     @provide(scope=Scope.APP)
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for OutboxProvider dependency."""
+        return settings.SERVICE_NAME
+    @provide(scope=Scope.APP)
     def provide_event_publisher(
         self,
-        kafka_bus: KafkaPublisherProtocol,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> CJEventPublisherProtocol:
-        """Provide event publisher."""
-        return CJEventPublisherImpl(kafka_bus, settings)
+        """Provide event publisher with outbox pattern for transactional safety."""
+        return CJEventPublisherImpl(outbox_repository, redis_client, settings)
 
     # Batch processing modules with clean architecture
     @provide(scope=Scope.APP)
@@ -284,7 +291,7 @@ class CJAssessmentServiceProvider(Provider):
         content_client: ContentClientProtocol,
         event_publisher: CJEventPublisherProtocol,
         llm_interaction: LLMInteractionProtocol,
-        redis_client: RedisClientProtocol,
+        redis_client: AtomicRedisClientProtocol,
         tracer: Tracer,
     ) -> CJAssessmentKafkaConsumer:
         """Provide Kafka consumer for CJ Assessment Service."""
