@@ -15,7 +15,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core.event_enums import ProcessingEvent
-from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, CJAssessmentFailedV1
+from common_core.events.cj_assessment_events import (
+    CJAssessmentCompletedV1,
+    CJAssessmentFailedV1,
+    GradeProjectionSummary,
+)
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -23,6 +27,19 @@ from common_core.status_enums import BatchStatus, ProcessingStage
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
 from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
+
+
+def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
+    """Create test grade projections for unit tests."""
+    if essay_ids is None:
+        essay_ids = []
+
+    return GradeProjectionSummary(
+        projections_available=True,
+        primary_grades={eid: "B" for eid in essay_ids},
+        confidence_labels={eid: "HIGH" for eid in essay_ids},
+        confidence_scores={eid: 0.85 for eid in essay_ids},
+    )
 
 
 @pytest.fixture
@@ -100,6 +117,9 @@ class TestCJEventPublisherImpl:
                 {"els_essay_id": "essay-002", "rank": 2, "score": 0.88},
                 {"els_essay_id": "essay-003", "rank": 3, "score": 0.76},
             ],
+            grade_projections_summary=create_test_grade_projections(
+                ["essay-001", "essay-002", "essay-003"]
+            ),
         )
 
         envelope: EventEnvelope = EventEnvelope(
@@ -223,6 +243,7 @@ class TestCJEventPublisherImpl:
             system_metadata=system_metadata,
             cj_assessment_job_id="cj-job-fail",
             rankings=[],
+            grade_projections_summary=create_test_grade_projections(),
         )
 
         envelope: EventEnvelope = EventEnvelope(
@@ -271,6 +292,7 @@ class TestCJEventPublisherImpl:
             system_metadata=system_metadata,
             cj_assessment_job_id="cj-job-passthrough",
             rankings=[],
+            grade_projections_summary=create_test_grade_projections(),
         )
 
         envelope: EventEnvelope = EventEnvelope(
@@ -396,6 +418,7 @@ class TestCJEventPublisherImpl:
                         ),
                         cj_assessment_job_id="cj-job-1",
                         rankings=[{"els_essay_id": "essay-1", "rank": 1, "score": 0.90}],
+                        grade_projections_summary=create_test_grade_projections(["essay-1"]),
                     ),
                 ),
                 "processing.cj.assessment.completed.v1",
@@ -494,6 +517,7 @@ class TestCJEventPublisherImpl:
             system_metadata=system_metadata,
             cj_assessment_job_id="cj-job-partition",
             rankings=[],
+            grade_projections_summary=create_test_grade_projections(),
         )
 
         envelope: EventEnvelope = EventEnvelope(

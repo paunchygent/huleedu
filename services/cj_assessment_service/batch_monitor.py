@@ -26,6 +26,9 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 
 from services.cj_assessment_service.cj_core_logic import scoring_ranking
+from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    calculate_grade_projections,
+)
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
@@ -419,6 +422,9 @@ class BatchMonitor:
             # Get final rankings
             rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
+            # Calculate grade projections (placeholder until Task 4 implementation)
+            grade_projections = calculate_grade_projections(rankings)
+
             # Create the event data with primitive parameters
             event_data = CJAssessmentCompletedV1(
                 event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
@@ -438,6 +444,7 @@ class BatchMonitor:
                 ),
                 cj_assessment_job_id=str(batch_id),
                 rankings=rankings,
+                grade_projections_summary=grade_projections,
             )
 
             # Wrap in EventEnvelope

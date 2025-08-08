@@ -12,6 +12,7 @@ from common_core.events import (
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
 )
+from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.events.result_events import (
     BatchAssessmentCompletedV1,
     BatchResultsReadyV1,
@@ -26,6 +27,19 @@ from common_core.status_enums import BatchStatus, ProcessingStage
 from services.result_aggregator_service.implementations.event_processor_impl import (
     EventProcessorImpl,
 )
+
+
+def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
+    """Create test grade projections for unit tests."""
+    if essay_ids is None:
+        essay_ids = []
+
+    return GradeProjectionSummary(
+        projections_available=True,
+        primary_grades={eid: "B" for eid in essay_ids},
+        confidence_labels={eid: "HIGH" for eid in essay_ids},
+        confidence_scores={eid: 0.85 for eid in essay_ids},
+    )
 
 
 @pytest.fixture
@@ -251,6 +265,9 @@ async def test_batch_assessment_completed_published_on_cj_completion(
                 entity_type="batch",
                 event="cj_assessment_completed",
             ),
+            grade_projections_summary=create_test_grade_projections(
+                ["essay_0", "essay_1", "essay_2"]
+            ),
         ),
     )
 
@@ -400,6 +417,7 @@ async def test_correlation_id_propagation(
                 entity_type="batch",
                 event="cj_assessment_completed",
             ),
+            grade_projections_summary=create_test_grade_projections(),
         ),
     )
 

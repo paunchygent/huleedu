@@ -30,7 +30,7 @@ from aiokafka import ConsumerRecord
 
 # from common_core.domain_enums import CourseCode  # Not used in this test file
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import SystemProcessingMetadata
@@ -38,6 +38,20 @@ from common_core.status_enums import EssayStatus, ProcessingStage
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
+
+
+def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
+    """Create test grade projections for unit tests."""
+    if essay_ids is None:
+        essay_ids = []
+
+    return GradeProjectionSummary(
+        projections_available=True,
+        primary_grades=dict.fromkeys(essay_ids, "B"),
+        confidence_labels=dict.fromkeys(essay_ids, "HIGH"),
+        confidence_scores=dict.fromkeys(essay_ids, 0.85),
+    )
+
 
 # --- Test Helpers ---
 
@@ -220,6 +234,7 @@ def create_cj_assessment_completion_event(
         system_metadata=system_metadata,
         cj_assessment_job_id=f"cj-job-{batch_id}",
         rankings=rankings,
+        grade_projections_summary=create_test_grade_projections(essay_ids),
     )
 
     return EventEnvelope(

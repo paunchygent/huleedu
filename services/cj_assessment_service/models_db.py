@@ -9,12 +9,15 @@ from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    func,
     text,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
@@ -65,6 +68,9 @@ class CJBatchUpload(Base):
 
     # Metadata for CJ processing
     processing_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Assignment context for grade projection
+    assignment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Relationships
     essays: Mapped[list[ProcessedEssay]] = relationship(
@@ -379,3 +385,70 @@ class EventOutbox(Base):
             f"published_at={self.published_at}"
             f")>"
         )
+
+
+class AssessmentInstruction(Base):
+    """Assessment instructions for AI judges.
+
+    Stores predefined instructions that guide the AI in assessing essays.
+    Can be associated with either a specific assignment or a course (fallback).
+    """
+
+    __tablename__ = "assessment_instructions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assignment_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, unique=True, index=True
+    )
+    course_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    instructions_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "(assignment_id IS NOT NULL AND course_id IS NULL) OR "
+            "(assignment_id IS NULL AND course_id IS NOT NULL)",
+            name="chk_context_type",
+        ),
+    )
+
+
+class AnchorEssayReference(Base):
+    """References to anchor essays stored in Content Service.
+
+    Anchor essays are pre-graded reference essays used to calibrate
+    the grade projection system. The actual essay content is stored
+    in the Content Service; this table just maintains references.
+    """
+
+    __tablename__ = "anchor_essay_references"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    grade: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
+    content_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    assignment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class GradeProjection(Base):
+    """Grade projections with statistical confidence.
+
+    Stores the predicted grades for essays based on CJ rankings,
+    along with confidence scores and metadata about the projection.
+    """
+
+    __tablename__ = "grade_projections"
+
+    els_essay_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("cj_processed_essays.els_essay_id"), primary_key=True
+    )
+    cj_batch_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cj_batch_uploads.id"), primary_key=True
+    )
+    primary_grade: Mapped[str] = mapped_column(String(3), nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_label: Mapped[str] = mapped_column(String(10), nullable=False)
+    calculation_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("idx_batch_grade", "cj_batch_id", "primary_grade"),)

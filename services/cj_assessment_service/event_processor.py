@@ -34,6 +34,9 @@ from huleedu_service_libs.observability import (
 )
 
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
+from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    calculate_grade_projections,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
@@ -259,6 +262,9 @@ async def _process_cj_assessment_impl(
                 extra=log_extra,
             )
 
+        # Calculate grade projections (placeholder until Task 4 implementation)
+        grade_projections = calculate_grade_projections(workflow_result.rankings)
+
         # Construct and publish CJAssessmentCompletedV1 event
         completed_event_data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
@@ -276,6 +282,7 @@ async def _process_cj_assessment_impl(
             ),
             cj_assessment_job_id=workflow_result.batch_id,
             rankings=workflow_result.rankings,
+            grade_projections_summary=grade_projections,
         )
 
         # The envelope for the outgoing event

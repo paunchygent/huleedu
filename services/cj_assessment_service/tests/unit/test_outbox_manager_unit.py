@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core.event_enums import ProcessingEvent
-from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -22,6 +22,19 @@ from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
+
+
+def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
+    """Create test grade projections for unit tests."""
+    if essay_ids is None:
+        essay_ids = []
+
+    return GradeProjectionSummary(
+        projections_available=True,
+        primary_grades={eid: "B" for eid in essay_ids},
+        confidence_labels={eid: "HIGH" for eid in essay_ids},
+        confidence_scores={eid: 0.85 for eid in essay_ids},
+    )
 
 
 @pytest.fixture
@@ -64,6 +77,7 @@ def sample_event_envelope() -> EventEnvelope:
         system_metadata=system_metadata,
         cj_assessment_job_id="cj-job-test-123",
         rankings=[{"els_essay_id": "essay-test-1", "rank": 1, "score": 0.85}],
+        grade_projections_summary=create_test_grade_projections(["essay-test-1"]),
     )
 
     return EventEnvelope(
@@ -329,6 +343,7 @@ class TestOutboxManagerErrorHandling:
             system_metadata=system_metadata,
             cj_assessment_job_id="cj-job-partition",
             rankings=[],
+            grade_projections_summary=create_test_grade_projections(),
         )
 
         envelope: EventEnvelope = EventEnvelope(

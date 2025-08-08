@@ -101,6 +101,31 @@ class CJRepositoryProtocol(Protocol):
         """Provide async database session context manager."""
         ...  # pragma: no cover
 
+    async def get_assessment_instruction(
+        self,
+        session: AsyncSession,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> Any | None:  # AssessmentInstruction | None
+        """Get assessment instruction by assignment or course ID."""
+        ...
+
+    async def get_anchor_essay_references(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> list[Any]:  # list[AnchorEssayReference]
+        """Get anchor essay references for an assignment."""
+        ...
+
+    async def store_grade_projections(
+        self,
+        session: AsyncSession,
+        projections: list[Any],  # list[GradeProjection]
+    ) -> None:
+        """Store grade projections in database."""
+        ...
+
     async def create_new_cj_batch(
         self,
         session: AsyncSession,

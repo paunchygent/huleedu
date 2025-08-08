@@ -19,8 +19,31 @@ __all__ = [
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
     "ELS_CJAssessmentRequestV1",
+    "GradeProjectionSummary",
     "LLMConfigOverrides",
 ]
+
+
+class GradeProjectionSummary(BaseModel):
+    """Grade projection results - always included in CJ assessment results.
+
+    Provides predicted grades based on CJ rankings with statistical confidence scores.
+    Grade projections are only calculated when anchor essays are available for calibration.
+    """
+
+    projections_available: bool = Field(
+        default=False,
+        description="True when anchor essays are available and grades can be projected",
+    )
+    primary_grades: dict[str, str] = Field(
+        description="Mapping of essay_id to predicted grade (e.g., 'A', 'B+', 'C')",
+    )
+    confidence_labels: dict[str, str] = Field(
+        description="Mapping of essay_id to confidence label ('HIGH', 'MID', 'LOW')",
+    )
+    confidence_scores: dict[str, float] = Field(
+        description="Mapping of essay_id to confidence score (0.0-1.0)",
+    )
 
 
 class LLMConfigOverrides(BaseModel):
@@ -64,6 +87,11 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
         default=None,
         description="Optional LLM configuration overrides for this assessment batch",
     )
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Assignment context for grade projection",
+    )
     # class_designation: str  # Deferred (YAGNI)
 
 
@@ -78,6 +106,9 @@ class CJAssessmentCompletedV1(ProcessingUpdate):
     cj_assessment_job_id: str  # The internal ID from CJ_BatchUpload, for detailed log/result lookup
     rankings: list[dict[str, Any]]  # The consumer-friendly ranking data
     # Example: [{"els_essay_id": "uuid1", "rank": 1, "score": 0.75}, ...]
+    grade_projections_summary: GradeProjectionSummary = Field(
+        description="Grade projections with confidence scores - always included",
+    )
 
 
 class CJAssessmentFailedV1(ProcessingUpdate):

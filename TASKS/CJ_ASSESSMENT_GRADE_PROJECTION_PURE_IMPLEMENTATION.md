@@ -377,6 +377,11 @@ class OutboxManager:
 
 ### Task 4: Core Business Logic (DIRECT IMPLEMENTATION)
 
+**NOTE**: The modules referenced below (`context_builder.py`, `grade_projector.py`, `confidence_calculator.py`) 
+have been created with placeholder implementations in Phase 1 to satisfy type checking. 
+The `grade_projector.py` contains a minimal implementation that returns empty grade projections
+to maintain type safety. These placeholders will be replaced with full implementations in this task.
+
 **File 1**: `services/cj_assessment_service/cj_core_logic/context_builder.py`
 
 ```python
@@ -970,12 +975,12 @@ async def test_end_to_end_grade_projection():
 
 ## Success Criteria
 
-- [x] Grade projections always calculated (no flags)
-- [x] Confidence scores always included
-- [x] Outbox ensures reliable event delivery
-- [x] No user notifications from CJ
-- [x] Clean implementation without legacy code
-- [x] All tests pass without feature toggles
+- [ ] Grade projections always calculated (no flags)
+- [ ] Confidence scores always included
+- [ ] Outbox ensures reliable event delivery
+- [ ] No user notifications from CJ
+- [ ] Clean implementation without legacy code
+- [ ] All tests pass
 
 ---
 

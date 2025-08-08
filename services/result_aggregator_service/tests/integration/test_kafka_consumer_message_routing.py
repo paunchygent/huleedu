@@ -17,6 +17,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
@@ -28,6 +29,19 @@ from common_core.status_enums import BatchStatus, EssayStatus
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 
 from .conftest import create_kafka_record
+
+
+def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
+    """Create test grade projections for unit tests."""
+    if essay_ids is None:
+        essay_ids = []
+
+    return GradeProjectionSummary(
+        projections_available=True,
+        primary_grades={eid: "B" for eid in essay_ids},
+        confidence_labels={eid: "HIGH" for eid in essay_ids},
+        confidence_scores={eid: 0.85 for eid in essay_ids},
+    )
 
 
 class TestKafkaConsumerRouting:
@@ -168,6 +182,7 @@ class TestKafkaConsumerRouting:
             ),
             cj_assessment_job_id="job-123",
             rankings=rankings,
+            grade_projections_summary=create_test_grade_projections(["essay-1", "essay-2"]),
         )
 
         envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(

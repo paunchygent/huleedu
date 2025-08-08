@@ -37,6 +37,9 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
     check_batch_completion_conditions,
     update_comparison_result,
 )
+from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    calculate_grade_projections,
+)
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
@@ -411,6 +414,9 @@ async def _trigger_batch_scoring_completion(
         # Get final rankings
         rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
+        # Calculate grade projections (placeholder until Task 4 implementation)
+        grade_projections = calculate_grade_projections(rankings)
+
         # Create the event data with primitive parameters
         event_data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
@@ -430,6 +436,7 @@ async def _trigger_batch_scoring_completion(
             ),
             cj_assessment_job_id=str(batch_id),
             rankings=rankings,
+            grade_projections_summary=grade_projections,
         )
 
         # Wrap in EventEnvelope

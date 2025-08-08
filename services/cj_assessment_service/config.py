@@ -192,6 +192,46 @@ argument quality, and writing mechanics. Always respond with valid JSON.
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
+    # Outbox Relay Worker Configuration
+    OUTBOX_POLL_INTERVAL_SECONDS: float = Field(
+        default=5.0,
+        description="Maximum time to wait for Redis wake-up notification",
+    )
+    OUTBOX_BATCH_SIZE: int = Field(
+        default=100,
+        description="Maximum number of events to process per poll",
+    )
+    OUTBOX_MAX_RETRIES: int = Field(
+        default=5,
+        description="Maximum retry attempts before marking event as failed",
+    )
+    OUTBOX_ERROR_RETRY_INTERVAL_SECONDS: float = Field(
+        default=30.0,
+        description="How long to wait after an error",
+    )
+    OUTBOX_ENABLE_METRICS: bool = Field(
+        default=True,
+        description="Whether to collect Prometheus metrics for outbox",
+    )
+    OUTBOX_ENABLE_WAKE_NOTIFICATIONS: bool = Field(
+        default=True,
+        description="Whether to use Redis BLPOP for instant wake-up",
+    )
+
+    # Grade Projection Configuration (NO FEATURE FLAGS)
+    MIN_ANCHORS_REQUIRED: int = Field(
+        default=3,
+        description="Minimum anchor essays required for projection",
+    )
+    MAX_HESSIAN_BATCH_SIZE: int = Field(
+        default=50,
+        description="Maximum essays for Hessian calculation",
+    )
+    CONFIDENCE_CALCULATION_TIMEOUT: int = Field(
+        default=30,
+        description="Timeout in seconds for confidence calculation",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

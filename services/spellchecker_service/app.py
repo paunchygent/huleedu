@@ -77,7 +77,6 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     app.consumer_task = None
     app.kafka_consumer = None
     app.relay_worker = None
-    app.relay_worker_task = None
 
     # Setup dependency injection
     QuartDishka(app=app, container=app.container)

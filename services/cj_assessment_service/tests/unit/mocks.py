@@ -347,5 +347,32 @@ class MockDatabase(CJRepositoryProtocol):
 
     async def initialize_db_schema(self) -> None:
         """Initialize the database schema for testing."""
-        # Mock implementation - no need for actual behavior in these tests
+        pass
+
+    async def get_assessment_instruction(
+        self,
+        session: AsyncSession,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> Any | None:
+        """Get assessment instruction by assignment or course ID."""
+        # Mock implementation - return None for tests
+        return None
+
+    async def get_anchor_essay_references(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> list[Any]:
+        """Get anchor essay references for an assignment."""
+        # Mock implementation - return empty list for tests
+        return []
+
+    async def store_grade_projections(
+        self,
+        session: AsyncSession,
+        projections: list[Any],
+    ) -> None:
+        """Store grade projections in database."""
+        # Mock implementation - no-op for tests
         pass

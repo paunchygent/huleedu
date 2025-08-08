@@ -342,3 +342,151 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             trace_id=None,  # Not stored in DB
             span_id=None,  # Not stored in DB
         )
+
+    async def get_assessment_instruction(
+        self,
+        session: AsyncSession,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> Any | None:  # AssessmentInstruction | None
+        """Get assessment instruction by assignment or course ID.
+
+        Args:
+            session: Database session
+            assignment_id: Optional assignment ID (takes precedence)
+            course_id: Optional course ID (fallback)
+
+        Returns:
+            AssessmentInstruction or None if not found
+        """
+        from services.cj_assessment_service.models_db import AssessmentInstruction
+
+        if assignment_id:
+            # Try assignment-specific first
+            stmt = select(AssessmentInstruction).where(
+                AssessmentInstruction.assignment_id == assignment_id
+            )
+            result = await session.execute(stmt)
+            instruction = result.scalars().first()
+            if instruction:
+                return instruction
+
+        if course_id:
+            # Fall back to course-level
+            stmt = select(AssessmentInstruction).where(
+                AssessmentInstruction.course_id == course_id,
+                AssessmentInstruction.assignment_id.is_(None),
+            )
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+        return None
+
+    async def get_anchor_essay_references(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> list[Any]:  # list[AnchorEssayReference]
+        """Get anchor essay references for an assignment.
+
+        Args:
+            session: Database session
+            assignment_id: Assignment ID
+
+        Returns:
+            List of AnchorEssayReference objects
+        """
+        from services.cj_assessment_service.models_db import AnchorEssayReference
+
+        stmt = select(AnchorEssayReference).where(
+            AnchorEssayReference.assignment_id == assignment_id
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def store_grade_projections(
+        self,
+        session: AsyncSession,
+        projections: list[Any],  # list[GradeProjection]
+    ) -> None:
+        """Store grade projections in database.
+
+        Args:
+            session: Database session
+            projections: List of GradeProjection objects
+        """
+        if not projections:
+            return
+
+        try:
+            session.add_all(projections)
+            await session.flush()
+            self.logger.info(f"Stored {len(projections)} grade projections")
+        except Exception as e:
+            self.logger.error(f"Failed to store grade projections: {e}", extra={"error": str(e)})
+            # Re-raise to let caller handle
+            raise
+
+
+# Standalone functions for use in context_builder to avoid circular imports
+async def get_assessment_instruction(
+    session: AsyncSession,
+    assignment_id: str | None,
+    course_id: str | None,
+) -> Any | None:  # AssessmentInstruction | None
+    """Get assessment instruction by assignment or course ID.
+
+    Standalone function to avoid circular imports in context_builder.
+
+    Args:
+        session: Database session
+        assignment_id: Optional assignment ID (takes precedence)
+        course_id: Optional course ID (fallback)
+
+    Returns:
+        AssessmentInstruction or None if not found
+    """
+    from services.cj_assessment_service.models_db import AssessmentInstruction
+
+    if assignment_id:
+        # Try assignment-specific first
+        stmt = select(AssessmentInstruction).where(
+            AssessmentInstruction.assignment_id == assignment_id
+        )
+        result = await session.execute(stmt)
+        instruction = result.scalars().first()
+        if instruction:
+            return instruction
+
+    if course_id:
+        # Fall back to course-level
+        stmt = select(AssessmentInstruction).where(
+            AssessmentInstruction.course_id == course_id,
+            AssessmentInstruction.assignment_id.is_(None),
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
+
+    return None
+
+
+async def get_anchor_essay_references(
+    session: AsyncSession,
+    assignment_id: str,
+) -> list[Any]:  # list[AnchorEssayReference]
+    """Get anchor essay references for an assignment.
+
+    Standalone function to avoid circular imports in context_builder.
+
+    Args:
+        session: Database session
+        assignment_id: Assignment ID
+
+    Returns:
+        List of AnchorEssayReference objects
+    """
+    from services.cj_assessment_service.models_db import AnchorEssayReference
+
+    stmt = select(AnchorEssayReference).where(AnchorEssayReference.assignment_id == assignment_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

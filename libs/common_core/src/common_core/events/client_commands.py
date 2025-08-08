@@ -50,6 +50,11 @@ class ClientBatchPipelineRequestV1(BaseModel):
         description="Optional user-provided reason for the retry.",
         max_length=500,
     )
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Predefined assignment identifier for context-aware assessment",
+    )
 
     model_config = {
         "str_strip_whitespace": True,
