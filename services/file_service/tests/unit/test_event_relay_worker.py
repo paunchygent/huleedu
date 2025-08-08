@@ -29,6 +29,7 @@ class FakeOutboxEvent:
         event_type: str,
         event_data: dict[str, Any],
         event_key: str | None,
+        topic: str,
         created_at: datetime,
         published_at: datetime | None = None,
         retry_count: int = 0,
@@ -40,6 +41,7 @@ class FakeOutboxEvent:
         self._event_type = event_type
         self._event_data = event_data
         self._event_key = event_key
+        self._topic = topic
         self._created_at = created_at
         self._published_at = published_at
         self._retry_count = retry_count
@@ -68,6 +70,10 @@ class FakeOutboxEvent:
     @property
     def event_key(self) -> str | None:
         return self._event_key
+
+    @property
+    def topic(self) -> str:
+        return self._topic
 
     @property
     def created_at(self) -> datetime:
@@ -115,6 +121,7 @@ class FakeOutboxRepository:
             event_type=event_type,
             event_data=event_data,
             event_key=event_key,
+            topic=event_data.get("topic", "test.events.v1"),
             created_at=datetime.now(timezone.utc),
             published_at=None,
             retry_count=0,
@@ -212,13 +219,13 @@ def sample_event(
         aggregate_type="test_entity",
         event_type="test.event.created.v1",
         event_data={
-            "topic": "test.events.v1",
             "data": {"test": "data", "value": 42},
             "correlation_id": str(uuid4()),
             "source_service": "test-service",
             "metadata": {"user_id": "user-123"},
         },
         event_key="test-aggregate-123",
+        topic="test.events.v1",
         created_at=datetime.now(timezone.utc),
         published_at=None,
         retry_count=0,
@@ -374,10 +381,10 @@ class TestEventRelayWorker:
                 aggregate_type="test_entity",
                 event_type="test.batch.event.v1",
                 event_data={
-                    "topic": "test.batch.v1",
                     "data": {"index": i},
                 },
                 event_key=f"key-{i}",
+                topic="test.batch.v1",
                 created_at=datetime.now(timezone.utc),
                 published_at=None,
                 retry_count=0,

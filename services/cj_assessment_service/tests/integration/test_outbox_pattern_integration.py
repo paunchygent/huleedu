@@ -7,20 +7,22 @@ and reliability guarantees. Uses real database with testcontainer-based architec
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import asyncio
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
+from datetime import datetime, timezone
+from typing import Any, AsyncGenerator, Callable
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
-import asyncio
 
 import pytest
-from common_core.events.envelope import EventEnvelope
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, CJAssessmentFailedV1
+from common_core.events.envelope import EventEnvelope
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.outbox.models import EventOutbox
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
-from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -28,11 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
 from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
-from huleedu_service_libs.outbox.relay import OutboxSettings
-from huleedu_service_libs.redis_client import RedisClient
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
-from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 
 
 class OutboxIntegrationTestProvider(Provider):
@@ -103,6 +101,7 @@ class OutboxIntegrationTestProvider(Provider):
     ) -> OutboxManager:
         """Provide outbox manager for transactional event publishing."""
         from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
+
         return OutboxManager(outbox_repository, redis_client, settings)
 
     @provide(scope=Scope.APP)
@@ -166,9 +165,9 @@ class TestOutboxPatternIntegration:
         # Clean before test
         async with postgres_engine.begin() as conn:
             await conn.execute(delete(EventOutbox))
-        
+
         yield
-        
+
         # Clean after test
         async with postgres_engine.begin() as conn:
             await conn.execute(delete(EventOutbox))
@@ -191,11 +190,13 @@ class TestOutboxPatternIntegration:
         mock.published_events = []
 
         async def track_publish(topic: str, envelope: Any, key: str | None = None) -> None:
-            mock.published_events.append({
-                "topic": topic,
-                "envelope": envelope,
-                "key": key,
-            })
+            mock.published_events.append(
+                {
+                    "topic": topic,
+                    "envelope": envelope,
+                    "key": key,
+                }
+            )
 
         mock.publish.side_effect = track_publish
         return mock
@@ -230,7 +231,8 @@ class TestOutboxPatternIntegration:
             redis_client=redis_client,
             settings=settings,
         )
-        # Include OutboxProvider from shared library, with test provider overriding specific components
+        # Include OutboxProvider from shared library, with test provider overriding
+        # specific components
         container = make_async_container(OutboxProvider(), test_provider)
         try:
             yield container
@@ -258,7 +260,7 @@ class TestOutboxPatternIntegration:
                 from common_core.event_enums import ProcessingEvent
                 from common_core.metadata_models import SystemProcessingMetadata
                 from common_core.status_enums import BatchStatus, ProcessingStage
-                
+
                 system_metadata = SystemProcessingMetadata(
                     entity_id=str(cj_batch_id),
                     entity_type="batch",
@@ -267,7 +269,7 @@ class TestOutboxPatternIntegration:
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
                 )
-                
+
                 event_data = CJAssessmentCompletedV1(
                     event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
                     entity_id=str(cj_batch_id),
@@ -334,7 +336,7 @@ class TestOutboxPatternIntegration:
                 from common_core.event_enums import ProcessingEvent
                 from common_core.metadata_models import SystemProcessingMetadata
                 from common_core.status_enums import BatchStatus, ProcessingStage
-                
+
                 system_metadata = SystemProcessingMetadata(
                     entity_id=str(cj_batch_id),
                     entity_type="batch",
@@ -412,7 +414,7 @@ class TestOutboxPatternIntegration:
                 from common_core.event_enums import ProcessingEvent
                 from common_core.metadata_models import SystemProcessingMetadata
                 from common_core.status_enums import BatchStatus, ProcessingStage
-                
+
                 system_metadata = SystemProcessingMetadata(
                     entity_id=str(cj_batch_id),
                     entity_type="batch",
@@ -421,7 +423,7 @@ class TestOutboxPatternIntegration:
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
                 )
-                
+
                 event_data = CJAssessmentCompletedV1(
                     event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
                     entity_id=str(cj_batch_id),
@@ -431,9 +433,7 @@ class TestOutboxPatternIntegration:
                     status=BatchStatus.COMPLETED_SUCCESSFULLY,
                     system_metadata=system_metadata,
                     cj_assessment_job_id="cj-job-relay",
-                    rankings=[
-                        {"els_essay_id": "essay-relay", "rank": 1, "score": 0.85}
-                    ],
+                    rankings=[{"els_essay_id": "essay-relay", "rank": 1, "score": 0.85}],
                 )
 
                 envelope: EventEnvelope = EventEnvelope(
@@ -497,7 +497,7 @@ class TestOutboxPatternIntegration:
                     from common_core.event_enums import ProcessingEvent
                     from common_core.metadata_models import SystemProcessingMetadata
                     from common_core.status_enums import BatchStatus, ProcessingStage
-                    
+
                     system_metadata = SystemProcessingMetadata(
                         entity_id=str(cj_batch_id),
                         entity_type="batch",
@@ -506,7 +506,7 @@ class TestOutboxPatternIntegration:
                         processing_stage=ProcessingStage.COMPLETED,
                         event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
                     )
-                    
+
                     event_data = CJAssessmentCompletedV1(
                         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
                         entity_id=str(cj_batch_id),
@@ -532,9 +532,7 @@ class TestOutboxPatternIntegration:
                     # Transaction commits here
 
                 # Verify event was committed
-                stmt = select(EventOutbox).where(
-                    EventOutbox.aggregate_id == str(cj_batch_id)
-                )
+                stmt = select(EventOutbox).where(EventOutbox.aggregate_id == str(cj_batch_id))
                 result = await session.execute(stmt)
                 outbox_event = result.scalar_one_or_none()
 
@@ -562,10 +560,10 @@ class TestOutboxPatternIntegration:
                 from common_core.event_enums import ProcessingEvent
                 from common_core.metadata_models import SystemProcessingMetadata
                 from common_core.status_enums import BatchStatus, ProcessingStage
-                
+
                 for i in range(5):
                     batch_id = uuid4()
-                    
+
                     system_metadata = SystemProcessingMetadata(
                         entity_id=str(batch_id),
                         entity_type="batch",
@@ -574,7 +572,7 @@ class TestOutboxPatternIntegration:
                         processing_stage=ProcessingStage.COMPLETED,
                         event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
                     )
-                    
+
                     event_data = CJAssessmentCompletedV1(
                         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
                         entity_id=str(batch_id),
@@ -647,7 +645,7 @@ class TestOutboxPatternIntegration:
                 from common_core.event_enums import ProcessingEvent
                 from common_core.metadata_models import SystemProcessingMetadata
                 from common_core.status_enums import BatchStatus, ProcessingStage
-                
+
                 system_metadata = SystemProcessingMetadata(
                     entity_id=str(cj_batch_id),
                     entity_type="batch",
@@ -656,7 +654,7 @@ class TestOutboxPatternIntegration:
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
                 )
-                
+
                 event_data = CJAssessmentCompletedV1(
                     event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
                     entity_id=str(cj_batch_id),
@@ -681,9 +679,7 @@ class TestOutboxPatternIntegration:
                 await event_publisher.publish_assessment_completed(envelope, correlation_id)
 
                 # Verify custom partition key stored
-                stmt = select(EventOutbox).where(
-                    EventOutbox.aggregate_id == str(cj_batch_id)
-                )
+                stmt = select(EventOutbox).where(EventOutbox.aggregate_id == str(cj_batch_id))
                 result = await session.execute(stmt)
                 outbox_event = result.scalar_one()
 

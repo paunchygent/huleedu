@@ -63,9 +63,7 @@ def sample_event_envelope() -> EventEnvelope:
         status=BatchStatus.COMPLETED_SUCCESSFULLY,
         system_metadata=system_metadata,
         cj_assessment_job_id="cj-job-test-123",
-        rankings=[
-            {"els_essay_id": "essay-test-1", "rank": 1, "score": 0.85}
-        ],
+        rankings=[{"els_essay_id": "essay-test-1", "rank": 1, "score": 0.85}],
     )
 
     return EventEnvelope(
@@ -222,7 +220,7 @@ class TestOutboxManagerErrorHandling:
         # Given
         mock_repository: AsyncMock = AsyncMock()
         mock_repository.add_event.return_value = uuid4()
-        
+
         # Make Redis fail
         mock_redis_client.lpush.side_effect = Exception("Redis connection lost")
 
@@ -275,7 +273,7 @@ class TestOutboxManagerErrorHandling:
         )
 
         # Then
-        
+
         # Verify repository was called with correct parameters
         mock_repository.add_event.assert_called_once()
         call_args = mock_repository.add_event.call_args
@@ -283,17 +281,15 @@ class TestOutboxManagerErrorHandling:
         assert call_args.kwargs["aggregate_id"] == "test-success"
         assert call_args.kwargs["event_type"] == "processing.cj.assessment.completed.v1"
         assert call_args.kwargs["topic"] == "processing.cj.assessment.completed.v1"
-        
+
         # Verify event data was serialized correctly
         event_data = call_args.kwargs["event_data"]
         assert isinstance(event_data, dict)
         assert event_data["event_type"] == "processing.cj.assessment.completed.v1"
         assert event_data["source_service"] == "cj_assessment_service"
-        
+
         # Verify Redis notification was sent
-        mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:cj_assessment_service", "1"
-        )
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:cj_assessment_service", "1")
 
     async def test_custom_partition_key_handling(
         self,
@@ -388,17 +384,17 @@ class TestOutboxManagerErrorHandling:
         mock_repository.add_event.assert_called_once()
         call_args = mock_repository.add_event.call_args
         event_data = call_args.kwargs["event_data"]
-        
+
         # Should be a dict after serialization
         assert isinstance(event_data, dict)
-        
+
         # Check that timestamps are serialized as strings
         assert isinstance(event_data["event_timestamp"], str)
         assert isinstance(event_data["data"]["timestamp"], str)
-        
+
         # Check that UUIDs are serialized as strings
         assert isinstance(event_data["correlation_id"], str)
-        
+
         # Verify structure matches envelope
         assert event_data["event_type"] == sample_event_envelope.event_type
         assert event_data["source_service"] == sample_event_envelope.source_service

@@ -59,14 +59,14 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
             event_data=completion_data,  # Pass original EventEnvelope to OutboxManager
             topic=self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC,
         )
-        
+
         logger.info(
             "CJ assessment completion event stored in outbox",
             extra={
                 "correlation_id": str(correlation_id),
                 "aggregate_id": aggregate_id,
                 "topic": self.settings.CJ_ASSESSMENT_COMPLETED_TOPIC,
-            }
+            },
         )
 
     async def publish_assessment_failed(
@@ -99,12 +99,12 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
             event_data=failure_data,  # Pass original EventEnvelope to OutboxManager
             topic=self.settings.CJ_ASSESSMENT_FAILED_TOPIC,
         )
-        
+
         logger.info(
             "CJ assessment failure event stored in outbox",
             extra={
                 "correlation_id": str(correlation_id),
                 "aggregate_id": aggregate_id,
                 "topic": self.settings.CJ_ASSESSMENT_FAILED_TOPIC,
-            }
+            },
         )

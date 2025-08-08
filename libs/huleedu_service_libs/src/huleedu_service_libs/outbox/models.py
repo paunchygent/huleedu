@@ -87,7 +87,7 @@ class EventOutbox(Base):
         nullable=True,
         comment="Optional key for Kafka partitioning",
     )
-    
+
     # Kafka targeting
     topic: Mapped[str] = mapped_column(
         String(255),

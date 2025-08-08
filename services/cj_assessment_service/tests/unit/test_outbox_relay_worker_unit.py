@@ -30,6 +30,7 @@ class FakeOutboxEvent:
         event_type: str,
         event_data: dict[str, Any],
         event_key: str | None,
+        topic: str,
         created_at: datetime,
         published_at: datetime | None = None,
         retry_count: int = 0,
@@ -41,6 +42,7 @@ class FakeOutboxEvent:
         self._event_type = event_type
         self._event_data = event_data
         self._event_key = event_key
+        self._topic = topic
         self._created_at = created_at
         self._published_at = published_at
         self._retry_count = retry_count
@@ -69,6 +71,10 @@ class FakeOutboxEvent:
     @property
     def event_key(self) -> str | None:
         return self._event_key
+
+    @property
+    def topic(self) -> str:
+        return self._topic
 
     @property
     def created_at(self) -> datetime:
@@ -116,6 +122,7 @@ class FakeOutboxRepository:
             event_type=event_type,
             event_data=event_data,
             event_key=event_key,
+            topic=event_data.get("topic", "processing.cj.assessment.v1"),
             created_at=datetime.now(timezone.utc),
             published_at=None,
             retry_count=0,
@@ -213,13 +220,13 @@ def sample_event(
         aggregate_type="cj_batch",
         event_type="processing.cj.assessment.completed.v1",
         event_data={
-            "topic": "processing.cj.assessment.completed.v1",
             "data": {"entity_id": "batch-123", "cj_assessment_job_id": "job-456"},
             "correlation_id": str(uuid4()),
             "source_service": "cj_assessment_service",
             "metadata": {"user_id": "user-123"},
         },
         event_key="test-aggregate-123",
+        topic="processing.cj.assessment.completed.v1",
         created_at=datetime.now(timezone.utc),
         published_at=None,
         retry_count=0,
@@ -342,10 +349,10 @@ class TestEventRelayWorker:
                 aggregate_type="cj_batch",
                 event_type="processing.cj.assessment.completed.v1",
                 event_data={
-                    "topic": "processing.cj.assessment.completed.v1",
                     "data": {"entity_id": f"batch-{i}"},
                 },
                 event_key=f"key-{i}",
+                topic="processing.cj.assessment.completed.v1",
                 created_at=datetime.now(timezone.utc),
                 published_at=None,
                 retry_count=0,

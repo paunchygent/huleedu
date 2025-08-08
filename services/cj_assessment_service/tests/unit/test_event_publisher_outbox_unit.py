@@ -247,7 +247,7 @@ class TestCJEventPublisherImpl:
         sample_batch_id: UUID,
     ) -> None:
         """Verify that envelopes are passed to outbox manager without modification.
-        
+
         Note: CJ Assessment Service receives pre-built envelopes from event processor,
         so trace context injection happens at event creation, not in the publisher.
         """
@@ -287,11 +287,11 @@ class TestCJEventPublisherImpl:
         # Then - Verify envelope passed directly to OutboxManager without modification
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         call_args = mock_outbox_manager.publish_to_outbox.call_args
-        
+
         # Verify the exact same envelope object was passed
         passed_envelope = call_args.kwargs["event_data"]
         assert passed_envelope is envelope
-        
+
         # Verify metadata was preserved
         assert passed_envelope.metadata == {"test_metadata": "preserved"}
 
@@ -470,7 +470,7 @@ class TestCJEventPublisherImpl:
         sample_batch_id: UUID,
     ) -> None:
         """Verify envelope with custom partition key metadata is passed correctly.
-        
+
         Note: The CJ Assessment Service publisher doesn't extract partition keys;
         that's handled by the OutboxManager which reads from envelope.metadata.
         """
@@ -515,6 +515,6 @@ class TestCJEventPublisherImpl:
         passed_envelope = call_args.kwargs["event_data"]
         assert passed_envelope == envelope
         assert passed_envelope.metadata == {"partition_key": "custom-partition-key"}
-        
+
         # The publisher doesn't extract event_key; OutboxManager handles that
         assert "event_key" not in call_args.kwargs

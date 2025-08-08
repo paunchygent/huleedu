@@ -66,6 +66,11 @@ class OutboxEventImpl:
         return self._db_event.event_key
 
     @property
+    def topic(self) -> str:
+        """Kafka topic to publish to."""
+        return self._db_event.topic
+
+    @property
     def created_at(self) -> datetime:
         """Timestamp when the event was created."""
         return self._db_event.created_at
@@ -141,14 +146,10 @@ class PostgreSQLOutboxRepository:
         Returns:
             UUID: The ID of the created outbox event
         """
-        # Store topic in event_data for the relay worker
-        event_data_with_topic = event_data.copy()
-        event_data_with_topic["topic"] = topic
-
         if session is not None:
             # Use provided session for transaction sharing
             return await self._add_event_with_session(
-                session, aggregate_id, aggregate_type, event_type, event_data_with_topic, event_key
+                session, aggregate_id, aggregate_type, event_type, event_data, topic, event_key
             )
         else:
             # Create own session (existing behavior)
@@ -158,7 +159,8 @@ class PostgreSQLOutboxRepository:
                     aggregate_id,
                     aggregate_type,
                     event_type,
-                    event_data_with_topic,
+                    event_data,
+                    topic,
                     event_key,
                 )
                 await session.commit()
@@ -170,7 +172,8 @@ class PostgreSQLOutboxRepository:
         aggregate_id: str,
         aggregate_type: str,
         event_type: str,
-        event_data_with_topic: dict[str, Any],
+        event_data: dict[str, Any],
+        topic: str,
         event_key: str | None,
     ) -> UUID:
         """
@@ -181,7 +184,8 @@ class PostgreSQLOutboxRepository:
             aggregate_id: ID of the aggregate this event relates to
             aggregate_type: Type of aggregate
             event_type: Type of the event
-            event_data_with_topic: Event data with topic included
+            event_data: Event data without topic
+            topic: Kafka topic to publish to
             event_key: Optional key for Kafka partitioning
 
         Returns:
@@ -191,9 +195,9 @@ class PostgreSQLOutboxRepository:
             aggregate_id=aggregate_id,
             aggregate_type=aggregate_type,
             event_type=event_type,
-            event_data=event_data_with_topic,
+            event_data=event_data,
             event_key=event_key,
-            topic=event_data_with_topic["topic"],
+            topic=topic,
         )
         session.add(outbox_event)
         await session.flush()  # Get the ID but don't commit yet

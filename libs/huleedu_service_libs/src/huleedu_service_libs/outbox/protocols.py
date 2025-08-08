@@ -54,6 +54,11 @@ class OutboxEvent(Protocol):
         ...
 
     @property
+    def topic(self) -> str:
+        """Kafka topic to publish to."""
+        ...
+
+    @property
     def created_at(self) -> datetime:
         """Timestamp when the event was created."""
         ...

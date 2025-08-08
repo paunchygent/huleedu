@@ -6,7 +6,6 @@ enabling clean architecture and testability.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Awaitable, Callable, Protocol, TypeVar
 from uuid import UUID
 
@@ -312,7 +311,7 @@ class OutboxRepositoryProtocol(Protocol):
         session: AsyncSession | None = None,
     ) -> UUID:
         """Add event to outbox within current transaction for atomic consistency.
-        
+
         Args:
             aggregate_id: ID of the aggregate this event relates to
             aggregate_type: Type of aggregate (e.g., 'cj_batch', 'grade_projection')
@@ -321,7 +320,7 @@ class OutboxRepositoryProtocol(Protocol):
             topic: Kafka topic name for publishing
             event_key: Optional key for Kafka partitioning
             session: Optional AsyncSession for transaction sharing
-            
+
         Returns:
             UUID: The ID of the created outbox event
         """

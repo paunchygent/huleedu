@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
 import aiohttp
 from aiokafka.errors import KafkaError
@@ -12,8 +11,8 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.outbox import OutboxProvider
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
@@ -36,6 +35,7 @@ from services.cj_assessment_service.implementations.llm_interaction_impl import 
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
+from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
@@ -50,8 +50,6 @@ from services.cj_assessment_service.protocols import (
     LLMProviderProtocol,
     RetryManagerProtocol,
 )
-from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
-from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
 
 
 class CJAssessmentServiceProvider(Provider):
@@ -222,6 +220,7 @@ class CJAssessmentServiceProvider(Provider):
     def provide_service_name(self, settings: Settings) -> str:
         """Provide service name for OutboxProvider dependency."""
         return settings.SERVICE_NAME
+
     @provide(scope=Scope.APP)
     def provide_outbox_manager(
         self,

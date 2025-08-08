@@ -271,31 +271,11 @@ class EventRelayWorker:
 
                 return
 
-            # Extract topic from event data
-            topic = event.event_data.get("topic")
-            if not topic:
-                # Try to get topic from event mapper if available
-                if self.event_mapper:
-                    try:
-                        topic = self.event_mapper.get_topic_for_event(event.event_type)
-                    except ValueError:
-                        logger.error(
-                            f"No topic mapping found for event type {event.event_type}",
-                            extra={"event_type": event.event_type, "service": self.service_name},
-                        )
-                        topic = "unknown.events"  # Fallback topic
-                else:
-                    logger.warning(
-                        f"No topic found in event data and no mapper provided for "
-                        f"{event.event_type}",
-                        extra={"event_type": event.event_type, "service": self.service_name},
-                    )
-                    topic = "unknown.events"  # Fallback topic
+            # Get topic from the event property (stored in explicit column)
+            topic = event.topic
 
             # Prepare the event envelope for publishing
             envelope_data = event.event_data.copy()
-            # Remove internal fields that shouldn't be published
-            envelope_data.pop("topic", None)
 
             logger.info(
                 "Publishing event from outbox to Kafka",

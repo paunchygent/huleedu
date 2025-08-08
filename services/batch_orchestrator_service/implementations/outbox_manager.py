@@ -92,9 +92,6 @@ class OutboxManager:
             # Serialize the envelope to JSON for storage
             serialized_data = event_data.model_dump(mode="json")
 
-            # Add topic to the event data for relay worker
-            serialized_data["topic"] = topic
-
             # Determine Kafka key from envelope metadata or aggregate ID
             event_key = aggregate_id
             if hasattr(event_data, "metadata") and event_data.metadata:
