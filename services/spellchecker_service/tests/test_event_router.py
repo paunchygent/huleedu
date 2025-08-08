@@ -81,7 +81,6 @@ class TestProcessSingleMessage:
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
-            mock_kafka_bus,
             consumer_group_id="test-group",
         )
 
@@ -110,7 +109,7 @@ class TestProcessSingleMessage:
 
         # Verify the published result contains real spell check results
         publish_call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        published_result: SpellcheckResultDataV1 = publish_call_args[0][1]
+        published_result: SpellcheckResultDataV1 = publish_call_args[0][0]
         assert published_result.status == EssayStatus.SPELLCHECKED_SUCCESS
         assert published_result.corrections_made is not None
         assert published_result.storage_metadata is not None
@@ -151,7 +150,6 @@ class TestProcessSingleMessage:
                 mock_result_store,
                 mock_event_publisher,
                 mock_spell_logic,
-                mock_kafka_bus,
                 consumer_group_id="test-group",
             )
 
@@ -176,7 +174,7 @@ class TestProcessSingleMessage:
             mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
             call_args = mock_event_publisher.publish_spellcheck_result.call_args
-            published_event_data: SpellcheckResultDataV1 = call_args[0][1]
+            published_event_data: SpellcheckResultDataV1 = call_args[0][0]
 
             assert published_event_data.status == EssayStatus.SPELLCHECK_FAILED
             assert published_event_data.entity_id == sample_essay_id
@@ -235,7 +233,6 @@ class TestProcessSingleMessage:
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,
-            mock_kafka_bus,
             consumer_group_id="test-group",
         )
 
@@ -285,7 +282,6 @@ class TestProcessSingleMessage:
             mock_result_store,
             mock_event_publisher,
             mock_spell_logic,  # Use mock that fails
-            mock_kafka_bus,
             consumer_group_id="test-group",
         )
 
@@ -396,7 +392,6 @@ class TestProcessSingleMessage:
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,
-            mock_kafka_bus,
             consumer_group_id="test-group",
         )
 

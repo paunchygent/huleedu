@@ -53,7 +53,6 @@ async def test_first_time_event_processing_success(
             result_store=result_store,
             event_publisher=event_publisher,
             spell_logic=real_spell_logic,
-            kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
         await confirm_idempotency()  # Confirm after successful processing
@@ -110,7 +109,6 @@ async def test_duplicate_event_skipped(
             result_store=result_store,
             event_publisher=event_publisher,
             spell_logic=real_spell_logic,
-            kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
         await confirm_idempotency()  # Confirm after successful processing
@@ -152,7 +150,6 @@ async def test_processing_failure_keeps_lock(
             result_store=result_store,
             event_publisher=event_publisher,
             spell_logic=real_spell_logic,
-            kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
         await confirm_idempotency()  # Confirm after successful processing
@@ -225,7 +222,6 @@ async def test_deterministic_event_id_generation(
             result_store=result_store,
             event_publisher=event_publisher,
             spell_logic=real_spell_logic,
-            kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
         await confirm_idempotency()  # Confirm after successful processing

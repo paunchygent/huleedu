@@ -60,11 +60,10 @@ class ResultStoreProtocol(Protocol):
 class SpellcheckEventPublisherProtocol(Protocol):
     async def publish_spellcheck_result(
         self,
-        kafka_bus: KafkaPublisherProtocol,
         event_data: SpellcheckResultDataV1,
         correlation_id: UUID,
     ) -> None:
-        """Publishes a spell check result event to Kafka."""
+        """Publishes a spell check result event via outbox pattern."""
         ...
 
 

@@ -149,7 +149,6 @@ class TestObservabilityFeatures:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
             tracer=tracer,
         )
 
@@ -200,7 +199,6 @@ class TestObservabilityFeatures:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
             tracer=tracer,
         )
 
@@ -240,7 +238,6 @@ class TestObservabilityFeatures:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -292,7 +289,6 @@ class TestObservabilityFeatures:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -344,7 +340,6 @@ class TestObservabilityFeatures:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -378,7 +373,6 @@ class TestObservabilityFeatures:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
                 tracer=tracer,
             )
 

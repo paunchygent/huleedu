@@ -14,6 +14,7 @@ import sys
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.outbox import EventRelayWorker
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.spellchecker_service.config import settings
@@ -26,6 +27,8 @@ logger = create_service_logger("spell_checker.worker_main")
 should_stop = False
 kafka_consumer_instance: SpellCheckerKafkaConsumer | None = None
 consumer_task: asyncio.Task | None = None
+relay_worker_instance: EventRelayWorker | None = None
+relay_worker_task: asyncio.Task | None = None
 
 
 def setup_signal_handlers() -> None:
@@ -43,7 +46,7 @@ def setup_signal_handlers() -> None:
 
 async def main() -> None:
     """Main entry point."""
-    global kafka_consumer_instance, consumer_task
+    global kafka_consumer_instance, consumer_task, relay_worker_instance, relay_worker_task
 
     # Configure logging
     configure_service_logging(
@@ -79,9 +82,16 @@ async def main() -> None:
             # Get Kafka consumer from DI container (properly configured)
             kafka_consumer_instance = await request_container.get(SpellCheckerKafkaConsumer)
 
+            # Get outbox relay worker from DI container
+            relay_worker_instance = await request_container.get(EventRelayWorker)
+
             # Start Kafka consumer as background task
             consumer_task = asyncio.create_task(kafka_consumer_instance.start_consumer())
             logger.info("Kafka consumer background task started")
+
+            # Start outbox relay worker as background task
+            relay_worker_task = asyncio.create_task(relay_worker_instance.start())
+            logger.info("Outbox relay worker background task started")
 
             # Wait for shutdown signal
             while not should_stop:
@@ -98,6 +108,10 @@ async def main() -> None:
             logger.info("Stopping Kafka consumer...")
             await kafka_consumer_instance.stop_consumer()
 
+        if relay_worker_instance:
+            logger.info("Stopping outbox relay worker...")
+            await relay_worker_instance.stop()
+
         if consumer_task and not consumer_task.done():
             logger.info("Cancelling consumer background task...")
             consumer_task.cancel()
@@ -105,6 +119,14 @@ async def main() -> None:
                 await consumer_task
             except asyncio.CancelledError:
                 logger.info("Consumer background task cancelled successfully")
+
+        if relay_worker_task and not relay_worker_task.done():
+            logger.info("Cancelling relay worker background task...")
+            relay_worker_task.cancel()
+            try:
+                await relay_worker_task
+            except asyncio.CancelledError:
+                logger.info("Relay worker background task cancelled successfully")
 
     logger.info("Spell Checker Service Worker shutdown completed")
 

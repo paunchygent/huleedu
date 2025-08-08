@@ -263,7 +263,6 @@ class TestRealBusinessLogicWithBoundaryMocks:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should handle error gracefully and publish error event
@@ -272,7 +271,7 @@ class TestRealBusinessLogicWithBoundaryMocks:
 
         # Verify correlation ID propagated through real business logic
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
     async def test_real_parsing_logic_handles_invalid_messages(
@@ -295,7 +294,6 @@ class TestRealBusinessLogicWithBoundaryMocks:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
             )
 
         # Verify real business logic correctly categorized the error
@@ -355,7 +353,6 @@ class TestRealBusinessLogicWithBoundaryMocks:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
             )
 
         # Should be categorized as parsing error due to Pydantic validation
@@ -388,7 +385,6 @@ class TestRealBusinessLogicWithBoundaryMocks:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should complete successfully
@@ -400,7 +396,7 @@ class TestRealBusinessLogicWithBoundaryMocks:
 
         # Verify correlation ID propagated through real business logic
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
 

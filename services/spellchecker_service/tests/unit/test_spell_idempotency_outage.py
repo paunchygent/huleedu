@@ -72,7 +72,6 @@ async def test_redis_failure_fallback(
             result_store=result_store,
             event_publisher=event_publisher,
             spell_logic=real_spell_logic,
-            kafka_bus=kafka_bus,
             consumer_group_id="test-group",
         )
         await confirm_idempotency()  # Confirm after successful processing

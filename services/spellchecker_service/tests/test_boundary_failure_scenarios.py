@@ -133,7 +133,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should handle gracefully and publish error event
@@ -142,7 +141,7 @@ class TestBoundaryFailureScenarios:
 
         # Verify correlation ID preserved
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        assert published_args[2] == correlation_id
+        assert published_args[1] == correlation_id
 
     async def test_content_client_connection_boundary_failure(
         self, boundary_mocks: dict[str, AsyncMock], real_spell_logic: DefaultSpellLogic
@@ -163,7 +162,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -171,7 +169,7 @@ class TestBoundaryFailureScenarios:
 
         # Verify correlation ID preserved through connection failure
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        assert published_args[2] == correlation_id
+        assert published_args[1] == correlation_id
 
     async def test_result_store_connection_boundary_failure(
         self, boundary_mocks: dict[str, AsyncMock], real_spell_logic: DefaultSpellLogic
@@ -203,7 +201,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -211,7 +208,7 @@ class TestBoundaryFailureScenarios:
 
         # Verify correlation ID preserved through store failure
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        assert published_args[2] == correlation_id
+        assert published_args[1] == correlation_id
 
     async def test_event_publisher_boundary_failure(
         self, boundary_mocks: dict[str, AsyncMock], real_spell_logic: DefaultSpellLogic
@@ -238,7 +235,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should return True (success) even with publishing failure
@@ -267,7 +263,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         assert result is True
@@ -275,7 +270,7 @@ class TestBoundaryFailureScenarios:
 
         # Verify correlation ID preserved through session failure
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        assert published_args[2] == correlation_id
+        assert published_args[1] == correlation_id
 
     async def test_multiple_boundary_failures_cascade(
         self, boundary_mocks: dict[str, AsyncMock], real_spell_logic: DefaultSpellLogic
@@ -310,7 +305,6 @@ class TestBoundaryFailureScenarios:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should return True for graceful degradation (commits Kafka offset)
@@ -350,8 +344,7 @@ class TestBoundaryFailureScenarios:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
-            )
+                )
 
             # Should handle each error type gracefully
             assert result is True
@@ -359,7 +352,7 @@ class TestBoundaryFailureScenarios:
 
             # Verify correlation ID preserved for each error type
             call_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-            assert call_args[2] == correlation_id
+            assert call_args[1] == correlation_id
 
 
 # Prometheus registry cleanup for test isolation

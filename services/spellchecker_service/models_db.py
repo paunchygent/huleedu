@@ -8,6 +8,7 @@ services (e.g. essay_lifecycle_service.models_db) to guarantee consistency:
 • Enums are defined as ``str`` subclasses to ease JSON serialisation.
 • Relationship between job and tokens uses ``cascade='all, delete-orphan'`` so
   removing a job automatically cleans up tokens.
+• EventOutbox model is imported from shared library for transactional outbox pattern.
 """
 
 from __future__ import annotations
@@ -18,9 +19,11 @@ from typing import Any, List
 
 # Import shared enum to avoid drift across services
 from common_core.status_enums import SpellcheckJobStatus as SCJobStatus
+# Removed import of EventOutbox - using local definition for proper SQLAlchemy inheritance
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    DateTime,
     Enum,
     ForeignKey,
     Index,
@@ -29,15 +32,118 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.decl_api import DeclarativeBase
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class EventOutbox(Base):
+    """
+    Event outbox table for reliable event publishing using Transactional Outbox Pattern.
+
+    This table stores events that need to be published to Kafka, ensuring
+    that database updates and event publications are atomic. Events are
+    written to this table in the same transaction as business logic updates.
+
+    Following the File Service pattern with explicit topic column for better
+    query performance and clarity.
+    """
+
+    __tablename__ = "event_outbox"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+        nullable=False,
+        comment="Unique identifier for the outbox entry",
+    )
+
+    # Aggregate tracking
+    aggregate_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+        comment="ID of the aggregate (spellcheck_job_id) that generated this event",
+    )
+    aggregate_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        comment="Type of aggregate (spellcheck_job) for categorization",
+    )
+
+    # Event details
+    event_type: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Type/topic of the event (e.g., spellcheck.result.v1)",
+    )
+    event_data: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="The complete event data as JSON (EventEnvelope)",
+    )
+    event_key: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Kafka message key for partitioning",
+    )
+
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
+    )
+
+    # Processing state
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+        comment="When the event was created",
+    )
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="When the event was successfully published to Kafka",
+    )
+
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="Number of publish attempts",
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Last error message if publishing failed",
+    )
+
+    def __repr__(self) -> str:
+        """String representation of EventOutbox."""
+        return (
+            f"<EventOutbox("
+            f"id={self.id}, "
+            f"aggregate_id={self.aggregate_id}, "
+            f"event_type={self.event_type}, "
+            f"topic={self.topic}, "
+            f"published_at={self.published_at}"
+            f")>"
+        )
 
 
 class SpellcheckJob(Base):

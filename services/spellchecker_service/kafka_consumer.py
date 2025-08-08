@@ -92,7 +92,6 @@ class SpellCheckerKafkaConsumer:
                 result_store=self.result_store,
                 event_publisher=self.event_publisher,
                 spell_logic=self.spell_logic,
-                kafka_bus=self.kafka_bus,
                 tracer=self.tracer,
                 consumer_group_id=self.consumer_group,
             )

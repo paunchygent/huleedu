@@ -141,7 +141,6 @@ class TestRealBusinessLogicRobustness:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should handle error gracefully and publish error event
@@ -150,7 +149,7 @@ class TestRealBusinessLogicRobustness:
 
         # Verify correlation ID propagated through real business logic
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
     async def test_real_parsing_logic_handles_invalid_messages(
@@ -173,7 +172,6 @@ class TestRealBusinessLogicRobustness:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
             )
 
         # Verify real business logic correctly categorized the error
@@ -210,7 +208,6 @@ class TestRealBusinessLogicRobustness:
                 boundary_mocks["result_store"],
                 boundary_mocks["event_publisher"],
                 real_spell_logic,
-                boundary_mocks["kafka_bus"],
             )
 
         # Should be a parsing error since null UUID fails Pydantic validation
@@ -239,7 +236,6 @@ class TestRealBusinessLogicRobustness:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should complete successfully
@@ -251,7 +247,7 @@ class TestRealBusinessLogicRobustness:
 
         # Verify correlation ID propagated through real business logic
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
     async def test_real_business_logic_handles_result_store_errors(
@@ -285,7 +281,6 @@ class TestRealBusinessLogicRobustness:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should complete and publish error event
@@ -294,7 +289,7 @@ class TestRealBusinessLogicRobustness:
 
         # Verify correlation ID preserved through real business logic
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
     async def test_real_business_logic_handles_empty_content(
@@ -316,7 +311,6 @@ class TestRealBusinessLogicRobustness:
             boundary_mocks["result_store"],
             boundary_mocks["event_publisher"],
             real_spell_logic,
-            boundary_mocks["kafka_bus"],
         )
 
         # Should handle validation error and publish error event
@@ -325,7 +319,7 @@ class TestRealBusinessLogicRobustness:
 
         # Verify error event with correlation ID
         published_args = boundary_mocks["event_publisher"].publish_spellcheck_result.call_args[0]
-        published_correlation_id = published_args[2]
+        published_correlation_id = published_args[1]
         assert published_correlation_id == correlation_id
 
 

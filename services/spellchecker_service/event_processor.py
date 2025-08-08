@@ -41,7 +41,6 @@ from huleedu_service_libs.observability import (
     trace_operation,
     use_trace_context,
 )
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from opentelemetry import trace
 from pydantic import ValidationError
 
@@ -98,7 +97,6 @@ async def process_single_message(
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
-    kafka_bus: KafkaPublisherProtocol,
     tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
 ) -> bool:
@@ -158,7 +156,6 @@ async def process_single_message(
                         result_store,
                         event_publisher,
                         spell_logic,
-                        kafka_bus,
                         tracer,
                         consumer_group_id,
                         span,
@@ -199,7 +196,6 @@ async def process_single_message(
                 result_store,
                 event_publisher,
                 spell_logic,
-                kafka_bus,
                 tracer,
                 consumer_group_id,
                 None,  # No span for no parent context branch
@@ -221,7 +217,6 @@ async def _process_single_message_impl(
     result_store: ResultStoreProtocol,
     event_publisher: SpellcheckEventPublisherProtocol,
     spell_logic: SpellLogicProtocol,
-    kafka_bus: KafkaPublisherProtocol,
     tracer: "Tracer | None" = None,
     consumer_group_id: str = "spell-checker-group",
     span: "trace.Span | None" = None,
@@ -234,9 +229,8 @@ async def _process_single_message_impl(
         http_session: HTTP session for content service interaction
         content_client: Client for fetching content
         result_store: Store for saving processed results
-        event_publisher: Publisher for result events
+        event_publisher: Publisher for result events using outbox pattern
         spell_logic: Spell checking logic implementation
-        kafka_bus: Kafka bus for publishing events
         tracer: Optional tracer for distributed tracing
         consumer_group_id: Consumer group ID for metrics
 
@@ -401,9 +395,8 @@ async def _process_single_message_impl(
             extra={"correlation_id": str(request_envelope.correlation_id)},
         )
 
-        # Publish the result
+        # Publish the result via outbox pattern
         await event_publisher.publish_spellcheck_result(
-            kafka_bus,
             result_data,
             request_envelope.correlation_id,
         )
@@ -442,7 +435,6 @@ async def _process_single_message_impl(
             error_detail,
             request_envelope,
             event_publisher,
-            kafka_bus,
             essay_id_for_logging,
             processing_started_at,
         )
@@ -473,7 +465,6 @@ async def _process_single_message_impl(
             he.error_detail,
             request_envelope,
             event_publisher,
-            kafka_bus,
             essay_id_for_logging,
             processing_started_at,
         )
@@ -512,7 +503,6 @@ async def _process_single_message_impl(
                 error_detail,
                 request_envelope,
                 event_publisher,
-                kafka_bus,
                 essay_id_for_logging,
                 processing_started_at,
             )
@@ -523,7 +513,6 @@ async def _publish_structured_error_event(
     error_detail: ErrorDetail,
     request_envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1],
     event_publisher: SpellcheckEventPublisherProtocol,
-    kafka_bus: KafkaPublisherProtocol,
     essay_id_for_logging: str,
     processing_started_at: datetime,
 ) -> None:
@@ -619,9 +608,8 @@ async def _publish_structured_error_event(
             system_metadata=final_error_sys_meta,
         )
 
-        # Publish the structured error event
+        # Publish the structured error event via outbox pattern
         await event_publisher.publish_spellcheck_result(
-            kafka_bus,
             structured_failure_data,
             request_envelope.correlation_id,
         )

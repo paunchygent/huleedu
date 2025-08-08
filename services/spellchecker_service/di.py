@@ -11,7 +11,8 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.protocols import KafkaPublisherProtocol, RedisClientProtocol
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol, PostgreSQLOutboxRepository, EventRelayWorker, OutboxSettings
+from huleedu_service_libs.protocols import KafkaPublisherProtocol, AtomicRedisClientProtocol, RedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from opentelemetry.trace import Tracer
@@ -25,6 +26,7 @@ from services.spellchecker_service.implementations.content_client_impl import (
 from services.spellchecker_service.implementations.event_publisher_impl import (
     DefaultSpellcheckEventPublisher,
 )
+from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
 )
@@ -141,7 +143,7 @@ class SpellCheckerServiceProvider(Provider):
         return kafka_publisher
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         """Provide Redis client for idempotency operations."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis",
@@ -149,6 +151,11 @@ class SpellCheckerServiceProvider(Provider):
         )
         await redis_client.start()
         return redis_client
+
+    @provide(scope=Scope.APP)
+    async def provide_base_redis_client(self, atomic_redis_client: AtomicRedisClientProtocol) -> RedisClientProtocol:
+        """Provide Redis client as RedisClientProtocol for components that only need basic Redis operations."""
+        return atomic_redis_client
 
     @provide(scope=Scope.APP)
     async def provide_http_session(self) -> ClientSession:
@@ -204,14 +211,58 @@ class SpellCheckerServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    async def provide_outbox_repository(
+        self, 
+        engine: AsyncEngine,
+    ) -> OutboxRepositoryProtocol:
+        """Provide outbox repository for transactional event storage."""
+        return PostgreSQLOutboxRepository(engine)
+
+    @provide(scope=Scope.APP)
+    def provide_outbox_manager(
+        self,
+        outbox_repo: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager for transactional event publishing."""
+        return OutboxManager(outbox_repo, redis_client, settings)
+
+    @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(
         self,
+        outbox_manager: OutboxManager,
     ) -> SpellcheckEventPublisherProtocol:
-        """Provide spellcheck event publisher implementation."""
+        """Provide spellcheck event publisher using TRUE OUTBOX PATTERN."""
         return DefaultSpellcheckEventPublisher(
             kafka_event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             source_service_name="spell-checker-service",
             kafka_output_topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            outbox_manager=outbox_manager,
+        )
+
+    @provide(scope=Scope.APP)
+    async def provide_event_relay_worker(
+        self,
+        outbox_repo: OutboxRepositoryProtocol,
+        kafka_bus: KafkaPublisherProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> EventRelayWorker:
+        """Provide event relay worker for publishing outbox events to Kafka."""
+        # Create outbox settings
+        outbox_settings = OutboxSettings(
+            poll_interval_seconds=1.0,
+            batch_size=100,
+            max_retries=5,
+        )
+        
+        return EventRelayWorker(
+            outbox_repository=outbox_repo,
+            kafka_bus=kafka_bus,
+            settings=outbox_settings,
+            service_name=settings.SERVICE_NAME,
+            redis_client=redis_client,
         )
 
     @provide(scope=Scope.APP)
@@ -224,7 +275,7 @@ class SpellCheckerServiceProvider(Provider):
         event_publisher: SpellcheckEventPublisherProtocol,
         kafka_bus: KafkaPublisherProtocol,
         http_session: ClientSession,
-        redis_client: RedisClientProtocol,
+        redis_client: AtomicRedisClientProtocol,
         tracer: Tracer,
     ) -> SpellCheckerKafkaConsumer:
         """Provide Kafka consumer with injected dependencies."""

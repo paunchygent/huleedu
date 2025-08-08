@@ -79,7 +79,6 @@ class TestEventContractCompliance:
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
-            mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
         )
 
@@ -91,7 +90,7 @@ class TestEventContractCompliance:
 
         # Extract the published result from the real spell checking
         publish_call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        published_result: SpellcheckResultDataV1 = publish_call_args[0][1]
+        published_result: SpellcheckResultDataV1 = publish_call_args[0][0]
 
         # Verify contract compliance - the event should have all required fields
         assert published_result.event_name == ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
@@ -151,7 +150,6 @@ class TestEventContractCompliance:
             mock_result_store,
             mock_event_publisher,
             real_spell_logic,  # Use real implementation
-            mock_kafka_bus,  # Updated parameter order and name
             consumer_group_id="test-group",
         )
 
@@ -163,7 +161,7 @@ class TestEventContractCompliance:
 
         # Extract the correlation_id passed to publisher
         call_args = mock_event_publisher.publish_spellcheck_result.call_args
-        passed_correlation_id: UUID = call_args[0][2]  # Third argument
+        passed_correlation_id: UUID = call_args[0][1]  # Second argument
 
         # Extract expected correlation_id from the original kafka message
         request_envelope_dict = json.loads(kafka_message.value.decode("utf-8"))
@@ -177,7 +175,7 @@ class TestEventContractCompliance:
         assert passed_correlation_id == expected_correlation_id
 
         # Verify the published result has the expected correlation ID context
-        published_result: SpellcheckResultDataV1 = call_args[0][1]
+        published_result: SpellcheckResultDataV1 = call_args[0][0]
         assert (
             published_result.entity_id == sample_essay_id
         )  # Should match the essay from the request
