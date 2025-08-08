@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -160,6 +160,21 @@ class EventOutbox(Base):
         Text,
         nullable=True,
         comment="Last error message if publishing failed",
+    )
+
+    # Indexes for performance
+    __table_args__ = (
+        # Topic-aware index for unpublished events (relay worker efficiency)
+        Index(
+            "ix_event_outbox_unpublished_topic",
+            "published_at", "topic", "created_at",
+            postgresql_where=text("published_at IS NULL")
+        ),
+        # Topic index for filtering and queries
+        Index("ix_event_outbox_topic", "topic"),
+        # Legacy indexes
+        Index("ix_event_outbox_aggregate", "aggregate_type", "aggregate_id"),
+        Index("ix_event_outbox_event_type", "event_type"),
     )
 
     def __repr__(self) -> str:

@@ -73,10 +73,9 @@ class TestOutboxRepositoryIntegration(TestFileServiceOutboxPatternIntegration):
         assert stored_event.created_at is not None
 
         # Verify event data is stored correctly (SQLAlchemy auto-deserializes JSON)
-        # Repository adds topic to event_data
-        expected_data = event_data.copy()
-        expected_data["topic"] = "test.topic"
-        assert stored_event.event_data == expected_data
+        # Topic is now a separate column, not embedded in event_data
+        assert stored_event.event_data == event_data
+        assert stored_event.topic == "test.topic"
 
     async def test_get_unpublished_events_returns_correct_events(
         self,
@@ -287,9 +286,8 @@ class TestOutboxRepositoryIntegration(TestFileServiceOutboxPatternIntegration):
         stored_event = result.scalar_one()
 
         # SQLAlchemy auto-deserializes JSON
-        # Repository adds topic to event_data
-        expected_data = large_data.copy()
-        expected_data["topic"] = "large.data.topic"
-        assert stored_event.event_data == expected_data
+        # Topic is now a separate column, not embedded in event_data
+        assert stored_event.event_data == large_data
+        assert stored_event.topic == "large.data.topic"
         assert len(stored_event.event_data["data"]["large_content"]) == 10000
         assert len(stored_event.event_data["data"]["nested_data"]["array"]) == 1000

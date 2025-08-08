@@ -171,7 +171,7 @@ class TestPostgreSQLOutboxRepository:
         assert added_event.aggregate_id == "agg-123"
         assert added_event.aggregate_type == "test_aggregate"
         assert added_event.event_type == "test.event.v1"
-        assert added_event.event_data["topic"] == "test.topic"
+        assert added_event.topic == "test.topic"  # Topic is now a dedicated column
         assert added_event.event_data["test"] == "data"
         assert added_event.event_key == "key-123"
 

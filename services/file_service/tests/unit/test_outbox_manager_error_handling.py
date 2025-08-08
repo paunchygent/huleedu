@@ -346,9 +346,8 @@ class TestOutboxManagerErrorHandling:
         mock_repository.add_event.assert_called_once()
         call_args: Any = mock_repository.add_event.call_args
 
-        # Verify topic was added to serialized data
-        serialized_data: dict[str, Any] = call_args.kwargs["event_data"]
-        assert serialized_data["topic"] == "test.topic.success"
+        # Verify topic is passed as separate parameter (not in serialized data)
+        assert call_args.kwargs["topic"] == "test.topic.success"
 
         # Verify other parameters
         assert call_args.kwargs["aggregate_id"] == "test-success"
