@@ -21,28 +21,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Create initial schema for Class Management Service."""
-    # Create ENUM types
-    course_code_enum = postgresql.ENUM(
-        "ENG5", "ENG6", "ENG7", "SV1", "SV2", "SV3", name="course_code_enum"
-    )
-    course_code_enum.create(op.get_bind(), checkfirst=True)
-
-    language_enum = postgresql.ENUM("en", "sv", name="language_enum")
-    language_enum.create(op.get_bind(), checkfirst=True)
-
-    # Create courses table
+    # Create courses table with inline enum definitions
     op.create_table(
         "courses",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False, primary_key=True),
         sa.Column(
             "course_code",
-            course_code_enum,
+            postgresql.ENUM("ENG5", "ENG6", "ENG7", "SV1", "SV2", "SV3", name="course_code_enum"),
             nullable=False,
         ),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column(
             "language",
-            language_enum,
+            postgresql.ENUM("en", "sv", name="language_enum"),
             nullable=False,
             server_default="sv",
         ),

@@ -177,10 +177,10 @@ source /Users/olofs_mba/Documents/Repos/huledu-reboot/.env
 docker exec huleedu_<service>_db psql -U $HULEEDU_DB_USER -d <db_name> -c "SQL"
 
 # Or use hardcoded values:
-docker exec huleedu_class_management_db psql -U huleedu_user -d huledu_class_management -c "\dt"
+docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_management -c "\dt"
 
-# Database names follow pattern: huledu_<service_name>
-# Example: huledu_class_management, huledu_essay_lifecycle, etc.
+# Database names follow pattern: huleedu_<service_name>
+# Example: huleedu_class_management, huleedu_essay_lifecycle, etc.
 ```
 
 ### Service Management

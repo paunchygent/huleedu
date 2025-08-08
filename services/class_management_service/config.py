@@ -48,7 +48,7 @@ class Settings(BaseSettings):
             )
 
         return (
-            f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5435/huledu_class_management"
+            f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5435/huleedu_class_management"
         )
 
     PORT: int = 5002

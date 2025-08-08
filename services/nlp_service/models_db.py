@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -128,12 +129,19 @@ class EventOutbox(Base):
     event_data: Mapped[dict[str, Any]] = mapped_column(
         JSON,
         nullable=False,
-        comment="JSON payload containing the full event envelope including topic",
+        comment="JSON payload containing the full event envelope",
     )
     event_key: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         comment="Optional key for Kafka partitioning",
+    )
+    
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
     )
 
     # Publishing state
@@ -165,22 +173,15 @@ class EventOutbox(Base):
 
     # Indexes for performance
     __table_args__ = (
-        # Index for polling unpublished events efficiently
+        # Topic-aware index for unpublished events (relay worker efficiency)
         Index(
-            "ix_event_outbox_unpublished",
-            "published_at",
-            "created_at",
-            postgresql_where="published_at IS NULL",
+            "ix_event_outbox_unpublished_topic",
+            "published_at", "topic", "created_at",
+            postgresql_where=text("published_at IS NULL")
         ),
-        # Index for looking up events by aggregate
-        Index(
-            "ix_event_outbox_aggregate",
-            "aggregate_type",
-            "aggregate_id",
-        ),
-        # Index for monitoring/debugging by event type
-        Index(
-            "ix_event_outbox_event_type",
-            "event_type",
-        ),
+        # Topic index for filtering and queries
+        Index("ix_event_outbox_topic", "topic"),
+        # Legacy indexes
+        Index("ix_event_outbox_aggregate", "aggregate_type", "aggregate_id"),
+        Index("ix_event_outbox_event_type", "event_type"),
     )

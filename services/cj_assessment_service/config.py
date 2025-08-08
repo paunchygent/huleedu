@@ -70,7 +70,7 @@ class Settings(BaseSettings):
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
 
-        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/cj_assessment"
+        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/huleedu_cj_assessment"
 
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI

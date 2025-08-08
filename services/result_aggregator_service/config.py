@@ -47,7 +47,7 @@ class Settings(BaseSettings):
                 "HULEEDU_DB_PASSWORD are set in your .env file."
             )
 
-        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5436/result_aggregator"
+        return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5436/huleedu_result_aggregator"
 
     DATABASE_POOL_SIZE: int = Field(default=20)
     DATABASE_MAX_OVERFLOW: int = Field(default=10)

@@ -246,17 +246,17 @@ services:
   postgres-bos:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: huledu_batch_orchestrator_test
+      POSTGRES_DB: huleedu_batch_orchestrator_test
   
   postgres-els:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: huledu_essay_lifecycle_test
+      POSTGRES_DB: huleedu_essay_lifecycle_test
   
   postgres-cms:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: huledu_class_management_test
+      POSTGRES_DB: huleedu_class_management_test
   
   kafka:
     image: confluentinc/cp-kafka:7.4.0

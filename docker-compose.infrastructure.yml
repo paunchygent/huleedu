@@ -10,13 +10,13 @@ services:
     ports:
       - "5438:5432"  # Use unique port to avoid conflict with local PostgreSQL
     environment:
-      - POSTGRES_DB=batch_orchestrator
+      - POSTGRES_DB=huleedu_batch_orchestrator
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - batch_orchestrator_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d batch_orchestrator"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_batch_orchestrator"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,13 +32,13 @@ services:
     ports:
       - "5433:5432"  # Different port from BOS database
     environment:
-      - POSTGRES_DB=essay_lifecycle
+      - POSTGRES_DB=huleedu_essay_lifecycle
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - essay_lifecycle_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d essay_lifecycle"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_essay_lifecycle"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -54,13 +54,13 @@ services:
     ports:
       - "5434:5432"  # Different port from other databases
     environment:
-      - POSTGRES_DB=cj_assessment
+      - POSTGRES_DB=huleedu_cj_assessment
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - cj_assessment_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d cj_assessment"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_cj_assessment"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -75,13 +75,13 @@ services:
     ports:
       - "5435:5432"
     environment:
-      - POSTGRES_DB=huledu_class_management
+      - POSTGRES_DB=huleedu_class_management
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - class_management_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huledu_class_management"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_class_management"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -97,13 +97,13 @@ services:
     ports:
       - "5439:5432"
     environment:
-      - POSTGRES_DB=file_service_db
+      - POSTGRES_DB=huleedu_file_service
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - file_service_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d file_service_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_file_service"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -179,14 +179,14 @@ services:
     ports:
       - "5437:5432"
     environment:
-      - POSTGRES_DB=spellchecker
+      - POSTGRES_DB=huleedu_spellchecker
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - spellchecker_db_data:/var/lib/postgresql/data
       - ./services/spellchecker_service/docker/init_pg.sql:/docker-entrypoint-initdb.d/00_pg_trgm.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d spellchecker"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_spellchecker"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -202,13 +202,13 @@ services:
     ports:
       - "5436:5432"
     environment:
-      - POSTGRES_DB=result_aggregator
+      - POSTGRES_DB=huleedu_result_aggregator
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - result_aggregator_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d result_aggregator"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_result_aggregator"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -224,13 +224,13 @@ services:
     ports:
       - "5440:5432"
     environment:
-      - POSTGRES_DB=nlp_service
+      - POSTGRES_DB=huleedu_nlp
       - POSTGRES_USER=${HULEEDU_DB_USER}
       - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
     volumes:
       - nlp_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d nlp_service"]
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_nlp"]
       interval: 10s
       timeout: 5s
       retries: 5

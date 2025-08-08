@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Database Configuration
     DB_HOST: str = "nlp_db"
     DB_PORT: int = 5432
-    DB_NAME: str = "nlp_service"
+    DB_NAME: str = "huleedu_nlp"
 
     # Kafka Configuration
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"

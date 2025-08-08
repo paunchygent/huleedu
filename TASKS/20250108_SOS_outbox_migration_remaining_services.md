@@ -75,9 +75,9 @@
 ### Database Names and Ports (FROM RULE 085):
 | Service | Container Name | Database Name | Port |
 |---------|---------------|---------------|------|
-| `class_management_service` | `huleedu_class_management_db` | `huledu_class_management` | 5435 |
-| `essay_lifecycle_service` | `huleedu_essay_lifecycle_db` | `huledu_essay_lifecycle` | 5433 |
-| `nlp_service` | `huleedu_nlp_db` | `huledu_nlp` | 5439 |
+| `class_management_service` | `huleedu_class_management_db` | `huleedu_class_management` | 5435 |
+| `essay_lifecycle_service` | `huleedu_essay_lifecycle_db` | `huleedu_essay_lifecycle` | 5433 |
+| `nlp_service` | `huleedu_nlp_db` | `huleedu_nlp` | 5440 |
 
 ### Migration Standards (RULE 085 - MANDATORY):
 1. **Pre-Migration Analysis**: ALWAYS check current state first
@@ -192,21 +192,21 @@ pdm run pytest services/{service_name}/tests/ -x
 ```bash
 cd services/class_management_service
 ../../.venv/bin/alembic current
-docker exec huleedu_class_management_db psql -U huleedu_user -d huledu_class_management -c "\d event_outbox"
+docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_management -c "\d event_outbox"
 ```
 
 **For essay_lifecycle_service:**
 ```bash
 cd services/essay_lifecycle_service
 ../../.venv/bin/alembic current
-docker exec huleedu_essay_lifecycle_db psql -U huleedu_user -d huledu_essay_lifecycle -c "\d event_outbox"
+docker exec huleedu_essay_lifecycle_db psql -U huleedu_user -d huleedu_essay_lifecycle -c "\d event_outbox"
 ```
 
 **For nlp_service:**
 ```bash
 cd services/nlp_service
 ../../.venv/bin/alembic current
-docker exec huleedu_nlp_db psql -U huleedu_user -d huledu_nlp -c "\d event_outbox"
+docker exec huleedu_nlp_db psql -U huleedu_user -d huleedu_nlp -c "\d event_outbox"
 ```
 
 ## ULTRATHINK: SUCCESS CRITERIA

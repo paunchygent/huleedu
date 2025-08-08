@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     DB_HOST: str = Field(default="localhost", validation_alias="BATCH_ORCHESTRATOR_DB_HOST")
     DB_PORT: int = Field(default=5438, validation_alias="BATCH_ORCHESTRATOR_DB_PORT")
     DB_NAME: str = Field(
-        default="batch_orchestrator",
+        default="huleedu_batch_orchestrator",
         validation_alias="BATCH_ORCHESTRATOR_DB_NAME",
     )
     DB_POOL_SIZE: int = 5

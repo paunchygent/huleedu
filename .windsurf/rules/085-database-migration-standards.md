@@ -57,12 +57,14 @@ docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table
 **Database Name Mapping:**
 | Service | Container Name | Database Name | Port |
 |---------|---------------|---------------|------|
-| `cj_assessment_service` | `huleedu_cj_assessment_db` | `huledu_cj_assessment` | 5434 |
-| `class_management_service` | `huleedu_class_management_db` | `huledu_class_management` | 5435 |
-| `essay_lifecycle_service` | `huleedu_essay_lifecycle_db` | `huledu_essay_lifecycle` | 5433 |
-| `batch_orchestrator_service` | `huleedu_batch_orchestrator_db` | `huledu_batch_orchestrator` | 5438 |
-| `result_aggregator_service` | `huleedu_result_aggregator_db` | `huledu_result_aggregator` | 5436 |
-| `spellchecker_service` | `huleedu_spellchecker_db` | `huledu_spellchecker` | 5437 |
+| `cj_assessment_service` | `huleedu_cj_assessment_db` | `huleedu_cj_assessment` | 5434 |
+| `class_management_service` | `huleedu_class_management_db` | `huleedu_class_management` | 5435 |
+| `essay_lifecycle_service` | `huleedu_essay_lifecycle_db` | `huleedu_essay_lifecycle` | 5433 |
+| `batch_orchestrator_service` | `huleedu_batch_orchestrator_db` | `huleedu_batch_orchestrator` | 5438 |
+| `result_aggregator_service` | `huleedu_result_aggregator_db` | `huleedu_result_aggregator` | 5436 |
+| `spellchecker_service` | `huleedu_spellchecker_db` | `huleedu_spellchecker` | 5437 |
+| `file_service` | `huleedu_file_service_db` | `huleedu_file_service` | 5439 |
+| `nlp_service` | `huleedu_nlp_db` | `huleedu_nlp` | 5440 |
 
 ## 6. Secure Configuration Pattern (MANDATORY)
 

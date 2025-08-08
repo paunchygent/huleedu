@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # PostgreSQL Configuration (production)
     DATABASE_HOST: str = Field(default="essay_lifecycle_db", alias="ELS_DB_HOST")
     DATABASE_PORT: int = Field(default=5432, alias="ELS_DB_PORT")
-    DATABASE_NAME: str = Field(default="essay_lifecycle", alias="ELS_DB_NAME")
+    DATABASE_NAME: str = Field(default="huleedu_essay_lifecycle", alias="ELS_DB_NAME")
 
     # PostgreSQL Connection Pool Settings
     DATABASE_POOL_SIZE: int = 20

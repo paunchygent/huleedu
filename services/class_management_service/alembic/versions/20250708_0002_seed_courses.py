@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0002"
@@ -21,13 +22,21 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Seed courses table with predefined CourseCode enum values."""
+    # Define enum types to match database schema
+    course_code_enum = postgresql.ENUM(
+        "ENG5", "ENG6", "ENG7", "SV1", "SV2", "SV3", name="course_code_enum", create_type=False
+    )
+    language_enum = postgresql.ENUM(
+        "en", "sv", name="language_enum", create_type=False
+    )
+    
     # Create courses table reference for bulk insert
     courses_table = sa.table(
         "courses",
-        sa.column("id", sa.String),
-        sa.column("course_code", sa.String),
+        sa.column("id", postgresql.UUID(as_uuid=True)),
+        sa.column("course_code", course_code_enum),
         sa.column("name", sa.String),
-        sa.column("language", sa.String),
+        sa.column("language", language_enum),
         sa.column("skill_level", sa.Integer),
     )
 
@@ -45,7 +54,7 @@ def upgrade() -> None:
     for course_code, name, language, skill_level in course_data:
         op.execute(
             courses_table.insert().values(
-                id=str(uuid.uuid4()),
+                id=uuid.uuid4(),
                 course_code=course_code,
                 name=name,
                 language=language,

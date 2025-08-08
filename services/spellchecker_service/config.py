@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # Database configuration
     DB_HOST: str = "spellchecker_db"
     DB_PORT: int = 5432
-    DB_NAME: str = "spellchecker"
+    DB_NAME: str = "huleedu_spellchecker"
 
     # Redis configuration for idempotency
     REDIS_URL: str = "redis://redis:6379"

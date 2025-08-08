@@ -61,7 +61,7 @@ def get_url() -> str:
             )
 
         # File Service specific database
-        db_name = "file_service_db"
+        db_name = "huleedu_file_service"
         db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
         db_port = os.getenv("HULEEDU_DB_PORT", "5439")  # File Service specific port
 
