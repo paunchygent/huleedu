@@ -425,7 +425,7 @@ class AnchorEssayReference(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     grade: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
-    content_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    text_storage_id: Mapped[str] = mapped_column(String(255), nullable=False)
     assignment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -450,5 +450,11 @@ class GradeProjection(Base):
     confidence_label: Mapped[str] = mapped_column(String(10), nullable=False)
     calculation_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    # Model tracking fields
+    assessment_method: Mapped[str] = mapped_column(String(50), nullable=False, server_default="cj_assessment")
+    model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    normalized_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     __table_args__ = (Index("idx_batch_grade", "cj_batch_id", "primary_grade"),)

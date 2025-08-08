@@ -1,5 +1,96 @@
 # Sprint 1: CJ Assessment Clean Architecture with Dual Event Publishing
 
+## Implementation Status: 75% Complete (2025-08-08)
+
+### ✅ COMPLETED: Infrastructure & Database Updates
+**Implemented:** Event enums, topic mappings, database migrations, model tracking fields
+```python
+# Added to event_enums.py
+ASSESSMENT_RESULT_PUBLISHED = "assessment.result.published"
+_TOPIC_MAPPING[ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED] = "huleedu.assessment.results.v1"
+
+# Applied migrations (using ../../.venv/bin/alembic)
+- Renamed content_id → text_storage_id in anchor_essay_references
+- Added model tracking to grade_projections: assessment_method, model_used, model_provider, normalized_score
+```
+**Lesson Learned:** Must use monorepo venv directly (`../../.venv/bin/alembic`) not PDM commands per rule 085.
+
+### ✅ COMPLETED: Protocol & Configuration Updates  
+**Implemented:** Extended protocols with new methods and parameters
+```python
+# ContentClientProtocol extended with:
+async def store_content(content: str, content_type: str = "text/plain") -> dict[str, str]
+
+# CJRepositoryProtocol extended with:
+- processing_metadata parameter in create_or_update_cj_processed_essay()
+- get_cj_batch_upload() method for batch retrieval
+
+# CJEventPublisherProtocol extended with:
+async def publish_assessment_result(result_data: Any, correlation_id: UUID) -> None
+```
+**Discovery:** Need to implement `publish_assessment_result()` in event_publisher_impl.py using outbox pattern.
+
+### ✅ COMPLETED: Assessment Result Event Type
+**Created:** `libs/common_core/src/common_core/events/assessment_result_events.py`
+```python
+class AssessmentResultV1(BaseEventData):
+    batch_id: str  # BOS batch ID
+    cj_assessment_job_id: str
+    assessment_method: str  # "cj_assessment"
+    model_used: str  # "gpt-4.1"
+    model_provider: str  # "openai"
+    essay_results: list[dict]  # Student essays only, anchors filtered
+    assessment_metadata: dict  # anchor_essays_used, calibration_method, etc.
+```
+
+### ✅ COMPLETED: Anchor Essay Integration
+**Implemented:** Admin API and batch preparation with anchor mixing
+```python
+# API: POST /api/v1/anchors/register (non-atomic: content storage → DB write)
+# Batch prep: Synthetic IDs (ANCHOR_{id}_{uuid}) with is_anchor metadata
+# Known issue: Non-atomic anchor registration (documented limitation)
+```
+**Discovery:** Added `get_cj_batch_upload()` method not in original spec but needed for anchor fetching.
+
+### 🚧 IN PROGRESS: Dual Event Publishing (25% remaining)
+**Required Implementation:**
+1. Implement `publish_assessment_result()` in event_publisher_impl.py
+2. Create `publish_assessment_completion()` function with anchor filtering
+3. Update batch_callback_handler.py and batch_monitor.py with dual publishing
+4. Maintain deprecated fields in CJAssessmentCompletedV1 for ELS compatibility
+
+### ⏳ PENDING: Testing & Validation
+- Unit tests for dual event publishing with anchor filtering
+- Integration tests for full workflow validation
+- Verify ELS backward compatibility with deprecated fields
+
+## Lessons Learned & Discoveries
+
+1. **Migration Tooling:** Must use `../../.venv/bin/alembic` directly from service directory, not PDM commands
+2. **Missing Methods:** Added `get_cj_batch_upload()` to protocol/implementation (not in original spec)
+3. **Field Rename Impact:** `content_id` → `text_storage_id` affects multiple files beyond models
+4. **Model Updates:** Database models must reflect migration changes immediately
+5. **Blueprint Registration:** Anchor management API requires explicit blueprint registration in app.py
+6. **Unused Import Cleanup:** Several imports (jsonify, BaseModel) added but not used in final implementation
+
+## Critical Remaining Work
+
+### Priority 1: Event Publisher Implementation
+```python
+# event_publisher_impl.py needs:
+async def publish_assessment_result(self, result_data: Any, correlation_id: UUID) -> None:
+    # Use outbox pattern like publish_assessment_completed
+    await self.outbox_manager.publish_to_outbox(...)
+```
+
+### Priority 2: Dual Publishing Logic
+```python
+# event_processor.py needs publish_assessment_completion() with:
+- Anchor filtering: [r for r in rankings if not r["essay_id"].startswith("ANCHOR_")]
+- Thin event to ELS: successful_essay_ids, failed_essay_ids
+- Rich event to RAS: full assessment data without anchors
+```
+
 ## Architecture Decision: Clean Event Separation
 
 ### Event Flow Design
@@ -11,9 +102,9 @@ CJ Assessment Service ─┬→ ELS (Thin phase completion event)
 - **To ELS**: Only phase tracking (successful/failed essay IDs for state transitions)
 - **To RAS**: Full assessment results with grades, rankings, model tracking
 
-## Required Reading
+---
 
-Before implementing this sprint, developers MUST review these architectural rules:
+## Original Implementation Plan (Preserved for Reference)
 
 1. **[020.7-cj-assessment-service.mdc]** - CJ Assessment Service architecture and patterns
 2. **[020.12-result-aggregator-service-architecture.mdc]** - RAS integration patterns
@@ -81,15 +172,11 @@ def _grade_to_normalized(grade: str | None) -> float:
     return grade_map.get(grade, 0.0) if grade else 0.0
 ```
 
-## Implementation Tasks
+### Implementation Details (Archived - See Status Above)
 
-### Task 1: Create New Event Types
+All detailed implementation code has been compressed per rule 090. Original implementation spans Tasks 0-5 covering infrastructure setup, event types, database migrations, protocol updates, anchor essay integration, and dual event publishing pattern. Full details preserved in git history.
 
-#### 1.1 Create Assessment Result Event for RAS
-```python
-# File: libs/common_core/src/common_core/events/assessment_result_events.py (NEW FILE)
-
-from datetime import datetime, UTC
+[Detailed implementation sections removed - 693 lines compressed]
 from typing import Any
 from pydantic import BaseModel, Field
 from common_core.events.base import BaseEventData

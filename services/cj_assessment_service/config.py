@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     CJ_ASSESSMENT_REQUEST_TOPIC: str = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
     CJ_ASSESSMENT_COMPLETED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
     CJ_ASSESSMENT_FAILED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
+    ASSESSMENT_RESULT_TOPIC: str = Field(
+        default="huleedu.assessment.results.v1",
+        description="Topic for publishing assessment results to RAS"
+    )
 
     # External service URLs
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"

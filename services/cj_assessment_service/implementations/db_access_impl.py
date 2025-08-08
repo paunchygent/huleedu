@@ -122,6 +122,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         els_essay_id: str,
         text_storage_id: str,
         assessment_input_text: str,
+        processing_metadata: dict | None = None,
     ) -> ProcessedEssay:
         """Create or update a processed essay in CJ batch."""
         # Check if essay already exists
@@ -132,6 +133,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             existing_essay.cj_batch_id = cj_batch_id
             existing_essay.text_storage_id = text_storage_id
             existing_essay.assessment_input_text = assessment_input_text
+            existing_essay.processing_metadata = processing_metadata or {}
             await session.flush()
             return existing_essay
         else:
@@ -141,7 +143,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 cj_batch_id=cj_batch_id,
                 text_storage_id=text_storage_id,
                 assessment_input_text=assessment_input_text,
-                processing_metadata={},
+                processing_metadata=processing_metadata or {},
             )
             session.add(essay)
             await session.flush()
@@ -381,6 +383,14 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             return result.scalars().first()
 
         return None
+    
+    async def get_cj_batch_upload(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+    ) -> CJBatchUpload | None:
+        """Get CJ batch upload by ID."""
+        return await session.get(CJBatchUpload, cj_batch_id)
 
     async def get_anchor_essay_references(
         self,

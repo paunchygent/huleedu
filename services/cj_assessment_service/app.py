@@ -27,6 +27,7 @@ from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from services.cj_assessment_service.api import anchor_management
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
@@ -96,6 +97,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
+    app.register_blueprint(anchor_management.bp)
 
     @app.before_serving
     async def startup() -> None:

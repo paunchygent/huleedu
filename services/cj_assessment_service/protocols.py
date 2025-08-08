@@ -35,6 +35,22 @@ class ContentClientProtocol(Protocol):
         """
         ...
 
+    async def store_content(
+        self, 
+        content: str,
+        content_type: str = "text/plain"
+    ) -> dict[str, str]:
+        """Store content in Content Service.
+        
+        Args:
+            content: The text content to store
+            content_type: MIME type of content
+            
+        Returns:
+            Dict with 'content_id' key containing the storage ID
+        """
+        ...
+
 
 class RetryManagerProtocol(Protocol):
     """Protocol for managing LLM API retry logic."""
@@ -110,6 +126,14 @@ class CJRepositoryProtocol(Protocol):
         """Get assessment instruction by assignment or course ID."""
         ...
 
+    async def get_cj_batch_upload(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+    ) -> Any | None:  # CJBatchUpload | None
+        """Get CJ batch upload by ID."""
+        ...
+    
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,
@@ -147,6 +171,7 @@ class CJRepositoryProtocol(Protocol):
         els_essay_id: str,
         text_storage_id: str,
         assessment_input_text: str,
+        processing_metadata: dict | None = None,
     ) -> Any:  # CJ_ProcessedEssay
         """Create or update a processed essay record."""
         ...
@@ -226,6 +251,18 @@ class CJEventPublisherProtocol(Protocol):
         correlation_id: UUID,
     ) -> None:
         """Publish CJ assessment failure event."""
+        ...
+
+    async def publish_assessment_result(
+        self,
+        result_data: Any,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish assessment results to RAS.
+        
+        This is a new method needed for dual event publishing.
+        Implementation should use outbox pattern like publish_assessment_completed.
+        """
         ...
 
 

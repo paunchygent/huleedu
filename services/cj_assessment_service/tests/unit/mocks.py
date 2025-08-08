@@ -273,12 +273,14 @@ class MockDatabase(CJRepositoryProtocol):
         els_essay_id: str,
         text_storage_id: str,
         assessment_input_text: str,
+        processing_metadata: dict | None = None,
     ) -> Any:
         """Create or update a processed essay record."""
         essay_data = {
             "els_essay_id": els_essay_id,
             "text_storage_id": text_storage_id,
             "assessment_input_text": assessment_input_text,
+            "processing_metadata": processing_metadata or {},
         }
         self.essays.setdefault(cj_batch_id, []).append(essay_data)
 
@@ -359,6 +361,21 @@ class MockDatabase(CJRepositoryProtocol):
         # Mock implementation - return None for tests
         return None
 
+    async def get_cj_batch_upload(
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+    ) -> Any | None:
+        """Get CJ batch upload by ID."""
+        # Return a mock batch upload with assignment_id
+        if cj_batch_id in self.batches:
+            class MockBatchUpload:
+                def __init__(self, batch_id: int):
+                    self.id = batch_id
+                    self.assignment_id = "test-assignment-123"  # Default for testing
+            return MockBatchUpload(cj_batch_id)
+        return None
+    
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,

@@ -4,7 +4,7 @@ import json
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import AsyncGenerator, Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -269,17 +269,22 @@ class TestErrorHandlingIntegration:
         # Create Kafka message
         kafka_msg = self._create_kafka_message(callback, request_id)
 
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         # Act - Process same callback twice to test idempotency
         result1 = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
         result2 = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 
@@ -371,6 +376,9 @@ class TestErrorHandlingIntegration:
             await session.commit()
 
         # Test scenario: Process 10 callbacks, 5 success and 5 failures
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         # Create success callbacks (first 5)
         success_results = []
         for i in range(5):
@@ -385,6 +393,7 @@ class TestErrorHandlingIntegration:
                 kafka_msg,
                 postgres_repository,
                 mock_event_publisher,
+                mock_content_client,
                 test_settings,
             )
             success_results.append(result)
