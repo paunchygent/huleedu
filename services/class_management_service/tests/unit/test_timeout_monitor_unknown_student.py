@@ -107,10 +107,16 @@ class TestTimeoutMonitorUnknownStudent:
         mock_session.add.assert_called_once()
         created_student = mock_session.add.call_args[0][0]
 
+        # Verify system identity attributes
         assert created_student.first_name == "UNKNOWN"
         assert created_student.last_name == "STUDENT"
-        assert created_student.email == "unknown@huleedu.system"
         assert created_student.created_by_user_id == "SYSTEM_TIMEOUT"
+        
+        # Verify email follows system unknown student pattern
+        # Email must be unique per class to satisfy database constraints
+        assert created_student.email.startswith("unknown."), "Email should identify as system unknown student"
+        assert created_student.email.endswith("@huleedu.system"), "Email should use system domain"
+        assert str(class_id) in created_student.email, "Email should include class ID for uniqueness"
 
     @pytest.mark.asyncio
     async def test_unknown_student_reuse(

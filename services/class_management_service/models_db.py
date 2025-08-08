@@ -193,6 +193,13 @@ class EventOutbox(Base):
         nullable=True,
     )
 
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
+    )
+
     # Publishing state
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -218,12 +225,18 @@ class EventOutbox(Base):
 
     # Indexes for performance
     __table_args__ = (
-        # Index for polling unpublished events efficiently
+        # Index for polling unpublished events efficiently with topic filtering
         Index(
-            "ix_event_outbox_unpublished",
+            "ix_event_outbox_unpublished_topic",
             "published_at",
+            "topic",
             "created_at",
             postgresql_where="published_at IS NULL",
+        ),
+        # Index for filtering by topic
+        Index(
+            "ix_event_outbox_topic",
+            "topic",
         ),
         # Index for looking up events by aggregate
         Index(
