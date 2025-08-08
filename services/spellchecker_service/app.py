@@ -20,6 +20,7 @@ from huleedu_service_libs.logging_utils import (
     create_service_logger,
 )
 from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+from huleedu_service_libs.outbox import EventRelayWorker
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -75,6 +76,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     # Optional service-specific attributes (preserve existing patterns)
     app.consumer_task = None
     app.kafka_consumer = None
+    app.relay_worker = None
+    app.relay_worker_task = None
 
     # Setup dependency injection
     QuartDishka(app=app, container=app.container)
@@ -92,18 +95,25 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             # Setup metrics middleware (per Rule 020.4.4)
             setup_standard_service_metrics_middleware(app, "spell_checker")
 
-            # Get Kafka consumer from DI container and start it
+            # Get Kafka consumer and relay worker from DI container and start them
             async with app.container() as request_container:
                 app.kafka_consumer = await request_container.get(SpellCheckerKafkaConsumer)
+                app.relay_worker = await request_container.get(EventRelayWorker)
 
             # Start consumer as background task
             assert app.kafka_consumer is not None, "Kafka consumer must be initialized"
             app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
+            
+            # Start relay worker as background task
+            assert app.relay_worker is not None, "Relay worker must be initialized"
+            await app.relay_worker.start()
+            logger.info("EventRelayWorker started for outbox pattern")
 
             logger.info("Spell Checker Service started successfully")
             logger.info("Health endpoint: /healthz")
             logger.info("Metrics endpoint: /metrics")
             logger.info("Kafka consumer: running")
+            logger.info("Outbox relay worker: running")
 
         except Exception as e:
             logger.critical(f"Failed to start Spell Checker Service: {e}", exc_info=True)
@@ -113,6 +123,11 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     async def cleanup() -> None:
         """Application cleanup tasks including Kafka consumer shutdown."""
         try:
+            # Stop relay worker first
+            if app.relay_worker:
+                logger.info("Stopping EventRelayWorker...")
+                await app.relay_worker.stop()
+            
             # Stop Kafka consumer
             if app.kafka_consumer:
                 logger.info("Stopping Kafka consumer...")

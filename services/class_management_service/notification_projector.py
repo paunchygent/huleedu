@@ -79,7 +79,7 @@ class NotificationProjector:
             return
 
         notification = TeacherNotificationRequestedV1(
-            teacher_id=class_entity.user_id,
+            teacher_id=class_entity.created_by_user_id,
             notification_type="student_added_to_class",
             category=WebSocketEventCategory.CLASS_MANAGEMENT,
             priority=NotificationPriority.LOW,
@@ -87,10 +87,10 @@ class NotificationProjector:
                 "student_id": event.student_id,
                 "student_name": f"{event.first_name} {event.last_name}",
                 "class_id": str(class_id),
-                "class_designation": class_entity.class_designation,
+                "class_designation": class_entity.name,
                 "message": (
                     f"Student '{event.first_name} {event.last_name}' "
-                    f"added to class '{class_entity.class_designation}'"
+                    f"added to class '{class_entity.name}'"
                 ),
             },
             action_required=False,
@@ -154,7 +154,7 @@ class NotificationProjector:
             return
 
         notification = TeacherNotificationRequestedV1(
-            teacher_id=class_entity.user_id,
+            teacher_id=class_entity.created_by_user_id,
             notification_type="student_associations_confirmed",
             category=WebSocketEventCategory.STUDENT_WORKFLOW,
             priority=NotificationPriority.HIGH,

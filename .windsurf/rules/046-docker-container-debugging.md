@@ -1,0 +1,60 @@
+---
+description: Systematic approach for debugging HuleEdu Docker containers and services
+globs: 
+alwaysApply: false
+---
+# 046: Docker Container Debugging Protocol
+
+## Container Discovery (ALWAYS FIRST)
+```bash
+# 1. Find ALL containers (services + databases)
+docker ps | grep huleedu
+
+# 2. Service patterns:
+# - Combined: {service}_service (spellchecker, cj_assessment, batch_orchestrator)  
+# - Split: {service}_api + {service}_worker (essay_lifecycle)
+# - Database: huleedu_{service}_db
+```
+
+## Service Logs Access
+```bash
+# Check container exists FIRST
+docker ps | grep <service_pattern>
+
+# Then access logs
+docker logs huleedu_<container_name> --tail 50
+docker logs huleedu_<container_name> 2>&1 | grep -E "error|failed|exception"
+docker logs huleedu_<container_name> 2>&1 | grep "<correlation_id>"
+```
+
+## Database Access Pattern
+```bash
+# Database container: huleedu_{service}_db
+# Database name: huleedu_{service}
+# User: huleedu_user
+
+docker exec huleedu_{service}_db psql -U huleedu_user -d huleedu_{service} -c "SQL"
+
+# Examples:
+docker exec huleedu_spellchecker_db psql -U huleedu_user -d huleedu_spellchecker -c "\dt"
+docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment -c "SELECT * FROM event_outbox"
+```
+
+## Service Container Mapping
+| Service | Container(s) | Database |
+|---------|-------------|----------|
+| batch_orchestrator | huleedu_batch_orchestrator_service | huleedu_batch_orchestrator_db |
+| essay_lifecycle | huleedu_essay_lifecycle_api, huleedu_essay_lifecycle_worker | huleedu_essay_lifecycle_db |
+| spellchecker | huleedu_spellchecker_service | huleedu_spellchecker_db |
+| cj_assessment | huleedu_cj_assessment_service | huleedu_cj_assessment_db |
+| class_management | huleedu_class_management_service | huleedu_class_management_db |
+| file_service | huleedu_file_service | huleedu_file_service_db |
+| content_service | huleedu_content_service | huleedu_content_db |
+| result_aggregator | huleedu_result_aggregator_service | huleedu_result_aggregator_db |
+
+## Debug Workflow
+1. **ALWAYS** use `docker ps | grep huleedu` first
+2. **VERIFY** container name before accessing logs
+3. **CHECK** service architecture (combined vs split)
+4. **USE** correlation IDs to trace across services
+5. **ACCESS** databases with standard pattern above

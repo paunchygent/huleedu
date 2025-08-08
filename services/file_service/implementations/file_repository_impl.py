@@ -8,7 +8,7 @@ with user attribution, enabling audit trails and notification support.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, AsyncGenerator
 from uuid import UUID
 
@@ -88,7 +88,7 @@ class FileRepository(FileRepositoryProtocol):
                 file_size_bytes=file_size_bytes,
                 correlation_id=correlation_id,
                 processing_status=ProcessingStatus.PENDING.value,
-                upload_timestamp=datetime.now(UTC),
+                upload_timestamp=datetime.now(),
             )
             session.add(file_upload)
 
@@ -165,7 +165,7 @@ class FileRepository(FileRepositoryProtocol):
                 .where(FileUpload.file_upload_id == file_upload_id)
                 .values(
                     processing_status=status.value,
-                    processed_timestamp=datetime.now(UTC),
+                    processed_timestamp=datetime.now(),
                     raw_file_storage_id=raw_file_storage_id or FileUpload.raw_file_storage_id,
                     text_storage_id=text_storage_id or FileUpload.text_storage_id,
                     validation_error_code=validation_error_code or FileUpload.validation_error_code,

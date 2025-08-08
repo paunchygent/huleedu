@@ -161,6 +161,11 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 ### Docker Development
 
 ```markdown
+# Always use docker ps | grep huleedu first to find container name
+
+# Then access logs: read .cursor/rules/046-docker-container-debugging.mdc to properly debug containers.
+
+```markdown
 - **Rebuild**: `docker compose build --no-cache <service>`
 - **Start**: `docker compose up -d`
 - **Logs**: `docker compose logs -f <service>`
