@@ -186,7 +186,7 @@ async def _fetch_and_add_anchors(
     correlation_id: UUID,
 ) -> list[EssayForComparison]:
     """Fetch anchor essays and add to comparison pool."""
-    anchors = []
+    anchors: list[EssayForComparison] = []
     
     # Ensure assignment_id is not None (checked by caller)
     if not batch_upload.assignment_id:

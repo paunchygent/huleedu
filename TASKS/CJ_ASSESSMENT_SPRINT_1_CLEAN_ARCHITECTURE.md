@@ -1,6 +1,6 @@
 # Sprint 1: CJ Assessment Clean Architecture with Dual Event Publishing
 
-## Implementation Status: 75% Complete (2025-08-08)
+## Implementation Status: 95% Complete (2025-08-08)
 
 ### ✅ COMPLETED: Infrastructure & Database Updates
 **Implemented:** Event enums, topic mappings, database migrations, model tracking fields
@@ -52,17 +52,25 @@ class AssessmentResultV1(BaseEventData):
 ```
 **Discovery:** Added `get_cj_batch_upload()` method not in original spec but needed for anchor fetching.
 
-### 🚧 IN PROGRESS: Dual Event Publishing (25% remaining)
-**Required Implementation:**
-1. Implement `publish_assessment_result()` in event_publisher_impl.py
-2. Create `publish_assessment_completion()` function with anchor filtering
-3. Update batch_callback_handler.py and batch_monitor.py with dual publishing
-4. Maintain deprecated fields in CJAssessmentCompletedV1 for ELS compatibility
+### ✅ COMPLETED: Dual Event Publishing
+**Implemented:** Full dual event publishing pattern across all completion paths
+```python
+# Three locations updated with dual publishing:
+1. event_processor.py - publish_assessment_completion() function
+2. batch_callback_handler.py - _trigger_batch_scoring_completion() 
+3. batch_monitor.py - _trigger_scoring() for stuck batches
+
+# Event Pattern:
+- THIN to ELS: Student rankings only (anchors filtered), maintains backward compatibility
+- RICH to RAS: Full rankings INCLUDING anchors with is_anchor flag for score band visualization
+```
+
+**Key Design Decision:** Anchors are included in RAS events but marked with `is_anchor: true` and `display_name: "ANCHOR GRADE X"` to enable score band visualization. RAS can decide how to present anchors rather than having this decision made at the CJ Assessment level.
 
 ### ⏳ PENDING: Testing & Validation
-- Unit tests for dual event publishing with anchor filtering
-- Integration tests for full workflow validation
-- Verify ELS backward compatibility with deprecated fields
+- Unit tests for dual event publishing with anchor marking
+- Integration tests for full workflow validation  
+- Verify ELS backward compatibility with filtered rankings
 
 ## Lessons Learned & Discoveries
 
@@ -73,23 +81,13 @@ class AssessmentResultV1(BaseEventData):
 5. **Blueprint Registration:** Anchor management API requires explicit blueprint registration in app.py
 6. **Unused Import Cleanup:** Several imports (jsonify, BaseModel) added but not used in final implementation
 
-## Critical Remaining Work
+## Final Implementation Summary
 
-### Priority 1: Event Publisher Implementation
-```python
-# event_publisher_impl.py needs:
-async def publish_assessment_result(self, result_data: Any, correlation_id: UUID) -> None:
-    # Use outbox pattern like publish_assessment_completed
-    await self.outbox_manager.publish_to_outbox(...)
-```
-
-### Priority 2: Dual Publishing Logic
-```python
-# event_processor.py needs publish_assessment_completion() with:
-- Anchor filtering: [r for r in rankings if not r["essay_id"].startswith("ANCHOR_")]
-- Thin event to ELS: successful_essay_ids, failed_essay_ids
-- Rich event to RAS: full assessment data without anchors
-```
+### Dual Event Publishing Pattern
+- **ELS Event:** Thin event with student rankings only (anchors filtered out)
+- **RAS Event:** Rich event with ALL rankings including marked anchors for score bands
+- **Anchor Marking:** Each essay in RAS event has `is_anchor` flag and optional `display_name`
+- **Metadata Enhancement:** Added `anchor_grade_distribution` to show grade distribution of anchors
 
 ## Architecture Decision: Clean Event Separation
 

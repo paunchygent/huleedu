@@ -987,3 +987,79 @@ async def test_end_to_end_grade_projection():
 **Document Status**: READY FOR IMPLEMENTATION  
 **Development Mode**: PURE - NO LEGACY SUPPORT  
 **Implementation Approach**: DIRECT - NO FLAGS
+
+## ELS Event Publishing: Refactor for Future Sprint
+
+Implementation Recommendation
+
+  async def publish_assessment_completion(
+      workflow_result: Any,
+      grade_projections: Any,
+      request_event_data: ELS_CJAssessmentRequestV1,
+      settings: Settings,
+      event_publisher: CJEventPublisherProtocol,
+      correlation_id: UUID,
+      processing_started_at: datetime,
+  ) -> None:
+      """Publish assessment results following 
+  batch-process/individual-notify pattern."""
+
+      # 1. RICH BATCH EVENT TO RAS (includes anchors for score bands)
+      ras_event = create_ras_batch_event(workflow_result,
+  grade_projections)
+      await event_publisher.publish_assessment_result(ras_event,
+  correlation_id)
+
+      # 2. INDIVIDUAL ESSAY EVENTS TO ELS (transactional batch publish)
+      essay_events = []
+      for ranking in student_rankings:  # Anchors excluded
+          essay_event = EssayPhaseCompletedV1(
+              event_name=ProcessingEvent.ESSAY_PHASE_COMPLETED,
+              entity_id=ranking["els_essay_id"],
+              entity_type="essay",
+              parent_id=request_event_data.entity_id,  # Batch ID
+              phase_name="cj_assessment",
+              phase_status="completed",
+              batch_context={
+                  "batch_id": workflow_result.batch_id,
+                  "batch_type": "comparative_judgment",
+                  "pool_size": len(workflow_result.rankings),
+                  "anchor_count": len(anchor_rankings)
+              },
+              result_summary={
+                  "rank": ranking.get("rank"),
+                  "score": ranking.get("score"),
+                  "grade":
+  grade_projections.primary_grades.get(ranking["els_essay_id"])
+              }
+          )
+          essay_events.append(essay_event)
+
+      # Publish all essay events atomically using outbox pattern
+      await event_publisher.publish_essay_batch(essay_events,
+  correlation_id)
+
+  Key Design Decisions
+
+  1. Atomic Batch Publish: All essay events published together
+  (transactionally) to maintain consistency
+  2. Batch Context Included: Each essay event knows it was part of batch
+  processing
+  3. Domain Appropriate: ELS gets essay events, RAS gets assessment batch
+  event
+  4. Outbox Pattern: Both batch and individual events use transactional
+  outbox
+
+  This Solves
+
+  - ✅ ELS doesn't parse rankings
+  - ✅ Natural essay state transitions
+  - ✅ Batch processing reality preserved
+  - ✅ Audit trail maintained
+  - ✅ Failure isolation
+  - ✅ Scalable processing
+
+  This is how companies like Uber (batch driver payments → individual
+  notifications), Netflix (batch recommendations → individual user events),
+   and Amazon (batch order processing → individual item events) handle
+  similar patterns.

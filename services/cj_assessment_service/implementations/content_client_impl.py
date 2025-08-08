@@ -6,7 +6,7 @@ enabling the CJ service to fetch spellchecked essay content from the Content Ser
 
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiohttp
 from huleedu_service_libs.error_handling import (
@@ -139,14 +139,15 @@ class ContentClientImpl(ContentClientProtocol):
             ) as response:
                 if response.status == 200:
                     result = await response.json()
+                    content_id = result.get("content_id", "")
                     logger.debug(
                         "Successfully stored content in Content Service",
                         extra={
-                            "content_id": result.get("content_id"),
+                            "content_id": content_id,
                             "content_length": len(content),
                         },
                     )
-                    return result
+                    return {"content_id": str(content_id)}
                 else:
                     error_text = await response.text()
                     raise_external_service_error(
@@ -154,7 +155,7 @@ class ContentClientImpl(ContentClientProtocol):
                         operation="store_content",
                         external_service="content_service",
                         message=f"Content Service error: HTTP {response.status}",
-                        correlation_id=None,
+                        correlation_id=uuid4(),  # Generate new UUID for error tracking
                         status_code=response.status,
                         error_text=error_text[:500],
                     )

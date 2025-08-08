@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     )
 
 from common_core.event_enums import ProcessingEvent
+from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
@@ -41,6 +42,7 @@ from services.cj_assessment_service.cj_core_logic.grade_projector import (
     GradeProjector,
     calculate_grade_projections,
 )
+from services.cj_assessment_service.cj_core_logic.grade_utils import _grade_to_normalized
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
@@ -343,6 +345,7 @@ async def trigger_existing_workflow_continuation(
                 content_client=content_client,
                 correlation_id=correlation_id,
                 log_extra=log_extra,
+                settings=settings,
             )
 
 
@@ -354,6 +357,7 @@ async def _trigger_batch_scoring_completion(
     content_client: ContentClientProtocol,
     correlation_id: UUID,
     log_extra: dict[str, Any],
+    settings: Settings,
 ) -> None:
     """Trigger Bradley-Terry scoring and completion for a batch.
 
@@ -442,13 +446,18 @@ async def _trigger_batch_scoring_completion(
                 extra={**log_extra, "batch_id": batch_id},
             )
 
-        # Create the event data with primitive parameters
+        # Dual event publishing: thin to ELS, rich to RAS
+        # Separate student essays from anchors
+        student_rankings = [r for r in rankings if not r["els_essay_id"].startswith("ANCHOR_")]
+        anchor_rankings = [r for r in rankings if r["els_essay_id"].startswith("ANCHOR_")]
+        
+        # 1. THIN EVENT TO ELS (filtered rankings without anchors)
         event_data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
             entity_id=batch_upload.bos_batch_id,
             entity_type="batch",
             parent_id=None,
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
+            status=BatchStatus.COMPLETED_SUCCESSFULLY if student_rankings else BatchStatus.FAILED_CRITICALLY,
             system_metadata=SystemProcessingMetadata(
                 entity_id=batch_upload.bos_batch_id,
                 entity_type="batch",
@@ -460,7 +469,7 @@ async def _trigger_batch_scoring_completion(
                 event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
             ),
             cj_assessment_job_id=str(batch_id),
-            rankings=rankings,
+            rankings=student_rankings,  # Filtered rankings (no anchors)
             grade_projections_summary=grade_projections,
         )
 
@@ -473,9 +482,65 @@ async def _trigger_batch_scoring_completion(
             data=event_data,
         )
 
-        # Publish completion event
+        # Publish thin event to ELS
         await event_publisher.publish_assessment_completed(
             completion_data=completion_envelope,
+            correlation_id=correlation_id,
+        )
+        
+        # 2. RICH EVENT TO RAS (Full assessment results INCLUDING anchors for score bands)
+        essay_results = []
+        for ranking in rankings:  # Include ALL rankings (students + anchors)
+            essay_id = ranking["els_essay_id"]
+            is_anchor = essay_id.startswith("ANCHOR_")
+            grade = grade_projections.primary_grades.get(essay_id, "U")
+            
+            essay_results.append({
+                "essay_id": essay_id,
+                "normalized_score": _grade_to_normalized(grade),
+                "letter_grade": grade,
+                "confidence_score": grade_projections.confidence_scores.get(essay_id, 0.0),
+                "confidence_label": grade_projections.confidence_labels.get(essay_id, "LOW"),
+                "bt_score": ranking.get("score", 0.0),
+                "rank": ranking.get("rank", 999),
+                "is_anchor": is_anchor,
+                # Display name for anchors to help with score band visualization
+                "display_name": f"ANCHOR GRADE {grade}" if is_anchor else None,
+            })
+        
+        ras_event = AssessmentResultV1(
+            event_name=ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED,
+            entity_id=batch_upload.bos_batch_id,
+            entity_type="batch",
+            batch_id=batch_upload.bos_batch_id,
+            cj_assessment_job_id=str(batch_id),
+            assessment_method="cj_assessment",
+            model_used=settings.DEFAULT_LLM_MODEL,
+            model_provider=settings.DEFAULT_LLM_PROVIDER.value,
+            model_version=getattr(settings, "DEFAULT_LLM_MODEL_VERSION", None),
+            essay_results=essay_results,
+            assessment_metadata={
+                "anchor_essays_used": len(anchor_rankings),
+                "calibration_method": "anchor" if anchor_rankings else "default",
+                "processing_duration_seconds": (datetime.now(UTC) - batch_upload.created_at).total_seconds(),
+                "llm_temperature": settings.DEFAULT_LLM_TEMPERATURE,
+                "assignment_id": batch_upload.assignment_id if hasattr(batch_upload, 'assignment_id') else None,
+                "course_code": batch_upload.course_code if hasattr(batch_upload, 'course_code') else '',
+            },
+            assessed_at=datetime.now(UTC),
+        )
+        
+        ras_envelope = EventEnvelope[AssessmentResultV1](
+            event_type=settings.ASSESSMENT_RESULT_TOPIC,
+            event_timestamp=datetime.now(UTC),
+            source_service="cj_assessment_service",
+            correlation_id=correlation_id,
+            data=ras_event,
+        )
+        
+        # Publish rich event to RAS
+        await event_publisher.publish_assessment_result(
+            result_data=ras_envelope,
             correlation_id=correlation_id,
         )
 

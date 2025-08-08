@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from aiokafka import ConsumerRecord
 from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent
+from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
@@ -38,6 +39,7 @@ from services.cj_assessment_service.cj_core_logic.grade_projector import (
     GradeProjector,
     calculate_grade_projections,
 )
+from services.cj_assessment_service.cj_core_logic.grade_utils import _grade_to_normalized
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.protocols import (
@@ -48,6 +50,155 @@ from services.cj_assessment_service.protocols import (
 )
 
 logger = create_service_logger("event_processor")
+
+
+async def publish_assessment_completion(
+    workflow_result: Any,  # CJAssessmentWorkflowResult
+    grade_projections: Any,  # GradeProjectionSummary
+    request_event_data: ELS_CJAssessmentRequestV1,
+    settings: Settings,
+    event_publisher: CJEventPublisherProtocol,
+    correlation_id: UUID,
+    processing_started_at: datetime,
+) -> None:
+    """Publish dual events: thin to ELS, rich to RAS."""
+    
+    # Separate student essays from anchors using the correct field name
+    student_rankings = [r for r in workflow_result.rankings if not r["els_essay_id"].startswith("ANCHOR_")]
+    anchor_rankings = [r for r in workflow_result.rankings if r["els_essay_id"].startswith("ANCHOR_")]
+    
+    # Determine successful/failed essays (score field contains BT score)
+    successful_essay_ids = [r["els_essay_id"] for r in student_rankings if r.get("score") is not None]
+    failed_essay_ids = [r["els_essay_id"] for r in student_rankings if r.get("score") is None]
+    
+    # 1. THIN EVENT TO ELS (Phase tracking with essay IDs)
+    els_event = CJAssessmentCompletedV1(
+        event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
+        entity_id=request_event_data.entity_id,
+        entity_type=request_event_data.entity_type,
+        parent_id=request_event_data.parent_id,
+        status=BatchStatus.COMPLETED_SUCCESSFULLY if successful_essay_ids else BatchStatus.FAILED_CRITICALLY,
+        system_metadata=SystemProcessingMetadata(
+            entity_id=request_event_data.entity_id,
+            entity_type=request_event_data.entity_type,
+            parent_id=request_event_data.parent_id,
+            timestamp=datetime.now(UTC),
+            processing_stage=ProcessingStage.COMPLETED,
+            event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
+        ),
+        cj_assessment_job_id=workflow_result.batch_id,
+        # Rankings filtered to exclude anchors for ELS processing
+        rankings=student_rankings,  # Contains only student essays
+        grade_projections_summary=grade_projections,
+    )
+    
+    els_envelope = EventEnvelope[CJAssessmentCompletedV1](
+        event_type=settings.CJ_ASSESSMENT_COMPLETED_TOPIC,
+        source_service=settings.SERVICE_NAME,
+        correlation_id=correlation_id,
+        data=els_event,
+        metadata={},
+    )
+    
+    # Add trace context to metadata
+    if els_envelope.metadata is not None:
+        inject_trace_context(els_envelope.metadata)
+    
+    # Publish thin event to ELS using existing method
+    await event_publisher.publish_assessment_completed(
+        completion_data=els_envelope,
+        correlation_id=correlation_id,
+    )
+    
+    logger.info(
+        "Published thin completion event to ELS",
+        extra={
+            "correlation_id": str(correlation_id),
+            "batch_id": workflow_result.batch_id,
+            "successful_essays": len(successful_essay_ids),
+            "failed_essays": len(failed_essay_ids),
+            "anchors_filtered": len(anchor_rankings),
+        },
+    )
+    
+    # 2. RICH EVENT TO RAS (Full assessment results INCLUDING anchors for score bands)
+    essay_results = []
+    for ranking in workflow_result.rankings:  # Include ALL rankings (students + anchors)
+        essay_id = ranking["els_essay_id"]
+        is_anchor = essay_id.startswith("ANCHOR_")
+        grade = grade_projections.primary_grades.get(essay_id, "U")
+        
+        essay_results.append({
+            "essay_id": essay_id,
+            "normalized_score": _grade_to_normalized(grade),
+            "letter_grade": grade,
+            "confidence_score": grade_projections.confidence_scores.get(essay_id, 0.0),
+            "confidence_label": grade_projections.confidence_labels.get(essay_id, "LOW"),
+            "bt_score": ranking.get("score", 0.0),  # "score" field contains BT score
+            "rank": ranking.get("rank", 999),
+            "is_anchor": is_anchor,
+            # Display name for anchors to help with score band visualization
+            "display_name": f"ANCHOR GRADE {grade}" if is_anchor else None,
+        })
+    
+    ras_event = AssessmentResultV1(
+        event_name=ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED,
+        entity_id=request_event_data.entity_id,
+        entity_type="batch",
+        batch_id=str(request_event_data.entity_id),
+        cj_assessment_job_id=workflow_result.batch_id,
+        assessment_method="cj_assessment",
+        model_used=settings.DEFAULT_LLM_MODEL,
+        model_provider=settings.DEFAULT_LLM_PROVIDER.value,
+        model_version=getattr(settings, "DEFAULT_LLM_MODEL_VERSION", None),
+        essay_results=essay_results,
+        assessment_metadata={
+            "anchor_essays_used": len(anchor_rankings),
+            "calibration_method": "anchor" if anchor_rankings else "default",
+            "anchor_grade_distribution": {
+                grade: sum(1 for r in anchor_rankings 
+                          if grade_projections.primary_grades.get(r["els_essay_id"]) == grade)
+                for grade in ["A", "B", "C", "D", "E", "F", "U"]
+            } if anchor_rankings else {},
+            "comparison_count": len(workflow_result.comparisons) 
+                if hasattr(workflow_result, "comparisons") else 0,
+            "processing_duration_seconds": (datetime.now(UTC) - processing_started_at).total_seconds(),
+            "llm_temperature": settings.DEFAULT_LLM_TEMPERATURE,
+            "assignment_id": request_event_data.assignment_id,
+            "course_code": request_event_data.course_code.value 
+                if hasattr(request_event_data.course_code, 'value') 
+                else request_event_data.course_code,
+        },
+        assessed_at=datetime.now(UTC),
+    )
+    
+    ras_envelope = EventEnvelope[AssessmentResultV1](
+        event_type=settings.ASSESSMENT_RESULT_TOPIC,
+        source_service=settings.SERVICE_NAME,
+        correlation_id=correlation_id,
+        data=ras_event,
+        metadata={},
+    )
+    
+    # Add trace context to metadata
+    if ras_envelope.metadata is not None:
+        inject_trace_context(ras_envelope.metadata)
+    
+    # Publish rich event to RAS using new method
+    await event_publisher.publish_assessment_result(
+        result_data=ras_envelope,
+        correlation_id=correlation_id,
+    )
+    
+    logger.info(
+        f"Published dual events: ELS (thin) and RAS (rich) for batch {workflow_result.batch_id}",
+        extra={
+            "correlation_id": str(correlation_id),
+            "batch_id": workflow_result.batch_id,
+            "essay_results_count": len(essay_results),
+            "anchor_essays_used": len(anchor_rankings),
+        },
+    )
 
 
 async def process_single_message(
@@ -288,59 +439,19 @@ async def _process_cj_assessment_impl(
                 },
             )
 
-        # Construct and publish CJAssessmentCompletedV1 event
-        completed_event_data = CJAssessmentCompletedV1(
-            event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-            entity_id=request_event_data.entity_id,
-            entity_type=request_event_data.entity_type,
-            parent_id=request_event_data.parent_id,
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=SystemProcessingMetadata(  # New metadata for *this* completion event
-                entity_id=request_event_data.entity_id,
-                entity_type=request_event_data.entity_type,
-                parent_id=request_event_data.parent_id,
-                timestamp=datetime.now(UTC),
-                processing_stage=ProcessingStage.COMPLETED,
-                event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
-            ),
-            cj_assessment_job_id=workflow_result.batch_id,
-            rankings=workflow_result.rankings,
-            grade_projections_summary=grade_projections,
-        )
-
-        # The envelope for the outgoing event
-        correlation_uuid = correlation_id
-        completed_envelope = EventEnvelope[CJAssessmentCompletedV1](
-            event_type=settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
-            source_service=settings_obj.SERVICE_NAME,
-            correlation_id=correlation_uuid,
-            data=completed_event_data,
-            metadata={},
-        )
-
-        if completed_envelope.metadata is not None:
-            inject_trace_context(completed_envelope.metadata)
-
-        logger.info(
-            (
-                f"📤 Publishing CJ assessment completion event for batch "
-                f"{converted_request_data['bos_batch_id']}"
-            ),
-            extra={
-                **log_extra,
-                "completion_topic": settings_obj.CJ_ASSESSMENT_COMPLETED_TOPIC,
-                "job_id": workflow_result.batch_id,
-                "rankings_count": len(workflow_result.rankings),
-            },
-        )
-
-        await event_publisher.publish_assessment_completed(
-            completion_data=completed_envelope,
-            correlation_id=completed_envelope.correlation_id,
+        # Use dual event publishing: thin event to ELS, rich event to RAS
+        await publish_assessment_completion(
+            workflow_result=workflow_result,
+            grade_projections=grade_projections,
+            request_event_data=request_event_data,
+            settings=settings_obj,
+            event_publisher=event_publisher,
+            correlation_id=correlation_id,
+            processing_started_at=processing_started_at,
         )
 
         logger.info(
-            "CJ assessment message processed successfully and completion event published.",
+            "CJ assessment message processed successfully and dual events published.",
             extra=log_extra,
         )
         return True

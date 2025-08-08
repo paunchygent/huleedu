@@ -460,6 +460,7 @@ class TestBatchWorkflowIntegration:
                         kafka_msg,
                         postgres_repository,
                         mock_event_publisher,
+                        mock_content_client,
                         test_settings,
                     )
                 )
@@ -592,6 +593,7 @@ class TestBatchWorkflowIntegration:
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 

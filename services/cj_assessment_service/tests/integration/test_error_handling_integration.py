@@ -412,6 +412,7 @@ class TestErrorHandlingIntegration:
                 kafka_msg,
                 postgres_repository,
                 mock_event_publisher,
+                mock_content_client,
                 test_settings,
             )
             error_results.append(result)
