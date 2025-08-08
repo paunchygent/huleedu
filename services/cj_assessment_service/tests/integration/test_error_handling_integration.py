@@ -24,6 +24,7 @@ from services.cj_assessment_service.event_processor import process_llm_result
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
+    ContentClientProtocol,
 )
 
 # CJBatchState import removed - not used in this test file
@@ -174,10 +175,14 @@ class TestErrorHandlingIntegration:
         kafka_msg = self._create_kafka_message(callback, request_id)
 
         # Act - Should handle gracefully without any comparison pairs in database
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 
@@ -467,10 +472,14 @@ class TestErrorHandlingIntegration:
         postgres_repository.session = tracked_session  # type: ignore[method-assign]
 
         # Act - Process malformed message
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 
@@ -520,10 +529,14 @@ class TestErrorHandlingIntegration:
         kafka_msg = self._create_kafka_message(callback, request_id)
 
         # Act - Process callback with database failure
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 
@@ -614,10 +627,14 @@ class TestErrorHandlingIntegration:
         kafka_msg = self._create_kafka_message(callback, request_id)
 
         # Act - Process callback with publishing failure
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
             mock_event_publisher,
+            mock_content_client,
             test_settings,
         )
 

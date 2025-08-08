@@ -12,6 +12,7 @@ from common_core.status_enums import CJBatchStateEnum
 
 from services.cj_assessment_service.batch_monitor import BatchMonitor
 from services.cj_assessment_service.models_db import CJBatchState
+from services.cj_assessment_service.protocols import ContentClientProtocol
 
 if TYPE_CHECKING:
     pass
@@ -45,7 +46,8 @@ def batch_monitor(
     mock_repository: AsyncMock, mock_event_publisher: AsyncMock, mock_settings: MagicMock
 ) -> BatchMonitor:
     """Create a BatchMonitor instance."""
-    return BatchMonitor(mock_repository, mock_event_publisher, mock_settings)
+    mock_content_client = AsyncMock(spec=ContentClientProtocol)
+    return BatchMonitor(mock_repository, mock_event_publisher, mock_content_client, mock_settings)
 
 
 class TestBatchMonitor:

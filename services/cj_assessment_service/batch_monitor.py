@@ -27,6 +27,7 @@ from sqlalchemy.orm import selectinload
 
 from services.cj_assessment_service.cj_core_logic import scoring_ranking
 from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    GradeProjector,
     calculate_grade_projections,
 )
 from services.cj_assessment_service.metrics import get_business_metrics
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.protocols import (
         CJEventPublisherProtocol,
         CJRepositoryProtocol,
+        ContentClientProtocol,
     )
 
 logger = create_service_logger(__name__)
@@ -52,6 +54,7 @@ class BatchMonitor:
         self,
         repository: CJRepositoryProtocol,
         event_publisher: CJEventPublisherProtocol,
+        content_client: ContentClientProtocol,
         settings: Settings,
     ) -> None:
         """Initialize the batch monitor.
@@ -59,10 +62,12 @@ class BatchMonitor:
         Args:
             repository: Database access interface
             event_publisher: Event publishing interface
+            content_client: Content client for fetching anchor essays
             settings: Service configuration
         """
         self._repository = repository
         self._event_publisher = event_publisher
+        self._content_client = content_client
         self._settings = settings
 
         # Configuration
@@ -422,8 +427,27 @@ class BatchMonitor:
             # Get final rankings
             rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
-            # Calculate grade projections (placeholder until Task 4 implementation)
-            grade_projections = calculate_grade_projections(rankings)
+            # Calculate grade projections using async GradeProjector
+            grade_projector = GradeProjector()
+            grade_projections = await grade_projector.calculate_projections(
+                session=session,
+                rankings=rankings,
+                cj_batch_id=batch_id,
+                assignment_id=batch_upload.assignment_id if hasattr(batch_upload, 'assignment_id') else None,
+                course_code=batch_upload.course_code if hasattr(batch_upload, 'course_code') else '',
+                content_client=self._content_client,
+                correlation_id=correlation_id,
+            )
+            
+            # Log if no projections are available (no anchor essays)
+            if not grade_projections.projections_available:
+                logger.info(
+                    "No grade projections available - no anchor essays present",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": correlation_id,
+                    },
+                )
 
             # Create the event data with primitive parameters
             event_data = CJAssessmentCompletedV1(

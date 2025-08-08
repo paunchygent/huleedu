@@ -41,6 +41,7 @@ from services.cj_assessment_service.models_db import (
 )
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
+    ContentClientProtocol,
 )
 
 if TYPE_CHECKING:
@@ -75,7 +76,8 @@ class TestBatchWorkflowIntegration:
         test_settings: Settings,
     ) -> BatchMonitor:
         """Create a batch monitor instance."""
-        return BatchMonitor(postgres_repository, mock_event_publisher, test_settings)
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        return BatchMonitor(postgres_repository, mock_event_publisher, mock_content_client, test_settings)
 
     def _create_assessment_request(
         self,

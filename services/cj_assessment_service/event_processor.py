@@ -35,6 +35,7 @@ from huleedu_service_libs.observability import (
 
 from services.cj_assessment_service.cj_core_logic import run_cj_assessment_workflow
 from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    GradeProjector,
     calculate_grade_projections,
 )
 from services.cj_assessment_service.config import Settings
@@ -262,8 +263,30 @@ async def _process_cj_assessment_impl(
                 extra=log_extra,
             )
 
-        # Calculate grade projections (placeholder until Task 4 implementation)
-        grade_projections = calculate_grade_projections(workflow_result.rankings)
+        # Calculate grade projections using async GradeProjector
+        grade_projector = GradeProjector()
+        
+        # Get database session for grade projector
+        async with database.session() as session:
+            grade_projections = await grade_projector.calculate_projections(
+                session=session,
+                rankings=workflow_result.rankings,
+                cj_batch_id=int(workflow_result.batch_id),
+                assignment_id=request_event_data.assignment_id,
+                course_code=request_event_data.course_code.value if hasattr(request_event_data.course_code, 'value') else request_event_data.course_code,
+                content_client=content_client,
+                correlation_id=correlation_id,
+            )
+        
+        # Log if no projections are available (no anchor essays)
+        if not grade_projections.projections_available:
+            logger.info(
+                "No grade projections available - no anchor essays present",
+                extra={
+                    **log_extra,
+                    "batch_id": workflow_result.batch_id,
+                },
+            )
 
         # Construct and publish CJAssessmentCompletedV1 event
         completed_event_data = CJAssessmentCompletedV1(
@@ -492,6 +515,7 @@ async def process_llm_result(
     msg: ConsumerRecord,
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
+    content_client: ContentClientProtocol,
     settings_obj: Settings,
     tracer: "Tracer | None" = None,
 ) -> bool:
@@ -501,6 +525,7 @@ async def process_llm_result(
         msg: Kafka consumer record containing LLM comparison result
         database: Database access protocol implementation
         event_publisher: Event publisher protocol implementation
+        content_client: Content client for fetching anchor essays
         settings_obj: Application settings
         tracer: Optional OpenTelemetry tracer for distributed tracing
 
@@ -609,6 +634,7 @@ async def process_llm_result(
                         database=database,
                         event_publisher=event_publisher,
                         settings=settings_obj,
+                        content_client=content_client,
                     )
         else:
             # No parent context, process without it
@@ -622,6 +648,7 @@ async def process_llm_result(
                 database=database,
                 event_publisher=event_publisher,
                 settings=settings_obj,
+                content_client=content_client,
             )
 
         # Record callback processing metrics

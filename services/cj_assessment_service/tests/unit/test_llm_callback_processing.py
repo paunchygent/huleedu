@@ -16,7 +16,11 @@ from huleedu_service_libs.error_handling import create_error_detail_with_context
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.event_processor import process_llm_result
-from services.cj_assessment_service.protocols import CJEventPublisherProtocol, CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJEventPublisherProtocol,
+    CJRepositoryProtocol,
+    ContentClientProtocol,
+)
 
 
 @pytest.fixture
@@ -153,10 +157,14 @@ class TestLLMCallbackProcessing:
         )
 
         # Act
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
             event_publisher=mock_event_publisher,
+            content_client=mock_content_client,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -198,10 +206,14 @@ class TestLLMCallbackProcessing:
         )
 
         # Act
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
             event_publisher=mock_event_publisher,
+            content_client=mock_content_client,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -245,10 +257,14 @@ class TestLLMCallbackProcessing:
         )
 
         # Act
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
             event_publisher=mock_event_publisher,
+            content_client=mock_content_client,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -285,10 +301,14 @@ class TestLLMCallbackProcessing:
         )
 
         # Act
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
             event_publisher=mock_event_publisher,
+            content_client=mock_content_client,
             settings_obj=mock_settings,
             tracer=None,
         )
@@ -312,6 +332,9 @@ class TestLLMCallbackProcessing:
         request_ids = [str(uuid4()) for _ in range(3)]
 
         # Process multiple callbacks
+        # Create mock content client
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        
         for i, request_id in enumerate(request_ids):
             msg = create_llm_callback_message(
                 request_id=request_id,
@@ -325,6 +348,7 @@ class TestLLMCallbackProcessing:
                 msg=msg,
                 database=mock_database,
                 event_publisher=mock_event_publisher,
+                content_client=mock_content_client,
                 settings_obj=mock_settings,
                 tracer=None,
             )

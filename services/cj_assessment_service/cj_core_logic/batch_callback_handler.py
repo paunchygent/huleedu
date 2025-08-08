@@ -38,6 +38,7 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
     update_comparison_result,
 )
 from services.cj_assessment_service.cj_core_logic.grade_projector import (
+    GradeProjector,
     calculate_grade_projections,
 )
 from services.cj_assessment_service.config import Settings
@@ -47,6 +48,7 @@ from services.cj_assessment_service.models_db import ComparisonPair
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
+    ContentClientProtocol,
 )
 
 # Import existing proven workflow logic for integration
@@ -60,6 +62,7 @@ async def continue_cj_assessment_workflow(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
+    content_client: ContentClientProtocol,
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
     """Process LLM callback and continue existing workflow.
@@ -73,6 +76,7 @@ async def continue_cj_assessment_workflow(
         database: Database access protocol implementation
         event_publisher: Event publisher protocol implementation
         settings: Application settings
+        content_client: Content client for fetching anchor essays
         retry_processor: Optional retry processor for failed comparison handling
     """
     # Get business metrics
@@ -135,6 +139,7 @@ async def continue_cj_assessment_workflow(
                 database=database,
                 event_publisher=event_publisher,
                 settings=settings,
+                content_client=content_client,
                 correlation_id=correlation_id,
                 retry_processor=retry_processor,
             )
@@ -206,6 +211,7 @@ async def trigger_existing_workflow_continuation(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
+    content_client: ContentClientProtocol,
     correlation_id: UUID,
     retry_processor: BatchRetryProcessor | None = None,
 ) -> None:
@@ -334,6 +340,7 @@ async def trigger_existing_workflow_continuation(
                 database=database,
                 event_publisher=event_publisher,
                 session=session,
+                content_client=content_client,
                 correlation_id=correlation_id,
                 log_extra=log_extra,
             )
@@ -344,6 +351,7 @@ async def _trigger_batch_scoring_completion(
     database: CJRepositoryProtocol,
     event_publisher: CJEventPublisherProtocol,
     session: AsyncSession,
+    content_client: ContentClientProtocol,
     correlation_id: UUID,
     log_extra: dict[str, Any],
 ) -> None:
@@ -354,6 +362,7 @@ async def _trigger_batch_scoring_completion(
         database: Database access protocol
         event_publisher: Event publishing protocol
         session: Active database session
+        content_client: Content client for fetching anchor essays
         correlation_id: Correlation ID for tracing
         log_extra: Extra logging context
     """
@@ -414,8 +423,24 @@ async def _trigger_batch_scoring_completion(
         # Get final rankings
         rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
-        # Calculate grade projections (placeholder until Task 4 implementation)
-        grade_projections = calculate_grade_projections(rankings)
+        # Calculate grade projections using async GradeProjector
+        grade_projector = GradeProjector()
+        grade_projections = await grade_projector.calculate_projections(
+            session=session,
+            rankings=rankings,
+            cj_batch_id=batch_id,
+            assignment_id=batch_upload.assignment_id if hasattr(batch_upload, 'assignment_id') else None,
+            course_code=batch_upload.course_code if hasattr(batch_upload, 'course_code') else '',
+            content_client=content_client,
+            correlation_id=correlation_id,
+        )
+        
+        # Log if no projections are available (no anchor essays)
+        if not grade_projections.projections_available:
+            logger.info(
+                "No grade projections available - no anchor essays present",
+                extra={**log_extra, "batch_id": batch_id},
+            )
 
         # Create the event data with primitive parameters
         event_data = CJAssessmentCompletedV1(

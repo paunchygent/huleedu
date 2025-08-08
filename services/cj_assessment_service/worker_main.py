@@ -216,6 +216,7 @@ async def main() -> None:
             batch_monitor = BatchMonitor(
                 repository=database,
                 event_publisher=event_publisher,
+                content_client=content_client,
                 settings=settings,
             )
             logger.info("Batch monitor initialized")
