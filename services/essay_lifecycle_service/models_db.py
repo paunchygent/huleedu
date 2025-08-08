@@ -240,6 +240,13 @@ class EventOutbox(Base):
     event_type: Mapped[str] = mapped_column(String(255), nullable=False)
     event_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     event_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    
+    # Kafka targeting
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Kafka topic to publish to",
+    )
 
     # Publishing metadata
     created_at: Mapped[datetime] = mapped_column(
@@ -251,10 +258,15 @@ class EventOutbox(Base):
 
     # Indexes for efficient querying
     __table_args__ = (
-        # Partial index for unpublished events
+        # Topic-aware index for unpublished events (relay worker efficiency)
         Index(
-            "idx_outbox_unpublished", "published_at", postgresql_where=text("published_at IS NULL")
+            "ix_event_outbox_unpublished_topic",
+            "published_at", "topic", "created_at",
+            postgresql_where=text("published_at IS NULL")
         ),
+        # Topic index for filtering and queries
+        Index("ix_event_outbox_topic", "topic"),
+        # Legacy indexes
         Index("idx_outbox_created", "created_at"),
         Index("idx_outbox_aggregate", "aggregate_id", "aggregate_type"),
     )
