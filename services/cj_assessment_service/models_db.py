@@ -450,9 +450,11 @@ class GradeProjection(Base):
     confidence_label: Mapped[str] = mapped_column(String(10), nullable=False)
     calculation_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Model tracking fields
-    assessment_method: Mapped[str] = mapped_column(String(50), nullable=False, server_default="cj_assessment")
+    assessment_method: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="cj_assessment"
+    )
     model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     model_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     normalized_score: Mapped[float | None] = mapped_column(Float, nullable=True)

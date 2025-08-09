@@ -35,17 +35,13 @@ class ContentClientProtocol(Protocol):
         """
         ...
 
-    async def store_content(
-        self, 
-        content: str,
-        content_type: str = "text/plain"
-    ) -> dict[str, str]:
+    async def store_content(self, content: str, content_type: str = "text/plain") -> dict[str, str]:
         """Store content in Content Service.
-        
+
         Args:
             content: The text content to store
             content_type: MIME type of content
-            
+
         Returns:
             Dict with 'content_id' key containing the storage ID
         """
@@ -133,7 +129,7 @@ class CJRepositoryProtocol(Protocol):
     ) -> Any | None:  # CJBatchUpload | None
         """Get CJ batch upload by ID."""
         ...
-    
+
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,
@@ -259,7 +255,7 @@ class CJEventPublisherProtocol(Protocol):
         correlation_id: UUID,
     ) -> None:
         """Publish assessment results to RAS.
-        
+
         This is a new method needed for dual event publishing.
         Implementation should use outbox pattern like publish_assessment_completed.
         """

@@ -383,7 +383,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             return result.scalars().first()
 
         return None
-    
+
     async def get_cj_batch_upload(
         self,
         session: AsyncSession,

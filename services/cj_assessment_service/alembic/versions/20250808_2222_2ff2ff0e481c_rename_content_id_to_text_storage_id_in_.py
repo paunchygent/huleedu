@@ -9,8 +9,6 @@ Create Date: 2025-08-08 22:22:59.033675
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
 revision: str = "2ff2ff0e481c"
@@ -21,11 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.alter_column('anchor_essay_references', 'content_id', 
-                    new_column_name='text_storage_id')
+    op.alter_column("anchor_essay_references", "content_id", new_column_name="text_storage_id")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.alter_column('anchor_essay_references', 'text_storage_id', 
-                    new_column_name='content_id')
+    op.alter_column("anchor_essay_references", "text_storage_id", new_column_name="content_id")

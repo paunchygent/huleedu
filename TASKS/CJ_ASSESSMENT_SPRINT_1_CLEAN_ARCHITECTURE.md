@@ -2,6 +2,11 @@
 
 ## Implementation Status: 95% Complete (2025-08-08)
 
+### 🔴 CRITICAL ISSUE FOUND
+- **Missing `anchor_grade_distribution` field** in RAS events from batch_callback_handler.py and batch_monitor.py
+- Only event_processor.py has the complete implementation
+- See validation report: `services/cj_assessment_service/tests/DUAL_EVENT_VALIDATION_REPORT.md`
+
 ### ✅ COMPLETED: Infrastructure & Database Updates
 **Implemented:** Event enums, topic mappings, database migrations, model tracking fields
 ```python
@@ -800,23 +805,36 @@ async def handle_cj_assessment_completed(
     # Handle failed essays similarly...
 ```
 
+## Validation Results (Completed)
+
+**Validation Report**: See `services/cj_assessment_service/tests/DUAL_EVENT_VALIDATION_REPORT.md`
+
+### Critical Issue Found
+- **Missing `anchor_grade_distribution` field** in batch_callback_handler.py and batch_monitor.py
+- Required for RAS to visualize grade distribution of anchor essays
+
+### Immediate Actions Required
+1. Fix missing `anchor_grade_distribution` in two locations
+2. Extract shared dual event publishing function (DRY principle)
+3. Implement comprehensive test suite
+
 ## Testing Requirements
 
 **Relevant Rules**: [070-testing-and-quality-assurance.mdc], [075-test-creation-methodology.mdc]
 
-### Unit Tests
-1. Test dual event publishing with correct filtering
-2. Test anchor essay mixing with renamed fields
-3. Test anchor filtering from student results
-4. Test grade calibration with anchors
-5. Test processing_metadata persistence
+### Unit Tests Required
+1. `test_dual_event_publishing.py` - Core dual publishing logic
+2. `test_anchor_filtering.py` - Anchor identification and filtering
+3. `test_assessment_result_event.py` - AssessmentResultV1 construction
 
-### Integration Tests
-1. Full workflow with dual events
-2. Verify ELS receives thin event with essay IDs
-3. Verify RAS receives rich event without anchors
-4. Test anchor essay flow with correct field names
-5. Test backward compatibility with deprecated fields
+### Integration Tests Required
+1. `test_dual_event_workflow_integration.py` - Full workflow validation
+2. `test_anchor_essay_integration.py` - End-to-end anchor handling
+3. `test_outbox_pattern_dual_events.py` - Atomic consistency
+
+### Contract Tests Required
+1. `test_els_backward_compatibility.py` - ELS event contract
+2. `test_ras_event_contract.py` - RAS event contract
 
 ## Success Criteria
 

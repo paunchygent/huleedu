@@ -210,7 +210,7 @@ class GradeProjector:
 
         Returns:
             Dict of grade -> minimum BT score
-        
+
         Note:
             This method should only be called when anchor essays are present.
             The actual calibration would involve scoring the anchor essays
@@ -322,11 +322,9 @@ def calculate_grade_projections(rankings: list[dict[str, Any]]) -> GradeProjecti
     # Without access to anchor essays, we cannot provide grade projections
     # This is the correct behavior - grades should only be assigned when
     # we have calibration data from anchor essays
-    
-    logger.info(
-        "Legacy grade projection called - no anchor essays available, skipping grading"
-    )
-    
+
+    logger.info("Legacy grade projection called - no anchor essays available, skipping grading")
+
     return GradeProjectionSummary(
         projections_available=False,
         primary_grades={},

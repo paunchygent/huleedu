@@ -369,13 +369,15 @@ class MockDatabase(CJRepositoryProtocol):
         """Get CJ batch upload by ID."""
         # Return a mock batch upload with assignment_id
         if cj_batch_id in self.batches:
+
             class MockBatchUpload:
                 def __init__(self, batch_id: int):
                     self.id = batch_id
                     self.assignment_id = "test-assignment-123"  # Default for testing
+
             return MockBatchUpload(cj_batch_id)
         return None
-    
+
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,

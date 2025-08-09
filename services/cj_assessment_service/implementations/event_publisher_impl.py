@@ -108,28 +108,28 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
                 "topic": self.settings.CJ_ASSESSMENT_FAILED_TOPIC,
             },
         )
-    
+
     async def publish_assessment_result(
         self,
         result_data: Any,
         correlation_id: UUID,
     ) -> None:
         """Publish assessment results to RAS using TRUE OUTBOX PATTERN.
-        
+
         Args:
             result_data: The assessment result event data (EventEnvelope with AssessmentResultV1)
             correlation_id: Correlation ID for event tracing
-            
+
         Note:
             This publishes rich assessment data directly to RAS, bypassing ELS.
             Uses the same outbox pattern as other event publishing methods.
         """
         # result_data is an EventEnvelope[AssessmentResultV1]
         aggregate_id = str(correlation_id)
-        
+
         if hasattr(result_data, "data") and hasattr(result_data.data, "cj_assessment_job_id"):
             aggregate_id = str(result_data.data.cj_assessment_job_id)
-        
+
         # Store in outbox for atomic consistency
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="assessment_result",
@@ -138,7 +138,7 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
             event_data=result_data,
             topic=self.settings.ASSESSMENT_RESULT_TOPIC,
         )
-        
+
         logger.info(
             "Assessment result event stored in outbox for RAS",
             extra={

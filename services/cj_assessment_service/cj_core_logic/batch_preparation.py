@@ -66,7 +66,7 @@ async def create_cj_batch(
             initial_status=CJBatchStatusEnum.PENDING,
             expected_essay_count=len(essays_to_process),
         )
-        
+
         # Store assignment_id if provided
         if assignment_id:
             cj_batch.assignment_id = assignment_id
@@ -169,7 +169,7 @@ async def prepare_essays_for_assessment(
                 session, cj_batch, content_client, database, correlation_id
             )
             essays_for_api_model.extend(anchors)
-        
+
         logger.info(
             f"Prepared {len(essays_for_api_model)} essays for CJ assessment",
             extra=log_extra,
@@ -187,26 +187,24 @@ async def _fetch_and_add_anchors(
 ) -> list[EssayForComparison]:
     """Fetch anchor essays and add to comparison pool."""
     anchors: list[EssayForComparison] = []
-    
+
     # Ensure assignment_id is not None (checked by caller)
     if not batch_upload.assignment_id:
         return anchors
-    
+
     # Get anchor references for this assignment
-    anchor_refs = await database.get_anchor_essay_references(
-        session, batch_upload.assignment_id
-    )
-    
+    anchor_refs = await database.get_anchor_essay_references(session, batch_upload.assignment_id)
+
     for ref in anchor_refs:
         try:
             # Generate synthetic ID
             synthetic_id = f"ANCHOR_{ref.id}_{uuid4().hex[:8]}"
-            
+
             # Fetch content using renamed field
             content = await content_client.fetch_content(ref.text_storage_id, correlation_id)
-            
+
             # Store with metadata
-            processed = await database.create_or_update_cj_processed_essay(
+            await database.create_or_update_cj_processed_essay(
                 session=session,
                 cj_batch_id=batch_upload.id,
                 els_essay_id=synthetic_id,
@@ -216,12 +214,12 @@ async def _fetch_and_add_anchors(
                     "is_anchor": True,
                     "known_grade": ref.grade,
                     "anchor_ref_id": str(ref.id),
-                }
+                },
             )
-            
+
             # Ensure anchor is persisted before creating comparisons
             await session.flush()
-            
+
             # Create API model
             anchor_for_api = EssayForComparison(
                 id=synthetic_id,
@@ -229,7 +227,7 @@ async def _fetch_and_add_anchors(
                 current_bt_score=0.0,
             )
             anchors.append(anchor_for_api)
-            
+
         except Exception as e:
             logger.error(
                 f"Failed to fetch anchor essay {ref.id}: {e}",
@@ -241,6 +239,6 @@ async def _fetch_and_add_anchors(
                 exc_info=True,
             )
             # Continue with other anchors
-    
+
     logger.info(f"Added {len(anchors)} anchor essays to batch {batch_upload.id}")
     return anchors

@@ -77,7 +77,9 @@ class TestBatchWorkflowIntegration:
     ) -> BatchMonitor:
         """Create a batch monitor instance."""
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        return BatchMonitor(postgres_repository, mock_event_publisher, mock_content_client, test_settings)
+        return BatchMonitor(
+            postgres_repository, mock_event_publisher, mock_content_client, test_settings
+        )
 
     def _create_assessment_request(
         self,

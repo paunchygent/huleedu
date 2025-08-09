@@ -5,10 +5,10 @@ from __future__ import annotations
 
 def _grade_to_normalized(grade: str | None) -> float:
     """Convert letter grade to normalized score (0.0-1.0).
-    
+
     Args:
         grade: Letter grade (A, B, C, D, E, F, U) or None
-        
+
     Returns:
         Normalized score between 0.0 and 1.0
     """

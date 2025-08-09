@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     CJ_ASSESSMENT_FAILED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
     ASSESSMENT_RESULT_TOPIC: str = Field(
         default="huleedu.assessment.results.v1",
-        description="Topic for publishing assessment results to RAS"
+        description="Topic for publishing assessment results to RAS",
     )
 
     # External service URLs

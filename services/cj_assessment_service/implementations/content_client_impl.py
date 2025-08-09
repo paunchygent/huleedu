@@ -113,29 +113,26 @@ class ContentClientImpl(ContentClientProtocol):
         return await self.retry_manager.with_retry(
             _make_content_request, provider_name="content_service", correlation_id=correlation_id
         )
-    
-    async def store_content(
-        self, 
-        content: str,
-        content_type: str = "text/plain"
-    ) -> dict[str, str]:
+
+    async def store_content(self, content: str, content_type: str = "text/plain") -> dict[str, str]:
         """Store content in Content Service.
-        
+
         Args:
             content: The text content to store
             content_type: MIME type of content
-            
+
         Returns:
             Dict with 'content_id' key containing the storage ID
         """
+
         async def _make_store_request() -> dict[str, str]:
             """Make the HTTP request to store content."""
             url = f"{self.content_service_base_url}/store"
-            
+
             async with self.session.post(
                 url,
                 json={"content": content, "content_type": content_type},
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 200:
                     result = await response.json()
@@ -159,7 +156,7 @@ class ContentClientImpl(ContentClientProtocol):
                         status_code=response.status,
                         error_text=error_text[:500],
                     )
-        
+
         return await self.retry_manager.with_retry(
             _make_store_request, provider_name="content_service", correlation_id=None
         )

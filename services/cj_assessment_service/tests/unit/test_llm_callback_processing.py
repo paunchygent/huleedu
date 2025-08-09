@@ -159,7 +159,7 @@ class TestLLMCallbackProcessing:
         # Act
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
@@ -208,7 +208,7 @@ class TestLLMCallbackProcessing:
         # Act
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
@@ -259,7 +259,7 @@ class TestLLMCallbackProcessing:
         # Act
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
@@ -303,7 +303,7 @@ class TestLLMCallbackProcessing:
         # Act
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             msg=msg,
             database=mock_database,
@@ -334,7 +334,7 @@ class TestLLMCallbackProcessing:
         # Process multiple callbacks
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         for i, request_id in enumerate(request_ids):
             msg = create_llm_callback_message(
                 request_id=request_id,

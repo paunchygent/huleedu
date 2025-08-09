@@ -177,7 +177,7 @@ class TestErrorHandlingIntegration:
         # Act - Should handle gracefully without any comparison pairs in database
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
@@ -271,7 +271,7 @@ class TestErrorHandlingIntegration:
 
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         # Act - Process same callback twice to test idempotency
         result1 = await process_llm_result(
             kafka_msg,
@@ -378,7 +378,7 @@ class TestErrorHandlingIntegration:
         # Test scenario: Process 10 callbacks, 5 success and 5 failures
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         # Create success callbacks (first 5)
         success_results = []
         for i in range(5):
@@ -484,7 +484,7 @@ class TestErrorHandlingIntegration:
         # Act - Process malformed message
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
@@ -541,7 +541,7 @@ class TestErrorHandlingIntegration:
         # Act - Process callback with database failure
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
@@ -639,7 +639,7 @@ class TestErrorHandlingIntegration:
         # Act - Process callback with publishing failure
         # Create mock content client
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
-        
+
         result = await process_llm_result(
             kafka_msg,
             postgres_repository,
