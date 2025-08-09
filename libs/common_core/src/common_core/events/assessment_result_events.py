@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import Field
 
 from common_core.event_enums import ProcessingEvent
-from common_core.events.base import BaseEventData
+from common_core.events.base_event_models import BaseEventData
 
 
 class AssessmentResultV1(BaseEventData):
