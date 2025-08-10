@@ -32,6 +32,7 @@ dependencies = [
     "choix",  # Bradley-Terry scoring
     "numpy",
     "scipy",  # For statistical functions (Normal CDF)
+    "scikit-learn",  # For isotonic regression
     "tenacity",  # Retry logic
 ]
 
@@ -77,6 +78,7 @@ check_untyped_defs = true
 module = [
     "dishka.*",
     "choix.*",
+    "sklearn.*",
 ]
 ignore_missing_imports = true
 
