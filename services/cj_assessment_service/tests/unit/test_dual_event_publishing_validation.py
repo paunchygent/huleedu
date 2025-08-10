@@ -72,17 +72,16 @@ class TestDualEventPublishingValidation:
             {"els_essay_id": "student_mid", "score": 0.5, "rank": 2},
             {"els_essay_id": "student_low", "score": 0.05, "rank": 3},
             {"els_essay_id": "student_zero", "score": 0.0, "rank": 4},
-            
             # Anchor essays with edge case scores
             {"els_essay_id": "ANCHOR_perfect", "score": 1.0, "rank": 5},
             {"els_essay_id": "ANCHOR_minimal", "score": 0.01, "rank": 6},
         ]
-        
+
         grade_projections = GradeProjectionSummary(
             projections_available=True,
             primary_grades={
                 "student_high": "A",
-                "student_mid": "C", 
+                "student_mid": "C",
                 "student_low": "E",
                 "student_zero": "U",
                 "ANCHOR_perfect": "A",
@@ -105,7 +104,7 @@ class TestDualEventPublishingValidation:
                 "ANCHOR_minimal": 0.2,
             },
         )
-        
+
         # Act
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -115,40 +114,40 @@ class TestDualEventPublishingValidation:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Verify RAS event field types and values
         ras_call = mock_event_publisher.publish_assessment_result.call_args
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # Verify all essay results have correct field types
         for result in ras_envelope.data.essay_results:
             # String fields
             assert isinstance(result["essay_id"], str)
             assert isinstance(result["letter_grade"], str)
             assert isinstance(result["confidence_label"], str)
-            
+
             # Float fields
             assert isinstance(result["bt_score"], (int, float))
             assert isinstance(result["confidence_score"], (int, float))
             assert isinstance(result["normalized_score"], (int, float))
-            
+
             # Integer field
             assert isinstance(result["rank"], int)
-            
+
             # Boolean field
             assert isinstance(result["is_anchor"], bool)
-            
+
             # Nullable string field (only anchors have display names)
             if result["is_anchor"]:
                 assert isinstance(result["display_name"], str)
             else:
                 assert result["display_name"] is None
-        
+
         # Verify normalized_score is always in valid range
         for result in ras_envelope.data.essay_results:
             normalized_score = result["normalized_score"]
             assert 0.0 <= normalized_score <= 1.0
-        
+
         # Verify assessment_metadata field types
         metadata = ras_envelope.data.assessment_metadata
         assert isinstance(metadata["anchor_essays_used"], int)
@@ -170,7 +169,6 @@ class TestDualEventPublishingValidation:
         rankings = [
             # Student essay (should not get display name)
             {"els_essay_id": "student_1", "score": 0.8, "rank": 1},
-            
             # Anchor essays with each grade level
             {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 2},
             {"els_essay_id": "ANCHOR_B", "score": 0.85, "rank": 3},
@@ -180,7 +178,7 @@ class TestDualEventPublishingValidation:
             {"els_essay_id": "ANCHOR_F", "score": 0.3, "rank": 7},
             {"els_essay_id": "ANCHOR_U", "score": 0.1, "rank": 8},
         ]
-        
+
         grade_projections = GradeProjectionSummary(
             projections_available=True,
             primary_grades={
@@ -196,7 +194,7 @@ class TestDualEventPublishingValidation:
             confidence_labels={},
             confidence_scores={},
         )
-        
+
         # Act
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -206,31 +204,31 @@ class TestDualEventPublishingValidation:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Verify display name formats
         ras_call = mock_event_publisher.publish_assessment_result.call_args
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # Separate results by type
         student_results = [r for r in ras_envelope.data.essay_results if not r["is_anchor"]]
         anchor_results = [r for r in ras_envelope.data.essay_results if r["is_anchor"]]
-        
+
         # Verify student has no display name
         assert len(student_results) == 1
         assert student_results[0]["display_name"] is None
-        
+
         # Verify each anchor has correct display name format
         assert len(anchor_results) == 7
         expected_display_names = {
             "ANCHOR_A": "ANCHOR GRADE A",
-            "ANCHOR_B": "ANCHOR GRADE B", 
+            "ANCHOR_B": "ANCHOR GRADE B",
             "ANCHOR_C": "ANCHOR GRADE C",
             "ANCHOR_D": "ANCHOR GRADE D",
             "ANCHOR_E": "ANCHOR GRADE E",
             "ANCHOR_F": "ANCHOR GRADE F",
             "ANCHOR_U": "ANCHOR GRADE U",
         }
-        
+
         for result in anchor_results:
             essay_id = result["essay_id"]
             expected_name = expected_display_names[essay_id]
@@ -250,7 +248,7 @@ class TestDualEventPublishingValidation:
             {"els_essay_id": "student_partial", "score": 0.7, "rank": 2},
             {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 3},
         ]
-        
+
         # Grade projections with missing confidence data for some essays
         grade_projections = GradeProjectionSummary(
             projections_available=True,
@@ -270,7 +268,7 @@ class TestDualEventPublishingValidation:
                 "ANCHOR_A": 1.0,
             },
         )
-        
+
         # Act - Should not raise exceptions
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -280,20 +278,19 @@ class TestDualEventPublishingValidation:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Events should be published successfully
         ras_call = mock_event_publisher.publish_assessment_result.call_args
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # Verify all essays are included despite missing confidence data
         assert len(ras_envelope.data.essay_results) == 3
-        
+
         # Find the essay with partial confidence data
         partial_result = next(
-            r for r in ras_envelope.data.essay_results 
-            if r["essay_id"] == "student_partial"
+            r for r in ras_envelope.data.essay_results if r["essay_id"] == "student_partial"
         )
-        
+
         # Verify system provides default values for missing confidence data
         # (The exact default values depend on implementation, but should be reasonable)
         assert partial_result["confidence_label"] is not None
@@ -314,7 +311,7 @@ class TestDualEventPublishingValidation:
             {"els_essay_id": "student_null", "score": None, "rank": 2},  # Null score
             {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 3},
         ]
-        
+
         grade_projections = GradeProjectionSummary(
             projections_available=True,
             primary_grades={
@@ -333,7 +330,7 @@ class TestDualEventPublishingValidation:
                 "ANCHOR_A": 1.0,
             },
         )
-        
+
         # Act - Should handle null scores gracefully
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -343,25 +340,26 @@ class TestDualEventPublishingValidation:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Verify proper handling of null scores
         els_call = mock_event_publisher.publish_assessment_completed.call_args
         ras_call = mock_event_publisher.publish_assessment_result.call_args
-        
+
         els_envelope = els_call.kwargs["completion_data"]
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # ELS should recognize null score as failed essay
-        assert els_envelope.data.status == BatchStatus.COMPLETED_SUCCESSFULLY  # Still has 1 successful
-        
+        assert (
+            els_envelope.data.status == BatchStatus.COMPLETED_SUCCESSFULLY
+        )  # Still has 1 successful
+
         # RAS should include all essays, handling null scores appropriately
         assert len(ras_envelope.data.essay_results) == 3
-        
+
         null_score_result = next(
-            r for r in ras_envelope.data.essay_results 
-            if r["essay_id"] == "student_null"
+            r for r in ras_envelope.data.essay_results if r["essay_id"] == "student_null"
         )
-        
+
         # Verify null score is preserved (correct behavior for failed essays)
         assert null_score_result["bt_score"] is None  # Null scores remain null
         # normalized_score should still be calculated (likely 0.0 for failed essays)

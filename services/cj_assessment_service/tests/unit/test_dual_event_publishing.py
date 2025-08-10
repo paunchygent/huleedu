@@ -547,25 +547,24 @@ class TestDualEventPublishing:
         rankings = [
             # Student essays with different ID patterns
             {"els_essay_id": "student_001", "score": 0.8, "rank": 1},
-            {"els_essay_id": "essay_uuid_123", "score": 0.7, "rank": 2}, 
+            {"els_essay_id": "essay_uuid_123", "score": 0.7, "rank": 2},
             {"els_essay_id": "regular_id", "score": 0.6, "rank": 3},
             {"els_essay_id": "contains_ANCHOR_but_not_prefix", "score": 0.5, "rank": 7},
-            
             # Anchor essays with different formats
             {"els_essay_id": "ANCHOR_A_uuid_123", "score": 0.9, "rank": 4},
             {"els_essay_id": "ANCHOR_B_456", "score": 0.85, "rank": 5},
             {"els_essay_id": "ANCHOR_COMPLEX_ID_789", "score": 0.75, "rank": 6},
         ]
-        
+
         grade_projections = GradeProjectionSummary(
             projections_available=True,
             primary_grades={
                 "student_001": "A",
-                "essay_uuid_123": "B", 
+                "essay_uuid_123": "B",
                 "regular_id": "C",
                 "contains_ANCHOR_but_not_prefix": "D",
                 "ANCHOR_A_uuid_123": "A",
-                "ANCHOR_B_456": "B", 
+                "ANCHOR_B_456": "B",
                 "ANCHOR_COMPLEX_ID_789": "C",
             },
             confidence_labels={
@@ -587,7 +586,7 @@ class TestDualEventPublishing:
                 "ANCHOR_COMPLEX_ID_789": 0.8,
             },
         )
-        
+
         # Act
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -597,43 +596,43 @@ class TestDualEventPublishing:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Verify behavioral outcomes
         els_call = mock_event_publisher.publish_assessment_completed.call_args
         ras_call = mock_event_publisher.publish_assessment_result.call_args
-        
+
         els_envelope = els_call.kwargs["completion_data"]
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # ELS event should contain subset of essays (students only)
         assert len(els_envelope.data.rankings) == 4
         els_essay_ids = {r["els_essay_id"] for r in els_envelope.data.rankings}
-        
+
         # RAS event should contain all essays with anchor flags
         assert len(ras_envelope.data.essay_results) == 7
-        
+
         # Separate RAS results by anchor flag
         student_results = [r for r in ras_envelope.data.essay_results if not r["is_anchor"]]
         anchor_results = [r for r in ras_envelope.data.essay_results if r["is_anchor"]]
-        
+
         # Verify the separation produced the expected counts
         assert len(student_results) == 4
         assert len(anchor_results) == 3
-        
+
         # Verify all student essays appear in ELS event
         student_ids_in_ras = {r["essay_id"] for r in student_results}
         assert els_essay_ids == student_ids_in_ras
-        
+
         # Verify anchor-specific attributes are set correctly
         for anchor in anchor_results:
             assert anchor["is_anchor"] is True
             assert anchor["display_name"] is not None
-        
-        # Verify student-specific attributes are set correctly  
+
+        # Verify student-specific attributes are set correctly
         for student in student_results:
             assert student["is_anchor"] is False
             assert student["display_name"] is None
-        
+
         # Verify all original essays are accounted for in RAS
         all_ras_ids = {r["essay_id"] for r in ras_envelope.data.essay_results}
         all_original_ids = {r["els_essay_id"] for r in rankings}
@@ -653,30 +652,28 @@ class TestDualEventPublishing:
             {"els_essay_id": "student_excellent", "score": 0.95, "rank": 1},
             {"els_essay_id": "student_good", "score": 0.75, "rank": 2},
             {"els_essay_id": "student_poor", "score": 0.3, "rank": 10},
-            
             # Anchor essays with diverse grade assignments
-            {"els_essay_id": "ANCHOR_A_top", "score": 0.9, "rank": 3},      # Grade A
-            {"els_essay_id": "ANCHOR_A_second", "score": 0.88, "rank": 4},  # Grade A  
-            {"els_essay_id": "ANCHOR_B_single", "score": 0.8, "rank": 5},   # Grade B
-            {"els_essay_id": "ANCHOR_C_first", "score": 0.7, "rank": 6},    # Grade C
+            {"els_essay_id": "ANCHOR_A_top", "score": 0.9, "rank": 3},  # Grade A
+            {"els_essay_id": "ANCHOR_A_second", "score": 0.88, "rank": 4},  # Grade A
+            {"els_essay_id": "ANCHOR_B_single", "score": 0.8, "rank": 5},  # Grade B
+            {"els_essay_id": "ANCHOR_C_first", "score": 0.7, "rank": 6},  # Grade C
             {"els_essay_id": "ANCHOR_C_second", "score": 0.68, "rank": 7},  # Grade C
-            {"els_essay_id": "ANCHOR_C_third", "score": 0.65, "rank": 8},   # Grade C
-            {"els_essay_id": "ANCHOR_D_only", "score": 0.5, "rank": 9},     # Grade D
-            {"els_essay_id": "ANCHOR_U_failing", "score": 0.2, "rank": 11}, # Grade U
+            {"els_essay_id": "ANCHOR_C_third", "score": 0.65, "rank": 8},  # Grade C
+            {"els_essay_id": "ANCHOR_D_only", "score": 0.5, "rank": 9},  # Grade D
+            {"els_essay_id": "ANCHOR_U_failing", "score": 0.2, "rank": 11},  # Grade U
         ]
-        
+
         # Create grade projections with specific grade assignments
         grade_projections = GradeProjectionSummary(
             projections_available=True,
             primary_grades={
                 # Students get various grades but shouldn't affect anchor distribution
                 "student_excellent": "A",
-                "student_good": "B", 
+                "student_good": "B",
                 "student_poor": "U",
-                
                 # Anchors with intentional grade distribution: A=2, B=1, C=3, D=1, U=1
                 "ANCHOR_A_top": "A",
-                "ANCHOR_A_second": "A",  
+                "ANCHOR_A_second": "A",
                 "ANCHOR_B_single": "B",
                 "ANCHOR_C_first": "C",
                 "ANCHOR_C_second": "C",
@@ -687,7 +684,7 @@ class TestDualEventPublishing:
             confidence_labels={},
             confidence_scores={},
         )
-        
+
         # Act
         await publish_dual_assessment_events(
             rankings=rankings,
@@ -697,15 +694,15 @@ class TestDualEventPublishing:
             settings=test_settings,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Verify behavioral outcome in RAS event
         ras_call = mock_event_publisher.publish_assessment_result.call_args
         ras_envelope = ras_call.kwargs["result_data"]
-        
+
         # Verify anchor_grade_distribution is present and correct
         assert "anchor_grade_distribution" in ras_envelope.data.assessment_metadata
         distribution = ras_envelope.data.assessment_metadata["anchor_grade_distribution"]
-        
+
         # Verify expected grade distribution (based on anchor essays only)
         expected_distribution = {
             "A": 2,  # ANCHOR_A_top, ANCHOR_A_second
@@ -716,18 +713,18 @@ class TestDualEventPublishing:
             "F": 0,  # No F grade anchors
             "U": 1,  # ANCHOR_U_failing
         }
-        
+
         assert distribution == expected_distribution
-        
+
         # Verify all standard grades are represented in the distribution
         standard_grades = ["A", "B", "C", "D", "E", "F", "U"]
         for grade in standard_grades:
             assert grade in distribution
-        
+
         # Verify total anchor count matches expected
         total_anchors = sum(distribution.values())
         assert total_anchors == 8  # 8 anchor essays
-        
+
         # Verify RAS metadata indicates anchors were used
         assert ras_envelope.data.assessment_metadata["anchor_essays_used"] == 8
         assert ras_envelope.data.assessment_metadata["calibration_method"] == "anchor"
