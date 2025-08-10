@@ -110,7 +110,11 @@ class ProcessedEssay(Base):
 
     # CJ scoring results
     current_bt_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    current_bt_se: Mapped[float | None] = mapped_column(Float, nullable=True)  # Standard error
     comparison_count: Mapped[int] = mapped_column(default=0, nullable=False)
+
+    # Anchor essay flag
+    is_anchor: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))

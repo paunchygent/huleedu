@@ -36,13 +36,30 @@ class GradeProjectionSummary(BaseModel):
         description="True when anchor essays are available and grades can be projected",
     )
     primary_grades: dict[str, str] = Field(
-        description="Mapping of essay_id to predicted grade (e.g., 'A', 'B+', 'C')",
+        default_factory=dict,
+        description="Mapping of essay_id to predicted grade (e.g., 'A', 'B', 'C')",
     )
     confidence_labels: dict[str, str] = Field(
+        default_factory=dict,
         description="Mapping of essay_id to confidence label ('HIGH', 'MID', 'LOW')",
     )
     confidence_scores: dict[str, float] = Field(
+        default_factory=dict,
         description="Mapping of essay_id to confidence score (0.0-1.0)",
+    )
+
+    # New fields for enriched statistical data
+    grade_probabilities: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Per-essay probability distribution over grades (e.g. {'essay_id': {'A': 0.7, 'B': 0.3}})",
+    )
+    calibration_info: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Calibration details including grade centers and boundaries derived from anchors",
+    )
+    bt_stats: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Per-essay Bradley-Terry statistics {'essay_id': {'bt_mean': x, 'bt_se': y}}",
     )
 
 

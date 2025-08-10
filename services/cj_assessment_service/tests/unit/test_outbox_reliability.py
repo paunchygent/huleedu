@@ -2,7 +2,7 @@
 
 This module tests the observable behavioral outcomes of the transactional outbox pattern:
 - Event persistence occurs before publishing attempts
-- Retry mechanisms handle publishing failures appropriately 
+- Retry mechanisms handle publishing failures appropriately
 - Duplicate event prevention works across concurrent scenarios
 - Transaction rollback scenarios maintain data consistency
 - Cleanup processes work after successful publishing
@@ -15,7 +15,6 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
@@ -58,7 +57,7 @@ class TestOutboxReliability:
             processing_stage=ProcessingStage.COMPLETED,
             event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
         )
-        
+
         # Create grade projections summary
         grade_projections = GradeProjectionSummary(
             projections_available=True,
@@ -66,7 +65,7 @@ class TestOutboxReliability:
             confidence_labels={"essay_1": "HIGH", "essay_2": "MID"},
             confidence_scores={"essay_1": 0.9, "essay_2": 0.7},
         )
-        
+
         # Create proper completion data
         completion_data = CJAssessmentCompletedV1(
             event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
@@ -82,7 +81,7 @@ class TestOutboxReliability:
             ],
             grade_projections_summary=grade_projections,
         )
-        
+
         return EventEnvelope[CJAssessmentCompletedV1](
             event_type="cj_assessment.completed.v1",
             source_service="cj_assessment_service",
@@ -121,7 +120,7 @@ class TestOutboxReliability:
 
         # Assert - Outbox manager should be called for transactional persistence
         mock_outbox_manager.publish_to_outbox.assert_called_once()
-        
+
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "cj_batch"
         assert call_args.kwargs["event_type"] == test_settings.CJ_ASSESSMENT_COMPLETED_TOPIC
@@ -162,7 +161,7 @@ class TestOutboxReliability:
         assert failed_outbox_event.retry_count == 2
         assert failed_outbox_event.published_at is None
 
-    @pytest.mark.asyncio  
+    @pytest.mark.asyncio
     async def test_duplicate_event_prevention(
         self,
         mock_outbox_manager: AsyncMock,
@@ -173,7 +172,7 @@ class TestOutboxReliability:
         # Arrange
         event_publisher = CJEventPublisherImpl(mock_outbox_manager, test_settings)
         correlation_id = uuid4()
-        
+
         # Simulate the outbox manager detecting duplicate
         mock_outbox_manager.publish_to_outbox.side_effect = [
             None,  # First call succeeds
@@ -203,7 +202,7 @@ class TestOutboxReliability:
         successful_outbox_event = EventOutbox(
             id=uuid4(),
             aggregate_id="batch_123",
-            aggregate_type="cj_batch", 
+            aggregate_type="cj_batch",
             event_type="cj_assessment.completed.v1",
             event_data={"test": "data"},
             event_key="batch_123",
@@ -261,7 +260,7 @@ class TestOutboxReliability:
         # Assert - Rollback behavior
         mock_database_session.add.assert_called_once_with(outbox_event)
         mock_database_session.rollback.assert_called_once()
-        
+
         # Event should not be committed
         mock_database_session.commit.assert_not_called()
 
@@ -289,7 +288,7 @@ class TestOutboxReliability:
             completion_data=sample_completion_event,
             correlation_id=correlation_id_1,
         )
-        
+
         await event_publisher.publish_assessment_completed(
             completion_data=sample_completion_event,
             correlation_id=correlation_id_2,
@@ -297,11 +296,11 @@ class TestOutboxReliability:
 
         # Assert - Both calls completed without race condition issues
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Verify each call had proper parameters
         first_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         second_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
-        
+
         assert first_call.kwargs["aggregate_type"] == "cj_batch"
         assert second_call.kwargs["aggregate_type"] == "cj_batch"
         assert first_call.kwargs["event_data"] == sample_completion_event
@@ -317,7 +316,7 @@ class TestOutboxReliability:
         # Arrange
         event_publisher = CJEventPublisherImpl(mock_outbox_manager, test_settings)
         correlation_id = uuid4()
-        
+
         # Create mock RAS result data
         mock_result_envelope = Mock()
         mock_result_envelope.data.cj_assessment_job_id = "job_789"
@@ -330,7 +329,7 @@ class TestOutboxReliability:
 
         # Assert - RAS events use outbox pattern
         mock_outbox_manager.publish_to_outbox.assert_called_once()
-        
+
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "assessment_result"
         assert call_args.kwargs["event_type"] == "assessment.result.published"
@@ -357,7 +356,7 @@ class TestOutboxReliability:
 
         # Assert - Aggregate ID extraction behavior
         call_args = mock_outbox_manager.publish_to_outbox.call_args
-        
+
         # Should extract aggregate_id from event data's entity_id
         expected_aggregate_id = sample_completion_event.data.entity_id
         assert call_args.kwargs["aggregate_id"] == expected_aggregate_id
@@ -370,7 +369,7 @@ class TestOutboxReliability:
             id=uuid4(),
             aggregate_id="batch_complete_123",
             aggregate_type="cj_batch",
-            event_type="cj_assessment.completed.v1", 
+            event_type="cj_assessment.completed.v1",
             event_data={"complete": "event_data"},
             event_key="batch_complete_123",
             topic="cj_assessment.completed.v1",
@@ -389,11 +388,17 @@ class TestOutboxReliability:
         assert isinstance(complete_outbox_event.topic, str)
         assert isinstance(complete_outbox_event.created_at, datetime)
         assert isinstance(complete_outbox_event.retry_count, int)
-        
+
         # Nullable fields should have appropriate types when set
-        assert complete_outbox_event.published_at is None or isinstance(complete_outbox_event.published_at, datetime)
-        assert complete_outbox_event.last_error is None or isinstance(complete_outbox_event.last_error, str)
-        assert complete_outbox_event.event_key is None or isinstance(complete_outbox_event.event_key, str)
+        assert complete_outbox_event.published_at is None or isinstance(
+            complete_outbox_event.published_at, datetime
+        )
+        assert complete_outbox_event.last_error is None or isinstance(
+            complete_outbox_event.last_error, str
+        )
+        assert complete_outbox_event.event_key is None or isinstance(
+            complete_outbox_event.event_key, str
+        )
 
     @pytest.mark.asyncio
     async def test_failure_event_outbox_integration(
@@ -405,7 +410,7 @@ class TestOutboxReliability:
         # Arrange
         event_publisher = CJEventPublisherImpl(mock_outbox_manager, test_settings)
         correlation_id = uuid4()
-        
+
         mock_failure_envelope = Mock()
         mock_failure_envelope.data.entity_id = "failed_batch_123"
 
@@ -417,7 +422,7 @@ class TestOutboxReliability:
 
         # Assert - Failure events use same outbox reliability pattern
         mock_outbox_manager.publish_to_outbox.assert_called_once()
-        
+
         call_args = mock_outbox_manager.publish_to_outbox.call_args
         assert call_args.kwargs["aggregate_type"] == "cj_batch"
         assert call_args.kwargs["event_type"] == test_settings.CJ_ASSESSMENT_FAILED_TOPIC

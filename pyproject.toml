@@ -157,6 +157,7 @@ module = [
     "starlette.*",
     "rich.*",       # Rich library for terminal formatting
     "opentelemetry.*",  # OpenTelemetry instrumentation libraries
+    "scipy.*",      # SciPy lacks complete type stubs
 ]
 ignore_missing_imports = true
 

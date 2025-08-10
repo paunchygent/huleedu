@@ -20,6 +20,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic.bt_inference import (
+    compute_bt_standard_errors,
+)
 from services.cj_assessment_service.models_api import ComparisonResult, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 from services.cj_assessment_service.models_db import ProcessedEssay as CJ_ProcessedEssay
@@ -142,7 +145,10 @@ async def record_comparisons_and_update_scores(
     n_items = len(unique_els_essay_ids)
     els_id_to_idx_map = {els_id: i for i, els_id in enumerate(unique_els_essay_ids)}
 
+    # Build comparison data and track comparison counts
     choix_comparison_data = []
+    per_essay_counts: dict[str, int] = {els_id: 0 for els_id in unique_els_essay_ids}
+
     for comp in all_valid_db_comparisons:
         winner_id_str = comp.essay_a_els_id if comp.winner == "essay_a" else comp.essay_b_els_id
         loser_id_str = comp.essay_b_els_id if comp.winner == "essay_a" else comp.essay_a_els_id
@@ -151,6 +157,9 @@ async def record_comparisons_and_update_scores(
             choix_comparison_data.append(
                 (els_id_to_idx_map[winner_id_str], els_id_to_idx_map[loser_id_str]),
             )
+            # Track comparison counts
+            per_essay_counts[winner_id_str] += 1
+            per_essay_counts[loser_id_str] += 1
         else:
             logger.warning(
                 f"Comparison pair ({winner_id_str}, {loser_id_str}) contains IDs not in the "
@@ -177,18 +186,35 @@ async def record_comparisons_and_update_scores(
         # Normalize: mean-center the scores
         params -= np.mean(params)
 
-        # Map integer-indexed scores back to string ELS Essay IDs
+        # 4b. Compute analytical standard errors for each ability
+        se_vec = compute_bt_standard_errors(n_items, choix_comparison_data, params)
+
+        # Map integer-indexed scores and SEs back to string ELS Essay IDs
         updated_bt_scores: dict[str, float] = {
             unique_els_essay_ids[i]: float(params[i]) for i in range(n_items)
         }
+        updated_bt_ses: dict[str, float] = {
+            unique_els_essay_ids[i]: float(se_vec[i]) for i in range(n_items)
+        }
+
         logger.info(
-            f"Successfully computed BT scores for {len(updated_bt_scores)} essays in "
+            f"Successfully computed BT scores and SEs for {len(updated_bt_scores)} essays in "
             f"CJ Batch {cj_batch_id}.",
-            extra={"cj_batch_id": str(cj_batch_id)},
+            extra={
+                "cj_batch_id": str(cj_batch_id),
+                "mean_se": float(np.mean(se_vec)),
+                "max_se": float(np.max(se_vec)),
+            },
         )
 
-        # 5. Update scores in the database
-        await _update_essay_scores_in_database(db_session, cj_batch_id, updated_bt_scores)
+        # 5. Update scores, SEs, and comparison counts in the database
+        await _update_essay_scores_in_database(
+            db_session,
+            cj_batch_id,
+            updated_bt_scores,
+            updated_bt_ses,
+            per_essay_counts,
+        )
 
         return updated_bt_scores
 
@@ -270,8 +296,10 @@ async def get_essay_rankings(
             {
                 "rank": rank,
                 "els_essay_id": db_row.els_essay_id,
-                "score": db_row.current_bt_score,
-                # "comparison_count": db_row.comparison_count, # If you add this field
+                "bradley_terry_score": db_row.current_bt_score,
+                "bradley_terry_se": db_row.current_bt_se,
+                "comparison_count": db_row.comparison_count,
+                "is_anchor": bool(db_row.is_anchor),
             },
         )
 
@@ -289,13 +317,17 @@ async def _update_essay_scores_in_database(
     db_session: AsyncSession,
     cj_batch_id: int,  # This is the internal CJ_BatchUpload.id
     scores: dict[str, float],  # Keyed by els_essay_id (string)
+    ses: dict[str, float],  # Standard errors keyed by els_essay_id
+    counts: dict[str, int],  # Comparison counts keyed by els_essay_id
 ) -> None:
-    """Update essay Bradley-Terry scores in the database for a specific CJ Batch.
+    """Update essay Bradley-Terry scores, SEs, and counts in the database.
 
     Args:
         db_session: Database session
         cj_batch_id: Internal CJ batch ID
-        scores: Dictionary mapping essay IDs to scores
+        scores: Dictionary mapping essay IDs to BT scores
+        ses: Dictionary mapping essay IDs to standard errors
+        counts: Dictionary mapping essay IDs to comparison counts
     """
     if not scores:
         logger.debug(
@@ -305,24 +337,29 @@ async def _update_essay_scores_in_database(
         return
 
     logger.debug(
-        f"Updating BT scores for {len(scores)} essays in CJ Batch ID: {cj_batch_id}",
+        f"Updating BT scores and SEs for {len(scores)} essays in CJ Batch ID: {cj_batch_id}",
         extra={"cj_batch_id": str(cj_batch_id)},
     )
 
     for els_id, score_val in scores.items():
+        se_val = ses.get(els_id, 0.0)
+        count_val = counts.get(els_id, 0)
+
         stmt = (
             update(CJ_ProcessedEssay)
             .where(
                 CJ_ProcessedEssay.els_essay_id == els_id,
-                CJ_ProcessedEssay.cj_batch_id
-                == cj_batch_id,  # Ensure we only update essays in this specific CJ job
+                CJ_ProcessedEssay.cj_batch_id == cj_batch_id,
             )
-            .values(current_bt_score=score_val)
+            .values(
+                current_bt_score=score_val,
+                current_bt_se=se_val,
+                comparison_count=count_val,
+            )
         )
         await db_session.execute(stmt)
 
     logger.info(
-        f"DB statements prepared to update scores for {len(scores)} essays in "
-        f"CJ Batch ID: {cj_batch_id}",
+        f"Updated scores, SEs, and counts for {len(scores)} essays in CJ Batch ID: {cj_batch_id}",
         extra={"cj_batch_id": str(cj_batch_id)},
     )
