@@ -66,25 +66,44 @@ class GradeProjector:
 
     # Swedish 8-anchor grade system
     ANCHOR_GRADES = ["F", "E", "D", "D+", "C", "C+", "B", "A"]
-    
+
     # Derived minus grades (from lower boundaries)
     MINUS_GRADES = ["E-", "D-", "C-", "B-", "A-"]
-    
-    # Complete reportable scale (13 grades)
-    REPORTABLE_GRADES = ["F", "E-", "E", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "A-", "A"]
-    
+
+    # Derived plus grades (from upper boundaries)
+    PLUS_GRADES = ["E+", "B+"]  # F+ and A+ don't exist
+
+    # Complete reportable scale (15 grades)
+    REPORTABLE_GRADES = [
+        "F",
+        "E-",
+        "E",
+        "E+",
+        "D-",
+        "D",
+        "D+",
+        "C-",
+        "C",
+        "C+",
+        "B-",
+        "B",
+        "B+",
+        "A-",
+        "A",
+    ]
+
     # Swedish population distribution (historical data)
     POPULATION_PRIORS = {
-        "F": 0.02,   # 2% fail
-        "E": 0.08,   # 8% barely pass
-        "D": 0.15,   # 15% satisfactory
+        "F": 0.02,  # 2% fail
+        "E": 0.08,  # 8% barely pass
+        "D": 0.15,  # 15% satisfactory
         "D+": 0.20,  # 20% developing competence
-        "C": 0.25,   # 25% good (modal)
+        "C": 0.25,  # 25% good (modal)
         "C+": 0.15,  # 15% approaching excellence
-        "B": 0.10,   # 10% very good
-        "A": 0.05,   # 5% excellent
+        "B": 0.10,  # 10% very good
+        "A": 0.05,  # 5% excellent
     }
-    
+
     # Minimum anchors for stable estimation
     MIN_ANCHORS_FOR_EMPIRICAL = 3
     MIN_ANCHORS_FOR_VARIANCE = 5
@@ -170,8 +189,6 @@ class GradeProjector:
             )
             return self._empty_projections(available=False)
 
-        
-
         # Compute grade calibration from anchor essays
         calibration = self._calibrate_from_anchors(anchors, anchor_grades, correlation_id)
 
@@ -251,8 +268,6 @@ class GradeProjector:
 
         return anchor_grades
 
-    
-
     def _calibrate_from_anchors(
         self,
         anchors: list[dict[str, Any]],
@@ -260,7 +275,7 @@ class GradeProjector:
         correlation_id: UUID,
     ) -> CalibrationResult:
         """Calibrate grade boundaries using population priors, not anchor frequency."""
-        
+
         # Group anchors by grade
         anchors_by_grade = defaultdict(list)
         for anchor in anchors:
@@ -269,54 +284,54 @@ class GradeProjector:
                 if grade in self.ANCHOR_GRADES:  # Only calibrate anchor grades
                     bt_score = anchor.get("bradley_terry_score", 0.0)
                     anchors_by_grade[grade].append(bt_score)
-        
+
         # Calculate pooled variance for stabilization
         all_scores = [s for scores in anchors_by_grade.values() for s in scores]
         pooled_variance = np.var(all_scores) if len(all_scores) > 1 else 0.1
-        
+
         # Estimate parameters with sparse anchor handling
         grade_params = {}
         for grade in self.ANCHOR_GRADES:
             n_anchors = len(anchors_by_grade.get(grade, []))
-            
+
             if n_anchors >= self.MIN_ANCHORS_FOR_EMPIRICAL:
                 # Sufficient anchors: Use empirical estimates
                 mean = float(np.mean(anchors_by_grade[grade]))
                 variance = float(np.var(anchors_by_grade[grade]))
-                
+
             elif n_anchors > 0:
                 # Sparse anchors: Blend with expected position
                 empirical_mean = float(np.mean(anchors_by_grade[grade]))
                 expected_position = self._get_expected_grade_position(grade)
-                
+
                 # Shrinkage based on anchor count
                 weight = n_anchors / self.MIN_ANCHORS_FOR_EMPIRICAL
                 mean = weight * empirical_mean + (1 - weight) * expected_position
-                
+
                 # Inflate variance for uncertainty
                 variance = pooled_variance * (self.MIN_ANCHORS_FOR_EMPIRICAL / n_anchors)
-                
+
             else:
                 # No anchors: Use ordinal position
                 mean = self._get_expected_grade_position(grade)
                 variance = pooled_variance * 2.0
-                
+
                 self.logger.warning(
                     f"Grade {grade} has no anchors, using expected position {mean:.3f}",
-                    extra={"correlation_id": str(correlation_id), "grade": grade}
+                    extra={"correlation_id": str(correlation_id), "grade": grade},
                 )
-            
+
             # Store with POPULATION prior, not anchor frequency
             grade_params[grade] = GradeDistribution(
                 mean=mean,
                 variance=max(variance, 0.01),
                 n_anchors=n_anchors,
-                prior=self.POPULATION_PRIORS.get(grade, 1.0 / len(self.ANCHOR_GRADES))
+                prior=self.POPULATION_PRIORS.get(grade, 1.0 / len(self.ANCHOR_GRADES)),
             )
-        
+
         # Apply isotonic regression for monotonicity
         grade_params = self._apply_isotonic_constraint(grade_params)
-        
+
         # Derive boundaries for minus grades
         grade_boundaries = self._calculate_grade_boundaries(grade_params)
         return CalibrationResult(
@@ -325,8 +340,6 @@ class GradeProjector:
             grade_boundaries=grade_boundaries,
             pooled_variance=pooled_variance,
         )
-
-    
 
     def _get_expected_grade_position(self, grade: str) -> float:
         """Calculate expected ordinal position of a grade."""
@@ -342,13 +355,13 @@ class GradeProjector:
         """Apply isotonic regression to ensure grade means are monotonic."""
         grades = self.ANCHOR_GRADES
         means = np.array([grade_params[g].mean for g in grades])
-        
+
         iso_reg = IsotonicRegression(increasing=True)
         corrected_means = iso_reg.fit_transform(np.arange(len(grades)), means)
-        
+
         for i, grade in enumerate(grades):
             grade_params[grade].mean = corrected_means[i]
-            
+
         return grade_params
 
     def _calculate_grade_boundaries(
@@ -360,15 +373,15 @@ class GradeProjector:
             if i == 0:
                 lower_bound = -np.inf
             else:
-                prev_grade = self.ANCHOR_GRADES[i-1]
+                prev_grade = self.ANCHOR_GRADES[i - 1]
                 lower_bound = (grade_params[prev_grade].mean + grade_params[grade].mean) / 2
-            
+
             if i == len(self.ANCHOR_GRADES) - 1:
                 upper_bound = np.inf
             else:
-                next_grade = self.ANCHOR_GRADES[i+1]
+                next_grade = self.ANCHOR_GRADES[i + 1]
                 upper_bound = (grade_params[grade].mean + grade_params[next_grade].mean) / 2
-            
+
             boundaries[grade] = (lower_bound, upper_bound)
         return boundaries
 
@@ -431,21 +444,27 @@ class GradeProjector:
         primary_grade: str,
         grade_boundaries: dict[str, tuple[float, float]],
     ) -> str:
-        """Assign final grade with potential minus modifier."""
-        
-        # F, D+, C+ are assigned directly (no minus versions)
+        """Assign final grade with potential minus or plus modifier."""
+
+        # F, D+, C+ are assigned directly (no derived versions)
         if primary_grade in ["F", "D+", "C+"]:
             return primary_grade
-        
-        # Check if score falls in minus zone (lower 25% of grade range)
+
+        # Get grade boundaries
+        lower_bound, upper_bound = grade_boundaries[primary_grade]
+        grade_width = upper_bound - lower_bound
+        relative_position = (bt_score - lower_bound) / grade_width
+
+        # Check for minus grades (bottom 25% of range)
         if primary_grade in ["E", "D", "C", "B", "A"]:
-            lower_bound, upper_bound = grade_boundaries[primary_grade]
-            grade_width = upper_bound - lower_bound
-            relative_position = (bt_score - lower_bound) / grade_width
-            
             if relative_position < 0.25:  # Bottom quartile
                 return f"{primary_grade}-"
-        
+
+        # Check for plus grades (top 25% of range)
+        if primary_grade in ["E", "B"]:
+            if relative_position > 0.75:  # Top quartile
+                return f"{primary_grade}+"
+
         return primary_grade
 
     def _compute_grade_probabilities(
@@ -459,11 +478,23 @@ class GradeProjector:
         P(grade|score) ∝ P(score|grade) × P(grade)
 
         Accounts for measurement uncertainty by convolving distributions.
+
+        IMPORTANT: Applies boundary constraints to ensure grades respect
+        calibrated boundaries. Probabilities are zero outside boundaries.
         """
         log_probs = {}
 
         for grade in self.ANCHOR_GRADES:
             params = calibration.grade_params[grade]
+
+            # Apply boundary constraint FIRST
+            # Probabilities are zero outside the grade's boundary
+            if grade in calibration.grade_boundaries:
+                lower, upper = calibration.grade_boundaries[grade]
+                if not (lower <= bt_score <= upper):
+                    log_probs[grade] = -np.inf
+                    continue
+
             # Likelihood: score x comes from grade g's distribution
             # Account for measurement uncertainty by convolving distributions
             combined_variance = params.variance + bt_se**2
@@ -507,8 +538,6 @@ class GradeProjector:
 
         return probs
 
-    
-
     def _compute_normalized_entropy(self, probs: dict[str, float]) -> float:
         """Compute normalized Shannon entropy of probability distribution."""
         # Filter out zero probabilities
@@ -527,11 +556,11 @@ class GradeProjector:
 
     def _entropy_to_confidence(self, normalized_entropy: float) -> tuple[float, str]:
         """Convert normalized entropy to confidence score and label.
-    
+
         Calibrated for 8-grade Swedish system based on empirical testing.
         """
         confidence_score = 1.0 - normalized_entropy
-        
+
         # Thresholds calibrated for log(8) ≈ 2.08 max entropy
         # Empirically validated with Swedish exam data
         if normalized_entropy < 0.5:  # Top 50% confidence
@@ -540,7 +569,7 @@ class GradeProjector:
             label = "MID"
         else:  # Bottom 25%
             label = "LOW"
-        
+
         return confidence_score, label
 
     async def _store_projections(
@@ -649,5 +678,3 @@ class ProjectionsData:
         self.confidence_scores = confidence_scores
         self.grade_probabilities = grade_probabilities
         self.bt_stats = bt_stats
-
-

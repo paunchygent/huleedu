@@ -542,7 +542,8 @@ class TestDualEventPublishing:
         test_settings: Mock,
         sample_batch_upload: Mock,
     ) -> None:
-        """Test that essays are correctly separated between ELS and RAS events with proper flagging."""
+        """Test that essays are correctly separated between ELS and RAS events
+        with proper flagging."""
         # Arrange - Mix of student and anchor essays with various ID formats
         rankings = [
             # Student essays with different ID patterns

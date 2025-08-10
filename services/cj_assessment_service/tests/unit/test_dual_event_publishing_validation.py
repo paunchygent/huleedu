@@ -64,7 +64,8 @@ class TestDualEventPublishingValidation:
         test_settings: Mock,
         sample_batch_upload: Mock,
     ) -> None:
-        """Verify all RAS event fields have correct types and normalized scores are calculated properly."""
+        """Verify all RAS event fields have correct types and normalized scores
+        are calculated properly."""
         # Arrange - Test with extreme score values to verify normalization
         rankings = [
             # Student essays with various score ranges

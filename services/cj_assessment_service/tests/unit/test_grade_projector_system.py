@@ -181,8 +181,10 @@ class TestGradeProjectorSystem:
             for confidence_label in result.confidence_labels.values():
                 assert confidence_label in valid_confidence_labels
 
-            # All grades must be valid letter grades (5-grade system)
-            valid_grades = {"A", "B", "C", "D", "F"}
+            # All grades must be valid Swedish grades (8 anchor + 5 minus + 2 plus = 15 grades)
+            valid_grades = {
+                "F", "E-", "E", "E+", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A"
+            }
             for grade in result.primary_grades.values():
                 assert grade in valid_grades
 
@@ -298,7 +300,8 @@ class TestGradeProjectorSystem:
         mock_content_client: AsyncMock,
         mock_database_session: AsyncMock,
     ) -> None:
-        """Test that empty rankings list produces valid empty projections with projections_available=False."""
+        """Test that empty rankings list produces valid empty projections
+        with projections_available=False."""
         # Arrange
         grade_projector = GradeProjector()
         correlation_id = uuid4()
@@ -512,7 +515,8 @@ class TestGradeProjectorSystem:
             assert 0.0 <= result.confidence_scores["high_confidence_essay"] <= 1.0
             assert 0.0 <= result.confidence_scores["low_confidence_essay"] <= 1.0
 
-            # Generally, lower SE should lead to higher confidence (though not always due to entropy)
+            # Generally, lower SE should lead to higher confidence
+            # (though not always due to entropy)
             # We test that the mechanism exists, not the exact mapping
 
             # Verify SE is captured in bt_stats
@@ -607,7 +611,8 @@ class TestGradeProjectorSystem:
                     grade_low = grade_order[i + 1]
                     if grade_high in boundaries and grade_low in boundaries:
                         assert boundaries[grade_high] > boundaries[grade_low], (
-                            f"Boundary for {grade_high} ({boundaries[grade_high]}) should be > {grade_low} ({boundaries[grade_low]})"
+                            f"Boundary for {grade_high} ({boundaries[grade_high]}) "
+                            f"should be > {grade_low} ({boundaries[grade_low]})"
                         )
 
     @pytest.mark.asyncio
@@ -766,8 +771,12 @@ class TestGradeProjectorSystem:
             # Check extreme scores still produce valid grades
             assert "very_high" in result.primary_grades
             assert "very_low" in result.primary_grades
-            assert result.primary_grades["very_high"] in {"A", "B", "C", "D", "F"}
-            assert result.primary_grades["very_low"] in {"A", "B", "C", "D", "F"}
+            # Validate against Swedish grade system
+            valid_grades = {
+                "F", "E-", "E", "E+", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A"
+            }
+            assert result.primary_grades["very_high"] in valid_grades
+            assert result.primary_grades["very_low"] in valid_grades
 
             # With limited anchors (only A and C), grade assignment might vary
             # We just test that grades are assigned and are valid
@@ -956,20 +965,50 @@ class TestGradeProjectorSystem:
             }
             assert len(result.primary_grades) == len(student_essay_ids)
 
-            # Essays scoring above the A anchor (0.845) should likely get A
-            assert result.primary_grades["student_top1"] in {"A", "B"}  # 0.923 > 0.845
-            assert result.primary_grades["student_top2"] in {"A", "B"}  # 0.876 > 0.845
+            # Essays scoring above the A anchor (0.845) should likely get A or A-
+            assert result.primary_grades["student_top1"] in {"A", "A-", "B", "B+"}  # 0.923 > 0.845
+            assert result.primary_grades["student_top2"] in {"A", "A-", "B", "B+"}  # 0.876 > 0.845
 
             # Essays scoring between B (0.543) and A (0.845) anchors
-            assert result.primary_grades["student_mid1"] in {"A", "B", "C"}  # 0.612
+            assert result.primary_grades["student_mid1"] in {
+                "A",
+                "A-",
+                "B",
+                "B+",
+                "B-",
+                "C+",
+                "C",
+            }  # 0.612
 
             # Essays scoring around B anchor (0.543)
-            assert result.primary_grades["student_mid2"] in {"B", "C"}  # 0.487
+            assert result.primary_grades["student_mid2"] in {
+                "B", "B+", "B-", "C+", "C", "C-"
+            }  # 0.487
 
             # Essays scoring below C anchor (0.312)
-            assert result.primary_grades["student_low1"] in {"C", "D", "F"}  # 0.245
-            assert result.primary_grades["student_low2"] in {"C", "D", "F"}  # 0.134
-            assert result.primary_grades["student_bottom"] in {"C", "D", "F"}  # 0.078
+            assert result.primary_grades["student_low1"] in {
+                "C",
+                "C-",
+                "D+",
+                "D",
+                "D-",
+                "E",
+                "E+",
+                "E-",
+                "F",
+            }  # 0.245
+            assert result.primary_grades["student_low2"] in {
+                "D+",
+                "D",
+                "D-",
+                "E",
+                "E+",
+                "E-",
+                "F",
+            }  # 0.134
+            assert result.primary_grades["student_bottom"] in {
+                "D", "D-", "E", "E+", "E-", "F"
+            }  # 0.078
 
             # Verify all probability distributions sum to 1
             for essay_id in student_essay_ids:
