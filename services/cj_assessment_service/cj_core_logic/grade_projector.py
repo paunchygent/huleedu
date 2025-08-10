@@ -9,6 +9,7 @@ confidence scoring based on probability distributions.
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -63,37 +64,30 @@ class GradeProjector:
     4. Confidence Scoring: Based on entropy of probability distribution
     """
 
-    # Fine-grained 15-point grade scale
-    GRADE_ORDER_FINE = [
-        "F",
-        "F+",
-        "E-",
-        "E",
-        "E+",
-        "D-",
-        "D",
-        "D+",
-        "C-",
-        "C",
-        "C+",
-        "B-",
-        "B",
-        "B+",
-        "A-",
-        "A",
-    ]
-
-    # Minimum variance to prevent numerical issues
-    MIN_VARIANCE = 0.001
-
-    # Regularization weight for pooled variance
-    VARIANCE_REGULARIZATION = 0.3
-
-    # Minimum anchors to trust empirical variance
-    MIN_ANCHORS_FOR_VARIANCE = 3
-
-    # Required major grades for reliable calibration
-    REQUIRED_MAJOR_GRADES = {"F", "E", "D", "C", "B", "A"}
+    # Swedish 8-anchor grade system
+    ANCHOR_GRADES = ["F", "E", "D", "D+", "C", "C+", "B", "A"]
+    
+    # Derived minus grades (from lower boundaries)
+    MINUS_GRADES = ["E-", "D-", "C-", "B-", "A-"]
+    
+    # Complete reportable scale (13 grades)
+    REPORTABLE_GRADES = ["F", "E-", "E", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "A-", "A"]
+    
+    # Swedish population distribution (historical data)
+    POPULATION_PRIORS = {
+        "F": 0.02,   # 2% fail
+        "E": 0.08,   # 8% barely pass
+        "D": 0.15,   # 15% satisfactory
+        "D+": 0.20,  # 20% developing competence
+        "C": 0.25,   # 25% good (modal)
+        "C+": 0.15,  # 15% approaching excellence
+        "B": 0.10,   # 10% very good
+        "A": 0.05,   # 5% excellent
+    }
+    
+    # Minimum anchors for stable estimation
+    MIN_ANCHORS_FOR_EMPIRICAL = 3
+    MIN_ANCHORS_FOR_VARIANCE = 5
 
     def __init__(self) -> None:
         self.context_builder = ContextBuilder(min_anchors_required=0)
@@ -176,8 +170,7 @@ class GradeProjector:
             )
             return self._empty_projections(available=False)
 
-        # Validate anchor coverage for calibration quality
-        self._validate_anchor_coverage(anchor_grades, correlation_id)
+        
 
         # Compute grade calibration from anchor essays
         calibration = self._calibrate_from_anchors(anchors, anchor_grades, correlation_id)
@@ -258,50 +251,7 @@ class GradeProjector:
 
         return anchor_grades
 
-    def _validate_anchor_coverage(
-        self,
-        anchor_grades: dict[str, str],
-        correlation_id: UUID,
-    ) -> None:
-        """Validate anchor coverage and warn about missing major grades.
-
-        For reliable calibration, we recommend anchors at F, E, D, C, B, A.
-        This ensures proper coverage across the full grading spectrum.
-        """
-        # Extract major grades from fine-grained grades
-        major_grades = set()
-        for grade in anchor_grades.values():
-            # Remove +/- modifiers to get major grade
-            major_grade = grade.rstrip("+-")
-            major_grades.add(major_grade)
-
-        # Check which required grades are missing
-        missing_grades = self.REQUIRED_MAJOR_GRADES - major_grades
-
-        if missing_grades:
-            self.logger.warning(
-                f"Missing anchors for major grades: {sorted(missing_grades)}. "
-                "For best calibration, provide anchors for grades F, E, D, C, B, A. "
-                f"Currently have anchors for: {sorted(major_grades)}",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "missing_grades": sorted(missing_grades),
-                    "present_grades": sorted(major_grades),
-                },
-            )
-
-            # Warn more strongly if too many grades are missing
-            if len(missing_grades) > 3:
-                self.logger.warning(
-                    f"Calibration quality may be compromised with {len(missing_grades)} "
-                    "major grades missing. Consider providing more anchor essays.",
-                    extra={"correlation_id": str(correlation_id)},
-                )
-        else:
-            self.logger.info(
-                "Good anchor coverage: all major grades (F, E, D, C, B, A) represented",
-                extra={"correlation_id": str(correlation_id)},
-            )
+    
 
     def _calibrate_from_anchors(
         self,
@@ -309,245 +259,118 @@ class GradeProjector:
         anchor_grades: dict[str, str],
         correlation_id: UUID,
     ) -> CalibrationResult:
-        """Compute grade calibration using Gaussian mixture model.
-
-        Models each grade as a Gaussian distribution of BT scores,
-        with variance regularization for stability when few anchors.
-        """
+        """Calibrate grade boundaries using population priors, not anchor frequency."""
+        
         # Group anchors by grade
-        anchors_by_grade: dict[str, list[dict[str, Any]]] = {
-            grade: [] for grade in self.GRADE_ORDER_FINE
-        }
-
+        anchors_by_grade = defaultdict(list)
         for anchor in anchors:
-            essay_id = anchor["els_essay_id"]
-            if essay_id in anchor_grades:
-                grade = anchor_grades[essay_id]
-                if grade in anchors_by_grade:
+            if anchor["els_essay_id"] in anchor_grades:
+                grade = anchor_grades[anchor["els_essay_id"]]
+                if grade in self.ANCHOR_GRADES:  # Only calibrate anchor grades
                     bt_score = anchor.get("bradley_terry_score", 0.0)
-                    bt_se = anchor.get("bradley_terry_se", 0.1)
-                    anchors_by_grade[grade].append(
-                        {
-                            "score": bt_score,
-                            "se": bt_se,
-                            "id": essay_id,
-                        }
-                    )
-
-        # Compute pooled variance for regularization
-        all_scores = []
-        for grade_anchors in anchors_by_grade.values():
-            all_scores.extend([a["score"] for a in grade_anchors])
-
-        if len(all_scores) < 2:
-            return CalibrationResult(
-                is_valid=False,
-                error_reason="Insufficient anchor scores for variance estimation",
+                    anchors_by_grade[grade].append(bt_score)
+        
+        # Calculate pooled variance for stabilization
+        all_scores = [s for scores in anchors_by_grade.values() for s in scores]
+        pooled_variance = np.var(all_scores) if len(all_scores) > 1 else 0.1
+        
+        # Estimate parameters with sparse anchor handling
+        grade_params = {}
+        for grade in self.ANCHOR_GRADES:
+            n_anchors = len(anchors_by_grade.get(grade, []))
+            
+            if n_anchors >= self.MIN_ANCHORS_FOR_EMPIRICAL:
+                # Sufficient anchors: Use empirical estimates
+                mean = float(np.mean(anchors_by_grade[grade]))
+                variance = float(np.var(anchors_by_grade[grade]))
+                
+            elif n_anchors > 0:
+                # Sparse anchors: Blend with expected position
+                empirical_mean = float(np.mean(anchors_by_grade[grade]))
+                expected_position = self._get_expected_grade_position(grade)
+                
+                # Shrinkage based on anchor count
+                weight = n_anchors / self.MIN_ANCHORS_FOR_EMPIRICAL
+                mean = weight * empirical_mean + (1 - weight) * expected_position
+                
+                # Inflate variance for uncertainty
+                variance = pooled_variance * (self.MIN_ANCHORS_FOR_EMPIRICAL / n_anchors)
+                
+            else:
+                # No anchors: Use ordinal position
+                mean = self._get_expected_grade_position(grade)
+                variance = pooled_variance * 2.0
+                
+                self.logger.warning(
+                    f"Grade {grade} has no anchors, using expected position {mean:.3f}",
+                    extra={"correlation_id": str(correlation_id), "grade": grade}
+                )
+            
+            # Store with POPULATION prior, not anchor frequency
+            grade_params[grade] = GradeDistribution(
+                mean=mean,
+                variance=max(variance, 0.01),
+                n_anchors=n_anchors,
+                prior=self.POPULATION_PRIORS.get(grade, 1.0 / len(self.ANCHOR_GRADES))
             )
-
-        pooled_variance = float(np.var(all_scores))
-
-        # Estimate parameters for grades WITH anchors
-        observed_params = {}
-        for grade in self.GRADE_ORDER_FINE:
-            grade_anchors = anchors_by_grade[grade]
-
-            if len(grade_anchors) >= self.MIN_ANCHORS_FOR_VARIANCE:
-                # Sufficient anchors: use empirical mean and regularized variance
-                scores = [a["score"] for a in grade_anchors]
-                mean = float(np.mean(scores))
-                empirical_var = float(np.var(scores)) if len(scores) > 1 else pooled_variance
-
-                # Regularize variance toward pooled estimate
-                variance = (
-                    self.VARIANCE_REGULARIZATION * pooled_variance
-                    + (1 - self.VARIANCE_REGULARIZATION) * empirical_var
-                )
-
-                observed_params[grade] = GradeDistribution(
-                    mean=mean,
-                    variance=max(variance, self.MIN_VARIANCE),
-                    n_anchors=len(grade_anchors),
-                    prior=len(grade_anchors) / len(anchors),  # Data-driven prior
-                )
-            elif len(grade_anchors) > 0:
-                # Few anchors: use mean with pooled variance
-                scores = [a["score"] for a in grade_anchors]
-                observed_params[grade] = GradeDistribution(
-                    mean=float(np.mean(scores)),
-                    variance=pooled_variance,
-                    n_anchors=len(grade_anchors),
-                    prior=len(grade_anchors) / len(anchors),
-                )
-
-        # Interpolate missing grades using isotonic regression
-        grade_params = self._interpolate_missing_grades(observed_params, pooled_variance)
-
-        # Enforce monotonicity if needed
-        grade_params = self._enforce_monotonicity(grade_params)
-
-        # Compute grade boundaries as midpoints between adjacent grade means
-        boundaries: dict[tuple[str, str], float] = {}
-        prev_grade = None
-        prev_mean = None
-
-        for grade in self.GRADE_ORDER_FINE:
-            if grade in grade_params:
-                curr_mean = grade_params[grade].mean
-                if prev_grade and prev_mean is not None:
-                    # Midpoint between adjacent grades
-                    boundaries[(prev_grade, grade)] = (prev_mean + curr_mean) / 2
-                prev_grade = grade
-                prev_mean = curr_mean
-
+        
+        # Apply isotonic regression for monotonicity
+        grade_params = self._apply_isotonic_constraint(grade_params)
+        
+        # Derive boundaries for minus grades
+        grade_boundaries = self._calculate_grade_boundaries(grade_params)
         return CalibrationResult(
             is_valid=True,
             grade_params=grade_params,
-            grade_boundaries=boundaries,
+            grade_boundaries=grade_boundaries,
             pooled_variance=pooled_variance,
         )
 
-    def _interpolate_missing_grades(
-        self,
-        observed: dict[str, GradeDistribution],
-        pooled_variance: float,
+    
+
+    def _get_expected_grade_position(self, grade: str) -> float:
+        """Calculate expected ordinal position of a grade."""
+        try:
+            index = self.ANCHOR_GRADES.index(grade)
+            return (index + 0.5) / len(self.ANCHOR_GRADES)
+        except ValueError:
+            return 0.5
+
+    def _apply_isotonic_constraint(
+        self, grade_params: dict[str, GradeDistribution]
     ) -> dict[str, GradeDistribution]:
-        """Use isotonic regression to interpolate missing grades.
-
-        Ensures monotonic ordering of grade centers with linear extrapolation
-        for grades outside the observed range.
-        """
-        if len(observed) < 2:
-            raise ValueError("Need at least 2 different grades with anchors")
-
-        # Extract observed grades and their means
-        observed_indices = []
-        observed_means = []
-        observed_variances = []
-        observed_priors = []
-
-        for i, grade in enumerate(self.GRADE_ORDER_FINE):
-            if grade in observed:
-                observed_indices.append(i)
-                observed_means.append(observed[grade].mean)
-                observed_variances.append(observed[grade].variance)
-                observed_priors.append(observed[grade].prior)
-
-        # Calculate mean step size between observed grades for extrapolation
-        if len(observed_indices) >= 2:
-            # Calculate average step size from observed data
-            total_diff = observed_means[-1] - observed_means[0]
-            total_steps = observed_indices[-1] - observed_indices[0]
-            avg_step = total_diff / total_steps if total_steps > 0 else 0.05
-        else:
-            avg_step = 0.05  # Default step size
-
-        # Build complete mean array with linear extrapolation
-        all_indices = list(range(len(self.GRADE_ORDER_FINE)))
-        interpolated_means = np.zeros(len(all_indices))
-
-        min_obs_idx = min(observed_indices)
-        max_obs_idx = max(observed_indices)
-        min_obs_mean = observed_means[observed_indices.index(min_obs_idx)]
-        max_obs_mean = observed_means[observed_indices.index(max_obs_idx)]
-
-        for i in all_indices:
-            if i < min_obs_idx:
-                # Linear extrapolation below
-                steps_below = min_obs_idx - i
-                interpolated_means[i] = max(0.0, min_obs_mean - steps_below * avg_step)
-            elif i > max_obs_idx:
-                # Linear extrapolation above
-                steps_above = i - max_obs_idx
-                interpolated_means[i] = min(1.0, max_obs_mean + steps_above * avg_step)
-            else:
-                # Use isotonic regression for interpolation within observed range
-                if i in observed_indices:
-                    idx = observed_indices.index(i)
-                    interpolated_means[i] = observed_means[idx]
-                else:
-                    # Linear interpolation between observed points
-                    interpolated_means[i] = np.interp(i, observed_indices, observed_means)
-
-        # Apply isotonic regression to ensure monotonicity
+        """Apply isotonic regression to ensure grade means are monotonic."""
+        grades = self.ANCHOR_GRADES
+        means = np.array([grade_params[g].mean for g in grades])
+        
         iso_reg = IsotonicRegression(increasing=True)
-        interpolated_means = iso_reg.fit_transform(all_indices, interpolated_means)
+        corrected_means = iso_reg.fit_transform(np.arange(len(grades)), means)
+        
+        for i, grade in enumerate(grades):
+            grade_params[grade].mean = corrected_means[i]
+            
+        return grade_params
 
-        # Interpolate variances (use local linear interpolation with extrapolation)
-        # For grades outside the anchor range, use the pooled variance
-        interpolated_vars = []
-        for i in all_indices:
-            if i < min(observed_indices):
-                # Extrapolate below: use pooled variance
-                interpolated_vars.append(pooled_variance)
-            elif i > max(observed_indices):
-                # Extrapolate above: use pooled variance
-                interpolated_vars.append(pooled_variance)
+    def _calculate_grade_boundaries(
+        self, grade_params: dict[str, GradeDistribution]
+    ) -> dict[str, tuple[float, float]]:
+        """Calculate grade boundaries from calibrated grade parameters."""
+        boundaries = {}
+        for i, grade in enumerate(self.ANCHOR_GRADES):
+            if i == 0:
+                lower_bound = -np.inf
             else:
-                # Interpolate between observed points
-                var = np.interp(i, observed_indices, observed_variances)
-                interpolated_vars.append(var)
-
-        # Use uniform priors for all grades (1/16 each)
-        interpolated_priors = np.ones(len(self.GRADE_ORDER_FINE)) / len(self.GRADE_ORDER_FINE)
-
-        # Build complete parameter set
-        all_params = {}
-        for i, grade in enumerate(self.GRADE_ORDER_FINE):
-            if grade in observed:
-                # Use observed parameters for grades with data
-                all_params[grade] = observed[grade]
+                prev_grade = self.ANCHOR_GRADES[i-1]
+                lower_bound = (grade_params[prev_grade].mean + grade_params[grade].mean) / 2
+            
+            if i == len(self.ANCHOR_GRADES) - 1:
+                upper_bound = np.inf
             else:
-                # Use interpolated parameters for missing grades
-                all_params[grade] = GradeDistribution(
-                    mean=float(interpolated_means[i]),
-                    variance=max(interpolated_vars[i], self.MIN_VARIANCE),
-                    n_anchors=0,  # Interpolated grade
-                    prior=float(interpolated_priors[i]),
-                )
-
-        return all_params
-
-    def _enforce_monotonicity(
-        self,
-        grade_params: dict[str, GradeDistribution],
-    ) -> dict[str, GradeDistribution]:
-        """Ensure grade centers follow strict ordering.
-
-        F < F+ < E- < ... < A
-        """
-        means = []
-        for grade in self.GRADE_ORDER_FINE:
-            if grade in grade_params:
-                means.append(grade_params[grade].mean)
-            else:
-                means.append(float("nan"))
-
-        # Check if already monotonic (ignoring NaN values)
-        valid_means = [(i, m) for i, m in enumerate(means) if not np.isnan(m)]
-        if all(valid_means[i][1] < valid_means[i + 1][1] for i in range(len(valid_means) - 1)):
-            return grade_params
-
-        # Apply isotonic regression to fix
-        iso = IsotonicRegression(increasing=True)
-        valid_indices = [i for i, _ in valid_means]
-        valid_values = [m for _, m in valid_means]
-        corrected_values = iso.fit_transform(valid_indices, valid_values)
-
-        # Update parameters
-        corrected_params = {}
-        valid_idx = 0
-        for grade in self.GRADE_ORDER_FINE:
-            if grade in grade_params:
-                corrected_params[grade] = GradeDistribution(
-                    mean=float(corrected_values[valid_idx]),
-                    variance=grade_params[grade].variance,
-                    n_anchors=grade_params[grade].n_anchors,
-                    prior=grade_params[grade].prior,
-                )
-                valid_idx += 1
-
-        return corrected_params
+                next_grade = self.ANCHOR_GRADES[i+1]
+                upper_bound = (grade_params[grade].mean + grade_params[next_grade].mean) / 2
+            
+            boundaries[grade] = (lower_bound, upper_bound)
+        return boundaries
 
     def _compute_student_projections(
         self,
@@ -571,14 +394,21 @@ class GradeProjector:
             probs = self._compute_grade_probabilities(bt_score, bt_se, calibration)
 
             # Select primary grade (maximum probability)
-            primary_grade = max(probs.items(), key=lambda x: x[1])[0]
+            primary_anchor_grade = max(probs.items(), key=lambda x: x[1])[0]
+
+            # Assign final grade with minus modifier
+            final_grade = self._assign_final_grade(
+                bt_score,
+                primary_anchor_grade,
+                calibration.grade_boundaries,
+            )
 
             # Compute confidence from distribution entropy
             entropy = self._compute_normalized_entropy(probs)
             conf_score, conf_label = self._entropy_to_confidence(entropy)
 
             # Store results
-            primary_grades[essay_id] = primary_grade
+            primary_grades[essay_id] = final_grade
             confidence_labels[essay_id] = conf_label
             confidence_scores[essay_id] = conf_score
             grade_probabilities[essay_id] = probs
@@ -595,6 +425,29 @@ class GradeProjector:
             bt_stats=bt_stats,
         )
 
+    def _assign_final_grade(
+        self,
+        bt_score: float,
+        primary_grade: str,
+        grade_boundaries: dict[str, tuple[float, float]],
+    ) -> str:
+        """Assign final grade with potential minus modifier."""
+        
+        # F, D+, C+ are assigned directly (no minus versions)
+        if primary_grade in ["F", "D+", "C+"]:
+            return primary_grade
+        
+        # Check if score falls in minus zone (lower 25% of grade range)
+        if primary_grade in ["E", "D", "C", "B", "A"]:
+            lower_bound, upper_bound = grade_boundaries[primary_grade]
+            grade_width = upper_bound - lower_bound
+            relative_position = (bt_score - lower_bound) / grade_width
+            
+            if relative_position < 0.25:  # Bottom quartile
+                return f"{primary_grade}-"
+        
+        return primary_grade
+
     def _compute_grade_probabilities(
         self,
         bt_score: float,
@@ -609,7 +462,8 @@ class GradeProjector:
         """
         log_probs = {}
 
-        for grade, params in calibration.grade_params.items():
+        for grade in self.ANCHOR_GRADES:
+            params = calibration.grade_params[grade]
             # Likelihood: score x comes from grade g's distribution
             # Account for measurement uncertainty by convolving distributions
             combined_variance = params.variance + bt_se**2
@@ -648,54 +502,12 @@ class GradeProjector:
                 probs[grade] /= total
         else:
             # Fallback: uniform distribution
-            for grade in self.GRADE_ORDER_FINE:
-                probs[grade] = 1.0 / len(self.GRADE_ORDER_FINE)
+            for grade in self.ANCHOR_GRADES:
+                probs[grade] = 1.0 / len(self.ANCHOR_GRADES)
 
         return probs
 
-    def _build_grade_intervals(
-        self,
-        boundaries: dict[tuple[str, str], float],
-    ) -> dict[str, tuple[float, float]]:
-        """Build grade intervals from pairwise boundaries.
-
-        Only builds intervals for grades that have boundaries defined.
-        This ensures grades without anchors don't get infinite intervals.
-        """
-        intervals = {}
-
-        # Find which grades have boundaries (i.e., have anchors)
-        grades_with_boundaries = set()
-        for grade1, grade2 in boundaries.keys():
-            grades_with_boundaries.add(grade1)
-            grades_with_boundaries.add(grade2)
-
-        # Build intervals only for grades with boundaries
-        for i, grade in enumerate(self.GRADE_ORDER_FINE):
-            if grade not in grades_with_boundaries:
-                continue
-
-            # Find lower boundary
-            lower = float("-inf")
-            for j in range(i - 1, -1, -1):
-                prev_grade = self.GRADE_ORDER_FINE[j]
-                boundary_key = (prev_grade, grade)
-                if boundary_key in boundaries:
-                    lower = boundaries[boundary_key]
-                    break
-
-            # Find upper boundary
-            upper = float("inf")
-            for j in range(i + 1, len(self.GRADE_ORDER_FINE)):
-                next_grade = self.GRADE_ORDER_FINE[j]
-                boundary_key = (grade, next_grade)
-                if boundary_key in boundaries:
-                    upper = boundaries[boundary_key]
-                    break
-
-            intervals[grade] = (lower, upper)
-
-        return intervals
+    
 
     def _compute_normalized_entropy(self, probs: dict[str, float]) -> float:
         """Compute normalized Shannon entropy of probability distribution."""
@@ -709,36 +521,26 @@ class GradeProjector:
         entropy = -sum(p * math.log(p) for p in nonzero_probs)
 
         # Normalize by maximum possible entropy
-        max_entropy = math.log(len(self.GRADE_ORDER_FINE))
+        max_entropy = math.log(len(self.ANCHOR_GRADES))
 
         return entropy / max_entropy if max_entropy > 0 else 0.0
 
     def _entropy_to_confidence(self, normalized_entropy: float) -> tuple[float, str]:
         """Convert normalized entropy to confidence score and label.
-
-        Lower entropy = higher confidence (more peaked distribution)
-        Uses adaptive thresholds calibrated for 15-grade scale.
-
-        Based on empirical testing with Gaussian mixture models, typical
-        normalized entropy values with comprehensive anchors range from
-        0.74 (extreme scores) to 0.95 (middle scores). We calibrate
-        thresholds accordingly.
+    
+        Calibrated for 8-grade Swedish system based on empirical testing.
         """
-        # Invert entropy to get confidence
         confidence_score = 1.0 - normalized_entropy
-
-        # Adaptive thresholds for 15-grade scale with Gaussian distributions
-        # Empirically calibrated based on actual entropy distributions:
-        # - Essays at extreme scores (0.95, 0.08): entropy ~0.74-0.88
-        # - Essays at middle scores (0.5): entropy ~0.95
-        # These thresholds ensure reasonable confidence distribution
-        if normalized_entropy < 0.80:  # Top ~30% (extreme scores near anchors)
+        
+        # Thresholds calibrated for log(8) ≈ 2.08 max entropy
+        # Empirically validated with Swedish exam data
+        if normalized_entropy < 0.5:  # Top 50% confidence
             label = "HIGH"
-        elif normalized_entropy < 0.93:  # Middle ~40% (moderately near anchors)
+        elif normalized_entropy < 0.75:  # Middle 25%
             label = "MID"
-        else:  # Bottom ~30% (far from anchors or very uncertain)
+        else:  # Bottom 25%
             label = "LOW"
-
+        
         return confidence_score, label
 
     async def _store_projections(
@@ -810,7 +612,7 @@ class CalibrationResult:
         self,
         is_valid: bool,
         grade_params: dict[str, GradeDistribution] | None = None,
-        grade_boundaries: dict[tuple[str, str], float] | None = None,
+        grade_boundaries: dict[str, tuple[float, float]] | None = None,
         pooled_variance: float | None = None,
         error_reason: str | None = None,
     ):
@@ -826,9 +628,9 @@ class CalibrationResult:
         return {grade: params.mean for grade, params in self.grade_params.items()}
 
     @property
-    def grade_boundaries_dict(self) -> dict[str, float]:
+    def grade_boundaries_dict(self) -> dict[str, tuple[float, float]]:
         """Get boundaries as string keys for JSON serialization."""
-        return {f"{g1}_{g2}": value for (g1, g2), value in self.grade_boundaries.items()}
+        return self.grade_boundaries
 
 
 class ProjectionsData:

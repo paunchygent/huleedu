@@ -38,6 +38,19 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **Database**: Async SQLAlchemy (SQLite by default for development; **PostgreSQL recommended for production deployments**)
 - **Kafka**: Event consumption and publishing via EventEnvelope pattern
 
+## Grading System
+
+The service now uses a sophisticated 8-anchor Swedish national exam grade system. This system is designed for high psychometric reliability and statistical stability.
+
+### Key Features
+
+- **8 Anchor Grades**: The core calibration is based on 8 anchor grades: `F, E, D, D+, C, C+, B, A`.
+- **Derived Minus Grades**: The system derives "minus" grades (e.g., `B-`, `C-`) for scores that fall in the lower quartile of a grade band, providing more granular feedback without increasing rater complexity.
+- **Population Priors**: Instead of relying on the frequency of anchors provided, the system uses a set of population priors based on historical Swedish national exam data. This makes the grading more robust and less susceptible to bias from anchor selection.
+- **Shrinkage Estimation**: For grades with few or no anchors, the system uses shrinkage estimation to provide a stable and reasonable grade estimate, preventing wild fluctuations caused by sparse data.
+
+This new system provides more reliable, valid, and fair assessments compared to the previous 15-point scale.
+
 ## LLM Configuration & Dynamic Overrides
 
 ### Multi-Provider Support
