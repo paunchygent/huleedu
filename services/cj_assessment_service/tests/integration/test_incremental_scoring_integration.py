@@ -547,16 +547,16 @@ class TestIncrementalScoring:
 
         # 2. Scores remain mean-centered
         for entry in score_history:
-            scores: dict[str, float] = entry["scores"]
-            mean_score = sum(scores.values()) / len(scores)
+            entry_scores: dict[str, float] = entry["scores"]
+            mean_score = sum(entry_scores.values()) / len(entry_scores)
             assert abs(mean_score) < 1e-8, (
                 f"Scores not mean-centered at {entry['comparison_count']}: mean={mean_score}"
             )
 
         # 3. Score magnitudes are reasonable (not infinite)
         for entry in score_history:
-            scores: dict[str, float] = entry["scores"]
-            for essay_id, score in scores.items():
+            magnitude_scores: dict[str, float] = entry["scores"]
+            for essay_id, score in magnitude_scores.items():
                 assert abs(score) < 100, f"Unreasonable score magnitude for {essay_id}: {score}"
 
         # 4. Scores evolve (not static) as more data arrives
@@ -669,18 +669,18 @@ class TestIncrementalScoring:
         assert len(scores) > 0, "Should have calculated scores"
 
         # Verify comparison pairs were stored
-        stmt = select(ComparisonPair).where(ComparisonPair.cj_batch_id == batch_id)
-        result = await postgres_session.execute(stmt)
-        stored_pairs = result.scalars().all()
+        stmt_pairs = select(ComparisonPair).where(ComparisonPair.cj_batch_id == batch_id)
+        pairs_result = await postgres_session.execute(stmt_pairs)
+        stored_pairs = pairs_result.scalars().all()
 
         assert len(stored_pairs) == len(test_pairs), (
             f"Should have stored {len(test_pairs)} comparison pairs"
         )
 
         # Verify essays have scores
-        stmt = select(ProcessedEssay).where(ProcessedEssay.cj_batch_id == batch_id)
-        result = await postgres_session.execute(stmt)
-        essays_with_scores = result.scalars().all()
+        stmt_essays = select(ProcessedEssay).where(ProcessedEssay.cj_batch_id == batch_id)
+        essays_result = await postgres_session.execute(stmt_essays)
+        essays_with_scores = essays_result.scalars().all()
 
         essays_scored = sum(1 for e in essays_with_scores if e.current_bt_score is not None)
         assert essays_scored > 0, "Should have computed scores for some essays"
