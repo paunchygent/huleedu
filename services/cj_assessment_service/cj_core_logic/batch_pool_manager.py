@@ -75,24 +75,42 @@ class BatchPoolManager:
         )
 
         try:
-            from .batch_submission import append_to_failed_pool_atomic
-            
-            # Create new failed comparison entry
-            failed_entry = FailedComparisonEntry(
-                essay_a_id=comparison_task.essay_a.id,
-                essay_b_id=comparison_task.essay_b.id,
-                comparison_task=comparison_task,
-                failure_reason=failure_reason,
-                failed_at=datetime.now(UTC),
-                retry_count=0,
-                original_batch_id=str(cj_batch_id),
-                correlation_id=correlation_id,
-            )
-            
-            # Convert to JSON-serializable dict
-            failed_entry_json = failed_entry.model_dump(mode='json')
+            from .batch_submission import append_to_failed_pool_atomic, get_batch_state
             
             async with self.database.session() as session:
+                # First check if batch exists
+                batch_state = await get_batch_state(
+                    session=session,
+                    cj_batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                )
+                
+                if not batch_state:
+                    from huleedu_service_libs.error_handling import raise_resource_not_found
+                    raise_resource_not_found(
+                        service="cj_assessment_service",
+                        operation="add_to_failed_pool",
+                        message=f"Batch state not found for batch {cj_batch_id}",
+                        correlation_id=correlation_id,
+                        resource_type="batch_state",
+                        resource_id=str(cj_batch_id),
+                    )
+                
+                # Create new failed comparison entry
+                failed_entry = FailedComparisonEntry(
+                    essay_a_id=comparison_task.essay_a.id,
+                    essay_b_id=comparison_task.essay_b.id,
+                    comparison_task=comparison_task,
+                    failure_reason=failure_reason,
+                    failed_at=datetime.now(UTC),
+                    retry_count=0,
+                    original_batch_id=str(cj_batch_id),
+                    correlation_id=correlation_id,
+                )
+                
+                # Convert to JSON-serializable dict
+                failed_entry_json = failed_entry.model_dump(mode='json')
+                
                 # Use atomic JSONB append - no locking needed!
                 await append_to_failed_pool_atomic(
                     session=session,

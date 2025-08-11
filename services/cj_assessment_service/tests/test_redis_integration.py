@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import pytest
 from dishka import make_async_container
-from huleedu_service_libs.protocols import RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy.ext.asyncio import create_async_engine
+
+from huleedu_service_libs.outbox import OutboxProvider
 
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 
@@ -21,11 +23,14 @@ async def test_redis_client_di_injection() -> None:
     """Test that RedisClient can be injected via DI container."""
     # Create test database engine
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    container = make_async_container(CJAssessmentServiceProvider(engine=engine))
+    container = make_async_container(
+        CJAssessmentServiceProvider(engine=engine),
+        OutboxProvider(),  # Add OutboxProvider to provide OutboxRepositoryProtocol
+    )
 
     async with container() as request_container:
         # Test that we can get a RedisClient from DI
-        redis_client = await request_container.get(RedisClientProtocol)
+        redis_client = await request_container.get(AtomicRedisClientProtocol)
 
         # Verify it's the correct type
         assert isinstance(redis_client, RedisClient)

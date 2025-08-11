@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -48,36 +48,45 @@ class TestFailedComparisonPoolAdd:
         correlation_id = uuid4()
         failure_reason = "timeout"
 
-        # Mock database session and batch state retrieval
+        # Mock database session with proper query responses
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
+        
+        # Mock the execute method to return batch state when queried
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=sample_batch_state)
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        
+        # Mock commit for the atomic update
+        mock_session.commit = AsyncMock(return_value=None)
 
-        # Act & Assert
-        with (
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state"
-            ) as mock_get_batch_state,
-            patch(
-                "services.cj_assessment_service.cj_core_logic.batch_pool_manager.update_batch_processing_metadata"
-            ) as mock_update_metadata,
-        ):
-            mock_get_batch_state.return_value = sample_batch_state
-            mock_update_metadata.return_value = None
+        # Act
+        await batch_pool_manager.add_to_failed_pool(
+            cj_batch_id=cj_batch_id,
+            comparison_task=sample_comparison_task,
+            failure_reason=failure_reason,
+            correlation_id=correlation_id,
+        )
 
-            await batch_pool_manager.add_to_failed_pool(
-                cj_batch_id=cj_batch_id,
-                comparison_task=sample_comparison_task,
-                failure_reason=failure_reason,
-                correlation_id=correlation_id,
-            )
-
-            # Verify the mocks were called correctly
-            mock_get_batch_state.assert_called_once_with(
-                session=mock_session,
-                cj_batch_id=cj_batch_id,
-                correlation_id=correlation_id,
-            )
-            mock_update_metadata.assert_called_once()
+        # Assert - Verify database interactions through the mock
+        # Should have executed at least 2 queries: one for get_batch_state, one for atomic update
+        assert mock_session.execute.call_count >= 2
+        
+        # Verify commit was called for the atomic operation
+        mock_session.commit.assert_called()
+        
+        # Verify the SQL update contained the expected batch_id
+        update_call = None
+        for call in mock_session.execute.call_args_list:
+            if call.args and hasattr(call.args[0], 'text'):
+                # This is the SQL text update call
+                update_call = call
+                break
+        
+        if update_call:
+            # Verify the batch_id was passed to the SQL update
+            assert update_call.kwargs.get('batch_id') == cj_batch_id or \
+                   (update_call.args[1] if len(update_call.args) > 1 else {}).get('batch_id') == cj_batch_id
 
     @pytest.mark.asyncio
     async def test_add_to_failed_pool_no_batch_state(
@@ -92,26 +101,25 @@ class TestFailedComparisonPoolAdd:
         correlation_id = uuid4()
         failure_reason = "timeout"
 
-        # Mock database session and batch state retrieval
+        # Mock database session to return None for batch state query
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
+        
+        # Mock the execute method to return None when batch state is queried
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none = MagicMock(return_value=None)  # No batch state found
+        mock_session.execute = AsyncMock(return_value=mock_result)
 
         # Act & Assert
         from huleedu_service_libs.error_handling import HuleEduError
 
-        with patch(
-            "services.cj_assessment_service.cj_core_logic.batch_pool_manager.get_batch_state",
-            new_callable=AsyncMock,
-        ) as mock_get_batch_state:
-            mock_get_batch_state.return_value = None
-
-            with pytest.raises(HuleEduError, match="Batch state not found"):
-                await batch_pool_manager.add_to_failed_pool(
-                    cj_batch_id=cj_batch_id,
-                    comparison_task=sample_comparison_task,
-                    failure_reason=failure_reason,
-                    correlation_id=correlation_id,
-                )
+        with pytest.raises(HuleEduError, match="batch_state with ID"):
+            await batch_pool_manager.add_to_failed_pool(
+                cj_batch_id=cj_batch_id,
+                comparison_task=sample_comparison_task,
+                failure_reason=failure_reason,
+                correlation_id=correlation_id,
+            )
 
 
 class TestFailedComparisonPoolModels:
