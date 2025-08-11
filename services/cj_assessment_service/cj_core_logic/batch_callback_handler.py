@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+import types
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
         BatchRetryProcessor,
     )
+
+# Module-level placeholders for lazy imports to satisfy type checking
+scoring_ranking: types.ModuleType | None = None
+grade_projector: types.ModuleType | None = None
 
 from common_core.events.llm_provider_events import LLMComparisonResultV1
 
@@ -25,10 +30,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import BatchCompletionChecker
-from services.cj_assessment_service.cj_core_logic.scoring_ranking import (
-    get_essay_rankings,
-    record_comparisons_and_update_scores,
-)
 from services.cj_assessment_service.cj_core_logic.batch_submission import get_batch_state
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
     check_batch_completion_conditions,
@@ -36,9 +37,6 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
 )
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     publish_dual_assessment_events,
-)
-from services.cj_assessment_service.cj_core_logic.grade_projector import (
-    GradeProjector,
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
@@ -78,6 +76,15 @@ async def continue_cj_assessment_workflow(
         content_client: Content client for fetching anchor essays
         retry_processor: Optional retry processor for failed comparison handling
     """
+    # Lazy imports to avoid scipy/coverage conflict at module initialization
+    global scoring_ranking, grade_projector
+    if scoring_ranking is None:
+        from services.cj_assessment_service.cj_core_logic import scoring_ranking as _sr
+        scoring_ranking = _sr
+    if grade_projector is None:
+        from services.cj_assessment_service.cj_core_logic import grade_projector as _gp
+        grade_projector = _gp
+    
     # Get business metrics
     business_metrics = get_business_metrics()
     comparisons_total_metric = business_metrics.get("cj_comparisons_total")
@@ -411,7 +418,8 @@ async def _trigger_batch_scoring_completion(
 
         # Calculate final Bradley-Terry scores
         # This function fetches all valid comparisons from DB and computes scores
-        await record_comparisons_and_update_scores(
+        assert scoring_ranking is not None  # Type narrowing for mypy
+        await scoring_ranking.record_comparisons_and_update_scores(
             all_essays=essays_for_api,
             comparison_results=comparisons,  # Empty list - function fetches from DB
             db_session=session,
@@ -427,11 +435,13 @@ async def _trigger_batch_scoring_completion(
         )
 
         # Get final rankings
-        rankings = await get_essay_rankings(session, batch_id, correlation_id)
+        assert scoring_ranking is not None  # Type narrowing for mypy
+        rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
 
         # Calculate grade projections using async GradeProjector
-        grade_projector = GradeProjector()
-        grade_projections = await grade_projector.calculate_projections(
+        assert grade_projector is not None  # Type narrowing for mypy
+        grade_proj = grade_projector.GradeProjector()
+        grade_projections = await grade_proj.calculate_projections(
             session=session,
             rankings=rankings,
             cj_batch_id=batch_id,
