@@ -48,7 +48,7 @@ def _create_metrics() -> dict[str, Any]:
             "llm_response_duration_seconds": Histogram(
                 "llm_provider_response_duration_seconds",
                 "LLM API response time in seconds",
-                ["provider", "model", "cached"],
+                ["provider", "model"],
                 buckets=(0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300),
                 registry=REGISTRY,
             ),
@@ -62,12 +62,6 @@ def _create_metrics() -> dict[str, Any]:
                 "llm_provider_cost_dollars_total",
                 "Total estimated cost in USD",
                 ["provider", "model"],
-                registry=REGISTRY,
-            ),
-            "llm_cache_hits_total": Counter(
-                "llm_provider_cache_hits_total",
-                "Total cache hits for LLM responses",
-                ["provider"],
                 registry=REGISTRY,
             ),
             "circuit_breaker_state": Gauge(
@@ -181,7 +175,6 @@ def get_llm_metrics() -> dict[str, Any]:
         "llm_response_duration_seconds": all_metrics.get("llm_response_duration_seconds"),
         "llm_tokens_used_total": all_metrics.get("llm_tokens_used_total"),
         "llm_cost_dollars_total": all_metrics.get("llm_cost_dollars_total"),
-        "llm_cache_hits_total": all_metrics.get("llm_cache_hits_total"),
         "circuit_breaker_state": all_metrics.get("circuit_breaker_state"),
         "llm_concurrent_requests": all_metrics.get("llm_concurrent_requests"),
         # Enhanced Performance Metrics - Phase 7
@@ -231,7 +224,6 @@ def _get_existing_metrics() -> dict[str, Any]:
         "llm_response_duration_seconds": "llm_provider_response_duration_seconds",
         "llm_tokens_used_total": "llm_provider_tokens_used_total",
         "llm_cost_dollars_total": "llm_provider_cost_dollars_total",
-        "llm_cache_hits_total": "llm_provider_cache_hits_total",
         "circuit_breaker_state": "llm_provider_circuit_breaker_state",
         "llm_concurrent_requests": "llm_provider_concurrent_requests",
         # Enhanced Performance Metrics - Phase 7

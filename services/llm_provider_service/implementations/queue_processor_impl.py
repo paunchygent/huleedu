@@ -182,8 +182,8 @@ class QueueProcessorImpl:
                     },
                 )
 
-                # Note: This will check provider availability and make the actual LLM call
-                result = await self.orchestrator.perform_comparison(
+                # Direct processing for queued requests (bypasses API queueing)
+                result = await self.orchestrator.process_queued_request(
                     provider=provider,
                     user_prompt=req_data.user_prompt,
                     essay_a=req_data.essay_a,

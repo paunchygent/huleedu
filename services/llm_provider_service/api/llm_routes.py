@@ -141,61 +141,38 @@ async def generate_comparison(
                     }
                 ), 500
 
-            # Check if result is a queued response
-            if isinstance(result, LLMQueuedResult):
-                metrics["llm_requests_total"].labels(
-                    provider=result.provider,
-                    model=model_override or "default",
-                    request_type="comparison",
-                    status="queued",
-                ).inc()
+            # ARCHITECTURAL TRUTH: ALL LLM requests are queued - no immediate responses
+            # Always expect LLMQueuedResult as orchestrator should never return immediate responses
+            if not isinstance(result, LLMQueuedResult):
+                logger.error(f"Orchestrator returned non-queued result: {type(result)}")
+                return jsonify(
+                    {
+                        "error": "Internal error: Expected queued result",
+                        "correlation_id": str(correlation_id),
+                    }
+                ), 500
 
-                # Build queued response - callback will be delivered to specified topic
-                queued_response = LLMQueuedResponse(
-                    queue_id=result.queue_id,
-                    status=result.status,
-                    message=(
-                        f"Request queued for processing. "
-                        f"Provider {result.provider.value} is currently unavailable. "
-                        f"Result will be delivered via callback."
-                    ),
-                    estimated_wait_minutes=result.estimated_wait_minutes,
-                )
-
-                logger.info(f"Request queued with ID: {result.queue_id}")
-                return jsonify(queued_response.model_dump()), 202
-
-            # Regular successful response
             metrics["llm_requests_total"].labels(
                 provider=result.provider,
-                model=result.model,
+                model=model_override or "default",
                 request_type="comparison",
-                status="success",
+                status="queued",
             ).inc()
 
-            # Build response - direct mapping from internal model to API response model
-            # No translation needed as both use assessment domain language
-
-            # Convert confidence scale from 0-1 to 1-5
-            confidence_scaled = 1.0 + (result.confidence * 4.0)
-            # Ensure confidence is within valid range
-            confidence_scaled = max(1.0, min(5.0, confidence_scaled))
-
-            response = LLMComparisonResponse(
-                winner=result.winner,
-                justification=result.justification,
-                confidence=confidence_scaled,
-                provider=result.provider,
-                model=result.model,
-                response_time_ms=result.response_time_ms,
-                correlation_id=result.correlation_id,
-                token_usage=result.token_usage,
-                cost_estimate=result.cost_estimate,
-                trace_id=result.trace_id,
+            # Build queued response - callback will be delivered to specified topic
+            queued_response = LLMQueuedResponse(
+                queue_id=result.queue_id,
+                status=result.status,
+                message=(
+                    f"Request queued for processing. "
+                    f"Result will be delivered via callback to topic: {comparison_request.callback_topic}"
+                ),
+                estimated_wait_minutes=result.estimated_wait_minutes,
             )
 
-            tracer.add_span_event("request_completed", {"status": "success"})
-            return jsonify(response.model_dump()), 200
+            logger.info(f"Request queued with ID: {result.queue_id}")
+            tracer.add_span_event("request_completed", {"status": "queued"})
+            return jsonify(queued_response.model_dump()), 202
 
     except CircuitBreakerError as e:
         logger.error(f"Circuit breaker open: {e}")

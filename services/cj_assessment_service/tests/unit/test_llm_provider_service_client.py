@@ -130,24 +130,20 @@ Please respond with a JSON object containing:
         result = client._extract_essays_from_prompt(prompt)
         assert result is None
 
-    async def test_generate_comparison_success(
+    async def test_generate_comparison_async_success(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
     ) -> None:
-        """Test successful comparison generation."""
-        # Mock successful response
+        """Test successful async comparison generation (202 response)."""
+        # Mock async response - LLM Provider Service queues request and returns 202
         mock_response = AsyncMock()
-        mock_response.status = 200
+        mock_response.status = 202
         mock_response.text = AsyncMock(
             return_value=json.dumps(
                 {
-                    "winner": "Essay A",
-                    "justification": "Essay A has better structure",
-                    "confidence": 4.5,
-                    "provider": "anthropic",
-                    "model": "claude-3-haiku",
-                    "cached": False,
-                    "response_time_ms": 1500,
-                    "correlation_id": str(uuid4()),
+                    "queue_id": str(uuid4()),
+                    "status": "queued",
+                    "message": "Request queued for processing. Result will be delivered via callback to topic: huleedu.llm_provider.comparison_result.v1",
+                    "estimated_wait_minutes": 2,
                 }
             )
         )
@@ -166,23 +162,18 @@ Please respond with a JSON object."""
 
         # Call generate_comparison
         correlation_id = uuid4()
-        try:
-            result = await client.generate_comparison(
-                user_prompt=prompt,
-                model_override="claude-3-haiku",
-                temperature_override=0.1,
-                correlation_id=correlation_id,
-            )
-        except HuleEduError as e:
-            pytest.fail(f"Unexpected error: {e}")
+        result = await client.generate_comparison(
+            user_prompt=prompt,
+            model_override="claude-3-5-haiku",
+            temperature_override=0.1,
+            correlation_id=correlation_id,
+        )
 
-        # Verify result
-        assert result is not None
-        assert result["winner"] == "Essay A"
-        assert result["justification"] == "Essay A has better structure"
-        assert result["confidence"] == 4.5
+        # Async-only architecture: result should always be None
+        # Results delivered via Kafka callbacks
+        assert result is None
 
-        # Verify API call
+        # Verify API call and request body
         mock_session.post.assert_called_once()
         call_args = mock_session.post.call_args
         assert call_args[0][0] == "http://test-llm-service:8090/api/v1/comparison"
@@ -194,8 +185,56 @@ Please respond with a JSON object."""
         assert request_body["essay_a"] == "Essay A content."
         assert request_body["essay_b"] == "Essay B content."
         assert request_body["llm_config_overrides"]["provider_override"] == "anthropic"
-        assert request_body["llm_config_overrides"]["model_override"] == "claude-3-haiku"
+        assert request_body["llm_config_overrides"]["model_override"] == "claude-3-5-haiku"
         assert request_body["llm_config_overrides"]["temperature_override"] == 0.1
+        assert "callback_topic" in request_body
+        assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
+
+    async def test_generate_comparison_rejects_sync_response(
+        self, client: LLMProviderServiceClient, mock_session: AsyncMock
+    ) -> None:
+        """Test that 200 responses are rejected as architectural violations."""
+        # Mock synchronous response - this should be rejected
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "winner": "Essay A",
+                    "justification": "Essay A has better structure",
+                    "confidence": 4.5,
+                    "provider": "anthropic",
+                    "model": "claude-3-5-haiku",
+                    "response_time_ms": 1500,
+                    "correlation_id": str(uuid4()),
+                }
+            )
+        )
+
+        mock_session.post.return_value.__aenter__.return_value = mock_response
+
+        # Create test prompt
+        prompt = """Compare these two essays.
+Essay A (ID: 123):
+Essay A content.
+
+Essay B (ID: 456):
+Essay B content.
+
+Please respond with a JSON object."""
+
+        # Call generate_comparison - should raise error
+        correlation_id = uuid4()
+        with assert_raises_huleedu_error(
+            error_code=ErrorCode.INVALID_RESPONSE, 
+            message_contains="synchronous response (200)"
+        ):
+            await client.generate_comparison(
+                user_prompt=prompt,
+                model_override="claude-3-5-haiku",
+                temperature_override=0.1,
+                correlation_id=correlation_id,
+            )
 
     async def test_generate_comparison_http_error(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -266,82 +305,8 @@ Essay B content."""
                 correlation_id=correlation_id,
             )
 
-    async def test_generate_comparison_json_parse_error(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test handling of invalid JSON response."""
-        # Mock response with invalid JSON
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value="Invalid JSON response")
-
-        mock_session.post.return_value.__aenter__.return_value = mock_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        with assert_raises_huleedu_error(
-            error_code=ErrorCode.PARSING_ERROR,
-            message_contains="Failed to parse immediate response JSON",
-        ) as _:
-            await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
 
     # Queue-based response tests
-    async def test_generate_comparison_queued_returns_none(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test that queued response (202) returns None for callback-based processing."""
-        queue_id = str(uuid4())
-
-        # Mock initial 202 response
-        mock_initial_response = AsyncMock()
-        mock_initial_response.status = 202
-        mock_initial_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "queue_id": queue_id,
-                    "status": "queued",
-                    "estimated_wait_minutes": 5,
-                    "status_url": f"/api/v1/status/{queue_id}",
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_initial_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        try:
-            result = await client.generate_comparison(
-                user_prompt=prompt,
-                correlation_id=correlation_id,
-            )
-        except HuleEduError as e:
-            pytest.fail(f"Unexpected error: {e}")
-
-        # Verify result is None for async processing
-        assert result is None
-
-        # Verify API call was made with callback topic
-        mock_session.post.assert_called_once()
-        call_args = mock_session.post.call_args
-        request_body = call_args[1]["json"]
-        assert "callback_topic" in request_body
-        assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
 
     async def test_generate_comparison_queued_no_queue_id(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock
@@ -378,46 +343,3 @@ Essay B content."""
                 correlation_id=correlation_id,
             )
 
-    async def test_generate_comparison_callback_topic_required(
-        self, client: LLMProviderServiceClient, mock_session: AsyncMock
-    ) -> None:
-        """Test that callback topic is included in request for async processing."""
-        # Mock successful response
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(
-            return_value=json.dumps(
-                {
-                    "winner": "Essay A",
-                    "justification": "Essay A has better structure",
-                    "confidence": 4.5,
-                    "provider": "anthropic",
-                    "model": "claude-3-haiku",
-                    "cached": False,
-                    "response_time_ms": 1500,
-                    "correlation_id": str(uuid4()),
-                }
-            )
-        )
-
-        mock_session.post.return_value.__aenter__.return_value = mock_response
-
-        prompt = """Compare these two essays.
-Essay A (ID: 123):
-Essay A content.
-
-Essay B (ID: 456):
-Essay B content."""
-
-        correlation_id = uuid4()
-        await client.generate_comparison(
-            user_prompt=prompt,
-            correlation_id=correlation_id,
-        )
-
-        # Verify callback topic is included in request
-        mock_session.post.assert_called_once()
-        call_args = mock_session.post.call_args
-        request_body = call_args[1]["json"]
-        assert "callback_topic" in request_body
-        assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC

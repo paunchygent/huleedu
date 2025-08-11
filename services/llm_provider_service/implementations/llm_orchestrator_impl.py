@@ -5,9 +5,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from uuid import UUID
 
-from common_core import CircuitBreakerState, LLMProviderType
+from common_core import LLMProviderType
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability.tracing import get_current_trace_id
 
 from services.llm_provider_service.api_models import LLMComparisonRequest
 from services.llm_provider_service.config import Settings
@@ -70,8 +69,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         correlation_id: UUID,
         callback_topic: str | None = None,
         **overrides: Any,
-    ) -> LLMOrchestratorResponse | LLMQueuedResult:
-        """Perform LLM comparison with provider-first logic and queuing fallback.
+    ) -> LLMQueuedResult:
+        """Perform LLM comparison with async-only queuing pattern.
 
         Args:
             provider: LLM provider to use
@@ -82,7 +81,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            LLMOrchestratorResponse for immediate results or LLMQueuedResult for queued processing
+            LLMQueuedResult - ALL requests are queued for async processing with callback delivery
 
         Raises:
             HuleEduError: On any failure to perform comparison
@@ -113,24 +112,66 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             },
         )
 
-        # Check provider availability FIRST
-        is_available = await self._is_provider_available(provider)
+        # ARCHITECTURAL TRUTH: ALL HTTP API requests are queued - no immediate responses
+        # Queue all API requests to ensure async-only pattern
+        logger.info(f"Queuing LLM request for provider {provider.value}, correlation_id: {correlation_id}")
+        return await self._queue_request(
+            provider=provider,
+            user_prompt=user_prompt,
+            essay_a=essay_a,
+            essay_b=essay_b,
+            correlation_id=correlation_id,
+            overrides=overrides,
+            start_time=start_time,
+            callback_topic=callback_topic,
+        )
 
-        if not is_available:
-            # Provider unavailable - queue the request
-            return await self._queue_request(
-                provider=provider,
-                user_prompt=user_prompt,
-                essay_a=essay_a,
-                essay_b=essay_b,
+    async def process_queued_request(
+        self,
+        provider: LLMProviderType,
+        user_prompt: str,
+        essay_a: str,
+        essay_b: str,
+        correlation_id: UUID,
+        **overrides: Any,
+    ) -> LLMOrchestratorResponse:
+        """Process a queued request directly (internal use only).
+        
+        This method bypasses queueing and directly calls providers.
+        ONLY used by QueueProcessor for processing already-queued requests.
+        
+        Args:
+            provider: LLM provider to use
+            user_prompt: The comparison prompt
+            essay_a: First essay to compare
+            essay_b: Second essay to compare
+            correlation_id: Request correlation ID
+            **overrides: Additional parameter overrides
+
+        Returns:
+            LLMOrchestratorResponse with immediate result
+
+        Raises:
+            HuleEduError: On any failure to process request
+        """
+        start_time = time.time()
+        
+        # Validate provider exists
+        if provider not in self.providers:
+            available = [p.value for p in self.providers.keys()]
+            error_msg = f"Provider '{provider.value}' not found. Available: {available}"
+            logger.error(error_msg)
+            raise_configuration_error(
+                service="llm_provider_service",
+                operation="orchestrator_process_queued_request",
+                config_key="provider",
+                message=error_msg,
                 correlation_id=correlation_id,
-                overrides=overrides,
-                start_time=start_time,
-                callback_topic=callback_topic,
+                details={"requested_provider": provider.value, "available_providers": available},
             )
 
-        # Provider is available - make direct LLM request
-        return await self._make_llm_request(
+        # Make direct LLM request for queued processing
+        return await self._make_direct_llm_request(
             provider=provider,
             user_prompt=user_prompt,
             essay_a=essay_a,
@@ -163,8 +204,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 details={"provider": provider.value},
             )
 
-        logger.warning(
-            f"Provider {provider.value} is unavailable, queuing request. "
+        logger.info(
+            f"Queuing LLM request for provider {provider.value} (async-only architecture). "
             f"correlation_id: {correlation_id}"
         )
 
@@ -248,17 +289,17 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 },
             )
 
-    async def _make_llm_request(
+    async def _make_direct_llm_request(
         self,
         provider: LLMProviderType,
         user_prompt: str,
         essay_a: str,
         essay_b: str,
         correlation_id: UUID,
-        overrides: Dict[str, Any],
+        overrides: dict[str, Any],
         start_time: float,
     ) -> LLMOrchestratorResponse:
-        """Make direct LLM request when provider is available."""
+        """Make direct LLM request for queued processing (internal use only)."""
         try:
             provider_impl = self.providers[provider]
 
@@ -283,7 +324,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             response_time_ms = int((time.time() - start_time) * 1000)
 
             # Success - fresh LLM response
-            token_usage_dict: Dict[str, int] = {
+            token_usage_dict: dict[str, int] = {
                 "prompt_tokens": result.prompt_tokens,
                 "completion_tokens": result.completion_tokens,
                 "total_tokens": result.total_tokens,
@@ -303,17 +344,15 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                     "token_usage": token_usage_dict,
                     "cost_estimate": cost_estimate_value,
                     "model_used": result.model,
+                    "processing_context": "queued_request",
                 },
             )
 
             logger.info(
-                f"LLM request successful for provider {provider.value}, "
+                f"Direct LLM request successful for provider {provider.value} (queued processing), "
                 f"correlation_id: {correlation_id}, "
                 f"response_time: {response_time_ms}ms"
             )
-
-            # Capture current trace ID from active span
-            current_trace_id = get_current_trace_id()
 
             # Return fresh orchestrator response
             return LLMOrchestratorResponse(
@@ -326,7 +365,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 token_usage=token_usage_dict,
                 cost_estimate=cost_estimate_value,
                 correlation_id=correlation_id,
-                trace_id=current_trace_id,
+                trace_id=self.trace_context_manager.get_current_trace_id(),
             )
 
         except HuleEduError:
@@ -335,14 +374,14 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             await self._handle_provider_failure(
                 provider=provider,
                 correlation_id=correlation_id,
-                error="Provider error occurred",
+                error="Provider error occurred during queued processing",
                 response_time_ms=response_time_ms,
             )
             raise
         except Exception as e:
             # Unexpected error
             response_time_ms = int((time.time() - start_time) * 1000)
-            error_msg = f"Unexpected error calling provider {provider.value}: {str(e)}"
+            error_msg = f"Unexpected error calling provider {provider.value} (queued processing): {str(e)}"
             logger.error(error_msg, exc_info=True)
 
             await self._handle_provider_failure(
@@ -354,11 +393,11 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
             raise_external_service_error(
                 service="llm_provider_service",
-                operation="orchestrator_llm_request",
+                operation="orchestrator_direct_llm_request",
                 external_service=f"{provider.value}_provider",
                 message=error_msg,
                 correlation_id=correlation_id,
-                details={"provider": provider.value},
+                details={"provider": provider.value, "processing_context": "queued_request"},
             )
 
     async def _handle_provider_failure(
@@ -493,30 +532,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         return round(cost, 6)  # 6 decimal places for USD
 
-    async def _is_provider_available(self, provider: LLMProviderType) -> bool:
-        """Check if a provider is available for requests.
-
-        Args:
-            provider: The provider to check
-
-        Returns:
-            True if provider is available, False otherwise
-        """
-        # Check if provider exists
-        if provider not in self.providers:
-            return False
-
-        # Check circuit breaker state if available
-        provider_impl = self.providers[provider]
-        if hasattr(provider_impl, "__wrapped__"):
-            # Provider is wrapped with circuit breaker
-            original = provider_impl
-            if hasattr(original, "_circuit_breaker"):
-                circuit_breaker = original._circuit_breaker
-                return bool(circuit_breaker.state != CircuitBreakerState.OPEN)
-
-        # No circuit breaker or not wrapped - assume available
-        return True
 
     def _get_request_priority(self, overrides: Dict[str, Any]) -> int:
         """Determine request priority based on metadata.

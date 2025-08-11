@@ -60,7 +60,7 @@ class LLMOrchestratorProtocol(Protocol):
         essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
-    ) -> LLMOrchestratorResponse | LLMQueuedResult:
+    ) -> LLMQueuedResult:
         """Perform LLM comparison with provider selection.
 
         Args:
@@ -72,10 +72,40 @@ class LLMOrchestratorProtocol(Protocol):
             **overrides: Additional parameter overrides
 
         Returns:
-            LLMOrchestratorResponse for immediate results or LLMQueuedResult for queued processing
+            LLMQueuedResult - ALL requests are queued for async processing with callback delivery
 
         Raises:
             HuleEduError: On any failure to perform comparison
+        """
+        ...
+
+    async def process_queued_request(
+        self,
+        provider: LLMProviderType,
+        user_prompt: str,
+        essay_a: str,
+        essay_b: str,
+        correlation_id: UUID,
+        **overrides: Any,
+    ) -> LLMOrchestratorResponse:
+        """Process a queued request directly (internal use only).
+        
+        This method bypasses queueing and directly calls providers.
+        ONLY used by QueueProcessor for processing already-queued requests.
+        
+        Args:
+            provider: LLM provider to use
+            user_prompt: The comparison prompt
+            essay_a: First essay to compare
+            essay_b: Second essay to compare
+            correlation_id: Request correlation ID
+            **overrides: Additional parameter overrides
+
+        Returns:
+            LLMOrchestratorResponse with immediate result
+
+        Raises:
+            HuleEduError: On any failure to process request
         """
         ...
 
