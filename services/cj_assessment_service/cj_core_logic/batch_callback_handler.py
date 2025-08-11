@@ -24,9 +24,10 @@ from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
-from services.cj_assessment_service.cj_core_logic import (
-    batch_completion_checker,
-    scoring_ranking,
+from services.cj_assessment_service.cj_core_logic.batch_completion_checker import BatchCompletionChecker
+from services.cj_assessment_service.cj_core_logic.scoring_ranking import (
+    get_essay_rankings,
+    record_comparisons_and_update_scores,
 )
 from services.cj_assessment_service.cj_core_logic.batch_submission import get_batch_state
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
@@ -318,7 +319,7 @@ async def trigger_existing_workflow_continuation(
             return
 
         # Check if batch has reached completion and trigger scoring if ready
-        completion_checker = batch_completion_checker.BatchCompletionChecker(
+        completion_checker = BatchCompletionChecker(
             database=database,
         )
 
@@ -410,7 +411,7 @@ async def _trigger_batch_scoring_completion(
 
         # Calculate final Bradley-Terry scores
         # This function fetches all valid comparisons from DB and computes scores
-        await scoring_ranking.record_comparisons_and_update_scores(
+        await record_comparisons_and_update_scores(
             all_essays=essays_for_api,
             comparison_results=comparisons,  # Empty list - function fetches from DB
             db_session=session,
@@ -426,7 +427,7 @@ async def _trigger_batch_scoring_completion(
         )
 
         # Get final rankings
-        rankings = await scoring_ranking.get_essay_rankings(session, batch_id, correlation_id)
+        rankings = await get_essay_rankings(session, batch_id, correlation_id)
 
         # Calculate grade projections using async GradeProjector
         grade_projector = GradeProjector()

@@ -38,6 +38,10 @@ class TestBatchProcessor:
         """Create mock database protocol."""
         mock_db = AsyncMock(spec=CJRepositoryProtocol)
         mock_session = AsyncMock()
+        # Ensure session.add doesn't return a coroutine
+        mock_session.add = Mock()
+        mock_session.flush = AsyncMock()
+        mock_session.commit = AsyncMock()
         mock_db.session.return_value.__aenter__.return_value = mock_session
         mock_db.session.return_value.__aexit__.return_value = None
         return mock_db

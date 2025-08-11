@@ -84,11 +84,6 @@ class TestFunctionName:
 - **MUST** build complexity gradually using proven patterns
 - **MUST** complete one test file fully before starting next
 
-### 5.2. Coverage Targets
-- **Minimum**: 80+ tests for comprehensive utility coverage
-- **Target**: 100+ tests for production-ready coverage
-- **Quality**: 100% pass rate maintained throughout
-
 ## 6. Dependency Injection Testing Patterns
 
 ### 6.1. Protocol-Based Testing

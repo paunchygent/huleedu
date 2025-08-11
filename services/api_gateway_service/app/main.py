@@ -28,6 +28,17 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.SERVICE_NAME,
         version="1.0.0",
+        description="HuleEdu API Gateway - Secure client-facing API for React frontend integration",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        contact={
+            "name": "HuleEdu Development Team",
+            "url": "https://github.com/huledu/huledu-reboot",
+        },
+        license_info={
+            "name": "MIT",
+        },
     )
 
     # Register error handlers

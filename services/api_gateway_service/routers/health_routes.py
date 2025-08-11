@@ -49,9 +49,9 @@ async def health_check() -> dict[str, str | dict]:
         }
 
 
-@router.get("/metrics")
+@router.get("/metrics", response_class=PlainTextResponse)
 @inject
-async def metrics(registry: FromDishka[CollectorRegistry]) -> PlainTextResponse:
+async def metrics(registry: FromDishka[CollectorRegistry]):
     """Prometheus metrics endpoint."""
     try:
         metrics_data = generate_latest(registry)

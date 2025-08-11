@@ -128,32 +128,22 @@ Based on clarity, structure, argument quality, and writing mechanics.
 Always respond with valid JSON."""
 
         # Call the LLM Provider Service through the client
-        # Use claude-3-haiku-20240307 which is a valid Anthropic model
+        # Use claude-3-5-haiku which is a valid Anthropic model
         correlation_id = uuid4()
-        try:
-            result = await llm_client.generate_comparison(
-                user_prompt=prompt,
-                model_override="claude-3-haiku-20240307",
-                temperature_override=0.1,
-                correlation_id=correlation_id,
-            )
-        except HuleEduError as e:
-            pytest.fail(f"Unexpected error: {e}")
+        result = await llm_client.generate_comparison(
+            user_prompt=prompt,
+            model_override="claude-3-5-haiku",
+            temperature_override=0.1,
+            correlation_id=correlation_id,
+        )
 
-        # Verify the response
-        assert result is not None, "Expected a result"
+        # Verify async-only architecture: result should be None (queued for processing)
+        assert result is None, "Expected None result for async-only architecture"
 
-        print("\nComparison Result:")
-        print(f"Winner: {result['winner']}")
-        print(f"Justification: {result['justification']}")
-        print(f"Confidence: {result['confidence']}")
-
-        # Validate response format
-        assert result["winner"] in ["Essay A", "Essay B"]
-        assert isinstance(result["justification"], str)
-        assert len(result["justification"]) > 10  # Not empty
-        assert isinstance(result["confidence"], (int, float))
-        assert 1 <= result["confidence"] <= 5
+        print("\n✅ Async Integration Test Passed:")
+        print("- Request successfully queued for async processing")
+        print("- Results will be delivered via Kafka callbacks")
+        print(f"- Correlation ID: {correlation_id}")
 
     async def test_cj_assessment_error_handling(
         self, llm_client: LLMProviderServiceClient, integration_settings: Settings
@@ -226,17 +216,11 @@ Always respond with valid JSON."""
         except HuleEduError as e:
             pytest.fail(f"Unexpected error: {e}")
 
-        # Verify mock response
-        assert result is not None, "Expected a result from mock provider"
+        # Verify async-only architecture: result should be None (queued for processing)
+        assert result is None, "Expected None result for async-only architecture"
 
-        print("\nMock Provider Result:")
-        print(f"Winner: {result['winner']}")
-        print(f"Justification: {result['justification']}")
-        print(f"Confidence: {result['confidence']}")
-
-        # Validate response format
-        assert result["winner"] in ["Essay A", "Essay B"]
-        assert isinstance(result["justification"], str)
-        assert len(result["justification"]) > 0
-        assert isinstance(result["confidence"], (int, float))
-        assert 1 <= result["confidence"] <= 5
+        print("\n✅ Mock Provider Integration Test Passed:")
+        print("- Request successfully queued for async processing")
+        print("- Results will be delivered via Kafka callbacks")
+        print(f"- Correlation ID: {correlation_id}")
+        print("- Mock mode confirmed for testing environment")

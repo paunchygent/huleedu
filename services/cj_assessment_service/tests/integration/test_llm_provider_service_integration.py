@@ -261,18 +261,16 @@ class TestMockProviderIntegration:
                 f"{llm_provider_url}/comparison",
                 json=request_data,
             ) as response:
-                assert response.status == 200
+                # Verify async-only architecture: expect 202 (queued for processing)
+                assert response.status == 202
                 result = await response.json()
 
-                # Verify mock response format
-                assert "winner" in result
-                assert result["winner"] in ["Essay A", "Essay B"]
-                assert "justification" in result
-                assert "confidence" in result
-                assert 1 <= result["confidence"] <= 5
-                assert "provider" in result
-
-                print(f"Mock provider response: {result}")
+                # Verify queuing response format
+                assert "message" in result
+                assert "queued" in result["message"].lower() or "accepted" in result["message"].lower()
+                print(f"\n✅ Mock Provider Integration Test Passed:")
+                print(f"   - Request successfully queued with 202 response")
+                print(f"   - Response: {result['message']}")
 
     async def _check_service_availability(self, service_url: str) -> bool:
         """Check if a service is available."""

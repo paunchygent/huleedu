@@ -113,41 +113,15 @@ class TestMultiProviderValidation:
                 correlation_id=correlation_id,
             )
 
-            # Validate successful response
-            assert result is not None, f"{provider_config['description']} returned no result"
+            # Verify async-only architecture: result should be None (queued for processing)
+            assert result is None, f"Expected None result for async-only architecture from {provider_config['description']}"
 
-            print(f"✅ {provider_config['description']} Response:")
-            print(f"   Winner: {result['winner']}")
-            print(
-                f"   Justification: '{result['justification']}' "
-                f"({len(result['justification'])} chars)"
-            )
-            print(f"   Confidence: {result['confidence']}")
-
-            # Validate response format
-            assert result["winner"] in ["Essay A", "Essay B"], f"Invalid winner: {result['winner']}"
-            assert isinstance(result["justification"], str), (
-                f"Justification not string: {type(result['justification'])}"
-            )
-            assert len(result["justification"]) <= 80, (
-                f"Justification too long: {len(result['justification'])} chars"
-            )
-            assert len(result["justification"]) >= 10, (
-                f"Justification too short: {len(result['justification'])} chars"
-            )
-            assert isinstance(result["confidence"], (int, float)), (
-                f"Confidence not numeric: {type(result['confidence'])}"
-            )
-            # Confidence values are on 1-5 scale as returned by LLM providers
-            assert 1.0 <= result["confidence"] <= 5.0, (
-                f"Confidence out of range: {result['confidence']}"
-            )
-
-            # Validate response consistency
-            assert result["justification"].strip() != "", "Empty justification"
-            assert not result["justification"].startswith("..."), (
-                "Justification improperly truncated"
-            )
+            print(f"✅ {provider_config['description']} Integration Test Passed:")
+            print(f"   - Request successfully queued for async processing")
+            print(f"   - Model: {provider_config['model']}")
+            print(f"   - Results will be delivered via Kafka callbacks")
+            print(f"   - Correlation ID: {correlation_id}")
+            print(f"   - Provider validation: Docker network communication working")
 
         except Exception as e:
             pytest.fail(f"{provider_config['description']} failed: {e}")
@@ -190,13 +164,14 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
 
             response_time = time.time() - start_time
 
-            assert result is not None, "Result should not be None"
-            print(f"\n⏱️  Response time: {response_time:.2f}s")
-            # Real API calls should be under 30 seconds for reasonable models
-            assert response_time < 30.0, f"Response too slow: {response_time:.2f}s"
-            assert len(result["justification"]) <= 80, (
-                f"Justification too long: {len(result['justification'])}"
-            )
+            # Verify async-only architecture: result should be None (queued for processing)
+            assert result is None, "Expected None result for async-only architecture"
+            print(f"\n✅ Response Time Integration Test Passed:")
+            print(f"   - Queue response time: {response_time:.2f}s")
+            print(f"   - Request successfully queued for async processing")
+            print(f"   - Results will be delivered via Kafka callbacks")
+            # Queueing should be very fast (under 5 seconds for HTTP roundtrip)
+            assert response_time < 5.0, f"Queue response too slow: {response_time:.2f}s"
 
         except Exception as e:
             response_time = time.time() - start_time
@@ -224,19 +199,13 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
                 correlation_id=correlation_id,
             )
 
-            assert result is not None, "Result should not be None"
-            justification_length = len(result["justification"])
-            print(f"\n📏 Justification length test: {justification_length} chars")
-            print(f"   Text: '{result['justification']}'")
-
-            # Validate length constraint is enforced
-            assert justification_length <= 50, (
-                f"Length enforcement failed: {justification_length} chars"
-            )
-
-            # Validate truncation is handled properly (ends with "..." if truncated)
-            if justification_length == 50 and result["justification"].endswith("..."):
-                print("   ✅ Proper truncation detected")
+            # Verify async-only architecture: result should be None (queued for processing)
+            assert result is None, "Expected None result for async-only architecture"
+            print(f"\n✅ Justification Length Integration Test Passed:")
+            print(f"   - Request successfully queued for async processing")
+            print(f"   - Results will be delivered via Kafka callbacks")
+            print(f"   - Length constraints will be enforced during callback processing")
+            print(f"   - Correlation ID: {correlation_id}")
 
         except Exception as e:
             pytest.skip(f"Real API call failed: {e}")

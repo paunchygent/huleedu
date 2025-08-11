@@ -55,12 +55,116 @@ class BatchPipelineRequest(BaseModel):
     )
 
 
-@router.post("/batches/{batch_id}/pipelines", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/batches/{batch_id}/pipelines",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Request Pipeline Execution",
+    description="Submit a batch for processing through the specified pipeline phase",
+    response_description="Pipeline execution request accepted and queued",
+    responses={
+        202: {
+            "description": "Request accepted and queued for processing",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "accepted",
+                        "message": "Pipeline execution request received",
+                        "batch_id": "batch_123",
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "batch_id_mismatch": {
+                            "summary": "Batch ID mismatch between path and body",
+                            "value": {
+                                "error_type": "ValidationError",
+                                "message": "Batch ID in path must match batch ID in request body",
+                                "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "field": "batch_id",
+                                "expected": "batch_123",
+                                "received": "batch_456"
+                            }
+                        },
+                        "invalid_pipeline": {
+                            "summary": "Invalid pipeline phase specified",
+                            "value": {
+                                "error_type": "ValidationError",
+                                "message": "Invalid pipeline phase",
+                                "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "field": "requested_pipeline",
+                                "allowed_values": ["SPELLCHECK", "CONTENT_JUDGMENT", "FEEDBACK_GENERATION"]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error_type": "AuthenticationError",
+                        "message": "Valid JWT token required",
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Access forbidden - user does not own this batch",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error_type": "AuthorizationError",
+                        "message": "User does not have permission to access this batch",
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "batch_id": "batch_123",
+                        "user_id": "user_456"
+                    }
+                }
+            }
+        },
+        429: {
+            "description": "Rate limit exceeded",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error_type": "RateLimitError",
+                        "message": "Rate limit exceeded: 10 requests per minute",
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "retry_after": 60
+                    }
+                }
+            }
+        },
+        503: {
+            "description": "Service temporarily unavailable",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error_type": "KafkaPublishError",
+                        "message": "Failed to publish pipeline request: Kafka broker unavailable",
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "batch_id": "batch_123",
+                        "retry_recommended": True
+                    }
+                }
+            }
+        }
+    }
+)
 @limiter.limit("10/minute")
 @inject
 async def request_pipeline_execution(
-    request: Request,  # Required for rate limiting
     batch_id: str,
+    request: Request,  # Required for rate limiting
     pipeline_request: BatchPipelineRequest,
     kafka_bus: FromDishka[KafkaBus],
     metrics: FromDishka[GatewayMetrics],
@@ -70,8 +174,31 @@ async def request_pipeline_execution(
     """
     Request pipeline execution for a batch with comprehensive validation and security.
 
-    Uses proper ClientBatchPipelineRequestV1 contract from common_core and publishes
-    events in EventEnvelope format to the correct Kafka topic.
+    This endpoint allows authenticated users to submit their batches for processing through
+    the specified pipeline phase. The request is validated, authenticated, and then published
+    to the appropriate Kafka topic for asynchronous processing.
+
+    **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
+    
+    **Rate Limiting**: 10 requests per minute per user
+    
+    **Processing Flow**:
+    1. Validate batch ownership (user must own the batch)
+    2. Validate pipeline phase is supported
+    3. Publish request to Kafka for asynchronous processing
+    4. Return immediate acknowledgment with correlation ID for tracking
+
+    **Pipeline Phases**:
+    - `SPELLCHECK`: Basic spelling and grammar validation
+    - `CONTENT_JUDGMENT`: AI-powered content quality assessment
+    - `FEEDBACK_GENERATION`: Generate detailed feedback for essays
+
+    **Error Handling**:
+    - Validation errors return 400 with detailed field information
+    - Authentication failures return 401
+    - Authorization failures (batch ownership) return 403
+    - Rate limiting returns 429 with retry-after information
+    - Service unavailability returns 503 with retry recommendation
     """
     endpoint = f"/batches/{batch_id}/pipelines"
 

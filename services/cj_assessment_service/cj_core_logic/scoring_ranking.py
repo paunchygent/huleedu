@@ -6,7 +6,7 @@ using string-based essay IDs and protocol-based database access.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 from uuid import UUID
 
 import choix
@@ -32,7 +32,7 @@ logger = create_service_logger("cj_assessment_service.scoring_ranking")
 
 async def record_comparisons_and_update_scores(
     all_essays: list[EssayForComparison],  # essay.id is string els_essay_id
-    comparison_results: list[ComparisonResult | None],  # Can be None for async processing
+    comparison_results: Sequence[ComparisonResult | None],  # Can be None for async processing
     db_session: AsyncSession,
     cj_batch_id: int,
     correlation_id: UUID,

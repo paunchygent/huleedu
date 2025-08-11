@@ -234,6 +234,14 @@ class TraceContextManagerImpl:
             current_span.set_attribute("error", True)
             current_span.set_attribute("error.type", type(error).__name__)
 
+    def get_current_trace_id(self) -> str | None:
+        """Get current trace ID.
+
+        Returns:
+            Current trace ID or None if no active trace
+        """
+        return get_current_trace_id()
+
     def get_current_trace_summary(self) -> Dict[str, Any]:
         """Get summary of current trace state for debugging.
 

@@ -129,7 +129,11 @@ class Settings(BaseSettings):
     llm_retry_wait_min_seconds: float = 1.0  # Changed from llm_retry_base_delay_seconds
     llm_retry_wait_max_seconds: float = 30.0  # Changed from llm_retry_max_delay_seconds
     llm_retry_exponential_base: float = 2.0
-    llm_retry_on_exception_names: list[str] = []  # Empty list uses defaults
+    llm_retry_on_exception_names: list[str] = [
+        "asyncio.TimeoutError",
+        "aiohttp.ClientError", 
+        "aiohttp.ClientResponseError"
+    ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters
     MAX_PAIRWISE_COMPARISONS: int = 1000

@@ -1,0 +1,526 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "api-gateway-service",
+    "description": "HuleEdu API Gateway - Secure client-facing API for React frontend integration",
+    "contact": {
+      "name": "HuleEdu Development Team",
+      "url": "https://github.com/huledu/huledu-reboot"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Health",
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint following Rule 072 format.",
+        "operationId": "health_check_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "additionalProperties": true,
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "Health",
+          "Health"
+        ],
+        "summary": "Metrics",
+        "description": "Prometheus metrics endpoint.",
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/classes/{path}": {
+      "post": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Proxy Class Requests",
+        "description": "Proxies all /classes requests to the Class Management Service.",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Proxy Class Requests",
+        "description": "Proxies all /classes requests to the Class Management Service.",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Proxy Class Requests",
+        "description": "Proxies all /classes requests to the Class Management Service.",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Classes"
+        ],
+        "summary": "Proxy Class Requests",
+        "description": "Proxies all /classes requests to the Class Management Service.",
+        "operationId": "proxy_class_requests_v1_classes__path__post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/test/no-auth": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Test No Auth",
+        "description": "Test endpoint without authentication.",
+        "operationId": "test_no_auth_v1_test_no_auth_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/test/with-auth": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Test With Auth",
+        "description": "Test endpoint with authentication.",
+        "operationId": "test_with_auth_v1_test_with_auth_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/batches/{batch_id}/status": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get Batch Status",
+        "description": "Get batch status with strict ownership enforcement.\n\nActs as a pure proxy to the Result Aggregator Service which handles all\nstatus aggregation and any necessary fallback logic internally.",
+        "operationId": "get_batch_status_v1_batches__batch_id__status_get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/batches/{batch_id}/pipelines": {
+      "post": {
+        "tags": [
+          "Batches"
+        ],
+        "summary": "Request Pipeline Execution",
+        "description": "Request pipeline execution for a batch with comprehensive validation and security.\n\nUses proper ClientBatchPipelineRequestV1 contract from common_core and publishes\nevents in EventEnvelope format to the correct Kafka topic.",
+        "operationId": "request_pipeline_execution_v1_batches__batch_id__pipelines_post",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchPipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/batch": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Upload Batch Files",
+        "description": "Proxy file uploads to the File Service with authentication and rate limiting.\n\nStreams multipart/form-data directly to the File Service while adding\nauthentication headers and comprehensive error handling.",
+        "operationId": "upload_batch_files_v1_files_batch_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BatchClientStatus": {
+        "type": "string",
+        "enum": [
+          "available",
+          "processing"
+        ],
+        "title": "BatchClientStatus",
+        "description": "Defines the status of a batch as reported to the client."
+      },
+      "BatchPipelineRequest": {
+        "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id",
+            "description": "The unique identifier of the target batch (optional, taken from path)."
+          },
+          "requested_pipeline": {
+            "$ref": "#/components/schemas/PhaseName",
+            "description": "The final pipeline phase the user wants to run."
+          },
+          "is_retry": {
+            "type": "boolean",
+            "title": "Is Retry",
+            "description": "Flag indicating this is a user-initiated retry request.",
+            "default": false
+          },
+          "retry_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Reason",
+            "description": "Optional user-provided reason for the retry."
+          }
+        },
+        "type": "object",
+        "required": [
+          "requested_pipeline"
+        ],
+        "title": "BatchPipelineRequest",
+        "description": "Input model for batch pipeline requests from API Gateway clients.\n\nThis is separate from ClientBatchPipelineRequestV1 to avoid requiring\nuser_id in the client request (it comes from authentication)."
+      },
+      "BatchStatusResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/BatchClientStatus",
+            "description": "The current status of the batch."
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details",
+            "description": "The detailed status information."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "details"
+        ],
+        "title": "BatchStatusResponse",
+        "description": "Response model for batch status requests."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PhaseName": {
+        "type": "string",
+        "enum": [
+          "spellcheck",
+          "ai_feedback",
+          "cj_assessment",
+          "nlp",
+          "student_matching"
+        ],
+        "title": "PhaseName",
+        "description": "Enum defining all valid pipeline phase names for type-safe orchestration.\n\nThis enum is used as keys in the phase_initiators_map, within ProcessingPipelineState,\nand for validating requested_pipelines values, eliminating magic strings and\nproviding compile-time safety."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
