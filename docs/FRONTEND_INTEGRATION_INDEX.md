@@ -6,32 +6,15 @@ This documentation provides comprehensive guidance for integrating frontend appl
 
 ## Quick Navigation
 
-### 🚀 **Getting Started**
+### 🛠️ **Complete Integration Guide**
 
-- **[Quick Start Guide](FRONTEND_QUICK_START.md)** - Essential setup, authentication, and basic API usage
-- **[Development Setup](FRONTEND_QUICK_START.md#development-setup)** - Environment configuration and CORS setup
+- **[Svelte Integration Guide](SVELTE_INTEGRATION_GUIDE.md)** - Complete Svelte 5 integration from setup to production deployment
+- **[Shared Code Patterns](SHARED_CODE_PATTERNS.md)** - Reusable implementation patterns, utilities, and base clients  
+- **[API Reference](API_REFERENCE.md)** - Complete TypeScript types, interfaces, and API specifications
 
-### 📡 **Real-Time Features**
+### 📡 **WebSocket Communication**
 
-- **[Real-Time Communication Guide](FRONTEND_REALTIME_GUIDE.md)** - WebSocket integration and notifications *(Coming Soon)*
-- **[WebSocket API Documentation](WEBSOCKET_API_DOCUMENTATION.md)** - Technical WebSocket API reference
-
-### 📁 **File Management**
-
-- **[File Upload Guide](FRONTEND_FILE_UPLOAD_GUIDE.md)** - File handling, validation, and upload patterns *(Coming Soon)*
-
-### 🏭 **Production Deployment**
-
-- **[Production Guide](FRONTEND_PRODUCTION_GUIDE.md)** - Error handling, resilience, and production patterns *(Coming Soon)*
-
-### 🛠️ **Framework Integration**
-
-- **[Framework Examples](FRONTEND_FRAMEWORK_EXAMPLES.md)** - React, Svelte, and other framework-specific implementations *(Coming Soon)*
-- **[Svelte Integration Examples](SVELTE_INTEGRATION_EXAMPLES.md)** - Existing Svelte-specific examples
-
-### 📚 **Reference**
-
-- **[API Reference](FRONTEND_API_REFERENCE.md)** - TypeScript types and comprehensive API documentation *(Coming Soon)*
+- **[WebSocket API Documentation](WEBSOCKET_API_DOCUMENTATION.md)** - Technical WebSocket API reference and protocols
 - **[Frontend Readiness Checklist](../TASKS/FRONTEND_READINESS_CHECKLIST.md)** - Implementation checklist
 - **[API Gateway OpenAPI Specification](http://localhost:4001/docs)** - Interactive API documentation
 - **[Common Core Models](../libs/common_core/src/common_core/models/)** - Pydantic model definitions (source of truth)
@@ -40,24 +23,20 @@ This documentation provides comprehensive guidance for integrating frontend appl
 
 ```text
 Are you just getting started with HuleEdu integration?
-├─ YES → Start with Quick Start Guide
+├─ YES → Start with Svelte Integration Guide (covers setup to production)
 └─ NO → Continue below
 
 Do you need real-time notifications or live updates?
-├─ YES → Real-Time Communication Guide
+├─ YES → WebSocket API Documentation + Svelte Integration Guide
 └─ NO → Continue below
 
-Do you need to upload files or handle batches?
-├─ YES → File Upload Guide
+Do you need TypeScript types and API specifications?
+├─ YES → API Reference
 └─ NO → Continue below
 
-Are you preparing for production deployment?
-├─ YES → Production Guide
-└─ NO → Continue below
-
-Do you need framework-specific examples?
-├─ YES → Framework Examples
-└─ NO → API Reference for comprehensive documentation
+Do you need reusable code patterns and utilities?
+├─ YES → Shared Code Patterns
+└─ NO → Start with Svelte Integration Guide for comprehensive examples
 ```
 
 ## Architecture Overview
@@ -185,12 +164,10 @@ Based on the API Gateway Service configuration (`services/api_gateway_service/co
 
 | Document | Status | Last Updated |
 |----------|--------|--------------|
-| [Quick Start Guide](FRONTEND_QUICK_START.md) | ✅ Available | 2025-08-11 |
-| [Real-Time Communication Guide](FRONTEND_REALTIME_GUIDE.md) | 🚧 Coming Soon | - |
-| [File Upload Guide](FRONTEND_FILE_UPLOAD_GUIDE.md) | 🚧 Coming Soon | - |
-| [Production Guide](FRONTEND_PRODUCTION_GUIDE.md) | 🚧 Coming Soon | - |
-| [Framework Examples](FRONTEND_FRAMEWORK_EXAMPLES.md) | 🚧 Coming Soon | - |
-| [API Reference](FRONTEND_API_REFERENCE.md) | 🚧 Coming Soon | - |
+| [Svelte Integration Guide](SVELTE_INTEGRATION_GUIDE.md) | ✅ Available | 2025-08-11 |
+| [Shared Code Patterns](SHARED_CODE_PATTERNS.md) | ✅ Available | 2025-08-11 |
+| [API Reference](API_REFERENCE.md) | ✅ Available | 2025-08-11 |
+| [WebSocket API Documentation](WEBSOCKET_API_DOCUMENTATION.md) | ✅ Available | 2025-08-11 |
 
 ---
 

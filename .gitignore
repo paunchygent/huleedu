@@ -32,6 +32,7 @@ services/spellchecker_service/data/*.csv.gz
 services/*/.local_*
 .pdm-build/
 services/*/.pdm-build/
+.serena/
 
 # Coverage and test artifacts
 .coverage

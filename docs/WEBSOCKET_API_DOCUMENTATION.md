@@ -22,89 +22,19 @@ const websocket = new WebSocket(wsUrl);
 
 ### Connection Lifecycle
 
+For complete WebSocket client implementation with reconnection logic, see [Shared Code Patterns - WebSocket Connection Management](SHARED_CODE_PATTERNS.md#websocket-connection-management).
+
+Basic connection example:
 ```javascript
-class HuleEduWebSocketClient {
-    constructor(token, options = {}) {
-        this.token = token;
-        this.baseUrl = options.baseUrl || 'ws://localhost:8081';
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = options.maxReconnectAttempts || 5;
-        this.reconnectDelay = options.reconnectDelay || 1000;
-        this.websocket = null;
-        this.eventHandlers = new Map();
-    }
+const wsClient = new HuleEduWebSocketClient(token, {
+  maxReconnectAttempts: 5,
+  reconnectDelay: 1000,
+  heartbeatInterval: 30000
+});
 
-    connect() {
-        const wsUrl = `${this.baseUrl}/ws?token=${encodeURIComponent(this.token)}`;
-        this.websocket = new WebSocket(wsUrl);
-
-        this.websocket.onopen = (event) => {
-            console.log('WebSocket connected');
-            this.reconnectAttempts = 0;
-            this.emit('connected', event);
-        };
-
-        this.websocket.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                this.handleMessage(message);
-            } catch (error) {
-                console.error('Failed to parse WebSocket message:', error);
-            }
-        };
-
-        this.websocket.onclose = (event) => {
-            console.log('WebSocket disconnected:', event.code, event.reason);
-            this.emit('disconnected', event);
-            this.handleReconnection(event);
-        };
-
-        this.websocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            this.emit('error', error);
-        };
-    }
-
-    handleReconnection(event) {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-            
-            console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            
-            setTimeout(() => {
-                this.connect();
-            }, delay);
-        } else {
-            console.error('Max reconnection attempts reached');
-            this.emit('maxReconnectAttemptsReached');
-        }
-    }
-
-    on(eventType, handler) {
-        if (!this.eventHandlers.has(eventType)) {
-            this.eventHandlers.set(eventType, []);
-        }
-        this.eventHandlers.get(eventType).push(handler);
-    }
-
-    emit(eventType, data) {
-        const handlers = this.eventHandlers.get(eventType) || [];
-        handlers.forEach(handler => handler(data));
-    }
-
-    handleMessage(message) {
-        const { notification_type, data } = message;
-        this.emit('message', message);
-        this.emit(notification_type, data);
-    }
-
-    disconnect() {
-        if (this.websocket) {
-            this.websocket.close(1000, 'Client disconnect');
-        }
-    }
-}
+wsClient.on('connected', () => console.log('Connected'));
+wsClient.on('message', handleNotification);
+wsClient.connect();
 ```
 
 ## Notification Event Types
@@ -457,136 +387,25 @@ class ReconnectionManager {
 
 ## Client Integration Examples
 
-### React Hook Implementation
 
+### Framework Integration
+
+For production-ready WebSocket integration with Svelte 5, React, and other frameworks, see:
+
+- **[Svelte 5 Integration Guide](SVELTE_INTEGRATION_GUIDE.md#websocket-management)** - Complete WebSocket management with runes
+- **[Shared Code Patterns](SHARED_CODE_PATTERNS.md#websocket-connection-management)** - Base WebSocket client implementation
+
+Example integration:
 ```typescript
-import { useEffect, useRef, useState } from 'react';
+// For Svelte 5
+import { wsManager } from '$lib/stores/websocket.svelte';
 
-interface WebSocketMessage {
-    notification_type: string;
-    timestamp: string;
-    data: any;
-}
-
-interface UseWebSocketOptions {
-    token: string;
-    baseUrl?: string;
-    maxReconnectAttempts?: number;
-    reconnectDelay?: number;
-}
-
-export function useWebSocket(options: UseWebSocketOptions) {
-    const [isConnected, setIsConnected] = useState(false);
-    const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const websocketRef = useRef<HuleEduWebSocketClient | null>(null);
-
-    useEffect(() => {
-        const client = new HuleEduWebSocketClient(options.token, {
-            baseUrl: options.baseUrl,
-            maxReconnectAttempts: options.maxReconnectAttempts,
-            reconnectDelay: options.reconnectDelay
-        });
-
-        client.on('connected', () => {
-            setIsConnected(true);
-            setError(null);
-        });
-
-        client.on('disconnected', () => {
-            setIsConnected(false);
-        });
-
-        client.on('error', (error) => {
-            setError(error.message || 'WebSocket error');
-        });
-
-        client.on('message', (message) => {
-            setLastMessage(message);
-        });
-
-        client.connect();
-        websocketRef.current = client;
-
-        return () => {
-            client.disconnect();
-        };
-    }, [options.token]);
-
-    const subscribe = (eventType: string, handler: (data: any) => void) => {
-        websocketRef.current?.on(eventType, handler);
-    };
-
-    return {
-        isConnected,
-        lastMessage,
-        error,
-        subscribe
-    };
-}
+// Auto-reactive WebSocket state
+$effect(() => {
+  console.log('Connection status:', wsManager.isConnected);
+  console.log('Notifications:', wsManager.notifications.length);
+});
 ```
-
-### Svelte Store Implementation
-
-```typescript
-// websocket-store.ts
-import { writable, derived } from 'svelte/store';
-
-interface WebSocketState {
-    isConnected: boolean;
-    lastMessage: WebSocketMessage | null;
-    error: string | null;
-}
-
-function createWebSocketStore(token: string) {
-    const { subscribe, set, update } = writable<WebSocketState>({
-        isConnected: false,
-        lastMessage: null,
-        error: null
-    });
-
-    let client: HuleEduWebSocketClient | null = null;
-
-    const connect = () => {
-        client = new HuleEduWebSocketClient(token);
-
-        client.on('connected', () => {
-            update(state => ({ ...state, isConnected: true, error: null }));
-        });
-
-        client.on('disconnected', () => {
-            update(state => ({ ...state, isConnected: false }));
-        });
-
-        client.on('error', (error) => {
-            update(state => ({ ...state, error: error.message }));
-        });
-
-        client.on('message', (message) => {
-            update(state => ({ ...state, lastMessage: message }));
-        });
-
-        client.connect();
-    };
-
-    const disconnect = () => {
-        client?.disconnect();
-        client = null;
-    };
-
-    const subscribeToEvent = (eventType: string, handler: (data: any) => void) => {
-        client?.on(eventType, handler);
-    };
-
-    return {
-        subscribe,
-        connect,
-        disconnect,
-        subscribeToEvent
-    };
-}
-
-export const websocketStore = createWebSocketStore;
 ```
 
 ## Testing WebSocket Connections
