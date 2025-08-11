@@ -43,7 +43,7 @@ npm install @types/node
 ```typescript
 // .env
 VITE_API_BASE_URL=http://localhost:4001
-VITE_WS_BASE_URL=ws://localhost:8081
+VITE_WS_BASE_URL=ws://localhost:8080
 VITE_JWT_SECRET=your-development-secret
 ```
 
@@ -66,7 +66,7 @@ VITE_JWT_SECRET=your-development-secret
 // src/lib/config.ts
 export const config = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001',
-  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8081',
+  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8080',
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD
 };

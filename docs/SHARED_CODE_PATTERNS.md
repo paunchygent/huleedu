@@ -223,7 +223,7 @@ class HuleEduWebSocketClient {
     if (this.connectionState === 'connected') return;
     
     this.connectionState = 'connecting';
-    const wsUrl = `ws://localhost:8081/ws?token=${encodeURIComponent(this.token)}`;
+    const wsUrl = `ws://localhost:8080/ws?token=${encodeURIComponent(this.token)}`;
     
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(wsUrl);

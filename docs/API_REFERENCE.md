@@ -42,128 +42,81 @@ interface AuthHeaders {
 
 ### API Endpoints
 ```typescript
-// Base URL: http://localhost:4001/v1
-interface BatchEndpoints {
-  healthCheck: '/healthz';                           // GET (no auth)
-  createBatch: '/batches';                          // POST
-  getBatchStatus: '/batches/:batchId/status';       // GET
-  requestPipeline: '/batches/:batchId/pipelines';   // POST
-  uploadFiles: '/files/batch';                      // POST (FormData)
+// Base URL: http://localhost:4001
+interface ApiEndpoints {
+  // Health & Monitoring (no auth)
+  healthCheck: '/healthz';                          // GET
+  metrics: '/metrics';                              // GET (Prometheus)
+  
+  // Authentication Test 
+  testNoAuth: '/v1/test/no-auth';                   // GET (no auth)
+  testWithAuth: '/v1/test/with-auth';               // GET (auth required)
+  
+  // Batch Management (auth required)
+  requestPipeline: '/v1/batches/:batchId/pipelines'; // POST
+  getBatchStatus: '/v1/batches/:batchId/status';     // GET
+  
+  // File Operations (auth required) 
+  uploadFiles: '/v1/files/batch';                    // POST (FormData)
+  
+  // Class Management Proxy (auth required)
+  classManagement: '/v1/classes/*';                  // GET, POST, PUT, DELETE
 }
 ```
 
 ### Request/Response Types
 ```typescript
-interface BatchCreateRequest {
-  file_count: number;
-  title?: string;
-  description?: string;
-  class_id?: string;
+interface PipelineRequest {
+  batch_id: string;
+  requested_pipeline: PipelinePhase;
+  is_retry?: boolean;
+  retry_reason?: string;
 }
 
-interface BatchCreateResponse {
+interface PipelineResponse {
+  status: 'accepted';
+  message: 'Pipeline execution request received';
   batch_id: string;
-  status: BatchStatus;
-  created_at: string;
+  correlation_id: string;
 }
 
 interface BatchStatusResponse {
-  batch_id: string;
   status: BatchStatus;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
   details: {
-    progress?: {
-      percentage: number;
-      phase: string;
-      estimated_completion?: string;
-    };
-    files_processed?: number;
-    total_files?: number;
-    error_details?: string;
-    processing_duration_seconds?: number;
+    batch_id: string;
+    created_at: string;
+    updated_at: string;
+    total_essays: number;
+    processed_essays: number;
+    current_phase: PipelinePhase;
+    progress_percentage: number;
+    estimated_completion?: string;
   };
-  files?: BatchFileInfo[];
-}
-
-interface BatchFileInfo {
-  file_id: string;
-  filename: string;
-  size_bytes: number;
-  status: FileStatus;
-  upload_timestamp: string;
-  processing_results?: ProcessingResults;
 }
 
 type BatchStatus = 
-  | 'created' 
-  | 'uploading' 
-  | 'uploaded' 
-  | 'pending' 
-  | 'processing' 
-  | 'completed' 
-  | 'failed' 
-  | 'cancelled';
-
-type FileStatus = 
-  | 'uploaded' 
-  | 'processing' 
-  | 'completed' 
-  | 'failed';
-
-interface ProcessingResults {
-  spellcheck?: {
-    errors_found: number;
-    corrections_suggested: number;
-    confidence_score: number;
-  };
-  content_judgment?: {
-    quality_score: number;
-    readability_score: number;
-    coherence_score: number;
-    argument_strength: number;
-  };
-  feedback?: {
-    sections: string[];
-    overall_score: number;
-    word_count: number;
-  };
-}
+  | 'CREATED'           // Batch created, awaiting file upload
+  | 'FILES_UPLOADED'    // Files uploaded, ready for processing  
+  | 'PROCESSING'        // Currently being processed through pipeline
+  | 'COMPLETED'         // All processing completed successfully
+  | 'FAILED'            // Processing failed with errors
+  | 'CANCELLED';        // Processing cancelled by user or system
 ```
 
 ### Pipeline Processing
 ```typescript
-interface PipelineRequest {
-  pipeline_phase: PipelinePhase;
-  priority: Priority;
-  configuration?: PipelineConfiguration;
-}
-
 type PipelinePhase = 
-  | 'spellcheck' 
-  | 'content_judgment' 
-  | 'feedback_generation';
+  | 'SPELLCHECK'        // Basic spelling and grammar validation
+  | 'AI_FEEDBACK'       // AI-powered content quality assessment and feedback generation  
+  | 'CJ_ASSESSMENT'     // Comparative judgment assessment
+  | 'NLP';              // Natural language processing analysis
 
-type Priority = 
-  | 'low' 
-  | 'standard' 
-  | 'high' 
-  | 'urgent';
-
-interface PipelineConfiguration {
-  spellcheck?: {
-    language: string;
-    strict_mode: boolean;
-  };
-  content_judgment?: {
-    rubric_id?: string;
-    detailed_analysis: boolean;
-  };
-  feedback?: {
-    feedback_type: 'brief' | 'detailed' | 'comprehensive';
-    include_suggestions: boolean;
-  };
+// Pipeline requests are handled asynchronously (HTTP 202)
+interface PipelineExecutionFlow {
+  1: 'Request received (202 Accepted)';
+  2: 'Kafka message published';
+  3: 'WebSocket notifications sent';
+  4: 'Status updates via GET /v1/batches/{id}/status';
 }
 ```
 
@@ -173,35 +126,40 @@ interface PipelineConfiguration {
 
 ### Upload Request
 ```typescript
-interface FileUploadData {
-  batch_id: string;        // FormData field
-  files: File[];          // FormData field (multiple)
+// POST /v1/files/batch
+// Content-Type: multipart/form-data
+interface FileUploadFormData {
+  batch_id: string;        // Required: The batch identifier
+  files: File[];          // Required: Array of files to upload (max 50)
 }
 
 interface FileUploadResponse {
+  status: 'success';
+  message: 'Files uploaded successfully';
   batch_id: string;
-  uploaded_files: UploadedFileInfo[];
-  total_files: number;
+  files_uploaded: number;
   total_size_bytes: number;
-  upload_timestamp: string;
+  correlation_id: string;
 }
 
-interface UploadedFileInfo {
-  file_id: string;
-  filename: string;
-  original_filename: string;
-  size_bytes: number;
-  mime_type: string;
-  checksum: string;
+interface FileUploadLimits {
+  maxFileSize: 50 * 1024 * 1024;     // 50MB per file
+  maxTotalUpload: 100 * 1024 * 1024; // 100MB per request
+  maxFilesPerBatch: 50;               // 50 files maximum
+  supportedFormats: ['PDF', 'DOCX', 'TXT', 'RTF'];
+  rateLimit: '5 requests per minute per user';
 }
 ```
 
 ### File Validation
 ```typescript
-interface FileValidationRules {
-  maxFileSize: number;      // Default: 10MB
-  maxFiles: number;         // Default: 50
-  allowedMimeTypes: string[]; // text/plain, application/pdf, .docx, .doc
+// Validation is performed server-side with these rules:
+interface ActualFileValidationRules {
+  maxFileSize: 50 * 1024 * 1024;       // 50MB per file
+  maxTotalSize: 100 * 1024 * 1024;     // 100MB per request  
+  maxFiles: 50;                        // 50 files per batch
+  supportedFormats: ['PDF', 'DOCX', 'TXT', 'RTF'];
+  rateLimit: 5;                        // 5 requests per minute per user
 }
 
 interface FileValidationResult {
@@ -232,7 +190,7 @@ interface UploadProgress {
 ### Connection Configuration
 ```typescript
 interface WebSocketConfig {
-  url: string;                    // ws://localhost:8081/ws
+  url: string;                    // ws://localhost:8080/ws
   token: string;                  // JWT token (query parameter)
   maxReconnectAttempts?: number;  // Default: 5
   reconnectDelay?: number;        // Default: 1000ms
@@ -265,170 +223,201 @@ interface NotificationEnvelope {
 }
 
 type NotificationType =
-  // Batch Events
-  | 'BATCH_CREATED'
-  | 'BATCH_FILES_UPLOADED'
-  | 'BATCH_PROCESSING_STARTED'
-  | 'BATCH_PROCESSING_COMPLETED'
-  | 'BATCH_PROCESSING_FAILED'
-  // Essay Events
-  | 'ESSAY_SPELLCHECK_COMPLETED'
-  | 'ESSAY_CONTENT_JUDGMENT_COMPLETED'
-  | 'ESSAY_FEEDBACK_GENERATED'
-  | 'ESSAY_PROCESSING_FAILED'
-  // System Events
-  | 'SYSTEM_MAINTENANCE_SCHEDULED'
-  | 'SYSTEM_MAINTENANCE_STARTED'
-  | 'SYSTEM_MAINTENANCE_COMPLETED'
-  | 'SERVICE_DEGRADATION_ALERT'
-  | 'SERVICE_RESTORED';
+  // File Operations
+  | 'batch_files_uploaded'
+  | 'batch_file_removed'
+  | 'batch_validation_failed'
+  // Class Management
+  | 'class_created'
+  | 'student_added_to_class'
+  | 'validation_timeout_processed'
+  | 'student_associations_confirmed'
+  // Processing Results
+  | 'batch_spellcheck_completed'
+  | 'batch_cj_assessment_completed'
+  | 'batch_processing_started'
+  | 'batch_results_ready'
+  | 'batch_assessment_completed';
 
-// Batch Notification Data Types
-interface BatchCreatedData {
-  batch_id: string;
-  user_id: string;
-  status: BatchStatus;
-  file_count: number;
+// File Operation Notification Data Types
+interface BatchFilesUploadedData {
+  notification_type: 'batch_files_uploaded';
+  category: 'file_operations';
+  priority: 'standard';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    user_id: string;
+    files_uploaded: number;
+    total_size_bytes: number;
+  };
   correlation_id: string;
 }
 
-interface BatchFilesUploadedData {
-  batch_id: string;
-  user_id: string;
-  files_uploaded: number;
-  total_size_bytes: number;
+interface BatchFileRemovedData {
+  notification_type: 'batch_file_removed';
+  category: 'file_operations';
+  priority: 'standard';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    file_id: string;
+    filename: string;
+  };
+  correlation_id: string;
+}
+
+interface BatchValidationFailedData {
+  notification_type: 'batch_validation_failed';
+  category: 'system_alerts';
+  priority: 'immediate';
+  action_required: true;
+  payload: {
+    batch_id: string;
+    validation_errors: string[];
+    error_message: string;
+  };
+  correlation_id: string;
+}
+
+// Class Management Notification Data Types
+interface ClassCreatedData {
+  notification_type: 'class_created';
+  category: 'class_management';
+  priority: 'standard';
+  action_required: false;
+  payload: {
+    class_id: string;
+    class_name: string;
+    teacher_id: string;
+  };
+  correlation_id: string;
+}
+
+interface StudentAddedToClassData {
+  notification_type: 'student_added_to_class';
+  category: 'class_management';
+  priority: 'low';
+  action_required: false;
+  payload: {
+    class_id: string;
+    student_id: string;
+    student_name: string;
+  };
+  correlation_id: string;
+}
+
+interface ValidationTimeoutProcessedData {
+  notification_type: 'validation_timeout_processed';
+  category: 'student_workflow';
+  priority: 'immediate';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    timeout_duration_seconds: number;
+    processed_students: number;
+  };
+  correlation_id: string;
+}
+
+interface StudentAssociationsConfirmedData {
+  notification_type: 'student_associations_confirmed';
+  category: 'student_workflow';
+  priority: 'high';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    confirmed_associations: number;
+    pending_associations: number;
+  };
+  correlation_id: string;
+}
+
+// Processing Result Notification Data Types
+interface BatchSpellcheckCompletedData {
+  notification_type: 'batch_spellcheck_completed';
+  category: 'batch_progress';
+  priority: 'low';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    essays_processed: number;
+    total_errors_found: number;
+    processing_duration_seconds: number;
+  };
+  correlation_id: string;
+}
+
+interface BatchCjAssessmentCompletedData {
+  notification_type: 'batch_cj_assessment_completed';
+  category: 'batch_progress';
+  priority: 'standard';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    essays_assessed: number;
+    average_content_score: number;
+    processing_duration_seconds: number;
+  };
   correlation_id: string;
 }
 
 interface BatchProcessingStartedData {
-  batch_id: string;
-  user_id: string;
-  pipeline_phase: PipelinePhase;
-  estimated_duration_minutes: number;
+  notification_type: 'batch_processing_started';
+  category: 'batch_progress';
+  priority: 'low';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    pipeline_phase: string;
+    estimated_duration_minutes: number;
+  };
   correlation_id: string;
 }
 
-interface BatchProcessingCompletedData {
-  batch_id: string;
-  user_id: string;
-  pipeline_phase: PipelinePhase;
-  status: 'COMPLETED';
-  processing_duration_minutes: number;
-  essays_processed: number;
+interface BatchResultsReadyData {
+  notification_type: 'batch_results_ready';
+  category: 'processing_results';
+  priority: 'high';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    results_count: number;
+    download_url?: string;
+  };
   correlation_id: string;
 }
 
-interface BatchProcessingFailedData {
-  batch_id: string;
-  user_id: string;
-  pipeline_phase: PipelinePhase;
-  error_type: string;
-  error_message: string;
-  retry_recommended: boolean;
-  correlation_id: string;
-}
-
-// Essay Notification Data Types
-interface EssaySpellcheckCompletedData {
-  essay_id: string;
-  batch_id: string;
-  user_id: string;
-  spelling_errors_found: number;
-  grammar_errors_found: number;
-  confidence_score: number;
-  correlation_id: string;
-}
-
-interface EssayContentJudgmentCompletedData {
-  essay_id: string;
-  batch_id: string;
-  user_id: string;
-  content_quality_score: number;
-  readability_score: number;
-  coherence_score: number;
-  argument_strength: number;
-  correlation_id: string;
-}
-
-interface EssayFeedbackGeneratedData {
-  essay_id: string;
-  batch_id: string;
-  user_id: string;
-  feedback_sections: string[];
-  overall_score: number;
-  feedback_length_words: number;
-  correlation_id: string;
-}
-
-interface EssayProcessingFailedData {
-  essay_id: string;
-  batch_id: string;
-  user_id: string;
-  pipeline_phase: PipelinePhase;
-  error_type: string;
-  error_message: string;
-  retry_recommended: boolean;
-  correlation_id: string;
-}
-
-// System Notification Data Types
-interface SystemMaintenanceScheduledData {
-  maintenance_start: string;
-  maintenance_end: string;
-  affected_services: string[];
-  description: string;
-  user_id: string;
-  correlation_id: string;
-}
-
-interface SystemMaintenanceStartedData {
-  maintenance_type: string;
-  estimated_duration_minutes: number;
-  affected_services: string[];
-  user_id: string;
-  correlation_id: string;
-}
-
-interface SystemMaintenanceCompletedData {
-  maintenance_type: string;
-  actual_duration_minutes: number;
-  services_restored: string[];
-  user_id: string;
-  correlation_id: string;
-}
-
-interface ServiceDegradationAlertData {
-  affected_service: string;
-  degradation_level: 'minor' | 'moderate' | 'severe';
-  expected_delay_minutes: number;
-  estimated_resolution: string;
-  user_id: string;
-  correlation_id: string;
-}
-
-interface ServiceRestoredData {
-  restored_service: string;
-  downtime_duration_minutes: number;
-  performance_status: 'normal' | 'degraded';
-  user_id: string;
+interface BatchAssessmentCompletedData {
+  notification_type: 'batch_assessment_completed';
+  category: 'processing_results';
+  priority: 'standard';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    total_essays: number;
+    completed_assessments: number;
+    overall_completion_rate: number;
+  };
   correlation_id: string;
 }
 
 type NotificationData = 
-  | BatchCreatedData
+  // File Operations
   | BatchFilesUploadedData
+  | BatchFileRemovedData
+  | BatchValidationFailedData
+  // Class Management
+  | ClassCreatedData
+  | StudentAddedToClassData
+  | ValidationTimeoutProcessedData
+  | StudentAssociationsConfirmedData
+  // Processing Results
+  | BatchSpellcheckCompletedData
+  | BatchCjAssessmentCompletedData
   | BatchProcessingStartedData
-  | BatchProcessingCompletedData
-  | BatchProcessingFailedData
-  | EssaySpellcheckCompletedData
-  | EssayContentJudgmentCompletedData
-  | EssayFeedbackGeneratedData
-  | EssayProcessingFailedData
-  | SystemMaintenanceScheduledData
-  | SystemMaintenanceStartedData
-  | SystemMaintenanceCompletedData
-  | ServiceDegradationAlertData
-  | ServiceRestoredData;
+  | BatchResultsReadyData
+  | BatchAssessmentCompletedData;
 ```
 
 ### WebSocket Event Handlers
@@ -440,25 +429,23 @@ interface WebSocketEventHandlers {
   error: (error: Event) => void;
   message: (message: NotificationEnvelope) => void;
   
-  // Batch Events
-  BATCH_CREATED: (data: BatchCreatedData) => void;
-  BATCH_FILES_UPLOADED: (data: BatchFilesUploadedData) => void;
-  BATCH_PROCESSING_STARTED: (data: BatchProcessingStartedData) => void;
-  BATCH_PROCESSING_COMPLETED: (data: BatchProcessingCompletedData) => void;
-  BATCH_PROCESSING_FAILED: (data: BatchProcessingFailedData) => void;
+  // File Operation Events
+  batch_files_uploaded: (data: BatchFilesUploadedData) => void;
+  batch_file_removed: (data: BatchFileRemovedData) => void;
+  batch_validation_failed: (data: BatchValidationFailedData) => void;
   
-  // Essay Events
-  ESSAY_SPELLCHECK_COMPLETED: (data: EssaySpellcheckCompletedData) => void;
-  ESSAY_CONTENT_JUDGMENT_COMPLETED: (data: EssayContentJudgmentCompletedData) => void;
-  ESSAY_FEEDBACK_GENERATED: (data: EssayFeedbackGeneratedData) => void;
-  ESSAY_PROCESSING_FAILED: (data: EssayProcessingFailedData) => void;
+  // Class Management Events
+  class_created: (data: ClassCreatedData) => void;
+  student_added_to_class: (data: StudentAddedToClassData) => void;
+  validation_timeout_processed: (data: ValidationTimeoutProcessedData) => void;
+  student_associations_confirmed: (data: StudentAssociationsConfirmedData) => void;
   
-  // System Events
-  SYSTEM_MAINTENANCE_SCHEDULED: (data: SystemMaintenanceScheduledData) => void;
-  SYSTEM_MAINTENANCE_STARTED: (data: SystemMaintenanceStartedData) => void;
-  SYSTEM_MAINTENANCE_COMPLETED: (data: SystemMaintenanceCompletedData) => void;
-  SERVICE_DEGRADATION_ALERT: (data: ServiceDegradationAlertData) => void;
-  SERVICE_RESTORED: (data: ServiceRestoredData) => void;
+  // Processing Result Events
+  batch_spellcheck_completed: (data: BatchSpellcheckCompletedData) => void;
+  batch_cj_assessment_completed: (data: BatchCjAssessmentCompletedData) => void;
+  batch_processing_started: (data: BatchProcessingStartedData) => void;
+  batch_results_ready: (data: BatchResultsReadyData) => void;
+  batch_assessment_completed: (data: BatchAssessmentCompletedData) => void;
   
   // Reconnection Events
   maxReconnectAttemptsReached: (data: { attempts: number }) => void;
@@ -475,8 +462,8 @@ interface WebSocketError {
 }
 
 type WebSocketErrorCode = 
-  | 4001  // Authentication failed
-  | 4029  // Rate limit exceeded  
+  | 1008  // Authentication failed
+  | 4000  // Rate limit exceeded  
   | 1011  // Server error
   | 1000  // Normal closure
   | 1001  // Going away
@@ -551,23 +538,23 @@ interface RateLimitError extends Error {
 
 ## Environment Configuration
 
-### Frontend Environment Variables
+### Frontend Environment Variables (Svelte 5 + Vite)
 ```typescript
 interface FrontendEnvConfig {
   // API Configuration
-  REACT_APP_API_BASE_URL: string;      // Default: http://localhost:4001
-  REACT_APP_WS_BASE_URL: string;       // Default: ws://localhost:8081
+  VITE_API_BASE_URL: string;           // Default: http://localhost:4001
+  VITE_WS_BASE_URL: string;            // Default: ws://localhost:8080
   NODE_ENV: 'development' | 'production' | 'test';
   
   // Feature Flags
-  REACT_APP_ENABLE_WEBSOCKET: string;  // 'true' | 'false'
-  REACT_APP_ENABLE_DEBUG_LOGGING: string; // 'true' | 'false'
+  VITE_ENABLE_WEBSOCKET: string;       // 'true' | 'false'
+  VITE_ENABLE_DEBUG_LOGGING: string;   // 'true' | 'false'
   
   // Timeouts and Limits
-  REACT_APP_API_TIMEOUT: string;       // Default: '30000' (ms)
-  REACT_APP_UPLOAD_TIMEOUT: string;    // Default: '300000' (ms)
-  REACT_APP_MAX_FILE_SIZE: string;     // Default: '10485760' (10MB)
-  REACT_APP_MAX_FILES: string;         // Default: '50'
+  VITE_API_TIMEOUT: string;            // Default: '30000' (ms)
+  VITE_UPLOAD_TIMEOUT: string;         // Default: '300000' (ms)
+  VITE_MAX_FILE_SIZE: string;          // Default: '10485760' (10MB)
+  VITE_MAX_FILES: string;              // Default: '50'
 }
 ```
 
@@ -740,7 +727,7 @@ function formatFileSize(bytes: number): string {
 ```typescript
 export const API_DEFAULTS = {
   BASE_URL: 'http://localhost:4001',
-  WS_URL: 'ws://localhost:8081',
+  WS_URL: 'ws://localhost:8080',
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,

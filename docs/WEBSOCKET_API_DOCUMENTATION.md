@@ -4,7 +4,7 @@
 
 The HuleEdu WebSocket Service provides real-time communication capabilities for the platform, enabling instant notifications and status updates for batch processing, essay analysis, and system events.
 
-**Service URL**: `ws://localhost:8081/ws`  
+**Service URL**: `ws://localhost:8080/ws`  
 **Authentication**: JWT token via query parameter  
 **Protocol**: Text-based JSON messages
 
@@ -16,7 +16,7 @@ WebSocket connections require JWT authentication passed as a query parameter:
 
 ```javascript
 const token = "your-jwt-token-here";
-const wsUrl = `ws://localhost:8081/ws?token=${encodeURIComponent(token)}`;
+const wsUrl = `ws://localhost:8080/ws?token=${encodeURIComponent(token)}`;
 const websocket = new WebSocket(wsUrl);
 ```
 
@@ -39,303 +39,280 @@ wsClient.connect();
 
 ## Notification Event Types
 
-The WebSocket service delivers 15 different notification types based on the `TeacherNotificationRequestedV1` event structure:
+The WebSocket service delivers 12 different notification types based on the `TeacherNotificationRequestedV1` event structure:
 
-### 1. Batch Status Notifications
+### 1. File Operation Notifications
 
-#### `BATCH_CREATED`
-
-Notifies when a new batch is created.
-
-```json
-{
-    "notification_type": "BATCH_CREATED",
-    "timestamp": "2024-01-15T10:30:00Z",
-    "data": {
-        "batch_id": "batch_123",
-        "user_id": "user_456",
-        "status": "CREATED",
-        "file_count": 0,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `BATCH_FILES_UPLOADED`
+#### `batch_files_uploaded`
 
 Notifies when files are successfully uploaded to a batch.
 
 ```json
 {
-    "notification_type": "BATCH_FILES_UPLOADED",
+    "notification_type": "batch_files_uploaded",
     "timestamp": "2024-01-15T10:35:00Z",
-    "data": {
+    "category": "file_operations",
+    "priority": "standard",
+    "action_required": false,
+    "payload": {
         "batch_id": "batch_123",
         "user_id": "user_456",
         "files_uploaded": 5,
-        "total_size_bytes": 2048576,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
+        "total_size_bytes": 2048576
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-#### `BATCH_PROCESSING_STARTED`
+#### `batch_file_removed`
+
+Notifies when a file is removed from a batch.
+
+```json
+{
+    "notification_type": "batch_file_removed",
+    "timestamp": "2024-01-15T10:40:00Z",
+    "category": "file_operations", 
+    "priority": "standard",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "file_id": "file_789",
+        "filename": "essay_student1.pdf"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `batch_validation_failed`
+
+Notifies when batch validation fails.
+
+```json
+{
+    "notification_type": "batch_validation_failed",
+    "timestamp": "2024-01-15T10:45:00Z",
+    "category": "system_alerts",
+    "priority": "immediate", 
+    "action_required": true,
+    "payload": {
+        "batch_id": "batch_123",
+        "validation_errors": ["Invalid file format", "Missing student associations"],
+        "error_message": "Batch validation failed due to file format issues"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### 2. Class Management Notifications
+
+#### `class_created`
+
+Notifies when a new class is created.
+
+```json
+{
+    "notification_type": "class_created",
+    "timestamp": "2024-01-15T09:15:00Z",
+    "category": "class_management",
+    "priority": "standard",
+    "action_required": false,
+    "payload": {
+        "class_id": "class_456", 
+        "class_name": "English Composition A",
+        "teacher_id": "teacher_789"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `student_added_to_class`
+
+Notifies when a student is added to a class.
+
+```json
+{
+    "notification_type": "student_added_to_class",
+    "timestamp": "2024-01-15T09:30:00Z",
+    "category": "class_management",
+    "priority": "low",
+    "action_required": false,
+    "payload": {
+        "class_id": "class_456",
+        "student_id": "student_123",
+        "student_name": "John Smith"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `validation_timeout_processed`
+
+Notifies when validation timeout has been processed.
+
+```json
+{
+    "notification_type": "validation_timeout_processed",
+    "timestamp": "2024-01-15T11:00:00Z",
+    "category": "student_workflow",
+    "priority": "immediate",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "timeout_duration_seconds": 300,
+        "processed_students": 15
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `student_associations_confirmed`
+
+Notifies when student associations have been confirmed.
+
+```json
+{
+    "notification_type": "student_associations_confirmed",
+    "timestamp": "2024-01-15T11:15:00Z",
+    "category": "student_workflow", 
+    "priority": "high",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "confirmed_associations": 12,
+        "pending_associations": 3
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### 3. Processing Result Notifications
+
+#### `batch_spellcheck_completed`
+
+Notifies when spellcheck is completed for a batch.
+
+```json
+{
+    "notification_type": "batch_spellcheck_completed",
+    "timestamp": "2024-01-15T10:42:00Z",
+    "category": "batch_progress",
+    "priority": "low",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "essays_processed": 15,
+        "total_errors_found": 42,
+        "processing_duration_seconds": 180
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `batch_cj_assessment_completed`
+
+Notifies when content judgment assessment is completed for a batch.
+
+```json
+{
+    "notification_type": "batch_cj_assessment_completed",
+    "timestamp": "2024-01-15T11:15:00Z",
+    "category": "batch_progress",
+    "priority": "standard",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "essays_assessed": 15,
+        "average_content_score": 7.8,
+        "processing_duration_seconds": 450
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `batch_processing_started`
 
 Notifies when batch processing begins.
 
 ```json
 {
-    "notification_type": "BATCH_PROCESSING_STARTED",
-    "timestamp": "2024-01-15T10:40:00Z",
-    "data": {
+    "notification_type": "batch_processing_started",
+    "timestamp": "2024-01-15T10:00:00Z",
+    "category": "batch_progress",
+    "priority": "low",
+    "action_required": false,
+    "payload": {
         "batch_id": "batch_123",
-        "user_id": "user_456",
-        "pipeline_phase": "SPELLCHECK",
-        "estimated_duration_minutes": 15,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
+        "pipeline_phase": "spellcheck",
+        "estimated_duration_minutes": 8
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-#### `BATCH_PROCESSING_COMPLETED`
+#### `batch_results_ready`
 
-Notifies when batch processing is completed.
+Notifies when batch processing results are ready.
 
 ```json
 {
-    "notification_type": "BATCH_PROCESSING_COMPLETED",
-    "timestamp": "2024-01-15T10:55:00Z",
-    "data": {
+    "notification_type": "batch_results_ready",
+    "timestamp": "2024-01-15T12:00:00Z",
+    "category": "processing_results",
+    "priority": "high",
+    "action_required": false,
+    "payload": {
         "batch_id": "batch_123",
-        "user_id": "user_456",
-        "pipeline_phase": "SPELLCHECK",
-        "status": "COMPLETED",
-        "processing_duration_minutes": 14,
-        "essays_processed": 5,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
+        "results_count": 15,
+        "download_url": "/api/v1/batches/batch_123/results"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-#### `BATCH_PROCESSING_FAILED`
+#### `batch_assessment_completed`
 
-Notifies when batch processing fails.
+Notifies when all assessments for a batch are completed.
 
 ```json
 {
-    "notification_type": "BATCH_PROCESSING_FAILED",
-    "timestamp": "2024-01-15T10:45:00Z",
-    "data": {
+    "notification_type": "batch_assessment_completed",
+    "timestamp": "2024-01-15T12:30:00Z",
+    "category": "processing_results",
+    "priority": "standard",
+    "action_required": false,
+    "payload": {
         "batch_id": "batch_123",
-        "user_id": "user_456",
-        "pipeline_phase": "SPELLCHECK",
-        "error_type": "ValidationError",
-        "error_message": "Invalid file format detected",
-        "retry_recommended": true,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
+        "total_essays": 15,
+        "completed_assessments": 15,
+        "overall_completion_rate": 1.0
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-### 2. Essay Status Notifications
-
-#### `ESSAY_SPELLCHECK_COMPLETED`
-
-Notifies when spellcheck is completed for an essay.
-
-```json
-{
-    "notification_type": "ESSAY_SPELLCHECK_COMPLETED",
-    "timestamp": "2024-01-15T10:42:00Z",
-    "data": {
-        "essay_id": "essay_789",
-        "batch_id": "batch_123",
-        "user_id": "user_456",
-        "spelling_errors_found": 3,
-        "grammar_errors_found": 1,
-        "confidence_score": 0.95,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `ESSAY_CONTENT_JUDGMENT_COMPLETED`
-
-Notifies when content judgment is completed for an essay.
-
-```json
-{
-    "notification_type": "ESSAY_CONTENT_JUDGMENT_COMPLETED",
-    "timestamp": "2024-01-15T11:15:00Z",
-    "data": {
-        "essay_id": "essay_789",
-        "batch_id": "batch_123",
-        "user_id": "user_456",
-        "content_quality_score": 8.5,
-        "readability_score": 7.8,
-        "coherence_score": 8.2,
-        "argument_strength": 7.9,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `ESSAY_FEEDBACK_GENERATED`
-
-Notifies when feedback is generated for an essay.
-
-```json
-{
-    "notification_type": "ESSAY_FEEDBACK_GENERATED",
-    "timestamp": "2024-01-15T11:30:00Z",
-    "data": {
-        "essay_id": "essay_789",
-        "batch_id": "batch_123",
-        "user_id": "user_456",
-        "feedback_sections": ["structure", "content", "grammar", "style"],
-        "overall_score": 8.1,
-        "feedback_length_words": 245,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `ESSAY_PROCESSING_FAILED`
-
-Notifies when essay processing fails.
-
-```json
-{
-    "notification_type": "ESSAY_PROCESSING_FAILED",
-    "timestamp": "2024-01-15T10:43:00Z",
-    "data": {
-        "essay_id": "essay_789",
-        "batch_id": "batch_123",
-        "user_id": "user_456",
-        "pipeline_phase": "SPELLCHECK",
-        "error_type": "ProcessingError",
-        "error_message": "Text extraction failed - unsupported file format",
-        "retry_recommended": false,
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-### 3. System Notifications
-
-#### `SYSTEM_MAINTENANCE_SCHEDULED`
-
-Notifies about scheduled system maintenance.
-
-```json
-{
-    "notification_type": "SYSTEM_MAINTENANCE_SCHEDULED",
-    "timestamp": "2024-01-15T09:00:00Z",
-    "data": {
-        "maintenance_start": "2024-01-16T02:00:00Z",
-        "maintenance_end": "2024-01-16T04:00:00Z",
-        "affected_services": ["batch_processing", "file_upload"],
-        "description": "Scheduled database maintenance",
-        "user_id": "user_456",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `SYSTEM_MAINTENANCE_STARTED`
-
-Notifies when system maintenance begins.
-
-```json
-{
-    "notification_type": "SYSTEM_MAINTENANCE_STARTED",
-    "timestamp": "2024-01-16T02:00:00Z",
-    "data": {
-        "maintenance_type": "database_upgrade",
-        "estimated_duration_minutes": 120,
-        "affected_services": ["batch_processing", "file_upload"],
-        "user_id": "user_456",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `SYSTEM_MAINTENANCE_COMPLETED`
-
-Notifies when system maintenance is completed.
-
-```json
-{
-    "notification_type": "SYSTEM_MAINTENANCE_COMPLETED",
-    "timestamp": "2024-01-16T03:45:00Z",
-    "data": {
-        "maintenance_type": "database_upgrade",
-        "actual_duration_minutes": 105,
-        "services_restored": ["batch_processing", "file_upload"],
-        "user_id": "user_456",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `SERVICE_DEGRADATION_ALERT`
-
-Notifies about service performance degradation.
-
-```json
-{
-    "notification_type": "SERVICE_DEGRADATION_ALERT",
-    "timestamp": "2024-01-15T14:20:00Z",
-    "data": {
-        "affected_service": "content_judgment_service",
-        "degradation_level": "moderate",
-        "expected_delay_minutes": 5,
-        "estimated_resolution": "2024-01-15T15:00:00Z",
-        "user_id": "user_456",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
-
-#### `SERVICE_RESTORED`
-
-Notifies when service is restored after degradation.
-
-```json
-{
-    "notification_type": "SERVICE_RESTORED",
-    "timestamp": "2024-01-15T14:55:00Z",
-    "data": {
-        "restored_service": "content_judgment_service",
-        "downtime_duration_minutes": 35,
-        "performance_status": "normal",
-        "user_id": "user_456",
-        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-}
-```
 
 ## Error Handling and Reconnection
 
 ### Connection Errors
 
-#### Authentication Failure (4001)
+#### Authentication Failure (1008)
 
 ```json
 {
     "error": "Authentication failed",
-    "code": 4001,
+    "code": 1008,
     "message": "Invalid or expired JWT token",
     "retry_recommended": false
 }
 ```
 
-#### Rate Limit Exceeded (4029)
+#### Rate Limit Exceeded (4000)
 
 ```json
 {
     "error": "Rate limit exceeded",
-    "code": 4029,
+    "code": 4000,
     "message": "Too many connection attempts",
     "retry_after_seconds": 60
 }
@@ -390,7 +367,7 @@ class ReconnectionManager {
 
 ### Framework Integration
 
-For production-ready WebSocket integration with Svelte 5, React, and other frameworks, see:
+For production-ready WebSocket integration with Svelte 5 and other frameworks, see:
 
 - **[Svelte 5 Integration Guide](SVELTE_INTEGRATION_GUIDE.md#websocket-management)** - Complete WebSocket management with runes
 - **[Shared Code Patterns](SHARED_CODE_PATTERNS.md#websocket-connection-management)** - Base WebSocket client implementation
@@ -415,7 +392,7 @@ $effect(() => {
 ```javascript
 // Open browser console and run:
 const token = "your-jwt-token";
-const ws = new WebSocket(`ws://localhost:8081/ws?token=${encodeURIComponent(token)}`);
+const ws = new WebSocket(`ws://localhost:8080/ws?token=${encodeURIComponent(token)}`);
 
 ws.onopen = () => console.log('Connected');
 ws.onmessage = (event) => console.log('Message:', JSON.parse(event.data));
@@ -457,11 +434,11 @@ describe('WebSocket Client', () => {
 
     test('should handle message parsing', () => {
         const messageHandler = jest.fn();
-        client.on('BATCH_CREATED', messageHandler);
+        client.on('batch_files_uploaded', messageHandler);
         
         const testMessage = {
-            notification_type: 'BATCH_CREATED',
-            data: { batch_id: 'test-batch' }
+            notification_type: 'batch_files_uploaded',
+            payload: { batch_id: 'test-batch' }
         };
         
         // Simulate message receipt
@@ -469,7 +446,7 @@ describe('WebSocket Client', () => {
             data: JSON.stringify(testMessage)
         });
         
-        expect(messageHandler).toHaveBeenCalledWith(testMessage.data);
+        expect(messageHandler).toHaveBeenCalledWith(testMessage.payload);
     });
 });
 ```
@@ -502,7 +479,7 @@ The WebSocket service exposes Prometheus metrics at `/metrics`:
 ### Token Validation
 
 - JWT tokens are validated on connection establishment
-- Expired tokens result in immediate connection termination (code 4001)
+- Expired tokens result in immediate connection termination (code 1008)
 - Token refresh requires reconnection with new token
 
 ### Rate Limiting
@@ -525,7 +502,7 @@ CORS_ORIGINS=["http://localhost:3000", "https://app.huledu.com"]
 
 #### Connection Refused
 
-- Verify WebSocket service is running on port 8081
+- Verify WebSocket service is running on port 8080
 - Check firewall settings
 - Ensure CORS origins include your domain
 

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "api-gateway-service",
-    "description": "HuleEdu API Gateway - Secure client-facing API for React frontend integration",
+    "description": "HuleEdu API Gateway - Secure client-facing API for Svelte 5 frontend integration",
     "contact": {
       "name": "HuleEdu Development Team",
       "url": "https://github.com/huledu/huledu-reboot"
