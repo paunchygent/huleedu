@@ -17,7 +17,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core import LLMProviderType
-from common_core.error_enums import ErrorCode
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_interaction_impl import LLMInteractionImpl
@@ -34,7 +33,7 @@ class MockLLMProvider:
 
     def __init__(self, behavior: str = "success", exception: Exception | None = None) -> None:
         """Initialize test provider with configurable behavior.
-        
+
         Args:
             behavior: "success" for normal operation, "failure" to raise exception
             exception: Specific exception to raise on failure
@@ -65,10 +64,10 @@ class MockLLMProvider:
             "max_tokens_override": max_tokens_override,
             "provider_override": provider_override,
         }
-        
+
         if self.behavior == "failure":
             raise self.exception
-            
+
         # Async-only architecture always returns None
         return None
 
@@ -79,14 +78,16 @@ class MockBusinessMetricsCollector:
     def __init__(self) -> None:
         """Initialize metrics collector."""
         self.recorded_metrics: list[dict[str, Any]] = []
-        
+
     def record_llm_call(self, provider: str, model: str, status: str) -> None:
         """Record LLM call metric."""
-        self.recorded_metrics.append({
-            "provider": provider,
-            "model": model, 
-            "status": status,
-        })
+        self.recorded_metrics.append(
+            {
+                "provider": provider,
+                "model": model,
+                "status": status,
+            }
+        )
 
 
 class TestLLMInteractionImplProtocolCompliance:
@@ -112,12 +113,16 @@ class TestLLMInteractionImplProtocolCompliance:
         return MockLLMProvider(behavior="failure", exception=RuntimeError("Network timeout"))
 
     @pytest.fixture
-    def providers_dict_success(self, successful_provider: MockLLMProvider) -> dict[LLMProviderType, LLMProviderProtocol]:
+    def providers_dict_success(
+        self, successful_provider: MockLLMProvider
+    ) -> dict[LLMProviderType, LLMProviderProtocol]:
         """Create providers dict with successful provider."""
         return {LLMProviderType.OPENAI: successful_provider}
 
     @pytest.fixture
-    def providers_dict_failure(self, failing_provider: MockLLMProvider) -> dict[LLMProviderType, LLMProviderProtocol]:
+    def providers_dict_failure(
+        self, failing_provider: MockLLMProvider
+    ) -> dict[LLMProviderType, LLMProviderProtocol]:
         """Create providers dict with failing provider."""
         return {LLMProviderType.OPENAI: failing_provider}
 
@@ -183,7 +188,7 @@ class TestLLMInteractionImplProtocolCompliance:
         # Assert - Parameter passing verification
         assert len(result) == 0
         assert successful_provider.call_count == 1
-        
+
         params = successful_provider.last_call_params
         assert params["model_override"] == "test-model"
         assert params["temperature_override"] == 0.7
@@ -212,13 +217,13 @@ class TestLLMInteractionImplProtocolCompliance:
         # Assert - Error handling behavior
         assert len(result) == 1
         error_result = result[0]
-        
+
         assert isinstance(error_result, ComparisonResult)
         assert error_result.task == sample_comparison_task
         assert error_result.llm_assessment is None
         assert error_result.raw_llm_response_content is None
         assert error_result.error_detail is not None
-        
+
         # Verify provider was called despite error
         assert failing_provider.call_count == 1
 
@@ -233,16 +238,18 @@ class TestLLMInteractionImplProtocolCompliance:
         # Arrange
         llm_impl = LLMInteractionImpl(providers=providers_dict_success, settings=test_settings)
         correlation_id = uuid4()
-        
+
         tasks = []
         for i in range(3):
             essay_a = EssayForComparison(id=f"essay-a-{i}", text_content=f"Essay A {i}")
             essay_b = EssayForComparison(id=f"essay-b-{i}", text_content=f"Essay B {i}")
-            tasks.append(ComparisonTask(
-                essay_a=essay_a,
-                essay_b=essay_b,
-                prompt=f"Compare essays {i}",
-            ))
+            tasks.append(
+                ComparisonTask(
+                    essay_a=essay_a,
+                    essay_b=essay_b,
+                    prompt=f"Compare essays {i}",
+                )
+            )
 
         # Act
         result = await llm_impl.perform_comparisons(
@@ -306,7 +313,7 @@ class TestLLMInteractionImplProtocolCompliance:
         providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {
             LLMProviderType.OPENAI: successful_provider  # Only OpenAI available
         }
-        
+
         llm_impl = LLMInteractionImpl(providers=providers_dict, settings=settings)
 
         # Act
@@ -365,11 +372,13 @@ class TestLLMInteractionImplAsyncBehavior:
         for i in range(5):
             essay_a = EssayForComparison(id=f"async-a-{i}", text_content=f"Async A {i}")
             essay_b = EssayForComparison(id=f"async-b-{i}", text_content=f"Async B {i}")
-            tasks.append(ComparisonTask(
-                essay_a=essay_a,
-                essay_b=essay_b,
-                prompt=f"Async test {i}",
-            ))
+            tasks.append(
+                ComparisonTask(
+                    essay_a=essay_a,
+                    essay_b=essay_b,
+                    prompt=f"Async test {i}",
+                )
+            )
 
         correlation_id = uuid4()
 
@@ -391,8 +400,9 @@ class TestLLMInteractionImplErrorScenarios:
     def mixed_behavior_providers(self) -> dict[LLMProviderType, LLMProviderProtocol]:
         """Create providers with mixed success/failure behavior."""
         return {
-            LLMProviderType.OPENAI: MockLLMProvider(behavior="failure", 
-                exception=ConnectionError("Connection failed"))
+            LLMProviderType.OPENAI: MockLLMProvider(
+                behavior="failure", exception=ConnectionError("Connection failed")
+            )
         }
 
     @pytest.mark.asyncio
@@ -408,7 +418,7 @@ class TestLLMInteractionImplErrorScenarios:
         settings.max_concurrent_llm_requests = 3
 
         llm_impl = LLMInteractionImpl(providers=mixed_behavior_providers, settings=settings)
-        
+
         essay_a = EssayForComparison(id="error-a", text_content="Error test A")
         essay_b = EssayForComparison(id="error-b", text_content="Error test B")
         task = ComparisonTask(essay_a=essay_a, essay_b=essay_b, prompt="Error test")
@@ -423,7 +433,7 @@ class TestLLMInteractionImplErrorScenarios:
         # Assert - Structured error response
         assert len(result) == 1
         error_result = result[0]
-        
+
         assert isinstance(error_result, ComparisonResult)
         assert error_result.task == task
         assert error_result.llm_assessment is None
@@ -435,6 +445,7 @@ class TestLLMInteractionImplErrorScenarios:
         self,
     ) -> None:
         """Test mixed success/failure scenarios are handled independently."""
+
         # Arrange - Create provider that alternates between success and failure
         class AlternatingProvider(MockLLMProvider):
             def __init__(self) -> None:
@@ -463,11 +474,13 @@ class TestLLMInteractionImplErrorScenarios:
         for i in range(4):
             essay_a = EssayForComparison(id=f"mixed-a-{i}", text_content=f"Mixed A {i}")
             essay_b = EssayForComparison(id=f"mixed-b-{i}", text_content=f"Mixed B {i}")
-            tasks.append(ComparisonTask(
-                essay_a=essay_a,
-                essay_b=essay_b,
-                prompt=f"Mixed test {i}",
-            ))
+            tasks.append(
+                ComparisonTask(
+                    essay_a=essay_a,
+                    essay_b=essay_b,
+                    prompt=f"Mixed test {i}",
+                )
+            )
 
         correlation_id = uuid4()
 
@@ -477,11 +490,11 @@ class TestLLMInteractionImplErrorScenarios:
             correlation_id=correlation_id,
         )
 
-        # Assert - Only failed tasks return error results  
+        # Assert - Only failed tasks return error results
         # Successful tasks (odd-numbered calls) return None (async-only)
         # Failed tasks (even-numbered calls) return error results
         assert len(result) == 2  # 2 failures out of 4 tasks
-        
+
         for error_result in result:
             assert isinstance(error_result, ComparisonResult)
             assert error_result.llm_assessment is None
@@ -531,9 +544,7 @@ class TestLLMInteractionImplConfigurationBehavior:
         settings.max_concurrent_llm_requests = 3
 
         provider = MockLLMProvider(behavior="success")
-        providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {
-            provider_type: provider
-        }
+        providers_dict: dict[LLMProviderType, LLMProviderProtocol] = {provider_type: provider}
 
         # Act
         llm_impl = LLMInteractionImpl(providers=providers_dict, settings=settings)

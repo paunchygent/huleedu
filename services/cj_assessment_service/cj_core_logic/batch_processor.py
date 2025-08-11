@@ -308,6 +308,7 @@ class BatchProcessor:
         try:
             async with self.database.session() as session:
                 from sqlalchemy import update
+
                 from services.cj_assessment_service.models_db import CJBatchState
 
                 await session.execute(

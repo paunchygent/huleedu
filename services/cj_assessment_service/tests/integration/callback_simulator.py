@@ -22,8 +22,8 @@ from sqlalchemy import select
 from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
     continue_cj_assessment_workflow,
 )
-from services.cj_assessment_service.models_db import ComparisonPair
 from services.cj_assessment_service.models_api import ComparisonTask
+from services.cj_assessment_service.models_db import ComparisonPair
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.config import Settings
@@ -102,14 +102,14 @@ class CallbackSimulator:
             return 0
 
         # Check if the mock has stored submitted tasks (for async mocks)
-        if hasattr(mock_llm_interaction, '_submitted_tasks'):
+        if hasattr(mock_llm_interaction, "_submitted_tasks"):
             # This is an async mock that returned None - generate results
             comparison_tasks = mock_llm_interaction._submitted_tasks
             mock_results = self._generate_mock_results(comparison_tasks)
         else:
             # Try to get results from the mock's side_effect or return_value
             original_call_count = mock_llm_interaction.perform_comparisons.call_count
-            
+
             # Call the side_effect function to get the results
             side_effect = mock_llm_interaction.perform_comparisons.side_effect
             if callable(side_effect):
@@ -126,10 +126,10 @@ class CallbackSimulator:
                 mock_results = mock_llm_interaction.perform_comparisons.return_value
                 if hasattr(mock_results, "__await__"):
                     mock_results = await mock_results
-            
+
             # Reset the call count to what it was before (to avoid double-counting)
             mock_llm_interaction.perform_comparisons.call_count = original_call_count
-            
+
             # Filter out None results (async processing)
             if mock_results:
                 mock_results = [r for r in mock_results if r is not None]
@@ -261,8 +261,12 @@ class CallbackSimulator:
                 # Store both orderings since we might not know which order was used
                 # Ensure correlation ID is not None (it was assigned above if missing)
                 if pair.request_correlation_id is not None:
-                    mapping[(pair.essay_a_els_id, pair.essay_b_els_id)] = pair.request_correlation_id
-                    mapping[(pair.essay_b_els_id, pair.essay_a_els_id)] = pair.request_correlation_id
+                    mapping[(pair.essay_a_els_id, pair.essay_b_els_id)] = (
+                        pair.request_correlation_id
+                    )
+                    mapping[(pair.essay_b_els_id, pair.essay_a_els_id)] = (
+                        pair.request_correlation_id
+                    )
 
         return mapping
 
@@ -358,34 +362,31 @@ class CallbackSimulator:
         comparison_tasks: list[ComparisonTask],
     ) -> list[ComparisonResult]:
         """Generate mock comparison results for async processing simulation.
-        
+
         Args:
             comparison_tasks: List of comparison tasks
-            
+
         Returns:
             List of mock comparison results
         """
+        from common_core.domain_enums import EssayComparisonWinner
+
         from services.cj_assessment_service.models_api import (
             ComparisonResult,
             LLMAssessmentResponseSchema,
         )
-        from common_core.domain_enums import EssayComparisonWinner
-        
+
         results = []
         for i, task in enumerate(comparison_tasks):
             # Alternate winners for variety
-            winner = (
-                EssayComparisonWinner.ESSAY_A
-                if i % 2 == 0
-                else EssayComparisonWinner.ESSAY_B
-            )
-            
+            winner = EssayComparisonWinner.ESSAY_A if i % 2 == 0 else EssayComparisonWinner.ESSAY_B
+
             assessment = LLMAssessmentResponseSchema(
                 winner=winner,
                 confidence=3.5 + (i % 3) * 0.5,  # Vary confidence 3.5-4.5
                 justification=f"Essay {winner.value} demonstrates stronger argumentation",
             )
-            
+
             result = ComparisonResult(
                 task=task,
                 llm_assessment=assessment,
@@ -393,7 +394,7 @@ class CallbackSimulator:
                 error_detail=None,
             )
             results.append(result)
-            
+
         return results
 
     def _create_callback_event(

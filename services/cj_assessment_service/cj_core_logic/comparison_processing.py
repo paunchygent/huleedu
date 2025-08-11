@@ -18,7 +18,6 @@ from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfi
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
     EssayForComparison,
@@ -103,7 +102,9 @@ async def submit_comparisons_for_async_processing(
             essays_for_comparison=essays_for_api_model,
             db_session=session,
             cj_batch_id=cj_batch_id,
-            existing_pairs_threshold=getattr(settings, "comparisons_per_stability_check_iteration", 5),
+            existing_pairs_threshold=getattr(
+                settings, "comparisons_per_stability_check_iteration", 5
+            ),
             correlation_id=correlation_id,
         )
 

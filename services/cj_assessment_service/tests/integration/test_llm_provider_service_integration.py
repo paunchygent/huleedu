@@ -267,9 +267,11 @@ class TestMockProviderIntegration:
 
                 # Verify queuing response format
                 assert "message" in result
-                assert "queued" in result["message"].lower() or "accepted" in result["message"].lower()
-                print(f"\n✅ Mock Provider Integration Test Passed:")
-                print(f"   - Request successfully queued with 202 response")
+                assert (
+                    "queued" in result["message"].lower() or "accepted" in result["message"].lower()
+                )
+                print("\n✅ Mock Provider Integration Test Passed:")
+                print("   - Request successfully queued with 202 response")
                 print(f"   - Response: {result['message']}")
 
     async def _check_service_availability(self, service_url: str) -> bool:

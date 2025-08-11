@@ -40,13 +40,16 @@ class TestAnchorAPIRequestValidation:
         return MockCJRepository(behavior="success")
 
     @pytest.fixture
-    def test_app(self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol) -> Any:
+    def test_app(
+        self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol
+    ) -> Any:
         """Create test app for validation tests."""
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -55,7 +58,7 @@ class TestAnchorAPIRequestValidation:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         return app
 
     @pytest.fixture
@@ -68,18 +71,9 @@ class TestAnchorAPIRequestValidation:
         "request_data, expected_error_substring",
         [
             # Missing required fields
-            (
-                {"assignment_id": "test", "grade": "A"},
-                "Missing required fields"
-            ),
-            (
-                {"assignment_id": "test", "essay_text": "Valid text here"},
-                "Missing required fields"
-            ),
-            (
-                {"grade": "A", "essay_text": "Valid text here"},
-                "Missing required fields"
-            ),
+            ({"assignment_id": "test", "grade": "A"}, "Missing required fields"),
+            ({"assignment_id": "test", "essay_text": "Valid text here"}, "Missing required fields"),
+            ({"grade": "A", "essay_text": "Valid text here"}, "Missing required fields"),
             # Invalid grade values
             (
                 {
@@ -87,15 +81,15 @@ class TestAnchorAPIRequestValidation:
                     "grade": "G",
                     "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
                 },
-                "Invalid grade"
+                "Invalid grade",
             ),
             (
                 {
-                    "assignment_id": "test", 
+                    "assignment_id": "test",
                     "grade": "A+",
                     "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
                 },
-                "Invalid grade"
+                "Invalid grade",
             ),
             (
                 {
@@ -103,7 +97,7 @@ class TestAnchorAPIRequestValidation:
                     "grade": "invalid",
                     "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
                 },
-                "Invalid grade"
+                "Invalid grade",
             ),
             # Essay text too short
             (
@@ -112,7 +106,7 @@ class TestAnchorAPIRequestValidation:
                     "grade": "A",
                     "essay_text": "Short",
                 },
-                "Essay text too short"
+                "Essay text too short",
             ),
         ],
     )

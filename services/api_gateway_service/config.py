@@ -2,7 +2,7 @@
 Configuration for API Gateway Service.
 
 Uses Pydantic settings for environment-based configuration with
-FastAPI-specific settings and React frontend integration.
+FastAPI-specific settings and Svelte 5 + Vite frontend integration.
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     # Logging configuration
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
 
-    # CORS configuration for React frontend
+    # CORS configuration for Svelte 5 + Vite frontend
     CORS_ORIGINS: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:3001"],
-        description="Allowed CORS origins for React frontend",
+        default=["http://localhost:5173", "http://localhost:4173", "http://localhost:3000"],
+        description="Allowed CORS origins for Svelte 5 + Vite frontend",
     )
     CORS_ALLOW_CREDENTIALS: bool = Field(
         default=True, description="Allow credentials in CORS requests"

@@ -6,9 +6,9 @@ proven workflow logic instead of creating a parallel workflow system.
 
 from __future__ import annotations
 
+import types
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
-import types
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,12 +24,12 @@ grade_projector: types.ModuleType | None = None
 from common_core.events.llm_provider_events import LLMComparisonResultV1
 
 # EntityReference removed - using primitive parameters
-from common_core.status_enums import CJBatchStateEnum
-from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
-from services.cj_assessment_service.cj_core_logic.batch_completion_checker import BatchCompletionChecker
+from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
+    BatchCompletionChecker,
+)
 from services.cj_assessment_service.cj_core_logic.batch_submission import get_batch_state
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
     check_batch_completion_conditions,
@@ -39,6 +39,7 @@ from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.config import Settings
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair
@@ -80,11 +81,13 @@ async def continue_cj_assessment_workflow(
     global scoring_ranking, grade_projector
     if scoring_ranking is None:
         from services.cj_assessment_service.cj_core_logic import scoring_ranking as _sr
+
         scoring_ranking = _sr
     if grade_projector is None:
         from services.cj_assessment_service.cj_core_logic import grade_projector as _gp
+
         grade_projector = _gp
-    
+
     # Get business metrics
     business_metrics = get_business_metrics()
     comparisons_total_metric = business_metrics.get("cj_comparisons_total")

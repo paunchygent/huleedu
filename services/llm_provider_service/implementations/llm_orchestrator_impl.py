@@ -114,7 +114,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         # ARCHITECTURAL TRUTH: ALL HTTP API requests are queued - no immediate responses
         # Queue all API requests to ensure async-only pattern
-        logger.info(f"Queuing LLM request for provider {provider.value}, correlation_id: {correlation_id}")
+        logger.info(
+            f"Queuing LLM request for provider {provider.value}, correlation_id: {correlation_id}"
+        )
         return await self._queue_request(
             provider=provider,
             user_prompt=user_prompt,
@@ -136,10 +138,10 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
         """Process a queued request directly (internal use only).
-        
+
         This method bypasses queueing and directly calls providers.
         ONLY used by QueueProcessor for processing already-queued requests.
-        
+
         Args:
             provider: LLM provider to use
             user_prompt: The comparison prompt
@@ -155,7 +157,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             HuleEduError: On any failure to process request
         """
         start_time = time.time()
-        
+
         # Validate provider exists
         if provider not in self.providers:
             available = [p.value for p in self.providers.keys()]
@@ -381,7 +383,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         except Exception as e:
             # Unexpected error
             response_time_ms = int((time.time() - start_time) * 1000)
-            error_msg = f"Unexpected error calling provider {provider.value} (queued processing): {str(e)}"
+            error_msg = (
+                f"Unexpected error calling provider {provider.value} (queued processing): {str(e)}"
+            )
             logger.error(error_msg, exc_info=True)
 
             await self._handle_provider_failure(
@@ -531,7 +535,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         ) * provider_costs["completion"]
 
         return round(cost, 6)  # 6 decimal places for USD
-
 
     def _get_request_priority(self, overrides: Dict[str, Any]) -> int:
         """Determine request priority based on metadata.

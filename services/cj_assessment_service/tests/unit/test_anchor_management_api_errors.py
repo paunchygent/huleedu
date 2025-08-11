@@ -2,15 +2,13 @@
 
 Tests error scenarios and failure conditions for anchor essay registration:
 - Content service failures
-- Database operation failures  
+- Database operation failures
 - Missing response data handling
 - Unexpected exceptions
 - HTTP method validation
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -46,16 +44,18 @@ class TestAnchorAPIErrorHandling:
         return MissingStorageIdClient()
 
     @pytest.mark.asyncio
-    async def test_content_service_failure_handling(self, failing_content_client: MockContentClient) -> None:
+    async def test_content_service_failure_handling(
+        self, failing_content_client: MockContentClient
+    ) -> None:
         """Test handling of content service failures."""
         # Arrange
         mock_repository = MockCJRepository(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return failing_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -64,7 +64,7 @@ class TestAnchorAPIErrorHandling:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "content-failure-test",
@@ -82,16 +82,18 @@ class TestAnchorAPIErrorHandling:
             assert "Internal server error" in response_data["error"]
 
     @pytest.mark.asyncio
-    async def test_missing_content_id_handling(self, missing_storage_id_client: MissingStorageIdClient) -> None:
+    async def test_missing_content_id_handling(
+        self, missing_storage_id_client: MissingStorageIdClient
+    ) -> None:
         """Test handling when content service doesn't return storage_id."""
         # Arrange
         mock_repository = MockCJRepository(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return missing_storage_id_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -100,7 +102,7 @@ class TestAnchorAPIErrorHandling:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "missing-storage-id-test",
@@ -122,12 +124,12 @@ class TestAnchorAPIErrorHandling:
         """Test handling of database operation failures."""
         # Arrange
         mock_content_client = MockContentClient(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return failing_repository
@@ -136,7 +138,7 @@ class TestAnchorAPIErrorHandling:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "database-failure-test",
@@ -158,12 +160,12 @@ class TestAnchorAPIErrorHandling:
         """Test handling of unexpected exceptions."""
         # Arrange - Create mock that raises unexpected exception
         mock_content_client = MockContentClient(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return FailingMockRepository()  # type: ignore[return-value]
@@ -172,7 +174,7 @@ class TestAnchorAPIErrorHandling:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "unexpected-error-test",
@@ -199,12 +201,12 @@ class TestAnchorAPIErrorHandling:
         # Arrange
         mock_content_client = MockContentClient(behavior="success")
         mock_repository = MockCJRepository(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -213,7 +215,7 @@ class TestAnchorAPIErrorHandling:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             # Act
             response = await getattr(client, http_method)("/api/v1/anchors/register")

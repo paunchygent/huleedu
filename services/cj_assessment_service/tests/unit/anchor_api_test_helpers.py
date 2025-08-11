@@ -21,7 +21,7 @@ class MockContentClient(ContentClientProtocol):
 
     def __init__(self, behavior: str = "success", storage_id: str = "content-test-123") -> None:
         """Initialize mock with configurable behavior.
-        
+
         Args:
             behavior: "success" for normal operation, "failure" to raise exception
             storage_id: Storage ID to return on successful store operation
@@ -38,10 +38,10 @@ class MockContentClient(ContentClientProtocol):
             "content": content,
             "content_type": content_type,
         }
-        
+
         if self.behavior == "failure":
             raise RuntimeError("Content storage failed")
-        
+
         return {"content_id": self.storage_id}
 
     async def fetch_content(self, storage_id: str, correlation_id: UUID) -> str:
@@ -51,16 +51,16 @@ class MockContentClient(ContentClientProtocol):
 
 class MockSessionManager:
     """Proper async context manager for mock database sessions."""
-    
+
     def __init__(self, repository: "MockCJRepository") -> None:
         """Initialize with repository reference."""
         self.repository = repository
-    
+
     async def __aenter__(self) -> AsyncSession:
         """Enter session context."""
         self.repository.session_context_calls += 1
         return MockAsyncSession(self.repository)  # type: ignore[return-value]
-    
+
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit session context."""
         pass
@@ -219,18 +219,18 @@ class MockCJRepository(CJRepositoryProtocol):
 
 class MissingStorageIdClient(ContentClientProtocol):
     """Mock client that doesn't return storage_id for error testing."""
-    
+
     def __init__(self) -> None:
         """Initialize mock."""
         self.call_count = 0
         self.last_call_params: dict[str, Any] = {}
-        
+
     async def store_content(self, content: str, content_type: str = "text/plain") -> dict[str, str]:
         """Mock store that returns empty dict."""
         self.call_count += 1
         self.last_call_params = {"content": content, "content_type": content_type}
         return {}  # Missing content_id
-        
+
     async def fetch_content(self, storage_id: str, correlation_id: UUID) -> str:
         """Mock fetch operation."""
         return "Mock content"
@@ -238,7 +238,7 @@ class MissingStorageIdClient(ContentClientProtocol):
 
 class FailingMockRepository:
     """Mock repository that raises unexpected exception."""
-    
+
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         """Raise unexpected exception during session creation."""

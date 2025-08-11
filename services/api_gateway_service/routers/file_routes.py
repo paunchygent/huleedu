@@ -51,10 +51,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "batch_id": "batch_123",
                         "files_uploaded": 3,
                         "total_size_bytes": 1048576,
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request parameters or file validation failed",
@@ -67,8 +67,8 @@ logger = create_service_logger("api_gateway.file_routes")
                                 "error_type": "ValidationError",
                                 "message": "batch_id is required in form data",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                                "field": "batch_id"
-                            }
+                                "field": "batch_id",
+                            },
                         },
                         "no_files": {
                             "summary": "No files provided in request",
@@ -76,8 +76,8 @@ logger = create_service_logger("api_gateway.file_routes")
                                 "error_type": "ValidationError",
                                 "message": "At least one file is required",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                                "field": "files"
-                            }
+                                "field": "files",
+                            },
                         },
                         "file_too_large": {
                             "summary": "File exceeds size limit",
@@ -86,12 +86,12 @@ logger = create_service_logger("api_gateway.file_routes")
                                 "message": "File size exceeds maximum allowed (50MB)",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "field": "files",
-                                "max_size_bytes": 52428800
-                            }
-                        }
+                                "max_size_bytes": 52428800,
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -100,10 +100,10 @@ logger = create_service_logger("api_gateway.file_routes")
                     "example": {
                         "error_type": "AuthenticationError",
                         "message": "Valid JWT token required",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Access forbidden - user does not own this batch",
@@ -114,10 +114,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "message": "User does not have permission to upload files to this batch",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "batch_id": "batch_123",
-                        "user_id": "user_456"
+                        "user_id": "user_456",
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Batch not found",
@@ -128,10 +128,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "message": "Batch not found",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "resource_type": "batch",
-                        "resource_id": "batch_123"
+                        "resource_id": "batch_123",
                     }
                 }
-            }
+            },
         },
         413: {
             "description": "Request entity too large",
@@ -141,10 +141,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "error_type": "ValidationError",
                         "message": "Total upload size exceeds limit",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "max_total_size_bytes": 104857600
+                        "max_total_size_bytes": 104857600,
                     }
                 }
-            }
+            },
         },
         429: {
             "description": "Rate limit exceeded",
@@ -154,10 +154,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "error_type": "RateLimitError",
                         "message": "Rate limit exceeded: 5 uploads per minute",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "retry_after": 60
+                        "retry_after": 60,
                     }
                 }
-            }
+            },
         },
         503: {
             "description": "Service temporarily unavailable",
@@ -168,10 +168,10 @@ logger = create_service_logger("api_gateway.file_routes")
                         "message": "File service temporarily unavailable",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "external_service": "file_service",
-                        "retry_recommended": True
+                        "retry_recommended": True,
                     }
                 }
-            }
+            },
         },
         504: {
             "description": "Upload timeout",
@@ -181,12 +181,12 @@ logger = create_service_logger("api_gateway.file_routes")
                         "error_type": "TimeoutError",
                         "message": "File upload timeout - please try again with smaller files",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "timeout_seconds": 60.0
+                        "timeout_seconds": 60.0,
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 @limiter.limit("5/minute")  # Lower limit for file uploads
 @inject
@@ -205,9 +205,9 @@ async def upload_batch_files(
     supports multipart/form-data with multiple files and comprehensive error handling.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
-    
+
     **Rate Limiting**: 5 uploads per minute per user (lower limit due to resource intensity)
-    
+
     **File Requirements**:
     - Maximum file size: 50MB per file
     - Maximum total upload: 100MB per request
@@ -218,7 +218,7 @@ async def upload_batch_files(
     **Form Data Structure**:
     ```
     Content-Type: multipart/form-data
-    
+
     batch_id: string (required) - The batch identifier
     files: file[] (required) - Array of files to upload
     ```
@@ -238,14 +238,14 @@ async def upload_batch_files(
     - Rate limiting returns 429 with retry-after information
     - File service unavailability returns 503 with retry recommendation
     - Upload timeouts return 504 with timeout information
-    
+
     **Client Implementation Example**:
     ```javascript
     const formData = new FormData();
     formData.append('batch_id', 'batch_123');
     formData.append('files', file1);
     formData.append('files', file2);
-    
+
     const response = await fetch('/api/files/batch', {
         method: 'POST',
         headers: {

@@ -181,7 +181,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                             "All LLM calls must be async (202) with Kafka callbacks.",
                             extra={
                                 "correlation_id": str(correlation_id),
-                                "provider": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
+                                "provider": provider_override
+                                or self.settings.DEFAULT_LLM_PROVIDER.value,
                             },
                         )
                         # Treat as an error - we don't support synchronous LLM calls
@@ -189,7 +190,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                             service="cj_assessment_service",
                             operation="generate_comparison",
                             message="LLM Provider returned synchronous response (200). "
-                                    "Only async (202) responses are supported.",
+                            "Only async (202) responses are supported.",
                             correlation_id=correlation_id,
                             response_status=200,
                         )

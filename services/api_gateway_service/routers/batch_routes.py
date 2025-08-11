@@ -70,10 +70,10 @@ class BatchPipelineRequest(BaseModel):
                         "status": "accepted",
                         "message": "Pipeline execution request received",
                         "batch_id": "batch_123",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request parameters",
@@ -88,8 +88,8 @@ class BatchPipelineRequest(BaseModel):
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "field": "batch_id",
                                 "expected": "batch_123",
-                                "received": "batch_456"
-                            }
+                                "received": "batch_456",
+                            },
                         },
                         "invalid_pipeline": {
                             "summary": "Invalid pipeline phase specified",
@@ -98,12 +98,16 @@ class BatchPipelineRequest(BaseModel):
                                 "message": "Invalid pipeline phase",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                                 "field": "requested_pipeline",
-                                "allowed_values": ["SPELLCHECK", "CONTENT_JUDGMENT", "FEEDBACK_GENERATION"]
-                            }
-                        }
+                                "allowed_values": [
+                                    "SPELLCHECK",
+                                    "CONTENT_JUDGMENT",
+                                    "FEEDBACK_GENERATION",
+                                ],
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -112,10 +116,10 @@ class BatchPipelineRequest(BaseModel):
                     "example": {
                         "error_type": "AuthenticationError",
                         "message": "Valid JWT token required",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Access forbidden - user does not own this batch",
@@ -126,10 +130,10 @@ class BatchPipelineRequest(BaseModel):
                         "message": "User does not have permission to access this batch",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "batch_id": "batch_123",
-                        "user_id": "user_456"
+                        "user_id": "user_456",
                     }
                 }
-            }
+            },
         },
         429: {
             "description": "Rate limit exceeded",
@@ -139,10 +143,10 @@ class BatchPipelineRequest(BaseModel):
                         "error_type": "RateLimitError",
                         "message": "Rate limit exceeded: 10 requests per minute",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "retry_after": 60
+                        "retry_after": 60,
                     }
                 }
-            }
+            },
         },
         503: {
             "description": "Service temporarily unavailable",
@@ -153,12 +157,12 @@ class BatchPipelineRequest(BaseModel):
                         "message": "Failed to publish pipeline request: Kafka broker unavailable",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "batch_id": "batch_123",
-                        "retry_recommended": True
+                        "retry_recommended": True,
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 @limiter.limit("10/minute")
 @inject
@@ -179,9 +183,9 @@ async def request_pipeline_execution(
     to the appropriate Kafka topic for asynchronous processing.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
-    
+
     **Rate Limiting**: 10 requests per minute per user
-    
+
     **Processing Flow**:
     1. Validate batch ownership (user must own the batch)
     2. Validate pipeline phase is supported

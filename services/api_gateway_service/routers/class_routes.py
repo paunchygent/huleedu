@@ -38,11 +38,11 @@ logger = create_service_logger("api_gateway.class_routes")
                                         "name": "Advanced Writing",
                                         "description": "Advanced essay writing course",
                                         "created_at": "2024-01-15T10:30:00Z",
-                                        "student_count": 25
+                                        "student_count": 25,
                                     }
                                 ],
-                                "total_count": 1
-                            }
+                                "total_count": 1,
+                            },
                         },
                         "get_class_detail": {
                             "summary": "GET /classes/{class_id} - Get class details",
@@ -58,14 +58,14 @@ logger = create_service_logger("api_gateway.class_routes")
                                         "student_id": "student_456",
                                         "name": "John Doe",
                                         "email": "john@example.com",
-                                        "enrolled_at": "2024-01-10T09:00:00Z"
+                                        "enrolled_at": "2024-01-10T09:00:00Z",
                                     }
-                                ]
-                            }
-                        }
+                                ],
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         201: {
             "description": "Resource created successfully",
@@ -76,10 +76,10 @@ logger = create_service_logger("api_gateway.class_routes")
                         "name": "Creative Writing",
                         "description": "Creative writing workshop",
                         "created_at": "2024-01-15T12:00:00Z",
-                        "message": "Class created successfully"
+                        "message": "Class created successfully",
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request parameters",
@@ -92,8 +92,8 @@ logger = create_service_logger("api_gateway.class_routes")
                                 "error_type": "ValidationError",
                                 "message": "Class name is required",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                                "field": "name"
-                            }
+                                "field": "name",
+                            },
                         },
                         "invalid_class_id": {
                             "summary": "Invalid class identifier",
@@ -101,12 +101,12 @@ logger = create_service_logger("api_gateway.class_routes")
                                 "error_type": "ValidationError",
                                 "message": "Invalid class ID format",
                                 "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
-                                "field": "class_id"
-                            }
-                        }
+                                "field": "class_id",
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -115,10 +115,10 @@ logger = create_service_logger("api_gateway.class_routes")
                     "example": {
                         "error_type": "AuthenticationError",
                         "message": "Valid JWT token required",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Access forbidden - insufficient permissions",
@@ -129,10 +129,10 @@ logger = create_service_logger("api_gateway.class_routes")
                         "message": "User does not have permission to access this class",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "class_id": "class_123",
-                        "user_id": "user_456"
+                        "user_id": "user_456",
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Class not found",
@@ -143,10 +143,10 @@ logger = create_service_logger("api_gateway.class_routes")
                         "message": "Class not found",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "resource_type": "class",
-                        "resource_id": "class_123"
+                        "resource_id": "class_123",
                     }
                 }
-            }
+            },
         },
         409: {
             "description": "Conflict - resource already exists or operation not allowed",
@@ -157,10 +157,10 @@ logger = create_service_logger("api_gateway.class_routes")
                         "message": "Class with this name already exists",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "conflicting_field": "name",
-                        "existing_class_id": "class_456"
+                        "existing_class_id": "class_456",
                     }
                 }
-            }
+            },
         },
         503: {
             "description": "Service temporarily unavailable",
@@ -171,12 +171,12 @@ logger = create_service_logger("api_gateway.class_routes")
                         "message": "Class Management Service temporarily unavailable",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "external_service": "class_management",
-                        "retry_recommended": True
+                        "retry_recommended": True,
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 async def proxy_class_requests(
     path: str,
@@ -192,7 +192,7 @@ async def proxy_class_requests(
     and comprehensive error handling. All HTTP methods (GET, POST, PUT, DELETE) are supported.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
-    
+
     **Supported Operations**:
     - `GET /classes` - List user's classes
     - `GET /classes/{class_id}` - Get specific class details
@@ -225,7 +225,7 @@ async def proxy_class_requests(
     - Service unavailability returns 503 with retry recommendation
 
     **Client Implementation Examples**:
-    
+
     **List Classes**:
     ```javascript
     const response = await fetch('/api/classes', {
@@ -235,7 +235,7 @@ async def proxy_class_requests(
     });
     const { classes } = await response.json();
     ```
-    
+
     **Create Class**:
     ```javascript
     const response = await fetch('/api/classes', {
@@ -251,7 +251,7 @@ async def proxy_class_requests(
         })
     });
     ```
-    
+
     **Update Class**:
     ```javascript
     const response = await fetch(`/api/classes/${classId}`, {
@@ -266,7 +266,7 @@ async def proxy_class_requests(
         })
     });
     ```
-    
+
     **Proxy Behavior**:
     - All request headers are preserved (except 'host')
     - Request body is streamed to avoid memory issues with large payloads

@@ -33,12 +33,12 @@ logger = create_service_logger("api_gateway.status_routes")
                     "example": {
                         "message": "Success - no auth required",
                         "timestamp": "2024-01-15T10:30:00Z",
-                        "service": "api_gateway_service"
+                        "service": "api_gateway_service",
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 @inject
 async def test_no_auth(
@@ -47,13 +47,13 @@ async def test_no_auth(
 ):
     """
     Test endpoint for verifying API Gateway connectivity without authentication.
-    
+
     This endpoint is useful for:
     - Health checks and monitoring
     - Verifying basic API Gateway functionality
     - Testing network connectivity
     - Load balancer health checks
-    
+
     **No Authentication Required**: This endpoint bypasses authentication middleware
     """
     return {"message": "Success - no auth required"}
@@ -72,10 +72,10 @@ async def test_no_auth(
                         "message": "Success - authenticated as user_123",
                         "user_id": "user_123",
                         "timestamp": "2024-01-15T10:30:00Z",
-                        "token_valid": True
+                        "token_valid": True,
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication failed",
@@ -84,12 +84,12 @@ async def test_no_auth(
                     "example": {
                         "error_type": "AuthenticationError",
                         "message": "Valid JWT token required",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 @inject
 async def test_with_auth(
@@ -97,15 +97,15 @@ async def test_with_auth(
 ):
     """
     Test endpoint for verifying authentication and JWT token validation.
-    
+
     This endpoint is useful for:
     - Testing JWT token validity
     - Verifying authentication middleware
     - Debugging authentication issues
     - Client-side token validation
-    
+
     **Authentication Required**: Requires valid JWT token in Authorization header
-    
+
     **Returns**: User ID extracted from the validated JWT token
     """
     return {"message": f"Success - authenticated as {user_id}"}
@@ -139,11 +139,11 @@ class BatchStatusResponse(BaseModel):
                             "processed_essays": 3,
                             "current_phase": "CONTENT_JUDGMENT",
                             "progress_percentage": 60,
-                            "estimated_completion": "2024-01-15T11:15:00Z"
-                        }
+                            "estimated_completion": "2024-01-15T11:15:00Z",
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -152,10 +152,10 @@ class BatchStatusResponse(BaseModel):
                     "example": {
                         "error_type": "AuthenticationError",
                         "message": "Valid JWT token required",
-                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+                        "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Access forbidden - user does not own this batch",
@@ -167,10 +167,10 @@ class BatchStatusResponse(BaseModel):
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "batch_id": "batch_123",
                         "requested_by": "user_456",
-                        "actual_owner": "user_789"
+                        "actual_owner": "user_789",
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Batch not found",
@@ -181,10 +181,10 @@ class BatchStatusResponse(BaseModel):
                         "message": "Batch not found",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "resource_type": "batch",
-                        "resource_id": "batch_123"
+                        "resource_id": "batch_123",
                     }
                 }
-            }
+            },
         },
         503: {
             "description": "Service temporarily unavailable",
@@ -195,12 +195,12 @@ class BatchStatusResponse(BaseModel):
                         "message": "Result Aggregator Service temporarily unavailable",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "external_service": "result_aggregator",
-                        "retry_recommended": True
+                        "retry_recommended": True,
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 @inject
 async def get_batch_status(
@@ -218,9 +218,9 @@ async def get_batch_status(
     strict ownership validation to ensure users can only access their own batches.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
-    
+
     **Ownership Enforcement**: Users can only access batches they own
-    
+
     **Status Information Includes**:
     - Current processing phase (CREATED, PROCESSING, COMPLETED, FAILED)
     - Progress percentage and essay counts
@@ -236,15 +236,15 @@ async def get_batch_status(
     - `FAILED`: Processing failed with errors
     - `CANCELLED`: Processing cancelled by user or system
 
-    **Real-time Updates**: 
+    **Real-time Updates**:
     Status changes are also delivered via WebSocket notifications for real-time updates.
-    
+
     **Error Handling**:
     - Authentication failures return 401
     - Authorization failures (batch ownership) return 403
     - Missing batch returns 404
     - Service unavailability returns 503 with retry recommendation
-    
+
     **Client Implementation Example**:
     ```javascript
     const response = await fetch(`/api/batches/${batchId}/status`, {
@@ -252,7 +252,7 @@ async def get_batch_status(
             'Authorization': 'Bearer ' + token
         }
     });
-    
+
     const { status, details } = await response.json();
     console.log(`Batch ${details.batch_id} is ${status}`);
     ```

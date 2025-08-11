@@ -114,14 +114,16 @@ class TestMultiProviderValidation:
             )
 
             # Verify async-only architecture: result should be None (queued for processing)
-            assert result is None, f"Expected None result for async-only architecture from {provider_config['description']}"
+            assert result is None, (
+                f"Expected None result for async-only architecture from {provider_config['description']}"
+            )
 
             print(f"✅ {provider_config['description']} Integration Test Passed:")
-            print(f"   - Request successfully queued for async processing")
+            print("   - Request successfully queued for async processing")
             print(f"   - Model: {provider_config['model']}")
-            print(f"   - Results will be delivered via Kafka callbacks")
+            print("   - Results will be delivered via Kafka callbacks")
             print(f"   - Correlation ID: {correlation_id}")
-            print(f"   - Provider validation: Docker network communication working")
+            print("   - Provider validation: Docker network communication working")
 
         except Exception as e:
             pytest.fail(f"{provider_config['description']} failed: {e}")
@@ -166,10 +168,10 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
 
             # Verify async-only architecture: result should be None (queued for processing)
             assert result is None, "Expected None result for async-only architecture"
-            print(f"\n✅ Response Time Integration Test Passed:")
+            print("\n✅ Response Time Integration Test Passed:")
             print(f"   - Queue response time: {response_time:.2f}s")
-            print(f"   - Request successfully queued for async processing")
-            print(f"   - Results will be delivered via Kafka callbacks")
+            print("   - Request successfully queued for async processing")
+            print("   - Results will be delivered via Kafka callbacks")
             # Queueing should be very fast (under 5 seconds for HTTP roundtrip)
             assert response_time < 5.0, f"Queue response too slow: {response_time:.2f}s"
 
@@ -201,10 +203,10 @@ JSON response with winner, justification (max 50 chars), confidence 1-5."""
 
             # Verify async-only architecture: result should be None (queued for processing)
             assert result is None, "Expected None result for async-only architecture"
-            print(f"\n✅ Justification Length Integration Test Passed:")
-            print(f"   - Request successfully queued for async processing")
-            print(f"   - Results will be delivered via Kafka callbacks")
-            print(f"   - Length constraints will be enforced during callback processing")
+            print("\n✅ Justification Length Integration Test Passed:")
+            print("   - Request successfully queued for async processing")
+            print("   - Results will be delivered via Kafka callbacks")
+            print("   - Length constraints will be enforced during callback processing")
             print(f"   - Correlation ID: {correlation_id}")
 
         except Exception as e:

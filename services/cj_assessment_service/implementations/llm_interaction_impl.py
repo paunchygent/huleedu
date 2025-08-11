@@ -26,7 +26,6 @@ from services.cj_assessment_service.models_api import (
     ComparisonResult,
     ComparisonTask,
     ErrorDetail,
-    LLMAssessmentResponseSchema,
 )
 from services.cj_assessment_service.protocols import (
     LLMInteractionProtocol,
@@ -140,14 +139,16 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                     # ALL LLM calls are async - response_data is ALWAYS None
                     # Results arrive via Kafka callbacks from LLM Provider Service
-                    assert response_data is None, "LLM Provider must always return None (async-only architecture)"
-                    
+                    assert response_data is None, (
+                        "LLM Provider must always return None (async-only architecture)"
+                    )
+
                     logger.info(
                         f"Comparison for essays {task.essay_a.id} vs {task.essay_b.id} "
                         "queued for async processing - results will arrive via Kafka callback",
                         extra={"correlation_id": str(correlation_id)},
                     )
-                    
+
                     # Record queued LLM API call metric
                     if llm_api_calls_metric:
                         llm_api_calls_metric.labels(

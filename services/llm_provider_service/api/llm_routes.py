@@ -13,7 +13,6 @@ from quart_dishka import inject
 
 from services.llm_provider_service.api_models import (
     LLMComparisonRequest,
-    LLMComparisonResponse,
     LLMProviderListResponse,
     LLMProviderStatus,
     LLMQueuedResponse,

@@ -1461,7 +1461,7 @@ version = "1.0.0"
 requires_python = ">=3.11"
 editable = true
 path = "./services/api_gateway_service"
-summary = "HuleEdu API Gateway Service - Client-facing API for React frontend"
+summary = "HuleEdu API Gateway Service - Client-facing API for Svelte 5 + Vite frontend"
 groups = ["dev"]
 dependencies = [
     "PyJWT",

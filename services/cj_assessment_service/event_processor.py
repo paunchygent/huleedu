@@ -32,12 +32,11 @@ from huleedu_service_libs.observability import (
     use_trace_context,
 )
 
-from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import run_cj_assessment_workflow
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     publish_dual_assessment_events,
 )
-from services.cj_assessment_service.cj_core_logic.grade_projector import (
-    GradeProjector,
+from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
+    run_cj_assessment_workflow,
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics

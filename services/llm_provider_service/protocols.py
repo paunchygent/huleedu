@@ -89,10 +89,10 @@ class LLMOrchestratorProtocol(Protocol):
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
         """Process a queued request directly (internal use only).
-        
+
         This method bypasses queueing and directly calls providers.
         ONLY used by QueueProcessor for processing already-queued requests.
-        
+
         Args:
             provider: LLM provider to use
             user_prompt: The comparison prompt

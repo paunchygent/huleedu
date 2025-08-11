@@ -131,8 +131,8 @@ class Settings(BaseSettings):
     llm_retry_exponential_base: float = 2.0
     llm_retry_on_exception_names: list[str] = [
         "asyncio.TimeoutError",
-        "aiohttp.ClientError", 
-        "aiohttp.ClientResponseError"
+        "aiohttp.ClientError",
+        "aiohttp.ClientResponseError",
     ]  # Explicit defaults for transient network/API issues
 
     # CJ assessment parameters

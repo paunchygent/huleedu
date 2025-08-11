@@ -2,7 +2,7 @@
 
 Tests the mathematical logic and business rules for grade projection confidence:
 - Comparison count sigmoid curves
-- Score distribution analysis  
+- Score distribution analysis
 - Grade boundary distance calculations
 - Anchor essay bonuses
 - Weighted confidence aggregation
@@ -15,6 +15,7 @@ import math
 from typing import Any
 
 import pytest
+
 from services.cj_assessment_service.cj_core_logic.confidence_calculator import ConfidenceCalculator
 
 
@@ -73,7 +74,7 @@ class TestConfidenceCalculatorCore:
         # Sigmoid formula: 1.0 / (1.0 + exp(-(count - 5) / 3))
         expected = 1.0 / (1.0 + math.exp(-(comparison_count - 5) / 3))
         min_expected, max_expected = expected_confidence_range
-        
+
         # Verify sigmoid calculation matches expected range
         assert min_expected <= expected <= max_expected
 
@@ -92,7 +93,7 @@ class TestConfidenceCalculatorCore:
         self,
         confidence_calculator: ConfidenceCalculator,
         bt_score: float,
-        score_distribution: list[float], 
+        score_distribution: list[float],
         grade_boundaries: dict[str, float],
         has_anchors: bool,
         expected_confidence_range: tuple[float, float],
@@ -100,7 +101,7 @@ class TestConfidenceCalculatorCore:
         """Test confidence calculation for realistic assessment scenarios."""
         # Use moderate comparison count for realistic testing
         comparison_count = 8
-        
+
         confidence_score, confidence_label = confidence_calculator.calculate_confidence(
             bt_score=bt_score,
             comparison_count=comparison_count,
@@ -108,7 +109,7 @@ class TestConfidenceCalculatorCore:
             grade_boundaries=grade_boundaries,
             has_anchors=has_anchors,
         )
-        
+
         min_expected, max_expected = expected_confidence_range
         assert min_expected <= confidence_score <= max_expected
         assert isinstance(confidence_label, str)
@@ -144,9 +145,9 @@ class TestConfidenceCalculatorCore:
             grade_boundaries={},  # Empty boundaries for 0.5 boundary confidence
             has_anchors=False,
         )
-        
+
         min_expected, max_expected = expected_distribution_confidence_range
-        
+
         # Since this is a weighted average, the actual confidence will be influenced
         # by other factors, but distribution component should drive the direction
         if len(score_distribution) <= 1:
@@ -154,7 +155,7 @@ class TestConfidenceCalculatorCore:
             assert 0.3 <= confidence_score <= 0.7  # Allow for weighting effects
         elif max_expected > 0.8:  # Wide distribution
             assert confidence_score >= 0.4  # Should boost overall confidence
-        else:  # Narrow distribution  
+        else:  # Narrow distribution
             assert confidence_score <= 0.6  # Should lower overall confidence
 
 
@@ -212,17 +213,17 @@ class TestBoundaryConfidenceCalculation:
     ) -> None:
         """Test boundary confidence calculation edge cases."""
         result = confidence_calculator._calculate_boundary_confidence(bt_score, grade_boundaries)
-        
+
         # Result should always be between 0 and 1
         assert 0.0 <= result <= 1.0
-        
+
         # Find minimum distance manually to verify
         if not grade_boundaries:
             assert result == 0.5
         else:
             boundaries = sorted(grade_boundaries.values())
             min_distance = min(abs(bt_score - boundary) for boundary in boundaries)
-            
+
             if min_distance >= 0.15:
                 assert result == 1.0
             else:
@@ -302,29 +303,28 @@ class TestAnchorEssayBonus:
         # Calculate confidence without anchors
         confidence_without_anchors, _ = confidence_calculator.calculate_confidence(
             bt_score=standard_parameters["bt_score"],
-            comparison_count=standard_parameters["comparison_count"], 
+            comparison_count=standard_parameters["comparison_count"],
             score_distribution=standard_parameters["score_distribution"],
             grade_boundaries=standard_parameters["grade_boundaries"],
             has_anchors=False,
         )
-        
+
         # Calculate confidence with anchors
         confidence_with_anchors, _ = confidence_calculator.calculate_confidence(
             bt_score=standard_parameters["bt_score"],
             comparison_count=standard_parameters["comparison_count"],
-            score_distribution=standard_parameters["score_distribution"], 
+            score_distribution=standard_parameters["score_distribution"],
             grade_boundaries=standard_parameters["grade_boundaries"],
             has_anchors=True,
         )
-        
+
         # Anchors should increase confidence by approximately 0.15 bonus
         assert confidence_with_anchors > confidence_without_anchors
-        
+
         # The difference should be influenced by the 15% bonus in the weighted calculation
         # 10% weight for anchors (1.0 vs 0.0) + 15% direct bonus
-        expected_increase = 0.10 + 0.15  # Weight effect + direct bonus
         actual_increase = confidence_with_anchors - confidence_without_anchors
-        
+
         # Allow some tolerance due to max(confidence, 1.0) capping
         assert 0.10 <= actual_increase <= 0.25
 
@@ -335,7 +335,7 @@ class TestAnchorEssayBonus:
         """Test anchor bonus respects 1.0 maximum confidence cap."""
         # Use parameters that would exceed 1.0 with anchor bonus
         grade_boundaries: dict[str, float] = {"A": 0.8}
-        
+
         confidence_with_anchors, _ = confidence_calculator.calculate_confidence(
             bt_score=0.9,  # Far from boundaries
             comparison_count=20,  # High comparison count
@@ -343,7 +343,7 @@ class TestAnchorEssayBonus:
             grade_boundaries=grade_boundaries,  # Far from boundary
             has_anchors=True,
         )
-        
+
         # Should be capped at 1.0
         assert confidence_with_anchors <= 1.0
 
@@ -363,19 +363,19 @@ class TestBatchConfidenceStatistics:
         """Test batch statistics with mixed confidence levels."""
         confidence_scores = {
             "essay1": 0.85,  # HIGH
-            "essay2": 0.60,  # MID  
+            "essay2": 0.60,  # MID
             "essay3": 0.30,  # LOW
             "essay4": 0.90,  # HIGH
             "essay5": 0.45,  # MID
         }
-        
+
         stats = confidence_calculator.calculate_batch_confidence_stats(confidence_scores)
-        
+
         assert abs(stats["mean"] - 0.62) < 0.01  # (0.85+0.60+0.30+0.90+0.45)/5
         assert stats["std"] > 0  # Should have non-zero standard deviation
         assert stats["high_count"] == 2  # essay1, essay4
-        assert stats["mid_count"] == 2   # essay2, essay5
-        assert stats["low_count"] == 1   # essay3
+        assert stats["mid_count"] == 2  # essay2, essay5
+        assert stats["low_count"] == 1  # essay3
 
     def test_batch_statistics_uniform_confidence(
         self,
@@ -387,9 +387,9 @@ class TestBatchConfidenceStatistics:
             "essay2": 0.80,
             "essay3": 0.80,
         }
-        
+
         stats = confidence_calculator.calculate_batch_confidence_stats(confidence_scores)
-        
+
         assert abs(stats["mean"] - 0.80) < 0.01
         assert abs(stats["std"]) < 1e-10  # No variation (allow floating point precision)
         assert stats["high_count"] == 3
@@ -402,7 +402,7 @@ class TestBatchConfidenceStatistics:
     ) -> None:
         """Test batch statistics with empty confidence scores."""
         stats = confidence_calculator.calculate_batch_confidence_stats({})
-        
+
         assert stats["mean"] == 0.0
         assert stats["std"] == 0.0
         assert stats["high_count"] == 0
@@ -431,7 +431,7 @@ class TestBatchConfidenceStatistics:
     ) -> None:
         """Test batch statistics label counting at threshold boundaries."""
         stats = confidence_calculator.calculate_batch_confidence_stats(confidence_scores)
-        
+
         assert stats["high_count"] == expected_high_count
         assert stats["mid_count"] == expected_mid_count
         assert stats["low_count"] == expected_low_count
@@ -455,7 +455,7 @@ class TestConfidenceCalculatorMathematicalAccuracy:
         comparison_count = 5  # Should give exactly 0.5 comparison confidence
         score_distribution = [0.5]  # Should give 0.5 distribution confidence (single value)
         grade_boundaries: dict[str, float] = {}  # Should give 0.5 boundary confidence (empty)
-        
+
         confidence_score, _ = confidence_calculator.calculate_confidence(
             bt_score=bt_score,
             comparison_count=comparison_count,
@@ -463,7 +463,7 @@ class TestConfidenceCalculatorMathematicalAccuracy:
             grade_boundaries=grade_boundaries,
             has_anchors=False,
         )
-        
+
         # Expected: 0.35*0.5 + 0.20*0.5 + 0.35*0.5 + 0.10*0 = 0.45
         assert abs(confidence_score - 0.45) < 0.01
 
@@ -476,9 +476,9 @@ class TestConfidenceCalculatorMathematicalAccuracy:
         test_cases = [
             (5, 0.5),  # Should be exactly 0.5 at midpoint
             (8, 1.0 / (1.0 + math.exp(-1))),  # exp(-1) case
-            (2, 1.0 / (1.0 + math.exp(1))),   # exp(1) case
+            (2, 1.0 / (1.0 + math.exp(1))),  # exp(1) case
         ]
-        
+
         for comparison_count, expected_sigmoid in test_cases:
             # Calculate through full confidence calculation to verify sigmoid component
             confidence_score, _ = confidence_calculator.calculate_confidence(
@@ -488,9 +488,9 @@ class TestConfidenceCalculatorMathematicalAccuracy:
                 grade_boundaries={},
                 has_anchors=False,
             )
-            
+
             # Back-calculate the comparison component from weighted result
             # confidence = 0.35*sigmoid + 0.20*0.5 + 0.35*0.5 + 0.10*0 = 0.35*sigmoid + 0.275
             calculated_sigmoid = (confidence_score - 0.275) / 0.35
-            
+
             assert abs(calculated_sigmoid - expected_sigmoid) < 0.01

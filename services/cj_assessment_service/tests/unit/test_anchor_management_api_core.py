@@ -39,15 +39,18 @@ class TestAnchorRegistrationEndpoint:
         return MockCJRepository(behavior="success")
 
     @pytest.fixture
-    def test_app(self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol) -> Any:
+    def test_app(
+        self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol
+    ) -> Any:
         """Create test app with mock dependencies."""
+
         # Create test provider with mocks
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
-            @provide(scope=Scope.REQUEST) 
+
+            @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
 
@@ -55,7 +58,7 @@ class TestAnchorRegistrationEndpoint:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         return app
 
     @pytest.fixture
@@ -66,7 +69,7 @@ class TestAnchorRegistrationEndpoint:
 
     @pytest.mark.asyncio
     async def test_register_anchor_essay_successful_registration(
-        self, 
+        self,
         client: QuartTestClient,
         mock_content_client: ContentClientProtocol,
         mock_repository: CJRepositoryProtocol,
@@ -85,7 +88,7 @@ class TestAnchorRegistrationEndpoint:
         # Assert - HTTP Response
         assert response.status_code == 201
         response_data = await response.get_json()
-        
+
         assert response_data["anchor_id"] == 42
         assert response_data["storage_id"] == "content-abc123"
         assert response_data["status"] == "registered"
@@ -163,14 +166,16 @@ class TestAnchorAPIDependencyIntegration:
     async def test_content_client_integration_workflow(self) -> None:
         """Test complete content client integration workflow."""
         # Arrange
-        mock_content_client = MockContentClient(behavior="success", storage_id="integration-test-123")
+        mock_content_client = MockContentClient(
+            behavior="success", storage_id="integration-test-123"
+        )
         mock_repository = MockCJRepository(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -179,7 +184,7 @@ class TestAnchorAPIDependencyIntegration:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "integration-workflow-test",
@@ -192,14 +197,14 @@ class TestAnchorAPIDependencyIntegration:
 
             # Assert - Integration workflow completed successfully
             assert response.status_code == 201
-            
+
             # Verify content client was called with correct parameters
             assert mock_content_client.call_count == 1
             assert mock_content_client.last_call_params["content"] == request_data["essay_text"]
-            
+
             # Verify repository session was used
             assert mock_repository.session_context_calls == 1
-            
+
             # Verify anchor was created with content storage reference
             assert mock_repository.created_anchor is not None
             assert mock_repository.created_anchor.text_storage_id == "integration-test-123"
@@ -210,12 +215,12 @@ class TestAnchorAPIDependencyIntegration:
         # Arrange
         mock_content_client = MockContentClient(behavior="success")
         mock_repository = MockCJRepository(behavior="success")
-        
+
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
             def provide_content_client(self) -> ContentClientProtocol:
                 return mock_content_client
-            
+
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> CJRepositoryProtocol:
                 return mock_repository
@@ -224,7 +229,7 @@ class TestAnchorAPIDependencyIntegration:
         container = make_async_container(TestProvider())
         QuartDishka(app=app, container=container)
         app.register_blueprint(bp)
-        
+
         async with app.test_client() as client:
             request_data = {
                 "assignment_id": "session-management-test",
@@ -238,7 +243,7 @@ class TestAnchorAPIDependencyIntegration:
             # Assert - Session was properly managed
             assert response.status_code == 201
             assert mock_repository.session_context_calls == 1
-            
+
             # Verify the anchor entity was created and has expected ID
             assert mock_repository.created_anchor is not None
             assert mock_repository.created_anchor.id == 42  # Mock auto-increment value
@@ -249,7 +254,7 @@ class TestAnchorAPIDependencyIntegration:
         # Arrange - Create separate mock instances
         content_client_1 = MockContentClient(behavior="success", storage_id="isolation-test-1")
         content_client_2 = MockContentClient(behavior="success", storage_id="isolation-test-2")
-        
+
         # This test verifies that the DI system properly isolates dependencies
         # In a real scenario, each request would get its own instances
         assert content_client_1.storage_id != content_client_2.storage_id

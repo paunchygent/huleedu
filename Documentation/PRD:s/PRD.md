@@ -240,7 +240,7 @@ sequenceDiagram
 
 ### 7.3. Functional Requirements
 
-* **UI Framework**: SPA built with React.
+* **UI Framework**: SPA built with Svelte 5 + SvelteKit.
 * **Client-Side Routing**: Navigation without full page reloads.
 * **Authentication**: JWT-based against the **FastAPI-based API Gateway**.
 * **API Communication**: All backend interactions for commands/queries via the **FastAPI-based API Gateway Service** over HTTP/S.
@@ -258,14 +258,14 @@ sequenceDiagram
 
 (References to backend services updated)
 
-* **Core**: React with Vite (using `react-ts` template).
+* **Core**: Svelte 5 + SvelteKit with Vite (using `sv create` template).
 * **Language**: TypeScript.
-* **Routing**: React Router v6.
+* **Routing**: SvelteKit built-in file-based routing.
 * **State Management**:
-  * Server State & Caching: TanStack Query (`@tanstack/react-query`).
-  * Global UI/Client State: Zustand.
+  * Server State & Caching: TanStack Query Svelte (`@tanstack/svelte-query`).
+  * Global UI/Client State: Svelte 5 runes ($state, $derived) and context API.
 * **Data Fetching**: Custom `apiFetch` wrapper around native `fetch` for interactions with the **FastAPI-based API Gateway**.
-* **WebSocket Integration**: Custom React hook (`useWebSocket`) using native browser WebSocket API to connect to the **FastAPI/Starlette-based WebSocket Manager Service**.
+* **WebSocket Integration**: Custom Svelte 5 runes-based WebSocket store using native browser WebSocket API to connect to the **FastAPI/Starlette-based WebSocket Manager Service**.
 * **Styling**: Tailwind CSS, potentially with shadcn/ui.
 * **DTOs/Type Sharing**: Generate TypeScript interfaces from backend `common_core` Pydantic models.
 * **Environment Variables**: Vite's `import.meta.env` (e.g., `VITE_API_URL`, `VITE_WS_URL`).

@@ -1,7 +1,7 @@
 [project]
 name = "huleedu-api-gateway-service"
 version = "1.0.0"
-description = "HuleEdu API Gateway Service - Client-facing API for React frontend"
+description = "HuleEdu API Gateway Service - Client-facing API for Svelte 5 + Vite frontend"
 authors = [
     { name = "HuleEdu Team", email = "dev@huleedu.com" }
 ]

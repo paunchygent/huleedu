@@ -7,7 +7,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
 ## Assessment Summary
 
 ✅ **Strong Foundation**:
-- FastAPI-based API Gateway (port 4001) designed for React integration
+- FastAPI-based API Gateway (port 4001) designed for Svelte 5 + Vite integration
 - JWT authentication, rate limiting, CORS configuration
 - WebSocket Service (port 8081) with real-time notifications
 - Comprehensive event contracts in `common_core` with versioned Pydantic models
@@ -57,7 +57,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
 - [x] **WebSocket API documentation**
   - Created comprehensive WebSocket API documentation (`docs/WEBSOCKET_API_DOCUMENTATION.md`)
   - Documented connection patterns and authentication flow with JWT tokens
-  - Provided client-side connection examples (JavaScript/TypeScript, React hooks, Svelte stores)
+  - Provided client-side connection examples (JavaScript/TypeScript, Svelte 5 runes, Svelte stores)
   - Documented all 15 notification event types from TeacherNotificationRequestedV1
   - Included error handling, reconnection strategies, and troubleshooting guides
 

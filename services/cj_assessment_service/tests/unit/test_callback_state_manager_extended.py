@@ -4,7 +4,7 @@ This module tests uncovered edge cases and error paths in callback_state_manager
 focusing on observable behavior and side effects per Rule 075.
 
 Tests cover:
-- Error handling in batch completion checks  
+- Error handling in batch completion checks
 - Failed comparison pool management behavior
 - Successful retry handling observable effects
 - Batch counter update state transitions
@@ -17,7 +17,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any, AsyncContextManager, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -28,24 +28,22 @@ from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import CJBatchStateEnum
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.cj_core_logic.batch_pool_manager import BatchPoolManager
 from services.cj_assessment_service.cj_core_logic.batch_retry_processor import BatchRetryProcessor
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
     _update_batch_completion_counters,
     add_failed_comparison_to_pool,
     check_batch_completion_conditions,
-    handle_successful_retry,
     update_comparison_result,
 )
-from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 
 
 class MockSession:
     """Protocol-compliant mock session for behavioral testing."""
-    
+
     def __init__(
         self,
         comparison_pair: ComparisonPair | None = None,
@@ -58,14 +56,14 @@ class MockSession:
         self.raise_on_execute = raise_on_execute
         self.executed_queries: list[Any] = []
         self.committed = False
-        
+
     async def execute(self, stmt: Any) -> MockResult:
         """Track executed queries and return configured results."""
         self.executed_queries.append(stmt)
-        
+
         if self.raise_on_execute:
             raise self.raise_on_execute
-            
+
         # Return appropriate result based on query pattern
         stmt_str = str(stmt).lower()
         if "comparison_pairs" in stmt_str:
@@ -74,7 +72,7 @@ class MockSession:
             return MockResult(self.batch_state)
         else:
             return MockResult(None)
-            
+
     async def commit(self) -> None:
         """Track commit operation."""
         self.committed = True
@@ -82,11 +80,11 @@ class MockSession:
 
 class MockResult:
     """Mock SQLAlchemy result following protocol."""
-    
+
     def __init__(self, result: Any) -> None:
         """Initialize with result value."""
         self.result = result
-        
+
     def scalar_one_or_none(self) -> Any:
         """Return the configured result."""
         return self.result
@@ -100,79 +98,84 @@ async def mock_session_context(session: MockSession) -> AsyncIterator[AsyncSessi
 
 class MockRepository(CJRepositoryProtocol):
     """Protocol-compliant mock repository."""
-    
+
     def __init__(self, session: MockSession):
         """Initialize with mock session."""
         self._session = session
-        
+
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Return session context manager."""
         return mock_session_context(self._session)
-        
+
     # Required protocol methods with minimal implementations
     async def get_assessment_instruction(
         self, session: AsyncSession, assignment_id: str | None, course_id: str | None
     ) -> Any | None:
         return None
-        
+
     async def get_cj_batch_upload(self, session: AsyncSession, cj_batch_id: int) -> Any | None:
         return None
-        
+
     async def get_anchor_essay_references(
         self, session: AsyncSession, assignment_id: str
     ) -> list[Any]:
         return []
-        
-    async def store_grade_projections(
-        self, session: AsyncSession, projections: list[Any]
-    ) -> None:
+
+    async def store_grade_projections(self, session: AsyncSession, projections: list[Any]) -> None:
         pass
-        
+
     async def create_new_cj_batch(
-        self, session: AsyncSession, bos_batch_id: str, event_correlation_id: str,
-        language: str, course_code: str, essay_instructions: str,
-        initial_status: Any, expected_essay_count: int
+        self,
+        session: AsyncSession,
+        bos_batch_id: str,
+        event_correlation_id: str,
+        language: str,
+        course_code: str,
+        essay_instructions: str,
+        initial_status: Any,
+        expected_essay_count: int,
     ) -> Any:
         return None
-        
+
     async def create_or_update_cj_processed_essay(
-        self, session: AsyncSession, cj_batch_id: int, els_essay_id: str,
-        text_storage_id: str, assessment_input_text: str,
-        processing_metadata: dict | None = None
+        self,
+        session: AsyncSession,
+        cj_batch_id: int,
+        els_essay_id: str,
+        text_storage_id: str,
+        assessment_input_text: str,
+        processing_metadata: dict | None = None,
     ) -> Any:
         return None
-        
-    async def get_essays_for_cj_batch(
-        self, session: AsyncSession, cj_batch_id: int
-    ) -> list[Any]:
+
+    async def get_essays_for_cj_batch(self, session: AsyncSession, cj_batch_id: int) -> list[Any]:
         return []
-        
+
     async def get_comparison_pair_by_essays(
-        self, session: AsyncSession, cj_batch_id: int,
-        essay_a_els_id: str, essay_b_els_id: str
+        self, session: AsyncSession, cj_batch_id: int, essay_a_els_id: str, essay_b_els_id: str
     ) -> Any | None:
         return None
-        
+
     async def store_comparison_results(
         self, session: AsyncSession, results: list[Any], cj_batch_id: int
     ) -> None:
         pass
-        
+
     async def update_essay_scores_in_batch(
         self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float]
     ) -> None:
         pass
-        
+
     async def update_cj_batch_status(
         self, session: AsyncSession, cj_batch_id: int, status: Any
     ) -> None:
         pass
-        
+
     async def get_final_cj_rankings(
         self, session: AsyncSession, cj_batch_id: int
     ) -> list[dict[str, Any]]:
         return []
-        
+
     async def initialize_db_schema(self) -> None:
         pass
 
@@ -220,7 +223,7 @@ def create_test_llm_result(
 ) -> LLMComparisonResultV1:
     """Create LLM result for testing."""
     now = datetime.now(UTC)
-    
+
     if is_error:
         return LLMComparisonResultV1(
             request_id="req-123",
@@ -260,14 +263,14 @@ def create_test_llm_result(
 
 class TestBatchCompletionErrorHandling:
     """Test error handling in batch completion checking."""
-    
+
     @pytest.mark.asyncio
     async def test_check_batch_completion_database_error_returns_false(self) -> None:
         """Test that database errors in batch completion check return False safely."""
         # Arrange - Database error scenario
         session = MockSession(raise_on_execute=Exception("Database connection lost"))
         repository = MockRepository(session)
-        
+
         # Act - Check should handle error gracefully
         result = await check_batch_completion_conditions(
             batch_id=1,
@@ -275,18 +278,18 @@ class TestBatchCompletionErrorHandling:
             session=session,  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Returns False on error, doesn't propagate exception
         assert result is False
         assert len(session.executed_queries) == 1
-    
+
     @pytest.mark.asyncio
     async def test_check_batch_completion_missing_batch_state_returns_false(self) -> None:
         """Test that missing batch state returns False."""
         # Arrange - No batch state found
         session = MockSession(batch_state=None)
         repository = MockRepository(session)
-        
+
         # Act
         result = await check_batch_completion_conditions(
             batch_id=999,
@@ -294,11 +297,11 @@ class TestBatchCompletionErrorHandling:
             session=session,  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Returns False when batch not found
         assert result is False
         assert len(session.executed_queries) == 1
-    
+
     @pytest.mark.asyncio
     async def test_check_batch_completion_zero_total_comparisons_returns_false(self) -> None:
         """Test that zero total comparisons (invalid state) returns False."""
@@ -309,7 +312,7 @@ class TestBatchCompletionErrorHandling:
         )
         session = MockSession(batch_state=batch_state)
         repository = MockRepository(session)
-        
+
         # Act
         result = await check_batch_completion_conditions(
             batch_id=1,
@@ -317,14 +320,14 @@ class TestBatchCompletionErrorHandling:
             session=session,  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Returns False for invalid state
         assert result is False
 
 
 class TestUpdateBatchCompletionCounters:
     """Test batch counter update behavior."""
-    
+
     @pytest.mark.asyncio
     async def test_update_counters_increments_completed_on_success(self) -> None:
         """Test that successful comparison increments completed counter."""
@@ -334,7 +337,7 @@ class TestUpdateBatchCompletionCounters:
             failed_comparisons=1,
         )
         session = MockSession(batch_state=batch_state)
-        
+
         # Act - Update for successful comparison
         await _update_batch_completion_counters(
             session=session,  # type: ignore[arg-type]
@@ -342,11 +345,11 @@ class TestUpdateBatchCompletionCounters:
             is_error=False,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Completed counter incremented
         assert batch_state.completed_comparisons == 5
         assert batch_state.failed_comparisons == 1
-    
+
     @pytest.mark.asyncio
     async def test_update_counters_increments_failed_on_error(self) -> None:
         """Test that error comparison increments failed counter."""
@@ -356,7 +359,7 @@ class TestUpdateBatchCompletionCounters:
             failed_comparisons=1,
         )
         session = MockSession(batch_state=batch_state)
-        
+
         # Act - Update for failed comparison
         await _update_batch_completion_counters(
             session=session,  # type: ignore[arg-type]
@@ -364,11 +367,11 @@ class TestUpdateBatchCompletionCounters:
             is_error=True,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Failed counter incremented
         assert batch_state.completed_comparisons == 4
         assert batch_state.failed_comparisons == 2
-    
+
     @pytest.mark.asyncio
     async def test_update_counters_triggers_partial_scoring_at_threshold(self) -> None:
         """Test that partial scoring triggers at 80% threshold."""
@@ -379,7 +382,7 @@ class TestUpdateBatchCompletionCounters:
             partial_scoring_triggered=False,
         )
         session = MockSession(batch_state=batch_state)
-        
+
         # Act - Complete one more to hit 80%
         await _update_batch_completion_counters(
             session=session,  # type: ignore[arg-type]
@@ -387,17 +390,17 @@ class TestUpdateBatchCompletionCounters:
             is_error=False,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Partial scoring triggered
         assert batch_state.completed_comparisons == 8
         assert batch_state.partial_scoring_triggered is True
-    
+
     @pytest.mark.asyncio
     async def test_update_counters_handles_missing_batch_gracefully(self) -> None:
         """Test that missing batch state is handled without error."""
         # Arrange - No batch state
         session = MockSession(batch_state=None)
-        
+
         # Act - Should not raise
         await _update_batch_completion_counters(
             session=session,  # type: ignore[arg-type]
@@ -405,16 +408,16 @@ class TestUpdateBatchCompletionCounters:
             is_error=False,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Completed without error
         assert len(session.executed_queries) == 1
-    
+
     @pytest.mark.asyncio
     async def test_update_counters_handles_database_error_gracefully(self) -> None:
         """Test that database errors in counter updates don't propagate."""
         # Arrange
         session = MockSession(raise_on_execute=Exception("Connection lost"))
-        
+
         # Act - Should not raise
         await _update_batch_completion_counters(
             session=session,  # type: ignore[arg-type]
@@ -422,14 +425,14 @@ class TestUpdateBatchCompletionCounters:
             is_error=False,
             correlation_id=uuid4(),
         )
-        
+
         # Assert - Error was caught
         assert len(session.executed_queries) == 1
 
 
 class TestFailedComparisonPoolManagement:
     """Test failed comparison pool management behavior."""
-    
+
     @pytest.mark.asyncio
     async def test_add_failed_comparison_triggers_retry_batch(self) -> None:
         """Test that adding failed comparison can trigger retry batch submission."""
@@ -440,21 +443,21 @@ class TestFailedComparisonPoolManagement:
         )
         comparison_pair.winner = "error"
         comparison_pair.error_code = "RATE_LIMIT"
-        
+
         # Create protocol-compliant mocks
         pool_manager = AsyncMock(spec=BatchPoolManager)
         pool_manager.add_to_failed_pool = AsyncMock(return_value=None)
         pool_manager.check_retry_batch_needed = AsyncMock(return_value=True)
-        
+
         retry_processor = AsyncMock(spec=BatchRetryProcessor)
         retry_processor.submit_retry_batch = AsyncMock(return_value=None)
-        
+
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
             is_error=True,
             error_code=ErrorCode.RATE_LIMIT,
         )
-        
+
         # Act
         await add_failed_comparison_to_pool(
             pool_manager=pool_manager,
@@ -463,7 +466,7 @@ class TestFailedComparisonPoolManagement:
             comparison_result=comparison_result,
             correlation_id=correlation_id,
         )
-        
+
         # Assert - Observable behavior: retry batch triggered
         pool_manager.add_to_failed_pool.assert_called_once()
         pool_manager.check_retry_batch_needed.assert_called_once_with(
@@ -475,7 +478,7 @@ class TestFailedComparisonPoolManagement:
             cj_batch_id=1,
             correlation_id=correlation_id,
         )
-    
+
     @pytest.mark.asyncio
     async def test_add_failed_comparison_no_retry_when_not_needed(self) -> None:
         """Test that retry batch is not triggered when threshold not met."""
@@ -485,19 +488,19 @@ class TestFailedComparisonPoolManagement:
             request_correlation_id=correlation_id,
         )
         comparison_pair.winner = "error"
-        
+
         pool_manager = AsyncMock(spec=BatchPoolManager)
         pool_manager.add_to_failed_pool = AsyncMock(return_value=None)
         pool_manager.check_retry_batch_needed = AsyncMock(return_value=False)
-        
+
         retry_processor = AsyncMock(spec=BatchRetryProcessor)
         retry_processor.submit_retry_batch = AsyncMock()
-        
+
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
             is_error=True,
         )
-        
+
         # Act
         await add_failed_comparison_to_pool(
             pool_manager=pool_manager,
@@ -506,12 +509,12 @@ class TestFailedComparisonPoolManagement:
             comparison_result=comparison_result,
             correlation_id=correlation_id,
         )
-        
+
         # Assert - No retry batch submitted
         pool_manager.add_to_failed_pool.assert_called_once()
         pool_manager.check_retry_batch_needed.assert_called_once()
         retry_processor.submit_retry_batch.assert_not_called()
-    
+
     @pytest.mark.asyncio
     async def test_add_failed_comparison_handles_exceptions_gracefully(self) -> None:
         """Test that exceptions in pool management don't propagate."""
@@ -520,18 +523,16 @@ class TestFailedComparisonPoolManagement:
         comparison_pair = create_test_comparison_pair(
             request_correlation_id=correlation_id,
         )
-        
+
         pool_manager = AsyncMock(spec=BatchPoolManager)
-        pool_manager.add_to_failed_pool = AsyncMock(
-            side_effect=Exception("Pool error")
-        )
-        
+        pool_manager.add_to_failed_pool = AsyncMock(side_effect=Exception("Pool error"))
+
         retry_processor = AsyncMock(spec=BatchRetryProcessor)
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
             is_error=True,
         )
-        
+
         # Act - Should not raise
         await add_failed_comparison_to_pool(
             pool_manager=pool_manager,
@@ -540,14 +541,14 @@ class TestFailedComparisonPoolManagement:
             comparison_result=comparison_result,
             correlation_id=correlation_id,
         )
-        
+
         # Assert - Exception was caught
         pool_manager.add_to_failed_pool.assert_called_once()
 
 
 class TestUpdateComparisonResultWithPoolManager:
     """Test update_comparison_result with pool manager integration."""
-    
+
     @pytest.mark.asyncio
     async def test_update_result_adds_error_to_failed_pool_when_enabled(self) -> None:
         """Test that errors are added to failed pool when retry is enabled."""
@@ -558,27 +559,27 @@ class TestUpdateComparisonResultWithPoolManager:
             winner=None,
         )
         batch_state = create_test_batch_state()
-        
+
         session = MockSession(
             comparison_pair=comparison_pair,
             batch_state=batch_state,
         )
         repository = MockRepository(session)
-        
+
         settings = Settings()
         settings.ENABLE_FAILED_COMPARISON_RETRY = True
-        
+
         pool_manager = AsyncMock(spec=BatchPoolManager)
         pool_manager.add_to_failed_pool = AsyncMock()
         pool_manager.check_retry_batch_needed = AsyncMock(return_value=False)
-        
+
         retry_processor = AsyncMock(spec=BatchRetryProcessor)
-        
+
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
             is_error=True,
         )
-        
+
         # Act
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
@@ -588,13 +589,13 @@ class TestUpdateComparisonResultWithPoolManager:
             pool_manager=pool_manager,
             retry_processor=retry_processor,
         )
-        
+
         # Assert
         assert batch_id == 1
         assert comparison_pair.winner == "error"
         assert comparison_pair.error_code == "UNKNOWN_ERROR"
         assert session.committed is True
-    
+
     @pytest.mark.asyncio
     async def test_update_result_handles_successful_retry_when_enabled(self) -> None:
         """Test that successful comparisons trigger retry handling when enabled."""
@@ -605,24 +606,24 @@ class TestUpdateComparisonResultWithPoolManager:
             winner=None,
         )
         batch_state = create_test_batch_state()
-        
+
         session = MockSession(
             comparison_pair=comparison_pair,
             batch_state=batch_state,
         )
         repository = MockRepository(session)
-        
+
         settings = Settings()
         settings.ENABLE_FAILED_COMPARISON_RETRY = True
-        
+
         pool_manager = AsyncMock(spec=BatchPoolManager)
         pool_manager.database = repository
-        
+
         comparison_result = create_test_llm_result(
             correlation_id=correlation_id,
             is_error=False,
         )
-        
+
         # Act
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
@@ -632,7 +633,7 @@ class TestUpdateComparisonResultWithPoolManager:
             pool_manager=pool_manager,
             retry_processor=None,
         )
-        
+
         # Assert
         assert batch_id == 1
         assert comparison_pair.winner == "essay_a"

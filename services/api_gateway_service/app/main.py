@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.SERVICE_NAME,
         version="1.0.0",
-        description="HuleEdu API Gateway - Secure client-facing API for React frontend integration",
+        description="HuleEdu API Gateway - Secure client-facing API for Svelte 5 + Vite frontend integration",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",

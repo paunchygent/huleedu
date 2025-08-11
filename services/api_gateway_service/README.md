@@ -1,19 +1,19 @@
 # API Gateway Service
 
-## Overview **Client-facing API for React frontend integration**
+## Overview **Client-facing API for Svelte 5 + Vite frontend integration**
 
-The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for React frontend applications. It serves as the secure entry point for external clients, implementing authentication, rate limiting, and proper request validation while proxying to internal microservices.
+The API Gateway Service is a FastAPI-based microservice that provides client-facing HTTP endpoints for Svelte 5 + Vite frontend applications. It serves as the secure entry point for external clients, implementing authentication, rate limiting, and proper request validation while proxying to internal microservices.
 
 ## Architecture
 
 - **Framework**: FastAPI + uvicorn (client-facing optimization)
-- **Communication**: HTTP API for React frontend, Kafka for batch commands, HTTP proxy for file uploads
+- **Communication**: HTTP API for Svelte 5 + Vite frontend, Kafka for batch commands, HTTP proxy for file uploads
 - **Port**: 4001 (client-facing)
 - **Features**: CORS, OpenAPI docs, rate limiting, JWT authentication
 
 ## Key Responsibilities
 
-1. **Client API**: Secure HTTP endpoints for React frontend
+1. **Client API**: Secure HTTP endpoints for Svelte 5 + Vite frontend
 2. **Batch Commands**: Kafka event publishing using proper `ClientBatchPipelineRequestV1` contracts
 3. **File Upload Proxy**: Secure file upload proxy to File Service with authentication headers
 4. **Class Management Proxy**: Complete proxy to Class Management Service API
@@ -155,7 +155,7 @@ Environment variables (prefix: `API_GATEWAY_`):
 - File Service: `/v1/files/batch` (file uploads)
 - Class Management Service: `/v1/classes/*` (all class operations)
 
-**Consumed by**: React Frontend Applications
+**Consumed by**: Svelte 5 + Vite Frontend Applications
 
 ## Monitoring
 

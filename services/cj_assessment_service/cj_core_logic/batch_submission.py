@@ -86,7 +86,9 @@ async def submit_batch_chunk(
 
         # Log submission results
         # Count only non-None results with llm_assessment
-        successful_submissions = sum(1 for r in results if r is not None and r.llm_assessment is not None)
+        successful_submissions = sum(
+            1 for r in results if r is not None and r.llm_assessment is not None
+        )
         logger.info(
             f"Batch chunk submitted: {successful_submissions}/{len(batch_tasks)} successful",
             extra={

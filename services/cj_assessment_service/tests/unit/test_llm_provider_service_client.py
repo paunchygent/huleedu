@@ -226,8 +226,7 @@ Please respond with a JSON object."""
         # Call generate_comparison - should raise error
         correlation_id = uuid4()
         with assert_raises_huleedu_error(
-            error_code=ErrorCode.INVALID_RESPONSE, 
-            message_contains="synchronous response (200)"
+            error_code=ErrorCode.INVALID_RESPONSE, message_contains="synchronous response (200)"
         ):
             await client.generate_comparison(
                 user_prompt=prompt,
@@ -305,7 +304,6 @@ Essay B content."""
                 correlation_id=correlation_id,
             )
 
-
     # Queue-based response tests
 
     async def test_generate_comparison_queued_no_queue_id(
@@ -342,4 +340,3 @@ Essay B content."""
                 user_prompt=prompt,
                 correlation_id=correlation_id,
             )
-
