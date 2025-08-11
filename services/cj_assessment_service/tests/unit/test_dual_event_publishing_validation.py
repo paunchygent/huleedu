@@ -69,13 +69,13 @@ class TestDualEventPublishingValidation:
         # Arrange - Test with extreme score values to verify normalization
         rankings = [
             # Student essays with various score ranges
-            {"els_essay_id": "student_high", "score": 0.95, "rank": 1},
-            {"els_essay_id": "student_mid", "score": 0.5, "rank": 2},
-            {"els_essay_id": "student_low", "score": 0.05, "rank": 3},
-            {"els_essay_id": "student_zero", "score": 0.0, "rank": 4},
+            {"els_essay_id": "student_high", "bradley_terry_score": 0.95, "rank": 1},
+            {"els_essay_id": "student_mid", "bradley_terry_score": 0.5, "rank": 2},
+            {"els_essay_id": "student_low", "bradley_terry_score": 0.05, "rank": 3},
+            {"els_essay_id": "student_zero", "bradley_terry_score": 0.0, "rank": 4},
             # Anchor essays with edge case scores
-            {"els_essay_id": "ANCHOR_perfect", "score": 1.0, "rank": 5},
-            {"els_essay_id": "ANCHOR_minimal", "score": 0.01, "rank": 6},
+            {"els_essay_id": "ANCHOR_perfect", "bradley_terry_score": 1.0, "rank": 5},
+            {"els_essay_id": "ANCHOR_minimal", "bradley_terry_score": 0.01, "rank": 6},
         ]
 
         grade_projections = GradeProjectionSummary(
@@ -169,15 +169,15 @@ class TestDualEventPublishingValidation:
         # Arrange - Create anchors with each possible grade
         rankings = [
             # Student essay (should not get display name)
-            {"els_essay_id": "student_1", "score": 0.8, "rank": 1},
+            {"els_essay_id": "student_1", "bradley_terry_score": 0.8, "rank": 1},
             # Anchor essays with each grade level
-            {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 2},
-            {"els_essay_id": "ANCHOR_B", "score": 0.85, "rank": 3},
-            {"els_essay_id": "ANCHOR_C", "score": 0.75, "rank": 4},
-            {"els_essay_id": "ANCHOR_D", "score": 0.6, "rank": 5},
-            {"els_essay_id": "ANCHOR_E", "score": 0.45, "rank": 6},
-            {"els_essay_id": "ANCHOR_F", "score": 0.3, "rank": 7},
-            {"els_essay_id": "ANCHOR_U", "score": 0.1, "rank": 8},
+            {"els_essay_id": "ANCHOR_A", "bradley_terry_score": 0.9, "rank": 2},
+            {"els_essay_id": "ANCHOR_B", "bradley_terry_score": 0.85, "rank": 3},
+            {"els_essay_id": "ANCHOR_C", "bradley_terry_score": 0.75, "rank": 4},
+            {"els_essay_id": "ANCHOR_D", "bradley_terry_score": 0.6, "rank": 5},
+            {"els_essay_id": "ANCHOR_E", "bradley_terry_score": 0.45, "rank": 6},
+            {"els_essay_id": "ANCHOR_F", "bradley_terry_score": 0.3, "rank": 7},
+            {"els_essay_id": "ANCHOR_U", "bradley_terry_score": 0.1, "rank": 8},
         ]
 
         grade_projections = GradeProjectionSummary(
@@ -245,9 +245,9 @@ class TestDualEventPublishingValidation:
         """Test system handles missing or incomplete confidence data gracefully."""
         # Arrange - Mix of complete and incomplete confidence data
         rankings = [
-            {"els_essay_id": "student_complete", "score": 0.8, "rank": 1},
-            {"els_essay_id": "student_partial", "score": 0.7, "rank": 2},
-            {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 3},
+            {"els_essay_id": "student_complete", "bradley_terry_score": 0.8, "rank": 1},
+            {"els_essay_id": "student_partial", "bradley_terry_score": 0.7, "rank": 2},
+            {"els_essay_id": "ANCHOR_A", "bradley_terry_score": 0.9, "rank": 3},
         ]
 
         # Grade projections with missing confidence data for some essays
@@ -308,9 +308,9 @@ class TestDualEventPublishingValidation:
         """Test system handles null/None scores in rankings gracefully."""
         # Arrange - Mix of valid and null scores
         rankings: list[dict[str, Any]] = [
-            {"els_essay_id": "student_valid", "score": 0.8, "rank": 1},
-            {"els_essay_id": "student_null", "score": None, "rank": 2},  # Null score
-            {"els_essay_id": "ANCHOR_A", "score": 0.9, "rank": 3},
+            {"els_essay_id": "student_valid", "bradley_terry_score": 0.8, "rank": 1},
+            {"els_essay_id": "student_null", "bradley_terry_score": None, "rank": 2},  # Null score
+            {"els_essay_id": "ANCHOR_A", "bradley_terry_score": 0.9, "rank": 3},
         ]
 
         grade_projections = GradeProjectionSummary(

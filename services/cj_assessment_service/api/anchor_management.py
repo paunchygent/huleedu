@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dishka import FromDishka
-from dishka.integrations.quart import inject
 from huleedu_service_libs.logging_utils import create_service_logger
 from quart import Blueprint, request
+from quart_dishka import inject
 
 from services.cj_assessment_service.models_db import AnchorEssayReference
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol

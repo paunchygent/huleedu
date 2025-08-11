@@ -211,11 +211,11 @@ class TestDualEventPublishing:
         "rankings,expected_status",
         [
             (
-                [{"els_essay_id": "s1", "score": 0.5, "rank": 1}],  # Has score
+                [{"els_essay_id": "s1", "bradley_terry_score": 0.5, "rank": 1}],  # Has score
                 BatchStatus.COMPLETED_SUCCESSFULLY,
             ),
             (
-                [{"els_essay_id": "s1", "score": None, "rank": 1}],  # No score
+                [{"els_essay_id": "s1", "bradley_terry_score": None, "rank": 1}],  # No score
                 BatchStatus.FAILED_CRITICALLY,
             ),
             (
@@ -223,7 +223,7 @@ class TestDualEventPublishing:
                 BatchStatus.FAILED_CRITICALLY,
             ),
             (
-                [{"els_essay_id": "ANCHOR_1", "score": 0.5, "rank": 1}],  # Only anchor
+                [{"els_essay_id": "ANCHOR_1", "bradley_terry_score": 0.5, "rank": 1}],  # Only anchor
                 BatchStatus.FAILED_CRITICALLY,  # No students
             ),
         ],
@@ -270,8 +270,8 @@ class TestDualEventPublishing:
         """Verify all fields are mapped correctly between events."""
         # Arrange
         rankings = [
-            {"els_essay_id": "student_1", "score": 0.85, "rank": 1},
-            {"els_essay_id": "ANCHOR_A", "score": 0.95, "rank": 2},
+            {"els_essay_id": "student_1", "bradley_terry_score": 0.85, "rank": 1},
+            {"els_essay_id": "ANCHOR_A", "bradley_terry_score": 0.95, "rank": 2},
         ]
 
         grade_projections = GradeProjectionSummary(

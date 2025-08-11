@@ -172,13 +172,13 @@ class ContextBuilder:
         anchor_contents = {}
         for ref in anchor_refs:
             try:
-                content = await content_client.fetch_content(ref.content_id, correlation_id)
-                anchor_contents[ref.content_id] = content
+                content = await content_client.fetch_content(ref.text_storage_id, correlation_id)
+                anchor_contents[ref.text_storage_id] = content
                 self.logger.debug(
                     f"Fetched anchor content for grade {ref.grade}",
                     extra={
                         "correlation_id": str(correlation_id),
-                        "content_id": ref.content_id,
+                        "content_id": ref.text_storage_id,
                         "grade": ref.grade,
                     },
                 )
@@ -187,7 +187,7 @@ class ContextBuilder:
                     f"Failed to fetch anchor content: {e}",
                     extra={
                         "correlation_id": str(correlation_id),
-                        "content_id": ref.content_id,
+                        "content_id": ref.text_storage_id,
                         "error": str(e),
                     },
                 )

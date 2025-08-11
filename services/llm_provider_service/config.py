@@ -95,23 +95,23 @@ class Settings(BaseSettings):
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_BASE_URL: Optional[str] = None
-    ANTHROPIC_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-haiku-20241022"
     ANTHROPIC_ENABLED: bool = True
 
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: Optional[str] = None
-    OPENAI_DEFAULT_MODEL: str = "gpt-4.1"
+    OPENAI_DEFAULT_MODEL: str = "gpt-5-mini-2025-08-07"
     OPENAI_ORG_ID: Optional[str] = None
     OPENAI_ENABLED: bool = True
 
     GOOGLE_API_KEY: str = ""
     GOOGLE_PROJECT_ID: str = ""
-    GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash"
+    GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash-preview-05-20"
     GOOGLE_ENABLED: bool = True
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-sonnet-4"
+    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-5-haiku-20241022"
     OPENROUTER_ENABLED: bool = True
 
     # Internal/Self-hosted Model Support

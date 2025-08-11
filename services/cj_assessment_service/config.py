@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     DEFAULT_LLM_MODEL: str = Field(
-        default="gpt-4.1",
+        default="gpt-5-mini-2025-08-07",
         description="Default LLM model to use for comparison requests",
     )
 

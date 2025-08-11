@@ -5,6 +5,7 @@ This module handles low-level batch submission operations and database state man
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -167,13 +168,19 @@ async def update_submitted_count_in_session(
     await session.commit()
 
 
-async def get_batch_state(session: AsyncSession, cj_batch_id: int, correlation_id: UUID) -> Any:
+async def get_batch_state(
+    session: AsyncSession, 
+    cj_batch_id: int, 
+    correlation_id: UUID,
+    for_update: bool = False
+) -> Any:
     """Get batch state from database.
 
     Args:
         session: Database session
         cj_batch_id: CJ batch ID
         correlation_id: Request correlation ID for tracing
+        for_update: If True, lock the row for update (prevents concurrent modifications)
 
     Returns:
         Batch state object or None if not found
@@ -181,13 +188,23 @@ async def get_batch_state(session: AsyncSession, cj_batch_id: int, correlation_i
     # This would need to be implemented based on the repository protocol
     # For now, we'll use a placeholder that demonstrates the pattern
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload, noload
 
     from services.cj_assessment_service.models_db import CJBatchState
 
     try:
-        result = await session.execute(
-            select(CJBatchState).where(CJBatchState.batch_id == cj_batch_id)
-        )
+        if for_update:
+            # When locking for update, use a simple query without any relationship loading
+            # to avoid "FOR UPDATE cannot be applied to nullable side of outer join" error
+            stmt = (
+                select(CJBatchState)
+                .where(CJBatchState.batch_id == cj_batch_id)
+                .options(noload('*'))  # Disable all relationship loading
+                .with_for_update()
+            )
+        else:
+            stmt = select(CJBatchState).where(CJBatchState.batch_id == cj_batch_id)
+        result = await session.execute(stmt)
         return result.scalar_one_or_none()
     except Exception as e:
         logger.error(
@@ -242,6 +259,100 @@ async def update_batch_processing_metadata(
     except Exception as e:
         logger.error(
             f"Failed to update processing metadata: {e}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        raise
+
+
+async def append_to_failed_pool_atomic(
+    session: AsyncSession,
+    cj_batch_id: int,
+    failed_entry_json: dict[str, Any],
+    correlation_id: UUID,
+) -> None:
+    """Atomically append a failed comparison to the pool using JSONB operations.
+    
+    This function uses PostgreSQL's atomic JSONB operations to append to the failed pool
+    without needing to read-modify-write, eliminating race conditions.
+    
+    Args:
+        session: Database session
+        cj_batch_id: CJ batch ID
+        failed_entry_json: Failed entry data as JSON-serializable dict
+        correlation_id: Request correlation ID for tracing
+        
+    Raises:
+        DatabaseOperationError: On database operation failure
+    """
+    from sqlalchemy import text
+    
+    try:
+        # Use raw SQL for atomic JSONB operations
+        # The -> operator extracts as json, so cast back to jsonb for concatenation
+        stmt = text("""
+            UPDATE cj_batch_states
+            SET processing_metadata = 
+                CASE 
+                    WHEN processing_metadata IS NULL THEN 
+                        CAST(:initial_pool AS jsonb)
+                    ELSE
+                        jsonb_build_object(
+                            'failed_comparison_pool', 
+                            CASE 
+                                WHEN processing_metadata->'failed_comparison_pool' IS NULL THEN CAST(:entry AS jsonb)
+                                ELSE (processing_metadata->'failed_comparison_pool')::jsonb || CAST(:entry AS jsonb)
+                            END,
+                            'pool_statistics',
+                            jsonb_build_object(
+                                'total_failed', COALESCE((processing_metadata->'pool_statistics'->>'total_failed')::int, 0) + 1,
+                                'retry_attempts', COALESCE((processing_metadata->'pool_statistics'->>'retry_attempts')::int, 0),
+                                'last_retry_batch', processing_metadata->'pool_statistics'->>'last_retry_batch',
+                                'successful_retries', COALESCE((processing_metadata->'pool_statistics'->>'successful_retries')::int, 0),
+                                'permanently_failed', COALESCE((processing_metadata->'pool_statistics'->>'permanently_failed')::int, 0)
+                            )
+                        )
+                END
+            WHERE batch_id = :batch_id
+        """)
+        
+        # Create initial pool structure if metadata is null
+        initial_pool = {
+            "failed_comparison_pool": [failed_entry_json],
+            "pool_statistics": {
+                "total_failed": 1,
+                "retry_attempts": 0,
+                "last_retry_batch": None,
+                "successful_retries": 0,
+                "permanently_failed": 0
+            }
+        }
+        
+        await session.execute(
+            stmt,
+            {
+                "batch_id": cj_batch_id,
+                "entry": json.dumps([failed_entry_json]),
+                "initial_pool": json.dumps(initial_pool)
+            }
+        )
+        await session.commit()
+
+        logger.debug(
+            f"Atomically appended to failed pool for batch {cj_batch_id}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "cj_batch_id": cj_batch_id,
+            },
+        )
+        
+    except Exception as e:
+        logger.error(
+            f"Failed to atomically append to failed pool: {e}",
             extra={
                 "correlation_id": str(correlation_id),
                 "cj_batch_id": cj_batch_id,

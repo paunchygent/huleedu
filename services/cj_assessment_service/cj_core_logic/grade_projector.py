@@ -659,7 +659,14 @@ class CalibrationResult:
     @property
     def grade_boundaries_dict(self) -> dict[str, tuple[float, float]]:
         """Get boundaries as string keys for JSON serialization."""
-        return self.grade_boundaries
+        # Convert infinity values to large numbers for JSON serialization
+        result = {}
+        for grade, (lower, upper) in self.grade_boundaries.items():
+            # Replace infinity with very large/small numbers that JSON can handle
+            json_lower = -1e10 if lower == -np.inf else lower
+            json_upper = 1e10 if upper == np.inf else upper
+            result[grade] = (json_lower, json_upper)
+        return result
 
 
 class ProjectionsData:

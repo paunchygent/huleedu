@@ -5,7 +5,7 @@ This module handles failed comparison retry logic and statistics.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from huleedu_service_libs.error_handling import raise_processing_error
@@ -52,7 +52,7 @@ class BatchPoolManager:
         failure_reason: str,
         correlation_id: UUID,
     ) -> None:
-        """Add a failed comparison to the retry pool.
+        """Add a failed comparison to the retry pool using atomic JSONB operations.
 
         Args:
             cj_batch_id: CJ batch ID for tracking
@@ -75,70 +75,44 @@ class BatchPoolManager:
         )
 
         try:
+            from .batch_submission import append_to_failed_pool_atomic
+            
+            # Create new failed comparison entry
+            failed_entry = FailedComparisonEntry(
+                essay_a_id=comparison_task.essay_a.id,
+                essay_b_id=comparison_task.essay_b.id,
+                comparison_task=comparison_task,
+                failure_reason=failure_reason,
+                failed_at=datetime.now(UTC),
+                retry_count=0,
+                original_batch_id=str(cj_batch_id),
+                correlation_id=correlation_id,
+            )
+            
+            # Convert to JSON-serializable dict
+            failed_entry_json = failed_entry.model_dump(mode='json')
+            
             async with self.database.session() as session:
-                # Get current batch state
-                batch_state = await get_batch_state(
-                    session=session, cj_batch_id=cj_batch_id, correlation_id=correlation_id
-                )
-
-                if not batch_state:
-                    raise_processing_error(
-                        service="cj_assessment_service",
-                        operation="add_to_failed_pool",
-                        message="Batch state not found for failed pool addition",
-                        correlation_id=correlation_id,
-                        database_operation="get_batch_state",
-                        entity_id=str(cj_batch_id),
-                    )
-
-                # Get or create failed pool from processing_metadata
-                failed_pool_data = batch_state.processing_metadata or {}
-                failed_pool = FailedComparisonPool.model_validate(failed_pool_data)
-
-                # Create new failed comparison entry
-                failed_entry = FailedComparisonEntry(
-                    essay_a_id=comparison_task.essay_a.id,
-                    essay_b_id=comparison_task.essay_b.id,
-                    comparison_task=comparison_task,
-                    failure_reason=failure_reason,
-                    failed_at=datetime.now(),
-                    retry_count=0,
-                    original_batch_id=str(cj_batch_id),
+                # Use atomic JSONB append - no locking needed!
+                await append_to_failed_pool_atomic(
+                    session=session,
+                    cj_batch_id=cj_batch_id,
+                    failed_entry_json=failed_entry_json,
                     correlation_id=correlation_id,
                 )
-
-                # Add to pool
-                failed_pool.failed_comparison_pool.append(failed_entry)
-                failed_pool.pool_statistics.total_failed += 1
 
                 # Record metrics
                 business_metrics = get_business_metrics()
                 failed_comparisons_metric = business_metrics.get("cj_failed_comparisons_total")
-                pool_size_metric = business_metrics.get("cj_failed_pool_size")
 
                 if failed_comparisons_metric:
                     failed_comparisons_metric.labels(failure_reason=failure_reason).inc()
 
-                if pool_size_metric:
-                    pool_size_metric.labels(batch_id=str(cj_batch_id)).set(
-                        len(failed_pool.failed_comparison_pool)
-                    )
-
-                # Update batch state with new pool data
-                await update_batch_processing_metadata(
-                    session=session,
-                    cj_batch_id=cj_batch_id,
-                    metadata=failed_pool.model_dump(),
-                    correlation_id=correlation_id,
-                )
-
                 logger.info(
-                    f"Added comparison to failed pool. Pool now contains "
-                    f"{len(failed_pool.failed_comparison_pool)} entries",
+                    f"Successfully added comparison to failed pool using atomic operation",
                     extra={
                         "correlation_id": str(correlation_id),
                         "cj_batch_id": cj_batch_id,
-                        "pool_size": len(failed_pool.failed_comparison_pool),
                     },
                 )
 
@@ -354,7 +328,7 @@ class BatchPoolManager:
                 await update_batch_processing_metadata(
                     session=session,
                     cj_batch_id=cj_batch_id,
-                    metadata=failed_pool.model_dump(),
+                    metadata=failed_pool.model_dump(mode='json'),
                     correlation_id=correlation_id,
                 )
 

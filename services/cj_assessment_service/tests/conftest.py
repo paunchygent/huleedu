@@ -132,13 +132,18 @@ def cj_assessment_request_data_with_overrides(
     llm_config_overrides: LLMConfigOverrides,
 ) -> ELS_CJAssessmentRequestV1:
     """Provide ELS_CJAssessmentRequestV1 with LLM config overrides."""
+    # Create multiple essays for comparison testing
+    essay_ref_2 = EssayProcessingInputRefV1(
+        essay_id=str(uuid4()),
+        text_storage_id=str(uuid4()),
+    )
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         entity_id=sample_batch_id,
         entity_type="batch",
         parent_id=sample_parent_id,
         system_metadata=system_metadata,
-        essays_for_cj=[essay_processing_ref],
+        essays_for_cj=[essay_processing_ref, essay_ref_2],  # Multiple essays for comparisons
         language="en",
         course_code=CourseCode.ENG5,
         essay_instructions="Compare the quality of these essays.",
@@ -154,13 +159,18 @@ def cj_assessment_request_data_no_overrides(
     essay_processing_ref: EssayProcessingInputRefV1,
 ) -> ELS_CJAssessmentRequestV1:
     """Provide ELS_CJAssessmentRequestV1 without LLM config overrides."""
+    # Create multiple essays for comparison testing
+    essay_ref_2 = EssayProcessingInputRefV1(
+        essay_id=str(uuid4()),
+        text_storage_id=str(uuid4()),
+    )
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         entity_id=sample_batch_id,
         entity_type="batch",
         parent_id=sample_parent_id,
         system_metadata=system_metadata,
-        essays_for_cj=[essay_processing_ref],
+        essays_for_cj=[essay_processing_ref, essay_ref_2],  # Multiple essays for comparisons
         language="en",
         course_code=CourseCode.SV1,
         essay_instructions="Compare the quality of these essays.",
@@ -253,8 +263,13 @@ def mock_http_session() -> AsyncMock:
 def mock_settings() -> Settings:
     """Provide mock settings for testing."""
     settings = MagicMock()
-    settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
+    # Create a proper mock for the enum that has a value attribute
+    provider_mock = MagicMock()
+    provider_mock.value = "openai"
+    settings.DEFAULT_LLM_PROVIDER = provider_mock
     settings.DEFAULT_LLM_MODEL = "gpt-4o-mini"
+    settings.DEFAULT_LLM_MODEL_VERSION = "20240101"  # Add missing model version
+    settings.DEFAULT_LLM_TEMPERATURE = 0.7  # Add missing default temperature
     settings.TEMPERATURE = 0.7
     settings.MAX_TOKENS_RESPONSE = 4000
     settings.system_prompt = "You are a helpful AI assistant."
@@ -263,6 +278,7 @@ def mock_settings() -> Settings:
     # Add required Kafka and service configuration
     settings.CJ_ASSESSMENT_COMPLETED_TOPIC = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
     settings.CJ_ASSESSMENT_FAILED_TOPIC = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
+    settings.ASSESSMENT_RESULT_TOPIC = "huleedu.assessment.results.v1"  # Add missing RAS topic
     settings.SERVICE_NAME = "cj-assessment-service"
     settings.LLM_PROVIDERS_CONFIG = {
         "openai": MagicMock(

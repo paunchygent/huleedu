@@ -118,54 +118,91 @@ class TestEventProcessorOverrides:
 
         This test verifies that:
         1. LLM overrides are properly extracted from the request
-        2. LLM interaction is called with the correct overrides
+        2. Workflow is called with the correct parameters
         3. Event publisher receives correct completion data
         """
         # Arrange
-        # Configure mock database to return a proper CJ batch ID
-        mock_cj_batch = AsyncMock()
-        mock_cj_batch.id = 12345
-        mock_database.create_new_cj_batch.return_value = mock_cj_batch
-
-        # Configure mock database session context manager
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
-
-        # Mock the execute method to return empty results for rankings query
-        mock_result = MagicMock()
-        mock_result.all.return_value = []  # No essays in ranking query
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        # Act
-        result = await process_single_message(
-            msg=kafka_message_with_overrides,
-            database=mock_database,
-            content_client=mock_content_client,
-            event_publisher=mock_event_publisher,
-            llm_interaction=mock_llm_interaction,
-            settings_obj=mock_settings,
+        from unittest.mock import patch
+        from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
+            CJAssessmentWorkflowResult
         )
+        
+        # Create mock workflow result
+        mock_workflow_result = CJAssessmentWorkflowResult(
+            rankings=[
+                {"els_essay_id": "essay_1", "bradley_terry_score": 0.8, "rank": 1},
+                {"els_essay_id": "essay_2", "bradley_terry_score": 0.6, "rank": 2},
+            ],
+            batch_id="12345"
+        )
+        
+        # Mock the workflow function to return success
+        with patch(
+            "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+            new=AsyncMock(return_value=mock_workflow_result)
+        ) as mock_workflow:
+            # Mock the GradeProjector to return a simple result
+            from services.cj_assessment_service.cj_core_logic.grade_projector import (
+                GradeProjectionSummary
+            )
+            mock_grade_projections = GradeProjectionSummary(
+                projections_available=True,
+                primary_grades={"essay_1": "A", "essay_2": "B"},
+                confidence_labels={"essay_1": "HIGH", "essay_2": "MEDIUM"},
+                confidence_scores={"essay_1": 0.9, "essay_2": 0.7},
+            )
+            
+            with patch(
+                "services.cj_assessment_service.event_processor.GradeProjector"
+            ) as MockGradeProjector:
+                mock_projector_instance = AsyncMock()
+                mock_projector_instance.calculate_projections = AsyncMock(
+                    return_value=mock_grade_projections
+                )
+                MockGradeProjector.return_value = mock_projector_instance
+                
+                # Configure mock database session for grade projector
+                mock_session = AsyncMock()
+                mock_database.session.return_value.__aenter__.return_value = mock_session
+                mock_database.session.return_value.__aexit__.return_value = None
 
-        # Assert processing succeeded
-        assert result is True
+                # Act
+                result = await process_single_message(
+                    msg=kafka_message_with_overrides,
+                    database=mock_database,
+                    content_client=mock_content_client,
+                    event_publisher=mock_event_publisher,
+                    llm_interaction=mock_llm_interaction,
+                    settings_obj=mock_settings,
+                )
 
-        # Verify LLM interaction was called with overrides
-        # (Since we only have 1 essay, no comparisons will be made, but the setup should be correct)
+                # Assert processing succeeded
+                assert result is True
 
-        # Verify event publisher was called with completion event
-        mock_event_publisher.publish_assessment_completed.assert_called_once()
+                # Verify workflow was called with LLM config overrides
+                mock_workflow.assert_called_once()
+                workflow_call_args = mock_workflow.call_args
+                request_data = workflow_call_args.kwargs["request_data"]
+                
+                # Verify LLM config overrides were passed to workflow
+                assert request_data["llm_config_overrides"] is not None
+                assert request_data["llm_config_overrides"].model_override == "gpt-4o"
+                assert request_data["llm_config_overrides"].temperature_override == 0.3
+                assert request_data["llm_config_overrides"].max_tokens_override == 2000
 
-        # Extract the completion data to verify LLM overrides were processed
-        call_args = mock_event_publisher.publish_assessment_completed.call_args
-        completion_data = call_args[1]["completion_data"]
+                # Verify event publisher was called with completion event
+                mock_event_publisher.publish_assessment_completed.assert_called_once()
 
-        # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
-        assert isinstance(completion_data, EventEnvelope)
-        typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
-        assert typed_data.status.value == "completed_successfully"
-        assert hasattr(typed_data, "cj_assessment_job_id")
-        assert typed_data.cj_assessment_job_id == "12345"
+                # Extract the completion data to verify it was published correctly
+                call_args = mock_event_publisher.publish_assessment_completed.call_args
+                completion_data = call_args[1]["completion_data"]
+
+                # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
+                assert isinstance(completion_data, EventEnvelope)
+                typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
+                assert typed_data.status.value == "completed_successfully"
+                assert hasattr(typed_data, "cj_assessment_job_id")
+                assert typed_data.cj_assessment_job_id == "12345"
 
     @pytest.mark.asyncio
     async def test_process_message_without_llm_overrides(
@@ -185,47 +222,84 @@ class TestEventProcessorOverrides:
         3. Event publisher receives correct completion data
         """
         # Arrange
-        # Configure mock database to return a proper CJ batch ID
-        mock_cj_batch = AsyncMock()
-        mock_cj_batch.id = 98765
-        mock_database.create_new_cj_batch.return_value = mock_cj_batch
-
-        # Configure mock database session context manager
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
-
-        # Mock the execute method to return empty results for rankings query
-        mock_result = MagicMock()
-        mock_result.all.return_value = []  # No essays in ranking query
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        # Act
-        result = await process_single_message(
-            msg=kafka_message_no_overrides,
-            database=mock_database,
-            content_client=mock_content_client,
-            event_publisher=mock_event_publisher,
-            llm_interaction=mock_llm_interaction,
-            settings_obj=mock_settings,
+        from unittest.mock import patch
+        from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
+            CJAssessmentWorkflowResult
         )
+        
+        # Create mock workflow result
+        mock_workflow_result = CJAssessmentWorkflowResult(
+            rankings=[
+                {"els_essay_id": "essay_1", "bradley_terry_score": 0.75, "rank": 1},
+                {"els_essay_id": "essay_2", "bradley_terry_score": 0.55, "rank": 2},
+            ],
+            batch_id="98765"
+        )
+        
+        # Mock the workflow function to return success
+        with patch(
+            "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+            new=AsyncMock(return_value=mock_workflow_result)
+        ) as mock_workflow:
+            # Mock the GradeProjector to return a simple result
+            from services.cj_assessment_service.cj_core_logic.grade_projector import (
+                GradeProjectionSummary
+            )
+            mock_grade_projections = GradeProjectionSummary(
+                projections_available=True,
+                primary_grades={"essay_1": "B", "essay_2": "C"},
+                confidence_labels={"essay_1": "HIGH", "essay_2": "MEDIUM"},
+                confidence_scores={"essay_1": 0.85, "essay_2": 0.65},
+            )
+            
+            with patch(
+                "services.cj_assessment_service.event_processor.GradeProjector"
+            ) as MockGradeProjector:
+                mock_projector_instance = AsyncMock()
+                mock_projector_instance.calculate_projections = AsyncMock(
+                    return_value=mock_grade_projections
+                )
+                MockGradeProjector.return_value = mock_projector_instance
+                
+                # Configure mock database session for grade projector
+                mock_session = AsyncMock()
+                mock_database.session.return_value.__aenter__.return_value = mock_session
+                mock_database.session.return_value.__aexit__.return_value = None
 
-        # Assert processing succeeded
-        assert result is True
+                # Act
+                result = await process_single_message(
+                    msg=kafka_message_no_overrides,
+                    database=mock_database,
+                    content_client=mock_content_client,
+                    event_publisher=mock_event_publisher,
+                    llm_interaction=mock_llm_interaction,
+                    settings_obj=mock_settings,
+                )
 
-        # Verify event publisher was called with completion event
-        mock_event_publisher.publish_assessment_completed.assert_called_once()
+                # Assert processing succeeded
+                assert result is True
+                
+                # Verify workflow was called without LLM config overrides
+                mock_workflow.assert_called_once()
+                workflow_call_args = mock_workflow.call_args
+                request_data = workflow_call_args.kwargs["request_data"]
+                
+                # Verify no LLM config overrides were passed to workflow
+                assert request_data["llm_config_overrides"] is None
 
-        # Extract the completion data to verify no LLM overrides were used
-        call_args = mock_event_publisher.publish_assessment_completed.call_args
-        completion_data = call_args[1]["completion_data"]
+                # Verify event publisher was called with completion event
+                mock_event_publisher.publish_assessment_completed.assert_called_once()
 
-        # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
-        assert isinstance(completion_data, EventEnvelope)
-        typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
-        assert typed_data.status.value == "completed_successfully"
-        assert hasattr(typed_data, "cj_assessment_job_id")
-        assert typed_data.cj_assessment_job_id == "98765"
+                # Extract the completion data to verify no LLM overrides were used
+                call_args = mock_event_publisher.publish_assessment_completed.call_args
+                completion_data = call_args[1]["completion_data"]
+
+                # Verify completion data structure (EventEnvelope with CJAssessmentCompletedV1)
+                assert isinstance(completion_data, EventEnvelope)
+                typed_data = CJAssessmentCompletedV1.model_validate(completion_data.data)
+                assert typed_data.status.value == "completed_successfully"
+                assert hasattr(typed_data, "cj_assessment_job_id")
+                assert typed_data.cj_assessment_job_id == "98765"
 
     @pytest.mark.asyncio
     async def test_process_message_deserialization_with_overrides(
@@ -285,47 +359,82 @@ class TestEventProcessorOverrides:
         3. LLM overrides don't interfere with correlation ID handling
         """
         # Arrange
-        expected_correlation_id = str(cj_request_envelope_with_overrides.correlation_id)
-
-        # Configure mock database to return a proper CJ batch ID
-        mock_cj_batch = AsyncMock()
-        mock_cj_batch.id = 55555
-        mock_database.create_new_cj_batch.return_value = mock_cj_batch
-
-        # Configure mock database session context manager
-        mock_session = AsyncMock()
-        mock_database.session.return_value.__aenter__.return_value = mock_session
-        mock_database.session.return_value.__aexit__.return_value = None
-
-        # Mock the execute method to return empty results for rankings query
-        mock_result = MagicMock()
-        mock_result.all.return_value = []  # No essays in ranking query
-        mock_session.execute = AsyncMock(return_value=mock_result)
-
-        # Act
-        result = await process_single_message(
-            msg=kafka_message_with_overrides,
-            database=mock_database,
-            content_client=mock_content_client,
-            event_publisher=mock_event_publisher,
-            llm_interaction=mock_llm_interaction,
-            settings_obj=mock_settings,
+        from unittest.mock import patch
+        from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
+            CJAssessmentWorkflowResult
         )
+        
+        expected_correlation_id = str(cj_request_envelope_with_overrides.correlation_id)
+        
+        # Create mock workflow result
+        mock_workflow_result = CJAssessmentWorkflowResult(
+            rankings=[
+                {"els_essay_id": "essay_1", "bradley_terry_score": 0.85, "rank": 1},
+                {"els_essay_id": "essay_2", "bradley_terry_score": 0.65, "rank": 2},
+            ],
+            batch_id="55555"
+        )
+        
+        # Mock the workflow function to return success
+        with patch(
+            "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+            new=AsyncMock(return_value=mock_workflow_result)
+        ) as mock_workflow:
+            # Mock the GradeProjector to return a simple result
+            from services.cj_assessment_service.cj_core_logic.grade_projector import (
+                GradeProjectionSummary
+            )
+            mock_grade_projections = GradeProjectionSummary(
+                projections_available=True,
+                primary_grades={"essay_1": "A", "essay_2": "B"},
+                confidence_labels={"essay_1": "HIGH", "essay_2": "HIGH"},
+                confidence_scores={"essay_1": 0.95, "essay_2": 0.85},
+            )
+            
+            with patch(
+                "services.cj_assessment_service.event_processor.GradeProjector"
+            ) as MockGradeProjector:
+                mock_projector_instance = AsyncMock()
+                mock_projector_instance.calculate_projections = AsyncMock(
+                    return_value=mock_grade_projections
+                )
+                MockGradeProjector.return_value = mock_projector_instance
+                
+                # Configure mock database session for grade projector
+                mock_session = AsyncMock()
+                mock_database.session.return_value.__aenter__.return_value = mock_session
+                mock_database.session.return_value.__aexit__.return_value = None
 
-        # Assert
-        assert result is True
+                # Act
+                result = await process_single_message(
+                    msg=kafka_message_with_overrides,
+                    database=mock_database,
+                    content_client=mock_content_client,
+                    event_publisher=mock_event_publisher,
+                    llm_interaction=mock_llm_interaction,
+                    settings_obj=mock_settings,
+                )
 
-        # Verify correlation ID was propagated to event publisher
-        mock_event_publisher.publish_assessment_completed.assert_called_once()
-        publisher_call_args = mock_event_publisher.publish_assessment_completed.call_args
-        published_correlation_id = publisher_call_args[1]["correlation_id"]
-        # Should be UUID object with same string representation
-        assert str(published_correlation_id) == expected_correlation_id
+                # Assert
+                assert result is True
+                
+                # Verify correlation ID was passed to workflow
+                mock_workflow.assert_called_once()
+                workflow_call_args = mock_workflow.call_args
+                workflow_correlation_id = workflow_call_args.kwargs["correlation_id"]
+                assert str(workflow_correlation_id) == expected_correlation_id
 
-        # Verify completion data structure includes correct correlation
-        completion_data = publisher_call_args[1]["completion_data"]
-        assert isinstance(completion_data, EventEnvelope)
-        assert str(completion_data.correlation_id) == expected_correlation_id
+                # Verify correlation ID was propagated to event publisher
+                mock_event_publisher.publish_assessment_completed.assert_called_once()
+                publisher_call_args = mock_event_publisher.publish_assessment_completed.call_args
+                published_correlation_id = publisher_call_args[1]["correlation_id"]
+                # Should be UUID object with same string representation
+                assert str(published_correlation_id) == expected_correlation_id
+
+                # Verify completion data structure includes correct correlation
+                completion_data = publisher_call_args[1]["completion_data"]
+                assert isinstance(completion_data, EventEnvelope)
+                assert str(completion_data.correlation_id) == expected_correlation_id
 
     @pytest.mark.asyncio
     async def test_process_message_validation_error_with_overrides(
