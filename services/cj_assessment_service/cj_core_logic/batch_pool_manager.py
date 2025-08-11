@@ -76,7 +76,7 @@ class BatchPoolManager:
 
         try:
             from .batch_submission import append_to_failed_pool_atomic, get_batch_state
-            
+
             async with self.database.session() as session:
                 # First check if batch exists
                 batch_state = await get_batch_state(
@@ -84,9 +84,10 @@ class BatchPoolManager:
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                 )
-                
+
                 if not batch_state:
                     from huleedu_service_libs.error_handling import raise_resource_not_found
+
                     raise_resource_not_found(
                         service="cj_assessment_service",
                         operation="add_to_failed_pool",
@@ -95,7 +96,7 @@ class BatchPoolManager:
                         resource_type="batch_state",
                         resource_id=str(cj_batch_id),
                     )
-                
+
                 # Create new failed comparison entry
                 failed_entry = FailedComparisonEntry(
                     essay_a_id=comparison_task.essay_a.id,
@@ -107,10 +108,10 @@ class BatchPoolManager:
                     original_batch_id=str(cj_batch_id),
                     correlation_id=correlation_id,
                 )
-                
+
                 # Convert to JSON-serializable dict
-                failed_entry_json = failed_entry.model_dump(mode='json')
-                
+                failed_entry_json = failed_entry.model_dump(mode="json")
+
                 # Use atomic JSONB append - no locking needed!
                 await append_to_failed_pool_atomic(
                     session=session,
@@ -127,7 +128,7 @@ class BatchPoolManager:
                     failed_comparisons_metric.labels(failure_reason=failure_reason).inc()
 
                 logger.info(
-                    f"Successfully added comparison to failed pool using atomic operation",
+                    "Successfully added comparison to failed pool using atomic operation",
                     extra={
                         "correlation_id": str(correlation_id),
                         "cj_batch_id": cj_batch_id,
@@ -346,7 +347,7 @@ class BatchPoolManager:
                 await update_batch_processing_metadata(
                     session=session,
                     cj_batch_id=cj_batch_id,
-                    metadata=failed_pool.model_dump(mode='json'),
+                    metadata=failed_pool.model_dump(mode="json"),
                     correlation_id=correlation_id,
                 )
 

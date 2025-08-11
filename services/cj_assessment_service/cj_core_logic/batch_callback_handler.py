@@ -93,10 +93,11 @@ async def continue_cj_assessment_workflow(
 
     try:
         # Step 1: Update the comparison result in database
+        # Use the correlation_id from the callback event (which is the request_correlation_id)
         batch_id = await update_comparison_result(
             comparison_result=comparison_result,
             database=database,
-            correlation_id=correlation_id,
+            correlation_id=comparison_result.correlation_id,  # Use callback's correlation_id
             settings=settings,
             pool_manager=None,  # Will need proper injection
             retry_processor=retry_processor,
@@ -320,10 +321,15 @@ async def trigger_existing_workflow_continuation(
             database=database,
         )
 
+        # Extract config overrides from processing_metadata if available
+        config_overrides = None
+        if batch_state.processing_metadata and isinstance(batch_state.processing_metadata, dict):
+            config_overrides = batch_state.processing_metadata.get("config_overrides")
+
         is_complete = await completion_checker.check_batch_completion(
             cj_batch_id=batch_id,
             correlation_id=correlation_id,
-            config_overrides=batch_state.config_overrides,
+            config_overrides=config_overrides,
         )
 
         if is_complete:
@@ -401,12 +407,15 @@ async def _trigger_batch_scoring_completion(
         ]
 
         # Get all comparisons for this batch (already stored in DB)
-        comparisons: list[Any] = []  # Comparisons are already in DB from callbacks
+        # Note: The scoring function will fetch comparisons from the database
+        # We pass an empty list here since comparisons are already stored from callbacks
+        comparisons: list[Any] = []
 
         # Calculate final Bradley-Terry scores
+        # This function fetches all valid comparisons from DB and computes scores
         await scoring_ranking.record_comparisons_and_update_scores(
             all_essays=essays_for_api,
-            comparison_results=comparisons,
+            comparison_results=comparisons,  # Empty list - function fetches from DB
             db_session=session,
             cj_batch_id=batch_id,
             correlation_id=correlation_id,

@@ -51,12 +51,12 @@ class TestFailedComparisonPoolAdd:
         # Mock database session with proper query responses
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
-        
+
         # Mock the execute method to return batch state when queried
         mock_result = MagicMock()
         mock_result.scalar_one_or_none = MagicMock(return_value=sample_batch_state)
         mock_session.execute = AsyncMock(return_value=mock_result)
-        
+
         # Mock commit for the atomic update
         mock_session.commit = AsyncMock(return_value=None)
 
@@ -71,22 +71,25 @@ class TestFailedComparisonPoolAdd:
         # Assert - Verify database interactions through the mock
         # Should have executed at least 2 queries: one for get_batch_state, one for atomic update
         assert mock_session.execute.call_count >= 2
-        
+
         # Verify commit was called for the atomic operation
         mock_session.commit.assert_called()
-        
+
         # Verify the SQL update contained the expected batch_id
         update_call = None
         for call in mock_session.execute.call_args_list:
-            if call.args and hasattr(call.args[0], 'text'):
+            if call.args and hasattr(call.args[0], "text"):
                 # This is the SQL text update call
                 update_call = call
                 break
-        
+
         if update_call:
             # Verify the batch_id was passed to the SQL update
-            assert update_call.kwargs.get('batch_id') == cj_batch_id or \
-                   (update_call.args[1] if len(update_call.args) > 1 else {}).get('batch_id') == cj_batch_id
+            assert (
+                update_call.kwargs.get("batch_id") == cj_batch_id
+                or (update_call.args[1] if len(update_call.args) > 1 else {}).get("batch_id")
+                == cj_batch_id
+            )
 
     @pytest.mark.asyncio
     async def test_add_to_failed_pool_no_batch_state(
@@ -104,7 +107,7 @@ class TestFailedComparisonPoolAdd:
         # Mock database session to return None for batch state query
         mock_session = AsyncMock()
         mock_database.session.return_value.__aenter__.return_value = mock_session
-        
+
         # Mock the execute method to return None when batch state is queried
         mock_result = MagicMock()
         mock_result.scalar_one_or_none = MagicMock(return_value=None)  # No batch state found

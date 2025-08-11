@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import pytest
 from dishka import make_async_container
+from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy.ext.asyncio import create_async_engine
-
-from huleedu_service_libs.outbox import OutboxProvider
 
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
 

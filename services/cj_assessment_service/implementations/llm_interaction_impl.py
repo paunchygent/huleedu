@@ -120,7 +120,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         max_concurrent_requests = getattr(self.settings, "max_concurrent_llm_requests", 3)
         semaphore = asyncio.Semaphore(max_concurrent_requests)
 
-        async def process_task(task: ComparisonTask) -> ComparisonResult:
+        async def process_task(task: ComparisonTask) -> ComparisonResult | None:
             """Process a single comparison task with direct LLM call."""
             async with semaphore:
                 logger.info(
@@ -138,16 +138,15 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         max_tokens_override=max_tokens_override,
                     )
 
-                    # Handle async processing case - will be processed via callback in Phase 2
+                    # Handle async processing case - will be processed via callback
                     if response_data is None:
                         logger.info(
                             f"Comparison for essays {task.essay_a.id} vs {task.essay_b.id} "
-                            "queued for async processing"
+                            "queued for async processing - will be processed via callback"
                         )
-                        # For now, skip this comparison - Phase 2 will handle via callbacks
-                        raise ValueError(
-                            "Async comparison processing not yet implemented - Phase 2"
-                        )
+                        # Return None to indicate async processing
+                        # The actual result will come via callback from LLM Provider Service
+                        return None
 
                     # Record successful LLM API call metric
                     if llm_api_calls_metric:
@@ -210,8 +209,9 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 return_exceptions=True,
             )
 
-            # Handle any exceptions from gather
+            # Handle any exceptions and async results from gather
             final_results: list[ComparisonResult] = []
+            async_count = 0
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     logger.error(
@@ -239,6 +239,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                             raw_llm_response_content=None,
                         ),
                     )
+                elif result is None:
+                    # Async processing - will be handled via callback
+                    async_count += 1
+                    # Skip adding to results - callback will handle it
                 else:
                     # Type guard: result is ComparisonResult at this point
                     comparison_result = cast(ComparisonResult, result)
@@ -246,9 +250,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
             # Log summary
             successful_tasks = sum(1 for r in final_results if r.llm_assessment is not None)
+            failed_tasks = len(final_results) - successful_tasks
             logger.info(
-                f"Completed {len(tasks)} comparison tasks. "
-                f"Successful: {successful_tasks}, Failed: {len(tasks) - successful_tasks}",
+                f"Processed {len(tasks)} comparison tasks. "
+                f"Immediate: {successful_tasks}, Failed: {failed_tasks}, "
+                f"Async (queued): {async_count}",
             )
 
             return final_results

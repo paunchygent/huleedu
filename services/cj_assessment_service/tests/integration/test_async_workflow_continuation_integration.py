@@ -15,52 +15,36 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
 from common_core import EssayComparisonWinner, LLMProviderType
-from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import (
     LLMComparisonResultV1,
     TokenUsage,
 )
-from common_core.metadata_models import SystemProcessingMetadata
-from common_core.status_enums import CJBatchStateEnum, ProcessingStage
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from common_core.status_enums import CJBatchStateEnum
+from sqlalchemy import select
 
 from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
     check_workflow_continuation,
-    continue_cj_assessment_workflow,
 )
 from services.cj_assessment_service.cj_core_logic.batch_completion_checker import (
     BatchCompletionChecker,
 )
 from services.cj_assessment_service.cj_core_logic.callback_state_manager import (
-    check_batch_completion_conditions,
     update_comparison_result,
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_api import (
-    ComparisonResult,
-    ComparisonTask,
-    EssayForComparison,
-    LLMAssessmentResponseSchema,
-)
 from services.cj_assessment_service.models_db import (
     CJBatchState,
-    CJBatchUpload,
     ComparisonPair,
-    ProcessedEssay,
 )
 from services.cj_assessment_service.protocols import (
-    CJEventPublisherProtocol,
     CJRepositoryProtocol,
-    ContentClientProtocol,
-    LLMInteractionProtocol,
 )
 
 if TYPE_CHECKING:
@@ -70,7 +54,7 @@ if TYPE_CHECKING:
 @pytest.mark.integration
 class TestAsyncWorkflowContinuation:
     """Test the async callback-driven workflow continuation.
-    
+
     All tests use the repository pattern exclusively for database operations,
     matching production patterns and ensuring proper transaction boundaries.
     """
@@ -83,15 +67,15 @@ class TestAsyncWorkflowContinuation:
         completion_threshold: int = 80,
     ) -> tuple[int, list[UUID], int]:
         """Create a batch with essays and comparison pairs ready for callbacks.
-        
+
         Uses repository pattern exclusively - no external session management.
-        
+
         Args:
             repository: Repository for database operations
             essay_count: Number of essays to create
             batch_id: Batch identifier
             completion_threshold: Completion threshold percentage
-        
+
         Returns:
             Tuple of (cj_batch_id, list of correlation_ids, total_comparisons)
         """
@@ -107,7 +91,7 @@ class TestAsyncWorkflowContinuation:
                 initial_status=CJBatchStatusEnum.PENDING,
                 expected_essay_count=essay_count,
             )
-            
+
             # Create essays
             essays = []
             for i in range(essay_count):
@@ -119,7 +103,7 @@ class TestAsyncWorkflowContinuation:
                     assessment_input_text=f"Essay content {i}",
                 )
                 essays.append(essay)
-            
+
             # Create comparison pairs with correlation IDs for callbacks
             correlation_ids = []
             pair_count = 0
@@ -127,7 +111,7 @@ class TestAsyncWorkflowContinuation:
                 for j in range(i + 1, essay_count):
                     correlation_id = uuid4()
                     correlation_ids.append(correlation_id)
-                    
+
                     comparison = ComparisonPair(
                         cj_batch_id=cj_batch.id,
                         essay_a_els_id=f"essay_{i:03d}",
@@ -138,7 +122,7 @@ class TestAsyncWorkflowContinuation:
                     )
                     session.add(comparison)
                     pair_count += 1
-            
+
             # Update batch state with threshold
             batch_state = await session.get(CJBatchState, cj_batch.id)
             if batch_state:
@@ -148,10 +132,10 @@ class TestAsyncWorkflowContinuation:
                 batch_state.completed_comparisons = 0
                 batch_state.failed_comparisons = 0
                 batch_state.completion_threshold_pct = completion_threshold
-            
+
             # Commit all changes within the session
             await session.commit()
-            
+
             # Return IDs that don't require session access
             return cj_batch.id, correlation_ids, pair_count
 
@@ -166,7 +150,7 @@ class TestAsyncWorkflowContinuation:
             # For errors, only set error_detail and common fields
             from common_core.error_enums import ErrorCode
             from common_core.models.error_models import ErrorDetail
-            
+
             return LLMComparisonResultV1(
                 request_id=str(uuid4()),
                 correlation_id=correlation_id,
@@ -225,11 +209,9 @@ class TestAsyncWorkflowContinuation:
         """Test that batch states transition correctly through the workflow."""
         # Create batch with 5 essays (10 comparisons)
         batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=5,
-            completion_threshold=80
+            postgres_repository, essay_count=5, completion_threshold=80
         )
-        
+
         # Verify initial state using repository session
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
@@ -237,13 +219,13 @@ class TestAsyncWorkflowContinuation:
             assert batch_state.state == CJBatchStateEnum.WAITING_CALLBACKS
             assert batch_state.total_comparisons == 10
             assert batch_state.completed_comparisons == 0
-        
+
         # Process callbacks one by one
         for i, corr_id in enumerate(correlation_ids[:5]):  # Process first 5
             # Create callback result
             winner = EssayComparisonWinner.ESSAY_A if i % 2 == 0 else EssayComparisonWinner.ESSAY_B
             callback_result = self._create_callback_result(corr_id, winner)
-            
+
             # Update comparison result (uses its own session internally)
             returned_batch_id = await update_comparison_result(
                 comparison_result=callback_result,
@@ -251,9 +233,9 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-            
+
             assert returned_batch_id == batch_id
-            
+
             # Check if comparison was updated using repository session
             async with postgres_repository.session() as session:
                 stmt = select(ComparisonPair).where(
@@ -261,18 +243,18 @@ class TestAsyncWorkflowContinuation:
                 )
                 result = await session.execute(stmt)
                 comparison = result.scalar_one()
-                
+
                 assert comparison.winner == winner.value
                 assert comparison.completed_at is not None
                 assert comparison.confidence == 4.0
-        
+
         # Update batch state completed count
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             batch_state.completed_comparisons = 5
             await session.commit()
-        
+
         # Check if we should trigger completion (50% done, below 80% threshold)
         completion_checker = BatchCompletionChecker(postgres_repository)
         should_complete = await completion_checker.check_batch_completion(
@@ -280,7 +262,7 @@ class TestAsyncWorkflowContinuation:
             correlation_id=uuid4(),
         )
         assert not should_complete, "Should not complete at 50%"
-        
+
         # Process more callbacks to reach 80%
         for corr_id in correlation_ids[5:8]:  # Process 3 more (total 8/10 = 80%)
             callback_result = self._create_callback_result(corr_id, EssayComparisonWinner.ESSAY_A)
@@ -290,14 +272,14 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-        
+
         # Update batch state to 80% completion
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             batch_state.completed_comparisons = 8
             await session.commit()
-        
+
         # Check if we should trigger completion (80% done)
         should_complete = await completion_checker.check_batch_completion(
             cj_batch_id=batch_id,
@@ -315,20 +297,20 @@ class TestAsyncWorkflowContinuation:
         """Test that callbacks correctly trigger workflow continuation."""
         # Create batch with comparisons
         batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=4  # 6 comparisons total
+            postgres_repository,
+            essay_count=4,  # 6 comparisons total
         )
-        
+
         # Mock content client
         mock_content_client.fetch_content.side_effect = lambda cid, corr: f"Content {cid}"
-        
+
         # Process callbacks and check workflow continuation
         for i, corr_id in enumerate(correlation_ids):
             callback_result = self._create_callback_result(
                 corr_id,
-                EssayComparisonWinner.ESSAY_A if i % 2 == 0 else EssayComparisonWinner.ESSAY_B
+                EssayComparisonWinner.ESSAY_A if i % 2 == 0 else EssayComparisonWinner.ESSAY_B,
             )
-            
+
             # Update comparison result
             await update_comparison_result(
                 comparison_result=callback_result,
@@ -336,25 +318,25 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-            
+
             # Update batch state using repository session
             async with postgres_repository.session() as session:
                 batch_state = await session.get(CJBatchState, batch_id)
                 assert batch_state is not None
                 batch_state.completed_comparisons = i + 1
                 await session.commit()
-            
+
             # Check workflow continuation logic
             should_continue = await check_workflow_continuation(
                 batch_id=batch_id,
                 database=postgres_repository,
                 correlation_id=uuid4(),
             )
-            
+
             # The existing logic continues every 5 completions
             if i == 4:  # 5th completion (index 4)
-                assert should_continue, f"Should continue at completion {i+1}"
-            
+                assert should_continue, f"Should continue at completion {i + 1}"
+
             # Simulate state change if workflow continues
             if should_continue:
                 async with postgres_repository.session() as session:
@@ -371,19 +353,17 @@ class TestAsyncWorkflowContinuation:
         """Test that partial scoring triggers at the configured threshold."""
         # Create batch with 10 essays (45 comparisons)
         batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=10,
-            completion_threshold=80
+            postgres_repository, essay_count=10, completion_threshold=80
         )
-        
-        assert total_comparisons == 45, f"Should have 45 comparisons for 10 essays"
-        
+
+        assert total_comparisons == 45, "Should have 45 comparisons for 10 essays"
+
         # Process callbacks up to just below threshold (79%)
         callbacks_for_79_pct = int(45 * 0.79)  # 35 callbacks
         for i in range(callbacks_for_79_pct):
             callback_result = self._create_callback_result(
                 correlation_ids[i],
-                EssayComparisonWinner.ESSAY_A if i % 3 == 0 else EssayComparisonWinner.ESSAY_B
+                EssayComparisonWinner.ESSAY_A if i % 3 == 0 else EssayComparisonWinner.ESSAY_B,
             )
             await update_comparison_result(
                 comparison_result=callback_result,
@@ -391,14 +371,14 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=correlation_ids[i],
                 settings=test_settings,
             )
-        
+
         # Update batch state to 79% completion
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             batch_state.completed_comparisons = callbacks_for_79_pct
             await session.commit()
-        
+
         # Check completion - should NOT trigger at 79%
         completion_checker = BatchCompletionChecker(postgres_repository)
         should_complete = await completion_checker.check_batch_completion(
@@ -406,11 +386,10 @@ class TestAsyncWorkflowContinuation:
             correlation_id=uuid4(),
         )
         assert not should_complete, f"Should not complete at {callbacks_for_79_pct}/45 (79%)"
-        
+
         # Process one more callback to reach 80%
         callback_result = self._create_callback_result(
-            correlation_ids[callbacks_for_79_pct],
-            EssayComparisonWinner.ESSAY_B
+            correlation_ids[callbacks_for_79_pct], EssayComparisonWinner.ESSAY_B
         )
         await update_comparison_result(
             comparison_result=callback_result,
@@ -418,28 +397,28 @@ class TestAsyncWorkflowContinuation:
             correlation_id=correlation_ids[callbacks_for_79_pct],
             settings=test_settings,
         )
-        
+
         # Update batch state to 80% completion
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             batch_state.completed_comparisons = callbacks_for_79_pct + 1
             await session.commit()
-        
+
         # Check completion - should trigger at 80%
         should_complete = await completion_checker.check_batch_completion(
             cj_batch_id=batch_id,
             correlation_id=uuid4(),
         )
         assert should_complete, f"Should complete at {callbacks_for_79_pct + 1}/45 (80%)"
-        
+
         # Verify we can mark partial scoring as triggered
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             batch_state.partial_scoring_triggered = True
             await session.commit()
-            
+
             # Verify flag was set
             assert batch_state.partial_scoring_triggered
 
@@ -451,29 +430,29 @@ class TestAsyncWorkflowContinuation:
         """Test handling of error callbacks and recovery."""
         # Create batch
         batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=3  # 3 comparisons
+            postgres_repository,
+            essay_count=3,  # 3 comparisons
         )
-        
+
         # Process mix of success and error callbacks
         results = [
             (correlation_ids[0], EssayComparisonWinner.ESSAY_A, False),  # Success
-            (correlation_ids[1], EssayComparisonWinner.ERROR, True),     # Error
+            (correlation_ids[1], EssayComparisonWinner.ERROR, True),  # Error
             (correlation_ids[2], EssayComparisonWinner.ESSAY_B, False),  # Success
         ]
-        
+
         for corr_id, winner, is_error in results:
             callback_result = self._create_callback_result(corr_id, winner, is_error)
-            
+
             returned_batch_id = await update_comparison_result(
                 comparison_result=callback_result,
                 database=postgres_repository,
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-            
+
             assert returned_batch_id == batch_id
-            
+
             # Verify result was recorded correctly
             async with postgres_repository.session() as session:
                 stmt = select(ComparisonPair).where(
@@ -481,14 +460,14 @@ class TestAsyncWorkflowContinuation:
                 )
                 result = await session.execute(stmt)
                 comparison = result.scalar_one()
-                
+
                 if is_error:
                     assert comparison.winner == "error"
                     # Error handling may set error_code or just mark as error
                 else:
                     assert comparison.winner in ["Essay A", "Essay B"]
                     assert comparison.confidence == 4.0
-        
+
         # Update batch state with results
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
@@ -496,7 +475,7 @@ class TestAsyncWorkflowContinuation:
             batch_state.completed_comparisons = 2  # Only successful ones
             batch_state.failed_comparisons = 1
             await session.commit()
-        
+
         # Verify batch can still progress with some failures
         completion_percentage = (2 / 3) * 100  # 66.67%
         assert completion_percentage < 80, "Below default threshold with failures"
@@ -509,46 +488,43 @@ class TestAsyncWorkflowContinuation:
         """Test that callbacks are processed idempotently."""
         # Create batch with one comparison
         batch_id, correlation_ids, _ = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=2  # 1 comparison
+            postgres_repository,
+            essay_count=2,  # 1 comparison
         )
-        
+
         corr_id = correlation_ids[0]
-        
+
         # Process the same callback multiple times
         for attempt in range(3):
-            callback_result = self._create_callback_result(
-                corr_id,
-                EssayComparisonWinner.ESSAY_A
-            )
-            
+            callback_result = self._create_callback_result(corr_id, EssayComparisonWinner.ESSAY_A)
+
             returned_batch_id = await update_comparison_result(
                 comparison_result=callback_result,
                 database=postgres_repository,
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-            
+
             assert returned_batch_id == batch_id
-        
+
         # Verify comparison was only updated once
         async with postgres_repository.session() as session:
-            stmt = select(ComparisonPair).where(
-                ComparisonPair.request_correlation_id == corr_id
-            )
+            stmt = select(ComparisonPair).where(ComparisonPair.request_correlation_id == corr_id)
             result = await session.execute(stmt)
             comparison = result.scalar_one()
-            
+
             assert comparison.winner == "Essay A"
             assert comparison.confidence == 4.0
-            
+
             # Check that we still only have one comparison with this correlation_id
             count_stmt = select(ComparisonPair).where(
                 ComparisonPair.request_correlation_id == corr_id
             )
             count_result = await session.execute(count_stmt)
             all_comparisons = count_result.scalars().all()
-            assert len(all_comparisons) == 1, "Should only have one comparison despite multiple callbacks"
+            assert len(all_comparisons) == 1, (
+                "Should only have one comparison despite multiple callbacks"
+            )
 
     async def test_iteration_management(
         self,
@@ -558,18 +534,17 @@ class TestAsyncWorkflowContinuation:
         """Test that iterations are tracked correctly."""
         # Create batch
         batch_id, correlation_ids, total_comparisons = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=5  # 10 comparisons
+            postgres_repository,
+            essay_count=5,  # 10 comparisons
         )
-        
+
         # Check initial iteration
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
             assert batch_state is not None
             # Initial iteration could be 0 or 1 depending on implementation
             assert batch_state.current_iteration in [0, 1]
-            initial_iteration = batch_state.current_iteration
-        
+
         # Simulate moving to next iteration with metadata
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
@@ -580,12 +555,11 @@ class TestAsyncWorkflowContinuation:
                 "iteration_1_completed_at": datetime.now(UTC).isoformat(),
             }
             await session.commit()
-        
+
         # Process some callbacks for iteration 2
         for i in range(3):
             callback_result = self._create_callback_result(
-                correlation_ids[i],
-                EssayComparisonWinner.ESSAY_B
+                correlation_ids[i], EssayComparisonWinner.ESSAY_B
             )
             await update_comparison_result(
                 comparison_result=callback_result,
@@ -593,7 +567,7 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=correlation_ids[i],
                 settings=test_settings,
             )
-        
+
         # Verify iteration tracking
         async with postgres_repository.session() as session:
             batch_state = await session.get(CJBatchState, batch_id)
@@ -611,10 +585,10 @@ class TestAsyncWorkflowContinuation:
         """Test that concurrent callbacks are handled correctly."""
         # Create batch with multiple comparisons
         batch_id, correlation_ids, _ = await self._create_batch_with_comparisons(
-            postgres_repository, 
-            essay_count=6  # 15 comparisons
+            postgres_repository,
+            essay_count=6,  # 15 comparisons
         )
-        
+
         # Process multiple callbacks concurrently
         async def process_callback(corr_id: UUID, winner: EssayComparisonWinner) -> None:
             callback_result = self._create_callback_result(corr_id, winner)
@@ -624,27 +598,26 @@ class TestAsyncWorkflowContinuation:
                 correlation_id=corr_id,
                 settings=test_settings,
             )
-        
+
         # Create concurrent tasks
         tasks = []
         for i, corr_id in enumerate(correlation_ids[:10]):
             winner = EssayComparisonWinner.ESSAY_A if i % 2 == 0 else EssayComparisonWinner.ESSAY_B
             tasks.append(process_callback(corr_id, winner))
-        
+
         # Execute concurrently
         await asyncio.gather(*tasks)
-        
+
         # Verify all callbacks were processed correctly
         async with postgres_repository.session() as session:
             stmt = select(ComparisonPair).where(
-                ComparisonPair.cj_batch_id == batch_id,
-                ComparisonPair.winner.isnot(None)
+                ComparisonPair.cj_batch_id == batch_id, ComparisonPair.winner.isnot(None)
             )
             result = await session.execute(stmt)
             completed_pairs = result.scalars().all()
-            
+
             assert len(completed_pairs) == 10, "All concurrent callbacks should be processed"
-            
+
             # Verify no duplicates or corruption
             seen_correlation_ids = set()
             for pair in completed_pairs:
@@ -652,7 +625,7 @@ class TestAsyncWorkflowContinuation:
                 seen_correlation_ids.add(pair.request_correlation_id)
                 assert pair.winner in ["Essay A", "Essay B"]
                 assert pair.confidence == 4.0
-            
+
             # Verify data integrity
             for pair in completed_pairs:
                 assert pair.completed_at is not None

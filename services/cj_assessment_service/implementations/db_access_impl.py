@@ -102,11 +102,11 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
     ) -> CJBatchUpload:
         """Create a new CJ assessment batch with its required state tracking."""
         from datetime import UTC, datetime
-        
+
         from common_core.status_enums import CJBatchStateEnum
-        
+
         from services.cj_assessment_service.models_db import CJBatchState
-        
+
         # Create the batch
         cj_batch = CJBatchUpload(
             bos_batch_id=bos_batch_id,
@@ -120,7 +120,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         )
         session.add(cj_batch)
         await session.flush()  # Get the batch ID
-        
+
         # Create the required batch state for tracking
         # Every batch MUST have state tracking from creation
         batch_state = CJBatchState(
@@ -137,7 +137,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         )
         session.add(batch_state)
         await session.flush()
-        
+
         return cj_batch
 
     async def create_or_update_cj_processed_essay(

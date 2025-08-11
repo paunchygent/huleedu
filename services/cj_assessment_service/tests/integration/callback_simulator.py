@@ -1,0 +1,377 @@
+"""Callback simulator for integration testing of async CJ assessment workflow.
+
+This module provides a clean way to simulate LLM provider callbacks in tests,
+allowing the full async workflow to complete without modifying production code.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock
+from uuid import UUID, uuid4
+
+from common_core import EssayComparisonWinner, LLMProviderType
+from common_core.events.llm_provider_events import (
+    LLMComparisonResultV1,
+    TokenUsage,
+)
+from huleedu_service_libs.logging_utils import create_service_logger
+from sqlalchemy import select
+
+from services.cj_assessment_service.cj_core_logic.batch_callback_handler import (
+    continue_cj_assessment_workflow,
+)
+from services.cj_assessment_service.models_db import ComparisonPair
+
+if TYPE_CHECKING:
+    from services.cj_assessment_service.config import Settings
+    from services.cj_assessment_service.models_api import ComparisonResult
+    from services.cj_assessment_service.protocols import (
+        CJEventPublisherProtocol,
+        CJRepositoryProtocol,
+        ContentClientProtocol,
+    )
+
+logger = create_service_logger("cj_assessment_service.test.callback_simulator")
+
+
+class CallbackSimulator:
+    """Simulates LLM provider callbacks for integration testing.
+
+    This class bridges the gap between mock LLM responses and the async
+    callback-driven workflow, allowing tests to complete the full assessment
+    flow without modifying production code.
+    """
+
+    async def simulate_callbacks_from_mock_results(
+        self,
+        mock_llm_interaction: AsyncMock,
+        database: CJRepositoryProtocol,
+        event_publisher: CJEventPublisherProtocol,
+        settings: Settings,
+        content_client: ContentClientProtocol,
+        correlation_id: UUID,
+        cj_batch_id: int | None = None,
+    ) -> int:
+        """Process mock LLM results as if they were callbacks.
+
+        This method:
+        1. Extracts comparison results from the mock LLM interaction
+        2. Creates ComparisonPair records (simulating what LLM Provider Service would do)
+        3. Creates callback events from the mock results
+        4. Processes callbacks through the production callback handler
+
+        Args:
+            mock_llm_interaction: Mock LLM interaction with comparison results
+            database: Database repository for accessing comparison pairs
+            event_publisher: Event publisher for completion events
+            settings: Application settings
+            content_client: Content client for fetching content if needed
+            correlation_id: Original request correlation ID
+            cj_batch_id: Optional CJ batch ID (will be retrieved if not provided)
+
+        Returns:
+            Number of callbacks processed
+        """
+        logger.info("Starting callback simulation", extra={"correlation_id": str(correlation_id)})
+
+        # Extract comparison results from mock
+        if not mock_llm_interaction.perform_comparisons.called:
+            logger.warning("Mock LLM interaction was not called, no callbacks to simulate")
+            return 0
+
+        # Get the comparison tasks and results from the mock call
+        call_args = mock_llm_interaction.perform_comparisons.call_args
+        logger.debug(f"Mock call_args: {call_args}")
+
+        # Handle both positional and keyword arguments
+        if call_args:
+            if call_args.args:
+                comparison_tasks = call_args.args[0]  # First positional argument
+                correlation_arg = call_args.args[1] if len(call_args.args) > 1 else None
+            elif call_args.kwargs:
+                comparison_tasks = call_args.kwargs.get("tasks", [])
+                correlation_arg = call_args.kwargs.get("correlation_id", None)
+            else:
+                logger.warning("No arguments found in mock call")
+                return 0
+        else:
+            logger.warning("No call_args found in mock")
+            return 0
+
+        # Since the mock uses side_effect, we need to call it to get the results
+        # But we need to be careful not to double-count the call
+        # The safest approach is to temporarily reset the mock's call count
+        original_call_count = mock_llm_interaction.perform_comparisons.call_count
+
+        # Call the side_effect function to get the results
+        side_effect = mock_llm_interaction.perform_comparisons.side_effect
+        if callable(side_effect):
+            # Call with the same args
+            mock_results = await side_effect(
+                comparison_tasks,
+                correlation_arg,
+                call_args.kwargs.get("model_override") if call_args.kwargs else None,
+                call_args.kwargs.get("temperature_override") if call_args.kwargs else None,
+                call_args.kwargs.get("max_tokens_override") if call_args.kwargs else None,
+            )
+        else:
+            # If no side_effect, try return_value
+            mock_results = mock_llm_interaction.perform_comparisons.return_value
+            if hasattr(mock_results, "__await__"):
+                mock_results = await mock_results
+
+        # Reset the call count to what it was before (to avoid double-counting)
+        mock_llm_interaction.perform_comparisons.call_count = original_call_count
+
+        if not mock_results:
+            logger.warning("No mock results returned, no callbacks to simulate")
+            return 0
+
+        # Get CJ batch ID if not provided
+        if cj_batch_id is None:
+            cj_batch_id = await self._get_batch_id_from_database(database)
+            if cj_batch_id is None:
+                logger.error("No CJ batch found in database")
+                return 0
+
+        # Create ComparisonPair records (simulating what LLM Provider Service would do)
+        await self._create_comparison_pairs_for_tasks(
+            database=database,
+            comparison_tasks=comparison_tasks,
+            cj_batch_id=cj_batch_id,
+        )
+
+        # Find correlation IDs from database for these comparisons
+        comparison_to_correlation = await self._map_comparisons_to_correlations(
+            database=database,
+            comparison_results=mock_results,
+        )
+
+        # Process each result as a callback
+        callbacks_processed = 0
+        for comparison_result in mock_results:
+            # Find the correlation ID for this comparison
+            task = comparison_result.task
+            key = (task.essay_a.id, task.essay_b.id)
+            request_correlation_id = comparison_to_correlation.get(key)
+
+            if not request_correlation_id:
+                logger.warning(f"No correlation ID found for comparison {key}, skipping callback")
+                continue
+
+            # Create callback event from mock result
+            callback_event = self._create_callback_event(
+                comparison_result=comparison_result,
+                request_correlation_id=request_correlation_id,
+            )
+
+            # Process through production callback handler
+            await continue_cj_assessment_workflow(
+                comparison_result=callback_event,
+                correlation_id=correlation_id,
+                database=database,
+                event_publisher=event_publisher,
+                settings=settings,
+                content_client=content_client,
+                retry_processor=None,  # Not needed for successful callbacks
+            )
+
+            callbacks_processed += 1
+            logger.debug(
+                f"Processed callback {callbacks_processed}/{len(mock_results)}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "request_id": callback_event.request_id,
+                },
+            )
+
+        logger.info(
+            f"Completed callback simulation: {callbacks_processed} callbacks processed",
+            extra={"correlation_id": str(correlation_id)},
+        )
+
+        return callbacks_processed
+
+    async def _map_comparisons_to_correlations(
+        self,
+        database: CJRepositoryProtocol,
+        comparison_results: list[ComparisonResult],
+    ) -> dict[tuple[str, str], UUID]:
+        """Map comparison pairs to their correlation IDs from the database.
+
+        For test environments, this also assigns correlation IDs to pairs that don't have them yet,
+        simulating what would happen in production when the LLM provider returns request IDs.
+
+        Args:
+            database: Database repository
+            comparison_results: List of comparison results from mock
+
+        Returns:
+            Dictionary mapping (essay_a_id, essay_b_id) to correlation ID
+        """
+        mapping = {}
+
+        async with database.session() as session:
+            # First, try to get pairs that already have correlation IDs
+            stmt = select(ComparisonPair).where(
+                ComparisonPair.winner.is_(None),
+                ComparisonPair.request_correlation_id.isnot(None),
+            )
+            result = await session.execute(stmt)
+            pairs = result.scalars().all()
+
+            logger.debug(f"Found {len(pairs)} comparison pairs with correlation IDs")
+
+            # If no pairs have correlation IDs, get all pending pairs and assign them
+            if not pairs:
+                stmt = select(ComparisonPair).where(
+                    ComparisonPair.winner.is_(None),
+                )
+                result = await session.execute(stmt)
+                pairs = result.scalars().all()
+
+                logger.debug(f"Found {len(pairs)} pending comparison pairs without correlation IDs")
+
+                # Assign correlation IDs to simulate what happens in production
+                from uuid import uuid4
+
+                for pair in pairs:
+                    if pair.request_correlation_id is None:
+                        pair.request_correlation_id = uuid4()
+                        logger.debug(
+                            f"Assigned correlation ID {pair.request_correlation_id} to pair ({pair.essay_a_els_id}, {pair.essay_b_els_id})"
+                        )
+
+                # Commit the correlation IDs
+                await session.commit()
+
+            # Build mapping
+            for pair in pairs:
+                # Store both orderings since we might not know which order was used
+                # Ensure correlation ID is not None (it was assigned above if missing)
+                if pair.request_correlation_id is not None:
+                    mapping[(pair.essay_a_els_id, pair.essay_b_els_id)] = pair.request_correlation_id
+                    mapping[(pair.essay_b_els_id, pair.essay_a_els_id)] = pair.request_correlation_id
+
+        return mapping
+
+    async def _get_batch_id_from_database(
+        self,
+        database: CJRepositoryProtocol,
+    ) -> int | None:
+        """Get the most recent CJ batch ID from the database.
+
+        Args:
+            database: Database repository
+
+        Returns:
+            CJ batch ID or None if not found
+        """
+        async with database.session() as session:
+            from sqlalchemy import desc, select
+
+            from services.cj_assessment_service.models_db import CJBatchUpload
+
+            stmt = select(CJBatchUpload).order_by(desc(CJBatchUpload.id)).limit(1)
+            result = await session.execute(stmt)
+            batch = result.scalar_one_or_none()
+
+            if batch:
+                logger.debug(f"Found CJ batch ID {batch.id} from database")
+                return batch.id
+            return None
+
+    async def _create_comparison_pairs_for_tasks(
+        self,
+        database: CJRepositoryProtocol,
+        comparison_tasks: list[Any],
+        cj_batch_id: int,
+    ) -> None:
+        """Create ComparisonPair records for submitted tasks.
+
+        This simulates what the LLM Provider Service would do when it queues requests.
+        In production, the LLM Provider Service creates tracking records with correlation IDs.
+
+        Args:
+            database: Database repository
+            comparison_tasks: List of comparison tasks that were submitted
+            cj_batch_id: CJ batch ID
+        """
+        from datetime import UTC, datetime
+
+        async with database.session() as session:
+            for task in comparison_tasks:
+                # Check if pair already exists
+                stmt = select(ComparisonPair).where(
+                    ComparisonPair.cj_batch_id == cj_batch_id,
+                    ComparisonPair.essay_a_els_id == task.essay_a.id,
+                    ComparisonPair.essay_b_els_id == task.essay_b.id,
+                )
+                result = await session.execute(stmt)
+                existing_pair = result.scalar_one_or_none()
+
+                if not existing_pair:
+                    # Create new pair with correlation ID (simulating LLM Provider Service)
+                    new_pair = ComparisonPair(
+                        cj_batch_id=cj_batch_id,
+                        essay_a_els_id=task.essay_a.id,
+                        essay_b_els_id=task.essay_b.id,
+                        prompt_text=task.prompt,
+                        request_correlation_id=uuid4(),  # Assign correlation ID
+                        submitted_at=datetime.now(UTC),
+                    )
+                    session.add(new_pair)
+                    logger.debug(
+                        f"Created ComparisonPair for ({task.essay_a.id}, {task.essay_b.id}) "
+                        f"with correlation ID {new_pair.request_correlation_id}"
+                    )
+
+            await session.commit()
+
+    def _create_callback_event(
+        self,
+        comparison_result: ComparisonResult,
+        request_correlation_id: UUID,
+    ) -> LLMComparisonResultV1:
+        """Create a callback event from a mock comparison result.
+
+        Args:
+            comparison_result: Mock comparison result
+            request_correlation_id: Correlation ID for the request
+
+        Returns:
+            LLM comparison result event for callback processing
+        """
+        # Determine winner from the mock result
+        winner = EssayComparisonWinner.ESSAY_A
+        if comparison_result.llm_assessment:
+            # Use the winner directly from the assessment (it's already an enum)
+            winner = comparison_result.llm_assessment.winner
+
+        # Create callback event
+        return LLMComparisonResultV1(
+            request_id=str(request_correlation_id),  # Use correlation ID as request ID
+            correlation_id=request_correlation_id,
+            provider=LLMProviderType.ANTHROPIC,
+            model="claude-3-haiku-20240307",
+            winner=winner,
+            confidence=comparison_result.llm_assessment.confidence
+            if comparison_result.llm_assessment
+            else 3.0,
+            justification=comparison_result.llm_assessment.justification
+            if comparison_result.llm_assessment
+            else "Test justification",
+            response_time_ms=1500,
+            token_usage=TokenUsage(
+                prompt_tokens=500,
+                completion_tokens=150,
+                total_tokens=650,
+            ),
+            cost_estimate=0.001,
+            requested_at=datetime.now(UTC) - timedelta(seconds=2),
+            completed_at=datetime.now(UTC),
+            error_detail=None,
+            is_error=False,
+        )

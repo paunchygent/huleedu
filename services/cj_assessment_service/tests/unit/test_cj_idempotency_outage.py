@@ -126,7 +126,7 @@ def mock_boundary_services(
     mock_llm_interaction.perform_comparisons = AsyncMock(return_value=[mock_comparison_result])
 
     from common_core.config_enums import LLMProviderType
-    
+
     class Settings:
         MAX_PAIRWISE_COMPARISONS = 100
         CJ_ASSESSMENT_FAILED_TOPIC = ProcessingEvent.CJ_ASSESSMENT_FAILED.value
@@ -135,7 +135,9 @@ def mock_boundary_services(
         DEFAULT_LLM_MODEL = "gpt-4o"  # Required by dual_event_publisher
         DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI  # Required by dual_event_publisher
         DEFAULT_LLM_TEMPERATURE = 0.3  # Required by dual_event_publisher
-        ASSESSMENT_RESULT_TOPIC = "huleedu.ras.assessment_result.v1"  # Required by dual_event_publisher
+        ASSESSMENT_RESULT_TOPIC = (
+            "huleedu.ras.assessment_result.v1"  # Required by dual_event_publisher
+        )
 
     settings = Settings()
     return (

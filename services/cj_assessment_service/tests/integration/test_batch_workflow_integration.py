@@ -38,7 +38,6 @@ from services.cj_assessment_service.event_processor import (
 from services.cj_assessment_service.models_db import (
     CJBatchState,
     ComparisonPair,
-    ProcessedEssay,
 )
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
@@ -232,12 +231,12 @@ class TestBatchWorkflowIntegration:
         test_settings: Settings,
     ) -> None:
         """Test the CJ assessment workflow from request to completion.
-        
+
         This test validates the actual async workflow of the service:
         1. Batch creation and essay preparation
         2. Comparison task submission to LLM provider
         3. Initial completion with no scores (waiting for callbacks)
-        
+
         Note: The service is designed for async callback-based processing.
         In production, scores are calculated when callbacks arrive from the LLM Provider Service.
         """
@@ -279,12 +278,15 @@ class TestBatchWorkflowIntegration:
 
         # Verify the batch was created and essays were prepared
         async with postgres_repository.session() as session:
+            from sqlalchemy import select
+
             from services.cj_assessment_service.models_db import (
                 CJBatchState as CJBatchStateDb,
+            )
+            from services.cj_assessment_service.models_db import (
                 CJBatchUpload,
                 ProcessedEssay,
             )
-            from sqlalchemy import select
 
             # Check batch was created
             stmt = select(CJBatchUpload).where(CJBatchUpload.bos_batch_id == batch_id)
@@ -380,7 +382,7 @@ class TestBatchWorkflowIntegration:
                 # Update the existing batch state to appear stuck (simulate old activity)
                 # The batch state was already created by create_new_cj_batch
                 from sqlalchemy import update
-                
+
                 await session.execute(
                     update(CJBatchState)
                     .where(CJBatchState.batch_id == batch.id)
@@ -483,7 +485,7 @@ class TestBatchWorkflowIntegration:
             # Update the existing batch state for concurrent processing
             # The batch state was already created by create_new_cj_batch
             from sqlalchemy import update
-            
+
             await session.execute(
                 update(CJBatchState)
                 .where(CJBatchState.batch_id == batch.id)
@@ -627,7 +629,7 @@ class TestBatchWorkflowIntegration:
             # Update the existing batch state with 80 completed comparisons
             # The batch state was already created by create_new_cj_batch
             from sqlalchemy import update
-            
+
             await session.execute(
                 update(CJBatchState)
                 .where(CJBatchState.batch_id == batch.id)

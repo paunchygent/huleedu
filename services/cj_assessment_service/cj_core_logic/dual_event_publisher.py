@@ -66,7 +66,9 @@ async def publish_dual_assessment_events(
     successful_essay_ids = [
         r["els_essay_id"] for r in student_rankings if r.get("bradley_terry_score") is not None
     ]
-    failed_essay_ids = [r["els_essay_id"] for r in student_rankings if r.get("bradley_terry_score") is None]
+    failed_essay_ids = [
+        r["els_essay_id"] for r in student_rankings if r.get("bradley_terry_score") is None
+    ]
 
     # Extract batch metadata
     bos_batch_id = (
@@ -153,7 +155,9 @@ async def publish_dual_assessment_events(
                 "letter_grade": grade,
                 "confidence_score": grade_projections.confidence_scores.get(essay_id, 0.0),
                 "confidence_label": grade_projections.confidence_labels.get(essay_id, "LOW"),
-                "bt_score": ranking.get("bradley_terry_score", 0.0),  # bradley_terry_score field contains BT score
+                "bt_score": ranking.get(
+                    "bradley_terry_score", 0.0
+                ),  # bradley_terry_score field contains BT score
                 "rank": ranking.get("rank", 999),
                 "is_anchor": is_anchor,
                 # Display name for anchors to help with score band visualization

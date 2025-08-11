@@ -119,9 +119,14 @@ async def update_comparison_result(
                 )
         else:
             # Update success fields
-            comparison_pair.winner = (
-                comparison_result.winner.value if comparison_result.winner else None
-            )
+            # Convert winner enum to database format (lowercase with underscore)
+            if comparison_result.winner:
+                winner_value = comparison_result.winner.value  # e.g., "Essay A" or "Essay B"
+                # Convert to database format: "Essay A" -> "essay_a"
+                comparison_pair.winner = winner_value.lower().replace(" ", "_")
+            else:
+                comparison_pair.winner = None
+
             comparison_pair.confidence = comparison_result.confidence
             comparison_pair.justification = comparison_result.justification
             # Raw response not available in current model
@@ -435,7 +440,7 @@ async def handle_successful_retry(
                     await update_batch_processing_metadata(
                         session=session,
                         cj_batch_id=comparison_pair.cj_batch_id,
-                        metadata=failed_pool.model_dump(mode='json'),
+                        metadata=failed_pool.model_dump(mode="json"),
                         correlation_id=correlation_id,
                     )
 

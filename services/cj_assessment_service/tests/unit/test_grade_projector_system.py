@@ -183,7 +183,21 @@ class TestGradeProjectorSystem:
 
             # All grades must be valid Swedish grades (8 anchor + 5 minus + 2 plus = 15 grades)
             valid_grades = {
-                "F", "E-", "E", "E+", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A"
+                "F",
+                "E-",
+                "E",
+                "E+",
+                "D-",
+                "D",
+                "D+",
+                "C-",
+                "C",
+                "C+",
+                "B-",
+                "B",
+                "B+",
+                "A-",
+                "A",
             }
             for grade in result.primary_grades.values():
                 assert grade in valid_grades
@@ -773,7 +787,21 @@ class TestGradeProjectorSystem:
             assert "very_low" in result.primary_grades
             # Validate against Swedish grade system
             valid_grades = {
-                "F", "E-", "E", "E+", "D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A"
+                "F",
+                "E-",
+                "E",
+                "E+",
+                "D-",
+                "D",
+                "D+",
+                "C-",
+                "C",
+                "C+",
+                "B-",
+                "B",
+                "B+",
+                "A-",
+                "A",
             }
             assert result.primary_grades["very_high"] in valid_grades
             assert result.primary_grades["very_low"] in valid_grades
@@ -982,7 +1010,12 @@ class TestGradeProjectorSystem:
 
             # Essays scoring around B anchor (0.543)
             assert result.primary_grades["student_mid2"] in {
-                "B", "B+", "B-", "C+", "C", "C-"
+                "B",
+                "B+",
+                "B-",
+                "C+",
+                "C",
+                "C-",
             }  # 0.487
 
             # Essays scoring below C anchor (0.312)
@@ -1007,7 +1040,12 @@ class TestGradeProjectorSystem:
                 "F",
             }  # 0.134
             assert result.primary_grades["student_bottom"] in {
-                "D", "D-", "E", "E+", "E-", "F"
+                "D",
+                "D-",
+                "E",
+                "E+",
+                "E-",
+                "F",
             }  # 0.078
 
             # Verify all probability distributions sum to 1

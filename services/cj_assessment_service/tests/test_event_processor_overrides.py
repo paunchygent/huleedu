@@ -123,35 +123,37 @@ class TestEventProcessorOverrides:
         """
         # Arrange
         from unittest.mock import patch
+
         from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
-            CJAssessmentWorkflowResult
+            CJAssessmentWorkflowResult,
         )
-        
+
         # Create mock workflow result
         mock_workflow_result = CJAssessmentWorkflowResult(
             rankings=[
                 {"els_essay_id": "essay_1", "bradley_terry_score": 0.8, "rank": 1},
                 {"els_essay_id": "essay_2", "bradley_terry_score": 0.6, "rank": 2},
             ],
-            batch_id="12345"
+            batch_id="12345",
         )
-        
+
         # Mock the workflow function to return success
         with patch(
             "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
-            new=AsyncMock(return_value=mock_workflow_result)
+            new=AsyncMock(return_value=mock_workflow_result),
         ) as mock_workflow:
             # Mock the GradeProjector to return a simple result
             from services.cj_assessment_service.cj_core_logic.grade_projector import (
-                GradeProjectionSummary
+                GradeProjectionSummary,
             )
+
             mock_grade_projections = GradeProjectionSummary(
                 projections_available=True,
                 primary_grades={"essay_1": "A", "essay_2": "B"},
                 confidence_labels={"essay_1": "HIGH", "essay_2": "MEDIUM"},
                 confidence_scores={"essay_1": 0.9, "essay_2": 0.7},
             )
-            
+
             with patch(
                 "services.cj_assessment_service.event_processor.GradeProjector"
             ) as MockGradeProjector:
@@ -160,7 +162,7 @@ class TestEventProcessorOverrides:
                     return_value=mock_grade_projections
                 )
                 MockGradeProjector.return_value = mock_projector_instance
-                
+
                 # Configure mock database session for grade projector
                 mock_session = AsyncMock()
                 mock_database.session.return_value.__aenter__.return_value = mock_session
@@ -183,7 +185,7 @@ class TestEventProcessorOverrides:
                 mock_workflow.assert_called_once()
                 workflow_call_args = mock_workflow.call_args
                 request_data = workflow_call_args.kwargs["request_data"]
-                
+
                 # Verify LLM config overrides were passed to workflow
                 assert request_data["llm_config_overrides"] is not None
                 assert request_data["llm_config_overrides"].model_override == "gpt-4o"
@@ -223,35 +225,37 @@ class TestEventProcessorOverrides:
         """
         # Arrange
         from unittest.mock import patch
+
         from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
-            CJAssessmentWorkflowResult
+            CJAssessmentWorkflowResult,
         )
-        
+
         # Create mock workflow result
         mock_workflow_result = CJAssessmentWorkflowResult(
             rankings=[
                 {"els_essay_id": "essay_1", "bradley_terry_score": 0.75, "rank": 1},
                 {"els_essay_id": "essay_2", "bradley_terry_score": 0.55, "rank": 2},
             ],
-            batch_id="98765"
+            batch_id="98765",
         )
-        
+
         # Mock the workflow function to return success
         with patch(
             "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
-            new=AsyncMock(return_value=mock_workflow_result)
+            new=AsyncMock(return_value=mock_workflow_result),
         ) as mock_workflow:
             # Mock the GradeProjector to return a simple result
             from services.cj_assessment_service.cj_core_logic.grade_projector import (
-                GradeProjectionSummary
+                GradeProjectionSummary,
             )
+
             mock_grade_projections = GradeProjectionSummary(
                 projections_available=True,
                 primary_grades={"essay_1": "B", "essay_2": "C"},
                 confidence_labels={"essay_1": "HIGH", "essay_2": "MEDIUM"},
                 confidence_scores={"essay_1": 0.85, "essay_2": 0.65},
             )
-            
+
             with patch(
                 "services.cj_assessment_service.event_processor.GradeProjector"
             ) as MockGradeProjector:
@@ -260,7 +264,7 @@ class TestEventProcessorOverrides:
                     return_value=mock_grade_projections
                 )
                 MockGradeProjector.return_value = mock_projector_instance
-                
+
                 # Configure mock database session for grade projector
                 mock_session = AsyncMock()
                 mock_database.session.return_value.__aenter__.return_value = mock_session
@@ -278,12 +282,12 @@ class TestEventProcessorOverrides:
 
                 # Assert processing succeeded
                 assert result is True
-                
+
                 # Verify workflow was called without LLM config overrides
                 mock_workflow.assert_called_once()
                 workflow_call_args = mock_workflow.call_args
                 request_data = workflow_call_args.kwargs["request_data"]
-                
+
                 # Verify no LLM config overrides were passed to workflow
                 assert request_data["llm_config_overrides"] is None
 
@@ -360,37 +364,39 @@ class TestEventProcessorOverrides:
         """
         # Arrange
         from unittest.mock import patch
+
         from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
-            CJAssessmentWorkflowResult
+            CJAssessmentWorkflowResult,
         )
-        
+
         expected_correlation_id = str(cj_request_envelope_with_overrides.correlation_id)
-        
+
         # Create mock workflow result
         mock_workflow_result = CJAssessmentWorkflowResult(
             rankings=[
                 {"els_essay_id": "essay_1", "bradley_terry_score": 0.85, "rank": 1},
                 {"els_essay_id": "essay_2", "bradley_terry_score": 0.65, "rank": 2},
             ],
-            batch_id="55555"
+            batch_id="55555",
         )
-        
+
         # Mock the workflow function to return success
         with patch(
             "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
-            new=AsyncMock(return_value=mock_workflow_result)
+            new=AsyncMock(return_value=mock_workflow_result),
         ) as mock_workflow:
             # Mock the GradeProjector to return a simple result
             from services.cj_assessment_service.cj_core_logic.grade_projector import (
-                GradeProjectionSummary
+                GradeProjectionSummary,
             )
+
             mock_grade_projections = GradeProjectionSummary(
                 projections_available=True,
                 primary_grades={"essay_1": "A", "essay_2": "B"},
                 confidence_labels={"essay_1": "HIGH", "essay_2": "HIGH"},
                 confidence_scores={"essay_1": 0.95, "essay_2": 0.85},
             )
-            
+
             with patch(
                 "services.cj_assessment_service.event_processor.GradeProjector"
             ) as MockGradeProjector:
@@ -399,7 +405,7 @@ class TestEventProcessorOverrides:
                     return_value=mock_grade_projections
                 )
                 MockGradeProjector.return_value = mock_projector_instance
-                
+
                 # Configure mock database session for grade projector
                 mock_session = AsyncMock()
                 mock_database.session.return_value.__aenter__.return_value = mock_session
@@ -417,7 +423,7 @@ class TestEventProcessorOverrides:
 
                 # Assert
                 assert result is True
-                
+
                 # Verify correlation ID was passed to workflow
                 mock_workflow.assert_called_once()
                 workflow_call_args = mock_workflow.call_args

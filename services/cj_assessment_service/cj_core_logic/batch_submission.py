@@ -17,7 +17,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.models_api import ComparisonTask
-from services.cj_assessment_service.protocols import LLMInteractionProtocol
+from services.cj_assessment_service.protocols import (
+    CJRepositoryProtocol,
+    LLMInteractionProtocol,
+)
 
 logger = create_service_logger("cj_assessment_service.batch_submission")
 
@@ -37,17 +40,19 @@ async def submit_batch_chunk(
     cj_batch_id: int,
     correlation_id: UUID,
     llm_interaction: LLMInteractionProtocol,
+    database: CJRepositoryProtocol | None = None,
     model_override: str | None = None,
     temperature_override: float | None = None,
     max_tokens_override: int | None = None,
 ) -> None:
-    """Submit a chunk of comparison tasks.
+    """Submit a chunk of comparison tasks with tracking.
 
     Args:
         batch_tasks: List of comparison tasks to submit
         cj_batch_id: CJ batch ID for tracking
         correlation_id: Request correlation ID for tracing
         llm_interaction: LLM interaction protocol implementation
+        database: Optional database for creating tracking records
         model_override: Optional model name override
         temperature_override: Optional temperature override
         max_tokens_override: Optional max tokens override
@@ -56,6 +61,19 @@ async def submit_batch_chunk(
         HuleEduError: On LLM provider communication failure
     """
     try:
+        # Create tracking records if database is provided
+        if database is not None:
+            from .batch_submission_tracking import create_tracking_records
+
+            async with database.session() as session:
+                await create_tracking_records(
+                    session=session,
+                    batch_tasks=batch_tasks,
+                    cj_batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                )
+                await session.commit()
+
         # Use existing LLM interaction protocol for batch submission
         # This will handle async processing (returns None for queued requests)
         results = await llm_interaction.perform_comparisons(
@@ -169,10 +187,7 @@ async def update_submitted_count_in_session(
 
 
 async def get_batch_state(
-    session: AsyncSession, 
-    cj_batch_id: int, 
-    correlation_id: UUID,
-    for_update: bool = False
+    session: AsyncSession, cj_batch_id: int, correlation_id: UUID, for_update: bool = False
 ) -> Any:
     """Get batch state from database.
 
@@ -188,7 +203,7 @@ async def get_batch_state(
     # This would need to be implemented based on the repository protocol
     # For now, we'll use a placeholder that demonstrates the pattern
     from sqlalchemy import select
-    from sqlalchemy.orm import selectinload, noload
+    from sqlalchemy.orm import noload
 
     from services.cj_assessment_service.models_db import CJBatchState
 
@@ -199,7 +214,7 @@ async def get_batch_state(
             stmt = (
                 select(CJBatchState)
                 .where(CJBatchState.batch_id == cj_batch_id)
-                .options(noload('*'))  # Disable all relationship loading
+                .options(noload("*"))  # Disable all relationship loading
                 .with_for_update()
             )
         else:
@@ -276,34 +291,34 @@ async def append_to_failed_pool_atomic(
     correlation_id: UUID,
 ) -> None:
     """Atomically append a failed comparison to the pool using JSONB operations.
-    
+
     This function uses PostgreSQL's atomic JSONB operations to append to the failed pool
     without needing to read-modify-write, eliminating race conditions.
-    
+
     Args:
         session: Database session
         cj_batch_id: CJ batch ID
         failed_entry_json: Failed entry data as JSON-serializable dict
         correlation_id: Request correlation ID for tracing
-        
+
     Raises:
         DatabaseOperationError: On database operation failure
     """
     from sqlalchemy import text
-    
+
     try:
         # Use raw SQL for atomic JSONB operations
         # The -> operator extracts as json, so cast back to jsonb for concatenation
         stmt = text("""
             UPDATE cj_batch_states
-            SET processing_metadata = 
-                CASE 
-                    WHEN processing_metadata IS NULL THEN 
+            SET processing_metadata =
+                CASE
+                    WHEN processing_metadata IS NULL THEN
                         CAST(:initial_pool AS jsonb)
                     ELSE
                         jsonb_build_object(
-                            'failed_comparison_pool', 
-                            CASE 
+                            'failed_comparison_pool',
+                            CASE
                                 WHEN processing_metadata->'failed_comparison_pool' IS NULL THEN CAST(:entry AS jsonb)
                                 ELSE (processing_metadata->'failed_comparison_pool')::jsonb || CAST(:entry AS jsonb)
                             END,
@@ -319,7 +334,7 @@ async def append_to_failed_pool_atomic(
                 END
             WHERE batch_id = :batch_id
         """)
-        
+
         # Create initial pool structure if metadata is null
         initial_pool = {
             "failed_comparison_pool": [failed_entry_json],
@@ -328,17 +343,17 @@ async def append_to_failed_pool_atomic(
                 "retry_attempts": 0,
                 "last_retry_batch": None,
                 "successful_retries": 0,
-                "permanently_failed": 0
-            }
+                "permanently_failed": 0,
+            },
         }
-        
+
         await session.execute(
             stmt,
             {
                 "batch_id": cj_batch_id,
                 "entry": json.dumps([failed_entry_json]),
-                "initial_pool": json.dumps(initial_pool)
-            }
+                "initial_pool": json.dumps(initial_pool),
+            },
         )
         await session.commit()
 
@@ -349,7 +364,7 @@ async def append_to_failed_pool_atomic(
                 "cj_batch_id": cj_batch_id,
             },
         )
-        
+
     except Exception as e:
         logger.error(
             f"Failed to atomically append to failed pool: {e}",

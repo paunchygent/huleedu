@@ -17,7 +17,6 @@ import pytest
 from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST
-from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 

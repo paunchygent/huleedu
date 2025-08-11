@@ -223,7 +223,9 @@ class TestDualEventPublishing:
                 BatchStatus.FAILED_CRITICALLY,
             ),
             (
-                [{"els_essay_id": "ANCHOR_1", "bradley_terry_score": 0.5, "rank": 1}],  # Only anchor
+                [
+                    {"els_essay_id": "ANCHOR_1", "bradley_terry_score": 0.5, "rank": 1}
+                ],  # Only anchor
                 BatchStatus.FAILED_CRITICALLY,  # No students
             ),
         ],

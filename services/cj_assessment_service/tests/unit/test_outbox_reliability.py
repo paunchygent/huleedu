@@ -192,7 +192,7 @@ class TestOutboxReliability:
                 correlation_id=correlation_id,
             )
 
-        # Assert - Both calls were attempted 
+        # Assert - Both calls were attempted
         # (duplicate detection is outbox manager's responsibility)
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
 

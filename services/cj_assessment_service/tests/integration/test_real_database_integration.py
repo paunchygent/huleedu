@@ -35,6 +35,9 @@ from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     ContentClientProtocol,
 )
+from services.cj_assessment_service.tests.integration.callback_simulator import (
+    CallbackSimulator,
+)
 
 if TYPE_CHECKING:
     pass
@@ -153,6 +156,21 @@ class TestRealDatabaseIntegration:
 
         # Assert - Verify message processed successfully
         assert result is True
+
+        # Phase 2: Simulate LLM callbacks to complete the workflow
+        # This bridges the async gap in testing by processing the mock results as callbacks
+        callback_simulator = CallbackSimulator()
+        callbacks_processed = await callback_simulator.simulate_callbacks_from_mock_results(
+            mock_llm_interaction=mock_llm_interaction,
+            database=postgres_repository,
+            event_publisher=mock_event_publisher,
+            settings=test_settings,
+            content_client=mock_content_client,
+            correlation_id=correlation_id,
+        )
+
+        # Verify callbacks were processed
+        assert callbacks_processed > 0, "No callbacks were processed"
 
         # Verify database operations occurred
         async with postgres_repository.session() as session:

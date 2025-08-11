@@ -129,6 +129,7 @@ class BatchProcessor:
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                     llm_interaction=self.llm_interaction,
+                    database=self.database,  # Pass database for tracking records
                     model_override=model_override,
                     temperature_override=temperature_override,
                     max_tokens_override=max_tokens_override,
