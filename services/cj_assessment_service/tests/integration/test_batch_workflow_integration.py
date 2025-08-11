@@ -681,7 +681,7 @@ class TestBatchWorkflowIntegration:
             # First, check if the comparison pair was updated by the callback
             updated_pair = await session.get(ComparisonPair, pending_pair.id)
             assert updated_pair is not None
-            assert updated_pair.winner == "Essay A"
+            assert updated_pair.winner == "essay_a"
             assert updated_pair.completed_at is not None
 
             # Then check the batch state

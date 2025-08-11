@@ -23,6 +23,7 @@ from services.cj_assessment_service.cj_core_logic.batch_callback_handler import 
     continue_cj_assessment_workflow,
 )
 from services.cj_assessment_service.models_db import ComparisonPair
+from services.cj_assessment_service.models_api import ComparisonTask
 
 if TYPE_CHECKING:
     from services.cj_assessment_service.config import Settings
@@ -100,30 +101,38 @@ class CallbackSimulator:
             logger.warning("No call_args found in mock")
             return 0
 
-        # Since the mock uses side_effect, we need to call it to get the results
-        # But we need to be careful not to double-count the call
-        # The safest approach is to temporarily reset the mock's call count
-        original_call_count = mock_llm_interaction.perform_comparisons.call_count
-
-        # Call the side_effect function to get the results
-        side_effect = mock_llm_interaction.perform_comparisons.side_effect
-        if callable(side_effect):
-            # Call with the same args
-            mock_results = await side_effect(
-                comparison_tasks,
-                correlation_arg,
-                call_args.kwargs.get("model_override") if call_args.kwargs else None,
-                call_args.kwargs.get("temperature_override") if call_args.kwargs else None,
-                call_args.kwargs.get("max_tokens_override") if call_args.kwargs else None,
-            )
+        # Check if the mock has stored submitted tasks (for async mocks)
+        if hasattr(mock_llm_interaction, '_submitted_tasks'):
+            # This is an async mock that returned None - generate results
+            comparison_tasks = mock_llm_interaction._submitted_tasks
+            mock_results = self._generate_mock_results(comparison_tasks)
         else:
-            # If no side_effect, try return_value
-            mock_results = mock_llm_interaction.perform_comparisons.return_value
-            if hasattr(mock_results, "__await__"):
-                mock_results = await mock_results
-
-        # Reset the call count to what it was before (to avoid double-counting)
-        mock_llm_interaction.perform_comparisons.call_count = original_call_count
+            # Try to get results from the mock's side_effect or return_value
+            original_call_count = mock_llm_interaction.perform_comparisons.call_count
+            
+            # Call the side_effect function to get the results
+            side_effect = mock_llm_interaction.perform_comparisons.side_effect
+            if callable(side_effect):
+                # Call with the same args
+                mock_results = await side_effect(
+                    comparison_tasks,
+                    correlation_arg,
+                    call_args.kwargs.get("model_override") if call_args.kwargs else None,
+                    call_args.kwargs.get("temperature_override") if call_args.kwargs else None,
+                    call_args.kwargs.get("max_tokens_override") if call_args.kwargs else None,
+                )
+            else:
+                # If no side_effect, try return_value
+                mock_results = mock_llm_interaction.perform_comparisons.return_value
+                if hasattr(mock_results, "__await__"):
+                    mock_results = await mock_results
+            
+            # Reset the call count to what it was before (to avoid double-counting)
+            mock_llm_interaction.perform_comparisons.call_count = original_call_count
+            
+            # Filter out None results (async processing)
+            if mock_results:
+                mock_results = [r for r in mock_results if r is not None]
 
         if not mock_results:
             logger.warning("No mock results returned, no callbacks to simulate")
@@ -312,7 +321,21 @@ class CallbackSimulator:
                 result = await session.execute(stmt)
                 existing_pair = result.scalar_one_or_none()
 
-                if not existing_pair:
+                if existing_pair:
+                    # If pair exists but has no correlation ID, assign one
+                    if not existing_pair.request_correlation_id:
+                        existing_pair.request_correlation_id = uuid4()
+                        logger.debug(
+                            f"Assigned correlation ID {existing_pair.request_correlation_id} "
+                            f"to existing pair ({task.essay_a.id}, {task.essay_b.id})"
+                        )
+                    # If pair already has a winner, skip (already processed)
+                    elif existing_pair.winner:
+                        logger.debug(
+                            f"Pair ({task.essay_a.id}, {task.essay_b.id}) already has winner: "
+                            f"{existing_pair.winner}, skipping"
+                        )
+                else:
                     # Create new pair with correlation ID (simulating LLM Provider Service)
                     new_pair = ComparisonPair(
                         cj_batch_id=cj_batch_id,
@@ -329,6 +352,49 @@ class CallbackSimulator:
                     )
 
             await session.commit()
+
+    def _generate_mock_results(
+        self,
+        comparison_tasks: list[ComparisonTask],
+    ) -> list[ComparisonResult]:
+        """Generate mock comparison results for async processing simulation.
+        
+        Args:
+            comparison_tasks: List of comparison tasks
+            
+        Returns:
+            List of mock comparison results
+        """
+        from services.cj_assessment_service.models_api import (
+            ComparisonResult,
+            LLMAssessmentResponseSchema,
+        )
+        from common_core.domain_enums import EssayComparisonWinner
+        
+        results = []
+        for i, task in enumerate(comparison_tasks):
+            # Alternate winners for variety
+            winner = (
+                EssayComparisonWinner.ESSAY_A
+                if i % 2 == 0
+                else EssayComparisonWinner.ESSAY_B
+            )
+            
+            assessment = LLMAssessmentResponseSchema(
+                winner=winner,
+                confidence=3.5 + (i % 3) * 0.5,  # Vary confidence 3.5-4.5
+                justification=f"Essay {winner.value} demonstrates stronger argumentation",
+            )
+            
+            result = ComparisonResult(
+                task=task,
+                llm_assessment=assessment,
+                raw_llm_response_content=f'{{"winner": "{winner.value}"}}',
+                error_detail=None,
+            )
+            results.append(result)
+            
+        return results
 
     def _create_callback_event(
         self,

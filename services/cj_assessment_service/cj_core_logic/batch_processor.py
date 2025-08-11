@@ -113,10 +113,11 @@ class BatchProcessor:
         submission_timestamp = datetime.now()
 
         try:
-            # Update batch state to WAITING_CALLBACKS before submission
-            await self._update_batch_state(
+            # Update batch state to WAITING_CALLBACKS and set total comparisons
+            await self._update_batch_state_with_totals(
                 cj_batch_id=cj_batch_id,
                 state=CJBatchStateEnum.WAITING_CALLBACKS,
+                total_comparisons=len(comparison_tasks),
                 correlation_id=correlation_id,
             )
 
@@ -293,6 +294,62 @@ class BatchProcessor:
                 message=f"Failed to update batch state to {state.value}: {str(e)}",
                 correlation_id=correlation_id,
                 database_operation="update_batch_state",
+                entity_id=str(cj_batch_id),
+            )
+
+    async def _update_batch_state_with_totals(
+        self,
+        cj_batch_id: int,
+        state: CJBatchStateEnum,
+        total_comparisons: int,
+        correlation_id: UUID,
+    ) -> None:
+        """Update batch state and set total comparisons count."""
+        try:
+            async with self.database.session() as session:
+                from sqlalchemy import update
+                from services.cj_assessment_service.models_db import CJBatchState
+
+                await session.execute(
+                    update(CJBatchState)
+                    .where(CJBatchState.batch_id == cj_batch_id)
+                    .values(
+                        state=state,
+                        total_comparisons=total_comparisons,
+                        submitted_comparisons=total_comparisons,  # All comparisons submitted
+                    )
+                )
+                await session.commit()
+
+                logger.info(
+                    f"Updated batch state to {state.value} with {total_comparisons} total comparisons",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "cj_batch_id": cj_batch_id,
+                        "state": state.value,
+                        "total_comparisons": total_comparisons,
+                    },
+                )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to update batch state with totals for CJ batch {cj_batch_id}: {e}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "cj_batch_id": cj_batch_id,
+                    "target_state": state.value,
+                    "total_comparisons": total_comparisons,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="update_batch_state_with_totals",
+                message=f"Failed to update batch state with totals: {str(e)}",
+                correlation_id=correlation_id,
+                database_operation="update_batch_state_with_totals",
                 entity_id=str(cj_batch_id),
             )
 

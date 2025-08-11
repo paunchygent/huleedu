@@ -18,6 +18,7 @@ from services.cj_assessment_service.cj_core_logic.batch_config import BatchConfi
 from services.cj_assessment_service.cj_core_logic.batch_processor import BatchProcessor
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
+from common_core.status_enums import CJBatchStateEnum
 from services.cj_assessment_service.models_api import (
     ComparisonTask,
     EssayForComparison,
@@ -45,7 +46,7 @@ class ComparisonIterationResult(BaseModel):
     )
 
 
-async def perform_iterative_comparisons(
+async def submit_comparisons_for_async_processing(
     essays_for_api_model: list[EssayForComparison],
     cj_batch_id: int,
     database: CJRepositoryProtocol,
@@ -54,8 +55,12 @@ async def perform_iterative_comparisons(
     settings: Settings,
     correlation_id: UUID,
     log_extra: dict[str, Any],
-) -> dict[str, float]:
-    """Perform iterative comparison processing with LLM.
+) -> None:
+    """Submit essay comparisons for async LLM processing.
+
+    This function submits all comparison tasks and transitions the batch to
+    WAITING_CALLBACKS state. ALL LLM processing is async - results arrive via
+    Kafka callbacks which trigger scoring and completion.
 
     Args:
         essays_for_api_model: List of essays prepared for comparison
@@ -64,10 +69,8 @@ async def perform_iterative_comparisons(
         llm_interaction: LLM interaction protocol implementation
         request_data: Original request data containing LLM config overrides
         settings: Application settings
+        correlation_id: Request correlation ID
         log_extra: Logging context data
-
-    Returns:
-        Final Bradley-Terry scores for all essays
     """
     # Extract LLM config overrides from request data
     llm_config_overrides = request_data.get("llm_config_overrides")
@@ -86,86 +89,66 @@ async def perform_iterative_comparisons(
             extra=log_extra,
         )
 
-    # Update batch status to indicate comparison processing has started
+    # Generate initial comparison tasks
     async with database.session() as session:
+        # Update batch status to indicate comparison processing has started
         await database.update_cj_batch_status(
             session=session,
             cj_batch_id=cj_batch_id,
             status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
         )
 
-    previous_bt_scores: dict[str, float] = {
-        essay_api.id: essay_api.current_bt_score
-        for essay_api in essays_for_api_model
-        if essay_api.current_bt_score is not None
-    }
-    total_comparisons_performed = 0
-    current_iteration = 0
-    scores_are_stable = False
+        # Generate comparison tasks for the batch
+        comparison_tasks = await pair_generation.generate_comparison_tasks(
+            essays_for_comparison=essays_for_api_model,
+            db_session=session,
+            cj_batch_id=cj_batch_id,
+            existing_pairs_threshold=getattr(settings, "comparisons_per_stability_check_iteration", 5),
+            correlation_id=correlation_id,
+        )
 
-    while total_comparisons_performed < settings.MAX_PAIRWISE_COMPARISONS and not scores_are_stable:
-        current_iteration += 1
-        logger.info(f"Starting CJ Iteration {current_iteration}", extra=log_extra)
-
-        # Each iteration gets its own session/transaction to ensure reads see previous writes
-        async with database.session() as session:
-            # Process single iteration
-            iteration_result = await _process_comparison_iteration(
-                essays_for_api_model=essays_for_api_model,
-                cj_batch_id=cj_batch_id,
-                session=session,
-                llm_interaction=llm_interaction,
-                database=database,
-                request_data=request_data,
-                settings=settings,
-                model_override=model_override,
-                temperature_override=temperature_override,
-                max_tokens_override=max_tokens_override,
-                current_iteration=current_iteration,
-                correlation_id=correlation_id,
-                log_extra=log_extra,
+        if not comparison_tasks:
+            logger.warning(
+                f"No comparison tasks generated for batch {cj_batch_id}",
+                extra=log_extra,
             )
+            return
 
-            if not iteration_result:
-                # This could be either no tasks generated OR async processing initiated
-                # For async processing, workflow continues via callbacks
-                logger.info(
-                    "Iteration processing initiated asynchronously or no tasks generated",
-                    extra=log_extra,
-                )
-                break
+        # Create batch processor and submit all comparisons
+        batch_processor = BatchProcessor(
+            database=database,
+            llm_interaction=llm_interaction,
+            settings=settings,
+        )
 
-            total_comparisons_performed += iteration_result.valid_results_count
+        # Extract batch config overrides if available
+        batch_config_overrides = None
+        if "batch_config_overrides" in request_data:
+            batch_config_overrides = BatchConfigOverrides(**request_data["batch_config_overrides"])
 
-            # Update scores in the local essays_for_api_model for next iteration
-            for essay_api_item in essays_for_api_model:
-                if essay_api_item.id in iteration_result.updated_scores:
-                    essay_api_item.current_bt_score = iteration_result.updated_scores[
-                        essay_api_item.id
-                    ]
+        # Submit batch for async processing - this will set state to WAITING_CALLBACKS
+        submission_result = await batch_processor.submit_comparison_batch(
+            cj_batch_id=cj_batch_id,
+            comparison_tasks=comparison_tasks,
+            correlation_id=correlation_id,
+            config_overrides=batch_config_overrides,
+            model_override=model_override,
+            temperature_override=temperature_override,
+            max_tokens_override=max_tokens_override,
+        )
 
-            # Check for score stability
-            scores_are_stable = _check_iteration_stability(
-                total_comparisons_performed=total_comparisons_performed,
-                current_bt_scores_dict=iteration_result.updated_scores,
-                previous_bt_scores=previous_bt_scores,
-                settings=settings,
-                current_iteration=current_iteration,
-                log_extra=log_extra,
-            )
+        logger.info(
+            f"Submitted {submission_result.total_submitted} comparisons for async processing",
+            extra={
+                **log_extra,
+                "cj_batch_id": cj_batch_id,
+                "total_submitted": submission_result.total_submitted,
+                "all_submitted": submission_result.all_submitted,
+            },
+        )
 
-            previous_bt_scores = iteration_result.updated_scores.copy()
-            # Session auto-commits at end of context - no manual transaction management needed
-
-    final_scores = {essay.id: essay.current_bt_score or 0.0 for essay in essays_for_api_model}
-
-    logger.info(
-        f"Comparison processing completed after {current_iteration} iterations, "
-        f"{total_comparisons_performed} total comparisons",
-        extra=log_extra,
-    )
-
-    return final_scores
+        # Workflow pauses here - batch is now in WAITING_CALLBACKS state
+        # Callbacks will handle scoring and additional iterations if needed
 
 
 async def _process_comparison_iteration(

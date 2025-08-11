@@ -120,7 +120,7 @@ class TestRealDatabaseIntegration:
         postgres_repository: CJRepositoryProtocol,
         mock_content_client: ContentClientProtocol,
         mock_event_publisher: AsyncMock,
-        mock_llm_interaction: AsyncMock,
+        mock_llm_interaction_async: AsyncMock,  # Use async mock
         test_settings: Settings,
         db_verification_helpers: Any,
     ) -> None:
@@ -150,7 +150,7 @@ class TestRealDatabaseIntegration:
             postgres_repository,
             mock_content_client,
             mock_event_publisher,
-            mock_llm_interaction,
+            mock_llm_interaction_async,  # Use async mock
             test_settings,
         )
 
@@ -161,7 +161,7 @@ class TestRealDatabaseIntegration:
         # This bridges the async gap in testing by processing the mock results as callbacks
         callback_simulator = CallbackSimulator()
         callbacks_processed = await callback_simulator.simulate_callbacks_from_mock_results(
-            mock_llm_interaction=mock_llm_interaction,
+            mock_llm_interaction=mock_llm_interaction_async,  # Use async mock
             database=postgres_repository,
             event_publisher=mock_event_publisher,
             settings=test_settings,
@@ -190,7 +190,7 @@ class TestRealDatabaseIntegration:
             assert essay_count_in_db == essay_count
 
         # Verify external services were called
-        mock_llm_interaction.perform_comparisons.assert_called_once()
+        mock_llm_interaction_async.perform_comparisons.assert_called_once()
         mock_event_publisher.publish_assessment_completed.assert_called_once()
 
         # Verify the published event structure

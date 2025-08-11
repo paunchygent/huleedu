@@ -168,14 +168,31 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                 ) as response:
                     response_text = await response.text()
 
-                    if response.status == 200:
-                        # Immediate response - handle as before
-                        return await self._handle_immediate_response(response_text, correlation_id)
-
-                    elif response.status == 202:
-                        # Queued response - return None to indicate async processing
+                    if response.status == 202:
+                        # ALL LLM requests are async - this is the ONLY valid success response
+                        # LLM processing takes 10-30+ seconds, blocking HTTP is an anti-pattern
                         await self._handle_queued_response(response_text, correlation_id)
-                        return None
+                        return None  # Always return None - results come via Kafka callbacks
+
+                    elif response.status == 200:
+                        # This should never happen in production - LLM Provider should always queue
+                        logger.error(
+                            "LLM Provider returned 200 (sync) - this is an architectural violation. "
+                            "All LLM calls must be async (202) with Kafka callbacks.",
+                            extra={
+                                "correlation_id": str(correlation_id),
+                                "provider": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
+                            },
+                        )
+                        # Treat as an error - we don't support synchronous LLM calls
+                        raise_invalid_response(
+                            service="cj_assessment_service",
+                            operation="generate_comparison",
+                            message="LLM Provider returned synchronous response (200). "
+                                    "Only async (202) responses are supported.",
+                            correlation_id=correlation_id,
+                            response_status=200,
+                        )
 
                     else:
                         # Check if error is retryable
@@ -249,49 +266,11 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         # or applied at the transport layer for async compatibility
         return await self.retry_manager.with_retry(make_request)
 
-    async def _handle_immediate_response(
-        self, response_text: str, correlation_id: UUID
-    ) -> dict[str, Any]:
-        """Handle immediate (200) response from LLM Provider Service.
-
-        Args:
-            response_text: Raw response text from the HTTP response
-            correlation_id: Correlation ID for request tracing
-
-        Returns:
-            Tuple of (response_data, error_detail)
-        """
-        try:
-            response_data = json.loads(response_text)
-
-            # Extract the comparison result and preserve 1-5 confidence scale
-            # LLM Provider Service returns 1-5 scale, keep as-is for CJ Assessment
-            confidence = response_data.get("confidence", 3.0)
-
-            result = {
-                "winner": response_data.get("winner"),
-                "justification": response_data.get("justification"),
-                "confidence": confidence,
-            }
-
-            logger.info(
-                f"Successfully generated comparison via LLM Provider Service (immediate), "
-                f"provider: {response_data.get('provider')}, "
-                f"model: {response_data.get('model')}, "
-                f"response_time: {response_data.get('response_time_ms', 'N/A')}ms"
-            )
-
-            return result
-
-        except json.JSONDecodeError as e:
-            raise_parsing_error(
-                service="cj_assessment_service",
-                operation="_handle_immediate_response",
-                parse_target="immediate_response_json",
-                message=f"Failed to parse immediate response JSON: {str(e)}",
-                correlation_id=correlation_id,
-                response_preview=response_text[:200],
-            )
+    # REMOVED: _handle_immediate_response method
+    # This method was removed as part of the architectural simplification.
+    # ALL LLM calls are async (202) with Kafka callbacks.
+    # Synchronous responses (200) are an anti-pattern for LLM integration.
+    # LLMs take 10-30+ seconds - blocking HTTP for this duration is wasteful.
 
     async def _handle_queued_response(self, response_text: str, correlation_id: UUID) -> None:
         """Handle queued (202) response from LLM Provider Service.

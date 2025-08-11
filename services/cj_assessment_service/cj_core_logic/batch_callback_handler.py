@@ -20,6 +20,7 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 
 # EntityReference removed - using primitive parameters
 from common_core.status_enums import CJBatchStateEnum
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
@@ -372,12 +373,8 @@ async def _trigger_batch_scoring_completion(
         log_extra: Extra logging context
     """
     try:
-        # Update batch state to SCORING
-        await database.update_cj_batch_status(
-            session=session,
-            cj_batch_id=batch_id,
-            status=CJBatchStateEnum.SCORING,
-        )
+        # Batch is already in PERFORMING_COMPARISONS, no need to update status here
+        # Scoring is part of the comparison workflow
 
         # Get batch upload for BOS batch ID
         from services.cj_assessment_service.models_db import CJBatchUpload
@@ -400,7 +397,7 @@ async def _trigger_batch_scoring_completion(
         essays_for_api = [
             EssayForComparison(
                 id=essay.els_essay_id,
-                text_content=essay.content,
+                text_content=essay.assessment_input_text,
                 current_bt_score=essay.current_bt_score,
             )
             for essay in essays
@@ -425,7 +422,7 @@ async def _trigger_batch_scoring_completion(
         await database.update_cj_batch_status(
             session=session,
             cj_batch_id=batch_id,
-            status=CJBatchStateEnum.COMPLETED,
+            status=CJBatchStatusEnum.COMPLETE_STABLE,
         )
 
         # Get final rankings
@@ -487,7 +484,7 @@ async def _trigger_batch_scoring_completion(
             await database.update_cj_batch_status(
                 session=session,
                 cj_batch_id=batch_id,
-                status=CJBatchStateEnum.FAILED,
+                status=CJBatchStatusEnum.ERROR_PROCESSING,
             )
         except Exception as update_error:
             logger.error(

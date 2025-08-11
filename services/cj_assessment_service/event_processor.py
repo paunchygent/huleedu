@@ -269,83 +269,32 @@ async def _process_cj_assessment_impl(
             settings=settings_obj,
         )
 
+        # ALL workflows are async - comparisons submitted, results come via callbacks
+        # The workflow_result.rankings will ALWAYS be empty at this point
         logger.info(
-            f"CJ assessment workflow completed for batch {converted_request_data['bos_batch_id']}",
+            f"CJ assessment batch {converted_request_data['bos_batch_id']} submitted for async processing. "
+            "Results will be published when LLM callbacks complete.",
             extra={
                 **log_extra,
                 "job_id": workflow_result.batch_id,
-                "rankings_count": len(workflow_result.rankings),
-                "rankings_preview": workflow_result.rankings[:2]
-                if workflow_result.rankings
-                else [],
+                "async_processing": True,
             },
         )
 
-        # Record business metrics for completed assessment
+        # Record initial metrics (submission time)
         processing_ended_at = datetime.now(UTC)
-        processing_duration = (processing_ended_at - processing_started_at).total_seconds()
+        submission_duration = (processing_ended_at - processing_started_at).total_seconds()
 
         if duration_metric:
-            duration_metric.observe(processing_duration)
+            duration_metric.observe(submission_duration)
             logger.debug(
-                f"Recorded assessment duration: {processing_duration:.2f}s for batch "
+                f"Recorded submission duration: {submission_duration:.2f}s for batch "
                 f"{converted_request_data['bos_batch_id']}",
                 extra=log_extra,
             )
-
-        # Record comparisons made (estimated from rankings count)
-        if comparisons_metric and workflow_result.rankings:
-            # CJ assessments typically require n(n-1)/2 comparisons for n essays
-            estimated_comparisons = (
-                len(workflow_result.rankings) * (len(workflow_result.rankings) - 1) // 2
-            )
-            comparisons_metric.observe(estimated_comparisons)
-            logger.debug(
-                f"Recorded estimated comparisons: {estimated_comparisons} for batch "
-                f"{converted_request_data['bos_batch_id']}",
-                extra=log_extra,
-            )
-
-        # Calculate grade projections using async GradeProjector
-        grade_projector = GradeProjector()
-
-        # Get database session for grade projector
-        async with database.session() as session:
-            grade_projections = await grade_projector.calculate_projections(
-                session=session,
-                rankings=workflow_result.rankings,
-                cj_batch_id=int(workflow_result.batch_id),
-                assignment_id=request_event_data.assignment_id,
-                course_code=request_event_data.course_code.value
-                if hasattr(request_event_data.course_code, "value")
-                else request_event_data.course_code,
-                content_client=content_client,
-                correlation_id=correlation_id,
-            )
-
-        # Log if no projections are available (no anchor essays)
-        if not grade_projections.projections_available:
-            logger.info(
-                "No grade projections available - no anchor essays present",
-                extra={
-                    **log_extra,
-                    "batch_id": workflow_result.batch_id,
-                },
-            )
-
-        # Use dual event publishing: thin event to ELS, rich event to RAS
-        await publish_assessment_completion(
-            workflow_result=workflow_result,
-            grade_projections=grade_projections,
-            request_event_data=request_event_data,
-            settings=settings_obj,
-            event_publisher=event_publisher,
-            correlation_id=correlation_id,
-            processing_started_at=processing_started_at,
-        )
 
         logger.info(
-            "CJ assessment message processed successfully and dual events published.",
+            "CJ assessment message processed successfully - awaiting LLM callbacks.",
             extra=log_extra,
         )
         return True

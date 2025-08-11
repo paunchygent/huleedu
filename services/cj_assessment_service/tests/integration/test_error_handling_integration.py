@@ -307,7 +307,7 @@ class TestErrorHandlingIntegration:
             pair = result_check.scalar_one()
 
             # First callback should have updated the winner, second was idempotent
-            assert pair.winner == "Essay A"  # Updated by first callback
+            assert pair.winner == "essay_a"  # Updated by first callback
             assert pair.confidence == 4.2  # Updated by first callback
             assert pair.completed_at is not None  # Marked as completed
 
@@ -442,7 +442,7 @@ class TestErrorHandlingIntegration:
             # First 5 pairs: success callbacks, Last 5 pairs: error callbacks
             for i, pair in enumerate(batch_pairs_list):
                 if i < 5:  # First 5 pairs had success callbacks
-                    assert pair.winner == "Essay A"  # Updated by success callback
+                    assert pair.winner == "essay_a"  # Updated by success callback
                     assert pair.confidence == 4.2  # Updated by success callback
                     assert pair.completed_at is not None  # Marked as completed
                 else:  # Last 5 pairs had error callbacks

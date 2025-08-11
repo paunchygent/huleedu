@@ -244,7 +244,9 @@ class TestAsyncWorkflowContinuation:
                 result = await session.execute(stmt)
                 comparison = result.scalar_one()
 
-                assert comparison.winner == winner.value
+                # Convert enum value to database format
+                expected_winner = winner.value.lower().replace(" ", "_")  # "Essay A" -> "essay_a"
+                assert comparison.winner == expected_winner
                 assert comparison.completed_at is not None
                 assert comparison.confidence == 4.0
 
@@ -465,7 +467,7 @@ class TestAsyncWorkflowContinuation:
                     assert comparison.winner == "error"
                     # Error handling may set error_code or just mark as error
                 else:
-                    assert comparison.winner in ["Essay A", "Essay B"]
+                    assert comparison.winner in ["essay_a", "essay_b"]
                     assert comparison.confidence == 4.0
 
         # Update batch state with results
@@ -513,7 +515,7 @@ class TestAsyncWorkflowContinuation:
             result = await session.execute(stmt)
             comparison = result.scalar_one()
 
-            assert comparison.winner == "Essay A"
+            assert comparison.winner == "essay_a"
             assert comparison.confidence == 4.0
 
             # Check that we still only have one comparison with this correlation_id
@@ -623,7 +625,7 @@ class TestAsyncWorkflowContinuation:
             for pair in completed_pairs:
                 assert pair.request_correlation_id not in seen_correlation_ids
                 seen_correlation_ids.add(pair.request_correlation_id)
-                assert pair.winner in ["Essay A", "Essay B"]
+                assert pair.winner in ["essay_a", "essay_b"]
                 assert pair.confidence == 4.0
 
             # Verify data integrity

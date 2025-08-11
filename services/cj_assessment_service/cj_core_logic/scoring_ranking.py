@@ -32,7 +32,7 @@ logger = create_service_logger("cj_assessment_service.scoring_ranking")
 
 async def record_comparisons_and_update_scores(
     all_essays: list[EssayForComparison],  # essay.id is string els_essay_id
-    comparison_results: list[ComparisonResult],
+    comparison_results: list[ComparisonResult | None],  # Can be None for async processing
     db_session: AsyncSession,
     cj_batch_id: int,
     correlation_id: UUID,
@@ -61,6 +61,9 @@ async def record_comparisons_and_update_scores(
     # 1. Store new comparison results
     successful_comparisons_this_round = 0
     for result in comparison_results:
+        # Skip None results (async processing)
+        if result is None:
+            continue
         if result.llm_assessment:
             winner_db_val = None
             if result.llm_assessment.winner == EssayComparisonWinner.ESSAY_A:

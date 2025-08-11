@@ -214,6 +214,36 @@ def mock_content_client() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_llm_interaction_async() -> AsyncMock:
+    """Create mock LLM interaction that simulates async processing.
+    
+    Returns None for all comparisons to simulate async processing.
+    The CallbackSimulator will process these as callbacks.
+    """
+    from services.cj_assessment_service.protocols import LLMInteractionProtocol
+    
+    interaction = AsyncMock(spec=LLMInteractionProtocol)
+    
+    async def perform_comparisons_async(
+        tasks: list[Any],
+        correlation_id: Any,
+        model_override: str | None = None,
+        temperature_override: float | None = None,
+        max_tokens_override: int | None = None,
+    ) -> list[None]:
+        """Return None for all tasks to simulate async processing."""
+        # Store the tasks for the callback simulator to use
+        interaction._submitted_tasks = tasks
+        interaction._correlation_id = correlation_id
+        
+        # Return None for each task (async processing)
+        return [None] * len(tasks)
+    
+    interaction.perform_comparisons = AsyncMock(side_effect=perform_comparisons_async)
+    return interaction
+
+
+@pytest.fixture
 def mock_llm_interaction() -> AsyncMock:
     """Create mock LLM interaction for external service."""
     from common_core.domain_enums import EssayComparisonWinner

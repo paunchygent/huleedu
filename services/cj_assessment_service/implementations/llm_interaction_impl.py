@@ -138,36 +138,26 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         max_tokens_override=max_tokens_override,
                     )
 
-                    # Handle async processing case - will be processed via callback
-                    if response_data is None:
-                        logger.info(
-                            f"Comparison for essays {task.essay_a.id} vs {task.essay_b.id} "
-                            "queued for async processing - will be processed via callback"
-                        )
-                        # Return None to indicate async processing
-                        # The actual result will come via callback from LLM Provider Service
-                        return None
-
-                    # Record successful LLM API call metric
+                    # ALL LLM calls are async - response_data is ALWAYS None
+                    # Results arrive via Kafka callbacks from LLM Provider Service
+                    assert response_data is None, "LLM Provider must always return None (async-only architecture)"
+                    
+                    logger.info(
+                        f"Comparison for essays {task.essay_a.id} vs {task.essay_b.id} "
+                        "queued for async processing - results will arrive via Kafka callback",
+                        extra={"correlation_id": str(correlation_id)},
+                    )
+                    
+                    # Record queued LLM API call metric
                     if llm_api_calls_metric:
                         llm_api_calls_metric.labels(
                             provider=self.settings.DEFAULT_LLM_PROVIDER.value,
                             model=model_override or self.settings.DEFAULT_LLM_MODEL,
-                            status="success",
+                            status="queued",
                         ).inc()
 
-                    logger.info(
-                        f"LLM Response for essays {task.essay_a.id} vs {task.essay_b.id}: "
-                        f"Winner -> {response_data.get('winner')}",
-                    )
-
-                    llm_assessment = LLMAssessmentResponseSchema(**response_data)
-                    return ComparisonResult(
-                        task=task,
-                        llm_assessment=llm_assessment,
-                        error_detail=None,
-                        raw_llm_response_content=None,
-                    )
+                    # Always return None - ALL processing is async
+                    return None
 
                 except Exception as e:
                     # Record failed LLM API call metric

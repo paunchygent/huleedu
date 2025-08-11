@@ -91,8 +91,10 @@ async def run_cj_assessment_workflow(
             log_extra,
         )
 
-        # Phase 3: Iterative Comparison Loop
-        final_scores = await comparison_processing.perform_iterative_comparisons(
+        # Phase 3: Submit Comparisons for Async Processing
+        # ALL LLM calls are async - workflow ALWAYS pauses here
+        # Results arrive via Kafka callbacks which trigger completion
+        await comparison_processing.submit_comparisons_for_async_processing(
             essays_for_api_model,
             cj_batch_id,
             database,
@@ -103,18 +105,16 @@ async def run_cj_assessment_workflow(
             log_extra,
         )
 
-        # Phase 4: Complete and publish results
-        rankings = await _finalize_batch_results(
-            cj_batch_id, database, final_scores, correlation_id, log_extra
-        )
-
+        # Workflow pauses here - batch is now in WAITING_CALLBACKS state
+        # Callbacks will trigger scoring and event publishing via batch_callback_handler
         logger.info(
-            f"CJ assessment completed for batch {cj_batch_id}. "
-            f"Rankings generated for {len(rankings)} essays.",
+            f"CJ batch {cj_batch_id} comparisons submitted for async processing. "
+            "Workflow will continue via callback handler when LLM results arrive.",
             extra=log_extra,
         )
 
-        return CJAssessmentWorkflowResult(rankings=rankings, batch_id=str(cj_batch_id))
+        # Return empty result - actual results will be published by callback handler
+        return CJAssessmentWorkflowResult(rankings=[], batch_id=str(cj_batch_id))
 
     except Exception as e:
         logger.error(
