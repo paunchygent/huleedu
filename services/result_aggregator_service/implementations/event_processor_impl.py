@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from common_core.error_enums import ErrorCode
+from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.result_events import (
     BatchAssessmentCompletedV1,
     BatchResultsReadyV1,
@@ -29,7 +30,6 @@ from services.result_aggregator_service.protocols import (
 if TYPE_CHECKING:
     from common_core.events import (
         BatchEssaysRegistered,
-        CJAssessmentCompletedV1,
         ELSBatchPhaseOutcomeV1,
         EventEnvelope,
         SpellcheckResultDataV1,
@@ -345,64 +345,57 @@ class EventProcessorImpl(EventProcessorProtocol):
             )
             raise
 
-    async def process_cj_assessment_completed(
-        self, envelope: "EventEnvelope[CJAssessmentCompletedV1]", data: "CJAssessmentCompletedV1"
+    async def process_assessment_result(
+        self, envelope: "EventEnvelope[AssessmentResultV1]", data: AssessmentResultV1
     ) -> None:
-        """Process CJ assessment completion event."""
+        """Process assessment result event with rich business data from CJ Assessment Service."""
         try:
+            batch_id = data.batch_id
+            
             logger.info(
-                "Processing CJ assessment completed",
-                entity_id=data.entity_id,
-                entity_type=data.entity_type,
-                job_id=data.cj_assessment_job_id,
+                "Processing assessment results",
+                batch_id=batch_id,
+                cj_job_id=data.cj_assessment_job_id,
+                essay_count=len(data.essay_results),
+                assessment_method=data.assessment_method,
             )
 
-            # entity_id is the batch_id for CJ assessment events
-            batch_id = data.entity_id
-            if batch_id is None:
-                logger.error(
-                    "Cannot process CJ assessment: entity_id (batch_id) is None",
-                    job_id=data.cj_assessment_job_id,
-                )
-                return
-
-            # Process each ranking result
-            for ranking in data.rankings:
-                essay_id = ranking.get("els_essay_id")
-                rank = ranking.get("rank")
-                score = ranking.get("score")
-
-                if not essay_id:
-                    logger.warning("Missing essay_id in ranking", ranking=ranking)
-                    continue
-
+            # Process each essay result (excluding anchors for student results)
+            student_results = [r for r in data.essay_results if not r.get("is_anchor", False)]
+            
+            for essay_result in student_results:
+                essay_id = essay_result["essay_id"]
+                rank = essay_result.get("rank")
+                bt_score = essay_result.get("bt_score")
+                
                 await self.batch_repository.update_essay_cj_assessment_result(
                     essay_id=essay_id,
                     batch_id=batch_id,
                     status=ProcessingStage.COMPLETED,
                     correlation_id=envelope.correlation_id,
                     rank=rank,
-                    score=score,
-                    comparison_count=None,  # Not provided in current event
+                    score=bt_score,
+                    comparison_count=data.assessment_metadata.get("comparison_count"),
                     error_detail=None,
                 )
 
             # Invalidate cache
             await self.state_store.invalidate_batch(batch_id)
 
-            # Publish BatchAssessmentCompletedV1 event
-            # Get batch to get user_id
+            # Publish BatchAssessmentCompletedV1 event for downstream services
             batch = await self.batch_repository.get_batch(batch_id)
             if batch:
-                # Create thin rankings summary (only essential data)
+                # Create enriched rankings summary with business data
                 rankings_summary = [
                     {
-                        "essay_id": ranking.get("els_essay_id"),
-                        "rank": ranking.get("rank"),
-                        "score": ranking.get("score"),
+                        "essay_id": r["essay_id"],
+                        "rank": r.get("rank"),
+                        "score": r.get("bt_score"),
+                        "letter_grade": r.get("letter_grade"),
+                        "confidence_score": r.get("confidence_score"),
+                        "confidence_label": r.get("confidence_label"),
                     }
-                    for ranking in data.rankings
-                    if ranking.get("els_essay_id")
+                    for r in student_results
                 ]
 
                 # Create and publish BatchAssessmentCompletedV1 event
@@ -411,7 +404,7 @@ class EventProcessorImpl(EventProcessorProtocol):
                     user_id=batch.user_id,
                     assessment_job_id=data.cj_assessment_job_id,
                     rankings_summary=rankings_summary,
-                    status=BatchStatus.COMPLETED_SUCCESSFULLY,  # Required by ProcessingUpdate
+                    status=BatchStatus.COMPLETED_SUCCESSFULLY,
                     system_metadata=SystemProcessingMetadata(
                         entity_id=batch_id,
                         entity_type="batch",
@@ -431,19 +424,21 @@ class EventProcessorImpl(EventProcessorProtocol):
                     user_id=batch.user_id,
                     assessment_job_id=data.cj_assessment_job_id,
                     rankings_count=len(rankings_summary),
+                    anchor_essays_used=data.assessment_metadata.get("anchor_essays_used", 0),
                 )
 
             logger.info(
-                "CJ assessment results processed successfully",
+                "Assessment results processed successfully",
                 batch_id=batch_id,
-                rankings_count=len(data.rankings),
+                student_results=len(student_results),
+                assessment_method=data.assessment_method,
+                model_used=data.model_used,
             )
 
         except Exception as e:
             logger.error(
-                "Failed to process CJ assessment completed",
-                entity_id=data.entity_id,
-                entity_type=data.entity_type,
+                "Failed to process assessment results",
+                batch_id=data.batch_id,
                 error=str(e),
                 exc_info=True,
             )

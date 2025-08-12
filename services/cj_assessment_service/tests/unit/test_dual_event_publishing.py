@@ -95,10 +95,10 @@ class TestDualEventPublishing:
         """Test that ELS gets filtered rankings and RAS gets all rankings."""
         # Arrange
         rankings = [
-            {"els_essay_id": "student_1", "score": 0.8, "rank": 1},
-            {"els_essay_id": "ANCHOR_A_uuid", "score": 0.9, "rank": 2},
-            {"els_essay_id": "student_2", "score": 0.6, "rank": 3},
-            {"els_essay_id": "ANCHOR_B_uuid", "score": 0.5, "rank": 4},
+            {"els_essay_id": "student_1", "score": 0.8, "rank": 1, "bradley_terry_score": 0.8},
+            {"els_essay_id": "ANCHOR_A_uuid", "score": 0.9, "rank": 2, "bradley_terry_score": 0.9},
+            {"els_essay_id": "student_2", "score": 0.6, "rank": 3, "bradley_terry_score": 0.6},
+            {"els_essay_id": "ANCHOR_B_uuid", "score": 0.5, "rank": 4, "bradley_terry_score": 0.5},
         ]
         correlation_id = uuid4()
 
@@ -118,14 +118,17 @@ class TestDualEventPublishing:
         assert els_call is not None
         els_envelope = els_call.kwargs["completion_data"]
 
-        # ELS should only have student rankings
-        assert len(els_envelope.data.rankings) == 2
-        assert all(not r["els_essay_id"].startswith("ANCHOR_") for r in els_envelope.data.rankings)
-        assert els_envelope.data.rankings[0]["els_essay_id"] == "student_1"
-        assert els_envelope.data.rankings[1]["els_essay_id"] == "student_2"
+        # ELS should only have student essay IDs in processing summary (thin event)
+        successful_ids = els_envelope.data.processing_summary["successful_essay_ids"]
+        assert len(successful_ids) == 2
+        assert all(not essay_id.startswith("ANCHOR_") for essay_id in successful_ids)
+        assert "student_1" in successful_ids
+        assert "student_2" in successful_ids
 
-        # Check grade projections are included
-        assert els_envelope.data.grade_projections_summary == sample_grade_projections
+        # Check processing summary structure
+        assert els_envelope.data.processing_summary["total_essays"] == 2
+        assert els_envelope.data.processing_summary["successful"] == 2
+        assert els_envelope.data.processing_summary["failed"] == 0
 
         # Assert - RAS event
         ras_call = mock_event_publisher.publish_assessment_result.call_args
@@ -549,14 +552,29 @@ class TestDualEventPublishing:
         # Arrange - Mix of student and anchor essays with various ID formats
         rankings = [
             # Student essays with different ID patterns
-            {"els_essay_id": "student_001", "score": 0.8, "rank": 1},
-            {"els_essay_id": "essay_uuid_123", "score": 0.7, "rank": 2},
-            {"els_essay_id": "regular_id", "score": 0.6, "rank": 3},
-            {"els_essay_id": "contains_ANCHOR_but_not_prefix", "score": 0.5, "rank": 7},
+            {"els_essay_id": "student_001", "score": 0.8, "rank": 1, "bradley_terry_score": 0.8},
+            {"els_essay_id": "essay_uuid_123", "score": 0.7, "rank": 2, "bradley_terry_score": 0.7},
+            {"els_essay_id": "regular_id", "score": 0.6, "rank": 3, "bradley_terry_score": 0.6},
+            {
+                "els_essay_id": "contains_ANCHOR_but_not_prefix",
+                "score": 0.5,
+                "rank": 7,
+                "bradley_terry_score": 0.5,
+            },
             # Anchor essays with different formats
-            {"els_essay_id": "ANCHOR_A_uuid_123", "score": 0.9, "rank": 4},
-            {"els_essay_id": "ANCHOR_B_456", "score": 0.85, "rank": 5},
-            {"els_essay_id": "ANCHOR_COMPLEX_ID_789", "score": 0.75, "rank": 6},
+            {
+                "els_essay_id": "ANCHOR_A_uuid_123",
+                "score": 0.9,
+                "rank": 4,
+                "bradley_terry_score": 0.9,
+            },
+            {"els_essay_id": "ANCHOR_B_456", "score": 0.85, "rank": 5, "bradley_terry_score": 0.85},
+            {
+                "els_essay_id": "ANCHOR_COMPLEX_ID_789",
+                "score": 0.75,
+                "rank": 6,
+                "bradley_terry_score": 0.75,
+            },
         ]
 
         grade_projections = GradeProjectionSummary(
@@ -607,9 +625,9 @@ class TestDualEventPublishing:
         els_envelope = els_call.kwargs["completion_data"]
         ras_envelope = ras_call.kwargs["result_data"]
 
-        # ELS event should contain subset of essays (students only)
-        assert len(els_envelope.data.rankings) == 4
-        els_essay_ids = {r["els_essay_id"] for r in els_envelope.data.rankings}
+        # ELS event should contain processing summary (thin event)
+        assert len(els_envelope.data.processing_summary["successful_essay_ids"]) == 4
+        els_essay_ids = set(els_envelope.data.processing_summary["successful_essay_ids"])
 
         # RAS event should contain all essays with anchor flags
         assert len(ras_envelope.data.essay_results) == 7
@@ -624,6 +642,7 @@ class TestDualEventPublishing:
 
         # Verify all student essays appear in ELS event
         student_ids_in_ras = {r["essay_id"] for r in student_results}
+        # Note: ELS event contains essay IDs, RAS contains essay IDs - should match for students
         assert els_essay_ids == student_ids_in_ras
 
         # Verify anchor-specific attributes are set correctly

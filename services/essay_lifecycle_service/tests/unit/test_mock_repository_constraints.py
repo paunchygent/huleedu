@@ -325,11 +325,18 @@ class TestMockRepositoryConstraints:
             {"essay_id": "unique-essay", "batch_id": "batch-1", "entity_type": "essay"},
         ]
 
-        with pytest.raises(ValueError):  # Should raise constraint violation
+        from huleedu_service_libs.error_handling import HuleEduError
+        from common_core.error_enums import ErrorCode
+        
+        with pytest.raises(HuleEduError) as exc_info:  # Should raise constraint violation
             await mock_repository.create_essay_records_batch(
                 essay_data=duplicate_essay_data,
                 correlation_id=correlation_id,
             )
+        
+        # Verify error details
+        assert exc_info.value.error_detail.error_code == ErrorCode.VALIDATION_ERROR
+        assert "Duplicate essay_ids" in str(exc_info.value)
 
         # Test 2: Batch creation with unique essay_ids should succeed
         unique_essay_data: list[dict[str, str | None]] = [

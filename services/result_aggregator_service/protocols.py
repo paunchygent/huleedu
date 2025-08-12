@@ -7,11 +7,11 @@ from uuid import UUID
 
 from common_core.events import (
     BatchEssaysRegistered,
-    CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.result_events import BatchAssessmentCompletedV1, BatchResultsReadyV1
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
@@ -154,10 +154,10 @@ class EventProcessorProtocol(Protocol):
         """Process spellcheck completion event."""
         ...
 
-    async def process_cj_assessment_completed(
-        self, envelope: EventEnvelope[CJAssessmentCompletedV1], data: CJAssessmentCompletedV1
+    async def process_assessment_result(
+        self, envelope: EventEnvelope[AssessmentResultV1], data: AssessmentResultV1
     ) -> None:
-        """Process CJ assessment completion event."""
+        """Process assessment result event with rich business data from CJ Assessment Service."""
         ...
 
 

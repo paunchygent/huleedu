@@ -11,11 +11,11 @@ from aiokafka import AIOKafkaConsumer, ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
-    CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.assessment_result_events import AssessmentResultV1
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -52,7 +52,7 @@ class ResultAggregatorKafkaConsumer:
             topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),  # Add slot assignment for traceability
             topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
-            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+            topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),  # Rich event for business data
             # Future topics to add when services are implemented:
             # "huleedu.essay.nlp.completed.v1",
             # "huleedu.essay.aifeedback.completed.v1",
@@ -70,7 +70,7 @@ class ResultAggregatorKafkaConsumer:
                 "ELSBatchPhaseOutcomeV1": 43200,
                 # Processing completion events (24 hours)
                 "SpellcheckResultDataV1": 86400,
-                "CJAssessmentCompletedV1": 86400,
+                "AssessmentResultV1": 86400,  # Rich assessment data from CJ service
                 # Aggregation completion events (72 hours for batch lifecycle)
                 "ResultAggregatorBatchCompletedV1": 259200,
                 "ResultAggregatorClassSummaryUpdatedV1": 259200,
@@ -212,14 +212,6 @@ class ResultAggregatorKafkaConsumer:
                     spell_envelope, SpellcheckResultDataV1.model_validate(spell_envelope.data)
                 )
 
-            elif record.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
-                cj_envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(
-                    message_value_str
-                )
-                await self.event_processor.process_cj_assessment_completed(
-                    cj_envelope, CJAssessmentCompletedV1.model_validate(cj_envelope.data)
-                )
-
             elif record.topic == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED):
                 # Import here to avoid circular imports
                 from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
@@ -229,6 +221,15 @@ class ResultAggregatorKafkaConsumer:
                 )
                 await self.event_processor.process_essay_slot_assigned(
                     slot_envelope, EssaySlotAssignedV1.model_validate(slot_envelope.data)
+                )
+
+            elif record.topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
+                # Process rich assessment results from CJ Assessment Service
+                assessment_envelope = EventEnvelope[AssessmentResultV1].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_assessment_result(
+                    assessment_envelope, AssessmentResultV1.model_validate(assessment_envelope.data)
                 )
 
             else:

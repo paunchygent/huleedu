@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncGenerator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,11 +12,11 @@ from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events import (
     BatchEssaysRegistered,
-    CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
@@ -302,6 +302,14 @@ class TestProcessBatchPhaseOutcome:
         """Test processing successful phase completion."""
         # Arrange
         batch_id = str(uuid4())
+        
+        # Setup mock batch for duration calculation
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-123"
+        mock_batch.processing_started_at = datetime.now(timezone.utc) - timedelta(seconds=10)
+        mock_batch.processing_completed_at = datetime.now(timezone.utc)
+        mock_batch_repository.get_batch.return_value = mock_batch
+        mock_batch_repository.get_batch_essays.return_value = []
 
         data = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
@@ -346,6 +354,14 @@ class TestProcessBatchPhaseOutcome:
         """Test processing phase with some failures."""
         # Arrange
         batch_id = str(uuid4())
+        
+        # Setup mock batch for duration calculation
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-456"
+        mock_batch.processing_started_at = datetime.now(timezone.utc) - timedelta(seconds=20)
+        mock_batch.processing_completed_at = datetime.now(timezone.utc)
+        mock_batch_repository.get_batch.return_value = mock_batch
+        mock_batch_repository.get_batch_essays.return_value = []
 
         data = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
@@ -389,6 +405,14 @@ class TestProcessBatchPhaseOutcome:
         """Test processing critical phase failure."""
         # Arrange
         batch_id = str(uuid4())
+        
+        # Setup mock batch for duration calculation
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-789"
+        mock_batch.processing_started_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        mock_batch.processing_completed_at = None  # Not completed due to failure
+        mock_batch_repository.get_batch.return_value = mock_batch
+        mock_batch_repository.get_batch_essays.return_value = []
 
         data = ELSBatchPhaseOutcomeV1(
             batch_id=batch_id,
@@ -719,62 +743,76 @@ class TestProcessSpellcheckCompleted:
             await event_processor.process_spellcheck_completed(envelope, data)
 
 
-class TestProcessCJAssessmentCompleted:
-    """Tests for process_cj_assessment_completed method."""
+class TestProcessAssessmentResult:
+    """Tests for process_assessment_result method."""
 
     @pytest.mark.asyncio
-    async def test_successful_cj_assessment(
+    async def test_successful_assessment_result(
         self,
         event_processor: EventProcessorImpl,
         mock_batch_repository: AsyncMock,
         mock_state_store: AsyncMock,
     ) -> None:
-        """Test processing successful CJ assessment results."""
+        """Test processing successful assessment results from CJ Assessment Service."""
         # Arrange
         batch_id = str(uuid4())
+        cj_job_id = str(uuid4())
         essay1_id = str(uuid4())
         essay2_id = str(uuid4())
+        
+        # Setup mock batch with proper user_id
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-assessment-1"
+        mock_batch_repository.get_batch.return_value = mock_batch
 
-        # EntityReference removed - using primitive parameters
-        system_metadata = SystemProcessingMetadata(
+        data = AssessmentResultV1(
             entity_id=batch_id,
             entity_type="batch",
-            parent_id=None,
-            processing_stage=ProcessingStage.COMPLETED,
-        )
-
-        data = CJAssessmentCompletedV1(
-            entity_id=batch_id,
-            entity_type="batch",
-            parent_id=None,
-            cj_assessment_job_id=str(uuid4()),
-            rankings=[
+            batch_id=batch_id,
+            cj_assessment_job_id=cj_job_id,
+            assessment_method="cj_assessment",
+            model_used="gpt-4",
+            model_provider="openai",
+            essay_results=[
                 {
-                    "els_essay_id": essay1_id,
+                    "essay_id": essay1_id,
+                    "normalized_score": 0.85,
+                    "letter_grade": "A",
+                    "confidence_score": 0.9,
+                    "confidence_label": "HIGH",
+                    "bt_score": 1.2,
                     "rank": 1,
-                    "score": 0.85,
+                    "is_anchor": False,
                 },
                 {
-                    "els_essay_id": essay2_id,
+                    "essay_id": essay2_id,
+                    "normalized_score": 0.65,
+                    "letter_grade": "B",
+                    "confidence_score": 0.75,
+                    "confidence_label": "MID",
+                    "bt_score": 0.8,
                     "rank": 2,
-                    "score": 0.65,
+                    "is_anchor": False,
                 },
             ],
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=system_metadata,
-            grade_projections_summary=create_test_grade_projections([essay1_id, essay2_id]),
+            assessment_metadata={
+                "anchor_essays_used": 0,
+                "calibration_method": "default",
+                "comparison_count": 1,
+                "processing_duration_seconds": 10.5,
+            },
         )
 
-        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
+        envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="CJAssessmentCompletedV1",
+            event_type="AssessmentResultV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="cj_assessment",
             data=data,
         )
 
         # Act
-        await event_processor.process_cj_assessment_completed(envelope, data)
+        await event_processor.process_assessment_result(envelope, data)
 
         # Assert
         assert mock_batch_repository.update_essay_cj_assessment_result.call_count == 2
@@ -785,8 +823,8 @@ class TestProcessCJAssessmentCompleted:
         assert call_args_1.kwargs["batch_id"] == batch_id
         assert call_args_1.kwargs["status"] == ProcessingStage.COMPLETED
         assert call_args_1.kwargs["rank"] == 1
-        assert call_args_1.kwargs["score"] == 0.85
-        assert call_args_1.kwargs["comparison_count"] is None
+        assert call_args_1.kwargs["score"] == 1.2  # bt_score
+        assert call_args_1.kwargs["comparison_count"] == 1
         assert call_args_1.kwargs["error_detail"] is None
         assert "correlation_id" in call_args_1.kwargs
 
@@ -796,124 +834,139 @@ class TestProcessCJAssessmentCompleted:
         assert call_args_2.kwargs["batch_id"] == batch_id
         assert call_args_2.kwargs["status"] == ProcessingStage.COMPLETED
         assert call_args_2.kwargs["rank"] == 2
-        assert call_args_2.kwargs["score"] == 0.65
-        assert call_args_2.kwargs["comparison_count"] is None
+        assert call_args_2.kwargs["score"] == 0.8  # bt_score
+        assert call_args_2.kwargs["comparison_count"] == 1
         assert call_args_2.kwargs["error_detail"] is None
         assert "correlation_id" in call_args_2.kwargs
 
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
 
     @pytest.mark.asyncio
-    async def test_cj_assessment_with_missing_essay_id(
+    async def test_assessment_with_anchor_essays(
         self,
         event_processor: EventProcessorImpl,
         mock_batch_repository: AsyncMock,
         mock_state_store: AsyncMock,
     ) -> None:
-        """Test handling ranking without essay_id."""
+        """Test handling assessment results with anchor essays (should be excluded)."""
         # Arrange
         batch_id = str(uuid4())
+        cj_job_id = str(uuid4())
         essay1_id = str(uuid4())
-
-        # EntityReference removed - using primitive parameters
-        system_metadata = SystemProcessingMetadata(
+        
+        # Setup mock batch with proper user_id
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-assessment-2"
+        mock_batch_repository.get_batch.return_value = mock_batch
+        
+        data = AssessmentResultV1(
             entity_id=batch_id,
             entity_type="batch",
-            parent_id=None,
-            processing_stage=ProcessingStage.COMPLETED,
-        )
-
-        data = CJAssessmentCompletedV1(
-            entity_id=batch_id,
-            entity_type="batch",
-            parent_id=None,
-            cj_assessment_job_id=str(uuid4()),
-            rankings=[
+            batch_id=batch_id,
+            cj_assessment_job_id=cj_job_id,
+            assessment_method="cj_assessment",
+            model_used="gpt-4",
+            model_provider="openai",
+            essay_results=[
                 {
-                    "els_essay_id": essay1_id,
+                    "essay_id": essay1_id,
+                    "normalized_score": 0.85,
+                    "letter_grade": "A",
+                    "confidence_score": 0.9,
+                    "confidence_label": "HIGH",
+                    "bt_score": 1.2,
                     "rank": 1,
-                    "score": 0.85,
+                    "is_anchor": False,  # Student essay
                 },
                 {
-                    # Missing els_essay_id
-                    "rank": 2,
-                    "score": 0.65,
+                    "essay_id": "ANCHOR_001",
+                    "normalized_score": 0.95,
+                    "letter_grade": "A",
+                    "confidence_score": 1.0,
+                    "confidence_label": "HIGH",
+                    "bt_score": 2.0,
+                    "rank": 0,
+                    "is_anchor": True,  # Anchor essay - should be excluded
                 },
             ],
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=system_metadata,
-            grade_projections_summary=create_test_grade_projections([essay1_id]),
+            assessment_metadata={
+                "anchor_essays_used": 1,
+                "calibration_method": "anchor",
+                "comparison_count": 1,
+            },
         )
 
-        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
+        envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="CJAssessmentCompletedV1",
+            event_type="AssessmentResultV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="cj_assessment",
             data=data,
         )
 
         # Act
-        await event_processor.process_cj_assessment_completed(envelope, data)
+        await event_processor.process_assessment_result(envelope, data)
 
-        # Assert - should only process the first essay
+        # Assert - should only process the student essay, not the anchor
+        assert mock_batch_repository.update_essay_cj_assessment_result.call_count == 1
         call_args = mock_batch_repository.update_essay_cj_assessment_result.call_args
         assert call_args.kwargs["essay_id"] == essay1_id
         assert call_args.kwargs["batch_id"] == batch_id
         assert call_args.kwargs["status"] == ProcessingStage.COMPLETED
         assert call_args.kwargs["rank"] == 1
-        assert call_args.kwargs["score"] == 0.85
-        assert call_args.kwargs["comparison_count"] is None
-        assert call_args.kwargs["error_detail"] is None
+        assert call_args.kwargs["score"] == 1.2
         assert "correlation_id" in call_args.kwargs
 
     @pytest.mark.asyncio
-    async def test_cj_assessment_empty_rankings(
+    async def test_assessment_empty_results(
         self,
         event_processor: EventProcessorImpl,
         mock_batch_repository: AsyncMock,
         mock_state_store: AsyncMock,
     ) -> None:
-        """Test processing CJ assessment with empty rankings."""
+        """Test processing assessment with empty results."""
         # Arrange
         batch_id = str(uuid4())
+        cj_job_id = str(uuid4())
+        
+        # Setup mock batch with proper user_id
+        mock_batch = MagicMock()
+        mock_batch.user_id = "test-user-assessment-3"
+        mock_batch_repository.get_batch.return_value = mock_batch
 
-        # EntityReference removed - using primitive parameters
-        system_metadata = SystemProcessingMetadata(
+        data = AssessmentResultV1(
             entity_id=batch_id,
             entity_type="batch",
-            parent_id=None,
-            processing_stage=ProcessingStage.COMPLETED,
+            batch_id=batch_id,
+            cj_assessment_job_id=cj_job_id,
+            assessment_method="cj_assessment",
+            model_used="gpt-4",
+            model_provider="openai",
+            essay_results=[],  # Empty results
+            assessment_metadata={
+                "anchor_essays_used": 0,
+                "calibration_method": "default",
+                "comparison_count": 0,
+            },
         )
 
-        data = CJAssessmentCompletedV1(
-            entity_id=batch_id,
-            entity_type="batch",
-            parent_id=None,
-            cj_assessment_job_id=str(uuid4()),
-            rankings=[],
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=system_metadata,
-            grade_projections_summary=create_test_grade_projections(),
-        )
-
-        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
+        envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="CJAssessmentCompletedV1",
+            event_type="AssessmentResultV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="cj_assessment",
             data=data,
         )
 
         # Act
-        await event_processor.process_cj_assessment_completed(envelope, data)
+        await event_processor.process_assessment_result(envelope, data)
 
         # Assert
         mock_batch_repository.update_essay_cj_assessment_result.assert_not_called()
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
 
     @pytest.mark.asyncio
-    async def test_cj_assessment_repository_error(
+    async def test_assessment_repository_error(
         self,
         event_processor: EventProcessorImpl,
         mock_batch_repository: AsyncMock,
@@ -922,35 +975,39 @@ class TestProcessCJAssessmentCompleted:
         """Test error handling when repository fails."""
         # Arrange
         batch_id = str(uuid4())
+        cj_job_id = str(uuid4())
+        essay_id = str(uuid4())
 
-        # EntityReference removed - using primitive parameters
-        system_metadata = SystemProcessingMetadata(
+        data = AssessmentResultV1(
             entity_id=batch_id,
             entity_type="batch",
-            parent_id=None,
-            processing_stage=ProcessingStage.COMPLETED,
-        )
-
-        data = CJAssessmentCompletedV1(
-            entity_id=batch_id,
-            entity_type="batch",
-            parent_id=None,
-            cj_assessment_job_id=str(uuid4()),
-            rankings=[
+            batch_id=batch_id,
+            cj_assessment_job_id=cj_job_id,
+            assessment_method="cj_assessment",
+            model_used="gpt-4",
+            model_provider="openai",
+            essay_results=[
                 {
-                    "els_essay_id": str(uuid4()),
+                    "essay_id": essay_id,
+                    "normalized_score": 0.85,
+                    "letter_grade": "A",
+                    "confidence_score": 0.9,
+                    "confidence_label": "HIGH",
+                    "bt_score": 1.2,
                     "rank": 1,
-                    "score": 0.85,
+                    "is_anchor": False,
                 },
             ],
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=system_metadata,
-            grade_projections_summary=create_test_grade_projections([str(uuid4())]),
+            assessment_metadata={
+                "anchor_essays_used": 0,
+                "calibration_method": "default",
+                "comparison_count": 1,
+            },
         )
 
-        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
+        envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="CJAssessmentCompletedV1",
+            event_type="AssessmentResultV1",
             event_timestamp=datetime.now(timezone.utc),
             source_service="cj_assessment",
             data=data,
@@ -960,7 +1017,7 @@ class TestProcessCJAssessmentCompleted:
 
         # Act & Assert
         with pytest.raises(Exception, match="DB error"):
-            await event_processor.process_cj_assessment_completed(envelope, data)
+            await event_processor.process_assessment_result(envelope, data)
 
 
 # Test Coverage Summary:
@@ -968,6 +1025,5 @@ class TestProcessCJAssessmentCompleted:
 # - ELSBatchPhaseOutcomeV1: 4 tests (successful, with failures, critical failure, repository error)
 # - SpellcheckResultDataV1: 5 tests (with corrections, without corrections, failed, missing entity,
 #   missing batch_id)
-# - CJAssessmentCompletedV1: 4 tests (successful, missing essay_id, empty rankings, repository
-#   error)
+# - AssessmentResultV1: 4 tests (successful, with anchors, empty results, repository error)
 # Total: 16 tests covering all methods in EventProcessorImpl

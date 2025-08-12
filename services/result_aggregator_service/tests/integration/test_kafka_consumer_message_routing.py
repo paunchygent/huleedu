@@ -152,42 +152,58 @@ class TestKafkaConsumerRouting:
         call_args = mock_event_processor.process_spellcheck_completed.call_args
         assert call_args[0][1].entity_id == essay_id
 
-    async def test_route_cj_assessment_completed_event(
+    async def test_route_assessment_result_event(
         self,
         kafka_consumer: ResultAggregatorKafkaConsumer,
         mock_event_processor: AsyncMock,
     ) -> None:
-        """Test routing of CJAssessmentCompletedV1 event."""
+        """Test routing of AssessmentResultV1 event."""
         # Arrange
+        from common_core.events.assessment_result_events import AssessmentResultV1
+        
         batch_id: str = str(uuid4())
+        cj_job_id: str = str(uuid4())
 
-        # Use primitive parameters directly
-        entity_id = batch_id
-        entity_type = "batch"
-        parent_id = None
-
-        rankings = [
-            {"els_essay_id": "essay-1", "rank": 1, "score": 0.95},
-            {"els_essay_id": "essay-2", "rank": 2, "score": 0.85},
-        ]
-
-        data = CJAssessmentCompletedV1(
-            event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
-            entity_id=entity_id,
-            entity_type=entity_type,
-            parent_id=parent_id,
-            status=BatchStatus.COMPLETED_SUCCESSFULLY,
-            system_metadata=SystemProcessingMetadata(
-                entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
-            ),
-            cj_assessment_job_id="job-123",
-            rankings=rankings,
-            grade_projections_summary=create_test_grade_projections(["essay-1", "essay-2"]),
+        data = AssessmentResultV1(
+            entity_id=batch_id,
+            entity_type="batch",
+            batch_id=batch_id,
+            cj_assessment_job_id=cj_job_id,
+            assessment_method="cj_assessment",
+            model_used="gpt-4",
+            model_provider="openai",
+            essay_results=[
+                {
+                    "essay_id": "essay-1",
+                    "normalized_score": 0.95,
+                    "letter_grade": "A",
+                    "confidence_score": 0.9,
+                    "confidence_label": "HIGH",
+                    "bt_score": 1.2,
+                    "rank": 1,
+                    "is_anchor": False,
+                },
+                {
+                    "essay_id": "essay-2",
+                    "normalized_score": 0.85,
+                    "letter_grade": "B",
+                    "confidence_score": 0.8,
+                    "confidence_label": "MID",
+                    "bt_score": 0.8,
+                    "rank": 2,
+                    "is_anchor": False,
+                },
+            ],
+            assessment_metadata={
+                "anchor_essays_used": 0,
+                "calibration_method": "default",
+                "comparison_count": 1,
+            },
         )
 
-        envelope: EventEnvelope[CJAssessmentCompletedV1] = EventEnvelope(
+        envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="CJAssessmentCompletedV1",
+            event_type="AssessmentResultV1",
             event_timestamp=datetime.now(UTC),
             source_service="cj_assessment",
             correlation_id=uuid4(),
@@ -195,7 +211,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic=topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+            topic=topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),
             event_envelope=envelope,
         )
 
@@ -204,9 +220,9 @@ class TestKafkaConsumerRouting:
 
         # Assert
         assert result is True
-        mock_event_processor.process_cj_assessment_completed.assert_called_once()
-        call_args = mock_event_processor.process_cj_assessment_completed.call_args
-        assert call_args[0][1].rankings == rankings
+        mock_event_processor.process_assessment_result.assert_called_once()
+        call_args = mock_event_processor.process_assessment_result.call_args
+        assert len(call_args[0][1].essay_results) == 2
 
     async def test_route_batch_phase_outcome_event(
         self,
@@ -290,5 +306,5 @@ class TestKafkaConsumerRouting:
         # No processor method should be called
         mock_event_processor.process_batch_registered.assert_not_called()
         mock_event_processor.process_spellcheck_completed.assert_not_called()
-        mock_event_processor.process_cj_assessment_completed.assert_not_called()
+        mock_event_processor.process_assessment_result.assert_not_called()
         mock_event_processor.process_batch_phase_outcome.assert_not_called()

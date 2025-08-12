@@ -22,6 +22,7 @@ from common_core.events.result_events import (
 )
 from common_core.status_enums import BatchStatus
 from common_core.websocket_enums import NotificationPriority, WebSocketEventCategory
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
@@ -257,7 +258,7 @@ async def test_batch_results_ready_end_to_end_flow(
 
     # Verify Redis notification was sent for relay worker wake-up
     assert len(mock_redis_client.notifications_sent) == 1
-    assert mock_redis_client.notifications_sent[0] == "result_aggregator_service"
+    assert mock_redis_client.notifications_sent[0] == "1"  # OutboxManager sends "1" as wake signal
 
 
 @pytest.mark.asyncio
@@ -310,7 +311,7 @@ async def test_batch_assessment_completed_end_to_end_flow(
 
     # Verify Redis notification was sent for relay worker wake-up
     assert len(mock_redis_client.notifications_sent) == 1
-    assert mock_redis_client.notifications_sent[0] == "result_aggregator_service"
+    assert mock_redis_client.notifications_sent[0] == "1"  # OutboxManager sends "1" as wake signal
 
 
 @pytest.mark.asyncio
@@ -369,8 +370,8 @@ async def test_outbox_manager_failure_propagation(
         settings=settings,
     )
 
-    # Act & Assert - Exception should be propagated
-    with pytest.raises(Exception, match="Database connection failed"):
+    # Act & Assert - Exception should be wrapped in HuleEduError
+    with pytest.raises(HuleEduError, match="Failed to store event in outbox"):
         await notification_projector.handle_batch_results_ready(
             sample_batch_results_ready_event, uuid4()
         )

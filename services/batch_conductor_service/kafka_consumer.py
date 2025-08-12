@@ -272,35 +272,60 @@ class BCSKafkaConsumer:
                 logger.error("Cannot process CJ assessment result: entity_id (batch_id) is None")
                 return
 
-            # CJ assessment results contain ranking for multiple essays
-            for ranking in cj_data.rankings:
-                essay_id = ranking.get("els_essay_id")
-                if essay_id:
-                    # Record completion for each essay in the batch
-                    success = await self.batch_state_repo.record_essay_step_completion(
-                        batch_id=batch_id,
-                        essay_id=essay_id,
-                        step_name="cj_assessment",
-                        metadata={
-                            "completion_status": "success",
-                            "cj_job_id": cj_data.cj_assessment_job_id,
-                            "rank": ranking.get("rank"),
-                            "score": ranking.get("score"),
-                            "event_id": str(envelope.event_id),
-                            "timestamp": envelope.event_timestamp.isoformat(),
-                        },
-                    )
+            # Use processing_summary for state tracking only (NO business data)
+            processing_summary = cj_data.processing_summary
+            
+            # Record successful essay completions
+            for essay_id in processing_summary.get("successful_essay_ids", []):
+                # Record completion for each essay (state tracking only)
+                success = await self.batch_state_repo.record_essay_step_completion(
+                    batch_id=batch_id,
+                    essay_id=essay_id,
+                    step_name="cj_assessment",
+                    metadata={
+                        "completion_status": "success",
+                        "cj_job_id": cj_data.cj_assessment_job_id,
+                        # NO business data (rank, score) - just state tracking
+                        "event_id": str(envelope.event_id),
+                        "timestamp": envelope.event_timestamp.isoformat(),
+                    },
+                )
 
-                    if success:
-                        logger.info(
-                            f"Recorded CJ assessment completion for essay {essay_id} "
-                            f"in batch {batch_id}",
-                            extra={"correlation_id": str(envelope.correlation_id)},
-                        )
-                    else:
-                        logger.error(
-                            f"Failed to record CJ assessment completion for essay {essay_id}"
-                        )
+                if success:
+                    logger.info(
+                        f"Recorded CJ assessment completion for essay {essay_id} "
+                        f"in batch {batch_id}",
+                        extra={"correlation_id": str(envelope.correlation_id)},
+                    )
+                else:
+                    logger.error(
+                        f"Failed to record CJ assessment completion for essay {essay_id}"
+                    )
+            
+            # Record failed essay completions
+            for essay_id in processing_summary.get("failed_essay_ids", []):
+                success = await self.batch_state_repo.record_essay_step_completion(
+                    batch_id=batch_id,
+                    essay_id=essay_id,
+                    step_name="cj_assessment",
+                    metadata={
+                        "completion_status": "failed",
+                        "cj_job_id": cj_data.cj_assessment_job_id,
+                        "event_id": str(envelope.event_id),
+                        "timestamp": envelope.event_timestamp.isoformat(),
+                    },
+                )
+                
+                if success:
+                    logger.info(
+                        f"Recorded CJ assessment failure for essay {essay_id} "
+                        f"in batch {batch_id}",
+                        extra={"correlation_id": str(envelope.correlation_id)},
+                    )
+                else:
+                    logger.error(
+                        f"Failed to record CJ assessment failure for essay {essay_id}"
+                    )
 
         except Exception as e:
             logger.error(f"Error processing CJ assessment completion: {e}", exc_info=True)

@@ -246,6 +246,14 @@ class TestDefaultServiceResultHandler:
         result.entity_type = "batch"
         result.parent_id = None
         result.cj_assessment_job_id = "job-123"
+        # New structure with processing_summary
+        result.processing_summary = {
+            "successful_essay_ids": ["essay-1", "essay-2"],
+            "failed_essay_ids": [],
+            "successful": 2,
+            "failed": 0,
+        }
+        # Deprecated but kept for backward compatibility
         result.rankings = [
             {"els_essay_id": "essay-1", "rank": 1, "score": 0.85},
             {"els_essay_id": "essay-2", "rank": 2, "score": 0.75},

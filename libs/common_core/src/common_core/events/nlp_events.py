@@ -11,10 +11,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from common_core.domain_enums import CourseCode, BatchStatus
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData, ProcessingUpdate
-from common_core.metadata_models import SystemProcessingMetadata
 
 
 class StudentMatchSuggestion(BaseModel):
