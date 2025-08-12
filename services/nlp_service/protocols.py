@@ -12,7 +12,12 @@ from aiohttp import ClientSession
 from aiokafka import ConsumerRecord
 from common_core.domain_enums import CourseCode
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import EssayMatchResult, StudentMatchSuggestion
+from common_core.events.nlp_events import (
+    EssayMatchResult,
+    GrammarAnalysis,
+    NlpMetrics,
+    StudentMatchSuggestion,
+)
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
 
@@ -99,6 +104,53 @@ class NlpEventPublisherProtocol(Protocol):
         """Publish batch author match results to Kafka."""
         ...
 
+    async def publish_essay_nlp_completed(
+        self,
+        essay_id: str,
+        text_storage_id: str,
+        nlp_metrics: NlpMetrics,
+        grammar_analysis: GrammarAnalysis,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish NLP analysis completion event for a single essay.
+        
+        Note: No kafka_bus parameter - implementation uses outbox pattern internally.
+        
+        Args:
+            essay_id: Essay identifier
+            text_storage_id: Storage ID of essay content
+            nlp_metrics: Basic text metrics from spaCy
+            grammar_analysis: Grammar analysis from Language Tool
+            correlation_id: Correlation ID for tracking
+        """
+        ...
+
+    async def publish_batch_nlp_analysis_completed(
+        self,
+        batch_id: str,
+        total_essays: int,
+        successful_count: int,
+        failed_count: int,
+        successful_essay_ids: list[str],
+        failed_essay_ids: list[str],
+        processing_time_seconds: float,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish batch NLP analysis completion event to ELS.
+        
+        This is the thin event for state management, following the dual event pattern.
+        Rich business data goes to RAS via publish_essay_nlp_completed.
+        
+        Args:
+            batch_id: Batch identifier
+            total_essays: Total number of essays in batch
+            successful_count: Number of successfully processed essays
+            failed_count: Number of failed essays
+            processing_time_seconds: Total batch processing time
+            correlation_id: Correlation ID for tracking
+        """
+        ...
+
 
 class CommandHandlerProtocol(Protocol):
     """Base protocol for all NLP command handlers."""
@@ -133,5 +185,52 @@ class CommandHandlerProtocol(Protocol):
 
         Returns:
             True if processing succeeded, False otherwise
+        """
+        ...
+
+
+# Phase 2: NLP Analysis Protocols
+
+
+class NlpAnalyzerProtocol(Protocol):
+    """Protocol for spaCy-based text analysis."""
+
+    async def analyze_text(
+        self,
+        text: str,
+        language: str = "auto",
+    ) -> NlpMetrics:
+        """Extract basic text metrics using spaCy.
+        
+        Args:
+            text: The text to analyze
+            language: Language code ("en", "sv") or "auto" for detection
+            
+        Returns:
+            NlpMetrics with basic text statistics
+        """
+        ...
+
+
+class LanguageToolClientProtocol(Protocol):
+    """Protocol for Language Tool Service integration."""
+
+    async def check_grammar(
+        self,
+        text: str,
+        http_session: ClientSession,
+        correlation_id: UUID,
+        language: str = "auto",
+    ) -> GrammarAnalysis:
+        """Get grammar analysis from Language Tool Service.
+        
+        Args:
+            text: The text to check for grammar errors
+            language: Language code ("en", "sv") or "auto" 
+            http_session: HTTP session for external API calls
+            correlation_id: Correlation ID for tracking
+            
+        Returns:
+            GrammarAnalysis with detected errors and suggestions
         """
         ...

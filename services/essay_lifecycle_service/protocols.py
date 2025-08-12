@@ -366,6 +366,15 @@ class ServiceResultHandler(Protocol):
         """Handle CJ assessment failure from CJ Assessment Service."""
         ...
 
+    async def handle_nlp_analysis_completed(
+        self,
+        result_data: Any,  # BatchNlpAnalysisCompletedV1
+        correlation_id: UUID,
+        confirm_idempotency: Any = None,
+    ) -> bool:
+        """Handle NLP analysis completion from NLP Service."""
+        ...
+
 
 class BatchPhaseCoordinator(Protocol):
     """Protocol for coordinating batch-level phase completion and outcome publishing."""

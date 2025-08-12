@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from services.nlp_service.command_handlers.essay_student_matching_handler import (
     EssayStudentMatchingHandler,
 )
-from services.nlp_service.command_handlers.student_matching_handler import StudentMatchingHandler
+from services.nlp_service.command_handlers.batch_nlp_analysis_handler import BatchNlpAnalysisHandler
 from services.nlp_service.config import Settings, settings
 from services.nlp_service.features.student_matching.extraction.base_extractor import BaseExtractor
 from services.nlp_service.features.student_matching.extraction.email_anchor_extractor import (
@@ -47,12 +47,16 @@ from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.implementations.roster_cache_impl import RedisRosterCache
 from services.nlp_service.implementations.roster_client_impl import DefaultClassManagementClient
 from services.nlp_service.implementations.student_matcher_impl import DefaultStudentMatcher
+from services.nlp_service.implementations.nlp_analyzer_impl import SpacyNlpAnalyzer
+from services.nlp_service.implementations.language_tool_client_impl import LanguageToolServiceClient
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
 from services.nlp_service.metrics import get_business_metrics
 from services.nlp_service.protocols import (
     ClassManagementClientProtocol,
     CommandHandlerProtocol,
     ContentClientProtocol,
+    LanguageToolClientProtocol,
+    NlpAnalyzerProtocol,
     NlpEventPublisherProtocol,
     RosterCacheProtocol,
     StudentMatcherProtocol,
@@ -290,26 +294,35 @@ class NlpServiceProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_nlp_analyzer(self) -> NlpAnalyzerProtocol:
+        """Provide spaCy-based NLP analyzer."""
+        return SpacyNlpAnalyzer()
+
+    @provide(scope=Scope.APP)
+    def provide_language_tool_client(
+        self,
+        settings: Settings,
+    ) -> LanguageToolClientProtocol:
+        """Provide Language Tool Service client."""
+        return LanguageToolServiceClient(settings.LANGUAGE_TOOL_SERVICE_URL)
+
+    @provide(scope=Scope.APP)
     def provide_batch_nlp_handler(
         self,
         content_client: ContentClientProtocol,
-        class_management_client: ClassManagementClientProtocol,
-        roster_cache: RosterCacheProtocol,
-        student_matcher: StudentMatcherProtocol,
         event_publisher: NlpEventPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
-        kafka_bus: KafkaPublisherProtocol,
+        nlp_analyzer: NlpAnalyzerProtocol,
+        language_tool_client: LanguageToolClientProtocol,
         tracer: Tracer,
-    ) -> StudentMatchingHandler:
+    ) -> BatchNlpAnalysisHandler:
         """Provide Phase 2 batch NLP command handler."""
-        return StudentMatchingHandler(
+        return BatchNlpAnalysisHandler(
             content_client=content_client,
-            class_management_client=class_management_client,
-            roster_cache=roster_cache,
-            student_matcher=student_matcher,
             event_publisher=event_publisher,
             outbox_repository=outbox_repository,
-            kafka_bus=kafka_bus,
+            nlp_analyzer=nlp_analyzer,
+            language_tool_client=language_tool_client,
             tracer=tracer,
         )
 
@@ -317,7 +330,7 @@ class NlpServiceProvider(Provider):
     def provide_command_handlers(
         self,
         essay_student_matching_handler: EssayStudentMatchingHandler,
-        batch_nlp_handler: StudentMatchingHandler,
+        batch_nlp_handler: BatchNlpAnalysisHandler,
     ) -> dict[str, CommandHandlerProtocol]:
         """Provide dictionary of command handlers."""
         return {

@@ -329,6 +329,25 @@ async def _route_event(
             )
             return cj_result
 
+        elif event_type == topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED):
+            from common_core.events.nlp_events import BatchNlpAnalysisCompletedV1
+
+            nlp_result_data = BatchNlpAnalysisCompletedV1.model_validate(envelope.data)
+
+            # Record NLP analysis completion
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="nlp_completed", batch_id=str(nlp_result_data.batch_id)
+                ).inc()
+
+            # Handle the thin completion event - state transitions only
+            nlp_result: bool = await service_result_handler.handle_nlp_analysis_completed(
+                result_data=nlp_result_data,
+                correlation_id=correlation_id,
+                confirm_idempotency=confirm_idempotency,
+            )
+            return nlp_result
+
         # Handle Phase 1 student matching events
         elif event_type == topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND):
             from common_core.batch_service_models import (

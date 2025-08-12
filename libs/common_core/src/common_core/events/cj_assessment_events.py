@@ -113,7 +113,12 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
 
 
 class CJAssessmentCompletedV1(ProcessingUpdate):
-    """Result event from CJ Assessment Service to ELS reporting successful completion."""
+    """Result event from CJ Assessment Service to ELS (thin event for state management).
+    
+    CRITICAL: This is a thin event following clean architecture principles.
+    It contains ONLY state tracking information - NO business data.
+    Business data (rankings, scores, grade projections) goes to RAS via AssessmentResultV1.
+    """
 
     event_name: ProcessingEvent = Field(default=ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
     # entity_ref (from BaseEventData) is the BOS Batch ID this result pertains to
@@ -121,10 +126,18 @@ class CJAssessmentCompletedV1(ProcessingUpdate):
     # system_metadata (from ProcessingUpdate) populated by CJ Assessment Service
 
     cj_assessment_job_id: str  # The internal ID from CJ_BatchUpload, for detailed log/result lookup
-    rankings: list[dict[str, Any]]  # The consumer-friendly ranking data
-    # Example: [{"els_essay_id": "uuid1", "rank": 1, "score": 0.75}, ...]
-    grade_projections_summary: GradeProjectionSummary = Field(
-        description="Grade projections with confidence scores - always included",
+    
+    # Clean state tracking field - NO business data
+    processing_summary: dict[str, Any] = Field(
+        description="Summary of batch processing results for state management",
+        default_factory=lambda: {
+            "total_essays": 0,
+            "successful": 0,
+            "failed": 0,
+            "successful_essay_ids": [],  # Essay IDs that were successfully assessed
+            "failed_essay_ids": [],      # Essay IDs that failed assessment
+            "processing_time_seconds": 0.0,
+        },
     )
 
 

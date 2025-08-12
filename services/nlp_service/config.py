@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # External Service URLs
     CONTENT_SERVICE_URL: str = "http://content_service:8000"
     CLASS_MANAGEMENT_SERVICE_URL: str = "http://class_management_service:5002"
+    LANGUAGE_TOOL_SERVICE_URL: str = Field(
+        default="http://language_tool_service:8080",
+        description="Language Tool Service URL for grammar checking",
+    )
 
     # Redis Configuration
     REDIS_URL: str = "redis://redis:6379"

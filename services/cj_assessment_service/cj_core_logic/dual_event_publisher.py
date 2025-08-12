@@ -86,7 +86,10 @@ async def publish_dual_assessment_events(
     if hasattr(course_code, "value"):
         course_code = course_code.value
 
-    # 1. THIN EVENT TO ELS (Phase tracking with essay IDs)
+    # Calculate processing time
+    processing_time = (datetime.now(UTC) - processing_started_at).total_seconds()
+    
+    # 1. THIN EVENT TO ELS (Phase tracking with essay IDs only - NO business data)
     els_event = CJAssessmentCompletedV1(
         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
         entity_id=bos_batch_id,
@@ -106,9 +109,15 @@ async def publish_dual_assessment_events(
             event=ProcessingEvent.CJ_ASSESSMENT_COMPLETED.value,
         ),
         cj_assessment_job_id=cj_batch_id,
-        # Rankings filtered to exclude anchors for ELS processing
-        rankings=student_rankings,  # Contains only student essays
-        grade_projections_summary=grade_projections,
+        # Clean state tracking - NO business data (rankings, grades, scores)
+        processing_summary={
+            "total_essays": len(student_rankings),
+            "successful": len(successful_essay_ids),
+            "failed": len(failed_essay_ids),
+            "successful_essay_ids": successful_essay_ids,
+            "failed_essay_ids": failed_essay_ids,
+            "processing_time_seconds": round(processing_time, 2),
+        },
     )
 
     els_envelope = EventEnvelope[CJAssessmentCompletedV1](

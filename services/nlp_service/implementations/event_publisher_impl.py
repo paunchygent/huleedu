@@ -8,11 +8,17 @@ from uuid import UUID
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
+from common_core.status_enums import BatchStatus
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
+    BatchNlpAnalysisCompletedV1,
     EssayMatchResult,
+    EssayNlpCompletedV1,
+    GrammarAnalysis,
+    NlpMetrics,
     StudentMatchSuggestion,
 )
+from common_core.metadata_models import SystemProcessingMetadata
 
 # EntityReference removed - using primitive parameters
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -188,6 +194,214 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                     "correlation_id": str(correlation_id),
                     "batch_id": batch_id,
                     "topic": self.output_topic,
+                },
+            )
+            # Re-raise - structured error will be handled by OutboxManager
+            raise
+
+    async def publish_essay_nlp_completed(
+        self,
+        essay_id: str,
+        text_storage_id: str,
+        nlp_metrics: NlpMetrics,
+        grammar_analysis: GrammarAnalysis,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish NLP analysis completion event for a single essay.
+        
+        Note: No kafka_bus parameter - uses outbox pattern exclusively.
+        
+        Args:
+            essay_id: Essay identifier
+            text_storage_id: Storage ID of essay content
+            nlp_metrics: Basic text metrics from spaCy
+            grammar_analysis: Grammar analysis from Language Tool
+            correlation_id: Correlation ID for tracking
+        """
+        logger.debug(
+            f"Publishing NLP analysis completed for essay {essay_id} via outbox",
+            extra={
+                "correlation_id": str(correlation_id),
+                "essay_id": essay_id,
+                "word_count": nlp_metrics.word_count,
+                "error_count": grammar_analysis.error_count,
+            },
+        )
+
+        # Create the event data
+        event_data = EssayNlpCompletedV1(
+            event_name=ProcessingEvent.ESSAY_NLP_COMPLETED,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=None,
+            essay_id=essay_id,
+            text_storage_id=text_storage_id,
+            nlp_metrics=nlp_metrics,
+            grammar_analysis=grammar_analysis,
+            processing_metadata={
+                "source": "nlp_service",
+                "phase": "phase_2_analysis",
+            },
+        )
+
+        # Create event envelope
+        event_envelope = EventEnvelope[EssayNlpCompletedV1](
+            event_type=topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
+            source_service=self.source_service_name,
+            correlation_id=correlation_id,
+            data=event_data,
+            metadata={},
+        )
+
+        # Inject trace context if available
+        if event_envelope.metadata is not None:
+            inject_trace_context(event_envelope.metadata)
+
+        try:
+            # Publish via outbox pattern - no direct Kafka usage
+            await self.outbox_manager.publish_to_outbox(
+                aggregate_type="essay",
+                aggregate_id=essay_id,
+                event_type=event_envelope.event_type,
+                event_data=event_envelope,
+                topic=topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
+            )
+
+            logger.info(
+                f"Successfully stored NLP analysis results in outbox for essay {essay_id}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "essay_id": essay_id,
+                    "topic": topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to publish NLP analysis results for essay {essay_id}: {e}",
+                exc_info=True,
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "essay_id": essay_id,
+                },
+            )
+            # Re-raise - structured error will be handled by OutboxManager
+            raise
+
+    async def publish_batch_nlp_analysis_completed(
+        self,
+        batch_id: str,
+        total_essays: int,
+        successful_count: int,
+        failed_count: int,
+        successful_essay_ids: list[str],
+        failed_essay_ids: list[str],
+        processing_time_seconds: float,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish batch NLP analysis completion event to ELS.
+        
+        This is the thin event for state management, following the dual event pattern
+        established by CJ Assessment Service.
+        
+        Args:
+            batch_id: Batch identifier
+            total_essays: Total number of essays in batch
+            successful_count: Number of successfully processed essays
+            failed_count: Number of failed essays
+            successful_essay_ids: List of essay IDs that were successfully processed
+            failed_essay_ids: List of essay IDs that failed processing
+            processing_time_seconds: Total batch processing time
+            correlation_id: Correlation ID for tracking
+        """
+        from datetime import datetime
+        
+        logger.debug(
+            f"Publishing batch NLP analysis completion to ELS for batch {batch_id}",
+            extra={
+                "correlation_id": str(correlation_id),
+                "batch_id": batch_id,
+                "total_essays": total_essays,
+                "successful_count": successful_count,
+                "failed_count": failed_count,
+            },
+        )
+
+        # Determine batch status based on results
+        if failed_count == 0:
+            batch_status = BatchStatus.COMPLETED_SUCCESSFULLY
+        elif successful_count > 0:
+            batch_status = BatchStatus.COMPLETED_WITH_FAILURES
+        else:
+            batch_status = BatchStatus.FAILED_CRITICALLY
+
+        # Create system metadata
+        system_metadata = SystemProcessingMetadata(
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
+            timestamp=datetime.utcnow(),
+        )
+
+        # Create the thin event for ELS state management
+        event_data = BatchNlpAnalysisCompletedV1(
+            event_name=ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED,
+            entity_id=batch_id,
+            entity_type="batch",
+            parent_id=None,
+            status=batch_status,
+            system_metadata=system_metadata,
+            batch_id=batch_id,
+            processing_summary={
+                "total_essays": total_essays,
+                "successful": successful_count,
+                "failed": failed_count,
+                "successful_essay_ids": successful_essay_ids,
+                "failed_essay_ids": failed_essay_ids,
+                "processing_time_seconds": round(processing_time_seconds, 2),
+            },
+        )
+
+        # Create event envelope
+        event_envelope = EventEnvelope[BatchNlpAnalysisCompletedV1](
+            event_type=topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
+            source_service=self.source_service_name,
+            correlation_id=correlation_id,
+            data=event_data,
+            metadata={},
+        )
+
+        # Inject trace context if available
+        if event_envelope.metadata is not None:
+            inject_trace_context(event_envelope.metadata)
+
+        try:
+            # Publish via outbox pattern - no direct Kafka usage
+            await self.outbox_manager.publish_to_outbox(
+                aggregate_type="batch",
+                aggregate_id=batch_id,
+                event_type=event_envelope.event_type,
+                event_data=event_envelope,
+                topic=topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
+            )
+
+            logger.info(
+                f"Successfully stored batch NLP completion in outbox for batch {batch_id}",
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "batch_id": batch_id,
+                    "batch_status": batch_status.value,
+                    "topic": topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to publish batch NLP completion for batch {batch_id}: {e}",
+                exc_info=True,
+                extra={
+                    "correlation_id": str(correlation_id),
+                    "batch_id": batch_id,
                 },
             )
             # Re-raise - structured error will be handled by OutboxManager

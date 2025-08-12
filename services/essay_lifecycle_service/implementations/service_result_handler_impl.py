@@ -17,6 +17,7 @@ from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
     CJAssessmentFailedV1,
 )
+from common_core.events.nlp_events import BatchNlpAnalysisCompletedV1
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
@@ -29,6 +30,8 @@ from quart import current_app, has_app_context
 from services.essay_lifecycle_service.essay_state_machine import (
     EVT_CJ_ASSESSMENT_FAILED,
     EVT_CJ_ASSESSMENT_SUCCEEDED,
+    EVT_NLP_FAILED,
+    EVT_NLP_SUCCEEDED,
     EVT_SPELLCHECK_FAILED,
     EVT_SPELLCHECK_SUCCEEDED,
 )
@@ -266,30 +269,51 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         correlation_id: UUID,
         confirm_idempotency: Any = None,
     ) -> bool:
-        """Handle CJ assessment completion from CJ Assessment Service."""
+        """Handle CJ assessment completion from CJ Assessment Service.
+        
+        CRITICAL: This handler follows clean architecture principles.
+        It ONLY updates state machine status - NO business data storage.
+        Business data (rankings, scores, grade projections) goes to RAS via AssessmentResultV1.
+        
+        Args:
+            result_data: Batch CJ assessment completion event (thin event)
+            correlation_id: Correlation ID for tracking
+            confirm_idempotency: Optional idempotency confirmation callback
+            
+        Returns:
+            True if all essay states were successfully updated, False otherwise
+        """
         try:
             logger.info(
                 "Processing CJ assessment completion for batch",
                 extra={
                     "batch_id": result_data.entity_id,
                     "job_id": result_data.cj_assessment_job_id,
+                    "successful_count": result_data.processing_summary.get("successful", 0),
+                    "failed_count": result_data.processing_summary.get("failed", 0),
                     "correlation_id": str(correlation_id),
                 },
             )
 
+            # Extract essay IDs from the processing summary
+            successful_essay_ids = result_data.processing_summary.get("successful_essay_ids", [])
+            failed_essay_ids = result_data.processing_summary.get("failed_essay_ids", [])
+            
+            if not successful_essay_ids and not failed_essay_ids:
+                logger.warning(
+                    "No essay IDs found in CJ assessment completion event",
+                    extra={
+                        "batch_id": result_data.entity_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                return False
+
             # START UNIT OF WORK
             async with self.session_factory() as session:
                 async with session.begin():
-                    # CJ assessment results are batch-level, need to process each essay ranking
-                    for ranking in result_data.rankings:
-                        essay_id = ranking.get("els_essay_id")
-                        if not essay_id:
-                            logger.warning(
-                                "Missing essay ID in CJ ranking",
-                                extra={"ranking": ranking, "correlation_id": str(correlation_id)},
-                            )
-                            continue
-
+                    # Process successful essays
+                    for essay_id in successful_essay_ids:
                         # Get current essay state
                         essay_state = await self.repository.get_essay_state(essay_id)
                         if essay_state is None:
@@ -318,6 +342,8 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                             if "cj_assessment" not in existing_commanded_phases:
                                 existing_commanded_phases.append("cj_assessment")
 
+                            # CRITICAL: Only update state, NO business data storage
+                            # Business data (rankings, scores, grades) goes to RAS only
                             await self.repository.update_essay_status_via_machine(
                                 essay_id,
                                 state_machine.current_status,
@@ -325,9 +351,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                     "cj_assessment_result": {
                                         "success": True,
                                         "job_id": result_data.cj_assessment_job_id,
-                                        "rank": ranking.get("rank"),
-                                        "score": ranking.get("score"),
-                                        "ranking_data": ranking,
+                                        # NO rank, score, or ranking_data - violates clean architecture
                                     },
                                     "current_phase": "cj_assessment",
                                     "commanded_phases": existing_commanded_phases,
@@ -342,13 +366,76 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 extra={
                                     "essay_id": essay_id,
                                     "new_status": state_machine.current_status.value,
-                                    "rank": ranking.get("rank"),
                                     "correlation_id": str(correlation_id),
                                 },
                             )
                         else:
                             logger.error(
                                 f"State machine trigger '{EVT_CJ_ASSESSMENT_SUCCEEDED}' failed "
+                                f"for essay {essay_id} from status "
+                                f"{essay_state.current_status.value}.",
+                                extra={"correlation_id": str(correlation_id)},
+                            )
+                            continue
+                    
+                    # Process failed essays
+                    for essay_id in failed_essay_ids:
+                        # Get current essay state
+                        essay_state = await self.repository.get_essay_state(essay_id)
+                        if essay_state is None:
+                            logger.error(
+                                "Essay not found for CJ assessment failure",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            continue
+
+                        # Create state machine and trigger failure event
+                        state_machine = EssayStateMachine(
+                            essay_id=essay_id, initial_status=essay_state.current_status
+                        )
+
+                        # Attempt state transition
+                        if state_machine.trigger_event(EVT_CJ_ASSESSMENT_FAILED):
+                            # Preserve existing commanded_phases metadata
+                            existing_commanded_phases = essay_state.processing_metadata.get(
+                                "commanded_phases", []
+                            )
+
+                            # Ensure cj_assessment is in commanded_phases
+                            if "cj_assessment" not in existing_commanded_phases:
+                                existing_commanded_phases.append("cj_assessment")
+
+                            await self.repository.update_essay_status_via_machine(
+                                essay_id,
+                                state_machine.current_status,
+                                {
+                                    "cj_assessment_result": {
+                                        "success": False,
+                                        "job_id": result_data.cj_assessment_job_id,
+                                        # NO error details - clean architecture
+                                    },
+                                    "current_phase": "cj_assessment",
+                                    "commanded_phases": existing_commanded_phases,
+                                    "phase_outcome_status": "CJ_ASSESSMENT_FAILED",
+                                },
+                                session,
+                                correlation_id=correlation_id,
+                            )
+
+                            logger.info(
+                                "Processed CJ assessment failure for essay",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "new_status": state_machine.current_status.value,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                        else:
+                            logger.error(
+                                f"State machine trigger '{EVT_CJ_ASSESSMENT_FAILED}' failed "
                                 f"for essay {essay_id} from status "
                                 f"{essay_state.current_status.value}.",
                                 extra={"correlation_id": str(correlation_id)},
@@ -361,7 +448,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         "Checking batch phase completion for CJ assessment",
                         extra={
                             "batch_id": result_data.entity_id,
-                            "total_rankings": len(result_data.rankings),
+                            "total_essays": len(successful_essay_ids) + len(failed_essay_ids),
                             "correlation_id": str(correlation_id),
                         },
                     )
@@ -408,34 +495,27 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         },
                     )
 
-                    # We need a representative essay_state from the batch to trigger check_batch_completion
-                    if result_data.rankings:
-                        # Try multiple essays in case the first one has metadata issues
-                        for i, ranking in enumerate(
-                            result_data.rankings[:3]
-                        ):  # Check first 3 essays
-                            essay_id_in_ranking = ranking.get("els_essay_id")
-                            if essay_id_in_ranking:
-                                batch_representative_essay_state = (
-                                    await self.repository.get_essay_state(essay_id_in_ranking)
-                                )
-                                if batch_representative_essay_state:
-                                    logger.info(
-                                        f"Triggering batch completion check with essay {i + 1}/{len(result_data.rankings)}",
-                                        extra={
-                                            "essay_id": essay_id_in_ranking,
-                                            "essay_status": batch_representative_essay_state.current_status.value,
-                                            "essay_metadata": batch_representative_essay_state.processing_metadata,
-                                            "correlation_id": str(correlation_id),
-                                        },
-                                    )
-                                    await self.batch_coordinator.check_batch_completion(
-                                        essay_state=batch_representative_essay_state,
-                                        phase_name=PhaseName.CJ_ASSESSMENT,
-                                        correlation_id=correlation_id,
-                                        session=session,
-                                    )
-                                    break  # Only need to check once
+                    # Get a representative essay state to trigger batch completion check
+                    representative_essay_id = (successful_essay_ids + failed_essay_ids)[0] if (successful_essay_ids + failed_essay_ids) else None
+                    if representative_essay_id:
+                        representative_essay_state = await self.repository.get_essay_state(
+                            representative_essay_id
+                        )
+                        if representative_essay_state:
+                            logger.info(
+                                "Triggering batch completion check",
+                                extra={
+                                    "essay_id": representative_essay_id,
+                                    "essay_status": representative_essay_state.current_status.value,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            await self.batch_coordinator.check_batch_completion(
+                                essay_state=representative_essay_state,
+                                phase_name=PhaseName.CJ_ASSESSMENT,
+                                correlation_id=correlation_id,
+                                session=session,
+                            )
                     # Transaction commits here
 
             # Confirm idempotency after successful transaction commit
@@ -542,6 +622,225 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 "Error handling CJ assessment failure",
                 extra={
                     "batch_id": getattr(result_data, "entity_id", "unknown"),
+                    "error": str(e),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            return False
+
+    async def handle_nlp_analysis_completed(
+        self,
+        result_data: BatchNlpAnalysisCompletedV1,
+        correlation_id: UUID,
+        confirm_idempotency: Any = None,
+    ) -> bool:
+        """Handle NLP analysis completion from NLP Service.
+        
+        CRITICAL: This handler follows clean architecture principles.
+        It ONLY updates state machine status - NO business data storage.
+        Business data (NLP metrics, grammar analysis) is sent to RAS via separate events.
+        
+        Args:
+            result_data: Batch NLP analysis completion event (thin event)
+            correlation_id: Correlation ID for tracking
+            confirm_idempotency: Optional idempotency confirmation callback
+            
+        Returns:
+            True if all essay states were successfully updated, False otherwise
+        """
+        try:
+            logger.info(
+                "Processing NLP analysis completion for batch",
+                extra={
+                    "batch_id": result_data.batch_id,
+                    "successful_count": result_data.processing_summary.get("successful", 0),
+                    "failed_count": result_data.processing_summary.get("failed", 0),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # Extract essay IDs from the processing summary
+            successful_essay_ids = result_data.processing_summary.get("successful_essay_ids", [])
+            failed_essay_ids = result_data.processing_summary.get("failed_essay_ids", [])
+            
+            if not successful_essay_ids and not failed_essay_ids:
+                logger.warning(
+                    "No essay IDs found in NLP analysis completion event",
+                    extra={
+                        "batch_id": result_data.batch_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                return False
+
+            # START UNIT OF WORK
+            async with self.session_factory() as session:
+                async with session.begin():
+                    # Process successful essays
+                    for essay_id in successful_essay_ids:
+                        # Get current essay state
+                        essay_state = await self.repository.get_essay_state(essay_id)
+                        if essay_state is None:
+                            logger.error(
+                                "Essay not found for NLP analysis result",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            continue
+
+                        # Create state machine and trigger success event
+                        state_machine = EssayStateMachine(
+                            essay_id=essay_id, initial_status=essay_state.current_status
+                        )
+
+                        # Attempt state transition
+                        if state_machine.trigger_event(EVT_NLP_SUCCEEDED):
+                            # Preserve existing commanded_phases metadata
+                            existing_commanded_phases = essay_state.processing_metadata.get(
+                                "commanded_phases", []
+                            )
+
+                            # Ensure nlp_analysis is in commanded_phases
+                            if "nlp_analysis" not in existing_commanded_phases:
+                                existing_commanded_phases.append("nlp_analysis")
+
+                            # CRITICAL: Only update state, NO business data storage
+                            # Business data (NLP metrics, grammar analysis) goes to RAS only
+                            await self.repository.update_essay_status_via_machine(
+                                essay_id,
+                                state_machine.current_status,
+                                {
+                                    "nlp_analysis_result": {
+                                        "success": True,
+                                        # NO NLP metrics here - violates clean architecture
+                                        # NO grammar analysis here - violates clean architecture
+                                    },
+                                    "current_phase": "nlp_analysis",
+                                    "commanded_phases": existing_commanded_phases,
+                                    "phase_outcome_status": "NLP_ANALYSIS_SUCCESS",
+                                },
+                                session,
+                                correlation_id=correlation_id,
+                            )
+
+                            logger.info(
+                                "Successfully processed NLP analysis completion for essay",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "new_status": state_machine.current_status.value,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                        else:
+                            logger.error(
+                                f"State machine trigger '{EVT_NLP_SUCCEEDED}' failed "
+                                f"for essay {essay_id} from status "
+                                f"{essay_state.current_status.value}.",
+                                extra={"correlation_id": str(correlation_id)},
+                            )
+                            continue
+
+                    # Process failed essays
+                    for essay_id in failed_essay_ids:
+                        # Get current essay state
+                        essay_state = await self.repository.get_essay_state(essay_id)
+                        if essay_state is None:
+                            logger.error(
+                                "Essay not found for NLP analysis failure",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            continue
+
+                        # Create state machine and trigger failure event
+                        state_machine = EssayStateMachine(
+                            essay_id=essay_id, initial_status=essay_state.current_status
+                        )
+
+                        # Attempt state transition
+                        if state_machine.trigger_event(EVT_NLP_FAILED):
+                            # Preserve existing commanded_phases metadata
+                            existing_commanded_phases = essay_state.processing_metadata.get(
+                                "commanded_phases", []
+                            )
+
+                            # Ensure nlp_analysis is in commanded_phases
+                            if "nlp_analysis" not in existing_commanded_phases:
+                                existing_commanded_phases.append("nlp_analysis")
+
+                            await self.repository.update_essay_status_via_machine(
+                                essay_id,
+                                state_machine.current_status,
+                                {
+                                    "nlp_analysis_result": {
+                                        "success": False,
+                                        # NO error details here - clean architecture
+                                    },
+                                    "current_phase": "nlp_analysis",
+                                    "commanded_phases": existing_commanded_phases,
+                                    "phase_outcome_status": "NLP_ANALYSIS_FAILED",
+                                },
+                                session,
+                                correlation_id=correlation_id,
+                            )
+
+                            logger.info(
+                                "Processed NLP analysis failure for essay",
+                                extra={
+                                    "essay_id": essay_id,
+                                    "new_status": state_machine.current_status.value,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                        else:
+                            logger.error(
+                                f"State machine trigger '{EVT_NLP_FAILED}' failed "
+                                f"for essay {essay_id} from status "
+                                f"{essay_state.current_status.value}.",
+                                extra={"correlation_id": str(correlation_id)},
+                            )
+                            continue
+
+                    # Check batch completion after processing all essays
+                    logger.info(
+                        "Checking batch phase completion for NLP analysis",
+                        extra={
+                            "batch_id": result_data.batch_id,
+                            "total_essays": len(successful_essay_ids) + len(failed_essay_ids),
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+
+                    # Get a representative essay state to trigger batch completion check
+                    representative_essay_id = (successful_essay_ids + failed_essay_ids)[0] if (successful_essay_ids + failed_essay_ids) else None
+                    if representative_essay_id:
+                        representative_essay_state = await self.repository.get_essay_state(
+                            representative_essay_id
+                        )
+                        if representative_essay_state:
+                            await self.batch_coordinator.check_batch_completion(
+                                essay_state=representative_essay_state,
+                                phase_name=PhaseName.NLP,
+                                correlation_id=correlation_id,
+                                session=session,
+                            )
+                    # Transaction commits here
+
+            # Confirm idempotency after successful transaction commit
+            if confirm_idempotency is not None:
+                await confirm_idempotency()
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Error handling NLP analysis completion",
+                extra={
+                    "batch_id": getattr(result_data, "batch_id", "unknown"),
                     "error": str(e),
                     "correlation_id": str(correlation_id),
                 },
