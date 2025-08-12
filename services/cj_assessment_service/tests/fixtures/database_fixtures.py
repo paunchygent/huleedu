@@ -325,6 +325,7 @@ def mock_event_publisher() -> AsyncMock:
     publisher = AsyncMock(spec=CJEventPublisherProtocol)
     publisher.publish_assessment_completed = AsyncMock()
     publisher.publish_assessment_failed = AsyncMock()
+    publisher.publish_assessment_result = AsyncMock()  # Added for dual event publishing to RAS
     return publisher
 
 
