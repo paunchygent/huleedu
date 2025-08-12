@@ -38,3 +38,50 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
         response.headers["X-Correlation-ID"] = str(correlation_id)
 
         return response
+
+
+class DevelopmentMiddleware(BaseHTTPMiddleware):
+    """Middleware for development-specific features and debugging."""
+
+    def __init__(self, app, settings=None):
+        """Initialize development middleware with settings."""
+        super().__init__(app)
+        self.settings = settings
+
+    def is_development_environment(self) -> bool:
+        """Check if running in development environment."""
+        if not self.settings:
+            return False
+        return self.settings.ENV_TYPE.lower() in ["development", "dev", "local"]
+
+    async def dispatch(self, request: Request, call_next):
+        """Add development-specific features and headers."""
+        if not self.is_development_environment():
+            return await call_next(request)
+
+        # Add development debug info to request state
+        request.state.development_mode = True
+        request.state.cors_origins = getattr(self.settings, 'CORS_ORIGINS', [])
+
+        # Process request
+        response = await call_next(request)
+
+        # Add development-specific headers
+        response.headers["X-HuleEdu-Environment"] = "development"
+        response.headers["X-HuleEdu-Dev-Mode"] = "enabled"
+        response.headers["X-HuleEdu-CORS-Origins"] = ",".join(
+            getattr(self.settings, 'CORS_ORIGINS', [])
+        )
+
+        # Add service info for debugging
+        response.headers["X-HuleEdu-Service"] = getattr(
+            self.settings, 'SERVICE_NAME', 'api-gateway-service'
+        )
+
+        # Log development request for debugging
+        logger.debug(
+            f"Development request: {request.method} {request.url.path} "
+            f"from {request.client.host if request.client else 'unknown'}"
+        )
+
+        return response

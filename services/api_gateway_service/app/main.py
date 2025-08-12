@@ -47,6 +47,11 @@ def create_app() -> FastAPI:
     # Add Correlation ID Middleware (must be early in chain)
     app.add_middleware(CorrelationIDMiddleware)
 
+    # Add Development Middleware (only in development environment)
+    if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
+        from .middleware import DevelopmentMiddleware
+        app.add_middleware(DevelopmentMiddleware, settings=settings)
+
     # Setup distributed tracing and tracing middleware (second in chain)
     setup_tracing_and_middleware(app)
 
@@ -79,6 +84,11 @@ def create_app() -> FastAPI:
     app.include_router(status_routes.router, prefix="/v1", tags=["Status"])
     app.include_router(batch_routes.router, prefix="/v1", tags=["Batches"])
     app.include_router(file_routes.router, prefix="/v1", tags=["Files"])
+
+    # Include development routes (only in development environment)
+    if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
+        from ..routers import dev_routes
+        app.include_router(dev_routes.router, prefix="/dev", tags=["Development"])
 
     # Setup Dishka DI
     container = create_di_container()

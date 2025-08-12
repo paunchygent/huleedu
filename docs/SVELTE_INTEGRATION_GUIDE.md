@@ -76,7 +76,58 @@ export const config = {
 Ensure your API Gateway allows your development origin:
 ```bash
 # API Gateway should include your development URL in CORS_ORIGINS
-API_GATEWAY_CORS_ORIGINS=["http://localhost:3000", "http://localhost:5173"]
+API_GATEWAY_CORS_ORIGINS=["http://localhost:5173", "http://localhost:4173", "http://localhost:3000"]
+```
+
+### Development Utilities
+
+**Mock Endpoints for Development**
+The API Gateway provides mock endpoints specifically for Svelte 5 development:
+
+```typescript
+// Mock data endpoints (development only)
+const mockEndpoints = {
+  classes: '/dev/mock/classes',
+  students: '/dev/mock/students/{class_id}',
+  essays: '/dev/mock/essays/{status}',
+  batches: '/dev/mock/batches',
+  reactiveState: '/dev/mock/reactive-state',
+  wsNotification: '/dev/mock/websocket/trigger',
+  testToken: '/dev/auth/test-token'
+};
+
+// Example: Get mock classes optimized for Svelte 5 runes
+const response = await fetch(`${config.apiBaseUrl}/dev/mock/classes`);
+const { classes, metadata } = await response.json();
+
+// Reactive state data structure for Svelte 5
+const { app_state, reactive_counters } = await fetch(`${config.apiBaseUrl}/dev/mock/reactive-state`)
+  .then(r => r.json());
+```
+
+**Test Token Generation**
+```typescript
+// Generate test tokens for authentication testing
+const tokenResponse = await fetch(`${config.apiBaseUrl}/dev/auth/test-token`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    user_type: 'teacher',
+    expires_minutes: 60,
+    class_id: 'class-001'
+  })
+});
+
+const { access_token, claims } = await tokenResponse.json();
+```
+
+**Development Headers**
+Development mode includes debug headers:
+```
+X-HuleEdu-Environment: development
+X-HuleEdu-Dev-Mode: enabled  
+X-HuleEdu-CORS-Origins: http://localhost:5173,http://localhost:4173,http://localhost:3000
+X-HuleEdu-Service: api-gateway-service
 ```
 
 ### Basic Authentication

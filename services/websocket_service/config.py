@@ -70,8 +70,12 @@ class Settings(BaseSettings):
 
     # CORS Configuration for WebSocket upgrade
     CORS_ORIGINS: list[str] = Field(
-        default_factory=lambda: ["http://localhost:3000"],
-        description="Allowed origins for CORS",
+        default=[
+            "http://localhost:5173",  # Vite dev server (primary)
+            "http://localhost:4173",  # Vite preview server
+            "http://localhost:3000",  # Legacy/backup port
+        ],
+        description="Allowed origins for Svelte 5 + Vite WebSocket connections",
     )
     CORS_ALLOW_CREDENTIALS: bool = Field(default=True, description="Allow credentials in CORS")
     CORS_ALLOW_METHODS: list[str] = Field(
