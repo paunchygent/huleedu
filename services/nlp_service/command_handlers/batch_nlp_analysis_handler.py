@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import (
@@ -83,7 +83,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process Phase 2 batch NLP initiate commands
         """
-        return event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
+        return event_type == topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
 
     async def handle(
         self,
@@ -107,11 +107,11 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         """
         try:
             # Parse and validate command data
-            command_data = BatchServiceNLPInitiateCommandDataV1.model_validate(envelope.data)
+            command_data = BatchNlpProcessingRequestedV1.model_validate(envelope.data)
 
             # Log event processing
-            # Get batch_id from entity_id (inherited from BaseEventData)
-            batch_id = command_data.entity_id or "unknown_batch"
+            # Get batch_id from command_data
+            batch_id = command_data.batch_id
 
             log_event_processing(
                 logger=logger,

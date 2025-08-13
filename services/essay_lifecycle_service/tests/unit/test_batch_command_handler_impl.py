@@ -62,7 +62,7 @@ class TestDefaultBatchCommandHandler:
         return mock
 
     @pytest.fixture
-    def mock_future_services_handler(self) -> AsyncMock:
+    def mock_nlp_handler(self) -> AsyncMock:
         """Mock future services command handler."""
         mock = AsyncMock()
         mock.process_initiate_nlp_command = AsyncMock()
@@ -74,13 +74,13 @@ class TestDefaultBatchCommandHandler:
         self,
         mock_spellcheck_handler: AsyncMock,
         mock_cj_assessment_handler: AsyncMock,
-        mock_future_services_handler: AsyncMock,
+        mock_nlp_handler: AsyncMock,
     ) -> DefaultBatchCommandHandler:
         """Create DefaultBatchCommandHandler with mocked service handlers."""
         return DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler,
+            nlp_handler=mock_nlp_handler,
         )
 
     @pytest.fixture
@@ -142,7 +142,7 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_nlp_command_stub(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_future_services_handler: AsyncMock,
+        mock_nlp_handler: AsyncMock,
         correlation_id: UUID,
     ) -> None:
         """Test NLP command delegation to future services handler."""
@@ -154,7 +154,7 @@ class TestDefaultBatchCommandHandler:
         )
 
         # Verify delegation to future services handler
-        mock_future_services_handler.process_initiate_nlp_command.assert_called_once_with(
+        mock_nlp_handler.process_initiate_nlp_command.assert_called_once_with(
             mock_command, correlation_id
         )
 
@@ -163,21 +163,19 @@ class TestDefaultBatchCommandHandler:
     async def test_process_initiate_ai_feedback_command_stub(
         self,
         command_handler: DefaultBatchCommandHandler,
-        mock_future_services_handler: AsyncMock,
+        mock_nlp_handler: AsyncMock,
         correlation_id: UUID,
     ) -> None:
-        """Test AI feedback command delegation to future services handler."""
+        """Test AI feedback command logs warning (not yet implemented)."""
         mock_command = MagicMock(spec=BatchServiceAIFeedbackInitiateCommandDataV1)
+        mock_command.entity_id = "test-batch-123"
 
         # Execute
         await command_handler.process_initiate_ai_feedback_command(
             command_data=mock_command, correlation_id=correlation_id
         )
 
-        # Verify delegation to future services handler
-        mock_future_services_handler.process_initiate_ai_feedback_command.assert_called_once_with(
-            mock_command, correlation_id
-        )
+        # AI feedback is not yet implemented, just verify no error
 
     # Test: process_initiate_cj_assessment_command_delegation
     @pytest.mark.asyncio

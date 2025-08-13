@@ -30,13 +30,13 @@ class TestBatchCommandIntegration:
         # Create mocked service handlers using protocol-based mocking principles
         mock_spellcheck_handler = AsyncMock()
         mock_cj_assessment_handler = AsyncMock()
-        mock_future_services_handler = AsyncMock()
+        mock_nlp_handler = AsyncMock()
 
         # Create handler with mocked service handlers
         handler = DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler,
+            nlp_handler=mock_nlp_handler,
         )
 
         # Create simple command
@@ -61,8 +61,8 @@ class TestBatchCommandIntegration:
 
         # Verify other handlers not called
         mock_cj_assessment_handler.process_initiate_cj_assessment_command.assert_not_called()
-        mock_future_services_handler.process_initiate_nlp_command.assert_not_called()
-        mock_future_services_handler.process_initiate_ai_feedback_command.assert_not_called()
+        mock_nlp_handler.process_initiate_nlp_command.assert_not_called()
+        # AI feedback handler not yet implemented, no assert needed
 
     @pytest.mark.asyncio
     async def test_command_handler_handles_missing_essay_gracefully(self) -> None:
@@ -70,13 +70,13 @@ class TestBatchCommandIntegration:
         # Create mocked service handlers using protocol-based mocking principles
         mock_spellcheck_handler = AsyncMock()
         mock_cj_assessment_handler = AsyncMock()
-        mock_future_services_handler = AsyncMock()
+        mock_nlp_handler = AsyncMock()
 
         # Create handler with mocked service handlers
         handler = DefaultBatchCommandHandler(
             spellcheck_handler=mock_spellcheck_handler,
             cj_assessment_handler=mock_cj_assessment_handler,
-            future_services_handler=mock_future_services_handler,
+            nlp_handler=mock_nlp_handler,
         )
 
         # Create command for missing essay

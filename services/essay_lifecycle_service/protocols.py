@@ -418,7 +418,8 @@ class SpecializedServiceRequestDispatcher(Protocol):
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        batch_correlation_id: UUID,
+        batch_id: str,
+        correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:
         """Dispatch NLP requests to NLP Service."""

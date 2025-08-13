@@ -55,8 +55,8 @@ from services.essay_lifecycle_service.implementations.consumer_recovery_manager_
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
-    FutureServicesCommandHandler,
+from services.essay_lifecycle_service.implementations.nlp_command_handler import (
+    NlpCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
@@ -363,14 +363,14 @@ class CommandHandlerProvider(Provider):
         return CJAssessmentCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
-    def provide_future_services_command_handler(
+    def provide_nlp_command_handler(
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
         session_factory: async_sessionmaker,
-    ) -> FutureServicesCommandHandler:
-        """Provide future services command handler implementation."""
-        return FutureServicesCommandHandler(repository, request_dispatcher, session_factory)
+    ) -> NlpCommandHandler:
+        """Provide NLP command handler implementation."""
+        return NlpCommandHandler(repository, request_dispatcher, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_student_matching_command_handler(
@@ -394,14 +394,14 @@ class CommandHandlerProvider(Provider):
         self,
         spellcheck_handler: SpellcheckCommandHandler,
         cj_assessment_handler: CJAssessmentCommandHandler,
-        future_handler: FutureServicesCommandHandler,
+        nlp_handler: NlpCommandHandler,
         student_matching_handler: Any,  # StudentMatchingCommandHandler
     ) -> BatchCommandHandler:
         """Provide batch command handler implementation."""
 
         # Need to create an extended version that includes student matching
         return DefaultBatchCommandHandler(
-            spellcheck_handler, cj_assessment_handler, future_handler, student_matching_handler
+            spellcheck_handler, cj_assessment_handler, nlp_handler, student_matching_handler
         )
 
 

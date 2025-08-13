@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData, ProcessingUpdate
+from common_core.metadata_models import EssayProcessingInputRefV1
 
 
 class StudentMatchSuggestion(BaseModel):
@@ -84,6 +85,28 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
 
 
 # Phase 2: NLP Analysis Events
+
+
+class BatchNlpProcessingRequestedV1(BaseEventData):
+    """
+    Request from ELS to NLP Service for batch text analysis.
+    
+    This event is published by ELS after receiving BATCH_NLP_INITIATE_COMMAND
+    from BOS. It follows the same pattern as ESSAY_SPELLCHECK_REQUESTED,
+    maintaining architectural consistency across services.
+    
+    The 'event_name' should be ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED.
+    """
+    
+    essays_to_process: list[EssayProcessingInputRefV1] = Field(
+        description="List of essays to analyze with their text storage references"
+    )
+    language: str = Field(
+        description="Language code for processing (e.g., 'en', 'sv')"
+    )
+    batch_id: str = Field(
+        description="Batch identifier for tracking"
+    )
 
 
 class NlpMetrics(BaseModel):

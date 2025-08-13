@@ -36,6 +36,7 @@ class ProcessingEvent(str, Enum):
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_COMPLETED = "essay.spellcheck.completed"
     ESSAY_SPELLCHECK_REQUESTED = "essay.spellcheck.requested"
+    BATCH_NLP_PROCESSING_REQUESTED = "batch.nlp.processing.requested"
     ELS_CJ_ASSESSMENT_REQUESTED = "els.cj_assessment.requested"
     CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
     CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
@@ -80,6 +81,7 @@ class ProcessingEvent(str, Enum):
 _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED: "huleedu.essay.spellcheck.requested.v1",
     ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED: "huleedu.essay.spellcheck.completed.v1",
+    ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED: "huleedu.batch.nlp.processing.requested.v1",
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
     ProcessingEvent.ESSAY_CONTENT_PROVISIONED: "huleedu.file.essay.content.provisioned.v1",
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",

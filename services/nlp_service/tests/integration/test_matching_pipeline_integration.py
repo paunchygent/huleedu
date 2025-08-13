@@ -48,10 +48,10 @@ class TestMatchingPipelineIntegration:
 
         # Create container with test provider for missing dependencies
         from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
-        
+
         container = make_async_container(
-            MatchingTestProvider(), 
-            NlpServiceProvider(engine), 
+            MatchingTestProvider(),
+            NlpServiceProvider(engine),
             NlpDependencyProvider()
         )
 

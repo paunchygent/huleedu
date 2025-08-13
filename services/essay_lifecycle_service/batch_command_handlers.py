@@ -291,6 +291,29 @@ async def _route_event(
                 )
             return True
 
+        elif event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND):
+            from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+
+            nlp_command_data = BatchServiceNLPInitiateCommandDataV1.model_validate(envelope.data)
+
+            # Record NLP command processing
+            if coordination_events_metric:
+                coordination_events_metric.labels(
+                    event_type="nlp_command", batch_id=str(nlp_command_data.entity_id)
+                ).inc()
+
+            # Maintain trace context when calling the handler
+            if envelope.metadata:
+                with use_trace_context(envelope.metadata):
+                    await batch_command_handler.process_initiate_nlp_command(
+                        command_data=nlp_command_data, correlation_id=correlation_id
+                    )
+            else:
+                await batch_command_handler.process_initiate_nlp_command(
+                    command_data=nlp_command_data, correlation_id=correlation_id
+                )
+            return True
+
         # Handle specialized service result events
         elif event_type == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
             from common_core.events.spellcheck_models import SpellcheckResultDataV1

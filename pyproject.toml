@@ -290,6 +290,11 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning:pydantic.*",
     "ignore::DeprecationWarning:pkg_resources",
+    # Suppress spacy's internal click parser deprecation (library issue, not our code)
+    "ignore:Importing 'parser.split_arg_string' is deprecated:DeprecationWarning:spacy.cli._util",
+    "ignore:Importing 'parser.split_arg_string' is deprecated:DeprecationWarning:weasel.util.config",
+    # Suppress lexical_diversity's internal pkg_resources usage (library issue, not our code)
+    "ignore:pkg_resources is deprecated as an API:UserWarning:lexical_diversity.lex_div",
 ]
 
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from huleedu_service_libs.logging_utils import create_service_logger
+
 if TYPE_CHECKING:
     from common_core.batch_service_models import (
         BatchServiceAIFeedbackInitiateCommandDataV1,
@@ -22,13 +24,15 @@ if TYPE_CHECKING:
 from services.essay_lifecycle_service.implementations.cj_assessment_command_handler import (
     CJAssessmentCommandHandler,
 )
-from services.essay_lifecycle_service.implementations.future_services_command_handlers import (
-    FutureServicesCommandHandler,
+from services.essay_lifecycle_service.implementations.nlp_command_handler import (
+    NlpCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.spellcheck_command_handler import (
     SpellcheckCommandHandler,
 )
 from services.essay_lifecycle_service.protocols import BatchCommandHandler
+
+logger = create_service_logger("essay_lifecycle.batch_command_handler")
 
 
 class DefaultBatchCommandHandler(BatchCommandHandler):
@@ -38,7 +42,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         self,
         spellcheck_handler: SpellcheckCommandHandler,
         cj_assessment_handler: CJAssessmentCommandHandler,
-        future_services_handler: FutureServicesCommandHandler,
+        nlp_handler: NlpCommandHandler,
         student_matching_handler: Any | None = None,  # StudentMatchingCommandHandler
     ) -> None:
         """
@@ -47,12 +51,12 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         Args:
             spellcheck_handler: Handler for spellcheck commands
             cj_assessment_handler: Handler for CJ assessment commands
-            future_services_handler: Handler for future service commands
+            nlp_handler: Handler for NLP analysis commands
             student_matching_handler: Handler for Phase 1 student matching commands
         """
         self.spellcheck_handler = spellcheck_handler
         self.cj_assessment_handler = cj_assessment_handler
-        self.future_services_handler = future_services_handler
+        self.nlp_handler = nlp_handler
         self.student_matching_handler = student_matching_handler
 
     async def process_initiate_spellcheck_command(
@@ -69,7 +73,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
-        await self.future_services_handler.process_initiate_nlp_command(
+        await self.nlp_handler.process_initiate_nlp_command(
             command_data, correlation_id
         )
 
@@ -79,8 +83,12 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         correlation_id: UUID,
     ) -> None:
         """Process AI feedback initiation command from Batch Orchestrator Service."""
-        await self.future_services_handler.process_initiate_ai_feedback_command(
-            command_data, correlation_id
+        logger.warning(
+            "AI feedback command received but not yet implemented",
+            extra={
+                "batch_id": command_data.entity_id,
+                "correlation_id": str(correlation_id),
+            },
         )
 
     async def process_initiate_cj_assessment_command(

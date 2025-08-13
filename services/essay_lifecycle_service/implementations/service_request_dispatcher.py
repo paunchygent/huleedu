@@ -165,13 +165,96 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         self,
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
-        batch_correlation_id: UUID,
+        batch_id: str,
+        correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:
-        """Dispatch individual NLP requests to NLP Service."""
-        # TODO: Implement when NLP Service is available
+        """Dispatch NLP processing request to NLP Service.
+        
+        Following the architectural pattern established by spellcheck,
+        ELS forwards the batch request to NLP service for processing.
+        """
+        from datetime import UTC, datetime
+        
+        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.events.envelope import EventEnvelope
+        from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
+        
         logger = create_service_logger("specialized_service_dispatcher")
-        logger.info("Dispatching NLP requests (STUB)")
+        
+        logger.info(
+            "Dispatching NLP processing request to NLP Service",
+            extra={
+                "batch_id": batch_id,
+                "essay_count": len(essays_to_process),
+                "language": language.value,
+                "correlation_id": str(correlation_id),
+            },
+        )
+        
+        try:
+            # Create batch NLP processing request
+            nlp_request = BatchNlpProcessingRequestedV1(
+                event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED,
+                entity_id=batch_id,
+                entity_type="batch",
+                essays_to_process=essays_to_process,
+                language=language.value,
+                batch_id=batch_id,
+            )
+            
+            # Create event envelope
+            envelope = EventEnvelope[BatchNlpProcessingRequestedV1](
+                event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
+                source_service=self.settings.SERVICE_NAME,
+                correlation_id=correlation_id,
+                data=nlp_request,
+                metadata={},
+            )
+            
+            if envelope.metadata is not None:
+                inject_trace_context(envelope.metadata)
+            
+            # Publish to outbox for reliable delivery
+            topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
+            event_data = envelope.model_dump(mode="json")
+            
+            await self.outbox_repository.add_event(
+                aggregate_id=batch_id,
+                aggregate_type="batch",
+                event_type=envelope.event_type,
+                event_data=event_data,
+                topic=topic,
+                event_key=batch_id,
+                session=session,
+            )
+            
+            logger.info(
+                f"Dispatched NLP processing request for batch {batch_id}",
+                extra={
+                    "batch_id": batch_id,
+                    "event_id": str(envelope.event_id),
+                    "correlation_id": str(correlation_id),
+                    "essays_count": len(essays_to_process),
+                },
+            )
+            
+        except Exception as e:
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                from huleedu_service_libs.error_handling import raise_processing_error
+                
+                raise_processing_error(
+                    service="essay_lifecycle_service",
+                    operation="dispatch_nlp_requests",
+                    message=f"Failed to dispatch NLP request to outbox: {e.__class__.__name__}",
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
+                    language=language.value,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def dispatch_ai_feedback_requests(
         self,

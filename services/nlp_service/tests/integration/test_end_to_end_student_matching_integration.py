@@ -43,10 +43,10 @@ class TestEndToEndStudentMatchingIntegration:
 
         # Create container with test provider for missing dependencies
         from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
-        
+
         container = make_async_container(
-            EndToEndTestProvider(), 
-            NlpServiceProvider(engine), 
+            EndToEndTestProvider(),
+            NlpServiceProvider(engine),
             NlpDependencyProvider()
         )
 

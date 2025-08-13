@@ -84,7 +84,7 @@ class NlpKafkaConsumer:
         """Start the Kafka consumer and begin processing messages."""
         # Listen for both Phase 1 student matching and Phase 2 NLP commands
         phase1_topic = topic_name(ProcessingEvent.BATCH_STUDENT_MATCHING_REQUESTED)
-        phase2_topic = topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
+        phase2_topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
 
         self.consumer = AIOKafkaConsumer(
             phase1_topic,
