@@ -351,7 +351,7 @@ class EventProcessorImpl(EventProcessorProtocol):
         """Process assessment result event with rich business data from CJ Assessment Service."""
         try:
             batch_id = data.batch_id
-            
+
             logger.info(
                 "Processing assessment results",
                 batch_id=batch_id,
@@ -362,12 +362,12 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             # Process each essay result (excluding anchors for student results)
             student_results = [r for r in data.essay_results if not r.get("is_anchor", False)]
-            
+
             for essay_result in student_results:
                 essay_id = essay_result["essay_id"]
                 rank = essay_result.get("rank")
                 bt_score = essay_result.get("bt_score")
-                
+
                 await self.batch_repository.update_essay_cj_assessment_result(
                     essay_id=essay_id,
                     batch_id=batch_id,

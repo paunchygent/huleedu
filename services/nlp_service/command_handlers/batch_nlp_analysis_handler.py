@@ -11,7 +11,6 @@ Implements dual event pattern:
 from __future__ import annotations
 
 import time
-from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -21,7 +20,6 @@ if TYPE_CHECKING:
 import aiohttp
 from aiokafka import ConsumerRecord
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
-from common_core.status_enums import BatchStatus, EssayStatus
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import (
@@ -37,9 +35,9 @@ from pydantic import ValidationError
 from services.nlp_service.protocols import (
     CommandHandlerProtocol,
     ContentClientProtocol,
-    NlpEventPublisherProtocol,
-    NlpAnalyzerProtocol,
     LanguageToolClientProtocol,
+    NlpAnalyzerProtocol,
+    NlpEventPublisherProtocol,
 )
 
 logger = create_service_logger("nlp_service.command_handlers.batch_nlp_analysis")
@@ -110,11 +108,11 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         try:
             # Parse and validate command data
             command_data = BatchServiceNLPInitiateCommandDataV1.model_validate(envelope.data)
-            
+
             # Log event processing
             # Get batch_id from entity_id (inherited from BaseEventData)
             batch_id = command_data.entity_id or "unknown_batch"
-            
+
             log_event_processing(
                 logger=logger,
                 message="Processing Phase 2 NLP analysis batch",
@@ -187,7 +185,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                     # Step 2: Perform spaCy text analysis
                     # Determine language (use provided or auto-detect)
                     language = getattr(command_data, "language", "auto")
-                    
+
                     nlp_metrics = await self.nlp_analyzer.analyze_text(
                         text=essay_text,
                         language=language,
@@ -325,7 +323,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                     processing_time_seconds=batch_processing_time,
                     correlation_id=correlation_id,
                 )
-                
+
                 logger.info(
                     f"Published batch completion event to ELS for batch {batch_id}",
                     extra={

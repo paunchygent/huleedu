@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     # Add Development Middleware (only in development environment)
     if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
         from .middleware import DevelopmentMiddleware
+
         app.add_middleware(DevelopmentMiddleware, settings=settings)
 
     # Setup distributed tracing and tracing middleware (second in chain)
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     # Include development routes (only in development environment)
     if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
         from ..routers import dev_routes
+
         app.include_router(dev_routes.router, prefix="/dev", tags=["Development"])
 
     # Setup Dishka DI

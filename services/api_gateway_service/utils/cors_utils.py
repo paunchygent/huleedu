@@ -8,18 +8,18 @@ def get_cors_origins_for_environment(
     env_type: str, custom_origins: list[str] | None = None
 ) -> list[str]:
     """Get CORS origins based on environment type - optimized for Svelte 5 + Vite.
-    
+
     Args:
         env_type: Environment type (development, staging, production)
         custom_origins: Additional origins to include
-        
+
     Returns:
         List of allowed CORS origins for the specified environment
-        
+
     Example:
         >>> get_cors_origins_for_environment("development")
         ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000', 'http://localhost:8080']
-        
+
         >>> get_cors_origins_for_environment("production", ["https://custom.domain.com"])
         ['https://app.huledu.com', 'https://huledu.com', 'https://custom.domain.com']
     """
@@ -53,18 +53,18 @@ def get_cors_origins_for_environment(
 
 def is_development_environment(env_type: str) -> bool:
     """Check if running in development environment.
-    
+
     Args:
         env_type: Environment type from settings
-        
+
     Returns:
         True if environment is development-related, False otherwise
-        
+
     Example:
         >>> is_development_environment("development")
         True
         >>> is_development_environment("dev")
-        True  
+        True
         >>> is_development_environment("production")
         False
     """
@@ -73,15 +73,15 @@ def is_development_environment(env_type: str) -> bool:
 
 def get_development_cors_headers(cors_origins: list[str]) -> dict[str, str]:
     """Get development-specific CORS debug headers.
-    
+
     Args:
         cors_origins: List of CORS origins
-        
+
     Returns:
         Dictionary of headers for development debugging
     """
     return {
         "X-HuleEdu-Environment": "development",
-        "X-HuleEdu-Dev-Mode": "enabled", 
+        "X-HuleEdu-Dev-Mode": "enabled",
         "X-HuleEdu-CORS-Origins": ",".join(cors_origins),
     }

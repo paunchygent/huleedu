@@ -8,7 +8,6 @@ from uuid import UUID
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.status_enums import BatchStatus
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
     BatchNlpAnalysisCompletedV1,
@@ -19,6 +18,7 @@ from common_core.events.nlp_events import (
     StudentMatchSuggestion,
 )
 from common_core.metadata_models import SystemProcessingMetadata
+from common_core.status_enums import BatchStatus
 
 # EntityReference removed - using primitive parameters
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -208,9 +208,9 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         correlation_id: UUID,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
-        
+
         Note: No kafka_bus parameter - uses outbox pattern exclusively.
-        
+
         Args:
             essay_id: Essay identifier
             text_storage_id: Storage ID of essay content
@@ -300,10 +300,10 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         correlation_id: UUID,
     ) -> None:
         """Publish batch NLP analysis completion event to ELS.
-        
+
         This is the thin event for state management, following the dual event pattern
         established by CJ Assessment Service.
-        
+
         Args:
             batch_id: Batch identifier
             total_essays: Total number of essays in batch
@@ -315,7 +315,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             correlation_id: Correlation ID for tracking
         """
         from datetime import datetime
-        
+
         logger.debug(
             f"Publishing batch NLP analysis completion to ELS for batch {batch_id}",
             extra={

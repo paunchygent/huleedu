@@ -1,33 +1,61 @@
-# 🧠 ULTRATHINK: NLP Phase 2 Command Handler Implementation Plan (CORRECTED)
+# 🧠 ULTRATHINK: NLP Phase 2 Implementation Status
 
-## 📊 IMPLEMENTATION STATUS (Updated: 2025-01-13)
+## 📋 REFACTORING SUMMARY
+
+**Phase 2 NLP analyzer completely refactored from monolithic `SpacyNlpAnalyzer` to protocol-based DI architecture:**
+
+- **Core**: `NlpAnalyzerRefactored` class with 6 injected protocol dependencies
+- **DI**: `NlpDependencyProvider` provides all implementations via Dishka
+- **Metrics**: All 6 advanced linguistic metrics implemented (Zipf, MTLD/HDD, dependency distance, cohesion, PMI/NPMI, language detection)
+- **Tests**: 317-line unit tests + 450-line dependency tests + 243-line integration tests
+- **Patterns**: Full HuleEdu DDD compliance, skeleton mode fallback, structured error handling
+- **Legacy**: Old implementation deprecated with warnings
+
+## 📊 IMPLEMENTATION STATUS (Updated: 2025-08-13)
 
 ### ✅ COMPLETED
-- BatchNlpAnalysisHandler implementation (skeleton with proper error handling)
-- LanguageToolServiceClient skeleton with mock responses
-- Event models and topic mappings in common_core
-- DI wiring and provider configurations
-- Event publisher methods for NLP completed events
-- NLP Service dependencies updated in pyproject.toml (spacy, wordfreq, lexical-diversity, etc.)
-- Language Tool Service requirements fully documented
-- NlpMetrics model expanded with all required linguistic metrics
-- SpacyNlpAnalyzer full production implementation with:
-  - Lexical sophistication (Zipf frequency via wordfreq)
-  - Lexical diversity (MTLD/HDD via lexical-diversity)
-  - Syntactic complexity (dependency distance via TextDescriptives)
-  - Cohesion metrics (sentence similarity via TextDescriptives)
-  - Phraseology (PMI/NPMI via gensim)
-  - Automatic language detection (langdetect)
-  - Fallback skeleton mode for resilience
+
+**Core Implementation (DI Pattern)**
+
+- ✅ `NlpAnalyzerRefactored` with full DI architecture following HuleEdu patterns
+- ✅ Protocol-based dependency injection: 6 dependency protocols (`SpacyModelLoaderProtocol`, `LanguageDetectorProtocol`, `ZipfCalculatorProtocol`, `LexicalDiversityCalculatorProtocol`, `PhraseologyCalculatorProtocol`, `SyntacticComplexityCalculatorProtocol`)
+- ✅ Concrete implementations: `SpacyModelLoader`, `LanguageDetector`, `ZipfCalculator`, `LexicalDiversityCalculator`, `PhraseologyCalculator`, `SyntacticComplexityCalculator`
+- ✅ `NlpDependencyProvider` with proper Dishka configuration
+- ✅ Full DI container integration in `worker_main.py`
+
+**Advanced Linguistic Metrics**
+
+- ✅ Lexical sophistication: mean Zipf frequency, % tokens Zipf<3 (wordfreq)
+- ✅ Lexical diversity: MTLD/HDD (lexical-diversity)
+- ✅ Syntactic complexity: dependency distance, cohesion scores (TextDescriptives)
+- ✅ Phraseology: PMI/NPMI bigrams/trigrams (gensim)
+- ✅ Language detection with heuristic fallback (langdetect)
+- ✅ Skeleton mode fallback for library failures
+
+**Test Coverage**
+
+- ✅ Unit tests: `test_nlp_analyzer_refactored.py` (317 lines, comprehensive mocking)
+- ✅ Unit tests: `test_nlp_dependencies.py` (450 lines, isolated dependency testing)
+- ✅ Integration tests: `test_nlp_analyzer_integration.py` (243 lines, real library integration)
+- ✅ Test separation: unit (mocked) vs integration (real dependencies)
+- ✅ Test utilities with mock builders following HuleEdu standards
+
+**Deprecated Legacy**
+
+- ✅ `nlp_analyzer_impl.py` marked DEPRECATED with proper DI violation warnings
+- ✅ Legacy implementation preserved for reference during transition
 
 ### 🚧 IN PROGRESS
+
 - Nothing currently in progress
 
 ### ⏳ PENDING
-- Unit tests for all NLP components
-- Integration tests for end-to-end flow
-- Language Tool Service creation (separate microservice)
-- Docker configuration updates (add spaCy model downloads)
+
+- BatchNlpAnalysisHandler completion (using NlpAnalyzerRefactored)  
+- Language Tool Service microservice creation
+- Event publisher integration for NLP completion events
+- End-to-end integration tests
+- Docker spaCy model provisioning
 - Performance optimization for <500ms requirement
 
 ## ⚠️ CRITICAL VALIDATION UPDATE
@@ -39,15 +67,18 @@
 The implementation MUST adhere to these non-negotiable requirements:
 
 ### 1. ✅ Outbox Pattern Compliance
+
 - **MUST** use outbox pattern exclusively for ALL event publishing
 - **FORBIDDEN**: Direct Kafka publishing from business logic
 - **FORBIDDEN**: Passing `kafka_bus` to handlers or publishers
 - **Pattern**: Publisher → OutboxManager → Database → Relay Worker → Kafka
 
 ### 2. ✅ Structured Error Handling
+
 - **MUST** use `huleedu_service_libs.error_handling` factories
 - **FORBIDDEN**: Generic `Exception` handling without structured errors
 - **Required imports**:
+
   ```python
   from huleedu_service_libs.error_handling import (
       HuleEduError,
@@ -58,11 +89,13 @@ The implementation MUST adhere to these non-negotiable requirements:
   ```
 
 ### 3. ✅ Protocol-Based DI Patterns
+
 - **MUST** define all dependencies as Protocols
 - **MUST** use Dishka DI framework with proper scoping
 - **FORBIDDEN**: Direct concrete class dependencies in business logic
 
 ### 4. ✅ Event Topic Mapping
+
 - **MUST** add `ESSAY_NLP_COMPLETED` to `_TOPIC_MAPPING` in event_enums.py
 - **Critical**: Without this, events cannot be published
 
@@ -73,10 +106,12 @@ This document outlines the implementation plan for NLP Phase 2 text analysis cap
 ## Architectural Reality Check ✅
 
 **Current Handler Architecture:**
+
 - ✅ **Phase 1**: `EssayStudentMatchingHandler` handles `BATCH_STUDENT_MATCHING_REQUESTED` (working correctly)
 - ⚠️ **Phase 2**: `StudentMatchingHandler` handles `BATCH_NLP_INITIATE_COMMAND` (misnamed & wrong logic)
 
 **What Already Exists:**
+
 - ✅ Phase 1 student matching infrastructure (complete and working)
 - ✅ Phase 2 event handling infrastructure (routing works)
 - ✅ `BatchServiceNLPInitiateCommandDataV1` input event model (complete)
@@ -84,6 +119,7 @@ This document outlines the implementation plan for NLP Phase 2 text analysis cap
 - ✅ Kafka consumer subscribed to both Phase 1 and Phase 2 topics
 
 **What Needs Correction:**
+
 - 🔄 **RENAME** `StudentMatchingHandler` → `BatchNlpAnalysisHandler`
 - 🔄 **REPLACE** student matching logic with NLP analysis logic
 - ❌ Output event topic mapping for `ESSAY_NLP_COMPLETED`
@@ -92,6 +128,7 @@ This document outlines the implementation plan for NLP Phase 2 text analysis cap
 - ❌ Language Tool Service integration
 
 **Integration Flow:**
+
 ```
 Phase 1: Batch Orchestrator → EssayStudentMatchingHandler → Class Management (unchanged ✅)
 Phase 2: Batch Orchestrator → BatchNlpAnalysisHandler → Language Tool Service (grammar)
@@ -99,6 +136,7 @@ Phase 2: Batch Orchestrator → BatchNlpAnalysisHandler → Language Tool Servic
 ```
 
 **Key Constraints:**
+
 - ✅ **RENAME handler and replace business logic**
 - ✅ **PRESERVE Phase 1 student matching (no changes)**
 - ✅ Use existing `BatchServiceNLPInitiateCommandDataV1` event model
@@ -108,585 +146,88 @@ Phase 2: Batch Orchestrator → BatchNlpAnalysisHandler → Language Tool Servic
 
 ## Implementation Plan
 
-### Phase 1: Output Event Architecture (Week 1)
+## Technical Implementation Details
 
-**1.1 Add Topic Mapping for Output Events**
+**Event Architecture Requirements**
+
 ```python
 # libs/common_core/src/common_core/event_enums.py
-# CRITICAL: ADD to _TOPIC_MAPPING dictionary (currently missing):
-_TOPIC_MAPPING = {
-    # ... existing mappings ...
-    ProcessingEvent.ESSAY_NLP_COMPLETED: "huleedu.essay.nlp.completed.v1",  # ADD THIS LINE
-    # ... rest of mappings ...
-}
+ProcessingEvent.ESSAY_NLP_COMPLETED: "huleedu.essay.nlp.completed.v1"  # Required topic mapping
+
+# Event models: EssayNlpCompletedV1, NlpMetrics (with 13 linguistic fields), GrammarAnalysis
+# Input exists: BatchServiceNLPInitiateCommandDataV1 + topic mapping
 ```
 
-**1.2 Create Output Data Models (New Models Needed)**
+**Core Protocol Interfaces**
+
 ```python
-# libs/common_core/src/common_core/nlp_events.py - NEW FILE
-
-class EssayNlpCompletedV1(BaseEventData):
-    """NLP analysis completion event for single essay."""
-    essay_id: UUID
-    text_storage_id: str
-    nlp_metrics: NlpMetrics
-    grammar_analysis: GrammarAnalysis
-    processing_metadata: dict
-
-class NlpMetrics(BaseModel):
-    """Basic spaCy-derived metrics - SKELETON."""
-    word_count: int
-    sentence_count: int
-    avg_sentence_length: float
-    language_detected: str
-    # TODO: Add more metrics as needed
-
-class GrammarAnalysis(BaseModel):
-    """Grammar analysis from Language Tool Service."""
-    error_count: int
-    errors: list[dict]  # TODO: Define error structure
-    suggestions: list[dict]  # TODO: Define suggestion structure
-
-# NOTE: INPUT already exists:
-# - BatchServiceNLPInitiateCommandDataV1 ✅
-# - BATCH_NLP_INITIATE_COMMAND topic mapping ✅
+# NlpAnalyzerProtocol.analyze_text(text, language) -> NlpMetrics
+# LanguageToolClientProtocol.check_grammar(text, language, session, correlation_id) -> GrammarAnalysis
+# 6 dependency protocols: SpacyModelLoader, LanguageDetector, ZipfCalculator, LexicalDiversityCalculator, PhraseologyCalculator, SyntacticComplexityCalculator
 ```
 
-**1.3 Protocol Extensions**
+**Handler Implementation Pattern**
+
 ```python
-# services/nlp_service/protocols.py - ADDITIONS
-
-class NlpAnalyzerProtocol(Protocol):
-    """Protocol for spaCy-based text analysis."""
-    
-    async def analyze_text(
-        self,
-        text: str,
-        language: str = "auto",  # "en" or "sv" 
-    ) -> NlpMetrics:
-        """Extract basic text metrics using spaCy."""
-        ...
-
-class LanguageToolClientProtocol(Protocol):
-    """Protocol for Language Tool Service integration."""
-    
-    async def check_grammar(
-        self,
-        text: str,
-        language: str = "auto",
-        http_session: aiohttp.ClientSession,
-        correlation_id: UUID,
-    ) -> GrammarAnalysis:
-        """Get grammar analysis from Language Tool Service."""
-        ...
-
-# NOTE: NlpEventPublisherProtocol already exists for Phase 1 ✅
-# Will extend existing publisher for new ESSAY_NLP_COMPLETED events
+# BatchNlpAnalysisHandler (existing skeleton)
+# Dependencies: NlpAnalyzerProtocol, LanguageToolClientProtocol 
+# Pattern: fetch content → analyze with NlpAnalyzerRefactored → grammar check → publish results
+# Uses structured error handling from huleedu_service_libs.error_handling
 ```
 
-### Phase 2: Rename Handler & Replace Logic (Week 2)
+**DI Integration Requirements**
 
-**2.1 Rename Handler and Replace Business Logic**
 ```python
-# services/nlp_service/command_handlers/batch_nlp_analysis_handler.py  
-# RENAME from student_matching_handler.py and replace logic
-
-# Import structured error handling
-from huleedu_service_libs.error_handling import (
-    HuleEduError,
-    raise_external_service_error,
-    raise_processing_error,
-    raise_validation_error,
-)
-
-class BatchNlpAnalysisHandler(CommandHandlerProtocol):
-    """Handler for Phase 2 NLP analysis - RENAMED from StudentMatchingHandler."""
-
-    def __init__(
-        self,
-        # KEEP some existing dependencies:
-        content_client: ContentClientProtocol,
-        event_publisher: NlpEventPublisherProtocol, 
-        outbox_repository: OutboxRepositoryProtocol,
-        # REMOVED: kafka_bus - NEVER pass directly to handler (outbox pattern)
-        tracer: "Tracer | None" = None,
-        # ADD new Phase 2 dependencies:
-        nlp_analyzer: NlpAnalyzerProtocol,
-        language_tool_client: LanguageToolClientProtocol,
-    ) -> None:
-        """Initialize - CLEAN UP for NLP analysis purpose."""
-        # Keep relevant assignments
-        self.content_client = content_client
-        self.event_publisher = event_publisher
-        self.outbox_repository = outbox_repository
-        # NO kafka_bus assignment - publisher uses outbox internally
-        self.tracer = tracer
-        # ADD new assignments
-        self.nlp_analyzer = nlp_analyzer
-        self.language_tool_client = language_tool_client
-
-    async def can_handle(self, event_type: str) -> bool:
-        """UNCHANGED - handles BATCH_NLP_INITIATE_COMMAND events."""
-        return event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND)
-
-    async def handle(
-        self,
-        msg: ConsumerRecord,
-        envelope: EventEnvelope, 
-        http_session: aiohttp.ClientSession,
-        correlation_id: UUID,
-        span: "Span | None" = None,
-    ) -> bool:
-        """Process NLP analysis batch - COMPLETELY NEW LOGIC (not student matching)."""
-        
-        try:
-            # Parse command (SAME pattern)
-            command_data = BatchServiceNLPInitiateCommandDataV1.model_validate(envelope.data)
-            
-            logger.info(
-                f"Processing Phase 2 NLP analysis for batch {command_data.batch_id} "
-                f"with {len(command_data.essays_to_process)} essays",
-                extra={
-                    "batch_id": command_data.batch_id,
-                    "essay_count": len(command_data.essays_to_process),
-                    "correlation_id": str(correlation_id),
-                },
-            )
-            
-            # NEW: NLP analysis logic (not student matching)
-            for essay_ref in command_data.essays_to_process:
-                try:
-                    # Fetch content (SAME pattern as existing)
-                    essay_text = await self.content_client.fetch_content(
-                        storage_id=essay_ref.text_storage_id,
-                        http_session=http_session,
-                        correlation_id=correlation_id,
-                    )
-                    
-                    # REPLACE: Instead of student matching, do text analysis
-                    nlp_metrics = await self.nlp_analyzer.analyze_text(
-                        text=essay_text,
-                        language=command_data.language,  # Use provided language
-                    )
-                    
-                    grammar_analysis = await self.language_tool_client.check_grammar(
-                        text=essay_text,
-                        language=command_data.language,
-                        http_session=http_session,
-                        correlation_id=correlation_id,
-                    )
-                    
-                    # PUBLISH per-essay results using OUTBOX pattern
-                    await self.event_publisher.publish_essay_nlp_completed(
-                        # NO kafka_bus parameter - publisher uses outbox internally
-                        essay_id=essay_ref.essay_id,
-                        text_storage_id=essay_ref.text_storage_id,
-                        nlp_metrics=nlp_metrics,
-                        grammar_analysis=grammar_analysis,
-                        correlation_id=correlation_id,
-                    )
-                    
-                    logger.info(
-                        "Successfully processed Phase 2 NLP analysis for essay %s",
-                        essay_ref.essay_id,
-                        extra={
-                            "essay_id": essay_ref.essay_id,
-                            "batch_id": command_data.batch_id,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-                    
-                except HuleEduError:
-                    # Already structured error - re-raise
-                    raise
-                except aiohttp.ClientError as e:
-                    # External service error - use structured error
-                    raise_external_service_error(
-                        service="nlp_service",
-                        operation="process_essay_nlp",
-                        external_service="content_service_or_language_tool",
-                        message=f"Failed to process essay {essay_ref.essay_id}: {str(e)}",
-                        correlation_id=correlation_id,
-                        essay_id=essay_ref.essay_id,
-                        batch_id=command_data.batch_id,
-                    )
-                except Exception as essay_error:
-                    # Processing error - use structured error
-                    raise_processing_error(
-                        service="nlp_service",
-                        operation="analyze_essay",
-                        stage="nlp_analysis",
-                        message=f"Failed to analyze essay {essay_ref.essay_id}: {str(essay_error)}",
-                        correlation_id=correlation_id,
-                        essay_id=essay_ref.essay_id,
-                        batch_id=command_data.batch_id,
-                    )
-                    
-                    # Add failed result for this essay (same pattern as Phase 1)
-                    failed_result = EssayNlpAnalysisResult(
-                        essay_id=essay_ref.essay_id,
-                        text_storage_id=essay_ref.text_storage_id,
-                        nlp_metrics=NlpMetrics(
-                            word_count=0,
-                            sentence_count=0,
-                            avg_sentence_length=0.0,
-                        ),
-                        grammar_analysis=GrammarAnalysis(
-                            error_count=0,
-                            errors=[],
-                            suggestions=[],
-                        ),
-                        processing_metadata={
-                            "error": str(essay_error),
-                            "status": "FAILED",
-                        },
-                    )
-                    analysis_results.append(failed_result)
-                    # Continue processing other essays instead of failing the entire batch
-                    continue
-            
-            # Publish results (same pattern as Phase 1)
-            if analysis_results:
-                processing_summary = {
-                    "total_essays": len(command_data.essays_to_process),
-                    "processed": processed_count,
-                    "failed": len(command_data.essays_to_process) - processed_count,
-                }
-                
-                await self.event_publisher.publish_batch_nlp_analysis_results(
-                    # NO kafka_bus parameter - publisher uses outbox internally
-                    batch_id=command_data.batch_id,
-                    analysis_results=analysis_results,
-                    processing_summary=processing_summary,
-                    correlation_id=correlation_id,
-                )
-                
-                logger.info(
-                    "Published batch NLP analysis results for batch %s to Result Aggregator",
-                    command_data.batch_id,
-                    extra={
-                        "batch_id": command_data.batch_id,
-                        "total_results": len(analysis_results),
-                        "processing_summary": processing_summary,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
-            
-            logger.info(
-                f"Completed Phase 2 NLP analysis for batch {command_data.batch_id}: "
-                f"{processed_count}/{len(command_data.essays_to_process)} essays processed",
-                extra={
-                    "batch_id": command_data.batch_id,
-                    "processed_count": processed_count,
-                    "total_count": len(command_data.essays_to_process),
-                    "correlation_id": str(correlation_id),
-                },
-            )
-            
-            return processed_count > 0  # Return True if at least one essay was processed
-            
-        except ValidationError as e:
-            # Validation error - use structured error
-            raise_validation_error(
-                service="nlp_service",
-                operation="parse_nlp_command",
-                field="envelope.data",
-                message=f"Invalid NLP command format: {e.errors()}",
-                correlation_id=correlation_id,
-            )
-        except HuleEduError:
-            # Already structured error - re-raise
-            raise
-        except Exception as e:
-            # Unexpected error - use structured error
-            raise_processing_error(
-                service="nlp_service",
-                operation="handle_nlp_command",
-                stage="command_processing",
-                message=f"Unexpected error processing NLP batch: {str(e)}",
-                correlation_id=correlation_id,
-            )
+# services/nlp_service/di.py needs:
+# @provide NlpAnalyzerProtocol → return NlpAnalyzerRefactored (from di_nlp_dependencies)
+# Update provide_batch_nlp_handler() to inject NlpAnalyzerProtocol
 ```
 
-### Phase 3: Service Integrations (Week 3)
+## File Structure Status
 
-**3.1 spaCy Analyzer Implementation (Skeleton)**
-```python
-# services/nlp_service/implementations/nlp_analyzer_impl.py
+**✅ IMPLEMENTED FILES:**
 
-class SpacyNlpAnalyzer:
-    """Basic spaCy-based text analysis - SKELETON."""
-    
-    def __init__(self):
-        """Initialize spaCy models - SKELETON setup."""
-        # TODO: Load models lazily
-        self.nlp_en = None  # Will load spacy.load("en_core_web_sm")  
-        self.nlp_sv = None  # Will load spacy.load("sv_core_news_sm")
-        self._models_loaded = False
-        
-    async def _ensure_models_loaded(self):
-        """Lazy load spaCy models."""
-        if not self._models_loaded:
-            # TODO: Implement model loading
-            # self.nlp_en = spacy.load("en_core_web_sm")
-            # self.nlp_sv = spacy.load("sv_core_news_sm")
-            self._models_loaded = True
-        
-    async def analyze_text(self, text: str, language: str = "auto") -> NlpMetrics:
-        """SKELETON: Basic spaCy analysis."""
-        
-        await self._ensure_models_loaded()
-        
-        # TODO: Language detection if auto
-        # TODO: Select appropriate spaCy model
-        # TODO: Process text with spaCy
-        # TODO: Extract basic metrics
-        
-        # SKELETON return basic metrics
-        words = text.split()
-        sentences = text.split('.')
-        
-        return NlpMetrics(
-            word_count=len(words),
-            sentence_count=len(sentences),
-            avg_sentence_length=len(words) / max(len(sentences), 1),
-        )
 ```
-
-**3.2 Language Tool Service Client (Skeleton)**
-```python
-# services/nlp_service/implementations/language_tool_client_impl.py
-
-class LanguageToolServiceClient:
-    """Client for Language Tool Service integration - SKELETON."""
-    
-    def __init__(self, language_tool_service_url: str):
-        """Initialize client with service URL."""
-        self.service_url = language_tool_service_url.rstrip('/')
-        
-    async def check_grammar(
-        self,
-        text: str,
-        language: str = "auto",
-        http_session: aiohttp.ClientSession,
-        correlation_id: UUID,
-    ) -> GrammarAnalysis:
-        """SKELETON: Call Language Tool Service."""
-        
-        # TODO: Implement HTTP POST to Language Tool Service
-        # When implementing, use structured error handling:
-        # try:
-        #     async with http_session.post(...) as response:
-        #         ...
-        # except aiohttp.ClientError as e:
-        #     raise_external_service_error(
-        #         service="nlp_service",
-        #         operation="check_grammar",
-        #         external_service="language_tool_service",
-        #         message=str(e),
-        #         correlation_id=correlation_id,
-        #     )
-        
-        # SKELETON return empty analysis
-        return GrammarAnalysis(
-            error_count=0,
-            errors=[],
-            suggestions=[],
-        )
-```
-
-**3.3 Event Publisher Implementation**
-```python
-# services/nlp_service/implementations/event_publisher_impl.py - ADDITIONS
-
-class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
-    """Publisher that ALWAYS uses outbox for transactional safety."""
-    
-    def __init__(self, outbox_manager: OutboxManager, source_service_name: str):
-        """Initialize with outbox manager ONLY - no direct Kafka."""
-        self.outbox_manager = outbox_manager
-        self.source_service_name = source_service_name
-        # NO kafka_bus attribute - outbox pattern only!
-    
-    async def publish_essay_nlp_completed(
-        self,
-        # NO kafka_bus parameter - outbox only
-        essay_id: str,
-        text_storage_id: str,
-        nlp_metrics: NlpMetrics,
-        grammar_analysis: GrammarAnalysis,
-        correlation_id: UUID,
-    ) -> None:
-        """Publish essay NLP completion - ALWAYS via outbox."""
-        
-        # Create event data
-        event_data = EssayNlpCompletedV1(
-            essay_id=essay_id,
-            text_storage_id=text_storage_id,
-            nlp_metrics=nlp_metrics,
-            grammar_analysis=grammar_analysis,
-            processing_metadata={"timestamp": datetime.utcnow().isoformat()},
-        )
-        
-        # Create envelope
-        envelope = EventEnvelope(
-            event_type=topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
-            source_service=self.source_service_name,
-            correlation_id=correlation_id,
-            schema_version="1.0.0",
-            data=event_data,
-        )
-        
-        # ALWAYS use outbox for transactional safety
-        await self.outbox_manager.publish_to_outbox(
-            aggregate_type="essay",
-            aggregate_id=str(essay_id),
-            event_type=topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
-            event_data=envelope,  # Pass original Pydantic envelope
-            topic=topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),
-        )
-```
-
-### Phase 4: Update Existing DI Wiring (Week 4)
-
-**4.1 Update DI Providers for Renamed Handler**
-```python
-# services/nlp_service/di.py - UPDATE EXISTING PROVIDERS
-
-# UPDATE existing provider to match renamed handler
-@provide(scope=Scope.APP)
-def provide_batch_nlp_handler(
-    self,
-    # KEEP relevant dependencies:
-    content_client: ContentClientProtocol,
-    event_publisher: NlpEventPublisherProtocol,
-    outbox_repository: OutboxRepositoryProtocol,
-    # NO kafka_bus - handler doesn't need it (outbox pattern)
-    tracer: Tracer,
-    # ADD new Phase 2 dependencies:
-    nlp_analyzer: NlpAnalyzerProtocol,
-    language_tool_client: LanguageToolClientProtocol,
-) -> BatchNlpAnalysisHandler:
-    """UPDATE provider for renamed handler with clean dependencies."""
-    return BatchNlpAnalysisHandler(
-        # Relevant args only
-        content_client=content_client,
-        event_publisher=event_publisher,
-        outbox_repository=outbox_repository,
-        # NO kafka_bus parameter - removed per outbox pattern
-        tracer=tracer,
-        # NEW args
-        nlp_analyzer=nlp_analyzer,
-        language_tool_client=language_tool_client,
-    )
-
-# ADD new providers for new dependencies
-@provide(scope=Scope.APP)
-def provide_nlp_analyzer(self) -> NlpAnalyzerProtocol:
-    """Provide spaCy-based NLP analyzer."""
-    return SpacyNlpAnalyzer()
-
-@provide(scope=Scope.APP)
-def provide_language_tool_client(
-    self, 
-    settings: Settings
-) -> LanguageToolClientProtocol:
-    """Provide Language Tool Service client."""
-    return LanguageToolServiceClient(settings.LANGUAGE_TOOL_SERVICE_URL)
-
-# UPDATE command handlers mapping  
-@provide(scope=Scope.APP)
-def provide_command_handlers(
-    self,
-    essay_student_matching_handler: EssayStudentMatchingHandler,  # Phase 1 unchanged
-    batch_nlp_handler: BatchNlpAnalysisHandler,  # Phase 2 renamed
-) -> dict[str, CommandHandlerProtocol]:
-    """Update command handlers mapping for renamed Phase 2 handler."""
-    return {
-        "phase1_student_matching": essay_student_matching_handler,  # unchanged
-        "phase2_batch_nlp": batch_nlp_handler,  # updated type
-    }
-```
-
-**4.2 Event Processor Integration**
-```python
-# services/nlp_service/event_processor.py - NO CHANGES NEEDED
-
-# REALITY: process_single_message() receives handlers from DI container
-# The function signature is:
-# async def process_single_message(
-#     msg: ConsumerRecord,
-#     command_handlers: dict[str, CommandHandlerProtocol],  # ← Injected from DI
-#     http_session: aiohttp.ClientSession,
-#     tracer: "Tracer | None" = None,
-# ) -> bool:
-
-# NO MODIFICATIONS REQUIRED - existing code works because:
-# 1. DI already provides command_handlers dictionary 
-# 2. StudentMatchingHandler already handles BATCH_NLP_INITIATE_COMMAND
-# 3. Handler routing logic already works via can_handle() method
-```
-
-**4.3 Configuration Updates**
-```python
-# services/nlp_service/config.py - ADDITIONS
-
-class Settings(BaseSettings):
-    # ... existing settings
-    
-    # Language Tool Service Configuration (proper env pattern)
-    LANGUAGE_TOOL_SERVICE_URL: str = Field(
-        default="http://language-tool-service:8080",
-        env="NLP_SERVICE_LANGUAGE_TOOL_URL"
-    )
-    
-    # spaCy Configuration  
-    SPACY_MODEL_EN: str = Field(
-        default="en_core_web_sm",
-        env="NLP_SERVICE_SPACY_MODEL_EN"
-    )
-    SPACY_MODEL_SV: str = Field(
-        default="sv_core_news_sm",
-        env="NLP_SERVICE_SPACY_MODEL_SV"
-    )
-```
-
-## File Structure
-
-**New Files to Create:**
-```
-libs/common_core/src/common_core/
-└── nlp_events.py                          # NEW - Output data models
+services/nlp_service/implementations/
+├── nlp_analyzer_refactored.py        # Main NLP analyzer with DI
+├── nlp_dependencies.py               # Concrete dependency implementations
+├── language_tool_client_impl.py      # Language Tool Service client
 
 services/nlp_service/
-├── command_handlers/
-│   └── batch_nlp_analysis_handler.py      # RENAMED from student_matching_handler.py
-└── implementations/
-    ├── nlp_analyzer_impl.py               # NEW - spaCy integration
-    └── language_tool_client_impl.py       # NEW - Language Tool client
+├── nlp_dependency_protocols.py       # Protocol definitions for dependencies
+├── di_nlp_dependencies.py           # DI provider for NLP dependencies
+
+services/nlp_service/tests/unit/
+├── test_nlp_analyzer_refactored.py   # Unit tests with mocking
+├── test_nlp_dependencies.py          # Unit tests for dependencies
+└── test_utils.py                     # Test utilities
+
+services/nlp_service/tests/integration/
+└── test_nlp_analyzer_integration.py  # Integration tests with real libraries
 ```
 
-**Files to Modify:**
+**⚠️ DEPRECATED:**
+
 ```
-libs/common_core/src/common_core/event_enums.py           # ADD - topic mapping
-services/nlp_service/protocols.py                         # EXTEND - new protocols
-services/nlp_service/di.py                                # UPDATE - providers for renamed handler
-services/nlp_service/config.py                           # EXTEND - new settings
-services/nlp_service/implementations/event_publisher_impl.py  # EXTEND - new method
+services/nlp_service/implementations/
+└── nlp_analyzer_impl.py              # DEPRECATED - violates DI principles
 ```
 
-**Files That Remain Unchanged (Phase 1 + Infrastructure):**
+**⏳ FILES NEEDING COMPLETION:**
+
 ```
-services/nlp_service/command_handlers/essay_student_matching_handler.py  # ✅ Phase 1 unchanged
-services/nlp_service/event_processor.py    # ✅ Already works
-services/nlp_service/kafka_consumer.py     # ✅ Already subscribes to correct topics  
-services/nlp_service/worker_main.py        # ✅ Already handles DI correctly
-# ... all Phase 1 student matching infrastructure remains untouched
+services/nlp_service/command_handlers/
+└── batch_nlp_analysis_handler.py     # Needs to use NlpAnalyzerRefactored
+
+services/nlp_service/
+├── di.py                             # Needs NlpAnalyzerProtocol provider
+└── protocols.py                      # May need language tool protocol
 ```
 
 ## Dependencies
 
 **Add to pyproject.toml:**
+
 ```toml
 dependencies = [
     # ... existing dependencies
@@ -700,6 +241,7 @@ dependencies = [
 ## Testing Strategy
 
 **Unit Tests (Skeleton):**
+
 ```python
 # tests/unit/test_batch_nlp_analysis_handler.py
 async def test_handler_processes_batch_successfully():
@@ -718,82 +260,45 @@ async def test_grammar_analysis_integration():
 ```
 
 **Integration Tests (Skeleton):**
+
 ```python
 # tests/integration/test_phase2_nlp_flow.py
 async def test_end_to_end_nlp_analysis():
     """Test complete Phase 2 NLP analysis flow."""
 ```
 
-## Success Criteria
+## Key Achievements
 
-**Phase 1 Complete:** 
-- ✅ Event contracts defined in common_core
-- ✅ Protocol interfaces defined
-- ✅ Command handler skeleton created
+**✅ NLP Analyzer Refactoring Complete**
 
-**Phase 2 Complete:**
-- ✅ Handler processes batches (skeleton implementation)
-- ✅ spaCy integration foundation ready
-- ✅ Language Tool Service client skeleton
-- ✅ Error handling mirrors Phase 1
+- Protocol-based DI architecture with 6 dependency interfaces
+- Full spaCy + linguistic libraries integration (wordfreq, lexical-diversity, gensim, textdescriptives)
+- Comprehensive test coverage: 317-line unit tests + 450-line dependency tests + 243-line integration tests
+- Skeleton mode fallback for library failures
 
-**Phase 3 Complete:**
-- ✅ DI container wiring complete
-- ✅ Event processor routes Phase 2 events
-- ✅ Basic unit tests pass
-- ✅ Integration with existing infrastructure
+**⏳ Remaining Work**
 
-**Phase 4 Complete:**
-- ✅ Service processes Phase 2 events end-to-end
-- ✅ Results published to Result Aggregator
-- ✅ Metrics and logging functional
-- ✅ Ready for spaCy/Language Tool implementation
+- Complete BatchNlpAnalysisHandler to use NlpAnalyzerRefactored
+- Integrate NlpAnalyzerProtocol provider in main DI configuration
+- End-to-end integration testing
+- Language Tool Service microservice creation
 
-## Key Architectural Corrections & Alignments ✅
+## Architectural Compliance ✅
 
-**✅ ALIGNED: Outbox Pattern Compliance:**
-- **REMOVED** all `kafka_bus` parameters from handlers and publishers
-- **ENFORCED** OutboxManager-only pattern in event publisher
-- **FOLLOWS** transactional safety principles from rule 042.1
+**HuleEdu Pattern Adherence**
 
-**✅ ALIGNED: Structured Error Handling:**
-- **REPLACED** generic exceptions with `huleedu_service_libs.error_handling` factories
-- **ADDED** proper error categorization (validation, external service, processing)
-- **INCLUDED** correlation_id tracking in all errors
-
-**✅ ALIGNED: Protocol-Based DI:**
-- **DEFINED** clear Protocol interfaces for all new dependencies
-- **REMOVED** concrete class dependencies from business logic
-- **FOLLOWS** Dishka DI patterns with proper scoping
-
-**✅ ALIGNED: Event Architecture:**
-- **EXPLICIT** topic mapping addition for `ESSAY_NLP_COMPLETED`
-- **PROPER** EventEnvelope construction with schema_version
-- **CORRECT** Pydantic model passing to outbox
-
-**✅ CORRECTED: Handler Architecture:**
-- **RENAME** `StudentMatchingHandler` → `BatchNlpAnalysisHandler` 
-- **REPLACE** student matching logic with NLP analysis logic
-- **PRESERVE** Phase 1 (`EssayStudentMatchingHandler`) completely unchanged
-- **CLEAN UP** dependencies (remove unused Phase 1 deps, add Phase 2 deps)
-
-**✅ CORRECTED: What Actually Needs Implementation:**
-- Handler rename and business logic replacement (with proper error handling)
-- Output event topic mapping for `ESSAY_NLP_COMPLETED` (explicit addition)
-- Output data models for NLP results
-- spaCy integration implementation (skeleton with proper patterns)
-- Language Tool Service client implementation (with structured errors)
-
-**🚨 CRITICAL: All Hallucinations Corrected & Aligned:**
-- ✅ **NO** direct Kafka usage (outbox pattern only)
-- ✅ **NO** generic error handling (structured errors only)
-- ✅ **PRESERVE** Phase 1 student matching (completely unchanged)
-- ✅ **FOLLOW** all HuleEdu architectural mandates
+- ✅ Protocol-based DI with 6 dependency interfaces (Dishka scoping)
+- ✅ Structured error handling via `huleedu_service_libs.error_handling`
+- ✅ Outbox pattern for transactional event publishing
+- ✅ Clean separation: unit tests (mocked), integration tests (real dependencies)
+- ✅ Skeleton mode fallback for library failures
 
 ## Language Tool Service Implementation Requirements
 
 ### Service Architecture Decision
+
 **Create as Separate Microservice** following HuleEdu's bounded context principles:
+
 - **Location**: `services/language_tool_service/`
 - **Technology**: Java-based Language Tool with Python FastAPI/Quart wrapper
 - **Pattern**: Similar to LLM Provider Service architecture
@@ -802,6 +307,7 @@ async def test_end_to_end_nlp_analysis():
 ### Implementation Requirements
 
 #### 1. Service Structure
+
 ```
 services/language_tool_service/
 ├── Dockerfile          # Multi-stage: Java + Python wrapper
@@ -824,6 +330,7 @@ services/language_tool_service/
 ```
 
 #### 2. Required Patterns (MANDATORY)
+
 - **Dishka DI Container**: All dependencies via protocols
 - **Structured Error Handling**: Use `huleedu_service_libs.error_handling`
 - **Observability**: Full stack integration (logging, tracing, metrics)
@@ -832,6 +339,7 @@ services/language_tool_service/
 - **Configuration**: Environment-based via Pydantic BaseSettings
 
 #### 3. API Contract
+
 ```python
 # POST /v1/check
 {
@@ -863,6 +371,7 @@ services/language_tool_service/
 ```
 
 #### 4. Docker Configuration
+
 ```dockerfile
 # Multi-stage Dockerfile
 FROM openjdk:11-jre-slim as java-base
@@ -877,6 +386,7 @@ RUN apt-get update && apt-get install -y openjdk-11-jre-headless
 ```
 
 #### 5. Integration with NLP Service
+
 - HTTP client implementation in `LanguageToolServiceClient`
 - Circuit breaker pattern for resilience
 - Timeout handling (30s max)
@@ -886,6 +396,7 @@ RUN apt-get update && apt-get install -y openjdk-11-jre-headless
 ## Advanced NLP Metrics Implementation
 
 ### Required Linguistic Metrics (STRICT REQUIREMENTS)
+
 1. **Lexical sophistication**: mean Zipf, % tokens Zipf<3 (wordfreq)
 2. **Lexical diversity**: MTLD/HDD (lexical_diversity)
 3. **Syntactic complexity**: mean dependency distance (TextDescriptives), phrasal/clausal indices
@@ -894,6 +405,7 @@ RUN apt-get update && apt-get install -y openjdk-11-jre-headless
 6. **Phraseology**: avg PMI/npmi of essay bigrams/trigrams (gensim/textacy)
 
 ### Dependencies to Add
+
 ```toml
 # services/nlp_service/pyproject.toml
 dependencies = [

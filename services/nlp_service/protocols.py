@@ -113,9 +113,9 @@ class NlpEventPublisherProtocol(Protocol):
         correlation_id: UUID,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
-        
+
         Note: No kafka_bus parameter - implementation uses outbox pattern internally.
-        
+
         Args:
             essay_id: Essay identifier
             text_storage_id: Storage ID of essay content
@@ -137,10 +137,10 @@ class NlpEventPublisherProtocol(Protocol):
         correlation_id: UUID,
     ) -> None:
         """Publish batch NLP analysis completion event to ELS.
-        
+
         This is the thin event for state management, following the dual event pattern.
         Rich business data goes to RAS via publish_essay_nlp_completed.
-        
+
         Args:
             batch_id: Batch identifier
             total_essays: Total number of essays in batch
@@ -201,11 +201,11 @@ class NlpAnalyzerProtocol(Protocol):
         language: str = "auto",
     ) -> NlpMetrics:
         """Extract basic text metrics using spaCy.
-        
+
         Args:
             text: The text to analyze
             language: Language code ("en", "sv") or "auto" for detection
-            
+
         Returns:
             NlpMetrics with basic text statistics
         """
@@ -223,13 +223,13 @@ class LanguageToolClientProtocol(Protocol):
         language: str = "auto",
     ) -> GrammarAnalysis:
         """Get grammar analysis from Language Tool Service.
-        
+
         Args:
             text: The text to check for grammar errors
-            language: Language code ("en", "sv") or "auto" 
+            language: Language code ("en", "sv") or "auto"
             http_session: HTTP session for external API calls
             correlation_id: Correlation ID for tracking
-            
+
         Returns:
             GrammarAnalysis with detected errors and suggestions
         """

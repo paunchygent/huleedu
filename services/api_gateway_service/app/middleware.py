@@ -61,7 +61,7 @@ class DevelopmentMiddleware(BaseHTTPMiddleware):
 
         # Add development debug info to request state
         request.state.development_mode = True
-        request.state.cors_origins = getattr(self.settings, 'CORS_ORIGINS', [])
+        request.state.cors_origins = getattr(self.settings, "CORS_ORIGINS", [])
 
         # Process request
         response = await call_next(request)
@@ -70,12 +70,12 @@ class DevelopmentMiddleware(BaseHTTPMiddleware):
         response.headers["X-HuleEdu-Environment"] = "development"
         response.headers["X-HuleEdu-Dev-Mode"] = "enabled"
         response.headers["X-HuleEdu-CORS-Origins"] = ",".join(
-            getattr(self.settings, 'CORS_ORIGINS', [])
+            getattr(self.settings, "CORS_ORIGINS", [])
         )
 
         # Add service info for debugging
         response.headers["X-HuleEdu-Service"] = getattr(
-            self.settings, 'SERVICE_NAME', 'api-gateway-service'
+            self.settings, "SERVICE_NAME", "api-gateway-service"
         )
 
         # Log development request for debugging

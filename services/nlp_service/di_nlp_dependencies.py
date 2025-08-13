@@ -27,7 +27,7 @@ from services.nlp_service.protocols import NlpAnalyzerProtocol
 
 class NlpDependencyProvider(Provider):
     """Provider for NLP analyzer dependencies.
-    
+
     This is separate from the main NlpServiceProvider to maintain
     separation of concerns and avoid a monolithic DI configuration.
     """

@@ -302,7 +302,7 @@ class TestProcessBatchPhaseOutcome:
         """Test processing successful phase completion."""
         # Arrange
         batch_id = str(uuid4())
-        
+
         # Setup mock batch for duration calculation
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-123"
@@ -354,7 +354,7 @@ class TestProcessBatchPhaseOutcome:
         """Test processing phase with some failures."""
         # Arrange
         batch_id = str(uuid4())
-        
+
         # Setup mock batch for duration calculation
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-456"
@@ -405,7 +405,7 @@ class TestProcessBatchPhaseOutcome:
         """Test processing critical phase failure."""
         # Arrange
         batch_id = str(uuid4())
-        
+
         # Setup mock batch for duration calculation
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-789"
@@ -675,7 +675,6 @@ class TestProcessSpellcheckCompleted:
         # Arrange
         # The test wants to simulate missing entity_id in system_metadata
         # Create a minimal system_metadata without entity_id
-        from unittest.mock import Mock
 
         mock_metadata = Mock(spec=SystemProcessingMetadata)
         mock_metadata.entity_id = None  # This simulates missing entity_id
@@ -759,7 +758,7 @@ class TestProcessAssessmentResult:
         cj_job_id = str(uuid4())
         essay1_id = str(uuid4())
         essay2_id = str(uuid4())
-        
+
         # Setup mock batch with proper user_id
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-assessment-1"
@@ -853,12 +852,12 @@ class TestProcessAssessmentResult:
         batch_id = str(uuid4())
         cj_job_id = str(uuid4())
         essay1_id = str(uuid4())
-        
+
         # Setup mock batch with proper user_id
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-assessment-2"
         mock_batch_repository.get_batch.return_value = mock_batch
-        
+
         data = AssessmentResultV1(
             entity_id=batch_id,
             entity_type="batch",
@@ -928,7 +927,7 @@ class TestProcessAssessmentResult:
         # Arrange
         batch_id = str(uuid4())
         cj_job_id = str(uuid4())
-        
+
         # Setup mock batch with proper user_id
         mock_batch = MagicMock()
         mock_batch.user_id = "test-user-assessment-3"

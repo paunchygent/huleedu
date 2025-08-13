@@ -55,7 +55,8 @@ async def publish_dual_assessment_events(
     """
     if processing_started_at is None:
         processing_started_at = (
-            batch_upload.created_at.replace(tzinfo=UTC) if hasattr(batch_upload, "created_at") 
+            batch_upload.created_at.replace(tzinfo=UTC)
+            if hasattr(batch_upload, "created_at")
             else datetime.now(UTC)
         )
 
@@ -91,7 +92,7 @@ async def publish_dual_assessment_events(
     if processing_started_at.tzinfo is None:
         processing_started_at = processing_started_at.replace(tzinfo=UTC)
     processing_time = (datetime.now(UTC) - processing_started_at).total_seconds()
-    
+
     # 1. THIN EVENT TO ELS (Phase tracking with essay IDs only - NO business data)
     els_event = CJAssessmentCompletedV1(
         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,

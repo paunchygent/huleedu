@@ -12,7 +12,6 @@ from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
-    CJAssessmentCompletedV1,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
     SpellcheckResultDataV1,
@@ -160,7 +159,7 @@ class TestKafkaConsumerRouting:
         """Test routing of AssessmentResultV1 event."""
         # Arrange
         from common_core.events.assessment_result_events import AssessmentResultV1
-        
+
         batch_id: str = str(uuid4())
         cj_job_id: str = str(uuid4())
 

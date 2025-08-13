@@ -270,16 +270,16 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         confirm_idempotency: Any = None,
     ) -> bool:
         """Handle CJ assessment completion from CJ Assessment Service.
-        
+
         CRITICAL: This handler follows clean architecture principles.
         It ONLY updates state machine status - NO business data storage.
         Business data (rankings, scores, grade projections) goes to RAS via AssessmentResultV1.
-        
+
         Args:
             result_data: Batch CJ assessment completion event (thin event)
             correlation_id: Correlation ID for tracking
             confirm_idempotency: Optional idempotency confirmation callback
-            
+
         Returns:
             True if all essay states were successfully updated, False otherwise
         """
@@ -298,7 +298,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             # Extract essay IDs from the processing summary
             successful_essay_ids = result_data.processing_summary.get("successful_essay_ids", [])
             failed_essay_ids = result_data.processing_summary.get("failed_essay_ids", [])
-            
+
             if not successful_essay_ids and not failed_essay_ids:
                 logger.warning(
                     "No essay IDs found in CJ assessment completion event",
@@ -377,7 +377,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 extra={"correlation_id": str(correlation_id)},
                             )
                             continue
-                    
+
                     # Process failed essays
                     for essay_id in failed_essay_ids:
                         # Get current essay state
@@ -496,7 +496,11 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
 
                     # Get a representative essay state to trigger batch completion check
-                    representative_essay_id = (successful_essay_ids + failed_essay_ids)[0] if (successful_essay_ids + failed_essay_ids) else None
+                    representative_essay_id = (
+                        (successful_essay_ids + failed_essay_ids)[0]
+                        if (successful_essay_ids + failed_essay_ids)
+                        else None
+                    )
                     if representative_essay_id:
                         representative_essay_state = await self.repository.get_essay_state(
                             representative_essay_id
@@ -635,16 +639,16 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         confirm_idempotency: Any = None,
     ) -> bool:
         """Handle NLP analysis completion from NLP Service.
-        
+
         CRITICAL: This handler follows clean architecture principles.
         It ONLY updates state machine status - NO business data storage.
         Business data (NLP metrics, grammar analysis) is sent to RAS via separate events.
-        
+
         Args:
             result_data: Batch NLP analysis completion event (thin event)
             correlation_id: Correlation ID for tracking
             confirm_idempotency: Optional idempotency confirmation callback
-            
+
         Returns:
             True if all essay states were successfully updated, False otherwise
         """
@@ -662,7 +666,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             # Extract essay IDs from the processing summary
             successful_essay_ids = result_data.processing_summary.get("successful_essay_ids", [])
             failed_essay_ids = result_data.processing_summary.get("failed_essay_ids", [])
-            
+
             if not successful_essay_ids and not failed_essay_ids:
                 logger.warning(
                     "No essay IDs found in NLP analysis completion event",
@@ -816,7 +820,11 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
 
                     # Get a representative essay state to trigger batch completion check
-                    representative_essay_id = (successful_essay_ids + failed_essay_ids)[0] if (successful_essay_ids + failed_essay_ids) else None
+                    representative_essay_id = (
+                        (successful_essay_ids + failed_essay_ids)[0]
+                        if (successful_essay_ids + failed_essay_ids)
+                        else None
+                    )
                     if representative_essay_id:
                         representative_essay_state = await self.repository.get_essay_state(
                             representative_essay_id

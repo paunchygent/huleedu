@@ -17,7 +17,6 @@ from common_core.events.result_events import (
 )
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
-    SystemProcessingMetadata,
 )
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -230,7 +229,7 @@ async def test_batch_assessment_completed_published_on_assessment_result(
 
     # Create assessment result event (new pattern)
     from common_core.events.assessment_result_events import AssessmentResultV1
-    
+
     essay_results = [
         {
             "essay_id": "essay_0",
@@ -420,7 +419,7 @@ async def test_correlation_id_propagation(
 
     # Create assessment result event with specific correlation_id (new pattern)
     from common_core.events.assessment_result_events import AssessmentResultV1
-    
+
     envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
         event_type="huleedu.assessment.results.v1",
         source_service="cj_assessment_service",

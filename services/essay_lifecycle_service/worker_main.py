@@ -76,7 +76,9 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
         topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
         topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
         topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
-        topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),  # Phase 2 NLP completion from NLP Service
+        topic_name(
+            ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED
+        ),  # Phase 2 NLP completion from NLP Service
         topic_name(
             ProcessingEvent.BATCH_STUDENT_MATCHING_INITIATE_COMMAND
         ),  # Phase 1 command from BOS

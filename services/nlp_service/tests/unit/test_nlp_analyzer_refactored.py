@@ -12,9 +12,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from common_core.events.nlp_events import NlpMetrics
 
-from services.nlp_service.implementations.nlp_analyzer_refactored import NlpAnalyzerRefactored
 from services.nlp_service.tests.unit.test_utils import (
     NlpAnalyzerTestFixture,
     create_mock_complexity_calculator,
@@ -35,10 +33,10 @@ class TestAnalyzeTextWithMockedDependencies:
         """Test that empty text returns zero metrics."""
         # Arrange
         analyzer = NlpAnalyzerTestFixture().build()
-        
+
         # Act
         result = await analyzer.analyze_text("", "en")
-        
+
         # Assert
         assert result.word_count == 0
         assert result.sentence_count == 0
@@ -51,14 +49,12 @@ class TestAnalyzeTextWithMockedDependencies:
     async def test_analyze_text_with_auto_language_detection(self) -> None:
         """Test automatic language detection."""
         # Arrange
-        detector = create_mock_language_detector(
-            detection_map={"världen": "sv", "world": "en"}
-        )
+        detector = create_mock_language_detector(detection_map={"världen": "sv", "world": "en"})
         analyzer = NlpAnalyzerTestFixture().with_language_detector(detector).build()
-        
+
         # Act
         result = await analyzer.analyze_text("Hello world", "auto")
-        
+
         # Assert
         assert result.language_detected == "en"
         assert isinstance(detector.detect, AsyncMock)
@@ -70,10 +66,10 @@ class TestAnalyzeTextWithMockedDependencies:
         # Arrange
         failed_loader = create_mock_spacy_model_loader(should_fail=True)
         analyzer = NlpAnalyzerTestFixture().with_model_loader(failed_loader).build()
-        
+
         # Act
         result = await analyzer.analyze_text("Hello world. This is a test.", "en")
-        
+
         # Assert - skeleton mode uses simple splitting
         assert result.word_count == 6  # Simple word split
         assert result.sentence_count == 2  # Simple sentence split
@@ -86,21 +82,19 @@ class TestAnalyzeTextWithMockedDependencies:
         # Arrange
         tokens = ["the", "quick", "brown", "fox", "jumps"]
         mock_doc = create_mock_doc(tokens=tokens, sentences=1, with_dependency=True)
-        
+
         model_loader = create_mock_spacy_model_loader()
         model_loader.process_text = AsyncMock(return_value=mock_doc)  # type: ignore[method-assign]
-        
+
         zipf_calc = create_mock_zipf_calculator(mean_zipf=5.5, percent_below_3=10.0)
         diversity_calc = create_mock_diversity_calculator(mtld=75.0, hdd=0.85)
         phraseology_calc = create_mock_phraseology_calculator(
             bigram_pmi=2.5, trigram_pmi=1.8, bigram_npmi=0.35, trigram_npmi=0.25
         )
         complexity_calc = create_mock_complexity_calculator(
-            dependency_distance=2.3, 
-            first_order_coherence=0.75,
-            second_order_coherence=0.65
+            dependency_distance=2.3, first_order_coherence=0.75, second_order_coherence=0.65
         )
-        
+
         analyzer = (
             NlpAnalyzerTestFixture()
             .with_model_loader(model_loader)
@@ -110,10 +104,10 @@ class TestAnalyzeTextWithMockedDependencies:
             .with_complexity_calculator(complexity_calc)
             .build()
         )
-        
+
         # Act
         result = await analyzer.analyze_text("The quick brown fox jumps", "en")
-        
+
         # Assert
         assert result.word_count == 5
         assert result.sentence_count == 1
@@ -129,7 +123,7 @@ class TestAnalyzeTextWithMockedDependencies:
         assert result.mean_dependency_distance == 2.3
         assert result.first_order_coherence == 0.75
         assert result.second_order_coherence == 0.65
-        
+
         # Verify dependencies were called
         assert isinstance(model_loader.process_text, AsyncMock)
         model_loader.process_text.assert_called_once()
@@ -156,12 +150,12 @@ class TestDependencyInteractions:
         # Arrange
         detector = create_mock_language_detector()
         analyzer = NlpAnalyzerTestFixture().with_language_detector(detector).build()
-        
+
         # Act - explicit language
         await analyzer.analyze_text("Hello", "en")
         assert isinstance(detector.detect, AsyncMock)
         assert detector.detect.call_count == 0
-        
+
         # Act - auto language
         await analyzer.analyze_text("Hello", "auto")
         assert detector.detect.call_count == 1
@@ -172,37 +166,37 @@ class TestDependencyInteractions:
         # Arrange
         model_loader = create_mock_spacy_model_loader()
         detector = create_mock_language_detector(default_language="sv")
-        
+
         analyzer = (
             NlpAnalyzerTestFixture()
             .with_model_loader(model_loader)
             .with_language_detector(detector)
             .build()
         )
-        
+
         # Act with auto detection
         await analyzer.analyze_text("Hej världen", "auto")
-        
+
         # Assert
         assert isinstance(model_loader.process_text, AsyncMock)
         model_loader.process_text.assert_called_once()
         call_args = model_loader.process_text.call_args
         assert call_args[0][1] == "sv"  # Second argument is language
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_calculators_receive_processed_tokens(self) -> None:
         """Test that calculators receive the correct processed tokens."""
         # Arrange
         tokens = ["hello", "world", "test"]
         mock_doc = create_mock_doc(tokens=tokens)
-        
+
         model_loader = create_mock_spacy_model_loader()
         model_loader.process_text = AsyncMock(return_value=mock_doc)  # type: ignore[method-assign]
-        
+
         zipf_calc = create_mock_zipf_calculator()
         diversity_calc = create_mock_diversity_calculator()
         phraseology_calc = create_mock_phraseology_calculator()
-        
+
         analyzer = (
             NlpAnalyzerTestFixture()
             .with_model_loader(model_loader)
@@ -211,10 +205,10 @@ class TestDependencyInteractions:
             .with_phraseology_calculator(phraseology_calc)
             .build()
         )
-        
+
         # Act
         await analyzer.analyze_text("hello world test", "en")
-        
+
         # Assert - all calculators received the tokens
         assert isinstance(zipf_calc.calculate_metrics, MagicMock)
         zipf_calc.calculate_metrics.assert_called_once_with(tokens, "en")
@@ -235,18 +229,17 @@ class TestSkeletonModeFallback:
         # Arrange
         failed_loader = create_mock_spacy_model_loader(should_fail=True)
         analyzer = NlpAnalyzerTestFixture().with_model_loader(failed_loader).build()
-        
+
         # Act
         result = await analyzer.analyze_text(
-            "This is a test. Another sentence here! And a question?", 
-            "en"
+            "This is a test. Another sentence here! And a question?", "en"
         )
-        
+
         # Assert
         assert result.word_count == 10  # Simple word count
         assert result.sentence_count == 3  # Split by .!?
         assert result.avg_sentence_length == round(10 / 3, 2)
-        
+
         # All advanced metrics should be 0 in skeleton mode
         assert result.mean_zipf_frequency == 0.0
         assert result.mtld_score == 0.0
@@ -259,10 +252,10 @@ class TestSkeletonModeFallback:
         # Arrange
         failed_loader = create_mock_spacy_model_loader(should_fail=True)
         analyzer = NlpAnalyzerTestFixture().with_model_loader(failed_loader).build()
-        
+
         # Act
         result = await analyzer.analyze_text("", "en")
-        
+
         # Assert
         assert result.word_count == 0
         assert result.sentence_count == 0
@@ -271,13 +264,13 @@ class TestSkeletonModeFallback:
     @pytest.mark.asyncio
     async def test_skeleton_mode_whitespace_only(self) -> None:
         """Test skeleton mode handles whitespace-only text."""
-        # Arrange  
+        # Arrange
         failed_loader = create_mock_spacy_model_loader(should_fail=True)
         analyzer = NlpAnalyzerTestFixture().with_model_loader(failed_loader).build()
-        
+
         # Act
         result = await analyzer.analyze_text("   \n\t  ", "en")
-        
+
         # Assert
         assert result.word_count == 0  # No actual words
         assert result.sentence_count == 0
@@ -292,10 +285,10 @@ class TestProcessingTime:
         """Test that processing time is always at least 1ms."""
         # Arrange
         analyzer = NlpAnalyzerTestFixture().build()
-        
+
         # Act - even for empty text
         result = await analyzer.analyze_text("", "en")
-        
+
         # Assert
         assert result.processing_time_ms >= 1
 
@@ -304,14 +297,14 @@ class TestProcessingTime:
         """Test that more complex analysis takes more time."""
         # This is a loose test - just checking the value is set
         # In real scenarios, complex text would take longer
-        
+
         # Arrange
         analyzer = NlpAnalyzerTestFixture().build()
-        
+
         # Act
         simple_result = await analyzer.analyze_text("Hi", "en")
         complex_result = await analyzer.analyze_text("Complex " * 100, "en")
-        
+
         # Assert - both have processing times
         assert simple_result.processing_time_ms > 0
         assert complex_result.processing_time_ms > 0

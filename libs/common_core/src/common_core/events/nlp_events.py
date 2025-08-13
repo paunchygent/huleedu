@@ -88,7 +88,7 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
 
 class NlpMetrics(BaseModel):
     """Comprehensive NLP metrics for essay analysis.
-    
+
     Implements the full suite of linguistic metrics required for essay assessment:
     - Lexical sophistication (Zipf frequency)
     - Lexical diversity (MTLD/HDD)
@@ -102,68 +102,60 @@ class NlpMetrics(BaseModel):
     sentence_count: int = Field(description="Total number of sentences")
     avg_sentence_length: float = Field(description="Average sentence length in words")
     language_detected: str = Field(description="ISO 639-1 language code (en, sv, etc.)")
-    processing_time_ms: int = Field(default=0, description="Time taken for NLP processing in milliseconds")
-    
+    processing_time_ms: int = Field(
+        default=0, description="Time taken for NLP processing in milliseconds"
+    )
+
     # Lexical sophistication metrics (wordfreq library)
     mean_zipf_frequency: float = Field(
-        default=0.0,
-        description="Mean Zipf frequency of tokens (higher = more common words)"
+        default=0.0, description="Mean Zipf frequency of tokens (higher = more common words)"
     )
     percent_tokens_zipf_below_3: float = Field(
         default=0.0,
-        description="Percentage of tokens with Zipf frequency < 3 (rare/sophisticated words)"
+        description="Percentage of tokens with Zipf frequency < 3 (rare/sophisticated words)",
     )
-    
+
     # Lexical diversity metrics (lexical-diversity library)
     mtld_score: float = Field(
         default=0.0,
-        description="Measure of Textual Lexical Diversity (higher = more diverse vocabulary)"
+        description="Measure of Textual Lexical Diversity (higher = more diverse vocabulary)",
     )
     hdd_score: float = Field(
-        default=0.0,
-        description="Hypergeometric Distribution D (vocabulary diversity measure)"
+        default=0.0, description="Hypergeometric Distribution D (vocabulary diversity measure)"
     )
-    
+
     # Syntactic complexity metrics (TextDescriptives)
     mean_dependency_distance: float = Field(
         default=0.0,
-        description="Average dependency distance in syntax tree (higher = more complex)"
+        description="Average dependency distance in syntax tree (higher = more complex)",
     )
     phrasal_indices: dict[str, float] = Field(
-        default_factory=dict,
-        description="Phrasal complexity indices (if TAASSC available)"
+        default_factory=dict, description="Phrasal complexity indices (if TAASSC available)"
     )
     clausal_indices: dict[str, float] = Field(
-        default_factory=dict,
-        description="Clausal complexity indices (if TAASSC available)"
+        default_factory=dict, description="Clausal complexity indices (if TAASSC available)"
     )
-    
+
     # Cohesion metrics (TextDescriptives)
     first_order_coherence: float = Field(
-        default=0.0,
-        description="Adjacent sentence similarity (0-1, higher = more cohesive)"
+        default=0.0, description="Adjacent sentence similarity (0-1, higher = more cohesive)"
     )
     second_order_coherence: float = Field(
-        default=0.0,
-        description="Two-sentence gap similarity (0-1, higher = more cohesive)"
+        default=0.0, description="Two-sentence gap similarity (0-1, higher = more cohesive)"
     )
-    
+
     # Phraseology metrics (gensim)
     avg_bigram_pmi: float = Field(
-        default=0.0,
-        description="Average Pointwise Mutual Information of bigrams"
+        default=0.0, description="Average Pointwise Mutual Information of bigrams"
     )
     avg_trigram_pmi: float = Field(
-        default=0.0,
-        description="Average Pointwise Mutual Information of trigrams"
+        default=0.0, description="Average Pointwise Mutual Information of trigrams"
     )
     avg_bigram_npmi: float = Field(
-        default=0.0,
-        description="Average Normalized PMI of bigrams (-1 to 1)"
+        default=0.0, description="Average Normalized PMI of bigrams (-1 to 1)"
     )
     avg_trigram_npmi: float = Field(
-        default=0.0,
-        description="Average Normalized PMI of trigrams (-1 to 1)"
+        default=0.0, description="Average Normalized PMI of trigrams (-1 to 1)"
     )
 
 
@@ -186,7 +178,9 @@ class GrammarAnalysis(BaseModel):
     error_count: int = Field(description="Total number of grammar/spelling errors")
     errors: list[GrammarError] = Field(default_factory=list, description="List of detected errors")
     language: str = Field(description="Language used for analysis")
-    processing_time_ms: int = Field(default=0, description="Time taken for grammar check in milliseconds")
+    processing_time_ms: int = Field(
+        default=0, description="Time taken for grammar check in milliseconds"
+    )
 
 
 class EssayNlpCompletedV1(BaseEventData):
@@ -196,7 +190,7 @@ class EssayNlpCompletedV1(BaseEventData):
     Publisher: NLP Service
     Consumer: Result Aggregator Service
     Topic: huleedu.essay.nlp.completed.v1
-    
+
     Flow (Phase 2 - Text Analysis):
     1. Batch Orchestrator sends BATCH_NLP_INITIATE_COMMAND
     2. NLP Service fetches essay content from Content Service
@@ -204,7 +198,7 @@ class EssayNlpCompletedV1(BaseEventData):
     4. NLP Service calls Language Tool Service for grammar checking
     5. NLP Service publishes this event for each essay
     6. Result Aggregator collects and stores NLP results
-    
+
     Note: This is a Phase 2 event - part of the post-readiness text analysis flow.
     """
 
@@ -212,7 +206,9 @@ class EssayNlpCompletedV1(BaseEventData):
     essay_id: str = Field(description="Essay identifier")
     text_storage_id: str = Field(description="Storage ID of essay content")
     nlp_metrics: NlpMetrics = Field(description="Basic text metrics from spaCy analysis")
-    grammar_analysis: GrammarAnalysis = Field(description="Grammar analysis from Language Tool Service")
+    grammar_analysis: GrammarAnalysis = Field(
+        description="Grammar analysis from Language Tool Service"
+    )
     processing_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata about the NLP processing"
     )
@@ -221,26 +217,26 @@ class EssayNlpCompletedV1(BaseEventData):
 class BatchNlpAnalysisCompletedV1(ProcessingUpdate):
     """
     Thin completion event for ELS state management (Phase 2).
-    
+
     Publisher: NLP Service
     Consumer: Essay Lifecycle Service (ELS)
     Topic: huleedu.batch.nlp.analysis.completed.v1
-    
+
     This is the thin event for state machine updates, following the CJ Assessment pattern.
     Rich business data goes to RAS via EssayNlpCompletedV1 events.
-    
+
     Flow:
     1. NLP Service processes batch of essays
     2. Publishes EssayNlpCompletedV1 to RAS for each essay (rich data)
     3. Publishes this event to ELS when batch completes (thin, state only)
     4. ELS updates essay state machine to mark phase complete
     """
-    
+
     event_name: ProcessingEvent = ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED
     # entity_id (from BaseEventData) is the batch_id
     # status (from ProcessingUpdate) indicates batch outcome
     # system_metadata (from ProcessingUpdate) populated by NLP Service
-    
+
     batch_id: str = Field(description="Batch identifier")
     processing_summary: dict[str, Any] = Field(
         description="Summary of batch processing results",
@@ -249,7 +245,7 @@ class BatchNlpAnalysisCompletedV1(ProcessingUpdate):
             "successful": 0,
             "failed": 0,
             "successful_essay_ids": [],  # List of essay IDs that were successfully processed
-            "failed_essay_ids": [],      # List of essay IDs that failed processing
+            "failed_essay_ids": [],  # List of essay IDs that failed processing
             "processing_time_seconds": 0.0,
         },
     )

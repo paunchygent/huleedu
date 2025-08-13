@@ -274,7 +274,7 @@ class BCSKafkaConsumer:
 
             # Use processing_summary for state tracking only (NO business data)
             processing_summary = cj_data.processing_summary
-            
+
             # Record successful essay completions
             for essay_id in processing_summary.get("successful_essay_ids", []):
                 # Record completion for each essay (state tracking only)
@@ -298,10 +298,8 @@ class BCSKafkaConsumer:
                         extra={"correlation_id": str(envelope.correlation_id)},
                     )
                 else:
-                    logger.error(
-                        f"Failed to record CJ assessment completion for essay {essay_id}"
-                    )
-            
+                    logger.error(f"Failed to record CJ assessment completion for essay {essay_id}")
+
             # Record failed essay completions
             for essay_id in processing_summary.get("failed_essay_ids", []):
                 success = await self.batch_state_repo.record_essay_step_completion(
@@ -315,17 +313,14 @@ class BCSKafkaConsumer:
                         "timestamp": envelope.event_timestamp.isoformat(),
                     },
                 )
-                
+
                 if success:
                     logger.info(
-                        f"Recorded CJ assessment failure for essay {essay_id} "
-                        f"in batch {batch_id}",
+                        f"Recorded CJ assessment failure for essay {essay_id} in batch {batch_id}",
                         extra={"correlation_id": str(envelope.correlation_id)},
                     )
                 else:
-                    logger.error(
-                        f"Failed to record CJ assessment failure for essay {essay_id}"
-                    )
+                    logger.error(f"Failed to record CJ assessment failure for essay {essay_id}")
 
         except Exception as e:
             logger.error(f"Error processing CJ assessment completion: {e}", exc_info=True)
