@@ -1,4 +1,36 @@
-FROM python:3.11-slim
+# Multi-stage build for smaller final image
+FROM python:3.11-slim as builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PDM_USE_VENV=false
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PDM
+RUN pip install --no-cache-dir pdm
+
+# Set working directory
+WORKDIR /app
+
+# Copy shared local dependencies
+COPY libs/common_core/ /app/libs/common_core/
+COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+
+# Copy service files
+COPY services/nlp_service/ /app/services/nlp_service/
+
+# Switch to service directory and install dependencies
+WORKDIR /app/services/nlp_service
+RUN pdm install --prod --frozen-lockfile
+
+# Final runtime stage
+FROM python:3.11-slim as runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -10,39 +42,27 @@ ENV PYTHONUNBUFFERED=1 \
     SERVICE_NAME=nlp_service \
     PDM_USE_VENV=false
 
-# System dependencies
+# Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Set base WORKDIR for the application
-WORKDIR /app
-
-# Install PDM globally in the image
+# Install PDM in runtime (needed for pdm run command)
 RUN pip install --no-cache-dir pdm
 
-# Copy shared local dependencies first
-COPY libs/common_core/ /app/libs/common_core/
-COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+# Create application directory
+WORKDIR /app
 
-# Now, handle the specific service
-COPY services/nlp_service/ /app/services/nlp_service/
+# Copy the built application and dependencies from builder stage
+COPY --from=builder /app /app
 
-# Switch to service directory for dependency installation
-WORKDIR /app/services/nlp_service
-
-# Install dependencies for the nlp_service using its own pyproject.toml
-# PDM will use the overrides to find local dependencies at the correct paths
-# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
-RUN pdm install --prod --frozen-lockfile
-
+# Create user and set permissions
 RUN groupadd -r nlpuser && useradd --no-log-init -r -g nlpuser nlpuser \
     && chown -R nlpuser:nlpuser /app
-USER nlpuser
 
-# No HTTP health check for pure worker service
-# Health will be monitored via Kafka consumer metrics
+USER nlpuser
+WORKDIR /app/services/nlp_service
 
 # Command to run the worker service
 CMD ["pdm", "run", "start"]

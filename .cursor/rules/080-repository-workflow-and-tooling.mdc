@@ -50,3 +50,46 @@ alwaysApply: false
 ### 5.2. Service Directories
 - Each service resides in own directory under `services/`
 - Contains service-specific code, tests, configuration
+
+## 6. Docker Development Workflow
+
+### 6.1. Development vs Production Builds
+- **Development**: Use `Dockerfile.dev` with volume mounts for hot-reload
+- **Production**: Use standard `Dockerfile` for optimized deployment images
+- **NEVER** use `--no-cache` for development - use optimized layer caching instead
+
+### 6.2. Development Workflow Commands
+```bash
+# Start development environment with hot-reload
+./scripts/dev-workflow.sh dev <service_name>
+
+# Build development version of specific service
+./scripts/dev-workflow.sh build dev <service_name>
+
+# Incremental build using cache optimization
+./scripts/dev-workflow.sh incremental
+
+# Check what services need rebuilding
+./scripts/dev-workflow.sh check
+```
+
+### 6.3. Docker Compose Development
+```bash
+# Use development compose overlay for hot-reload
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# Start specific services in development mode
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service_name>
+```
+
+### 6.4. Performance Guidelines
+- **Incremental builds**: 4-6 seconds (using cache)
+- **Clean builds**: 5-7 minutes (without cache)
+- **Hot-reload**: Instant code changes via volume mounts
+- **Layer caching**: 99%+ cache hit rate for dependencies
+
+### 6.5. Build Optimization Rules
+- Dependencies installed before code copying for better caching
+- Multi-stage builds: `base` → `development` → `production`
+- Dynamic lockfile generation for development flexibility
+- Separate volume mounts for shared libraries and service code

@@ -165,6 +165,27 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 
 # Then access logs: read .cursor/rules/046-docker-container-debugging.mdc to properly debug containers.
 
+#### Development
+
+```bash
+# Start development environment with hot-reload
+./scripts/dev-workflow.sh dev <service_name>
+
+# Check what services need rebuilding
+./scripts/dev-workflow.sh check
+
+# Build development version with cache optimization
+./scripts/dev-workflow.sh build dev <service_name>
+
+# Incremental build (all services)
+./scripts/dev-workflow.sh incremental
+
+# Start services with development compose
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service_name>
+```
+
+#### Production
+
 ```markdown
 - **Rebuild**: `docker compose build --no-cache <service>`
 - **Start**: `docker compose up -d`

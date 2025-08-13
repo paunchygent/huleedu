@@ -1,0 +1,104 @@
+# Development-optimized Dockerfile with improved layer caching
+# Use this for development with volume mounts for hot-reload
+# Supports both API (start) and worker (start_worker) modes
+
+FROM python:3.11-slim as base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PDM_USE_VENV=false \
+    ENV_TYPE=docker \
+    PYTHONPATH=/app \
+    QUART_APP=app:app \
+    QUART_ENV=production \
+    LOG_LEVEL=INFO \
+    HTTP_PORT=6000 \
+    PROMETHEUS_PORT=9090
+
+# Install system dependencies (rarely change - good cache layer)
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    curl \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PDM (rarely changes - good cache layer)
+RUN pip install --no-cache-dir pdm
+
+WORKDIR /app
+
+# ========================================
+# DEPENDENCY INSTALLATION OPTIMIZATION
+# ========================================
+
+# First, copy only dependency files for better caching
+# This layer will only rebuild when dependencies change
+COPY libs/common_core/pyproject.toml /app/libs/common_core/pyproject.toml
+COPY libs/huleedu_service_libs/pyproject.toml /app/libs/huleedu_service_libs/pyproject.toml
+COPY services/essay_lifecycle_service/pyproject.toml /app/services/essay_lifecycle_service/pyproject.toml
+
+# Generate lockfile if it doesn't exist (better than --frozen-lockfile for dev)
+WORKDIR /app/services/essay_lifecycle_service
+RUN pdm lock --lockfile pdm.lock.docker || echo "Lock generation failed, will install without lock"
+
+# Now copy the source files for shared libraries
+# These change more frequently but still less than service code
+COPY libs/common_core/src/ /app/libs/common_core/src/
+COPY libs/huleedu_service_libs/src/ /app/libs/huleedu_service_libs/src/
+
+# Install dependencies (this layer caches well if pyproject.toml doesn't change)
+# Use lockfile if it exists, otherwise install normally
+RUN if [ -f "pdm.lock.docker" ]; then \
+        pdm install --prod --lockfile pdm.lock.docker; \
+    else \
+        pdm install --prod; \
+    fi
+
+# ========================================
+# DEVELOPMENT STAGE (for volume mounts)
+# ========================================
+FROM base as development
+
+# Create user and data directory
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
+    mkdir -p /data/essay_lifecycle && \
+    chown -R appuser:appuser /data/essay_lifecycle
+
+# Copy service code (this layer changes most frequently)
+COPY services/essay_lifecycle_service/ /app/services/essay_lifecycle_service/
+
+# Set permissions
+RUN chown -R appuser:appuser /app
+
+USER appuser
+WORKDIR /app/services/essay_lifecycle_service
+
+# Expose the ports the app runs on
+EXPOSE ${HTTP_PORT} ${PROMETHEUS_PORT}
+
+# Default to API mode, but can be overridden for worker mode
+CMD ["pdm", "run", "start"]
+
+# ========================================
+# PRODUCTION STAGE (for deployment)
+# ========================================
+FROM base as production
+
+# Copy service code for production build
+COPY services/essay_lifecycle_service/ /app/services/essay_lifecycle_service/
+
+# Create user, data directory and set permissions
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
+    mkdir -p /data/essay_lifecycle && \
+    chown -R appuser:appuser /data/essay_lifecycle && \
+    chown -R appuser:appuser /app
+
+USER appuser
+WORKDIR /app/services/essay_lifecycle_service
+
+# Expose the ports the app runs on
+EXPOSE ${HTTP_PORT} ${PROMETHEUS_PORT}
+
+# Default to API mode, but can be overridden for worker mode
+CMD ["pdm", "run", "start"]

@@ -52,9 +52,28 @@ docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessme
 | content_service | huleedu_content_service | huleedu_content_db |
 | result_aggregator | huleedu_result_aggregator_service | huleedu_result_aggregator_db |
 
+## Development Workflow Commands
+```bash
+# Start development environment with hot-reload
+./scripts/dev-workflow.sh dev <service_name>
+
+# Check what services need rebuilding
+./scripts/dev-workflow.sh check
+
+# Build development version with cache optimization
+./scripts/dev-workflow.sh build dev <service_name>
+
+# Incremental build (all services)
+./scripts/dev-workflow.sh incremental
+
+# Start services with development compose
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service_name>
+```
+
 ## Debug Workflow
 1. **ALWAYS** use `docker ps | grep huleedu` first
 2. **VERIFY** container name before accessing logs
 3. **CHECK** service architecture (combined vs split)
 4. **USE** correlation IDs to trace across services
 5. **ACCESS** databases with standard pattern above
+6. **USE** development commands for optimized builds (no --no-cache needed)
