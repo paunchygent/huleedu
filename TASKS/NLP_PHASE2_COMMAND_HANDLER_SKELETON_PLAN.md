@@ -1,5 +1,35 @@
 # 🧠 ULTRATHINK: NLP Phase 2 Command Handler Implementation Plan (CORRECTED)
 
+## 📊 IMPLEMENTATION STATUS (Updated: 2025-01-13)
+
+### ✅ COMPLETED
+- BatchNlpAnalysisHandler implementation (skeleton with proper error handling)
+- LanguageToolServiceClient skeleton with mock responses
+- Event models and topic mappings in common_core
+- DI wiring and provider configurations
+- Event publisher methods for NLP completed events
+- NLP Service dependencies updated in pyproject.toml (spacy, wordfreq, lexical-diversity, etc.)
+- Language Tool Service requirements fully documented
+- NlpMetrics model expanded with all required linguistic metrics
+- SpacyNlpAnalyzer full production implementation with:
+  - Lexical sophistication (Zipf frequency via wordfreq)
+  - Lexical diversity (MTLD/HDD via lexical-diversity)
+  - Syntactic complexity (dependency distance via TextDescriptives)
+  - Cohesion metrics (sentence similarity via TextDescriptives)
+  - Phraseology (PMI/NPMI via gensim)
+  - Automatic language detection (langdetect)
+  - Fallback skeleton mode for resilience
+
+### 🚧 IN PROGRESS
+- Nothing currently in progress
+
+### ⏳ PENDING
+- Unit tests for all NLP components
+- Integration tests for end-to-end flow
+- Language Tool Service creation (separate microservice)
+- Docker configuration updates (add spaCy model downloads)
+- Performance optimization for <500ms requirement
+
 ## ⚠️ CRITICAL VALIDATION UPDATE
 
 **Original plan contained multiple hallucinations. This is the corrected and ALIGNED version based on actual codebase analysis.**
@@ -760,12 +790,129 @@ async def test_end_to_end_nlp_analysis():
 - ✅ **PRESERVE** Phase 1 student matching (completely unchanged)
 - ✅ **FOLLOW** all HuleEdu architectural mandates
 
+## Language Tool Service Implementation Requirements
+
+### Service Architecture Decision
+**Create as Separate Microservice** following HuleEdu's bounded context principles:
+- **Location**: `services/language_tool_service/`
+- **Technology**: Java-based Language Tool with Python FastAPI/Quart wrapper
+- **Pattern**: Similar to LLM Provider Service architecture
+- **Port**: 8085 (avoiding conflicts with existing services)
+
+### Implementation Requirements
+
+#### 1. Service Structure
+```
+services/language_tool_service/
+├── Dockerfile          # Multi-stage: Java + Python wrapper
+├── README.md
+├── pyproject.toml      # Python dependencies for HTTP wrapper
+├── config.py           # Service configuration with BaseSettings
+├── app.py              # Quart/FastAPI HTTP wrapper
+├── di.py               # Dishka DI container setup
+├── protocols.py        # Protocol interfaces
+├── api/
+│   ├── __init__.py
+│   ├── grammar_routes.py   # POST /v1/check endpoint
+│   └── health_routes.py    # Health checks with DatabaseHealthChecker
+├── implementations/
+│   ├── __init__.py
+│   ├── language_tool_wrapper.py  # Java process management
+│   └── outbox_manager.py         # Outbox pattern if needed
+├── metrics.py          # Prometheus metrics
+└── tests/
+```
+
+#### 2. Required Patterns (MANDATORY)
+- **Dishka DI Container**: All dependencies via protocols
+- **Structured Error Handling**: Use `huleedu_service_libs.error_handling`
+- **Observability**: Full stack integration (logging, tracing, metrics)
+- **Health Endpoints**: `/healthz` with dependency checks
+- **Metrics Endpoint**: `/metrics` for Prometheus
+- **Configuration**: Environment-based via Pydantic BaseSettings
+
+#### 3. API Contract
+```python
+# POST /v1/check
+{
+    "text": str,
+    "language": str,  # "en", "sv", "auto"
+    "correlation_id": UUID
+}
+
+# Response
+{
+    "errors": [
+        {
+            "rule_id": str,
+            "message": str,
+            "short_message": str,
+            "offset": int,
+            "length": int,
+            "replacements": list[str],
+            "category": str,  # "grammar", "spelling", "style"
+            "severity": str   # "error", "warning", "info"
+        }
+    ],
+    "error_count": int,
+    "errors_per_100_words": float,
+    "category_breakdown": dict[str, int],
+    "language": str,
+    "processing_time_ms": int
+}
+```
+
+#### 4. Docker Configuration
+```dockerfile
+# Multi-stage Dockerfile
+FROM openjdk:11-jre-slim as java-base
+RUN apt-get update && apt-get install -y wget unzip
+RUN wget https://languagetool.org/download/LanguageTool-stable.zip
+RUN unzip LanguageTool-stable.zip
+
+FROM python:3.11-slim
+COPY --from=java-base /LanguageTool-* /opt/languagetool/
+RUN apt-get update && apt-get install -y openjdk-11-jre-headless
+# Python app setup with PDM...
+```
+
+#### 5. Integration with NLP Service
+- HTTP client implementation in `LanguageToolServiceClient`
+- Circuit breaker pattern for resilience
+- Timeout handling (30s max)
+- Fallback to empty grammar analysis on failure
+- Structured error propagation
+
+## Advanced NLP Metrics Implementation
+
+### Required Linguistic Metrics (STRICT REQUIREMENTS)
+1. **Lexical sophistication**: mean Zipf, % tokens Zipf<3 (wordfreq)
+2. **Lexical diversity**: MTLD/HDD (lexical_diversity)
+3. **Syntactic complexity**: mean dependency distance (TextDescriptives), phrasal/clausal indices
+4. **Cohesion**: first/second-order sentence similarity (TextDescriptives)
+5. **Grammar accuracy**: From Language Tool Service
+6. **Phraseology**: avg PMI/npmi of essay bigrams/trigrams (gensim/textacy)
+
+### Dependencies to Add
+```toml
+# services/nlp_service/pyproject.toml
+dependencies = [
+    # ... existing ...
+    "spacy>=3.7.0",
+    "wordfreq>=3.0.0",
+    "lexical-diversity>=0.1.1",
+    "textdescriptives>=2.8.0",
+    "langdetect>=1.0.9",
+    "gensim>=4.3.0",  # For phraseology metrics
+]
+```
+
 ## Next Steps After Implementation
 
-1. **spaCy Model Implementation:** Replace skeleton with real spaCy analysis
-2. **Language Tool Service:** Implement actual HTTP client integration
-3. **Language Detection:** Add proper language detection logic
-4. **Performance Testing:** Optimize for <500ms per essay requirement
-5. **Advanced Metrics:** Extend NlpMetrics based on requirements
+1. **Phase 1**: Implement real spaCy analysis with specified metrics
+2. **Phase 2**: Create Language Tool Service following HuleEdu patterns
+3. **Phase 3**: Integration testing with full pipeline
+4. **Phase 4**: Performance optimization for <500ms requirement
+5. **Phase 5**: Comprehensive unit and integration tests
 
-This plan provides the exact service structure foundation you need while avoiding premature optimization and complex assumptions. The skeleton will be immediately testable and ready for iterative enhancement.
+This plan ensures full compliance with HuleEdu architectural patterns while implementing the exact linguistic metrics required.

@@ -6,7 +6,7 @@ authors = [
     { name = "Olof Larsson", email = "paunchygent@gmail.com" },
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 license = {text = "MIT"}
 
 # Minimal root dependencies - most deps are per-service or in common_core
@@ -153,6 +153,12 @@ module = [
     "yaml.*",       # PyYAML stubs
     "pypandoc.*",   # pypandoc lacks type stubs
     "magic.*",      # python-magic lacks type stubs
+    "spacy.*",      # spaCy NLP framework
+    "langdetect.*", # Language detection library
+    "wordfreq.*",   # Word frequency library
+    "lexical_diversity.*", # Lexical diversity metrics
+    "gensim.*",     # Topic modeling and NLP library
+    "textdescriptives.*", # Text complexity metrics
     "fastapi.*",
     "starlette.*",
     "rich.*",       # Rich library for terminal formatting

@@ -87,13 +87,84 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
 
 
 class NlpMetrics(BaseModel):
-    """Basic spaCy-derived text metrics."""
+    """Comprehensive NLP metrics for essay analysis.
+    
+    Implements the full suite of linguistic metrics required for essay assessment:
+    - Lexical sophistication (Zipf frequency)
+    - Lexical diversity (MTLD/HDD)
+    - Syntactic complexity (dependency distance)
+    - Cohesion (sentence similarity)
+    - Phraseology (PMI/NPMI)
+    """
 
+    # Basic metrics (existing)
     word_count: int = Field(description="Total number of words in the text")
     sentence_count: int = Field(description="Total number of sentences")
     avg_sentence_length: float = Field(description="Average sentence length in words")
     language_detected: str = Field(description="ISO 639-1 language code (en, sv, etc.)")
     processing_time_ms: int = Field(default=0, description="Time taken for NLP processing in milliseconds")
+    
+    # Lexical sophistication metrics (wordfreq library)
+    mean_zipf_frequency: float = Field(
+        default=0.0,
+        description="Mean Zipf frequency of tokens (higher = more common words)"
+    )
+    percent_tokens_zipf_below_3: float = Field(
+        default=0.0,
+        description="Percentage of tokens with Zipf frequency < 3 (rare/sophisticated words)"
+    )
+    
+    # Lexical diversity metrics (lexical-diversity library)
+    mtld_score: float = Field(
+        default=0.0,
+        description="Measure of Textual Lexical Diversity (higher = more diverse vocabulary)"
+    )
+    hdd_score: float = Field(
+        default=0.0,
+        description="Hypergeometric Distribution D (vocabulary diversity measure)"
+    )
+    
+    # Syntactic complexity metrics (TextDescriptives)
+    mean_dependency_distance: float = Field(
+        default=0.0,
+        description="Average dependency distance in syntax tree (higher = more complex)"
+    )
+    phrasal_indices: dict[str, float] = Field(
+        default_factory=dict,
+        description="Phrasal complexity indices (if TAASSC available)"
+    )
+    clausal_indices: dict[str, float] = Field(
+        default_factory=dict,
+        description="Clausal complexity indices (if TAASSC available)"
+    )
+    
+    # Cohesion metrics (TextDescriptives)
+    first_order_coherence: float = Field(
+        default=0.0,
+        description="Adjacent sentence similarity (0-1, higher = more cohesive)"
+    )
+    second_order_coherence: float = Field(
+        default=0.0,
+        description="Two-sentence gap similarity (0-1, higher = more cohesive)"
+    )
+    
+    # Phraseology metrics (gensim)
+    avg_bigram_pmi: float = Field(
+        default=0.0,
+        description="Average Pointwise Mutual Information of bigrams"
+    )
+    avg_trigram_pmi: float = Field(
+        default=0.0,
+        description="Average Pointwise Mutual Information of trigrams"
+    )
+    avg_bigram_npmi: float = Field(
+        default=0.0,
+        description="Average Normalized PMI of bigrams (-1 to 1)"
+    )
+    avg_trigram_npmi: float = Field(
+        default=0.0,
+        description="Average Normalized PMI of trigrams (-1 to 1)"
+    )
 
 
 class GrammarError(BaseModel):
