@@ -1,4 +1,9 @@
-"""spaCy-based NLP analyzer implementation with advanced linguistic metrics."""
+"""spaCy-based NLP analyzer implementation with advanced linguistic metrics.
+
+DEPRECATED: This implementation violates DI principles by importing external libraries
+directly. Use nlp_analyzer_refactored.NlpAnalyzerRefactored instead, which properly
+uses dependency injection following HuleEdu's DDD and Clean Code principles.
+"""
 
 from __future__ import annotations
 

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.nlp_service.config import settings
 from services.nlp_service.di import NlpServiceProvider
+from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
 
 logger = create_service_logger("nlp_service.worker_main")
@@ -75,6 +76,7 @@ async def main() -> None:
     # Initialize dependency injection container with OutboxProvider
     container = make_async_container(
         NlpServiceProvider(engine=engine),
+        NlpDependencyProvider(),  # Provides NLP analyzer with proper DI
         OutboxProvider(),  # Provides OutboxRepositoryProtocol and EventRelayWorker
     )
 

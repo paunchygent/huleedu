@@ -47,7 +47,6 @@ from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.implementations.roster_cache_impl import RedisRosterCache
 from services.nlp_service.implementations.roster_client_impl import DefaultClassManagementClient
 from services.nlp_service.implementations.student_matcher_impl import DefaultStudentMatcher
-from services.nlp_service.implementations.nlp_analyzer_impl import SpacyNlpAnalyzer
 from services.nlp_service.implementations.language_tool_client_impl import LanguageToolServiceClient
 from services.nlp_service.kafka_consumer import NlpKafkaConsumer
 from services.nlp_service.metrics import get_business_metrics
@@ -179,17 +178,17 @@ class NlpServiceProvider(Provider):
 
     # Extraction components
     @provide(scope=Scope.APP)
-    def provide_examnet_extractor(self, settings: Settings) -> ExamnetExtractor:
+    def provide_examnet_extractor(self) -> ExamnetExtractor:
         """Provide exam.net format extractor."""
         return ExamnetExtractor()
 
     @provide(scope=Scope.APP)
-    def provide_header_extractor(self, settings: Settings) -> HeaderExtractor:
+    def provide_header_extractor(self) -> HeaderExtractor:
         """Provide header pattern extractor."""
         return HeaderExtractor()
 
     @provide(scope=Scope.APP)
-    def provide_email_anchor_extractor(self, settings: Settings) -> EmailAnchorExtractor:
+    def provide_email_anchor_extractor(self) -> EmailAnchorExtractor:
         """Provide email anchor extractor."""
         return EmailAnchorExtractor()
 
@@ -205,7 +204,7 @@ class NlpServiceProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_extraction_pipeline(
-        self, strategies: list[BaseExtractor], settings: Settings
+        self, strategies: list[BaseExtractor]
     ) -> ExtractionPipeline:
         """Provide extraction pipeline with configured strategies."""
         return ExtractionPipeline(strategies=strategies)
@@ -222,12 +221,12 @@ class NlpServiceProvider(Provider):
         return NameMatcher(name_parser=name_parser)
 
     @provide(scope=Scope.APP)
-    def provide_email_matcher(self, settings: Settings) -> EmailMatcher:
+    def provide_email_matcher(self) -> EmailMatcher:
         """Provide email matcher."""
         return EmailMatcher()
 
     @provide(scope=Scope.APP)
-    def provide_confidence_calculator(self, settings: Settings) -> ConfidenceCalculator:
+    def provide_confidence_calculator(self) -> ConfidenceCalculator:
         """Provide confidence calculator."""
         return ConfidenceCalculator()
 
@@ -237,7 +236,6 @@ class NlpServiceProvider(Provider):
         name_matcher: NameMatcher,
         email_matcher: EmailMatcher,
         confidence_calculator: ConfidenceCalculator,
-        settings: Settings,
     ) -> RosterMatcher:
         """Provide roster matcher orchestrator."""
         return RosterMatcher(
@@ -293,10 +291,6 @@ class NlpServiceProvider(Provider):
             tracer=tracer,
         )
 
-    @provide(scope=Scope.APP)
-    def provide_nlp_analyzer(self) -> NlpAnalyzerProtocol:
-        """Provide spaCy-based NLP analyzer."""
-        return SpacyNlpAnalyzer()
 
     @provide(scope=Scope.APP)
     def provide_language_tool_client(
