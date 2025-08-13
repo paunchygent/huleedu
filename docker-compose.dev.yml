@@ -72,18 +72,165 @@ services:
       - ENV_TYPE=development
       - LOG_LEVEL=DEBUG
 
-  # Add other services as needed...
-  # Template for other services:
-  # service_name:
-  #   volumes:
-  #     - ./services/service_name:/app/services/service_name:cached
-  #     - ./libs/common_core/src:/app/libs/common_core/src:cached
-  #     - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
-  #     - /app/services/service_name/__pycache__
-  #     - /app/services/service_name/__pypackages__
-  #   environment:
-  #     - ENV_TYPE=development
-  #     - LOG_LEVEL=DEBUG
+  # Class Management Service
+  class_management_service:
+    build:
+      context: .
+      dockerfile: services/class_management_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/class_management_service:/app/services/class_management_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/class_management_service/__pycache__
+      - /app/services/class_management_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # Batch Conductor Service
+  batch_conductor_service:
+    build:
+      context: .
+      dockerfile: services/batch_conductor_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/batch_conductor_service:/app/services/batch_conductor_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/batch_conductor_service/__pycache__
+      - /app/services/batch_conductor_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # LLM Provider Service
+  llm_provider_service:
+    build:
+      context: .
+      dockerfile: services/llm_provider_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/llm_provider_service:/app/services/llm_provider_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/llm_provider_service/__pycache__
+      - /app/services/llm_provider_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # API Gateway Service
+  api_gateway_service:
+    build:
+      context: .
+      dockerfile: services/api_gateway_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/api_gateway_service:/app/services/api_gateway_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/api_gateway_service/__pycache__
+      - /app/services/api_gateway_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # Result Aggregator Service
+  result_aggregator_service:
+    build:
+      context: .
+      dockerfile: services/result_aggregator_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/result_aggregator_service:/app/services/result_aggregator_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/result_aggregator_service/__pycache__
+      - /app/services/result_aggregator_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # WebSocket Service
+  websocket_service:
+    build:
+      context: .
+      dockerfile: services/websocket_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/websocket_service:/app/services/websocket_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/websocket_service/__pycache__
+      - /app/services/websocket_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # CJ Assessment Service
+  cj_assessment_service:
+    build:
+      context: .
+      dockerfile: services/cj_assessment_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/cj_assessment_service:/app/services/cj_assessment_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/cj_assessment_service/__pycache__
+      - /app/services/cj_assessment_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # Spellchecker Service (add missing services that we already optimized)
+  spellchecker_service:
+    build:
+      context: .
+      dockerfile: services/spellchecker_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/spellchecker_service:/app/services/spellchecker_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/spellchecker_service/__pycache__
+      - /app/services/spellchecker_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # File Service
+  file_service:
+    build:
+      context: .
+      dockerfile: services/file_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/file_service:/app/services/file_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/file_service/__pycache__
+      - /app/services/file_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
+
+  # Content Service
+  content_service:
+    build:
+      context: .
+      dockerfile: services/content_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/content_service:/app/services/content_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/content_service/__pycache__
+      - /app/services/content_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - LOG_LEVEL=DEBUG
 
 # Development-specific volumes for faster file watching
 volumes:

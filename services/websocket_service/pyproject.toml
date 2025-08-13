@@ -3,7 +3,6 @@ name = "huleedu-websocket-service"
 version = "0.1.0"
 description = "WebSocket Service for real-time notifications in HuleEdu"
 authors = [{ name = "HuleEdu Team", email = "paunchygent@gmail.com" }]
-readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 

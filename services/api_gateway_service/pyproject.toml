@@ -22,7 +22,6 @@ dependencies = [
     "httpx",    # HTTP client for service communication
     "passlib[bcrypt]"           # For password hashing (future)
 ]
-readme = "README.md"
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
