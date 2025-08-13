@@ -294,7 +294,7 @@ class NlpAnalyzerTestFixture:
 
     def build(self) -> Any:
         """Build the NlpAnalyzerRefactored with configured dependencies."""
-        from services.nlp_service.implementations.nlp_analyzer_refactored import (
+        from services.nlp_service.implementations.nlp_analyzer_impl import (
             NlpAnalyzerRefactored,
         )
 

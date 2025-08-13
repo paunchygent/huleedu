@@ -5,7 +5,7 @@ Separated from main di.py to avoid monolithic file and maintain clear separation
 
 from dishka import Provider, Scope, provide
 
-from services.nlp_service.implementations.nlp_analyzer_refactored import NlpAnalyzerRefactored
+from services.nlp_service.implementations.nlp_analyzer_impl import NlpAnalyzerRefactored
 from services.nlp_service.implementations.nlp_dependencies import (
     LanguageDetector,
     LexicalDiversityCalculator,

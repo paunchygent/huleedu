@@ -43,7 +43,13 @@ class TestExtractionPipelineIntegration:
         engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
         # Create container with test provider for missing dependencies
-        container = make_async_container(ExtractionTestProvider(), NlpServiceProvider(engine))
+        from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
+        
+        container = make_async_container(
+            ExtractionTestProvider(), 
+            NlpServiceProvider(engine), 
+            NlpDependencyProvider()
+        )
 
         try:
             yield container
