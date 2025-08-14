@@ -154,6 +154,11 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             "correlation_id": str(correlation_id),
             "callback_topic": self.settings.LLM_PROVIDER_CALLBACK_TOPIC,  # Required field
         }
+        
+        logger.info(
+            f"DEBUG: Sending request to LLM Provider with correlation_id: {correlation_id}",
+            extra={"essay_a_preview": essay_a[:50], "essay_b_preview": essay_b[:50]},
+        )
 
         # Make initial HTTP request with retry logic
         url = f"{self.base_url}/comparison"

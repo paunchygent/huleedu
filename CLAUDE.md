@@ -169,13 +169,24 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 
 ```bash
 # Main development workflow
-pdm run dev <command> <service>     # Use main dev script
-pdm run dev dev nlp_service         # Start service with hot-reload
-pdm run dev build nlp_service       # Build specific service
+pdm run dev <command> [service]     # Use main dev script
+
+# Building services
+pdm run dev build                   # Build production images with cache
+pdm run dev build clean             # Clean build (no cache) for production
+pdm run dev build dev               # Build ALL dev images with hot-reload support
+pdm run dev build dev cj_assessment # Build specific dev image
+
+# Running services
+pdm run dev dev                     # Start ALL services with hot-reload
+pdm run dev dev nlp_service         # Start specific service with hot-reload
+
+# Utilities
 pdm run dev check                   # Check what needs rebuilding
+pdm run dev incremental             # Incremental build using cache
 
 # Quick commands
-pdm run up                          # Start all services
+pdm run up                          # Start all services (production mode)
 pdm run down                        # Stop all services
 pdm run logs nlp_service           # Follow service logs
 ```

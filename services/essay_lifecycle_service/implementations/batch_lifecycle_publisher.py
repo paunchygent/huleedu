@@ -431,8 +431,8 @@ class BatchLifecyclePublisher:
             "ELSBatchPhaseOutcomeV1 event stored in outbox for reliable delivery",
             extra={
                 "batch_id": batch_id,
-                "phase": getattr(event_data, "phase", "unknown"),
-                "outcome": getattr(event_data, "outcome", "unknown"),
+                "phase": getattr(event_data, "phase_name", "unknown"),
+                "outcome": getattr(event_data, "phase_status", "unknown"),
                 "correlation_id": str(correlation_id),
                 "topic": topic,
             },

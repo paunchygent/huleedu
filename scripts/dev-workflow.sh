@@ -35,15 +35,21 @@ build_with_cache() {
     echo_info "Build complete! Services: $services"
 }
 
-# Function to build single service for development  
+# Function to build single service or all services for development  
 build_dev_service() {
     local service="$1"
-    echo_info "Building $service for development..."
     
-    # Build development version
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml build $service
-    
-    echo_info "Development build complete for $service"
+    if [ -z "$service" ]; then
+        echo_info "Building all services for development..."
+        # Build all services with dev configuration in parallel
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+        echo_info "Development build complete for all services"
+    else
+        echo_info "Building $service for development..."
+        # Build specific service with dev configuration
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build $service
+        echo_info "Development build complete for $service"
+    fi
 }
 
 # Function to start development environment
@@ -137,7 +143,7 @@ case "$1" in
         echo "Commands:"
         echo "  build [services]        - Build services with optimized caching"
         echo "  build clean [services]  - Clean build (no cache) for services"
-        echo "  build dev [service]     - Build single service for development"
+        echo "  build dev [service]     - Build service(s) for development (omit service to build all)"
         echo "  dev [services]          - Start development environment with hot-reload"
         echo "  incremental             - Incremental build using cache"
         echo "  check                   - Check what services need rebuilding"

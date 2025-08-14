@@ -41,23 +41,23 @@ async def generate_comparison(
     metrics = get_llm_metrics()
     start_time = time.time()
 
-    # Generate correlation ID if not provided
-    correlation_id = uuid4()
-
     try:
+        # Parse request first to get correlation_id
+        data = await request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+
+        try:
+            comparison_request = LLMComparisonRequest(**data)
+        except Exception as e:
+            return jsonify({"error": f"Invalid request format: {str(e)}"}), 400
+
+        # Use correlation_id from request if provided, otherwise generate a new one
+        correlation_id = comparison_request.correlation_id or uuid4()
+
         # Start tracing for the API request
         with tracer.start_api_request_span("comparison", correlation_id):
             tracer.add_span_event("request_started", {"correlation_id": str(correlation_id)})
-
-            # Parse request
-            data = await request.get_json()
-            if not data:
-                return jsonify({"error": "No JSON data provided"}), 400
-
-            try:
-                comparison_request = LLMComparisonRequest(**data)
-            except Exception as e:
-                return jsonify({"error": f"Invalid request format: {str(e)}"}), 400
 
             logger.info(f"Processing comparison request with correlation_id: {correlation_id}")
 

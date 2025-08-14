@@ -86,6 +86,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         self,
         tasks: list[ComparisonTask],
         correlation_id: UUID,
+        tracking_map: dict[tuple[str, str], UUID] | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
@@ -95,6 +96,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
         Args:
             tasks: List of comparison tasks to process.
             correlation_id: Request correlation ID for tracing
+            tracking_map: Optional map of (essay_a_id, essay_b_id) to unique correlation IDs
             model_override: Optional model name override
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
@@ -107,6 +109,11 @@ class LLMInteractionImpl(LLMInteractionProtocol):
             return []
 
         logger.info(f"Processing {len(tasks)} comparison tasks")
+        logger.info(
+            f"DEBUG: perform_comparisons called with tracking_map: {tracking_map is not None}, "
+            f"tracking_map size: {len(tracking_map) if tracking_map else 0}",
+            extra={"correlation_id": str(correlation_id)},
+        )
 
         # Get the provider for the current model configuration
         provider = self._get_provider_for_model()
@@ -126,11 +133,27 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                     f"Processing comparison for essays {task.essay_a.id} vs {task.essay_b.id}",
                 )
 
+                # Get the unique correlation ID for this specific comparison
+                # If tracking_map is provided, use the unique ID, otherwise use the batch correlation_id
+                task_correlation_id = correlation_id
+                if tracking_map:
+                    task_key = (task.essay_a.id, task.essay_b.id)
+                    task_correlation_id = tracking_map.get(task_key, correlation_id)
+                    logger.info(
+                        f"DEBUG: Using tracking_map correlation ID {task_correlation_id} for task {task_key}",
+                        extra={"batch_correlation_id": str(correlation_id)},
+                    )
+                else:
+                    logger.warning(
+                        f"DEBUG: No tracking_map provided, using batch correlation ID {correlation_id}",
+                        extra={"essay_a": task.essay_a.id, "essay_b": task.essay_b.id},
+                    )
+
                 # Make direct LLM API request - no caching
                 try:
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
-                        correlation_id=correlation_id,
+                        correlation_id=task_correlation_id,  # Use unique correlation ID
                         system_prompt_override=None,
                         model_override=model_override,
                         temperature_override=temperature_override,

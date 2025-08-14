@@ -27,6 +27,7 @@ WORKDIR /app/services/websocket_service
 
 # Install dependencies for the websocket_service using its own pyproject.toml
 # Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+COPY pdm.lock /app/services/websocket_service/pdm.lock
 RUN pdm install --prod --frozen-lockfile
 
 # Setup user and permissions. Note: chown needs to be run as root.

@@ -161,19 +161,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             f"{batch_essays_registered.course_code.value}"
         )
 
-        # Process any pending content for this batch
-        pending_count = await self.process_pending_content_for_batch(batch_id)
-
-        if pending_count > 0:
-            self._logger.info(
-                f"Processed {pending_count} pending content items for batch {batch_id}",
-                extra={
-                    "batch_id": batch_id,
-                    "pending_count": pending_count,
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
     async def assign_slot_to_content(
         self, batch_id: str, text_storage_id: str, original_file_name: str
     ) -> str | None:

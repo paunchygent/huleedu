@@ -33,6 +33,7 @@ COPY services/batch_conductor_service/ /app/services/batch_conductor_service/
 # Install deps declared in this service's pyproject
 WORKDIR /app/services/batch_conductor_service
 # Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+COPY pdm.lock /app/services/batch_conductor_service/pdm.lock
 RUN pdm install --prod --frozen-lockfile
 
 # ------------------------------------------------------------------

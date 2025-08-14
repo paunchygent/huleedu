@@ -1,5 +1,5 @@
 # Multi-stage build for optimized production image
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -27,10 +27,11 @@ COPY services/file_service/ /app/services/file_service/
 
 # Switch to service directory and install dependencies
 WORKDIR /app/services/file_service
+COPY pdm.lock /app/services/file_service/pdm.lock
 RUN pdm install --prod --frozen-lockfile
 
 # Final runtime stage
-FROM python:3.11-slim as runtime
+FROM python:3.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

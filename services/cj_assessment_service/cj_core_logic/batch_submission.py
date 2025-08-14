@@ -61,24 +61,36 @@ async def submit_batch_chunk(
         HuleEduError: On LLM provider communication failure
     """
     try:
-        # Create tracking records if database is provided
+        # Create tracking records and get unique correlation IDs if database is provided
+        tracking_map = {}
         if database is not None:
             from .batch_submission_tracking import create_tracking_records
 
             async with database.session() as session:
-                await create_tracking_records(
+                tracking_map = await create_tracking_records(
                     session=session,
                     batch_tasks=batch_tasks,
                     cj_batch_id=cj_batch_id,
                     correlation_id=correlation_id,
                 )
                 await session.commit()
+                logger.info(
+                    f"DEBUG: Created tracking_map with {len(tracking_map)} entries for batch {cj_batch_id}",
+                    extra={"correlation_id": str(correlation_id), "tracking_map_sample": str(list(tracking_map.items())[:2])},
+                )
+        else:
+            logger.warning(
+                f"DEBUG: No database provided, tracking_map is empty for batch {cj_batch_id}",
+                extra={"correlation_id": str(correlation_id)},
+            )
 
         # Use existing LLM interaction protocol for batch submission
         # This will handle async processing (returns None for queued requests)
+        # Pass tracking_map so unique correlation IDs can be used for each task
         results = await llm_interaction.perform_comparisons(
             tasks=batch_tasks,
             correlation_id=correlation_id,
+            tracking_map=tracking_map,  # Pass the unique correlation IDs
             model_override=model_override,
             temperature_override=temperature_override,
             max_tokens_override=max_tokens_override,

@@ -1,5 +1,5 @@
 # Multi-stage build for smaller final image
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -27,10 +27,11 @@ COPY services/nlp_service/ /app/services/nlp_service/
 
 # Switch to service directory and install dependencies
 WORKDIR /app/services/nlp_service
+COPY pdm.lock /app/services/nlp_service/pdm.lock
 RUN pdm install --prod --frozen-lockfile
 
 # Final runtime stage
-FROM python:3.11-slim as runtime
+FROM python:3.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

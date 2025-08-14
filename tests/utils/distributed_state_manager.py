@@ -87,83 +87,63 @@ class DistributedStateManager:
 
     async def _atomic_redis_cleanup(self) -> int:
         """
-        Perform atomic Redis cleanup using transactions to handle concurrent modifications.
+        Perform complete Redis cleanup using FLUSHALL to ensure test isolation.
 
-        Cleans up both idempotency keys and pending content keys.
+        For tests, we need absolute certainty that no stale data remains,
+        so we use FLUSHALL rather than pattern matching which can miss keys.
 
-        Returns number of keys cleared.
+        Returns number of keys cleared (from DBSIZE before flush).
         """
-        # Atomic cleanup script that handles concurrent modifications
-        atomic_cleanup_script = """
-            -- Comprehensive cleanup for test isolation
-            -- NO LEGACY PATTERNS - only current V2 patterns
-            local patterns = {
-                'huleedu:idempotency:v2:*',     -- V2 idempotency keys
-                'pending_content:*',             -- File service temp storage
-                'ras:*',                         -- Result aggregator state
-                'bcs:*',                         -- Batch conductor state
-                'outbox:wake:*',                 -- Outbox notifications
-                'api:batch:*',                   -- API batch state
-                'llm_provider:*'                 -- LLM provider queues
-            }
-
-            local batch_size = 1000  -- Increased for faster cleanup
-            local total_deleted = 0
-
-            -- Clean up keys matching each pattern
-            for _, pattern in ipairs(patterns) do
-                local cursor = 0
-                repeat
-                    local scan_result = redis.call(
-                        'SCAN', cursor, 'MATCH', pattern, 'COUNT', batch_size
-                    )
-                    cursor = tonumber(scan_result[1])
-                    local keys = scan_result[2]
-
-                    if #keys > 0 then
-                        -- Delete batch atomically
-                        local deleted = redis.call('DEL', unpack(keys))
-                        total_deleted = total_deleted + deleted
-                    end
-                until cursor == 0
-            end
-
-            -- Also clean up the pending content index key
-            local index_deleted = redis.call('DEL', 'pending_content:index')
-            total_deleted = total_deleted + index_deleted
-
-            return total_deleted
-        """
-
         try:
-            clear_cmd = [
+            # First, count existing keys for reporting
+            count_cmd = [
                 "docker",
-                "exec",
+                "exec", 
                 self.redis_container,
                 "redis-cli",
-                "EVAL",
-                atomic_cleanup_script,
-                "0",
+                "DBSIZE"
+            ]
+            
+            count_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
+            key_count_before = int(count_result.stdout.strip())
+
+            # Perform complete flush
+            flush_cmd = [
+                "docker",
+                "exec",
+                self.redis_container, 
+                "redis-cli",
+                "FLUSHALL"
             ]
 
-            result = subprocess.run(clear_cmd, capture_output=True, text=True, check=True)
-            cleared_count = int(result.stdout.strip())
+            flush_result = subprocess.run(flush_cmd, capture_output=True, text=True, check=True)
+            
+            if "OK" not in flush_result.stdout:
+                raise RuntimeError(f"FLUSHALL command failed: {flush_result.stdout}")
 
-            if cleared_count > 0:
+            # Verify cleanup was successful
+            verify_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
+            key_count_after = int(verify_result.stdout.strip())
+            
+            if key_count_after != 0:
+                logger.warning(f"⚠️ Redis cleanup incomplete: {key_count_after} keys remain")
+                return key_count_before
+            
+            if key_count_before > 0:
                 logger.info(
-                    f"🗑️ Atomically cleared {cleared_count} Redis keys "
-                    f"(idempotency + pending content)"
+                    f"🗑️ Completely flushed Redis: {key_count_before} keys cleared "
+                    f"(idempotency, outbox, and all test state)"
                 )
             else:
-                logger.info("✅ No Redis keys to clear (idempotency or pending content)")
+                logger.info("✅ Redis was already clean (0 keys)")
 
-            return cleared_count
+            return key_count_before
 
         except subprocess.CalledProcessError as e:
-            logger.warning(f"⚠️ Failed atomic Redis cleanup: {e.stderr}")
+            logger.warning(f"⚠️ Failed Redis FLUSHALL cleanup: {e.stderr}")
             raise
         except Exception as e:
-            logger.warning(f"⚠️ Unexpected error in atomic cleanup: {e}")
+            logger.warning(f"⚠️ Unexpected error in Redis cleanup: {e}")
             raise
 
     async def ensure_clean_test_environment(
@@ -258,13 +238,16 @@ class DistributedStateManager:
 
     async def validate_clean_state(self) -> dict[str, Any]:
         """
-        Validate that distributed system state is clean with comprehensive verification.
+        Validate that distributed system state is completely clean.
+
+        Since we use FLUSHALL for cleanup, we simply verify that Redis is empty
+        and provide sample keys if any remain for debugging.
 
         Returns:
             Dict with validation results for debugging
         """
         validation = {
-            "redis_idempotency_keys": 0,
+            "redis_total_keys": 0,
             "redis_sample_keys": [],
             "kafka_consumer_groups": [],
             "clean": True,
@@ -272,59 +255,48 @@ class DistributedStateManager:
         }
 
         try:
-            # Comprehensive Redis validation using SCAN for reliability
-            verification_script = """
-            local pattern = 'huleedu:idempotency:v2:*'
-            local cursor = 0
-            local total_count = 0
-            local sample_keys = {}
-            local max_samples = 5
-
-            repeat
-                local result = redis.call('SCAN', cursor, 'MATCH', pattern, 'COUNT', 100)
-                cursor = tonumber(result[1])
-                local keys = result[2]
-                total_count = total_count + #keys
-
-                -- Collect sample keys for debugging
-                for i = 1, math.min(#keys, max_samples - #sample_keys) do
-                    table.insert(sample_keys, keys[i])
-                    if #sample_keys >= max_samples then break end
-                end
-            until cursor == 0 or #sample_keys >= max_samples
-
-            return {total_count, sample_keys}
-            """
-
+            # Check total Redis key count
             count_cmd = [
                 "docker",
                 "exec",
                 self.redis_container,
                 "redis-cli",
-                "EVAL",
-                verification_script,
-                "0",
+                "DBSIZE"
             ]
-            result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
+            count_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
+            key_count = int(count_result.stdout.strip())
+            validation["redis_total_keys"] = key_count
 
-            # Parse Redis response
-            output_lines = result.stdout.strip().split("\n")
-            if len(output_lines) >= 1:
-                validation["redis_idempotency_keys"] = int(output_lines[0])
-                # Collect sample keys if present
-                if len(output_lines) > 1:
-                    validation["redis_sample_keys"] = output_lines[1:]
-
-            key_count = validation["redis_idempotency_keys"]
-            if isinstance(key_count, int) and key_count > 0:
+            if key_count > 0:
                 validation["clean"] = False
-                sample_keys_raw = validation.get("redis_sample_keys", [])
-                if isinstance(sample_keys_raw, list):
-                    sample_keys = sample_keys_raw[:3]
-                    sample_info = f" (samples: {sample_keys})" if sample_keys else ""
+                
+                # Get sample keys for debugging
+                keys_cmd = [
+                    "docker",
+                    "exec", 
+                    self.redis_container,
+                    "redis-cli",
+                    "KEYS", "*"
+                ]
+                keys_result = subprocess.run(keys_cmd, capture_output=True, text=True, check=True)
+                
+                if keys_result.stdout.strip():
+                    all_keys = keys_result.stdout.strip().split('\n')
+                    validation["redis_sample_keys"] = all_keys[:5]  # First 5 keys for debugging
+                    
+                    logger.warning(
+                        f"⚠️ Redis not clean: {key_count} keys found. "
+                        f"Sample keys: {validation['redis_sample_keys']}"
+                    )
+                    
+                    # Specifically check for idempotency keys that cause the test issue
+                    idempotency_keys = [k for k in all_keys if "idempotency" in k]
+                    if idempotency_keys:
+                        logger.warning(
+                            f"🚨 Found {len(idempotency_keys)} idempotency keys that will cause test failures!"
+                        )
                 else:
-                    sample_info = ""
-                logger.warning(f"⚠️ Found {key_count} Redis idempotency keys{sample_info}")
+                    logger.info("✅ Redis is clean (0 keys)")
 
         except Exception as e:
             logger.warning(f"⚠️ Could not validate Redis state: {e}")
@@ -366,11 +338,11 @@ class DistributedStateManager:
                 )
                 return validation
             else:
-                key_count = validation.get("redis_idempotency_keys", 0)
+                key_count = validation.get("redis_total_keys", 0)
                 sample_keys = validation.get("redis_sample_keys", [])
                 logger.warning(
                     f"⚠️ State not clean after coordinated attempt {attempt + 1}: "
-                    f"found {key_count} keys, samples: {sample_keys[:3]}"
+                    f"found {key_count} Redis keys, samples: {sample_keys[:3]}"
                 )
 
                 # If cleanup failed, wait for services to settle before retry
@@ -379,14 +351,20 @@ class DistributedStateManager:
                     await self._wait_for_services_idle(timeout_seconds=10)
 
         # Final attempt failed - provide detailed error info
-        key_count = validation.get("redis_idempotency_keys", 0)
+        key_count = validation.get("redis_total_keys", 0)
         sample_keys = validation.get("redis_sample_keys", [])
+        
+        # Check specifically for idempotency keys that cause test failures
+        idempotency_samples = [k for k in sample_keys if "idempotency" in k]
+        idempotency_warning = f" ({len(idempotency_samples)} idempotency keys found!)" if idempotency_samples else ""
+        
         raise RuntimeError(
             f"Failed to achieve clean state after {max_attempts} coordinated attempts: "
-            f"found {key_count} Redis keys remaining. "
+            f"found {key_count} Redis keys remaining{idempotency_warning}. "
             f"Sample keys: {sample_keys[:5]}. "
-            f"This suggests services are continuously creating idempotency keys "
-            f"even when reporting idle status, indicating a service coordination issue."
+            f"This suggests services are continuously creating state keys "
+            f"even when reporting idle status, or Docker services are not running properly. "
+            f"Try manually running: docker exec huleedu_redis redis-cli FLUSHALL"
         )
 
 

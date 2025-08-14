@@ -312,15 +312,25 @@ async def watch_pipeline_progression_with_consumer(
                                 )
                             elif message.topic == PIPELINE_TOPICS["essay_spellcheck_completed"]:
                                 spellcheck_completions += 1
+                                essay_id = event_data.get("essay_id", "unknown")
                                 if spellcheck_completions == 1:
                                     print("📨 📝 Spellchecker processing essays...")
+                                print(f"📨 📝 Spellcheck completed: {essay_id} ({spellcheck_completions}/{expected_essay_count})")
+                                if spellcheck_completions == expected_essay_count:
+                                    print(f"✅ All {spellcheck_completions} essays spellcheck completed! ELS will aggregate...")
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 phase_name = event_data.get("phase_name")
                                 phase_status = event_data.get("phase_status")
+                                processed_essays = event_data.get("processed_essays", [])
+                                failed_essay_ids = event_data.get("failed_essay_ids", [])
+                                processed_count = len(processed_essays)
+                                failed_count = len(failed_essay_ids)
+                                
                                 if phase_name == "spellcheck":
                                     print(
                                         f"📨 3️⃣ ELS published phase outcome: "
-                                        f"{phase_name} -> {phase_status}",
+                                        f"{phase_name} -> {phase_status} "
+                                        f"(✅ {processed_count} processed, ❌ {failed_count} failed)",
                                     )
                                     completion_statuses = [
                                         "completed_successfully",
@@ -328,13 +338,14 @@ async def watch_pipeline_progression_with_consumer(
                                     ]
                                     if phase_status in completion_statuses:
                                         print(
-                                            "✅ Spellcheck phase completed! "
+                                            f"✅ Spellcheck phase completed! {processed_count} essays ready for CJ assessment. "
                                             "BOS will initiate CJ assessment...",
                                         )
                                 elif phase_name == "cj_assessment":
                                     print(
                                         f"📨 6️⃣ ELS published phase outcome: "
-                                        f"{phase_name} -> {phase_status}",
+                                        f"{phase_name} -> {phase_status} "
+                                        f"(✅ {processed_count} processed, ❌ {failed_count} failed)",
                                     )
                                     completion_statuses = [
                                         "completed_successfully",
@@ -342,7 +353,7 @@ async def watch_pipeline_progression_with_consumer(
                                     ]
                                     if phase_status in completion_statuses:
                                         print(
-                                            "🎯 Pipeline SUCCESS! "
+                                            f"🎯 Pipeline SUCCESS! CJ Assessment completed with {processed_count} essays! "
                                             "Complete end-to-end processing finished.",
                                         )
                                         return dict(envelope_data)

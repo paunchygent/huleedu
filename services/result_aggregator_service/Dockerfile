@@ -31,6 +31,7 @@ WORKDIR /app/services/result_aggregator_service
 
 # Install dependencies for the result_aggregator_service using its own pyproject.toml
 # Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+COPY pdm.lock /app/services/result_aggregator_service/pdm.lock
 RUN pdm install --prod --frozen-lockfile
 
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
