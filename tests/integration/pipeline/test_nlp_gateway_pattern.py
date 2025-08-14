@@ -112,7 +112,7 @@ class TestNlpGatewayPattern:
         batch_id = f"test-batch-{uuid4().hex[:8]}"
         
         # Step 3: Create BOS command event
-        bos_command = EventEnvelope(
+        bos_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
             event_type="huleedu.batch.nlp.initiate.command.v1",
             source_service="batch_orchestrator_service",
@@ -192,7 +192,7 @@ class TestNlpGatewayPattern:
         ]
         
         # Create BOS command with realistic metadata that the comprehensive test uses
-        realistic_command = EventEnvelope(
+        realistic_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
             event_type="huleedu.batch.nlp.initiate.command.v1",
             source_service="batch_orchestrator_service",
@@ -270,7 +270,7 @@ class TestNlpGatewayPattern:
         batch_id = f"e2e-batch-{uuid4().hex[:8]}"
         
         # Create realistic test event
-        pipeline_command = EventEnvelope(
+        pipeline_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
             event_type="huleedu.batch.nlp.initiate.command.v1", 
             source_service="batch_orchestrator_service",

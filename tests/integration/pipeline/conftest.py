@@ -116,10 +116,14 @@ class DevelopmentServiceHealthChecker:
         url = f"{DEVELOPMENT_SERVICES[service_name]}/healthz"
         
         try:
+            if not self.session:
+                return False
             async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return data.get("status") == "healthy"
+                    if data and isinstance(data, dict):
+                        return bool(data.get("status") == "healthy")
+                    return False
                 return False
         except Exception:
             return False

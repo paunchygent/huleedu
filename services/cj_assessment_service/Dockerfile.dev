@@ -1,7 +1,7 @@
 # Development-optimized Dockerfile with improved layer caching
 # Use this for development with volume mounts for hot-reload
 
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -54,7 +54,7 @@ RUN if [ -f "pdm.lock.docker" ]; then \
 # ========================================
 # DEVELOPMENT STAGE (for volume mounts)
 # ========================================
-FROM base as development
+FROM base AS development
 
 # Create user with cj_assessment naming convention
 RUN groupadd -r cjassessment && useradd --no-log-init -r -g cjassessment cjassessment
@@ -74,7 +74,7 @@ CMD ["pdm", "run", "start"]
 # ========================================
 # PRODUCTION STAGE (for deployment)
 # ========================================
-FROM base as production
+FROM base AS production
 
 # Copy service code for production build
 COPY services/cj_assessment_service/ /app/services/cj_assessment_service/

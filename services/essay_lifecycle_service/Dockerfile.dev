@@ -2,7 +2,7 @@
 # Use this for development with volume mounts for hot-reload
 # Supports both API (start) and worker (start_worker) modes
 
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -58,7 +58,7 @@ RUN if [ -f "pdm.lock.docker" ]; then \
 # ========================================
 # DEVELOPMENT STAGE (for volume mounts)
 # ========================================
-FROM base as development
+FROM base AS development
 
 # Create user and data directory
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
@@ -83,7 +83,7 @@ CMD ["pdm", "run", "start"]
 # ========================================
 # PRODUCTION STAGE (for deployment)
 # ========================================
-FROM base as production
+FROM base AS production
 
 # Copy service code for production build
 COPY services/essay_lifecycle_service/ /app/services/essay_lifecycle_service/

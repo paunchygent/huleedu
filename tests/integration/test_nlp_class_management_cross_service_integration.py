@@ -310,7 +310,7 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # For now, we'll simulate NLP's response based on expected behavior
 
         # Step 2: Set up Class Management handler with real repository
-        class_repository = PostgreSQLClassRepositoryImpl(engine=cm_db_engine)
+        class_repository: PostgreSQLClassRepositoryImpl = PostgreSQLClassRepositoryImpl(engine=cm_db_engine)
         cm_handler = BatchAuthorMatchesHandler(
             class_repository=class_repository,
             session_factory=cm_session_factory,

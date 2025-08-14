@@ -269,6 +269,7 @@ class LLMInteractionProtocol(Protocol):
         self,
         tasks: list[Any],
         correlation_id: UUID,
+        tracking_map: dict[tuple[str, str], UUID] | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,

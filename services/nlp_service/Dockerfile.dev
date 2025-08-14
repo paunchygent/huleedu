@@ -1,7 +1,7 @@
 # Development-optimized Dockerfile with improved layer caching
 # Use this for development with volume mounts for hot-reload
 
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -52,7 +52,7 @@ RUN if [ -f "pdm.lock.docker" ]; then \
 # ========================================
 # DEVELOPMENT STAGE (for volume mounts)
 # ========================================
-FROM base as development
+FROM base AS development
 
 # Create user first
 RUN groupadd -r nlpuser && useradd --no-log-init -r -g nlpuser nlpuser
@@ -72,7 +72,7 @@ CMD ["pdm", "run", "start"]
 # ========================================
 # PRODUCTION STAGE (for deployment)
 # ========================================
-FROM base as production
+FROM base AS production
 
 # Copy service code for production build
 COPY services/nlp_service/ /app/services/nlp_service/
