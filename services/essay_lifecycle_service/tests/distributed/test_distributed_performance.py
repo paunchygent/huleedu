@@ -29,6 +29,7 @@ from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )
@@ -186,11 +187,17 @@ class TestDistributedPerformance:
             )
 
             event_publisher = AsyncMock(spec=BatchLifecyclePublisher)
+            content_assignment_service = ContentAssignmentService(
+                batch_tracker=batch_tracker,
+                repository=repo,
+                batch_lifecycle_publisher=event_publisher,
+            )
             coordination_handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
                 repository=repo,
                 batch_lifecycle_publisher=event_publisher,
                 pending_content_ops=mock_pending_content_ops,
+                content_assignment_service=content_assignment_service,
                 session_factory=repo.get_session_factory(),
             )
 

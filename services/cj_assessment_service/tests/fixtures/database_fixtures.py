@@ -227,6 +227,7 @@ def mock_llm_interaction_async() -> AsyncMock:
     async def perform_comparisons_async(
         tasks: list[Any],
         correlation_id: Any,
+        tracking_map: dict[tuple[str, str], Any] | None = None,
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,

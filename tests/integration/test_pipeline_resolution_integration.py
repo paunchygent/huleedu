@@ -24,6 +24,7 @@ import aiohttp
 import pytest
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
     ClientPipelineRequestHandler,
@@ -73,13 +74,20 @@ class TestPipelineResolutionIntegration:
         """Mock batch repository for state management testing."""
         mock_repo = AsyncMock(spec=BatchRepositoryProtocol)
 
-        # Mock successful batch retrieval
+        # Mock successful batch retrieval with correct status field
         mock_repo.get_batch_by_id.return_value = {
             "batch_id": "test-batch-integration-001",
             "requested_pipeline": "ai_feedback",
-            "current_state": "pipeline_resolution_requested",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,  # Use correct field and enum value
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
+        }
+        
+        # Mock batch context to return valid context
+        mock_repo.get_batch_context.return_value = {
+            "batch_id": "test-batch-integration-001",
+            "course_code": "ENG5",
+            "class_type": "GUEST",
         }
 
         # Mock successful batch update and pipeline state saving
@@ -282,7 +290,13 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.return_value = {
             "batch_id": "test-batch-invalid-name-001",
             "requested_pipeline": "invalid_pipeline_name",
-            "current_state": "pipeline_resolution_requested",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+        }
+        
+        mock_batch_repository.get_batch_by_id.return_value = {
+            "batch_id": "test-batch-invalid-name-001",
+            "requested_pipeline": "invalid_pipeline_name",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
         }
@@ -329,7 +343,13 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.return_value = {
             "batch_id": "test-batch-bcs-error-001",
             "requested_pipeline": "spellcheck",  # Use a valid pipeline name
-            "current_state": "pipeline_resolution_requested",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+        }
+        
+        mock_batch_repository.get_batch_by_id.return_value = {
+            "batch_id": "test-batch-bcs-error-001",
+            "requested_pipeline": "spellcheck",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
         }
@@ -388,7 +408,13 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.return_value = {
             "batch_id": "test-batch-idempotent-001",
             "requested_pipeline": "ai_feedback",
-            "current_state": "pipeline_resolved",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+        }
+        
+        mock_batch_repository.get_batch_by_id.return_value = {
+            "batch_id": "test-batch-idempotent-001",
+            "requested_pipeline": "ai_feedback",
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             "resolved_pipeline": ["spellcheck", "nlp", "ai_feedback"],  # Already resolved
             "created_at": "2025-01-01T00:00:00Z",
         }
@@ -447,12 +473,22 @@ class TestPipelineResolutionIntegration:
             return {
                 "batch_id": batch_id,
                 "requested_pipeline": "ai_feedback",
-                "current_state": "pipeline_resolution_requested",
+                "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
+                "resolved_pipeline": None,
+                "created_at": "2025-01-01T00:00:00Z",
+            }
+        
+        def mock_get_batch_by_id(batch_id: str):
+            return {
+                "batch_id": batch_id,
+                "requested_pipeline": "ai_feedback",
+                "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
                 "resolved_pipeline": None,
                 "created_at": "2025-01-01T00:00:00Z",
             }
 
         mock_batch_repository.get_batch_context.side_effect = mock_get_batch_context
+        mock_batch_repository.get_batch_by_id.side_effect = mock_get_batch_by_id
         mock_batch_repository.get_processing_pipeline_state.return_value = None
 
         # Create multiple concurrent events

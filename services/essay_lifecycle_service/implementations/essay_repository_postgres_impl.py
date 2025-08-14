@@ -206,17 +206,20 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             "updated_at": essay_state.updated_at.replace(tzinfo=None),
         }
 
-    async def get_essay_state(self, essay_id: str) -> ConcreteEssayState | None:
+    async def get_essay_state(self, essay_id: str, session: AsyncSession | None = None) -> ConcreteEssayState | None:
         """Retrieve essay state by ID."""
-        async with self.session() as session:
-            stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id)
-            result = await session.execute(stmt)
-            db_essay = result.scalars().first()
+        if session is None:
+            async with self.session() as session:
+                return await self.get_essay_state(essay_id, session)
+        
+        stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id)
+        result = await session.execute(stmt)
+        db_essay = result.scalars().first()
 
-            if db_essay is None:
-                return None
+        if db_essay is None:
+            return None
 
-            return self._db_to_essay_state(db_essay)
+        return self._db_to_essay_state(db_essay)
 
     async def update_essay_state(
         self,

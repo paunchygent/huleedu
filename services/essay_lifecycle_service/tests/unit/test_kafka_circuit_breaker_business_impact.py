@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, call, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -44,6 +44,7 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     EssayRepositoryProtocol,
 )
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 
 
 class BusinessWorkflowContext(BaseModel):
@@ -212,11 +213,19 @@ class TestBatchCoordinationBusinessImpact:
             fail_with_external_error
         )
 
+        # Create content assignment service
+        content_assignment_service = ContentAssignmentService(
+            batch_tracker=mock_batch_tracker,
+            repository=mock_repository,
+            batch_lifecycle_publisher=event_publisher,
+        )
+
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
             pending_content_ops=mock_pending_content_ops,
+            content_assignment_service=content_assignment_service,
             session_factory=mock_session_factory,
         )
 
@@ -332,11 +341,19 @@ class TestBatchCoordinationBusinessImpact:
             fail_on_batch_ready
         )
 
+        # Create content assignment service
+        content_assignment_service = ContentAssignmentService(
+            batch_tracker=mock_batch_tracker,
+            repository=mock_repository,
+            batch_lifecycle_publisher=event_publisher,
+        )
+
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
             pending_content_ops=mock_pending_content_ops,
+            content_assignment_service=content_assignment_service,
             session_factory=mock_session_factory,
         )
 
@@ -406,7 +423,11 @@ class TestBatchCoordinationBusinessImpact:
         # Even though the handler raised an exception, we can verify partial progress
 
         # Verify content assignment happened before publishing failure
-        mock_batch_tracker.assign_slot_to_content.assert_called_once()
+        # Note: With ContentAssignmentService architecture, this may be called multiple times for idempotency
+        mock_batch_tracker.assign_slot_to_content.assert_called()
+        # Verify the calls were for the expected content
+        expected_call = call(business_context.batch_id, 'content_123', 'essay.txt')
+        assert expected_call in mock_batch_tracker.assign_slot_to_content.call_args_list
         mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
 
         # Verify mark_slot_fulfilled was called (happens before publishing)
@@ -904,11 +925,19 @@ class TestBusinessImpactIntegrationScenarios:
         # Create mock BatchLifecyclePublisher
         event_publisher = AsyncMock()
 
+        # Create content assignment service
+        content_assignment_service = ContentAssignmentService(
+            batch_tracker=mock_batch_tracker,
+            repository=mock_repository,
+            batch_lifecycle_publisher=event_publisher,
+        )
+
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
             batch_lifecycle_publisher=event_publisher,
             pending_content_ops=mock_pending_content_ops,
+            content_assignment_service=content_assignment_service,
             session_factory=mock_session_factory,
         )
 

@@ -387,11 +387,21 @@ class TestAtomicBatchCreationIntegration:
         # Create mock pending content ops for testing
         mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
 
+        # Create content assignment service
+        from services.essay_lifecycle_service.domain_services import ContentAssignmentService
+        
+        content_assignment_service = ContentAssignmentService(
+            batch_tracker=batch_tracker,
+            repository=postgres_repository,
+            batch_lifecycle_publisher=event_publisher,
+        )
+
         return DefaultBatchCoordinationHandler(
             batch_tracker=batch_tracker,
             repository=postgres_repository,
             batch_lifecycle_publisher=event_publisher,
             pending_content_ops=mock_pending_content_ops,
+            content_assignment_service=content_assignment_service,
             session_factory=session_factory,
         )
 

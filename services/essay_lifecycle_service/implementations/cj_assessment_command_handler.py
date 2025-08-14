@@ -192,7 +192,7 @@ class CJAssessmentCommandHandler:
                         for essay_ref in successfully_transitioned_essays:
                             try:
                                 essay_state_model = await self.repository.get_essay_state(
-                                    essay_ref.essay_id
+                                    essay_ref.essay_id, session
                                 )
                                 if essay_state_model:
                                     essay_machine = EssayStateMachine(

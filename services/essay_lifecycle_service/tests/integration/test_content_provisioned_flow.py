@@ -50,6 +50,7 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
 from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
     RedisPendingContentOperations,
 )
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 
 logger = create_service_logger("test.content_provisioned_flow")
 
@@ -163,11 +164,19 @@ class TestContentProvisionedFlow:
                 topic_naming=mock_topic_naming,
             )
 
+            # Create content assignment service
+            content_assignment_service = ContentAssignmentService(
+                batch_tracker=batch_tracker,
+                repository=repository,
+                batch_lifecycle_publisher=event_publisher,
+            )
+
             handler = DefaultBatchCoordinationHandler(
                 batch_tracker=batch_tracker,
                 repository=repository,
                 batch_lifecycle_publisher=event_publisher,
                 pending_content_ops=mock_pending_content_ops,
+                content_assignment_service=content_assignment_service,
                 session_factory=repository.get_session_factory(),
             )
 

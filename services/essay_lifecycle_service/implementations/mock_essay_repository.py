@@ -76,8 +76,9 @@ class MockEssayRepository(EssayRepositoryProtocol):
             self._locks[key] = asyncio.Lock()
         return self._locks[key]
 
-    async def get_essay_state(self, essay_id: str) -> EssayState | None:
+    async def get_essay_state(self, essay_id: str, session: AsyncSession | None = None) -> EssayState | None:
         """Retrieve essay state by ID."""
+        # Mock implementation doesn't use sessions but must match protocol signature
         return self.essays.get(essay_id)
 
     async def update_essay_state(

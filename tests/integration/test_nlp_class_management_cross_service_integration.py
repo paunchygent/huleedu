@@ -19,13 +19,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncGenerator, Generator
-from typing import Any, TypeVar
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.essay_lifecycle_events import BatchStudentMatchingRequestedV1
@@ -43,16 +42,6 @@ from testcontainers.kafka import KafkaContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
-from services.class_management_service.api_models import (
-    CreateClassRequest,
-    CreateStudentRequest,
-    UpdateClassRequest,
-    UpdateStudentRequest,
-)
-
-# Import NLP service components (for DB schema)
-# Note: This test simulates NLP response without importing NLP service components
-# from services.nlp_service.models import Base as NlpBase  # Not needed for this test
 # Import Class Management service components
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
@@ -61,73 +50,18 @@ from services.class_management_service.models_db import (
     Base as ClassManagementBase,
 )
 from services.class_management_service.models_db import (
+    Course,
     EssayStudentAssociation,
     Student,
     UserClass,
 )
-from services.class_management_service.protocols import ClassRepositoryProtocol
+from services.class_management_service.implementations.class_repository_postgres_impl import (
+    PostgreSQLClassRepositoryImpl,
+)
 
 logger = create_service_logger("test.nlp_class_management_integration")
 
-T = TypeVar("T", bound=UserClass, covariant=True)
-U = TypeVar("U", bound=Student, covariant=True)
 
-
-class MockClassRepository(ClassRepositoryProtocol[UserClass, Student]):
-    """Mock class repository for testing."""
-
-    def __init__(self, students: list[Student]):
-        self.students = {student.id: student for student in students}
-
-    async def get_student_by_id(self, student_id: UUID) -> Student | None:
-        """Get student by ID."""
-        return self.students.get(student_id)
-
-    async def create_class(
-        self, user_id: str, class_data: CreateClassRequest, correlation_id: UUID
-    ) -> UserClass:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def get_class_by_id(self, class_id: UUID) -> UserClass | None:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def update_class(
-        self, class_id: UUID, class_data: UpdateClassRequest, correlation_id: UUID
-    ) -> UserClass | None:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def delete_class(self, class_id: UUID) -> bool:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def create_student(
-        self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
-    ) -> Student:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def update_student(
-        self, student_id: UUID, student_data: UpdateStudentRequest, correlation_id: UUID
-    ) -> Student | None:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def delete_student(self, student_id: UUID) -> bool:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def associate_essay_to_student(
-        self, user_id: str, essay_id: UUID, student_id: UUID, correlation_id: UUID
-    ) -> None:
-        """Not implemented for this test."""
-        raise NotImplementedError()
-
-    async def get_batch_student_associations(self, batch_id: UUID) -> list[Any]:
-        """Get all student-essay associations for a batch."""
-        return []
 
 
 class TestNLPClassManagementCrossServiceIntegration:
@@ -216,6 +150,40 @@ class TestNLPClassManagementCrossServiceIntegration:
             await client.stop()
 
     @pytest.fixture
+    async def test_course(
+        self, cm_session_factory: async_sessionmaker[AsyncSession]
+    ) -> Course:
+        """Create test course in Class Management database."""
+        course = Course(
+            course_code=CourseCode.ENG5,
+            name="English 5",
+            language=Language.SWEDISH,
+        )
+
+        async with cm_session_factory() as session:
+            async with session.begin():
+                session.add(course)
+
+        return course
+
+    @pytest.fixture
+    async def test_class(
+        self, cm_session_factory: async_sessionmaker[AsyncSession], test_course: Course
+    ) -> UserClass:
+        """Create test class in Class Management database."""
+        user_class = UserClass(
+            name="Test Class ENG5",
+            created_by_user_id="test_user",
+            course_id=test_course.id,
+        )
+
+        async with cm_session_factory() as session:
+            async with session.begin():
+                session.add(user_class)
+
+        return user_class
+
+    @pytest.fixture
     async def test_students(
         self, cm_session_factory: async_sessionmaker[AsyncSession]
     ) -> list[Student]:
@@ -295,13 +263,16 @@ class TestNLPClassManagementCrossServiceIntegration:
     @pytest.mark.timeout(60)
     async def test_student_essay_association_flow(
         self,
+        cm_db_engine,
         cm_session_factory: async_sessionmaker[AsyncSession],
+        test_class: UserClass,
         test_students: list[Student],
         kafka_producer: AIOKafkaProducer,
     ):
         """Test complete student-essay association flow between services."""
-        batch_id = f"test-batch-{uuid4().hex[:8]}"
-        class_id = f"test-class-{uuid4().hex[:8]}"
+        # Use proper UUIDs for batch_id and actual class_id from test fixture
+        batch_id = str(uuid4())
+        class_id = str(test_class.id)  # Use the actual class ID from our test fixture
         correlation_id = str(uuid4())
 
         # Prepare test essays with real content - essay IDs must be valid UUIDs
@@ -338,10 +309,10 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # Note: In a real cross-service test, we'd instantiate the NLP event handler
         # For now, we'll simulate NLP's response based on expected behavior
 
-        # Step 2: Set up Class Management handler
-        mock_repository = MockClassRepository(test_students)
+        # Step 2: Set up Class Management handler with real repository
+        class_repository = PostgreSQLClassRepositoryImpl(engine=cm_db_engine)
         cm_handler = BatchAuthorMatchesHandler(
-            class_repository=mock_repository,
+            class_repository=class_repository,
             session_factory=cm_session_factory,
         )
 

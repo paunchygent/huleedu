@@ -7,10 +7,12 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
+from common_core.websocket_enums import NotificationPriority
 
 from services.essay_lifecycle_service.notification_projector import ELSNotificationProjector
 
@@ -127,6 +129,54 @@ class TestELSNotificationProjector:
         assert payload["total_count"] == 2
         assert "1 of 2 essays completed successfully" in payload["message"]
 
+    async def test_nlp_completion_notification_published(
+        self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock
+    ) -> None:
+        """Test that NLP completion events are published correctly."""
+        # Sample NLP completion outcome event
+        nlp_outcome = ELSBatchPhaseOutcomeV1(
+            batch_id="batch-nlp-123",
+            phase_name=PhaseName.NLP,
+            phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
+            processed_essays=[
+                EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),
+                EssayProcessingInputRefV1(essay_id="essay-2", text_storage_id="storage-2"),
+            ],
+            failed_essay_ids=[],
+            correlation_id=uuid4(),
+        )
+
+        await notification_projector.handle_phase_outcome(nlp_outcome, "teacher-nlp")
+
+        # Verify notification was published
+        mock_kafka_publisher.publish.assert_called_once()
+        call_args = mock_kafka_publisher.publish.call_args
+        
+        # Verify topic
+        assert call_args[1]["topic"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+        
+        # Verify envelope structure
+        envelope = call_args[1]["envelope"]
+        assert envelope.source_service == "essay_lifecycle_service"
+        assert envelope.event_type == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
+        
+        # Verify notification data
+        notification = envelope.data
+        assert notification.teacher_id == "teacher-nlp"
+        assert notification.notification_type == "batch_nlp_completed"
+        assert notification.priority == NotificationPriority.STANDARD
+        assert notification.batch_id == "batch-nlp-123"
+        
+        # Verify payload
+        payload = notification.payload
+        assert payload["batch_id"] == "batch-nlp-123"
+        assert payload["phase_name"] == "nlp"
+        assert payload["phase_status"] == "completed_successfully"
+        assert payload["success_count"] == 2
+        assert payload["failed_count"] == 0
+        assert payload["total_count"] == 2
+        assert "NLP analysis completed for batch: All 2 essays completed successfully" in payload["message"]
+
     async def test_unknown_phase_name_skips_notification(
         self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock
     ) -> None:
@@ -134,7 +184,7 @@ class TestELSNotificationProjector:
         # Create event with unsupported phase name
         unknown_phase_outcome = ELSBatchPhaseOutcomeV1(
             batch_id="batch-789",
-            phase_name=PhaseName.NLP,  # Not supported in mapping
+            phase_name=PhaseName.AI_FEEDBACK,  # Not yet implemented, no notification mapping
             phase_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processed_essays=[
                 EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1"),

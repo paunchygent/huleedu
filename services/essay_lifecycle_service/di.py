@@ -94,6 +94,7 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     BatchPhaseCoordinator,
     ConsumerRecoveryManager,
+    ContentAssignmentProtocol,
     EssayRepositoryProtocol,
     KafkaConsumerHealthMonitor,
     MetricsCollector,
@@ -426,20 +427,38 @@ class BatchCoordinationProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def provide_content_assignment_service(
+        self,
+        batch_tracker: BatchEssayTracker,
+        repository: EssayRepositoryProtocol,
+        batch_lifecycle_publisher: BatchLifecyclePublisher,
+    ) -> ContentAssignmentProtocol:
+        """Provide content assignment domain service implementation."""
+        from services.essay_lifecycle_service.domain_services import ContentAssignmentService
+        
+        return ContentAssignmentService(
+            batch_tracker=batch_tracker,
+            repository=repository,
+            batch_lifecycle_publisher=batch_lifecycle_publisher,
+        )
+
+    @provide(scope=Scope.APP)
     def provide_batch_coordination_handler(
         self,
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
         pending_content_ops: RedisPendingContentOperations,
+        content_assignment_service: ContentAssignmentProtocol,
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
-        """Provide batch coordination handler implementation with direct publisher injection."""
+        """Provide batch coordination handler implementation with proper DI."""
         handler = DefaultBatchCoordinationHandler(
             batch_tracker,
             repository,
             batch_lifecycle_publisher,
             pending_content_ops,
+            content_assignment_service,
             session_factory,
         )
         return handler

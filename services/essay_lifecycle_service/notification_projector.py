@@ -40,7 +40,7 @@ class ELSNotificationProjector:
             teacher_id: Teacher ID resolved from batch context
         """
         # Map phase names to notification types and priorities
-        # Note: AI_FEEDBACK phase not yet implemented, so only handling SPELLCHECK and CJ_ASSESSMENT
+        # Note: AI_FEEDBACK phase not yet implemented, so only handling SPELLCHECK, CJ_ASSESSMENT, and NLP
         notification_mapping = {
             PhaseName.SPELLCHECK: {
                 "type": "batch_spellcheck_completed",
@@ -51,6 +51,11 @@ class ELSNotificationProjector:
                 "type": "batch_cj_assessment_completed",
                 "priority": NotificationPriority.STANDARD,
                 "message_template": "CJ assessment completed for batch",
+            },
+            PhaseName.NLP: {
+                "type": "batch_nlp_completed",
+                "priority": NotificationPriority.STANDARD,
+                "message_template": "NLP analysis completed for batch",
             },
         }
 

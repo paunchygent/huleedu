@@ -399,19 +399,27 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         await self._persistence.remove_batch_from_database(batch_id)
 
     async def process_pending_content_for_batch(self, batch_id: str) -> int:
-        """Process any pending content for a newly registered batch."""
+        """
+        Process any pending content for a newly registered batch.
+        
+        This method handles only Redis-level slot assignment operations.
+        Database coordination is handled separately by the ContentAssignmentService.
+        
+        Returns:
+            Number of pending content items successfully assigned to slots
+        """
         # Get all pending content
         pending_content = await self._pending_content_ops.get_pending_content(batch_id)
 
         if not pending_content:
             return 0
 
-        processed_count = 0
+        assigned_count = 0
 
         for content_metadata in pending_content:
             text_storage_id = content_metadata["text_storage_id"]
 
-            # Try to assign to available slot
+            # Try to assign to available slot (Redis operation only)
             assigned_essay_id = await self._slot_operations.assign_slot_atomic(
                 batch_id, content_metadata
             )
@@ -419,21 +427,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             if assigned_essay_id:
                 # Successfully assigned - remove from pending
                 await self._pending_content_ops.remove_pending_content(batch_id, text_storage_id)
-
-                # Mark slot as fulfilled (will check batch completion)
-                completion_result = await self.mark_slot_fulfilled(
-                    batch_id, assigned_essay_id, text_storage_id
-                )
-
-                if completion_result:
-                    # Batch is complete - completion event will be published
-                    # by the caller (batch_coordination_handler)
-                    pass
-
-                processed_count += 1
+                assigned_count += 1
 
                 self._logger.info(
-                    f"Reconciled pending content: {text_storage_id} -> {assigned_essay_id}",
+                    f"Assigned pending content to Redis slot: {text_storage_id} -> {assigned_essay_id}",
                     extra={
                         "batch_id": batch_id,
                         "text_storage_id": text_storage_id,
@@ -447,7 +444,12 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     extra={"batch_id": batch_id, "text_storage_id": text_storage_id},
                 )
 
-        return processed_count
+        self._logger.info(
+            f"Processed {assigned_count} pending content items for batch {batch_id}",
+            extra={"batch_id": batch_id, "assigned_count": assigned_count}
+        )
+
+        return assigned_count
 
     async def initialize_from_database(self) -> None:
         """Initialize batch expectations from database on startup (recovery mechanism)."""
