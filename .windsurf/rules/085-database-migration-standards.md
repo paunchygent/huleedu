@@ -109,7 +109,7 @@ def database_url(self) -> str:
 
 ## 7. Operational Services (VERIFIED)
 
-**All 6 Alembic-enabled services are fully operational with secure configuration:**
+**All 7 Alembic-enabled services are fully operational with secure configuration:**
 
 | Service | Database Port | Status | Security Status |
 |---------|---------------|--------|-----------------|
@@ -119,6 +119,7 @@ def database_url(self) -> str:
 | `batch_orchestrator_service` | 5438 | ✅ OPERATIONAL | ✅ SECURE |
 | `result_aggregator_service` | 5436 | ✅ OPERATIONAL | ✅ SECURE |
 | `spellchecker_service` | 5437 | ✅ OPERATIONAL | ✅ SECURE |
+| `nlp_service` | 5440 | ✅ OPERATIONAL | ✅ SECURE |
 
 **Integration verified:** All services successfully execute `../../.venv/bin/alembic current`
 **Security verified:** No hardcoded secrets in any configuration files

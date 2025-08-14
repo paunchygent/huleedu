@@ -168,20 +168,16 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 #### Development
 
 ```bash
-# Start development environment with hot-reload
-./scripts/dev-workflow.sh dev <service_name>
+# Main development workflow
+pdm run dev <command> <service>     # Use main dev script
+pdm run dev dev nlp_service         # Start service with hot-reload
+pdm run dev build nlp_service       # Build specific service
+pdm run dev check                   # Check what needs rebuilding
 
-# Check what services need rebuilding
-./scripts/dev-workflow.sh check
-
-# Build development version with cache optimization
-./scripts/dev-workflow.sh build dev <service_name>
-
-# Incremental build (all services)
-./scripts/dev-workflow.sh incremental
-
-# Start services with development compose
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service_name>
+# Quick commands
+pdm run up                          # Start all services
+pdm run down                        # Stop all services
+pdm run logs nlp_service           # Follow service logs
 ```
 
 #### Production
@@ -207,6 +203,23 @@ docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_ma
 
 # Database names follow pattern: huleedu_<service_name>
 # Example: huleedu_class_management, huleedu_essay_lifecycle, etc.
+```
+
+### Database Environment Separation
+
+```bash
+# Development (default): Docker containers
+HULEEDU_ENVIRONMENT=development
+
+# Production: External managed databases  
+HULEEDU_ENVIRONMENT=production
+# Requires: HULEEDU_PROD_DB_HOST, HULEEDU_PROD_DB_PASSWORD
+
+# Database management
+pdm run db-reset                    # Reset development databases
+pdm run db-seed                     # Seed development data
+pdm run prod-validate              # Validate production config
+pdm run prod-migrate               # Run production migrations
 ```
 
 ### Service Management

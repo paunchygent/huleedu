@@ -318,54 +318,24 @@ test-expensive = "pytest -m 'financial or slow or docker' -v --tb=short"
 test-financial = "pytest -m financial -v --tb=short"
 test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
 
-# Docker convenience scripts - Development workflow
-# Quick commands
-dc-up = "docker compose up -d"  # Start services (uses existing images)
-dc-build = "docker compose up -d --build"  # Rebuild and start services
-dc-down = "docker compose down --remove-orphans"  # Stop and clean up
-dc-logs = "docker compose logs --tail=100"  # Get logs with last 100 lines
-dc-ps = "docker compose ps"  # Show running services
+# Core Development Workflows (use scripts/dev-workflow.sh for most tasks)
+dev = "scripts/dev-workflow.sh"  # Main development script: pdm run dev <command> <service>
+up = "docker compose up -d"  # Start services
+down = "docker compose down --remove-orphans"  # Stop services  
+logs = "docker compose logs -f --tail=50"  # Follow logs: pdm run logs <service>
 
-# Service-specific commands (use service names as arguments)
-dc-restart = "docker compose restart"  # Restart service: pdm run dc-restart api_gateway_service
-dc-rebuild = "docker compose up -d --build"  # Rebuild specific service: pdm run dc-rebuild batch_orchestrator_service
-dc-logs-service = "docker compose logs -f --tail=50"  # Logs for specific service: pdm run dc-logs-service content_service
+# Database Management
+db-reset = "scripts/reset-dev-databases.sh"  # Reset development databases
+db-seed = "scripts/seed-dev-data.sh"  # Seed development data
 
-# Development workflow commands with BuildKit optimization
-dev-up = "docker compose up -d"  # Start with volume mounts (uses override file)
-dev-build = {cmd = "docker compose build --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fast parallel build with BuildKit
-dev-rebuild = {composite = ["docker compose down --remove-orphans", "pdm run dev-build", "docker compose up -d"]}
+# Production Deployment
+prod-validate = "scripts/validate-production-config.sh"  # Validate production config
+prod-migrate = "scripts/migrate-production.sh"  # Run production migrations
 
-# Optimized no-cache builds (2025 best practices)
-dev-fresh = {cmd = "docker compose build --no-cache --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Force fresh parallel build
-dev-fresh-single = {cmd = "docker compose build --no-cache", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fresh build single service (add service name)
-dev-fresh-verbose = {cmd = "docker compose build --no-cache --parallel --progress=plain", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Fresh build with detailed output
-
-# Performance-optimized builds
-build-parallel = {cmd = "docker compose build --parallel", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Maximum parallel build
-build-parallel-pull = {cmd = "docker compose build --parallel --pull", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Update base images + parallel
-build-service = {cmd = "docker compose build", env = {"COMPOSE_DOCKER_CLI_BUILD" = "1", "DOCKER_BUILDKIT" = "1"}}  # Optimized single service build (add service name)
-
-# System management
-docker-reset = {composite = ["docker compose down --remove-orphans --volumes", "pdm run build-parallel", "docker compose up -d"]}  # Full reset with optimized build
-docker-clean = "docker system prune -af --volumes"  # Clean all unused Docker resources (use with caution!)
-docker-builder-prune = "docker builder prune -af"  # Clean BuildKit cache (frees disk space)
-
-# Individual service development
-dev-content = "pdm run -p services/content_service dev"
-dev-batch = "pdm run -p services/batch_orchestrator_service dev"
-dev-file = "pdm run -p services/file_service dev"
-run-spellchecker = "pdm run -p services/spellchecker_service start_worker"
-dev-gateway = "pdm run -p services/api_gateway_service dev"
-dev-aggregator = "pdm run -p services/result_aggregator_service dev"
-dev-llm = "pdm run -p services/llm_provider_service dev"
-dev-websocket = "pdm run -p services/websocket_service dev"
-
-# Build common_core wheel
-build-common-core = "pdm build -p libs/common_core"
-
-# Kafka infrastructure
-kafka-setup-topics = "python scripts/kafka_topic_bootstrap.py"
+# Utilities
+build-common-core = "pdm build -p libs/common_core"  # Build shared library
+kafka-setup = "python scripts/kafka_topic_bootstrap.py"  # Initialize Kafka topics
+docker-clean = "docker system prune -af"  # Clean Docker resources (use with caution)
 
 # Observability is integrated into main stack - use standard docker compose commands
 obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"

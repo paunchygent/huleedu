@@ -1,0 +1,51 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    ENV_TYPE=docker \
+    QUART_APP=app:app \
+    QUART_ENV=production \
+    FILE_SERVICE_LOG_LEVEL=INFO \
+    FILE_SERVICE_HTTP_PORT=7001 \
+    FILE_SERVICE_PROMETHEUS_PORT=9092 \
+    FILE_SERVICE_HOST=0.0.0.0 \
+    PDM_USE_VENV=false
+
+# Set base WORKDIR for the application
+WORKDIR /app
+
+# Install curl for health checks and required system dependencies
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libmagic1 \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir pdm
+
+# Copy shared local dependencies first
+COPY libs/common_core/ /app/libs/common_core/
+COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+
+# Now, handle the specific service
+COPY services/file_service/ /app/services/file_service/
+
+# Switch to service directory for dependency installation
+WORKDIR /app/services/file_service
+
+# Install dependencies for the file_service using its own pyproject.toml
+# PDM will use the overrides to find local dependencies at the correct paths
+# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
+RUN pdm install --prod --frozen-lockfile
+
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
+# Expose the ports the app runs on
+EXPOSE ${FILE_SERVICE_HTTP_PORT}
+EXPOSE ${FILE_SERVICE_PROMETHEUS_PORT}
+
+# Command to run the application from service directory
+CMD ["pdm", "run", "start"] 

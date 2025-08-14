@@ -1,4 +1,36 @@
-FROM python:3.11-slim
+# Multi-stage build for optimized production image
+FROM python:3.11-slim as builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PDM_USE_VENV=false
+
+# Install build dependencies (for compilation)
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PDM
+RUN pip install --no-cache-dir pdm
+
+# Set working directory
+WORKDIR /app
+
+# Copy shared local dependencies
+COPY libs/common_core/ /app/libs/common_core/
+COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+
+# Copy service files
+COPY services/file_service/ /app/services/file_service/
+
+# Switch to service directory and install dependencies
+WORKDIR /app/services/file_service
+RUN pdm install --prod --frozen-lockfile
+
+# Final runtime stage
+FROM python:3.11-slim as runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -12,40 +44,32 @@ ENV PYTHONUNBUFFERED=1 \
     FILE_SERVICE_HOST=0.0.0.0 \
     PDM_USE_VENV=false
 
-# Set base WORKDIR for the application
-WORKDIR /app
-
-# Install curl for health checks and required system dependencies
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install ONLY runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
     curl \
     libmagic1 \
     pandoc \
-    && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir pdm
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy shared local dependencies first
-COPY libs/common_core/ /app/libs/common_core/
-COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+# Install PDM in runtime (needed for pdm run command)
+RUN pip install --no-cache-dir pdm
 
-# Now, handle the specific service
-COPY services/file_service/ /app/services/file_service/
+# Create application directory
+WORKDIR /app
 
-# Switch to service directory for dependency installation
+# Copy the built application and dependencies from builder stage
+COPY --from=builder /app /app
+
+# Create user and set permissions
+RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 WORKDIR /app/services/file_service
 
-# Install dependencies for the file_service using its own pyproject.toml
-# PDM will use the overrides to find local dependencies at the correct paths
-# Use --frozen-lockfile to skip lockfile generation and avoid segmentation faults
-RUN pdm install --prod --frozen-lockfile
-
-RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
-# Expose the ports the app runs on
 EXPOSE ${FILE_SERVICE_HTTP_PORT}
 EXPOSE ${FILE_SERVICE_PROMETHEUS_PORT}
 
-# Command to run the application from service directory
-CMD ["pdm", "run", "start"] 
+# Command to run the application
+CMD ["pdm", "run", "start"]

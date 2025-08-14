@@ -49,9 +49,18 @@ settings = Settings()
 **Correct Pattern**:
 ```python
 class Settings(BaseSettings):
+    # Environment-aware DATABASE_URL property (preferred)
+    @property
+    def DATABASE_URL(self) -> str:
+        if self.ENVIRONMENT == "production":
+            # Production: External database
+            return f"postgresql+asyncpg://{user}:{password}@{prod_host}:{port}/{db_name}"
+        else:
+            # Development: Docker container
+            return f"postgresql+asyncpg://{user}:{password}@localhost:{port}/{db_name}"
+    
+    # Simple string field (for services without environment separation)
     DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost:5432/db"
-    # Service-specific variants allowed
-    DATABASE_URL_CJ: str = "postgresql+asyncpg://user:pass@localhost:5432/cj_db"
 ```
 
 **Anti-Patterns**:
