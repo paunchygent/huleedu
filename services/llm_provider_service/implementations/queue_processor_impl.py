@@ -236,13 +236,17 @@ class QueueProcessorImpl:
             ):
                 req_provider = request.request_data.llm_config_overrides.provider_override
 
-            raise_processing_error(
-                service="llm_provider_service",
-                operation="queue_request_processing",
-                message=f"Processing failed: {str(e)}",
-                correlation_id=request.request_data.correlation_id or request.queue_id,
-                details={"provider": req_provider.value, "queue_id": str(request.queue_id)},
-            )
+            # Create a HuleEduError and handle it properly without re-raising
+            try:
+                raise_processing_error(
+                    service="llm_provider_service",
+                    operation="queue_request_processing",
+                    message=f"Processing failed: {str(e)}",
+                    correlation_id=request.request_data.correlation_id or request.queue_id,
+                    details={"provider": req_provider.value, "queue_id": str(request.queue_id)},
+                )
+            except HuleEduError as processing_error:
+                await self._handle_request_hule_error(request, processing_error)
 
     async def _handle_request_success(
         self, request: QueuedRequest, result: LLMOrchestratorResponse

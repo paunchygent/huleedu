@@ -323,6 +323,8 @@ dev = "scripts/dev-workflow.sh"  # Main development script: pdm run dev <command
 up = "docker compose up -d"  # Start services
 down = "docker compose down --remove-orphans"  # Stop services  
 logs = "docker compose logs -f --tail=50"  # Follow logs: pdm run logs <service>
+restart = {shell = "docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart $@"}  # Restart dev services: pdm run restart <service1> <service2>
+restart-all = "docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart"  # Restart all dev services
 
 # Database Management
 db-reset = "scripts/reset-dev-databases.sh"  # Reset development databases

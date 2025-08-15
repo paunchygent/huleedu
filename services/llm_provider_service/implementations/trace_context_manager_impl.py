@@ -159,16 +159,10 @@ class TraceContextManagerImpl:
 
         except Exception as e:
             logger.warning(f"Failed to restore trace context for queue {queue_id}: {e}")
-            # Fallback: create new span without context
-            with self.tracer.start_as_current_span(
-                "queue_processing.context_restore_failed",
-                attributes={
-                    "service.name": "llm_provider_service",
-                    "queue_id": str(queue_id),
-                    "error": str(e),
-                },
-            ) as span:
-                yield span
+            # CRITICAL FIX: Don't yield again in except block - this violates 
+            # generator protocol and causes "generator didn't stop after throw()" error
+            # Just re-raise the exception to let the caller handle it properly
+            raise
         finally:
             if context_token:
                 otel_context.detach(context_token)

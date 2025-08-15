@@ -98,7 +98,7 @@ class EssayRepositoryProtocol(Protocol):
         """Create multiple essay records in single atomic transaction.
 
         Args:
-            essay_data: List of dicts with keys: essay_id, batch_id, entity_type
+            essay_data: List of dicts with keys: entity_id, parent_id, entity_type
         """
         ...
 
@@ -106,7 +106,9 @@ class EssayRepositoryProtocol(Protocol):
         """List all essays in a batch."""
         ...
 
-    async def get_batch_status_summary(self, batch_id: str) -> dict[EssayStatus, int]:
+    async def get_batch_status_summary(
+        self, batch_id: str, session: AsyncSession | None = None
+    ) -> dict[EssayStatus, int]:
         """Get status count breakdown for a batch."""
         ...
 

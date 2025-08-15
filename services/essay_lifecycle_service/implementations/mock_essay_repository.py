@@ -198,13 +198,14 @@ class MockEssayRepository(EssayRepositoryProtocol):
             created_essays: list[ProtocolEssayState] = []
 
             # Validate all essay_ids are unique first
-            essay_ids = [data.get("essay_id") for data in essay_data]
+            # Data MUST come with "entity_id" and "parent_id" keys - no exceptions
+            essay_ids = [data.get("entity_id") for data in essay_data]
             if not all(essay_ids):
                 raise_validation_error(
                     service="essay_lifecycle_service",
                     operation="create_essay_records_batch",
-                    field="essay_id",
-                    message="All essay records must have essay_id",
+                    field="entity_id",
+                    message="All essay records must have entity_id",
                     correlation_id=correlation_id,
                 )
 
@@ -213,8 +214,8 @@ class MockEssayRepository(EssayRepositoryProtocol):
                 raise_validation_error(
                     service="essay_lifecycle_service",
                     operation="create_essay_records_batch",
-                    field="essay_id",
-                    message="Duplicate essay_ids in batch",
+                    field="entity_id",
+                    message="Duplicate entity_ids in batch",
                     correlation_id=correlation_id,
                 )
 
@@ -224,7 +225,7 @@ class MockEssayRepository(EssayRepositoryProtocol):
                     raise_validation_error(
                         service="essay_lifecycle_service",
                         operation="create_essay_records_batch",
-                        field="essay_id",
+                        field="entity_id",
                         message=f"Essay with ID {essay_id} already exists",
                         correlation_id=correlation_id,
                         value=essay_id,
@@ -232,17 +233,17 @@ class MockEssayRepository(EssayRepositoryProtocol):
 
             # Create all essays
             for data in essay_data:
-                essay_id = data["essay_id"]
+                essay_id = data["entity_id"]  # Changed from "essay_id" to match batch handler
                 if essay_id is None:
                     raise_validation_error(
                         service="essay_lifecycle_service",
                         operation="create_essay_records_batch",
-                        field="essay_id",
-                        message="essay_id cannot be None",
+                        field="entity_id",
+                        message="entity_id cannot be None",
                         correlation_id=correlation_id,
                     )
 
-                batch_id = data.get("batch_id")
+                batch_id = data.get("parent_id")  # Changed from "batch_id" to match batch handler
                 entity_type = data.get("entity_type", "essay")
 
                 essay_state = EssayState(
@@ -266,8 +267,18 @@ class MockEssayRepository(EssayRepositoryProtocol):
         """List all essays in a batch."""
         return [essay for essay in self.essays.values() if essay.batch_id == batch_id]
 
-    async def get_batch_status_summary(self, batch_id: str) -> dict[EssayStatus, int]:
-        """Get status count breakdown for a batch."""
+    async def get_batch_status_summary(
+        self, batch_id: str, session: AsyncSession | None = None
+    ) -> dict[EssayStatus, int]:
+        """Get status count breakdown for a batch.
+        
+        Args:
+            batch_id: The batch ID to get status summary for
+            session: Optional session (ignored in mock, kept for protocol compatibility)
+            
+        Returns:
+            Dictionary mapping EssayStatus to count
+        """
         status_counts: dict[EssayStatus, int] = {}
 
         for essay in self.essays.values():

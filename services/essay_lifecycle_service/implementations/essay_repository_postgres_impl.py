@@ -445,6 +445,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 db_essay = EssayStateDB(**db_data)
                 session.add(db_essay)
 
+            # Flush to make essays visible to subsequent queries in the same transaction
+            # This is critical for content provisioning to find the essays
+            await session.flush()
+
             # All essays are committed together in a single transaction
             self.logger.info(
                 f"Successfully created batch of {len(essay_states)} essay records for batch {batch_id}"
@@ -645,26 +649,45 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
             return essays
 
-    async def get_batch_status_summary(self, batch_id: str) -> dict[EssayStatus, int]:
-        """Get status count breakdown for a batch using efficient SQL aggregation."""
+    async def get_batch_status_summary(
+        self, batch_id: str, session: AsyncSession | None = None
+    ) -> dict[EssayStatus, int]:
+        """Get status count breakdown for a batch using efficient SQL aggregation.
+        
+        Args:
+            batch_id: The batch ID to get status summary for
+            session: Optional session to use for transactional consistency
+            
+        Returns:
+            Dictionary mapping EssayStatus to count
+        """
         from sqlalchemy import func
 
-        async with self.session() as session:
+        # Helper function to execute query and process results
+        async def execute_query(exec_session: AsyncSession) -> dict[EssayStatus, int]:
             # Use SQL GROUP BY aggregation for optimal performance
             stmt = (
                 select(EssayStateDB.current_status, func.count().label("count"))
                 .where(EssayStateDB.batch_id == batch_id)
                 .group_by(EssayStateDB.current_status)
             )
-            result = await session.execute(stmt)
+            result = await exec_session.execute(stmt)
             rows = result.all()
 
             # Convert to dictionary with EssayStatus enum keys
-            summary: dict[EssayStatus, int] = {}
+            status_summary: dict[EssayStatus, int] = {}
             for status_value, count in rows:
-                summary[status_value] = count
+                status_summary[status_value] = count
 
-            return summary
+            return status_summary
+
+        # Use provided session or create new one
+        if session:
+            return await execute_query(session)
+        else:
+            # Create new session if not provided
+            async with self.session() as new_session:
+                return await execute_query(new_session)
 
     async def get_batch_summary_with_essays(
         self, batch_id: str
@@ -915,6 +938,10 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
             if existing_essay_db:
                 # Update existing essay with content information
+                # CRITICAL: Always ensure batch_id is set - essays created during batch registration
+                # already have batch_id, but we must preserve it. If somehow missing, set it now.
+                if not existing_essay_db.batch_id:
+                    existing_essay_db.batch_id = batch_id
                 existing_essay_db.text_storage_id = text_storage_id
                 existing_essay_db.current_status = initial_status.value  # type: ignore[assignment]
                 existing_essay_db.processing_metadata = {

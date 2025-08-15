@@ -97,51 +97,51 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                 logger.error("Missing entity_id in spellcheck result")
                 return False
 
-            essay_state = await self.repository.get_essay_state(result_data.entity_id)
-            if essay_state is None:
-                logger.error(
-                    "Essay not found for spellcheck result",
-                    extra={
-                        "essay_id": result_data.entity_id,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
-                return False
+            # START UNIT OF WORK - Open transaction early for all DB operations
+            async with self.session_factory() as session:
+                async with session.begin():
+                    essay_state = await self.repository.get_essay_state(result_data.entity_id, session)
+                    if essay_state is None:
+                        logger.error(
+                            "Essay not found for spellcheck result",
+                            extra={
+                                "essay_id": result_data.entity_id,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                        return False
 
-            # Create state machine and trigger appropriate event
-            state_machine = EssayStateMachine(
-                essay_id=result_data.entity_id, initial_status=essay_state.current_status
-            )
+                    # Create state machine and trigger appropriate event
+                    state_machine = EssayStateMachine(
+                        essay_id=result_data.entity_id, initial_status=essay_state.current_status
+                    )
 
-            if is_success:
-                trigger = EVT_SPELLCHECK_SUCCEEDED
-                logger.info(
-                    "Spellcheck succeeded, transitioning to success state",
-                    extra={
-                        "essay_id": result_data.entity_id,
-                        "current_status": essay_state.current_status.value,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
-            else:
-                trigger = EVT_SPELLCHECK_FAILED
-                logger.warning(
-                    "Spellcheck failed, transitioning to failed state",
-                    extra={
-                        "essay_id": result_data.entity_id,
-                        "current_status": essay_state.current_status.value,
-                        "error_info": result_data.system_metadata.error_info
-                        if result_data.system_metadata
-                        else None,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
+                    if is_success:
+                        trigger = EVT_SPELLCHECK_SUCCEEDED
+                        logger.info(
+                            "Spellcheck succeeded, transitioning to success state",
+                            extra={
+                                "essay_id": result_data.entity_id,
+                                "current_status": essay_state.current_status.value,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                    else:
+                        trigger = EVT_SPELLCHECK_FAILED
+                        logger.warning(
+                            "Spellcheck failed, transitioning to failed state",
+                            extra={
+                                "essay_id": result_data.entity_id,
+                                "current_status": essay_state.current_status.value,
+                                "error_info": result_data.system_metadata.error_info
+                                if result_data.system_metadata
+                                else None,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
 
-            # Attempt state transition
-            if state_machine.trigger_event(trigger):
-                # START UNIT OF WORK
-                async with self.session_factory() as session:
-                    async with session.begin():
+                    # Attempt state transition
+                    if state_machine.trigger_event(trigger):
                         storage_ref_to_add = None
                         if is_success and result_data.storage_metadata:
                             # Get tracer if available
@@ -218,7 +218,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
 
                         # Check for batch phase completion after individual essay state update
                         updated_essay_state = await self.repository.get_essay_state(
-                            result_data.entity_id
+                            result_data.entity_id, session
                         )
                         if updated_essay_state:
                             await self.batch_coordinator.check_batch_completion(
@@ -228,18 +228,18 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 session=session,
                             )
                         # Transaction commits here
+                    else:
+                        logger.error(
+                            f"State machine trigger '{trigger}' failed for essay "
+                            f"{result_data.entity_id} from status "
+                            f"{essay_state.current_status.value}.",
+                            extra={"correlation_id": str(correlation_id)},
+                        )
+                        return False
 
-                # Confirm idempotency after successful transaction commit
-                if confirm_idempotency is not None:
-                    await confirm_idempotency()
-            else:
-                logger.error(
-                    f"State machine trigger '{trigger}' failed for essay "
-                    f"{result_data.entity_id} from status "
-                    f"{essay_state.current_status.value}.",
-                    extra={"correlation_id": str(correlation_id)},
-                )
-                return False
+            # Confirm idempotency after successful transaction commit
+            if confirm_idempotency is not None:
+                await confirm_idempotency()
 
             logger.info(
                 "Successfully processed spellcheck result",
@@ -315,7 +315,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     # Process successful essays
                     for essay_id in successful_essay_ids:
                         # Get current essay state
-                        essay_state = await self.repository.get_essay_state(essay_id)
+                        essay_state = await self.repository.get_essay_state(essay_id, session)
                         if essay_state is None:
                             logger.error(
                                 "Essay not found for CJ assessment result",
@@ -381,7 +381,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     # Process failed essays
                     for essay_id in failed_essay_ids:
                         # Get current essay state
-                        essay_state = await self.repository.get_essay_state(essay_id)
+                        essay_state = await self.repository.get_essay_state(essay_id, session)
                         if essay_state is None:
                             logger.error(
                                 "Essay not found for CJ assessment failure",
@@ -462,7 +462,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                         return False
 
                     batch_status_summary = await self.repository.get_batch_status_summary(
-                        result_data.entity_id
+                        result_data.entity_id, session
                     )
 
                     # Safely create status summary for logging, handling potential mock issues
@@ -503,7 +503,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
                     if representative_essay_id:
                         representative_essay_state = await self.repository.get_essay_state(
-                            representative_essay_id
+                            representative_essay_id, session
                         )
                         if representative_essay_state:
                             logger.info(
@@ -683,7 +683,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     # Process successful essays
                     for essay_id in successful_essay_ids:
                         # Get current essay state
-                        essay_state = await self.repository.get_essay_state(essay_id)
+                        essay_state = await self.repository.get_essay_state(essay_id, session)
                         if essay_state is None:
                             logger.error(
                                 "Essay not found for NLP analysis result",
@@ -749,7 +749,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     # Process failed essays
                     for essay_id in failed_essay_ids:
                         # Get current essay state
-                        essay_state = await self.repository.get_essay_state(essay_id)
+                        essay_state = await self.repository.get_essay_state(essay_id, session)
                         if essay_state is None:
                             logger.error(
                                 "Essay not found for NLP analysis failure",
@@ -827,7 +827,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                     )
                     if representative_essay_id:
                         representative_essay_state = await self.repository.get_essay_state(
-                            representative_essay_id
+                            representative_essay_id, session
                         )
                         if representative_essay_state:
                             await self.batch_coordinator.check_batch_completion(

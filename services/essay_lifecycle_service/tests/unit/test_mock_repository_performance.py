@@ -209,8 +209,8 @@ class TestMockRepositoryPerformance:
         for batch_size in batch_sizes:
             essay_data: list[dict[str, str | None]] = [
                 {
-                    "essay_id": f"batch-perf-{batch_size}-{i}",
-                    "batch_id": f"perf-batch-{batch_size}",
+                    "entity_id": f"batch-perf-{batch_size}-{i}",
+                    "parent_id": f"perf-batch-{batch_size}",
                     "entity_type": "essay",
                 }
                 for i in range(batch_size)
@@ -295,8 +295,8 @@ class TestMockRepositoryPerformance:
             # Create simplified essay data for memory testing
             essay_data: list[dict[str, str | None]] = [
                 {
-                    "essay_id": f"memory-test-{batch_num}-{i}",
-                    "batch_id": f"memory-batch-{batch_num}",
+                    "entity_id": f"memory-test-{batch_num}-{i}",
+                    "parent_id": f"memory-batch-{batch_num}",
                     "entity_type": "essay",
                 }
                 for i in range(batch_size)

@@ -155,7 +155,7 @@ class TestRepositoryBehavioralParity:
 
         # Create batch of essays
         essay_data: list[dict[str, str | None]] = [
-            {"essay_id": essay_id, "batch_id": batch_id, "entity_type": "essay"}
+            {"entity_id": essay_id, "parent_id": batch_id, "entity_type": "essay"}
             for essay_id in essay_ids
         ]
 

@@ -464,13 +464,26 @@ async def _trigger_batch_scoring_completion(
             )
 
         # Use centralized dual event publishing function
+        # IMPORTANT: Use the original correlation_id from the batch, not the callback's correlation_id
+        # This ensures the completion event has the same correlation_id as the original request
+        original_correlation_id = UUID(batch_upload.event_correlation_id)
+        
+        logger.info(
+            f"Publishing completion events with original correlation_id from batch",
+            extra={
+                **log_extra,
+                "original_correlation_id": str(original_correlation_id),
+                "callback_correlation_id": str(correlation_id),
+            },
+        )
+        
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
             batch_upload=batch_upload,
             event_publisher=event_publisher,
             settings=settings,
-            correlation_id=correlation_id,
+            correlation_id=original_correlation_id,
             processing_started_at=batch_upload.created_at,
         )
 

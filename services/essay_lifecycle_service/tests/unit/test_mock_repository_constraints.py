@@ -316,13 +316,13 @@ class TestMockRepositoryConstraints:
 
         # Test 1: Batch creation with duplicate essay_ids should fail
         duplicate_essay_data: list[dict[str, str | None]] = [
-            {"essay_id": "duplicate-essay", "batch_id": "batch-1", "entity_type": "essay"},
+            {"entity_id": "duplicate-essay", "parent_id": "batch-1", "entity_type": "essay"},
             {
-                "essay_id": "duplicate-essay",
-                "batch_id": "batch-1",
+                "entity_id": "duplicate-essay",
+                "parent_id": "batch-1",
                 "entity_type": "essay",
             },  # Duplicate
-            {"essay_id": "unique-essay", "batch_id": "batch-1", "entity_type": "essay"},
+            {"entity_id": "unique-essay", "parent_id": "batch-1", "entity_type": "essay"},
         ]
 
         from common_core.error_enums import ErrorCode
@@ -336,13 +336,13 @@ class TestMockRepositoryConstraints:
 
         # Verify error details
         assert exc_info.value.error_detail.error_code == ErrorCode.VALIDATION_ERROR
-        assert "Duplicate essay_ids" in str(exc_info.value)
+        assert "Duplicate entity_ids" in str(exc_info.value)
 
         # Test 2: Batch creation with unique essay_ids should succeed
         unique_essay_data: list[dict[str, str | None]] = [
-            {"essay_id": "batch-essay-1", "batch_id": "batch-1", "entity_type": "essay"},
-            {"essay_id": "batch-essay-2", "batch_id": "batch-1", "entity_type": "essay"},
-            {"essay_id": "batch-essay-3", "batch_id": "batch-1", "entity_type": "essay"},
+            {"entity_id": "batch-essay-1", "parent_id": "batch-1", "entity_type": "essay"},
+            {"entity_id": "batch-essay-2", "parent_id": "batch-1", "entity_type": "essay"},
+            {"entity_id": "batch-essay-3", "parent_id": "batch-1", "entity_type": "essay"},
         ]
 
         created_essays = await mock_repository.create_essay_records_batch(

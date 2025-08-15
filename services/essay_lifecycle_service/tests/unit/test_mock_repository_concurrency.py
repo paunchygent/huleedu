@@ -213,8 +213,8 @@ class TestMockRepositoryConcurrency:
         async def create_batch_essays(batch_index: int) -> int:
             essay_data: list[dict[str, str | None]] = [
                 {
-                    "essay_id": f"batch-{batch_index}-essay-{i}",
-                    "batch_id": batch_id,
+                    "entity_id": f"batch-{batch_index}-essay-{i}",
+                    "parent_id": batch_id,
                     "entity_type": "essay",
                 }
                 for i in range(5)
@@ -453,8 +453,8 @@ class TestMockRepositoryConcurrency:
             # Create batch essay data for additional essays
             additional_essays: list[dict[str, str | None]] = [
                 {
-                    "essay_id": f"batch-{operation_id}-essay-{i}",
-                    "batch_id": batch_id,
+                    "entity_id": f"batch-{operation_id}-essay-{i}",
+                    "parent_id": batch_id,
                     "entity_type": "essay",
                 }
                 for i in range(3)

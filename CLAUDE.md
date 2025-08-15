@@ -186,9 +186,10 @@ pdm run dev check                   # Check what needs rebuilding
 pdm run dev incremental             # Incremental build using cache
 
 # Quick commands
-pdm run up                          # Start all services (production mode)
+pdm run up                          # Start all services 
+pdm run restart {service_name}      # Restart specific service
 pdm run down                        # Stop all services
-pdm run logs nlp_service           # Follow service logs
+pdm run logs nlp_service         # Follow service logs
 ```
 
 #### Production
@@ -271,3 +272,5 @@ pdm run prod-migrate               # Run production migrations
 - Document all environment variables
 - Include examples in documentation
 ```
+- ALWAYS USE   1. restart - for restarting specific services
+  2. restart-all - for restarting all services
