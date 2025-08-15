@@ -145,6 +145,23 @@ class MockBatchStateRepository:
         # Mock implementation - not used in these tests
         return False
 
+    async def record_batch_phase_completion(
+        self, batch_id: str, phase_name: str, completed: bool
+    ) -> bool:
+        """Record phase completion status for multi-pipeline dependency resolution."""
+        # Mock implementation for testing
+        return True
+
+    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
+        """Clear pipeline state when pipeline completes, preparing for next pipeline."""
+        # Mock implementation for testing
+        return True
+    
+    async def get_completed_phases(self, batch_id: str) -> set[str]:
+        """Get all completed phases for a batch."""
+        # Return empty set for mock
+        return set()
+
 
 def create_mock_kafka_record(
     topic: str, event_envelope: EventEnvelope[Any], offset: int = 12345
@@ -214,16 +231,15 @@ def create_cj_assessment_completion_event(
         event="cj_assessment.completed",
     )
 
-    # Create rankings for each essay
-    rankings = []
-    for i, essay_id in enumerate(essay_ids):
-        rankings.append(
-            {
-                "els_essay_id": essay_id,
-                "rank": i + 1,
-                "score": 0.9 - (i * 0.1),  # Decreasing scores
-            }
-        )
+    # Create processing summary with successful essay IDs
+    processing_summary = {
+        "total_essays": len(essay_ids),
+        "successful": len(essay_ids),
+        "failed": 0,
+        "successful_essay_ids": essay_ids,
+        "failed_essay_ids": [],
+        "processing_time_seconds": 5.2,
+    }
 
     cj_data = CJAssessmentCompletedV1(
         event_name=ProcessingEvent.CJ_ASSESSMENT_COMPLETED,
@@ -233,8 +249,7 @@ def create_cj_assessment_completion_event(
         status=EssayStatus.CJ_ASSESSMENT_SUCCESS,
         system_metadata=system_metadata,
         cj_assessment_job_id=f"cj-job-{batch_id}",
-        rankings=rankings,
-        grade_projections_summary=create_test_grade_projections(essay_ids),
+        processing_summary=processing_summary,
     )
 
     return EventEnvelope(

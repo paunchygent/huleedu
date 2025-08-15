@@ -243,6 +243,47 @@ class BatchValidationErrorsV1(BaseModel):
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
 
+class BatchPipelineCompletedV1(BaseModel):
+    """
+    Event indicating that all requested pipeline phases have completed for a batch.
+
+    Publisher: Batch Orchestrator Service (BOS)
+    Consumer: API Gateway, UI Services, Batch Conductor Service (BCS)
+    Topic: batch.pipeline.completed
+    
+    Published when:
+    1. All requested pipeline phases have completed (successfully or with failures)
+    2. No more phases remain in the requested_pipelines list
+    3. Pipeline execution has reached its terminal state
+    
+    This event enables:
+    - Multi-pipeline support by clearing active pipeline state
+    - UI notifications of pipeline completion
+    - BCS to track completed phases for dependency resolution
+    - API Gateway to update batch status for clients
+    """
+
+    event: str = Field(default="batch.pipeline.completed", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier")
+    completed_phases: list[str] = Field(
+        description="List of phase names that were completed in this pipeline execution"
+    )
+    final_status: str = Field(
+        description="Final pipeline status: COMPLETED_SUCCESSFULLY or COMPLETED_WITH_FAILURES"
+    )
+    processing_duration_seconds: float = Field(
+        description="Total duration of pipeline execution in seconds"
+    )
+    successful_essay_count: int = Field(
+        description="Number of essays that completed successfully across all phases"
+    )
+    failed_essay_count: int = Field(
+        description="Number of essays that failed in any phase"
+    )
+    correlation_id: UUID = Field(description="Correlation ID from the original pipeline request")
+    metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+
+
 # BatchEssaysReadyV2 REMOVED - No need for V2 when following no-backwards-compatibility
 # The main BatchEssaysReady event above has been completely rewritten instead
 
@@ -256,3 +297,5 @@ class BatchCoordinationEventData(BaseModel):
     batch_validation_errors: BatchValidationErrorsV1 | None = None  # New structured error event
     batch_readiness_timeout: BatchReadinessTimeout | None = None
     excess_content_provisioned: ExcessContentProvisionedV1 | None = None
+    batch_content_provisioning_completed: BatchContentProvisioningCompletedV1 | None = None
+    batch_pipeline_completed: BatchPipelineCompletedV1 | None = None  # Multi-pipeline support

@@ -11,6 +11,7 @@ class ProcessingEvent(str, Enum):
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
     BATCH_ESSAYS_READY = "batch.essays.ready"
+    BATCH_PIPELINE_COMPLETED = "batch.pipeline.completed"
     # -------------  Essay lifecycle  -------------#
     ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
     ESSAY_LIFECYCLE_STATE_UPDATED = "essay.lifecycle.state.updated"
@@ -83,6 +84,7 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED: "huleedu.essay.spellcheck.completed.v1",
     ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED: "huleedu.batch.nlp.processing.requested.v1",
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
+    ProcessingEvent.BATCH_PIPELINE_COMPLETED: "huleedu.batch.pipeline.completed.v1",
     ProcessingEvent.ESSAY_CONTENT_PROVISIONED: "huleedu.file.essay.content.provisioned.v1",
     ProcessingEvent.EXCESS_CONTENT_PROVISIONED: "huleedu.els.excess.content.provisioned.v1",
     ProcessingEvent.ESSAY_VALIDATION_FAILED: "huleedu.file.essay.validation.failed.v1",

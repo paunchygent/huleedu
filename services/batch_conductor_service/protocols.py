@@ -77,6 +77,46 @@ class BatchStateRepositoryProtocol(Protocol):
         """
         ...
 
+    async def record_batch_phase_completion(
+        self, batch_id: str, phase_name: str, completed: bool
+    ) -> bool:
+        """
+        Record phase completion status for multi-pipeline dependency resolution.
+
+        Args:
+            batch_id: Batch identifier
+            phase_name: Name of the completed phase
+            completed: Whether the phase completed successfully
+
+        Returns:
+            True if recorded successfully, False otherwise
+        """
+        ...
+
+    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
+        """
+        Clear pipeline state when pipeline completes, preparing for next pipeline.
+
+        Args:
+            batch_id: Batch identifier
+
+        Returns:
+            True if cleared successfully, False otherwise
+        """
+        ...
+    
+    async def get_completed_phases(self, batch_id: str) -> set[str]:
+        """
+        Get all completed phases for a batch.
+        
+        Args:
+            batch_id: Batch identifier
+            
+        Returns:
+            Set of phase names that have completed successfully
+        """
+        ...
+
 
 class PipelineRulesProtocol(Protocol):
     """

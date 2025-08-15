@@ -8,6 +8,7 @@ networks:
 volumes:
   huleedu_content_store_data:
   batch_orchestrator_db_data:
+  batch_conductor_db_data:
   essay_lifecycle_db_data:
   cj_assessment_db_data:
   redis_data:

@@ -412,10 +412,11 @@ class PipelineCoordinationProvider(Provider):
         redis_client: AtomicRedisClientProtocol,
         notification_service: NotificationService,
         state_manager: BatchPipelineStateManager,
+        event_publisher: BatchEventPublisherProtocol,
     ) -> PipelinePhaseCoordinatorProtocol:
         """Provide pipeline phase coordinator implementation with extracted services."""
         return DefaultPipelinePhaseCoordinator(
-            batch_repo, phase_initiators_map, redis_client, notification_service, state_manager
+            batch_repo, phase_initiators_map, redis_client, notification_service, state_manager, event_publisher
         )
 
     @provide(scope=Scope.APP)

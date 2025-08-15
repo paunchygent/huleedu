@@ -8,7 +8,7 @@ Follows the same pattern as BOS MockBatchRepositoryImpl.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
@@ -31,6 +31,7 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         self.batch_summaries: dict[str, dict[str, Any]] = {}
         self.ttl_expiry: dict[str, datetime] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self.ttl_seconds = 7 * 24 * 60 * 60  # 7 days in seconds, matching Redis implementation
 
     def _get_lock(self, key: str) -> asyncio.Lock:
         """Get or create lock for atomic operations (simulates Redis WATCH)."""
@@ -42,7 +43,7 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         """Check if key has expired based on TTL."""
         if key not in self.ttl_expiry:
             return False
-        return datetime.utcnow() > self.ttl_expiry[key]
+        return datetime.now(UTC) > self.ttl_expiry[key]
 
     async def record_essay_step_completion(
         self, batch_id: str, essay_id: str, step_name: str, metadata: dict | None = None
@@ -60,8 +61,8 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 {
                     "completed_steps": set[str](),
                     "step_metadata": {},
-                    "created_at": datetime.utcnow().isoformat(),
-                    "last_updated": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(UTC).isoformat(),
+                    "last_updated": datetime.now(UTC).isoformat(),
                 },
             )
 
@@ -72,11 +73,11 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             # Update state
             essay_state["completed_steps"].add(step_name)
             essay_state["step_metadata"][step_name] = metadata or {}
-            essay_state["last_updated"] = datetime.utcnow().isoformat()
+            essay_state["last_updated"] = datetime.now(UTC).isoformat()
 
             # Store with TTL (7 days like production)
             self.essay_states[essay_key] = essay_state
-            self.ttl_expiry[essay_key] = datetime.utcnow() + timedelta(days=7)
+            self.ttl_expiry[essay_key] = datetime.now(UTC) + timedelta(days=7)
 
             # Invalidate batch summary cache
             batch_summary_key = f"bcs:batch_summary:{batch_id}"
@@ -144,7 +145,7 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
     async def cleanup_expired_data(self) -> int:
         """Clean up expired entries (simulate Redis TTL expiration)."""
         cleaned_count = 0
-        current_time = datetime.utcnow()
+        current_time = datetime.now(UTC)
 
         # Clean essay states
         expired_keys = [key for key, expiry in self.ttl_expiry.items() if current_time > expiry]
@@ -156,3 +157,74 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             cleaned_count += 1
 
         return cleaned_count
+
+    async def record_batch_phase_completion(
+        self, batch_id: str, phase_name: str, completed: bool
+    ) -> bool:
+        """
+        Record phase completion status for multi-pipeline dependency resolution.
+
+        Mock implementation for testing.
+
+        Args:
+            batch_id: Batch identifier
+            phase_name: Name of the completed phase
+            completed: Whether the phase completed successfully
+
+        Returns:
+            True if recorded successfully, False otherwise
+        """
+        key = f"bcs:batch:{batch_id}:phases"
+        if key not in self.batch_summaries:
+            self.batch_summaries[key] = {}
+        
+        self.batch_summaries[key][phase_name] = "completed" if completed else "failed"
+        
+        # Set TTL for this key
+        self.ttl_expiry[key] = datetime.now(UTC) + timedelta(seconds=self.ttl_seconds)
+        
+        return True
+
+    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
+        """
+        Clear pipeline state when pipeline completes, preparing for next pipeline.
+
+        Mock implementation for testing.
+
+        Args:
+            batch_id: Batch identifier
+
+        Returns:
+            True if cleared successfully, False otherwise
+        """
+        key = f"bcs:batch:{batch_id}:phases"
+        
+        # Remove the phases tracking key if it exists
+        if key in self.batch_summaries:
+            del self.batch_summaries[key]
+        
+        # Remove TTL tracking for this key
+        if key in self.ttl_expiry:
+            del self.ttl_expiry[key]
+        
+        return True
+    
+    async def get_completed_phases(self, batch_id: str) -> set[str]:
+        """
+        Get all completed phases for a batch.
+        
+        Args:
+            batch_id: Batch identifier
+            
+        Returns:
+            Set of phase names that have completed successfully
+        """
+        key = f"bcs:batch:{batch_id}:phases"
+        
+        # Return empty set if no phases recorded
+        if key not in self.batch_summaries:
+            return set()
+        
+        # Return only phases marked as completed
+        phases = self.batch_summaries[key]
+        return {phase for phase, status in phases.items() if status == "completed"}

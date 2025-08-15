@@ -69,7 +69,12 @@ class EventDrivenServicesProvider(Provider):
     def provide_batch_state_repository(
         self, redis_client: AtomicRedisClientProtocol, settings: Settings
     ) -> BatchStateRepositoryProtocol:
-        """Provide batch state repository implementation based on environment configuration."""
+        """
+        Provide batch state repository with cache-aside pattern.
+        
+        Uses Redis for fast lookups (7-day TTL) and PostgreSQL for permanent storage.
+        This enables dependency resolution even weeks/months after phases complete.
+        """
         if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
             from services.batch_conductor_service.implementations import (
                 mock_batch_state_repository,
@@ -77,12 +82,22 @@ class EventDrivenServicesProvider(Provider):
 
             return mock_batch_state_repository.MockBatchStateRepositoryImpl()
         else:
-            from services.batch_conductor_service.implementations import (
-                batch_state_repository_impl,
+            from services.batch_conductor_service.implementations.redis_batch_state_repository import (
+                RedisCachedBatchStateRepositoryImpl,
+            )
+            from services.batch_conductor_service.implementations.postgres_batch_state_repository import (
+                PostgreSQLBatchStateRepositoryImpl,
             )
 
-            return batch_state_repository_impl.RedisCachedBatchStateRepositoryImpl(
+            # Create PostgreSQL repository for permanent storage
+            postgres_repo = PostgreSQLBatchStateRepositoryImpl(
+                database_url=settings.database_url
+            )
+
+            # Create Redis repository with PostgreSQL fallback
+            return RedisCachedBatchStateRepositoryImpl(
                 redis_client=redis_client,
+                postgres_repository=postgres_repo,  # Wire both repositories together!
             )
 
     @provide(scope=Scope.APP)
@@ -99,6 +114,7 @@ class EventDrivenServicesProvider(Provider):
                     dlq_reason: str,
                     additional_metadata=None,
                 ) -> bool:
+                    _ = (base_topic, failed_event_envelope, dlq_reason, additional_metadata)
                     return True
 
             return _NoOpDlqProducer()

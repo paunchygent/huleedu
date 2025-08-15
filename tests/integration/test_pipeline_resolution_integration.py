@@ -60,6 +60,16 @@ class MockBatchConductorClient:
                 response_data: dict[str, Any] = await response.json()
                 return response_data
 
+    async def report_phase_completion(
+        self,
+        batch_id: str,
+        completed_phase: Any,  # PhaseName
+        success: bool = True,
+    ) -> None:
+        """Mock implementation of phase completion reporting."""
+        # For testing, we just log the call
+        pass
+
 
 class TestPipelineResolutionIntegration:
     """Integration tests for complete pipeline resolution workflow."""

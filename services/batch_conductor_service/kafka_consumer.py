@@ -15,7 +15,9 @@ from typing import Any
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 
 from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, OperationStatus
@@ -90,6 +92,8 @@ class BCSKafkaConsumer:
                 topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
                 topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),
                 topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+                "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
+                "huleedu.batch.pipeline.completed.v1",  # Pipeline completions for state clearing
                 # Add more specialized service result topics as needed
             ]
 
@@ -166,6 +170,12 @@ class BCSKafkaConsumer:
             elif msg.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
                 await self._handle_cj_assessment_completed(msg)
                 await self._track_event_success(event_type)
+            elif msg.topic == "huleedu.els.batch.phase.outcome.v1":
+                await self._handle_els_batch_phase_outcome(msg)
+                await self._track_event_success("els_batch_phase_outcome")
+            elif msg.topic == "huleedu.batch.pipeline.completed.v1":
+                await self._handle_batch_pipeline_completed(msg)
+                await self._track_event_success("batch_pipeline_completed")
             else:
                 logger.warning(f"Unknown topic: {msg.topic}")
                 await self._track_event_failure(event_type, "unknown_topic")
@@ -324,4 +334,93 @@ class BCSKafkaConsumer:
 
         except Exception as e:
             logger.error(f"Error processing CJ assessment completion: {e}", exc_info=True)
+            raise
+
+    async def _handle_els_batch_phase_outcome(self, msg: ConsumerRecord) -> None:
+        """
+        Handle ELS batch phase outcome events for dependency resolution.
+        
+        Track phase completions from ELS to enable multi-pipeline support
+        and intelligent dependency resolution.
+        """
+        try:
+            # Parse the event envelope
+            envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
+            event: ELSBatchPhaseOutcomeV1 = ELSBatchPhaseOutcomeV1.model_validate(envelope.data)
+            
+            # Determine if phase completed successfully
+            # Use string comparison since BatchStatus enum might not be imported
+            success = str(event.phase_status).endswith("COMPLETED_SUCCESSFULLY")
+            
+            # Record phase completion for dependency resolution
+            result = await self.batch_state_repo.record_batch_phase_completion(
+                batch_id=event.batch_id,
+                phase_name=event.phase_name.value,
+                completed=success,
+            )
+            
+            if result:
+                successful_count = len(event.processed_essays)
+                failed_count = len(event.failed_essay_ids)
+                logger.info(
+                    f"Recorded phase {event.phase_name.value} completion for batch {event.batch_id} "
+                    f"(success={success}, successful_essays={successful_count})",
+                    extra={
+                        "batch_id": event.batch_id,
+                        "phase_name": event.phase_name.value,
+                        "success": success,
+                        "successful_essay_count": successful_count,
+                        "failed_essay_count": failed_count,
+                        "correlation_id": str(envelope.correlation_id),
+                    },
+                )
+            else:
+                logger.error(
+                    f"Failed to record phase completion for batch {event.batch_id}",
+                    extra={"batch_id": event.batch_id, "phase_name": event.phase_name.value},
+                )
+                
+        except Exception as e:
+            logger.error(f"Error processing ELS batch phase outcome: {e}", exc_info=True)
+            raise
+
+    async def _handle_batch_pipeline_completed(self, msg: ConsumerRecord) -> None:
+        """
+        Handle batch pipeline completion events to clear state for next pipeline.
+        
+        When a pipeline completes, clear the tracked phase completions to enable
+        fresh execution of the next pipeline.
+        """
+        try:
+            # Parse the event envelope
+            envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
+            event: BatchPipelineCompletedV1 = BatchPipelineCompletedV1.model_validate(envelope.data)
+            
+            # Clear pipeline state for this batch
+            result = await self.batch_state_repo.clear_batch_pipeline_state(
+                batch_id=event.batch_id
+            )
+            
+            if result:
+                logger.info(
+                    f"Cleared pipeline state for batch {event.batch_id} after pipeline completion "
+                    f"(status={event.final_status}, completed_phases={event.completed_phases})",
+                    extra={
+                        "batch_id": event.batch_id,
+                        "final_status": event.final_status,
+                        "completed_phases": event.completed_phases,
+                        "successful_essay_count": event.successful_essay_count,
+                        "failed_essay_count": event.failed_essay_count,
+                        "duration_seconds": event.processing_duration_seconds,
+                        "correlation_id": str(event.correlation_id),
+                    },
+                )
+            else:
+                logger.error(
+                    f"Failed to clear pipeline state for batch {event.batch_id}",
+                    extra={"batch_id": event.batch_id},
+                )
+                
+        except Exception as e:
+            logger.error(f"Error processing batch pipeline completed event: {e}", exc_info=True)
             raise

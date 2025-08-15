@@ -114,6 +114,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      batch_conductor_db:
+        condition: service_healthy
     networks:
       - huleedu_internal_network
     ports:
@@ -125,6 +127,14 @@ services:
       - LOG_LEVEL=INFO
       - HTTP_PORT=4002
       - BCS_REDIS_URL=redis://redis:6379
+      # Database configuration
+      - BCS_DB_HOST=batch_conductor_db
+      - BCS_DB_PORT=5432
+      - BCS_DB_NAME=huleedu_batch_conductor
+      - BCS_DB_USER=${HULEEDU_DB_USER}
+      - BCS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=batch_conductor_service
       - OTEL_TRACES_EXPORTER=otlp

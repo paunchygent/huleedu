@@ -14,6 +14,7 @@ from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionRequestV1,
 )
 from services.batch_conductor_service.protocols import (
+    BatchStateRepositoryProtocol,
     DlqProducerProtocol,
     PipelineResolutionServiceProtocol,
 )
@@ -84,4 +85,95 @@ async def define_pipeline(
 
     except Exception as e:
         logger.error(f"Unexpected error during pipeline resolution: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@pipeline_bp.route("/internal/v1/phases/complete", methods=["POST"])
+@inject
+async def record_phase_completion(
+    batch_state_repo: FromDishka[BatchStateRepositoryProtocol],
+) -> tuple[Response, int]:
+    """
+    Internal endpoint for recording phase completion.
+    
+    Called by BOS when a pipeline phase completes to enable multi-pipeline support
+    by tracking which phases have been completed for each batch.
+    
+    This allows subsequent pipeline requests to skip already-completed phases,
+    supporting efficient multi-pipeline workflows.
+    """
+    try:
+        # Parse and validate request
+        request_data = await request.get_json()
+        
+        # Extract required fields
+        batch_id = request_data.get("batch_id")
+        phase_name = request_data.get("phase_name")
+        success = request_data.get("success", True)
+        
+        # Validate required fields
+        if not batch_id or not phase_name:
+            logger.warning(
+                "Missing required fields in phase completion request",
+                extra={"request_data": request_data},
+            )
+            return jsonify({"error": "Missing required fields: batch_id and phase_name"}), 400
+        
+        logger.info(
+            f"Recording phase completion: {phase_name} for batch {batch_id}",
+            extra={
+                "batch_id": batch_id,
+                "phase_name": phase_name,
+                "success": success,
+            },
+        )
+        
+        # For batch-level phase completion, we record a single "batch-level" essay
+        # This simplifies tracking since BOS doesn't know individual essay IDs
+        # The key point is that the phase is marked complete for dependency resolution
+        batch_level_essay_id = f"batch_{batch_id}_aggregate"
+        
+        # Record the phase completion
+        result = await batch_state_repo.record_essay_step_completion(
+            batch_id=batch_id,
+            essay_id=batch_level_essay_id,
+            step_name=phase_name,
+            metadata={
+                "success": success,
+                "recorded_by": "BOS",
+                "is_batch_level": True,
+            },
+        )
+        
+        if result:
+            logger.info(
+                f"Successfully recorded phase completion: {phase_name} for batch {batch_id}",
+                extra={
+                    "batch_id": batch_id,
+                    "phase_name": phase_name,
+                },
+            )
+            return jsonify({
+                "status": "recorded",
+                "batch_id": batch_id,
+                "phase_name": phase_name,
+            }), 200
+        else:
+            logger.error(
+                f"Failed to record phase completion in repository",
+                extra={
+                    "batch_id": batch_id,
+                    "phase_name": phase_name,
+                },
+            )
+            return jsonify({"error": "Failed to record phase completion"}), 500
+            
+    except Exception as e:
+        logger.error(
+            f"Unexpected error during phase completion recording: {e}",
+            extra={
+                "error": str(e),
+            },
+            exc_info=True,
+        )
         return jsonify({"error": "Internal server error"}), 500

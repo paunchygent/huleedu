@@ -174,3 +174,94 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                 exc_info=True,
             )
             raise
+
+    async def report_phase_completion(
+        self,
+        batch_id: str,
+        completed_phase: PhaseName,
+        success: bool = True,
+    ) -> None:
+        """
+        Report phase completion to BCS for tracking and dependency resolution.
+        
+        This enables BCS to:
+        1. Track which phases have been completed for a batch
+        2. Skip completed phases in subsequent pipeline requests
+        3. Support multi-pipeline workflows efficiently
+        
+        Args:
+            batch_id: The unique identifier of the batch
+            completed_phase: The phase that has completed
+            success: Whether the phase completed successfully
+            
+        Note: This is a best-effort operation - failures are logged but don't block
+        pipeline progression to maintain resilience.
+        """
+        # Construct phase completion endpoint
+        completion_endpoint = f"{self.settings.BCS_BASE_URL}/internal/v1/phases/complete"
+        
+        # Prepare request payload
+        request_data = {
+            "batch_id": batch_id,
+            "phase_name": completed_phase.value,
+            "success": success,
+        }
+        
+        self.logger.info(
+            f"Reporting phase completion to BCS: {completed_phase.value} for batch {batch_id}",
+            extra={
+                "batch_id": batch_id,
+                "phase": completed_phase.value,
+                "success": success,
+                "endpoint": completion_endpoint,
+            },
+        )
+        
+        try:
+            # Make HTTP POST request to BCS
+            async with self.http_session.post(
+                completion_endpoint,
+                json=request_data,
+                timeout=aiohttp.ClientTimeout(total=5),  # Short timeout for non-blocking
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status >= 400:
+                    response_text = await response.text()
+                    self.logger.warning(
+                        f"BCS phase completion report failed with status {response.status}",
+                        extra={
+                            "batch_id": batch_id,
+                            "phase": completed_phase.value,
+                            "status_code": response.status,
+                            "response": response_text,
+                        },
+                    )
+                else:
+                    self.logger.info(
+                        f"Successfully reported phase completion to BCS",
+                        extra={
+                            "batch_id": batch_id,
+                            "phase": completed_phase.value,
+                        },
+                    )
+                    
+        except aiohttp.ClientError as e:
+            # Log but don't raise - this is best-effort
+            self.logger.warning(
+                f"Failed to report phase completion to BCS: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "phase": completed_phase.value,
+                    "error": str(e),
+                },
+            )
+        except Exception as e:
+            # Log unexpected errors but don't raise
+            self.logger.error(
+                f"Unexpected error reporting phase completion to BCS: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "phase": completed_phase.value,
+                },
+                exc_info=True,
+            )

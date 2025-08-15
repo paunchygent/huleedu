@@ -392,3 +392,192 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
     def _get_current_timestamp(self) -> str:
         """Get current UTC timestamp as ISO string."""
         return datetime.now(UTC).isoformat()
+
+    async def record_batch_phase_completion(
+        self, batch_id: str, phase_name: str, completed: bool
+    ) -> bool:
+        """
+        Record phase completion status using cache-aside pattern.
+
+        Stores in Redis for fast lookups (7-day TTL) and persists to PostgreSQL
+        for permanent storage. This enables dependency resolution even weeks/months
+        after a phase completed.
+
+        Args:
+            batch_id: Batch identifier
+            phase_name: Name of the completed phase
+            completed: Whether the phase completed successfully
+
+        Returns:
+            True if recorded successfully, False otherwise
+        """
+        try:
+            key = f"bcs:batch:{batch_id}:phases"
+            field = phase_name
+            value = "completed" if completed else "failed"
+            
+            # Store phase completion status in Redis for fast lookups
+            await self.redis_client.hset(key, field, value)
+            
+            # Set TTL to 7 days for Redis cache
+            await self.redis_client.expire(key, self.redis_ttl)
+            
+            # CRITICAL: Also persist to PostgreSQL for permanent record
+            if self.postgres_repository:
+                try:
+                    await self.postgres_repository.record_batch_phase_completion(
+                        batch_id, phase_name, completed
+                    )
+                    logger.info(
+                        f"Recorded phase {phase_name} as {value} for batch {batch_id} "
+                        f"(Redis cache + PostgreSQL permanent)",
+                        extra={
+                            "batch_id": batch_id,
+                            "phase_name": phase_name,
+                            "completed": completed,
+                        },
+                    )
+                except Exception as pg_error:
+                    # Log PostgreSQL failure but don't fail the operation
+                    # Redis cache is sufficient for immediate needs
+                    logger.warning(
+                        f"PostgreSQL persistence failed for phase completion "
+                        f"(continuing with Redis only): {pg_error}",
+                        extra={"batch_id": batch_id, "phase_name": phase_name},
+                    )
+            else:
+                logger.info(
+                    f"Cached phase {phase_name} as {value} for batch {batch_id} in Redis only",
+                    extra={
+                        "batch_id": batch_id,
+                        "phase_name": phase_name,
+                        "completed": completed,
+                    },
+                )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to record phase completion for batch {batch_id}: {e}",
+                extra={"batch_id": batch_id, "phase_name": phase_name},
+                exc_info=True,
+            )
+            return False
+
+    async def get_completed_phases(self, batch_id: str) -> set[str]:
+        """
+        Get all completed phases for a batch, with PostgreSQL fallback.
+        
+        First checks Redis cache, then falls back to PostgreSQL if needed.
+        If PostgreSQL has data but Redis doesn't, repopulates Redis cache.
+        
+        Args:
+            batch_id: Batch identifier
+            
+        Returns:
+            Set of phase names that have completed successfully
+        """
+        try:
+            key = f"bcs:batch:{batch_id}:phases"
+            
+            # First try Redis
+            redis_phases = await self.redis_client.hgetall(key)
+            
+            if redis_phases:
+                # Parse Redis data - only return phases marked as completed
+                completed_phases = {
+                    phase for phase, status in redis_phases.items() 
+                    if status == "completed"
+                }
+                
+                logger.debug(
+                    f"Retrieved {len(completed_phases)} completed phases from Redis for batch {batch_id}",
+                    extra={"batch_id": batch_id, "phase_count": len(completed_phases)},
+                )
+                return completed_phases
+            
+            # Redis miss - try PostgreSQL
+            if self.postgres_repository:
+                logger.info(
+                    f"Redis cache miss for batch {batch_id}, querying PostgreSQL",
+                    extra={"batch_id": batch_id},
+                )
+                
+                # Get from PostgreSQL
+                completed_phases = await self.postgres_repository.get_completed_phases(batch_id)
+                
+                if completed_phases:
+                    # Repopulate Redis cache for faster future lookups
+                    for phase in completed_phases:
+                        await self.redis_client.hset(key, phase, "completed")
+                    await self.redis_client.expire(key, self.redis_ttl)
+                    
+                    logger.info(
+                        f"Repopulated Redis cache with {len(completed_phases)} phases from PostgreSQL "
+                        f"for batch {batch_id}",
+                        extra={
+                            "batch_id": batch_id,
+                            "phase_count": len(completed_phases),
+                        },
+                    )
+                
+                return completed_phases
+            
+            # No data in either Redis or PostgreSQL
+            return set()
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to get completed phases for batch {batch_id}: {e}",
+                extra={"batch_id": batch_id},
+                exc_info=True,
+            )
+            
+            # Try PostgreSQL as last resort
+            if self.postgres_repository:
+                try:
+                    return await self.postgres_repository.get_completed_phases(batch_id)
+                except Exception:
+                    pass
+            
+            return set()
+
+    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
+        """
+        Clear Redis cache entries for batch pipeline state.
+
+        This clears the Redis cache when a pipeline completes to prevent memory bloat.
+        The permanent records in PostgreSQL are NOT affected - they remain forever
+        for dependency resolution.
+
+        Args:
+            batch_id: Batch identifier
+
+        Returns:
+            True if cleared successfully, False otherwise
+        """
+        try:
+            key = f"bcs:batch:{batch_id}:phases"
+            
+            # Clear Redis cache for this batch's phases
+            result = await self.redis_client.delete(key)
+            
+            # Also notify PostgreSQL (even though it's a no-op there)
+            if self.postgres_repository:
+                await self.postgres_repository.clear_batch_pipeline_state(batch_id)
+            
+            logger.info(
+                f"Cleared Redis cache for batch {batch_id} pipeline state (deleted {result} keys). "
+                f"PostgreSQL records retained permanently.",
+                extra={"batch_id": batch_id, "keys_deleted": result},
+            )
+            return True
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to clear Redis cache for batch {batch_id}: {e}",
+                extra={"batch_id": batch_id},
+                exc_info=True,
+            )
+            return False

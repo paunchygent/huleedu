@@ -155,7 +155,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test successful processing of spellcheck completion event."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
@@ -183,7 +183,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         sample_spellcheck_message_data["data"]["status"] = EssayStatus.SPELLCHECK_FAILED.value
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
@@ -208,7 +208,7 @@ class TestBCSKafkaConsumerBehavior:
         sample_spellcheck_message_data["data"]["system_metadata"]["entity"]["parent_id"] = None
 
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
@@ -233,7 +233,7 @@ class TestBCSKafkaConsumerBehavior:
         )
 
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act
@@ -274,7 +274,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test successful processing of CJ assessment completion event."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
@@ -304,7 +304,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         sample_cj_assessment_message_data["data"]["rankings"] = []
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
@@ -325,7 +325,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         sample_cj_assessment_message_data["data"]["rankings"][0]["els_essay_id"] = None
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
@@ -346,7 +346,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_batch_state_repo.record_essay_step_completion.return_value = False
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act
@@ -411,7 +411,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test handling of messages from unknown topics."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps({"test": "data"})
+        mock_msg.value = json.dumps({"test": "data"}).encode("utf-8")
         mock_msg.topic = "unknown.topic"
 
         # Act
@@ -447,7 +447,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test message routing to spellcheck handler based on topic."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Mock the handler to verify it's called
@@ -466,7 +466,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test message routing to CJ assessment handler based on topic."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Mock the handler to verify it's called
@@ -491,7 +491,7 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_batch_state_repo.record_essay_step_completion.side_effect = Exception("Database error")
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Act & Assert
@@ -506,7 +506,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test that exceptions from message handlers are properly propagated."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_spellcheck_message_data)
+        mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
         # Mock handler to raise exception
@@ -596,7 +596,7 @@ class TestBCSKafkaConsumerBehavior:
             msg_data["event_id"] = str(uuid4())
 
             mock_msg = Mock()
-            mock_msg.value = json.dumps(msg_data)
+            mock_msg.value = json.dumps(msg_data).encode("utf-8")
             mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
             messages.append(mock_msg)
 
@@ -620,11 +620,11 @@ class TestBCSKafkaConsumerBehavior:
         """Test processing of mixed event types in sequence."""
         # Arrange
         spellcheck_msg = Mock()
-        spellcheck_msg.value = json.dumps(sample_spellcheck_message_data)
+        spellcheck_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
         spellcheck_msg.topic = "huleedu.development.essay.spellcheck"
 
         cj_msg = Mock()
-        cj_msg.value = json.dumps(sample_cj_assessment_message_data)
+        cj_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         cj_msg.topic = "huleedu.cj_assessment.completed"
 
         # Act
@@ -658,7 +658,7 @@ class TestBCSKafkaConsumerBehavior:
 
         sample_cj_assessment_message_data["data"]["rankings"] = rankings
         mock_msg = Mock()
-        mock_msg.value = json.dumps(sample_cj_assessment_message_data)
+        mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
 
         # Act

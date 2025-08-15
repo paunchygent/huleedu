@@ -7,6 +7,7 @@ from .batch_coordination_events import (
     BatchContentProvisioningCompletedV1,
     BatchEssaysReady,
     BatchEssaysRegistered,
+    BatchPipelineCompletedV1,
     BatchReadinessTimeout,
     ExcessContentProvisionedV1,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "BatchEssaysReady",
     "BatchFileAddedV1",
     "BatchFileRemovedV1",
+    "BatchPipelineCompletedV1",
     "BatchReadinessTimeout",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
