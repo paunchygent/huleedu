@@ -347,20 +347,25 @@ class ClientPipelineRequestHandler:
             raise ValueError(error_msg) from e
 
     def _has_active_pipeline(self, pipeline_state: ProcessingPipelineState) -> bool:
-        """Check if batch has an active pipeline in progress."""
+        """Check if batch has an active pipeline in progress.
+
+        Returns True only if there are phases actively being processed.
+        Completed pipelines and pending pipelines should not block new pipeline requests.
+        """
         from common_core.pipeline_models import PipelineExecutionStatus
 
         try:
             # Direct Pydantic model access - no conversion needed
             state_obj = pipeline_state
 
-            # Check if any phase is currently in progress
+            # Check if any phase is currently in active processing
+            # PENDING_DEPENDENCIES means configured but not started - should not block
             active_statuses = {
                 PipelineExecutionStatus.IN_PROGRESS,
                 PipelineExecutionStatus.DISPATCH_INITIATED,
             }
 
-            # Check all phases using the enum values
+            # Check all phases to see if any are actively processing
             for phase_name in PhaseName:
                 phase_detail = state_obj.get_pipeline(phase_name.value)
                 if phase_detail and phase_detail.status in active_statuses:
@@ -385,47 +390,40 @@ class ClientPipelineRequestHandler:
             ProcessingPipelineState,
         )
 
-        # Initialize pipeline state details based on resolved pipeline
-        spellcheck_detail = PipelineStateDetail(
-            status=(
-                PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if PhaseName.SPELLCHECK in resolved_pipeline
-                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            ),
-        )
-        cj_assessment_detail = PipelineStateDetail(
-            status=(
-                PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if PhaseName.CJ_ASSESSMENT in resolved_pipeline
-                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            ),
-        )
-        ai_feedback_detail = PipelineStateDetail(
-            status=(
-                PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if PhaseName.AI_FEEDBACK in resolved_pipeline
-                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            ),
-        )
-        nlp_detail = PipelineStateDetail(
-            status=(
-                PipelineExecutionStatus.PENDING_DEPENDENCIES
-                if PhaseName.NLP in resolved_pipeline
-                else PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG
-            ),
-        )
+        # Fetch existing pipeline state or create a new one if it doesn't exist
+        existing_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
+        if existing_state:
+            # If state exists, update it
+            updated_pipeline_state = existing_state
+            # CRITICAL: Set requested_pipelines to the CURRENT pipeline execution order
+            # This replaces any previous pipeline execution order
+            updated_pipeline_state.requested_pipelines = [p.value for p in resolved_pipeline]
 
-        # Create updated pipeline state
-        updated_pipeline_state = ProcessingPipelineState(
-            batch_id=batch_id,
-            requested_pipelines=[
-                phase.value for phase in resolved_pipeline
-            ],  # Convert enums to strings
-            spellcheck=spellcheck_detail,
-            cj_assessment=cj_assessment_detail,
-            ai_feedback=ai_feedback_detail,
-            nlp=nlp_detail,
-        )
+            # Update status for newly resolved phases
+            for phase in resolved_pipeline:
+                phase_detail = updated_pipeline_state.get_pipeline(phase.value)
+                # If a phase was previously skipped or not started, set it to pending.
+                if phase_detail and phase_detail.status in [
+                    PipelineExecutionStatus.SKIPPED_BY_USER_CONFIG,
+                    PipelineExecutionStatus.REQUESTED_BY_USER,  # Default status
+                ]:
+                    phase_detail.status = PipelineExecutionStatus.PENDING_DEPENDENCIES
+        else:
+            # If no state exists, create a new one from scratch
+            pipeline_details = {}
+            for phase in PhaseName:
+                status = (
+                    PipelineExecutionStatus.PENDING_DEPENDENCIES
+                    if phase in resolved_pipeline
+                    else PipelineExecutionStatus.REQUESTED_BY_USER  # Default state
+                )
+                pipeline_details[phase.value] = PipelineStateDetail(status=status)
+
+            updated_pipeline_state = ProcessingPipelineState(
+                batch_id=batch_id,
+                requested_pipelines=[p.value for p in resolved_pipeline],
+                **pipeline_details,
+            )
 
         # Save updated state - direct Pydantic model
         await self.batch_repo.save_processing_pipeline_state(
@@ -437,6 +435,7 @@ class ClientPipelineRequestHandler:
             "Updated batch pipeline state with BCS resolution",
             extra={
                 "batch_id": batch_id,
-                "resolved_pipeline": resolved_pipeline,
+                "resolved_pipeline": [p.value for p in resolved_pipeline],
+                "requested_pipelines": updated_pipeline_state.requested_pipelines,
             },
         )

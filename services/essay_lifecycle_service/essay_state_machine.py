@@ -103,6 +103,16 @@ class EssayStateMachine:
                 "dest": EssayStatus.AWAITING_AI_FEEDBACK.value,
             },
             {
+                "trigger": CMD_INITIATE_AI_FEEDBACK,
+                "source": EssayStatus.NLP_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_AI_FEEDBACK.value,
+            },
+            {
+                "trigger": CMD_INITIATE_AI_FEEDBACK,
+                "source": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_AI_FEEDBACK.value,
+            },
+            {
                 "trigger": EVT_AI_FEEDBACK_STARTED,
                 "source": EssayStatus.AWAITING_AI_FEEDBACK.value,
                 "dest": EssayStatus.AI_FEEDBACK_IN_PROGRESS.value,
@@ -131,6 +141,11 @@ class EssayStateMachine:
             {
                 "trigger": CMD_INITIATE_CJ_ASSESSMENT,
                 "source": EssayStatus.AI_FEEDBACK_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
+            },
+            {
+                "trigger": CMD_INITIATE_CJ_ASSESSMENT,
+                "source": EssayStatus.NLP_SUCCESS.value,
                 "dest": EssayStatus.AWAITING_CJ_ASSESSMENT.value,
             },
             {
@@ -170,6 +185,11 @@ class EssayStateMachine:
                 "dest": EssayStatus.AWAITING_NLP.value,
             },
             {
+                "trigger": CMD_INITIATE_NLP,
+                "source": EssayStatus.CJ_ASSESSMENT_SUCCESS.value,
+                "dest": EssayStatus.AWAITING_NLP.value,
+            },
+            {
                 "trigger": EVT_NLP_STARTED,
                 "source": EssayStatus.AWAITING_NLP.value,
                 "dest": EssayStatus.NLP_IN_PROGRESS.value,
@@ -177,6 +197,11 @@ class EssayStateMachine:
             {
                 "trigger": EVT_NLP_SUCCEEDED,
                 "source": EssayStatus.NLP_IN_PROGRESS.value,
+                "dest": EssayStatus.NLP_SUCCESS.value,
+            },
+            {
+                "trigger": EVT_NLP_SUCCEEDED,
+                "source": EssayStatus.AWAITING_NLP.value,
                 "dest": EssayStatus.NLP_SUCCESS.value,
             },
             {

@@ -175,7 +175,7 @@ pdm run dev <command> [service]     # Use main dev script
 pdm run dev build                   # Build production images with cache
 pdm run dev build clean             # Clean build (no cache) for production
 pdm run dev build dev               # Build ALL dev images with hot-reload support
-pdm run dev build dev cj_assessment # Build specific dev image
+pdm run dev build dev nlp_service   # Build specific dev image
 
 # Running services
 pdm run dev dev                     # Start ALL services with hot-reload
@@ -187,7 +187,7 @@ pdm run dev incremental             # Incremental build using cache
 
 # Quick commands
 pdm run up                          # Start all services 
-pdm run restart {service_name}      # Restart specific service
+pdm run restart essay_lifecycle_worker      # Restart specific service
 pdm run down                        # Stop all services
 pdm run logs nlp_service         # Follow service logs
 ```

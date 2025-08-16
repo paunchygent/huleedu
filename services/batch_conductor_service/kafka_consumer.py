@@ -90,7 +90,7 @@ class BCSKafkaConsumer:
             # Subscribe to processing result topics
             topics = [
                 topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
-                topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),
+                # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
                 topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
                 "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
                 "huleedu.batch.pipeline.completed.v1",  # Pipeline completions for state clearing

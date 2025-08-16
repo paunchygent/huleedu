@@ -26,7 +26,7 @@ def create_container() -> AsyncContainer:
 
 
 async def initialize_metrics(app: Quart, container: AsyncContainer) -> None:
-    """Initialize shared metrics and attach them to the Quart app."""
+    """Initialize shared metrics."""
     try:
         # Use shared metrics instead of creating new ones
         metrics = get_http_metrics()
@@ -36,6 +36,7 @@ async def initialize_metrics(app: Quart, container: AsyncContainer) -> None:
         app.extensions["metrics"] = metrics
 
         logger.info("Batch Conductor Service shared metrics initialized successfully.")
+            
     except Exception as e:
         logger.critical("Failed to initialize shared metrics: %s", e, exc_info=True)
         raise

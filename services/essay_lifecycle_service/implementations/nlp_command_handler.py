@@ -12,6 +12,11 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from services.essay_lifecycle_service.constants import MetadataKey
+from services.essay_lifecycle_service.essay_state_machine import (
+    CMD_INITIATE_NLP,
+    EssayStateMachine,
+)
 from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
@@ -70,29 +75,52 @@ class NlpCommandHandler:
                     try:
                         essay_state = await self.repository.get_essay_state(essay_ref.essay_id)
                         if essay_state:
-                            # Update metadata to track NLP phase initiation
-                            metadata_updates = {
-                                "nlp_phase": "initiated",
-                                "nlp_initiated_at": str(correlation_id),
-                                "current_phase": "nlp_analysis",
-                            }
-                            
-                            await self.repository.update_essay_processing_metadata(
+                            # Use state machine to properly transition to NLP state
+                            essay_machine = EssayStateMachine(
                                 essay_id=essay_ref.essay_id,
-                                metadata_updates=metadata_updates,
-                                session=session,
-                                correlation_id=correlation_id,
+                                initial_status=essay_state.current_status
                             )
                             
-                            successfully_transitioned.append(essay_ref)
-                            
-                            logger.info(
-                                f"Updated essay {essay_ref.essay_id} state for NLP phase",
-                                extra={
-                                    "batch_id": command_data.entity_id,
-                                    "correlation_id": str(correlation_id),
-                                },
-                            )
+                            # Attempt to trigger the transition for initiating NLP
+                            if essay_machine.trigger_event(CMD_INITIATE_NLP):
+                                # Include NLP in commanded phases for proper phase outcome tracking
+                                existing_commanded_phases = essay_state.processing_metadata.get(
+                                    MetadataKey.COMMANDED_PHASES, []
+                                )
+                                
+                                # Persist the new state from the machine with metadata
+                                await self.repository.update_essay_status_via_machine(
+                                    essay_id=essay_ref.essay_id,
+                                    new_status=essay_machine.current_status,
+                                    metadata={
+                                        "bos_command": "nlp_initiate",
+                                        MetadataKey.CURRENT_PHASE: "nlp",
+                                        MetadataKey.COMMANDED_PHASES: list(
+                                            set(existing_commanded_phases + ["nlp"])
+                                        ),
+                                    },
+                                    session=session,
+                                    storage_reference=None,
+                                    correlation_id=correlation_id,
+                                )
+                                
+                                successfully_transitioned.append(essay_ref)
+                                
+                                logger.info(
+                                    f"Transitioned essay {essay_ref.essay_id} to {essay_machine.current_status.value} for NLP phase",
+                                    extra={
+                                        "batch_id": command_data.entity_id,
+                                        "correlation_id": str(correlation_id),
+                                    },
+                                )
+                            else:
+                                logger.warning(
+                                    f"State machine transition failed for essay {essay_ref.essay_id} from status {essay_state.current_status.value}",
+                                    extra={
+                                        "batch_id": command_data.entity_id,
+                                        "correlation_id": str(correlation_id),
+                                    },
+                                )
                     except Exception as e:
                         logger.error(
                             f"Failed to update state for essay {essay_ref.essay_id}: {e}",

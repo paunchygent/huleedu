@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from ..event_enums import ProcessingEvent
 from ..metadata_models import SystemProcessingMetadata
+from ..status_enums import BatchStatus, EssayStatus
 
 if TYPE_CHECKING:
-    from ..event_enums import ProcessingEvent
-    from ..status_enums import BatchStatus, EssayStatus
+    pass  # Keep for any future type-only imports
 
 
 class BaseEventData(BaseModel):

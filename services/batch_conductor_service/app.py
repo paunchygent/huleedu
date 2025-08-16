@@ -7,6 +7,8 @@ The service provides pipeline dependency resolution and batch state analysis for
 
 from __future__ import annotations
 
+import asyncio
+
 from quart import Quart
 from quart_dishka import QuartDishka
 
@@ -37,7 +39,7 @@ QuartDishka(app=app, container=container)
 
 @app.before_serving
 async def startup() -> None:
-    """Initialize middleware and metrics."""
+    """Initialize middleware, metrics, and Kafka consumer."""
     try:
         # Metrics rely on the DI container which is already wired
         await initialize_metrics(app, container)
@@ -48,6 +50,33 @@ async def startup() -> None:
             status_label_name="status_code",
             logger_name="bcs.metrics",
         )
+        
+        # Start Kafka consumer for phase completion tracking
+        try:
+            from services.batch_conductor_service.protocols import KafkaEventConsumerProtocol
+            
+            async with container() as request_container:
+                kafka_consumer = await request_container.get(KafkaEventConsumerProtocol)
+                
+            # Store consumer as app attribute and start as background task
+            app.kafka_consumer = kafka_consumer
+            app.consumer_task = asyncio.create_task(kafka_consumer.start_consuming())
+            
+            logger.info(
+                "BCS Kafka consumer started for phase completion tracking",
+                extra={
+                    "topics": [
+                        "huleedu.essay.spellcheck.completed.v1",
+                        "huleedu.cj_assessment.completed.v1",
+                        "huleedu.els.batch.phase.outcome.v1",
+                        "huleedu.batch.pipeline.completed.v1",
+                    ]
+                },
+            )
+        except Exception as e:
+            logger.error(f"Failed to start Kafka consumer: {e}", exc_info=True)
+            # Don't raise - let the HTTP API still work even if Kafka consumer fails
+            
         logger.info("Batch Conductor Service startup completed successfully")
     except Exception as e:
         logger.critical("Failed to start Batch Conductor Service: %s", e, exc_info=True)
@@ -56,8 +85,21 @@ async def startup() -> None:
 
 @app.after_serving
 async def shutdown() -> None:
-    """Gracefully shutdown all services."""
+    """Gracefully shutdown all services including Kafka consumer."""
     try:
+        # Stop Kafka consumer if running
+        if hasattr(app, 'kafka_consumer') and app.kafka_consumer:
+            logger.info("Stopping BCS Kafka consumer...")
+            await app.kafka_consumer.stop_consuming()
+            
+        # Cancel consumer task if running
+        if hasattr(app, 'consumer_task') and app.consumer_task and not app.consumer_task.done():
+            app.consumer_task.cancel()
+            try:
+                await app.consumer_task
+            except asyncio.CancelledError:
+                pass  # Expected when cancelling
+            
         await shutdown_services()
         logger.info("Batch Conductor Service shutdown completed")
     except Exception as e:

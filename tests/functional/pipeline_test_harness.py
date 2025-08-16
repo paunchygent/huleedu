@@ -640,6 +640,10 @@ class PipelineTestHarness:
 
                             # Check for completion event
                             if expected_completion_event in event_type:
+                                # For NLP pipeline, mark the phase as completed when we get the completion event
+                                if "nlp.analysis.completed" in event_type:
+                                    tracker.completed_phases.add("nlp")
+                                    logger.info("✅ Phase nlp completed (from completion event)")
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
                                 return envelope_data
 

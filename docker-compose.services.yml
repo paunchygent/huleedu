@@ -123,9 +123,10 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
-      - HTTP_PORT=4002
+      - BCS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - BCS_KAFKA_CONSUMER_GROUP_ID=batch-conductor-service-group
+      - BCS_LOG_LEVEL=INFO
+      - BCS_HTTP_PORT=4002
       - BCS_REDIS_URL=redis://redis:6379
       # Database configuration
       - BCS_DB_HOST=batch_conductor_db

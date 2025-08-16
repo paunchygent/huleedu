@@ -134,10 +134,11 @@ class EventDrivenServicesProvider(Provider):
             kafka_bus=kafka_bus,
         )
 
+    @provide(scope=Scope.APP)
     def provide_kafka_consumer(
         self,
         batch_state_repository: BatchStateRepositoryProtocol,
-        redis_client: RedisClientProtocol,
+        redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> KafkaEventConsumerProtocol:
         """Provide Kafka event consumer implementation."""

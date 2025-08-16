@@ -266,16 +266,68 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
     async def is_batch_step_complete(self, batch_id: str, step_name: str) -> bool:
         """
         Check if a processing step is complete for the entire batch.
-
-        A step is considered complete when all essays in the batch have completed that step.
+        
+        First tries Redis cache based on essay-level summary.
+        Falls back to PostgreSQL phase_completions table if Redis data is missing.
         """
-        summary = await self.get_batch_completion_summary(batch_id)
+        try:
+            # First try Redis-based summary approach
+            summary = await self.get_batch_completion_summary(batch_id)
 
-        if step_name not in summary:
+            if step_name in summary:
+                step_summary = summary[step_name]
+                redis_result = step_summary["completed"] == step_summary["total"]
+                
+                logger.debug(
+                    f"Redis: Step {step_name} completion check for batch {batch_id}: {redis_result}",
+                    extra={
+                        "batch_id": batch_id, 
+                        "step_name": step_name, 
+                        "completed": step_summary["completed"],
+                        "total": step_summary["total"],
+                        "is_complete": redis_result
+                    },
+                )
+                return redis_result
+            
+            # Redis summary missing for this step - fall back to PostgreSQL
+            if self.postgres_repository:
+                logger.info(
+                    f"Redis summary missing for step {step_name} in batch {batch_id}, falling back to PostgreSQL",
+                    extra={"batch_id": batch_id, "step_name": step_name},
+                )
+                
+                postgres_result = await self.postgres_repository.is_batch_step_complete(batch_id, step_name)
+                
+                logger.info(
+                    f"PostgreSQL fallback: Step {step_name} completion for batch {batch_id}: {postgres_result}",
+                    extra={"batch_id": batch_id, "step_name": step_name, "is_complete": postgres_result},
+                )
+                
+                return postgres_result
+            
+            # No data in Redis and no PostgreSQL repository
+            logger.debug(
+                f"No completion data found for step {step_name} in batch {batch_id}",
+                extra={"batch_id": batch_id, "step_name": step_name},
+            )
             return False
-
-        step_summary = summary[step_name]
-        return step_summary["completed"] == step_summary["total"]
+            
+        except Exception as e:
+            logger.error(
+                f"Failed to check step completion for batch {batch_id}, step {step_name}: {e}",
+                extra={"batch_id": batch_id, "step_name": step_name, "error": str(e)},
+                exc_info=True,
+            )
+            
+            # Try PostgreSQL as last resort
+            if self.postgres_repository:
+                try:
+                    return await self.postgres_repository.is_batch_step_complete(batch_id, step_name)
+                except Exception:
+                    pass
+            
+            return False
 
     async def _get_essay_state_from_redis(self, essay_key: str) -> dict[str, Any]:
         """Get essay state from Redis, returning default state if not found."""

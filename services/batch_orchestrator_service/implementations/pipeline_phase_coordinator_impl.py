@@ -91,11 +91,13 @@ class DefaultPipelinePhaseCoordinator:
         else:
             updated_status = PipelineExecutionStatus.FAILED
 
-        # Update status from IN_PROGRESS to completion status
+        # Update status from DISPATCH_INITIATED to completion status
+        # Note: Phases go directly from DISPATCH_INITIATED to completion
+        # without an intermediate IN_PROGRESS state in the current implementation
         await self.state_manager.update_phase_status_atomically(
             batch_id=batch_id,
             phase_name=completed_phase,
-            expected_status=PipelineExecutionStatus.IN_PROGRESS,
+            expected_status=PipelineExecutionStatus.DISPATCH_INITIATED,
             new_status=updated_status,
             completion_timestamp=datetime.now(UTC).isoformat(),
             correlation_id=str(correlation_id),
@@ -185,13 +187,35 @@ class DefaultPipelinePhaseCoordinator:
                     batch_id=batch_id,
                 )
 
+            # DEBUG: Log what's actually in requested_pipelines
+            logger.info(
+                f"DEBUG: Processing phase conclusion - batch={batch_id}, "
+                f"completed_phase={completed_phase.value}, "
+                f"requested_pipelines={requested_pipelines}",
+                extra={
+                    "batch_id": batch_id,
+                    "requested_pipelines": requested_pipelines,
+                    "completed_phase": completed_phase.value,
+                    "correlation_id": correlation_id,
+                },
+            )
+
             # Dynamic next phase determination
             try:
                 current_index = requested_pipelines.index(completed_phase.value)
+                logger.info(
+                    f"DEBUG: Found completed phase at index {current_index} of {len(requested_pipelines)}",
+                    extra={
+                        "batch_id": batch_id,
+                        "current_index": current_index,
+                        "total_phases": len(requested_pipelines),
+                        "correlation_id": correlation_id,
+                    },
+                )
             except ValueError:
                 logger.error(
                     f"Completed phase '{completed_phase.value}' not found in requested_pipelines "
-                    f"for batch {batch_id}",
+                    f"for batch {batch_id}. requested_pipelines={requested_pipelines}",
                 )
                 return
 
@@ -326,7 +350,7 @@ class DefaultPipelinePhaseCoordinator:
         correlation_id: UUID,
         batch_context: Any,
     ) -> None:
-        """Initiate execution of the first phase in a BCS-resolved pipeline."""
+        """Initiate execution of the first uncompleted phase in a BCS-resolved pipeline."""
         logger.info(
             f"Initiating resolved pipeline for batch {batch_id}",
             extra={
@@ -346,36 +370,53 @@ class DefaultPipelinePhaseCoordinator:
                 batch_id=batch_id,
             )
 
-        # Get first phase from resolved pipeline
-        first_phase_name = resolved_pipeline[0]
-
-        # Check idempotency - don't re-initiate if already started
+        # Get current pipeline state for checking phase statuses
         current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
-        if current_pipeline_state:
-            pipeline_detail = current_pipeline_state.get_pipeline(first_phase_name.value)
-            if pipeline_detail and pipeline_detail.status in [
-                PipelineExecutionStatus.DISPATCH_INITIATED,
-                PipelineExecutionStatus.IN_PROGRESS,
-                PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
-            ]:
-                logger.info(
-                    f"First phase {first_phase_name.value} already initiated for "
-                    f"batch {batch_id}, skipping",
-                    extra={"current_status": pipeline_detail.status.value},
-                )
-                return
+        
+        # Find the first uncompleted phase in the resolved pipeline
+        phase_to_initiate = None
+        for phase_name in resolved_pipeline:
+            if current_pipeline_state:
+                pipeline_detail = current_pipeline_state.get_pipeline(phase_name.value)
+                if pipeline_detail and pipeline_detail.status in [
+                    PipelineExecutionStatus.DISPATCH_INITIATED,
+                    PipelineExecutionStatus.IN_PROGRESS,
+                    PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
+                ]:
+                    logger.info(
+                        f"Phase {phase_name.value} already completed/in-progress for "
+                        f"batch {batch_id}, checking next phase",
+                        extra={"current_status": pipeline_detail.status.value},
+                    )
+                    continue  # Check next phase
+            
+            # Found first uncompleted phase
+            phase_to_initiate = phase_name
+            logger.info(
+                f"Found first uncompleted phase {phase_name.value} for batch {batch_id}",
+                extra={"correlation_id": correlation_id},
+            )
+            break
+        
+        # If all phases are complete, nothing to do
+        if phase_to_initiate is None:
+            logger.info(
+                f"All phases in resolved pipeline already completed for batch {batch_id}",
+                extra={"resolved_pipeline": [p.value for p in resolved_pipeline]},
+            )
+            return
 
-        # Get phase initiator
-        initiator = self.phase_initiators_map.get(first_phase_name)
+        # Get phase initiator for the uncompleted phase
+        initiator = self.phase_initiators_map.get(phase_to_initiate)
         if not initiator:
             raise_validation_error(
                 service="batch_orchestrator_service",
                 operation="initiate_resolved_pipeline",
                 field="phase_initiator",
-                message=f"No initiator found for first phase {first_phase_name}",
+                message=f"No initiator found for phase {phase_to_initiate}",
                 correlation_id=correlation_id,
                 batch_id=batch_id,
-                phase=first_phase_name.value,
+                phase=phase_to_initiate.value,
             )
 
         # Get essays that were stored from the original BatchEssaysReady event
@@ -395,32 +436,32 @@ class DefaultPipelinePhaseCoordinator:
 
         logger.info(f"Retrieved {len(essays_for_processing)} essays for pipeline initiation")
 
-        # Initiate first phase
+        # Initiate the uncompleted phase
         try:
             await initiator.initiate_phase(
                 batch_id=batch_id,
-                phase_to_initiate=first_phase_name,
+                phase_to_initiate=phase_to_initiate,
                 correlation_id=correlation_id,
                 essays_for_processing=essays_for_processing,
                 batch_context=batch_context,
             )
         except HuleEduError as e:
             logger.error(
-                f"Failed to initiate first phase {first_phase_name} for batch {batch_id}: {e}",
+                f"Failed to initiate phase {phase_to_initiate} for batch {batch_id}: {e}",
             )
             # Record phase failure with structured error details
             await self.state_manager.record_phase_failure(
                 batch_id=batch_id,
-                phase_name=first_phase_name,
+                phase_name=phase_to_initiate,
                 error=e,
                 correlation_id=str(correlation_id),
             )
             raise
 
-        # Update pipeline state - mark first phase as DISPATCH_INITIATED
+        # Update pipeline state - mark phase as DISPATCH_INITIATED
         await self.state_manager.update_phase_status_atomically(
             batch_id=batch_id,
-            phase_name=first_phase_name,
+            phase_name=phase_to_initiate,
             expected_status=PipelineExecutionStatus.PENDING_DEPENDENCIES,
             new_status=PipelineExecutionStatus.DISPATCH_INITIATED,
             completion_timestamp=datetime.now(UTC).isoformat(),
@@ -428,7 +469,7 @@ class DefaultPipelinePhaseCoordinator:
         )
 
         logger.info(
-            f"Successfully initiated first phase {first_phase_name.value} for batch {batch_id}",
+            f"Successfully initiated phase {phase_to_initiate.value} for batch {batch_id}",
             extra={"correlation_id": correlation_id},
         )
 

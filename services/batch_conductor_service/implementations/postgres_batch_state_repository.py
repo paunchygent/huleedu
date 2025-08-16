@@ -96,9 +96,52 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         return {}
 
     async def is_batch_step_complete(self, batch_id: str, step_name: str) -> bool:
-        """Check if batch step is complete using PostgreSQL data."""
-        # Placeholder implementation
-        return False
+        """
+        Check if batch step is complete using PostgreSQL phase_completions data.
+        
+        A step is considered complete if it has a record in phase_completions
+        with completed=True for the given batch.
+        
+        Args:
+            batch_id: Batch identifier
+            step_name: Phase/step name to check
+            
+        Returns:
+            True if the step is completed for this batch, False otherwise
+        """
+        try:
+            async with self.async_session() as session:
+                stmt = select(PhaseCompletion.completed).where(
+                    and_(
+                        PhaseCompletion.batch_id == batch_id,
+                        PhaseCompletion.phase_name == step_name,
+                        PhaseCompletion.completed == True,
+                    )
+                )
+                
+                result = await session.execute(stmt)
+                completion_record = result.first()
+                
+                is_complete = completion_record is not None
+                
+                logger.debug(
+                    f"PostgreSQL: Step {step_name} completion check for batch {batch_id}: {is_complete}",
+                    extra={
+                        "batch_id": batch_id, 
+                        "step_name": step_name, 
+                        "is_complete": is_complete
+                    },
+                )
+                
+                return is_complete
+                
+        except Exception as e:
+            logger.error(
+                f"PostgreSQL: Failed to check step completion for batch {batch_id}, step {step_name}: {e}",
+                extra={"batch_id": batch_id, "step_name": step_name, "error": str(e)},
+                exc_info=True,
+            )
+            return False
 
     @retry(
         stop=stop_after_attempt(3),

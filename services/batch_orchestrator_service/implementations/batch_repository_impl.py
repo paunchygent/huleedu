@@ -56,13 +56,38 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
         if not isinstance(pipeline_state, ProcessingPipelineState):
             raise ValueError(f"Expected ProcessingPipelineState, got {type(pipeline_state)}")
 
+        logger = create_service_logger("batch_orchestrator_service.batch_repository")
         async with self._get_lock(batch_id):
+            # DEBUG: Log what we're saving
+            logger.info(
+                f"DEBUG: Saving pipeline state for batch {batch_id}",
+                extra={
+                    "batch_id": batch_id,
+                    "requested_pipelines": pipeline_state.requested_pipelines,
+                    "spellcheck_status": pipeline_state.spellcheck.status.value if pipeline_state.spellcheck else None,
+                    "nlp_status": pipeline_state.nlp.status.value if pipeline_state.nlp else None,
+                },
+            )
             self.pipeline_states[batch_id] = pipeline_state
             return True
 
     async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:
         """Mock implementation - retrieves pipeline state from memory."""
-        return self.pipeline_states.get(batch_id)
+        logger = create_service_logger("batch_orchestrator_service.batch_repository")
+        state = self.pipeline_states.get(batch_id)
+        if state:
+            logger.info(
+                f"DEBUG: Retrieved pipeline state for batch {batch_id}",
+                extra={
+                    "batch_id": batch_id,
+                    "requested_pipelines": state.requested_pipelines,
+                    "spellcheck_status": state.spellcheck.status.value if state.spellcheck else None,
+                    "nlp_status": state.nlp.status.value if state.nlp else None,
+                },
+            )
+        else:
+            logger.info(f"DEBUG: No pipeline state found for batch {batch_id}")
+        return state
 
     async def store_batch_context(
         self,
