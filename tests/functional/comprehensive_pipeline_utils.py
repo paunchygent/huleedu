@@ -36,6 +36,9 @@ PIPELINE_TOPICS = {
         ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
     ),
     "cj_assessment_completed": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+    # NLP pipeline topics
+    "batch_nlp_initiate": topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
+    "batch_nlp_analysis_completed": topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
 }
 
 
@@ -315,9 +318,13 @@ async def watch_pipeline_progression_with_consumer(
                                 essay_id = event_data.get("essay_id", "unknown")
                                 if spellcheck_completions == 1:
                                     print("📨 📝 Spellchecker processing essays...")
-                                print(f"📨 📝 Spellcheck completed: {essay_id} ({spellcheck_completions}/{expected_essay_count})")
+                                print(
+                                    f"📨 📝 Spellcheck completed: {essay_id} ({spellcheck_completions}/{expected_essay_count})"
+                                )
                                 if spellcheck_completions == expected_essay_count:
-                                    print(f"✅ All {spellcheck_completions} essays spellcheck completed! ELS will aggregate...")
+                                    print(
+                                        f"✅ All {spellcheck_completions} essays spellcheck completed! ELS will aggregate..."
+                                    )
                             elif message.topic == PIPELINE_TOPICS["els_batch_phase_outcome"]:
                                 phase_name = event_data.get("phase_name")
                                 phase_status = event_data.get("phase_status")
@@ -325,7 +332,7 @@ async def watch_pipeline_progression_with_consumer(
                                 failed_essay_ids = event_data.get("failed_essay_ids", [])
                                 processed_count = len(processed_essays)
                                 failed_count = len(failed_essay_ids)
-                                
+
                                 if phase_name == "spellcheck":
                                     print(
                                         f"📨 3️⃣ ELS published phase outcome: "

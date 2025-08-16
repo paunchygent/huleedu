@@ -94,13 +94,17 @@ async def record_phase_completion(
     batch_state_repo: FromDishka[BatchStateRepositoryProtocol],
 ) -> tuple[Response, int]:
     """
-    Internal endpoint for recording phase completion.
+    TEST/OPS ENDPOINT ONLY - NOT FOR PRODUCTION USE.
     
-    Called by BOS when a pipeline phase completes to enable multi-pipeline support
-    by tracking which phases have been completed for each batch.
+    Internal endpoint for manually recording phase completion during testing and operations.
+    In production, phase completions are recorded automatically via Kafka events.
     
-    This allows subsequent pipeline requests to skip already-completed phases,
-    supporting efficient multi-pipeline workflows.
+    WARNING: This endpoint bypasses normal event flow and should only be used for:
+    - Integration testing of multi-pipeline scenarios
+    - Manual operational intervention during incident recovery
+    - Development and debugging
+    
+    Production phase tracking occurs through Kafka event handlers only.
     """
     try:
         # Parse and validate request

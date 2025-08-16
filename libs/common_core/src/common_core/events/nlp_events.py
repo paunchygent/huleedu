@@ -15,6 +15,7 @@ from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData, ProcessingUpdate
 from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.status_enums import BatchStatus, EssayStatus
 
 
 class StudentMatchSuggestion(BaseModel):

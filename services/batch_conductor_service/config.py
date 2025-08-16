@@ -95,6 +95,14 @@ class Settings(BaseSettings):
         default="huleedu_user", description="Database user"
     )
     
+    # PostgreSQL persistence configuration
+    ENABLE_POSTGRES_PERSISTENCE: bool = Field(
+        default=True, description="Enable PostgreSQL persistence for phase completions"
+    )
+    USE_REDIS_FOR_STATE: bool = Field(
+        default=True, description="Use Redis as primary state store (PostgreSQL as fallback)"
+    )
+    
     @property
     def _db_user(self) -> str:
         """Get database user from environment or config."""

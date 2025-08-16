@@ -287,6 +287,9 @@ class BCSKafkaConsumer:
 
             # Record successful essay completions
             for essay_id in processing_summary.get("successful_essay_ids", []):
+                if essay_id is None:
+                    logger.warning("Skipping None essay_id in successful_essay_ids")
+                    continue
                 # Record completion for each essay (state tracking only)
                 success = await self.batch_state_repo.record_essay_step_completion(
                     batch_id=batch_id,

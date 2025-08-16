@@ -69,22 +69,19 @@ class TestBCSKafkaConsumerBehavior:
             "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
             "data": {
                 "event_name": "essay.spellcheck.completed",
-                "entity_ref": {
+                "entity_id": "essay-123",
+                "entity_type": "essay",
+                "parent_id": "batch-456",
+                "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "system_metadata": {
                     "entity_id": "essay-123",
                     "entity_type": "essay",
                     "parent_id": "batch-456",
-                },
-                "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
-                "system_metadata": {
-                    "entity": {
-                        "entity_id": "essay-123",
-                        "entity_type": "essay",
-                        "parent_id": "batch-456",
-                    },
                     "processing_stage": "completed",
                     "event": "essay.spellcheck.completed",
                 },
                 "original_text_storage_id": "text-storage-123",
+                "storage_metadata": None,
                 "corrections_made": 5,
             },
         }
@@ -101,44 +98,25 @@ class TestBCSKafkaConsumerBehavior:
             "data": {
                 "event_name": "cj_assessment.completed",
                 "cj_assessment_job_id": "cj_job_789",
-                "entity_ref": {
+                "entity_id": "batch-789",
+                "entity_type": "batch",
+                "parent_id": None,
+                "status": "completed_successfully",
+                "system_metadata": {
                     "entity_id": "batch-789",
                     "entity_type": "batch",
                     "parent_id": None,
-                },
-                "status": "completed_successfully",
-                "system_metadata": {
-                    "entity": {
-                        "entity_id": "batch-789",
-                        "entity_type": "batch",
-                        "parent_id": None,
-                    },
                     "processing_stage": "completed",
                     "event": "cj_assessment_completed",
                 },
-                "rankings": [
-                    {
-                        "els_essay_id": "essay-001",
-                        "rank": 1,
-                        "score": 0.95,
-                        "pair_wins": 8,
-                        "pair_losses": 2,
-                    },
-                    {
-                        "els_essay_id": "essay-002",
-                        "rank": 2,
-                        "score": 0.85,
-                        "pair_wins": 6,
-                        "pair_losses": 4,
-                    },
-                    {
-                        "els_essay_id": "essay-003",
-                        "rank": 3,
-                        "score": 0.75,
-                        "pair_wins": 4,
-                        "pair_losses": 6,
-                    },
-                ],
+                "processing_summary": {
+                    "total_essays": 3,
+                    "successful": 3,
+                    "failed": 0,
+                    "successful_essay_ids": ["essay-001", "essay-002", "essay-003"],
+                    "failed_essay_ids": [],
+                    "processing_time_seconds": 5.2,
+                },
             },
         }
 
@@ -203,9 +181,9 @@ class TestBCSKafkaConsumerBehavior:
         sample_spellcheck_message_data: dict,
     ) -> None:
         """Test handling of spellcheck event with missing batch_id."""
-        # Arrange
-        sample_spellcheck_message_data["data"]["entity_ref"]["parent_id"] = None
-        sample_spellcheck_message_data["data"]["system_metadata"]["entity"]["parent_id"] = None
+        # Arrange - Remove all possible batch_id fields
+        sample_spellcheck_message_data["data"]["parent_id"] = None
+        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = None
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
@@ -226,11 +204,9 @@ class TestBCSKafkaConsumerBehavior:
         sample_spellcheck_message_data: dict,
     ) -> None:
         """Test batch_id extraction from system_metadata fallback."""
-        # Arrange - Remove batch_id from entity_ref but keep in system_metadata
-        sample_spellcheck_message_data["data"]["entity_ref"]["parent_id"] = None
-        sample_spellcheck_message_data["data"]["system_metadata"]["entity"]["parent_id"] = (
-            "batch-from-metadata"
-        )
+        # Arrange - Remove batch_id from direct field but keep in system_metadata
+        sample_spellcheck_message_data["data"]["parent_id"] = None
+        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = "batch-from-metadata"
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
@@ -252,11 +228,12 @@ class TestBCSKafkaConsumerBehavior:
         """Test handling of spellcheck message deserialization errors."""
         # Arrange
         mock_msg = Mock()
-        mock_msg.value = "invalid json"
+        mock_msg.value = b"invalid json"  # Must be bytes for .decode() to work
         mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
 
-        # Act & Assert
-        with pytest.raises(json.JSONDecodeError):
+        # Act & Assert - Should raise validation error for invalid JSON structure
+        from pydantic import ValidationError
+        with pytest.raises((json.JSONDecodeError, ValidationError)):
             await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
         mock_batch_state_repo.record_essay_step_completion.assert_not_called()
@@ -283,14 +260,14 @@ class TestBCSKafkaConsumerBehavior:
         # Assert - Should record completion for all 3 essays
         assert mock_batch_state_repo.record_essay_step_completion.call_count == 3
 
-        # Verify first essay completion
+        # Verify first essay completion (state tracking only, no business data)
         first_call = mock_batch_state_repo.record_essay_step_completion.call_args_list[0]
         assert first_call[1]["batch_id"] == "batch-789"
         assert first_call[1]["essay_id"] == "essay-001"
         assert first_call[1]["step_name"] == "cj_assessment"
         assert first_call[1]["metadata"]["completion_status"] == "success"
-        assert first_call[1]["metadata"]["rank"] == 1
-        assert first_call[1]["metadata"]["score"] == 0.95
+        assert first_call[1]["metadata"]["cj_job_id"] == "cj_job_789"
+        # NO business data (rank, score) - just state tracking
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -300,9 +277,10 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo: AsyncMock,
         sample_cj_assessment_message_data: dict,
     ) -> None:
-        """Test handling of CJ assessment with empty rankings."""
+        """Test handling of CJ assessment with no successful essays."""
         # Arrange
-        sample_cj_assessment_message_data["data"]["rankings"] = []
+        sample_cj_assessment_message_data["data"]["processing_summary"]["successful_essay_ids"] = []
+        sample_cj_assessment_message_data["data"]["processing_summary"]["successful"] = 0
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
@@ -321,9 +299,11 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo: AsyncMock,
         sample_cj_assessment_message_data: dict,
     ) -> None:
-        """Test handling of CJ assessment ranking with missing essay_id."""
+        """Test handling of CJ assessment with None in successful essay IDs."""
         # Arrange
-        sample_cj_assessment_message_data["data"]["rankings"][0]["els_essay_id"] = None
+        sample_cj_assessment_message_data["data"]["processing_summary"]["successful_essay_ids"] = [
+            None, "essay-002", "essay-003"
+        ]
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
@@ -592,7 +572,7 @@ class TestBCSKafkaConsumerBehavior:
         messages = []
         for i in range(3):
             msg_data = sample_spellcheck_message_data.copy()
-            msg_data["data"]["entity_ref"]["entity_id"] = f"essay-{i}"
+            msg_data["data"]["entity_id"] = f"essay-{i}"
             msg_data["event_id"] = str(uuid4())
 
             mock_msg = Mock()
@@ -643,20 +623,16 @@ class TestBCSKafkaConsumerBehavior:
         sample_cj_assessment_message_data: dict,
     ) -> None:
         """Test processing of CJ assessment with large number of essays."""
-        # Arrange - Create 50 essay rankings
-        rankings = []
-        for i in range(50):
-            rankings.append(
-                {
-                    "els_essay_id": f"essay-{i:03d}",
-                    "rank": i + 1,
-                    "score": 0.95 - (i * 0.01),
-                    "pair_wins": 25 - i,
-                    "pair_losses": i,
-                }
-            )
-
-        sample_cj_assessment_message_data["data"]["rankings"] = rankings
+        # Arrange - Create 50 successful essay IDs
+        successful_essay_ids = [f"essay-{i:03d}" for i in range(50)]
+        sample_cj_assessment_message_data["data"]["processing_summary"] = {
+            "total_essays": 50,
+            "successful": 50,
+            "failed": 0,
+            "successful_essay_ids": successful_essay_ids,
+            "failed_essay_ids": [],
+            "processing_time_seconds": 25.5,
+        }
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")
         mock_msg.topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)

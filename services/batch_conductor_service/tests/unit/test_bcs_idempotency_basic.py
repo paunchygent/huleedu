@@ -679,7 +679,8 @@ async def test_coordination_event_ttl_verification(
             topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED): 86400,
             "CJAssessmentCompletedV1": 86400,
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED): 86400,
-            topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED): 86400,
+            # AI feedback not yet implemented - will add when service is ready
+            # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED): 86400,
         },
         default_ttl=86400,  # 24 hours for coordination events
         enable_debug_logging=True,

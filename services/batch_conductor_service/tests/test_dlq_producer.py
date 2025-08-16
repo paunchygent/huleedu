@@ -21,20 +21,20 @@ from services.batch_conductor_service.implementations.kafka_dlq_producer_impl im
 )
 
 
-class TestEntityRef(BaseModel):
+class MockEntityRef(BaseModel):
     """Test model for entity references."""
 
     entity_id: str
     parent_id: str
 
 
-class TestEntityRefNoParent(BaseModel):
+class MockEntityRefNoParent(BaseModel):
     """Test model for entity references without parent_id."""
 
     entity_id: str
 
 
-class TestProcessingResult(BaseModel):
+class MockProcessingResult(BaseModel):
     """Test model for processing results."""
 
     status: str
@@ -42,63 +42,63 @@ class TestProcessingResult(BaseModel):
     corrections: list[str]
 
 
-class TestEventData(BaseModel):
+class MockEventData(BaseModel):
     """Test model for event data in DLQ producer tests."""
 
     batch_id: str
-    entity_ref: TestEntityRef
-    processing_result: TestProcessingResult
+    entity_ref: MockEntityRef
+    processing_result: MockProcessingResult
 
 
-class TestSimpleEventData(BaseModel):
+class MockSimpleEventData(BaseModel):
     """Simple test model for basic event data."""
 
     batch_id: str
     other_data: str
 
 
-class TestEntityOnlyEventData(BaseModel):
+class MockEntityOnlyEventData(BaseModel):
     """Test model for events with only entity reference."""
 
-    entity_ref: TestEntityRef
+    entity_ref: MockEntityRef
 
 
-class TestEntityNoParentEventData(BaseModel):
+class MockEntityNoParentEventData(BaseModel):
     """Test model for events with entity reference without parent_id."""
 
-    entity_ref: TestEntityRefNoParent
+    entity_ref: MockEntityRefNoParent
 
 
-class TestEntityIdEventData(BaseModel):
+class MockEntityIdEventData(BaseModel):
     """Test model for events with entity_id."""
 
     entity_id: str
     status: str = "completed"
 
 
-class TestEmptyEventData(BaseModel):
+class MockEmptyEventData(BaseModel):
     """Test model for empty event data."""
 
     random_data: str = "no_key_fields"
     status: str = "failed"
 
 
-class TestAnalysisResult(BaseModel):
+class MockAnalysisResult(BaseModel):
     """Test model for analysis result."""
 
     text: str
 
 
-class TestLargeEventData(BaseModel):
+class MockLargeEventData(BaseModel):
     """Test model for large event data."""
 
     batch_id: str
     large_text_field: str
     essay_content: str
-    analysis_results: list[TestAnalysisResult]
+    analysis_results: list[MockAnalysisResult]
 
 
-class TestPipelineFailureEventData(BaseModel):
+class MockPipelineFailureEventData(BaseModel):
     """Test model for pipeline failure event data."""
 
     batch_id: str
@@ -107,23 +107,23 @@ class TestPipelineFailureEventData(BaseModel):
     error_details: str
 
 
-class TestSpellcheckFailureEventData(BaseModel):
+class MockSpellcheckFailureEventData(BaseModel):
     """Test model for spellcheck failure event data."""
 
     batch_id: str
-    entity_ref: TestEntityRef
+    entity_ref: MockEntityRef
     failure_reason: str
     error_details: str
 
 
-class TestConcurrentFailureEventData(BaseModel):
+class MockConcurrentFailureEventData(BaseModel):
     """Test model for concurrent failure event data."""
 
     batch_id: str
     failure_sequence: int
 
 
-class TestKafkaDlqProducerBehavior:
+class MockKafkaDlqProducerBehavior:
     """Test business behavior of DLQ producer with realistic failure scenarios."""
 
     @pytest.fixture
@@ -141,18 +141,18 @@ class TestKafkaDlqProducerBehavior:
         return KafkaDlqProducerImpl(kafka_bus=mock_kafka_bus)
 
     @pytest.fixture
-    def sample_event_envelope(self) -> EventEnvelope[TestEventData]:
+    def sample_event_envelope(self) -> EventEnvelope[MockEventData]:
         """Create realistic event envelope for testing."""
-        return EventEnvelope[TestEventData](
+        return EventEnvelope[MockEventData](
             event_id=uuid4(),
             event_type="huleedu.spellcheck.result.v1",
             event_timestamp=datetime.now(UTC),
             source_service="spellchecker_service",
             correlation_id=uuid4(),
-            data=TestEventData(
+            data=MockEventData(
                 batch_id="batch_essays_001",
-                entity_ref=TestEntityRef(entity_id="essay_123", parent_id="batch_essays_001"),
-                processing_result=TestProcessingResult(
+                entity_ref=MockEntityRef(entity_id="essay_123", parent_id="batch_essays_001"),
+                processing_result=MockProcessingResult(
                     status="completed",
                     errors_found=3,
                     corrections=["teh -> the", "recieve -> receive", "occured -> occurred"],
@@ -347,7 +347,7 @@ class TestKafkaDlqProducerBehavior:
             await dlq_producer.publish_to_dlq(
                 base_topic=base_topic,
                 failed_event_envelope=sample_event_envelope,
-                dlq_reason="TestReason",
+                dlq_reason="MockReason",
             )
 
             # Assert
@@ -362,19 +362,19 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test key extraction when event data has direct batch_id."""
         # Arrange - Event with direct batch_id in data
-        event_with_batch_id = EventEnvelope[TestSimpleEventData](
+        event_with_batch_id = EventEnvelope[MockSimpleEventData](
             event_id=uuid4(),
             event_type="huleedu.test.event.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_service",
-            data=TestSimpleEventData(batch_id="batch_direct_123", other_data="test_value"),
+            data=MockSimpleEventData(batch_id="batch_direct_123", other_data="test_value"),
         )
 
         # Act
         await dlq_producer.publish_to_dlq(
             base_topic="huleedu.test.topic",
             failed_event_envelope=event_with_batch_id,
-            dlq_reason="TestReason",
+            dlq_reason="MockReason",
         )
 
         # Assert - Should use direct batch_id as key
@@ -386,13 +386,13 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test key extraction from entity_ref.parent_id when no direct batch_id."""
         # Arrange - Event with entity_ref structure
-        event_with_entity_ref = EventEnvelope[TestEntityOnlyEventData](
+        event_with_entity_ref = EventEnvelope[MockEntityOnlyEventData](
             event_id=uuid4(),
             event_type="huleedu.test.event.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_service",
-            data=TestEntityOnlyEventData(
-                entity_ref=TestEntityRef(entity_id="essay_456", parent_id="batch_parent_789")
+            data=MockEntityOnlyEventData(
+                entity_ref=MockEntityRef(entity_id="essay_456", parent_id="batch_parent_789")
             ),
         )
 
@@ -400,7 +400,7 @@ class TestKafkaDlqProducerBehavior:
         await dlq_producer.publish_to_dlq(
             base_topic="huleedu.test.topic",
             failed_event_envelope=event_with_entity_ref,
-            dlq_reason="TestReason",
+            dlq_reason="MockReason",
         )
 
         # Assert - Should use entity_ref.parent_id as key
@@ -412,13 +412,13 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test key extraction from entity_ref.entity_id when no parent_id."""
         # Arrange - Event with entity_ref but no parent_id
-        event_with_entity_id = EventEnvelope[TestEntityNoParentEventData](
+        event_with_entity_id = EventEnvelope[MockEntityNoParentEventData](
             event_id=uuid4(),
             event_type="huleedu.test.event.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_service",
-            data=TestEntityNoParentEventData(
-                entity_ref=TestEntityRefNoParent(entity_id="standalone_entity_999")
+            data=MockEntityNoParentEventData(
+                entity_ref=MockEntityRefNoParent(entity_id="standalone_entity_999")
             ),
         )
 
@@ -426,7 +426,7 @@ class TestKafkaDlqProducerBehavior:
         await dlq_producer.publish_to_dlq(
             base_topic="huleedu.test.topic",
             failed_event_envelope=event_with_entity_id,
-            dlq_reason="TestReason",
+            dlq_reason="MockReason",
         )
 
         # Assert - Should use entity_ref.entity_id as key
@@ -438,19 +438,19 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test key extraction fallback when no suitable key fields are available."""
         # Arrange - Event with no batch_id or entity_ref
-        event_without_key_fields = EventEnvelope[TestEmptyEventData](
+        event_without_key_fields = EventEnvelope[MockEmptyEventData](
             event_id=uuid4(),
             event_type="huleedu.test.event.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_service",
-            data=TestEmptyEventData(),
+            data=MockEmptyEventData(),
         )
 
         # Act
         await dlq_producer.publish_to_dlq(
             base_topic="huleedu.test.topic",
             failed_event_envelope=event_without_key_fields,
-            dlq_reason="TestReason",
+            dlq_reason="MockReason",
         )
 
         # Assert - Should use None as key when no suitable fields found
@@ -473,7 +473,7 @@ class TestKafkaDlqProducerBehavior:
         result = await dlq_producer.publish_to_dlq(
             base_topic="huleedu.test.topic",
             failed_event_envelope=sample_event_envelope,
-            dlq_reason="TestFailure",
+            dlq_reason="MockFailure",
         )
 
         # Assert - Should return False and not raise exception
@@ -538,13 +538,13 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test realistic pipeline resolution failure DLQ scenario."""
         # Arrange - Simulate a pipeline resolution failure event
-        pipeline_failure_event = EventEnvelope[TestPipelineFailureEventData](
+        pipeline_failure_event = EventEnvelope[MockPipelineFailureEventData](
             event_id=uuid4(),
             event_type="huleedu.batch.pipeline.resolution.failed.v1",
             event_timestamp=datetime.now(UTC),
             source_service="batch_conductor_service",
             correlation_id=uuid4(),
-            data=TestPipelineFailureEventData(
+            data=MockPipelineFailureEventData(
                 batch_id="batch_pipeline_fail_001",
                 requested_pipeline="ai_feedback",
                 failure_reason="dependency_resolution_failed",
@@ -581,15 +581,15 @@ class TestKafkaDlqProducerBehavior:
     ) -> None:
         """Test realistic spellcheck service failure DLQ scenario."""
         # Arrange - Simulate a spellcheck processing failure
-        spellcheck_failure_event = EventEnvelope[TestSpellcheckFailureEventData](
+        spellcheck_failure_event = EventEnvelope[MockSpellcheckFailureEventData](
             event_id=uuid4(),
             event_type="huleedu.spellcheck.processing.failed.v1",
             event_timestamp=datetime.now(UTC),
             source_service="spellchecker_service",
             correlation_id=uuid4(),
-            data=TestSpellcheckFailureEventData(
+            data=MockSpellcheckFailureEventData(
                 batch_id="batch_spellcheck_fail_001",
-                entity_ref=TestEntityRef(
+                entity_ref=MockEntityRef(
                     entity_id="essay_failed_001",
                     parent_id="batch_spellcheck_fail_001",
                 ),
@@ -624,12 +624,12 @@ class TestKafkaDlqProducerBehavior:
         # Arrange - Multiple different failure events
         failure_events = []
         for i in range(3):
-            event = EventEnvelope[TestConcurrentFailureEventData](
+            event = EventEnvelope[MockConcurrentFailureEventData](
                 event_id=uuid4(),
                 event_type=f"huleedu.test.failure.v{i + 1}",
                 event_timestamp=datetime.now(UTC),
                 source_service="test_service",
-                data=TestConcurrentFailureEventData(
+                data=MockConcurrentFailureEventData(
                     batch_id=f"batch_concurrent_{i + 1}", failure_sequence=i + 1
                 ),
             )
@@ -662,16 +662,16 @@ class TestKafkaDlqProducerBehavior:
         """Test handling of large event data payloads."""
         # Arrange - Create event with large data payload
         large_text = "x" * 10000  # 10KB of text
-        large_data_event = EventEnvelope[TestLargeEventData](
+        large_data_event = EventEnvelope[MockLargeEventData](
             event_id=uuid4(),
             event_type="huleedu.large.data.event.v1",
             event_timestamp=datetime.now(UTC),
             source_service="test_service",
-            data=TestLargeEventData(
+            data=MockLargeEventData(
                 batch_id="batch_large_data_001",
                 large_text_field=large_text,
                 essay_content=large_text,
-                analysis_results=[TestAnalysisResult(text=large_text[:1000]) for _ in range(10)],
+                analysis_results=[MockAnalysisResult(text=large_text[:1000]) for _ in range(10)],
             ),
         )
 

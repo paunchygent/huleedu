@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from prometheus_client import REGISTRY, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Histogram, Gauge
 
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -84,6 +84,26 @@ def _create_metrics() -> dict[str, Any]:
                 ["operation", "status"],
                 registry=REGISTRY,
             ),
+            # Database operation metrics
+            "db_operation_duration": Histogram(
+                "bcs_db_operation_duration_seconds",
+                "Database operation duration",
+                ["operation"],
+                buckets=(0.01, 0.05, 0.1, 0.5, 1, 2.5, 5, 10),
+                registry=REGISTRY,
+            ),
+            "db_operation_errors": Counter(
+                "bcs_db_operation_errors_total",
+                "Database operation errors",
+                ["operation", "error_type"],
+                registry=REGISTRY,
+            ),
+            "db_connection_pool_size": Gauge(
+                "bcs_db_connection_pool_size",
+                "Database connection pool size",
+                ["pool_name"],
+                registry=REGISTRY,
+            ),
         }
 
         logger.info("Successfully created all BCS metrics")
@@ -123,6 +143,9 @@ def _get_existing_metrics() -> dict[str, Any]:
         "pipeline_resolution_duration_seconds": "huleedu_bcs_pipeline_resolution_duration_seconds",
         "events_processed_total": "huleedu_bcs_events_processed_total",
         "els_requests": "bcs_els_requests_total",
+        "db_operation_duration": "bcs_db_operation_duration_seconds",
+        "db_operation_errors": "bcs_db_operation_errors_total",
+        "db_connection_pool_size": "bcs_db_connection_pool_size",
     }
 
     existing: dict[str, Any] = {}
@@ -189,3 +212,24 @@ def get_pipeline_service_metrics() -> dict[str, Any]:
             "pipeline_resolution_duration_seconds"
         ),
     }
+
+
+def get_database_metrics() -> dict[str, Any]:
+    """Get database operation metrics.
+
+    Returns:
+        Dictionary containing database operation metrics
+    """
+    all_metrics = get_metrics()
+    return {
+        "db_operation_duration": all_metrics.get("db_operation_duration"),
+        "db_operation_errors": all_metrics.get("db_operation_errors"),
+        "db_connection_pool_size": all_metrics.get("db_connection_pool_size"),
+    }
+
+
+# Export commonly used metrics directly
+metrics_dict = get_metrics()
+DB_OPERATION_DURATION = metrics_dict.get("db_operation_duration")
+DB_OPERATION_ERRORS = metrics_dict.get("db_operation_errors")
+DB_CONNECTION_POOL_SIZE = metrics_dict.get("db_connection_pool_size")

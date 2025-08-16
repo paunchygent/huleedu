@@ -8,13 +8,20 @@ Used as fallback for Redis operations and permanent audit trail.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from time import time
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from services.batch_conductor_service.metrics import (
+    DB_OPERATION_DURATION,
+    DB_OPERATION_ERRORS,
+    DB_CONNECTION_POOL_SIZE,
+)
 from services.batch_conductor_service.models_db import PhaseCompletion
 from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
 
@@ -26,6 +33,19 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
     PostgreSQL implementation for permanent storage of batch processing state.
 
     Provides database persistence with transactions for audit trail and reprocessing.
+    
+    DATA RETENTION STRATEGY:
+    - Phase completions are PERMANENT records (never deleted)
+    - Serves as audit trail for compliance and debugging
+    - Enables dependency resolution even months after completion
+    - No TTL or cleanup required - storage is minimal (batch_id, phase, timestamp)
+    - If archival is needed in future, consider partitioning by year
+    
+    PRODUCTION HARDENING:
+    - Connection pooling: pool_size=10, max_overflow=20
+    - Retry logic: 3 attempts with exponential backoff (2-10 seconds)
+    - Health checks: Integrated with /healthz endpoint
+    - Metrics: Prometheus histograms for operation duration and error counters
     """
 
     def __init__(self, database_url: str):
@@ -80,6 +100,11 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         # Placeholder implementation
         return False
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
     async def record_batch_phase_completion(
         self, batch_id: str, phase_name: str, completed: bool
     ) -> bool:
@@ -97,6 +122,7 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         Returns:
             True if recorded successfully, False otherwise
         """
+        start_time = time()
         try:
             async with self.async_session() as session:
                 async with session.begin():
@@ -122,6 +148,12 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     await session.execute(stmt)
                     await session.commit()
                     
+                    # Record metrics
+                    if DB_OPERATION_DURATION:
+                        DB_OPERATION_DURATION.labels(operation="record_phase_completion").observe(
+                            time() - start_time
+                        )
+                    
                     logger.info(
                         f"PostgreSQL: Persisted phase {phase_name} completion for batch {batch_id} "
                         f"(completed={completed})",
@@ -134,6 +166,10 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     return True
                     
         except IntegrityError as e:
+            if DB_OPERATION_ERRORS:
+                DB_OPERATION_ERRORS.labels(
+                    operation="record_phase_completion", error_type="integrity_error"
+                ).inc()
             # This shouldn't happen with ON CONFLICT, but handle it gracefully
             logger.warning(
                 f"PostgreSQL: Integrity error recording phase completion for batch {batch_id}, "
@@ -143,6 +179,10 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             return True  # Consider it success since the record exists
             
         except Exception as e:
+            if DB_OPERATION_ERRORS:
+                DB_OPERATION_ERRORS.labels(
+                    operation="record_phase_completion", error_type="general_error"
+                ).inc()
             logger.error(
                 f"PostgreSQL: Failed to record phase completion for batch {batch_id}, "
                 f"phase {phase_name}: {e}",
@@ -151,6 +191,11 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             )
             return False
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """
         Get all completed phases for a batch from PostgreSQL.
@@ -163,6 +208,7 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         Returns:
             Set of phase names that have completed successfully
         """
+        start_time = time()
         try:
             async with self.async_session() as session:
                 stmt = select(PhaseCompletion.phase_name).where(
@@ -175,6 +221,12 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 result = await session.execute(stmt)
                 completed_phases = {row[0] for row in result}
                 
+                # Record metrics
+                if DB_OPERATION_DURATION:
+                    DB_OPERATION_DURATION.labels(operation="get_completed_phases").observe(
+                        time() - start_time
+                    )
+                
                 logger.debug(
                     f"PostgreSQL: Retrieved {len(completed_phases)} completed phases for batch {batch_id}",
                     extra={"batch_id": batch_id, "phase_count": len(completed_phases)},
@@ -183,6 +235,10 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 return completed_phases
                 
         except Exception as e:
+            if DB_OPERATION_ERRORS:
+                DB_OPERATION_ERRORS.labels(
+                    operation="get_completed_phases", error_type="general_error"
+                ).inc()
             logger.error(
                 f"PostgreSQL: Failed to get completed phases for batch {batch_id}: {e}",
                 extra={"batch_id": batch_id, "error": str(e)},

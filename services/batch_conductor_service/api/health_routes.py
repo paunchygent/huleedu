@@ -12,6 +12,7 @@ from quart_dishka import inject
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from services.batch_conductor_service.config import Settings
+from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
 
 logger = create_service_logger("bcs.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -21,6 +22,7 @@ health_bp = Blueprint("health_routes", __name__)
 @inject
 async def health_check(
     redis_client: FromDishka[AtomicRedisClientProtocol],
+    batch_state_repo: FromDishka[BatchStateRepositoryProtocol],
     settings: FromDishka[Settings],
 ) -> Response | tuple[Response, int]:
     """Health check endpoint compliant with Rule 072 format."""
@@ -46,6 +48,34 @@ async def health_check(
         checks["dependencies_available"] = False
         overall_status = "degraded"
         message = "Batch Conductor Service is degraded - Redis unavailable"
+
+    # Check PostgreSQL connectivity (if configured)
+    if settings.ENABLE_POSTGRES_PERSISTENCE:
+        try:
+            # Attempt a simple query to check database connectivity
+            test_batch_id = "health-check-test"
+            await batch_state_repo.get_completed_phases(test_batch_id)
+            dependencies["postgresql"] = {
+                "status": "healthy",
+                "message": "PostgreSQL connection successful",
+            }
+        except Exception as e:
+            logger.error(f"PostgreSQL health check failed: {e}")
+            dependencies["postgresql"] = {
+                "status": "unhealthy",
+                "message": f"PostgreSQL connection failed: {str(e)}",
+            }
+            # PostgreSQL is optional, so don't degrade overall status
+            # unless it's the primary store
+            if not settings.USE_REDIS_FOR_STATE:
+                checks["dependencies_available"] = False
+                overall_status = "degraded"
+                message = "Batch Conductor Service is degraded - PostgreSQL unavailable"
+    else:
+        dependencies["postgresql"] = {
+            "status": "not_configured",
+            "message": "PostgreSQL persistence not enabled",
+        }
 
     # Note: Essay Lifecycle Service is checked dynamically during operations
     # Not checked here to avoid cascading health check failures
