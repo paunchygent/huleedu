@@ -104,14 +104,14 @@ class BatchStateRepositoryProtocol(Protocol):
             True if cleared successfully, False otherwise
         """
         ...
-    
+
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """
         Get all completed phases for a batch.
-        
+
         Args:
             batch_id: Batch identifier
-            
+
         Returns:
             Set of phase names that have completed successfully
         """

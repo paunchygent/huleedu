@@ -26,6 +26,7 @@ from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
@@ -59,7 +60,6 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
-from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 
 logger = create_service_logger("test.redis_transaction_db_update")
 

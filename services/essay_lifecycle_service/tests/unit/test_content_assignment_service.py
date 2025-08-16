@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from common_core.status_enums import EssayStatus
@@ -107,7 +107,9 @@ class TestContentAssignmentService:
 
         mock_batch_tracker.assign_slot_to_content.return_value = slot_assignment_result
         if repository_result:
-            mock_repository.create_essay_state_with_content_idempotency.return_value = repository_result
+            mock_repository.create_essay_state_with_content_idempotency.return_value = (
+                repository_result
+            )
             # Mock mark_slot_fulfilled to return None (no batch completion) for basic scenarios
             mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
@@ -135,7 +137,7 @@ class TestContentAssignmentService:
         else:
             # Slot assigned - should proceed with database operations
             mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
-            
+
             # Verify essay data structure
             call_args = mock_repository.create_essay_state_with_content_idempotency.call_args
             essay_data = call_args.kwargs["essay_data"]
@@ -240,8 +242,8 @@ class TestContentAssignmentService:
     @pytest.mark.parametrize(
         "class_type, should_cleanup",
         [
-            ("GUEST", True),   # GUEST batches are cleaned up
-            ("REGULAR", False), # REGULAR batches are not cleaned up
+            ("GUEST", True),  # GUEST batches are cleaned up
+            ("REGULAR", False),  # REGULAR batches are not cleaned up
         ],
     )
     async def test_assign_content_to_essay_batch_completion_cleanup(
@@ -264,23 +266,27 @@ class TestContentAssignmentService:
 
         mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True, assigned_essay_id
+            True,
+            assigned_essay_id,
         )
 
         # Mock batch completion with proper essay data structure
         batch_ready_event = AsyncMock()
         batch_ready_event.batch_id = batch_id
-        batch_ready_event.ready_essays = [{
-            "essay_id": assigned_essay_id,
-            "text_storage_id": text_storage_id,
-            "batch_id": batch_id,
-        }]
+        batch_ready_event.ready_essays = [
+            {
+                "essay_id": assigned_essay_id,
+                "text_storage_id": text_storage_id,
+                "batch_id": batch_id,
+            }
+        ]
         batch_ready_event.course_code = "ENG5"
         batch_ready_event.class_type = class_type
-        
+
         original_correlation_id = uuid4()
         mock_batch_tracker.mark_slot_fulfilled.return_value = (
-            batch_ready_event, original_correlation_id
+            batch_ready_event,
+            original_correlation_id,
         )
         mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user"}
 
@@ -296,7 +302,7 @@ class TestContentAssignmentService:
         # Assert
         # Should publish batch content provisioning completed event
         mock_publisher.publish_batch_content_provisioning_completed.assert_called_once()
-        
+
         # Verify event data structure
         call_args = mock_publisher.publish_batch_content_provisioning_completed.call_args
         event_data = call_args.kwargs["event_data"]
@@ -329,7 +335,8 @@ class TestContentAssignmentService:
 
         mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True, assigned_essay_id
+            True,
+            assigned_essay_id,
         )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
@@ -347,7 +354,7 @@ class TestContentAssignmentService:
         mock_publisher.publish_essay_slot_assigned.assert_called_once()
         slot_event_call = mock_publisher.publish_essay_slot_assigned.call_args
         slot_event = slot_event_call.kwargs["event_data"]
-        
+
         assert slot_event.batch_id == batch_id
         assert slot_event.essay_id == assigned_essay_id
         assert slot_event.text_storage_id == text_storage_id
@@ -373,7 +380,8 @@ class TestContentAssignmentService:
 
         mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True, assigned_essay_id
+            True,
+            assigned_essay_id,
         )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
@@ -418,7 +426,8 @@ class TestContentAssignmentService:
 
         mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
         mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True, assigned_essay_id
+            True,
+            assigned_essay_id,
         )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
@@ -435,7 +444,7 @@ class TestContentAssignmentService:
         # Verify essay data handles missing fields gracefully
         repo_call = mock_repository.create_essay_state_with_content_idempotency.call_args
         essay_data = repo_call.kwargs["essay_data"]
-        
+
         assert essay_data["original_file_name"] == "test.docx"
         assert essay_data["file_size"] == 0  # Default for missing file_size_bytes
         assert essay_data["file_upload_id"] is None  # Default for missing file_upload_id

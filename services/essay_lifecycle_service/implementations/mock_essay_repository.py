@@ -76,7 +76,9 @@ class MockEssayRepository(EssayRepositoryProtocol):
             self._locks[key] = asyncio.Lock()
         return self._locks[key]
 
-    async def get_essay_state(self, essay_id: str, session: AsyncSession | None = None) -> EssayState | None:
+    async def get_essay_state(
+        self, essay_id: str, session: AsyncSession | None = None
+    ) -> EssayState | None:
         """Retrieve essay state by ID."""
         # Mock implementation doesn't use sessions but must match protocol signature
         return self.essays.get(essay_id)
@@ -271,11 +273,11 @@ class MockEssayRepository(EssayRepositoryProtocol):
         self, batch_id: str, session: AsyncSession | None = None
     ) -> dict[EssayStatus, int]:
         """Get status count breakdown for a batch.
-        
+
         Args:
             batch_id: The batch ID to get status summary for
             session: Optional session (ignored in mock, kept for protocol compatibility)
-            
+
         Returns:
             Dictionary mapping EssayStatus to count
         """

@@ -159,7 +159,7 @@ class TraceContextManagerImpl:
 
         except Exception as e:
             logger.warning(f"Failed to restore trace context for queue {queue_id}: {e}")
-            # CRITICAL FIX: Don't yield again in except block - this violates 
+            # CRITICAL FIX: Don't yield again in except block - this violates
             # generator protocol and causes "generator didn't stop after throw()" error
             # Just re-raise the exception to let the caller handle it properly
             raise

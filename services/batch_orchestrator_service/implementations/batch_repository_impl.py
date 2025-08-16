@@ -64,7 +64,9 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
                 extra={
                     "batch_id": batch_id,
                     "requested_pipelines": pipeline_state.requested_pipelines,
-                    "spellcheck_status": pipeline_state.spellcheck.status.value if pipeline_state.spellcheck else None,
+                    "spellcheck_status": pipeline_state.spellcheck.status.value
+                    if pipeline_state.spellcheck
+                    else None,
                     "nlp_status": pipeline_state.nlp.status.value if pipeline_state.nlp else None,
                 },
             )
@@ -81,7 +83,9 @@ class MockBatchRepositoryImpl(BatchRepositoryProtocol):
                 extra={
                     "batch_id": batch_id,
                     "requested_pipelines": state.requested_pipelines,
-                    "spellcheck_status": state.spellcheck.status.value if state.spellcheck else None,
+                    "spellcheck_status": state.spellcheck.status.value
+                    if state.spellcheck
+                    else None,
                     "nlp_status": state.nlp.status.value if state.nlp else None,
                 },
             )

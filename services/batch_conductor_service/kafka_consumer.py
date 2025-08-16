@@ -342,7 +342,7 @@ class BCSKafkaConsumer:
     async def _handle_els_batch_phase_outcome(self, msg: ConsumerRecord) -> None:
         """
         Handle ELS batch phase outcome events for dependency resolution.
-        
+
         Track phase completions from ELS to enable multi-pipeline support
         and intelligent dependency resolution.
         """
@@ -350,18 +350,18 @@ class BCSKafkaConsumer:
             # Parse the event envelope
             envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
             event: ELSBatchPhaseOutcomeV1 = ELSBatchPhaseOutcomeV1.model_validate(envelope.data)
-            
+
             # Determine if phase completed successfully
             # Use string comparison since BatchStatus enum might not be imported
             success = str(event.phase_status).endswith("COMPLETED_SUCCESSFULLY")
-            
+
             # Record phase completion for dependency resolution
             result = await self.batch_state_repo.record_batch_phase_completion(
                 batch_id=event.batch_id,
                 phase_name=event.phase_name.value,
                 completed=success,
             )
-            
+
             if result:
                 successful_count = len(event.processed_essays)
                 failed_count = len(event.failed_essay_ids)
@@ -382,7 +382,7 @@ class BCSKafkaConsumer:
                     f"Failed to record phase completion for batch {event.batch_id}",
                     extra={"batch_id": event.batch_id, "phase_name": event.phase_name.value},
                 )
-                
+
         except Exception as e:
             logger.error(f"Error processing ELS batch phase outcome: {e}", exc_info=True)
             raise
@@ -390,7 +390,7 @@ class BCSKafkaConsumer:
     async def _handle_batch_pipeline_completed(self, msg: ConsumerRecord) -> None:
         """
         Handle batch pipeline completion events to clear state for next pipeline.
-        
+
         When a pipeline completes, clear the tracked phase completions to enable
         fresh execution of the next pipeline.
         """
@@ -398,12 +398,10 @@ class BCSKafkaConsumer:
             # Parse the event envelope
             envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
             event: BatchPipelineCompletedV1 = BatchPipelineCompletedV1.model_validate(envelope.data)
-            
+
             # Clear pipeline state for this batch
-            result = await self.batch_state_repo.clear_batch_pipeline_state(
-                batch_id=event.batch_id
-            )
-            
+            result = await self.batch_state_repo.clear_batch_pipeline_state(batch_id=event.batch_id)
+
             if result:
                 logger.info(
                     f"Cleared pipeline state for batch {event.batch_id} after pipeline completion "
@@ -423,7 +421,7 @@ class BCSKafkaConsumer:
                     f"Failed to clear pipeline state for batch {event.batch_id}",
                     extra={"batch_id": event.batch_id},
                 )
-                
+
         except Exception as e:
             logger.error(f"Error processing batch pipeline completed event: {e}", exc_info=True)
             raise

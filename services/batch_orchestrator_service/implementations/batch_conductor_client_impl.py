@@ -183,30 +183,30 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
     ) -> None:
         """
         Report phase completion to BCS for tracking and dependency resolution.
-        
+
         This enables BCS to:
         1. Track which phases have been completed for a batch
         2. Skip completed phases in subsequent pipeline requests
         3. Support multi-pipeline workflows efficiently
-        
+
         Args:
             batch_id: The unique identifier of the batch
             completed_phase: The phase that has completed
             success: Whether the phase completed successfully
-            
+
         Note: This is a best-effort operation - failures are logged but don't block
         pipeline progression to maintain resilience.
         """
         # Construct phase completion endpoint
         completion_endpoint = f"{self.settings.BCS_BASE_URL}/internal/v1/phases/complete"
-        
+
         # Prepare request payload
         request_data = {
             "batch_id": batch_id,
             "phase_name": completed_phase.value,
             "success": success,
         }
-        
+
         self.logger.info(
             f"Reporting phase completion to BCS: {completed_phase.value} for batch {batch_id}",
             extra={
@@ -216,7 +216,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                 "endpoint": completion_endpoint,
             },
         )
-        
+
         try:
             # Make HTTP POST request to BCS
             async with self.http_session.post(
@@ -238,13 +238,13 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                     )
                 else:
                     self.logger.info(
-                        f"Successfully reported phase completion to BCS",
+                        "Successfully reported phase completion to BCS",
                         extra={
                             "batch_id": batch_id,
                             "phase": completed_phase.value,
                         },
                     )
-                    
+
         except aiohttp.ClientError as e:
             # Log but don't raise - this is best-effort
             self.logger.warning(

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Any
-from unittest.mock import AsyncMock, call, Mock
+from unittest.mock import AsyncMock, Mock, call
 from uuid import UUID, uuid4
 
 import pytest
@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
@@ -44,7 +45,6 @@ from services.essay_lifecycle_service.protocols import (
     BatchEssayTracker,
     EssayRepositoryProtocol,
 )
-from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 
 
 class BusinessWorkflowContext(BaseModel):
@@ -426,7 +426,7 @@ class TestBatchCoordinationBusinessImpact:
         # Note: With ContentAssignmentService architecture, this may be called multiple times for idempotency
         mock_batch_tracker.assign_slot_to_content.assert_called()
         # Verify the calls were for the expected content
-        expected_call = call(business_context.batch_id, 'content_123', 'essay.txt')
+        expected_call = call(business_context.batch_id, "content_123", "essay.txt")
         assert expected_call in mock_batch_tracker.assign_slot_to_content.call_args_list
         mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
 

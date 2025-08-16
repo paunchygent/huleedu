@@ -46,6 +46,9 @@ from testcontainers.redis import RedisContainer
 from services.class_management_service.implementations.batch_author_matches_handler import (
     BatchAuthorMatchesHandler,
 )
+from services.class_management_service.implementations.class_repository_postgres_impl import (
+    PostgreSQLClassRepositoryImpl,
+)
 from services.class_management_service.models_db import (
     Base as ClassManagementBase,
 )
@@ -55,13 +58,8 @@ from services.class_management_service.models_db import (
     Student,
     UserClass,
 )
-from services.class_management_service.implementations.class_repository_postgres_impl import (
-    PostgreSQLClassRepositoryImpl,
-)
 
 logger = create_service_logger("test.nlp_class_management_integration")
-
-
 
 
 class TestNLPClassManagementCrossServiceIntegration:
@@ -150,9 +148,7 @@ class TestNLPClassManagementCrossServiceIntegration:
             await client.stop()
 
     @pytest.fixture
-    async def test_course(
-        self, cm_session_factory: async_sessionmaker[AsyncSession]
-    ) -> Course:
+    async def test_course(self, cm_session_factory: async_sessionmaker[AsyncSession]) -> Course:
         """Create test course in Class Management database."""
         course = Course(
             course_code=CourseCode.ENG5,
@@ -310,7 +306,9 @@ Hi! My name is Hilda Grahn and I live in Landvetter.""",
         # For now, we'll simulate NLP's response based on expected behavior
 
         # Step 2: Set up Class Management handler with real repository
-        class_repository: PostgreSQLClassRepositoryImpl = PostgreSQLClassRepositoryImpl(engine=cm_db_engine)
+        class_repository: PostgreSQLClassRepositoryImpl = PostgreSQLClassRepositoryImpl(
+            engine=cm_db_engine
+        )
         cm_handler = BatchAuthorMatchesHandler(
             class_repository=class_repository,
             session_factory=cm_session_factory,

@@ -242,18 +242,11 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             # Get queue stats for estimated wait time
             queue_stats = await self.queue_manager.get_queue_stats()
 
-            # Publish queued event
-            await self.event_publisher.publish_llm_request_completed(
-                provider=provider.value,
-                correlation_id=correlation_id,
-                success=True,
-                response_time_ms=int((time.time() - start_time) * 1000),
-                metadata={
-                    "request_type": "comparison",
-                    "queued": True,
-                    "queue_id": str(queued_request.queue_id),
-                    "priority": queued_request.priority,
-                },
+            # DO NOT publish completed event here - request is only queued, not completed!
+            # Completion events are published by queue_processor after actual processing
+            logger.debug(
+                f"Request queued successfully for provider {provider.value}, "
+                f"queue_id: {queued_request.queue_id}, correlation_id: {correlation_id}"
             )
 
             # Return queued result

@@ -64,18 +64,18 @@ class ContentAssignmentService(ContentAssignmentProtocol):
     ) -> tuple[bool, str | None]:
         """
         Perform atomic content-to-essay assignment with full state coordination.
-        
+
         This method encapsulates the complete assignment flow used by both:
         1. Normal content provisioning (EssayContentProvisionedV1 events)
         2. Pending content recovery (during batch registration)
-        
+
         Args:
             batch_id: The batch ID
             text_storage_id: Storage ID for the essay content
             content_metadata: Content metadata (file_name, size, hash, etc.)
             correlation_id: Operation correlation ID
             session: Database session for atomic operations
-            
+
         Returns:
             Tuple of (was_created, final_essay_id)
             - was_created: True if new assignment, False if idempotent

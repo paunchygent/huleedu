@@ -8,7 +8,7 @@ from aiohttp import ClientSession, ClientTimeout
 from dishka import Provider, Scope, provide
 from prometheus_client import CollectorRegistry
 
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol, RedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from services.batch_conductor_service.config import Settings, settings
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,
@@ -71,7 +71,7 @@ class EventDrivenServicesProvider(Provider):
     ) -> BatchStateRepositoryProtocol:
         """
         Provide batch state repository with cache-aside pattern.
-        
+
         Uses Redis for fast lookups (7-day TTL) and PostgreSQL for permanent storage.
         This enables dependency resolution even weeks/months after phases complete.
         """
@@ -82,17 +82,15 @@ class EventDrivenServicesProvider(Provider):
 
             return mock_batch_state_repository.MockBatchStateRepositoryImpl()
         else:
-            from services.batch_conductor_service.implementations.redis_batch_state_repository import (
-                RedisCachedBatchStateRepositoryImpl,
-            )
             from services.batch_conductor_service.implementations.postgres_batch_state_repository import (
                 PostgreSQLBatchStateRepositoryImpl,
             )
+            from services.batch_conductor_service.implementations.redis_batch_state_repository import (
+                RedisCachedBatchStateRepositoryImpl,
+            )
 
             # Create PostgreSQL repository for permanent storage
-            postgres_repo = PostgreSQLBatchStateRepositoryImpl(
-                database_url=settings.database_url
-            )
+            postgres_repo = PostgreSQLBatchStateRepositoryImpl(database_url=settings.database_url)
 
             # Create Redis repository with PostgreSQL fallback
             return RedisCachedBatchStateRepositoryImpl(
@@ -151,6 +149,34 @@ class EventDrivenServicesProvider(Provider):
             redis_client=redis_client,
         )
 
+    @provide(scope=Scope.APP)
+    def provide_event_publisher(self, settings: Settings) -> KafkaPublisherProtocol:
+        """Provide Kafka event publisher for BCS phase events."""
+        # Use no-op publisher for local/test to avoid Kafka requirement
+        if settings.ENV_TYPE not in {"docker", "production"}:
+            
+            class _NoOpEventPublisher:
+                async def start(self) -> None:
+                    pass
+                
+                async def stop(self) -> None:
+                    pass
+                    
+                async def publish(self, topic: str, envelope, key: str | None = None) -> None:
+                    pass
+            
+            return _NoOpEventPublisher()
+        
+        from huleedu_service_libs.kafka_client import KafkaBus
+        
+        # Create KafkaBus for event publishing
+        kafka_bus = KafkaBus(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            client_id=f"bcs-events-{settings.SERVICE_NAME}",
+        )
+        
+        return kafka_bus
+
 
 class PipelineServicesProvider(Provider):
     """Provider for pipeline-related service dependencies."""
@@ -186,6 +212,7 @@ class PipelineServicesProvider(Provider):
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
         dlq_producer: DlqProducerProtocol,
+        event_publisher: KafkaPublisherProtocol,
         metrics: dict[str, Any],
     ) -> PipelineResolutionServiceProtocol:
         """Provide pipeline resolution service implementation with proper DI metrics injection."""
@@ -195,7 +222,7 @@ class PipelineServicesProvider(Provider):
 
         # Create service instance with metrics injected via constructor
         service = prs_impl.DefaultPipelineResolutionService(
-            pipeline_rules, pipeline_generator, dlq_producer, metrics
+            pipeline_rules, pipeline_generator, dlq_producer, event_publisher, metrics
         )
 
         return service

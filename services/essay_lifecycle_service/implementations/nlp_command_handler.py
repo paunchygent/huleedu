@@ -9,7 +9,6 @@ from uuid import UUID
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
 from common_core.domain_enums import Language
 from huleedu_service_libs.logging_utils import create_service_logger
-
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from services.essay_lifecycle_service.constants import MetadataKey
@@ -21,8 +20,6 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
-
-
 
 logger = create_service_logger("essay_lifecycle.nlp_command_handler")
 
@@ -45,13 +42,13 @@ class NlpCommandHandler:
         self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service.
-        
+
         This method:
         1. Updates essay states to track NLP phase initiation
         2. Forwards requests to NLP service via dispatcher
-        
+
         This follows the same pattern as spellcheck, maintaining architectural consistency.
-        
+
         Args:
             command_data: The NLP initiation command data from BOS
             correlation_id: Correlation ID for tracking the request flow
@@ -64,10 +61,10 @@ class NlpCommandHandler:
                 "correlation_id": str(correlation_id),
             },
         )
-        
+
         # Track successfully transitioned essays for forwarding
         successfully_transitioned = []
-        
+
         async with self.session_factory() as session:
             async with session.begin():
                 # Update essay states to reflect NLP processing has been initiated
@@ -78,16 +75,16 @@ class NlpCommandHandler:
                             # Use state machine to properly transition to NLP state
                             essay_machine = EssayStateMachine(
                                 essay_id=essay_ref.essay_id,
-                                initial_status=essay_state.current_status
+                                initial_status=essay_state.current_status,
                             )
-                            
+
                             # Attempt to trigger the transition for initiating NLP
                             if essay_machine.trigger_event(CMD_INITIATE_NLP):
                                 # Include NLP in commanded phases for proper phase outcome tracking
                                 existing_commanded_phases = essay_state.processing_metadata.get(
                                     MetadataKey.COMMANDED_PHASES, []
                                 )
-                                
+
                                 # Persist the new state from the machine with metadata
                                 await self.repository.update_essay_status_via_machine(
                                     essay_id=essay_ref.essay_id,
@@ -103,9 +100,9 @@ class NlpCommandHandler:
                                     storage_reference=None,
                                     correlation_id=correlation_id,
                                 )
-                                
+
                                 successfully_transitioned.append(essay_ref)
-                                
+
                                 logger.info(
                                     f"Transitioned essay {essay_ref.essay_id} to {essay_machine.current_status.value} for NLP phase",
                                     extra={
@@ -130,7 +127,7 @@ class NlpCommandHandler:
                                 "error": str(e),
                             },
                         )
-                
+
                 # Dispatch NLP requests to NLP service
                 if successfully_transitioned:
                     batch_id = command_data.entity_id
@@ -143,7 +140,7 @@ class NlpCommandHandler:
                             },
                         )
                         return
-                    
+
                     await self.request_dispatcher.dispatch_nlp_requests(
                         essays_to_process=successfully_transitioned,
                         language=Language(command_data.language),
@@ -151,7 +148,7 @@ class NlpCommandHandler:
                         correlation_id=correlation_id,
                         session=session,
                     )
-                
+
                 logger.info(
                     f"Completed NLP phase initiation for batch {command_data.entity_id}",
                     extra={

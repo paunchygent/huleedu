@@ -95,26 +95,26 @@ async def record_phase_completion(
 ) -> tuple[Response, int]:
     """
     TEST/OPS ENDPOINT ONLY - NOT FOR PRODUCTION USE.
-    
+
     Internal endpoint for manually recording phase completion during testing and operations.
     In production, phase completions are recorded automatically via Kafka events.
-    
+
     WARNING: This endpoint bypasses normal event flow and should only be used for:
     - Integration testing of multi-pipeline scenarios
     - Manual operational intervention during incident recovery
     - Development and debugging
-    
+
     Production phase tracking occurs through Kafka event handlers only.
     """
     try:
         # Parse and validate request
         request_data = await request.get_json()
-        
+
         # Extract required fields
         batch_id = request_data.get("batch_id")
         phase_name = request_data.get("phase_name")
         success = request_data.get("success", True)
-        
+
         # Validate required fields
         if not batch_id or not phase_name:
             logger.warning(
@@ -122,7 +122,7 @@ async def record_phase_completion(
                 extra={"request_data": request_data},
             )
             return jsonify({"error": "Missing required fields: batch_id and phase_name"}), 400
-        
+
         logger.info(
             f"Recording phase completion: {phase_name} for batch {batch_id}",
             extra={
@@ -131,12 +131,12 @@ async def record_phase_completion(
                 "success": success,
             },
         )
-        
+
         # For batch-level phase completion, we record a single "batch-level" essay
         # This simplifies tracking since BOS doesn't know individual essay IDs
         # The key point is that the phase is marked complete for dependency resolution
         batch_level_essay_id = f"batch_{batch_id}_aggregate"
-        
+
         # Record the phase completion
         result = await batch_state_repo.record_essay_step_completion(
             batch_id=batch_id,
@@ -148,7 +148,7 @@ async def record_phase_completion(
                 "is_batch_level": True,
             },
         )
-        
+
         if result:
             logger.info(
                 f"Successfully recorded phase completion: {phase_name} for batch {batch_id}",
@@ -157,21 +157,23 @@ async def record_phase_completion(
                     "phase_name": phase_name,
                 },
             )
-            return jsonify({
-                "status": "recorded",
-                "batch_id": batch_id,
-                "phase_name": phase_name,
-            }), 200
+            return jsonify(
+                {
+                    "status": "recorded",
+                    "batch_id": batch_id,
+                    "phase_name": phase_name,
+                }
+            ), 200
         else:
             logger.error(
-                f"Failed to record phase completion in repository",
+                "Failed to record phase completion in repository",
                 extra={
                     "batch_id": batch_id,
                     "phase_name": phase_name,
                 },
             )
             return jsonify({"error": "Failed to record phase completion"}), 500
-            
+
     except Exception as e:
         logger.error(
             f"Unexpected error during phase completion recording: {e}",

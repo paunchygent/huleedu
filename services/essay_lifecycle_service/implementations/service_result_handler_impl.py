@@ -100,7 +100,9 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             # START UNIT OF WORK - Open transaction early for all DB operations
             async with self.session_factory() as session:
                 async with session.begin():
-                    essay_state = await self.repository.get_essay_state(result_data.entity_id, session)
+                    essay_state = await self.repository.get_essay_state(
+                        result_data.entity_id, session
+                    )
                     if essay_state is None:
                         logger.error(
                             "Essay not found for spellcheck result",

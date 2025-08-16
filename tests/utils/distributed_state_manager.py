@@ -96,39 +96,27 @@ class DistributedStateManager:
         """
         try:
             # First, count existing keys for reporting
-            count_cmd = [
-                "docker",
-                "exec", 
-                self.redis_container,
-                "redis-cli",
-                "DBSIZE"
-            ]
-            
+            count_cmd = ["docker", "exec", self.redis_container, "redis-cli", "DBSIZE"]
+
             count_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
             key_count_before = int(count_result.stdout.strip())
 
             # Perform complete flush
-            flush_cmd = [
-                "docker",
-                "exec",
-                self.redis_container, 
-                "redis-cli",
-                "FLUSHALL"
-            ]
+            flush_cmd = ["docker", "exec", self.redis_container, "redis-cli", "FLUSHALL"]
 
             flush_result = subprocess.run(flush_cmd, capture_output=True, text=True, check=True)
-            
+
             if "OK" not in flush_result.stdout:
                 raise RuntimeError(f"FLUSHALL command failed: {flush_result.stdout}")
 
             # Verify cleanup was successful
             verify_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
             key_count_after = int(verify_result.stdout.strip())
-            
+
             if key_count_after != 0:
                 logger.warning(f"⚠️ Redis cleanup incomplete: {key_count_after} keys remain")
                 return key_count_before
-            
+
             if key_count_before > 0:
                 logger.info(
                     f"🗑️ Completely flushed Redis: {key_count_before} keys cleared "
@@ -256,39 +244,27 @@ class DistributedStateManager:
 
         try:
             # Check total Redis key count
-            count_cmd = [
-                "docker",
-                "exec",
-                self.redis_container,
-                "redis-cli",
-                "DBSIZE"
-            ]
+            count_cmd = ["docker", "exec", self.redis_container, "redis-cli", "DBSIZE"]
             count_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
             key_count = int(count_result.stdout.strip())
             validation["redis_total_keys"] = key_count
 
             if key_count > 0:
                 validation["clean"] = False
-                
+
                 # Get sample keys for debugging
-                keys_cmd = [
-                    "docker",
-                    "exec", 
-                    self.redis_container,
-                    "redis-cli",
-                    "KEYS", "*"
-                ]
+                keys_cmd = ["docker", "exec", self.redis_container, "redis-cli", "KEYS", "*"]
                 keys_result = subprocess.run(keys_cmd, capture_output=True, text=True, check=True)
-                
+
                 if keys_result.stdout.strip():
-                    all_keys = keys_result.stdout.strip().split('\n')
+                    all_keys = keys_result.stdout.strip().split("\n")
                     validation["redis_sample_keys"] = all_keys[:5]  # First 5 keys for debugging
-                    
+
                     logger.warning(
                         f"⚠️ Redis not clean: {key_count} keys found. "
                         f"Sample keys: {validation['redis_sample_keys']}"
                     )
-                    
+
                     # Specifically check for idempotency keys that cause the test issue
                     idempotency_keys = [k for k in all_keys if "idempotency" in k]
                     if idempotency_keys:
@@ -353,11 +329,13 @@ class DistributedStateManager:
         # Final attempt failed - provide detailed error info
         key_count = validation.get("redis_total_keys", 0)
         sample_keys = validation.get("redis_sample_keys", [])
-        
+
         # Check specifically for idempotency keys that cause test failures
         idempotency_samples = [k for k in sample_keys if "idempotency" in k]
-        idempotency_warning = f" ({len(idempotency_samples)} idempotency keys found!)" if idempotency_samples else ""
-        
+        idempotency_warning = (
+            f" ({len(idempotency_samples)} idempotency keys found!)" if idempotency_samples else ""
+        )
+
         raise RuntimeError(
             f"Failed to achieve clean state after {max_attempts} coordinated attempts: "
             f"found {key_count} Redis keys remaining{idempotency_warning}. "

@@ -389,7 +389,7 @@ class TestAtomicBatchCreationIntegration:
 
         # Create content assignment service
         from services.essay_lifecycle_service.domain_services import ContentAssignmentService
-        
+
         content_assignment_service = ContentAssignmentService(
             batch_tracker=batch_tracker,
             repository=postgres_repository,

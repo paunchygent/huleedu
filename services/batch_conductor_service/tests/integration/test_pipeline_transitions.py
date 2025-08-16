@@ -104,9 +104,7 @@ class MockBatchStateRepository(BatchStateRepositoryProtocol):
         self.completed_phases: dict[str, set[str]] = {}
         self.phase_status: dict[tuple[str, str], bool] = {}
 
-    async def record_batch_phase_completion(
-        self, batch_id: str, phase: str, success: bool
-    ) -> bool:
+    async def record_batch_phase_completion(self, batch_id: str, phase: str, success: bool) -> bool:
         """Record phase completion in memory."""
         if batch_id not in self.completed_phases:
             self.completed_phases[batch_id] = set()
@@ -149,9 +147,7 @@ class MockBatchStateRepository(BatchStateRepositoryProtocol):
         if batch_id in self.completed_phases:
             del self.completed_phases[batch_id]
         # Remove phase status for this batch
-        self.phase_status = {
-            k: v for k, v in self.phase_status.items() if k[0] != batch_id
-        }
+        self.phase_status = {k: v for k, v in self.phase_status.items() if k[0] != batch_id}
         return True
 
     def clear(self) -> None:
@@ -194,8 +190,7 @@ async def pipeline_service(
     await pipeline_generator._ensure_loaded()
 
     pipeline_rules = DefaultPipelineRules(
-        pipeline_generator=pipeline_generator,
-        batch_state_repository=mock_batch_repo
+        pipeline_generator=pipeline_generator, batch_state_repository=mock_batch_repo
     )
 
     # Create empty metrics dict for testing
@@ -226,8 +221,7 @@ async def integrated_system(
     await pipeline_generator._ensure_loaded()
 
     pipeline_rules = DefaultPipelineRules(
-        pipeline_generator=pipeline_generator,
-        batch_state_repository=mock_batch_repo
+        pipeline_generator=pipeline_generator, batch_state_repository=mock_batch_repo
     )
 
     # Create empty metrics dict for testing
@@ -252,10 +246,11 @@ class TestPipelineTransitions:
     """Test multi-pipeline transitions and phase tracking."""
 
     async def _resolve_pipeline_with_metadata(
-        self, pipeline_service: DefaultPipelineResolutionService,
+        self,
+        pipeline_service: DefaultPipelineResolutionService,
         batch_id: str,
         requested_pipeline: str,
-        correlation_id: str
+        correlation_id: str,
     ) -> dict[str, Any]:
         """Wrapper to call resolve_pipeline and return expected test format."""
         # Generate deterministic UUID from correlation_id
@@ -324,14 +319,11 @@ class TestPipelineTransitions:
         assert all(not isinstance(r, Exception) for r in results)
 
         # All should have same resolution
-        successful_results: list[dict[str, Any]] = [
-            r for r in results if isinstance(r, dict)
-        ]
+        successful_results: list[dict[str, Any]] = [r for r in results if isinstance(r, dict)]
         assert len(successful_results) == len(results)  # All should be successful
         first_result = successful_results[0]
         assert all(
-            r["phases_to_execute"] == first_result["phases_to_execute"]
-            for r in successful_results
+            r["phases_to_execute"] == first_result["phases_to_execute"] for r in successful_results
         )
 
     @pytest.mark.integration
@@ -425,8 +417,7 @@ class TestPipelineTransitions:
         await pipeline_generator._ensure_loaded()
 
         pipeline_rules = DefaultPipelineRules(
-            pipeline_generator=pipeline_generator,
-            batch_state_repository=system["batch_repo"]
+            pipeline_generator=pipeline_generator, batch_state_repository=system["batch_repo"]
         )
 
         # Create a mock DLQ producer for the new service

@@ -92,7 +92,7 @@ class TestPipelineResolutionIntegration:
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
         }
-        
+
         # Mock batch context to return valid context
         mock_repo.get_batch_context.return_value = {
             "batch_id": "test-batch-integration-001",
@@ -302,7 +302,7 @@ class TestPipelineResolutionIntegration:
             "requested_pipeline": "invalid_pipeline_name",
             "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
         }
-        
+
         mock_batch_repository.get_batch_by_id.return_value = {
             "batch_id": "test-batch-invalid-name-001",
             "requested_pipeline": "invalid_pipeline_name",
@@ -355,7 +355,7 @@ class TestPipelineResolutionIntegration:
             "requested_pipeline": "spellcheck",  # Use a valid pipeline name
             "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
         }
-        
+
         mock_batch_repository.get_batch_by_id.return_value = {
             "batch_id": "test-batch-bcs-error-001",
             "requested_pipeline": "spellcheck",
@@ -420,7 +420,7 @@ class TestPipelineResolutionIntegration:
             "requested_pipeline": "ai_feedback",
             "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
         }
-        
+
         mock_batch_repository.get_batch_by_id.return_value = {
             "batch_id": "test-batch-idempotent-001",
             "requested_pipeline": "ai_feedback",
@@ -487,7 +487,7 @@ class TestPipelineResolutionIntegration:
                 "resolved_pipeline": None,
                 "created_at": "2025-01-01T00:00:00Z",
             }
-        
+
         def mock_get_batch_by_id(batch_id: str):
             return {
                 "batch_id": batch_id,

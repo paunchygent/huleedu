@@ -158,7 +158,7 @@ async def test_e2e_nlp_pipeline_guest_batch(
 
     # Setup Kafka manager
     kafka_manager = KafkaTestManager()
-    
+
     # Create test harness
     harness = PipelineTestHarness(service_manager, kafka_manager, auth_manager)
 
@@ -183,7 +183,7 @@ async def test_e2e_nlp_pipeline_guest_batch(
         assert nlp_result.all_steps_completed, "GUEST NLP pipeline did not complete successfully"
         assert "spellcheck" in nlp_result.executed_steps, "Spellcheck phase not executed"
         assert "nlp" in nlp_result.executed_steps, "NLP analysis phase not executed"
-        
+
         logger.info(
             f"✅ GUEST batch NLP pipeline success! "
             f"Executed steps: {nlp_result.executed_steps} "

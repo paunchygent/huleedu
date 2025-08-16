@@ -91,7 +91,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         # Pipeline 1: NLP (should run spellcheck + nlp)
         # ==================================================================
         logger.info("🚀 Executing Pipeline 1: NLP (expecting spellcheck + nlp)")
-        
+
         nlp_result = await harness.execute_pipeline(
             pipeline_name="nlp",
             expected_steps=["spellcheck", "nlp"],
@@ -117,7 +117,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         # Pipeline 2: CJ Assessment (should SKIP spellcheck, only run cj_assessment)
         # ==================================================================
         logger.info("🚀 Executing Pipeline 2: CJ Assessment (expecting only cj_assessment)")
-        
+
         cj_result = await harness.execute_pipeline(
             pipeline_name="cj_assessment",
             expected_steps=["cj_assessment"],  # Spellcheck should be pruned!
@@ -130,10 +130,12 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         assert "cj_assessment" in cj_result.executed_steps, "CJ Assessment not executed"
         assert "spellcheck" not in cj_result.executed_steps, "Spellcheck should have been pruned"
         assert "spellcheck" in cj_result.pruned_phases, "Spellcheck should be in pruned phases"
-        
+
         # Verify storage ID reuse
         if "spellcheck" in cj_result.reused_storage_ids:
-            logger.info(f"✅ Reused spellcheck storage ID: {cj_result.reused_storage_ids['spellcheck']}")
+            logger.info(
+                f"✅ Reused spellcheck storage ID: {cj_result.reused_storage_ids['spellcheck']}"
+            )
 
         logger.info(
             f"✅ Pipeline 2 complete: Executed {cj_result.executed_steps}, "
@@ -141,14 +143,15 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         )
 
         # CJ should be faster since it skipped spellcheck
-        assert cj_result.execution_time_seconds < nlp_execution_time, \
+        assert cj_result.execution_time_seconds < nlp_execution_time, (
             "CJ Assessment should be faster due to phase pruning"
+        )
 
         # ==================================================================
         # Pipeline 3: AI Feedback (should SKIP spellcheck + nlp, only run ai_feedback)
         # ==================================================================
         logger.info("🚀 Executing Pipeline 3: AI Feedback (expecting only ai_feedback)")
-        
+
         ai_result = await harness.execute_pipeline(
             pipeline_name="ai_feedback",
             expected_steps=["ai_feedback"],  # Both spellcheck and nlp should be pruned!
@@ -163,10 +166,12 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         assert "nlp" not in ai_result.executed_steps, "NLP should have been pruned"
         assert "spellcheck" in ai_result.pruned_phases, "Spellcheck should be in pruned phases"
         assert "nlp" in ai_result.pruned_phases, "NLP should be in pruned phases"
-        
+
         # Verify storage ID reuse for multiple phases
         if "spellcheck" in ai_result.reused_storage_ids:
-            logger.info(f"✅ Reused spellcheck storage ID: {ai_result.reused_storage_ids['spellcheck']}")
+            logger.info(
+                f"✅ Reused spellcheck storage ID: {ai_result.reused_storage_ids['spellcheck']}"
+            )
         if "nlp" in ai_result.reused_storage_ids:
             logger.info(f"✅ Reused NLP storage ID: {ai_result.reused_storage_ids['nlp']}")
 
@@ -176,8 +181,9 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         )
 
         # AI Feedback should be the fastest since it skipped the most phases
-        assert ai_result.execution_time_seconds < cj_result.execution_time_seconds, \
+        assert ai_result.execution_time_seconds < cj_result.execution_time_seconds, (
             "AI Feedback should be fastest due to maximum phase pruning"
+        )
 
         # ==================================================================
         # Summary
@@ -194,8 +200,12 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
             f"Pipeline 3 (AI): {ai_result.executed_steps} in {ai_result.execution_time_seconds:.2f}s "
             f"(pruned: {ai_result.pruned_phases})"
         )
-        logger.info(f"Total phases executed: {len(nlp_result.executed_steps) + len(cj_result.executed_steps) + len(ai_result.executed_steps)}")
-        logger.info(f"Total phases pruned: {len(cj_result.pruned_phases) + len(ai_result.pruned_phases)}")
+        logger.info(
+            f"Total phases executed: {len(nlp_result.executed_steps) + len(cj_result.executed_steps) + len(ai_result.executed_steps)}"
+        )
+        logger.info(
+            f"Total phases pruned: {len(cj_result.pruned_phases) + len(ai_result.pruned_phases)}"
+        )
         logger.info("=" * 60)
 
     finally:
@@ -241,7 +251,7 @@ async def test_e2e_comprehensive_pipeline_all_phases(
 
         # Execute comprehensive pipeline
         logger.info("🚀 Executing Comprehensive Pipeline (all phases)")
-        
+
         comprehensive_result = await harness.execute_pipeline(
             pipeline_name="comprehensive",
             expected_steps=["spellcheck", "nlp", "cj_assessment", "ai_feedback"],
@@ -252,7 +262,7 @@ async def test_e2e_comprehensive_pipeline_all_phases(
         # Validate all phases executed
         assert comprehensive_result.all_steps_completed, "Comprehensive pipeline did not complete"
         assert "spellcheck" in comprehensive_result.executed_steps
-        assert "nlp" in comprehensive_result.executed_steps  
+        assert "nlp" in comprehensive_result.executed_steps
         assert "cj_assessment" in comprehensive_result.executed_steps
         assert "ai_feedback" in comprehensive_result.executed_steps
 

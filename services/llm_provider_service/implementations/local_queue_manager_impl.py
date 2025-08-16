@@ -96,8 +96,22 @@ class LocalQueueManagerImpl(QueueRepositoryProtocol):
 
             # Check if already exists
             if queue_id_str in self._data:
-                logger.warning(f"Request {queue_id_str} already in queue")
-                return False
+                existing_request = self._data[queue_id_str]
+                
+                # If it's a retry (higher retry_count) or different status, allow replacement
+                if (request.retry_count > existing_request.retry_count or 
+                    request.status != existing_request.status):
+                    logger.info(
+                        f"Replacing existing request {queue_id_str} "
+                        f"(retry: {existing_request.retry_count} -> {request.retry_count}, "
+                        f"status: {existing_request.status} -> {request.status})"
+                    )
+                    # Remove existing request's memory footprint
+                    self._memory_bytes -= existing_request.size_bytes
+                    # The heap entry will be cleaned up naturally in get_next()
+                else:
+                    logger.warning(f"Request {queue_id_str} already in queue with same/newer retry count")
+                    return False
 
             # Calculate size if not provided
             if request.size_bytes == 0:

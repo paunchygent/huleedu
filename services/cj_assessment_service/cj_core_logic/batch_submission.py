@@ -76,7 +76,10 @@ async def submit_batch_chunk(
                 await session.commit()
                 logger.info(
                     f"DEBUG: Created tracking_map with {len(tracking_map)} entries for batch {cj_batch_id}",
-                    extra={"correlation_id": str(correlation_id), "tracking_map_sample": str(list(tracking_map.items())[:2])},
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "tracking_map_sample": str(list(tracking_map.items())[:2]),
+                    },
                 )
         else:
             logger.warning(

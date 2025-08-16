@@ -17,15 +17,16 @@ from dishka import AsyncContainer, Provider, Scope, make_async_container, provid
 
 from services.llm_provider_service.api_models import LLMComparisonRequest, LLMConfigOverrides
 from services.llm_provider_service.config import Settings
-from services.llm_provider_service.implementations.mock_provider_impl import MockProviderImpl
 from services.llm_provider_service.implementations.llm_orchestrator_impl import LLMOrchestratorImpl
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
-from services.llm_provider_service.implementations.trace_context_manager_impl import TraceContextManagerImpl
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
+)
 from services.llm_provider_service.protocols import (
-    LLMProviderProtocol,
-    LLMOrchestratorProtocol,
-    QueueManagerProtocol,
     LLMEventPublisherProtocol,
+    LLMOrchestratorProtocol,
+    LLMProviderProtocol,
+    QueueManagerProtocol,
 )
 from services.llm_provider_service.queue_models import QueuedRequest
 
@@ -44,7 +45,7 @@ class MockQueueManager:
         status: QueueStatus,
         message: Optional[str] = None,
         result_location: Optional[str] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> bool:
         """Track status updates."""
         all_kwargs = kwargs.copy()
@@ -93,7 +94,12 @@ class MockEventPublisher:
         metadata: Dict[str, Any],
     ) -> None:
         """Track started events."""
-        self.events.append(("started", {"provider": provider, "correlation_id": correlation_id, "metadata": metadata}))
+        self.events.append(
+            (
+                "started",
+                {"provider": provider, "correlation_id": correlation_id, "metadata": metadata},
+            )
+        )
 
     async def publish_llm_request_completed(
         self,
@@ -104,13 +110,18 @@ class MockEventPublisher:
         metadata: Dict[str, Any],
     ) -> None:
         """Track completion events."""
-        self.events.append(("completed", {
-            "provider": provider,
-            "correlation_id": correlation_id,
-            "success": success,
-            "response_time_ms": response_time_ms,
-            "metadata": metadata
-        }))
+        self.events.append(
+            (
+                "completed",
+                {
+                    "provider": provider,
+                    "correlation_id": correlation_id,
+                    "success": success,
+                    "response_time_ms": response_time_ms,
+                    "metadata": metadata,
+                },
+            )
+        )
 
     async def publish_llm_provider_failure(
         self,
@@ -121,13 +132,18 @@ class MockEventPublisher:
         circuit_breaker_opened: bool = False,
     ) -> None:
         """Track failure events."""
-        self.events.append(("failure", {
-            "provider": provider,
-            "failure_type": failure_type,
-            "correlation_id": correlation_id,
-            "error_details": error_details,
-            "circuit_breaker_opened": circuit_breaker_opened
-        }))
+        self.events.append(
+            (
+                "failure",
+                {
+                    "provider": provider,
+                    "failure_type": failure_type,
+                    "correlation_id": correlation_id,
+                    "error_details": error_details,
+                    "circuit_breaker_opened": circuit_breaker_opened,
+                },
+            )
+        )
 
     async def publish_to_topic(
         self,
@@ -159,13 +175,16 @@ class ErrorTriggeringMockProvider:
     ) -> Any:
         """Generate comparison with guaranteed errors every 10th request."""
         self.request_count += 1
-        
+
         print(f"🔥 ErrorTriggeringMockProvider: Processing request #{self.request_count}")
-        
+
         # Fail every 10th request to guarantee errors
         if self.request_count % 10 == 0:
-            print(f"💥 ErrorTriggeringMockProvider: Triggering error on request #{self.request_count}")
+            print(
+                f"💥 ErrorTriggeringMockProvider: Triggering error on request #{self.request_count}"
+            )
             from huleedu_service_libs.error_handling import raise_external_service_error
+
             raise_external_service_error(
                 service="llm_provider_service",
                 operation="error_triggering_mock_comparison",
@@ -174,12 +193,15 @@ class ErrorTriggeringMockProvider:
                 correlation_id=correlation_id,
                 details={"provider": "mock", "request_count": self.request_count},
             )
-        
+
         # Otherwise return a mock response
-        from services.llm_provider_service.internal_models import LLMProviderResponse
         from common_core import EssayComparisonWinner, LLMProviderType
-        
-        print(f"✅ ErrorTriggeringMockProvider: Returning success response for request #{self.request_count}")
+
+        from services.llm_provider_service.internal_models import LLMProviderResponse
+
+        print(
+            f"✅ ErrorTriggeringMockProvider: Returning success response for request #{self.request_count}"
+        )
         return LLMProviderResponse(
             winner=EssayComparisonWinner.ESSAY_A,  # Fixed: use enum, not .value
             justification="Test justification",
@@ -315,10 +337,10 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
         try:
             await queue_processor._process_request(queued_request)
             # If we get here, no exception was raised (good!)
-            
+
             # Check status updates since this request started
             new_updates = queue_manager.status_updates[initial_update_count:]
-            
+
             # Find the final status for this request
             request_final_status = None
             all_statuses_for_request = []
@@ -326,17 +348,19 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
                 if queue_id == request_id:
                     all_statuses_for_request.append(status)
                     request_final_status = status
-            
-            print(f"📊 Request {i+1} (ID: {request_id}): statuses = {all_statuses_for_request}, final = {request_final_status}")
-            
+
+            print(
+                f"📊 Request {i + 1} (ID: {request_id}): statuses = {all_statuses_for_request}, final = {request_final_status}"
+            )
+
             if request_final_status == QueueStatus.COMPLETED:
                 successful_count += 1
             elif request_final_status == QueueStatus.FAILED:
                 error_count += 1
-                print(f"🚨 Detected FAILED status for request {i+1}")
+                print(f"🚨 Detected FAILED status for request {i + 1}")
             else:
-                print(f"⚠️  Request {i+1} has unexpected final status: {request_final_status}")
-                
+                print(f"⚠️  Request {i + 1} has unexpected final status: {request_final_status}")
+
         except Exception as e:
             # This should NOT happen with our fix
             pytest.fail(f"Queue processor raised unexpected exception: {e}")
@@ -344,15 +368,23 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
     # Verify results
     assert successful_count > 0, "Should have successfully processed some requests"
     assert error_count > 0, "Should have encountered guaranteed errors (every 10th request)"
-    assert successful_count + error_count == max_attempts, f"All requests should be accounted for: {successful_count} + {error_count} != {max_attempts}"
+    assert successful_count + error_count == max_attempts, (
+        f"All requests should be accounted for: {successful_count} + {error_count} != {max_attempts}"
+    )
 
     # With ErrorTriggeringMockProvider, we expect exactly 2 errors (10th and 20th requests out of 25)
     expected_errors = max_attempts // 10  # Should be 2 for 25 requests
-    assert error_count == expected_errors, f"Expected {expected_errors} errors but got {error_count}"
+    assert error_count == expected_errors, (
+        f"Expected {expected_errors} errors but got {error_count}"
+    )
 
-    print(f"✅ Successfully processed {max_attempts} requests: {successful_count} successful, {error_count} failed")
-    print(f"✅ All errors were handled internally without raising exceptions")
-    print(f"✅ Error rate: {error_count}/{max_attempts} = {error_count/max_attempts:.1%} as expected")
+    print(
+        f"✅ Successfully processed {max_attempts} requests: {successful_count} successful, {error_count} failed"
+    )
+    print("✅ All errors were handled internally without raising exceptions")
+    print(
+        f"✅ Error rate: {error_count}/{max_attempts} = {error_count / max_attempts:.1%} as expected"
+    )
 
 
 @pytest.mark.asyncio
@@ -403,10 +435,10 @@ async def test_queue_processor_error_within_context_manager(di_container: AsyncC
     error_encountered = False
     for _ in range(50):  # Try up to 50 times to hit the 5% error rate
         queue_manager.status_updates = []  # Reset for each attempt
-        
+
         try:
             await queue_processor._process_request(queued_request)
-            
+
             # Check if this attempt resulted in an error
             if queue_manager.status_updates:
                 last_status = queue_manager.status_updates[-1][1]

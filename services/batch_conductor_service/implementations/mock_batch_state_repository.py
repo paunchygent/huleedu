@@ -8,7 +8,7 @@ Follows the same pattern as BOS MockBatchRepositoryImpl.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from services.batch_conductor_service.protocols import BatchStateRepositoryProtocol
@@ -177,12 +177,12 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
         key = f"bcs:batch:{batch_id}:phases"
         if key not in self.batch_summaries:
             self.batch_summaries[key] = {}
-        
+
         self.batch_summaries[key][phase_name] = "completed" if completed else "failed"
-        
+
         # Set TTL for this key
         self.ttl_expiry[key] = datetime.now(UTC) + timedelta(seconds=self.ttl_seconds)
-        
+
         return True
 
     async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
@@ -198,33 +198,33 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             True if cleared successfully, False otherwise
         """
         key = f"bcs:batch:{batch_id}:phases"
-        
+
         # Remove the phases tracking key if it exists
         if key in self.batch_summaries:
             del self.batch_summaries[key]
-        
+
         # Remove TTL tracking for this key
         if key in self.ttl_expiry:
             del self.ttl_expiry[key]
-        
+
         return True
-    
+
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """
         Get all completed phases for a batch.
-        
+
         Args:
             batch_id: Batch identifier
-            
+
         Returns:
             Set of phase names that have completed successfully
         """
         key = f"bcs:batch:{batch_id}:phases"
-        
+
         # Return empty set if no phases recorded
         if key not in self.batch_summaries:
             return set()
-        
+
         # Return only phases marked as completed
         phases = self.batch_summaries[key]
         return {phase for phase, status in phases.items() if status == "completed"}

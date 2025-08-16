@@ -372,7 +372,7 @@ class DefaultPipelinePhaseCoordinator:
 
         # Get current pipeline state for checking phase statuses
         current_pipeline_state = await self.batch_repo.get_processing_pipeline_state(batch_id)
-        
+
         # Find the first uncompleted phase in the resolved pipeline
         phase_to_initiate = None
         for phase_name in resolved_pipeline:
@@ -389,7 +389,7 @@ class DefaultPipelinePhaseCoordinator:
                         extra={"current_status": pipeline_detail.status.value},
                     )
                     continue  # Check next phase
-            
+
             # Found first uncompleted phase
             phase_to_initiate = phase_name
             logger.info(
@@ -397,7 +397,7 @@ class DefaultPipelinePhaseCoordinator:
                 extra={"correlation_id": correlation_id},
             )
             break
-        
+
         # If all phases are complete, nothing to do
         if phase_to_initiate is None:
             logger.info(
@@ -526,7 +526,7 @@ class DefaultPipelinePhaseCoordinator:
     ) -> None:
         """
         Publish BatchPipelineCompletedV1 event when all pipeline phases are complete.
-        
+
         This enables:
         1. Multi-pipeline support by clearing active pipeline state
         2. UI notifications of pipeline completion
@@ -538,7 +538,7 @@ class DefaultPipelinePhaseCoordinator:
         successful_essays = 0
         failed_essays = 0
         pipeline_start_time = None
-        
+
         # Iterate through all requested pipelines to gather completion metrics
         for phase_name in pipeline_state.requested_pipelines:
             phase_detail = pipeline_state.get_pipeline(phase_name)
@@ -547,43 +547,39 @@ class DefaultPipelinePhaseCoordinator:
                     completed_phases.append(phase_name)
                 elif phase_detail.status == PipelineExecutionStatus.FAILED:
                     has_any_failures = True
-                    
+
                 # Track earliest start time for duration calculation
                 if phase_detail.started_at and (
                     not pipeline_start_time or phase_detail.started_at < pipeline_start_time
                 ):
                     pipeline_start_time = phase_detail.started_at
-        
+
         # Calculate processing duration
         processing_duration_seconds = 0.0
         if pipeline_start_time:
-            processing_duration_seconds = (
-                datetime.now(UTC) - pipeline_start_time
-            ).total_seconds()
-        
+            processing_duration_seconds = (datetime.now(UTC) - pipeline_start_time).total_seconds()
+
         # Determine final status based on whether there were any failures
-        final_status = (
-            "COMPLETED_WITH_FAILURES" if has_any_failures else "COMPLETED_SUCCESSFULLY"
-        )
-        
+        final_status = "COMPLETED_WITH_FAILURES" if has_any_failures else "COMPLETED_SUCCESSFULLY"
+
         # Get essay counts from batch context if available
         batch_context = await self.batch_repo.get_batch_context(batch_id)
         if batch_context:
             total_essays = batch_context.expected_essay_count
-            
+
             # TODO: Track actual essay-level success/failure counts from ELSBatchPhaseOutcomeV1
             # For now, use conservative approach: any failure means at least one essay failed
             # In production, we should aggregate actual counts from phase outcomes
             if has_any_failures:
                 # Without detailed tracking, we can't know exact counts
                 # Conservative: report that at least 1 essay failed
-                successful_essays = total_essays - 1  
+                successful_essays = total_essays - 1
                 failed_essays = 1
             else:
                 # All phases completed successfully, all essays succeeded
                 successful_essays = total_essays
                 failed_essays = 0
-        
+
         # Create the pipeline completion event
         completion_event = BatchPipelineCompletedV1(
             batch_id=batch_id,
@@ -600,7 +596,7 @@ class DefaultPipelinePhaseCoordinator:
                 event="batch.pipeline.completed",
             ),
         )
-        
+
         # Wrap in event envelope
         event_envelope: EventEnvelope[BatchPipelineCompletedV1] = EventEnvelope(
             event_type="batch.pipeline.completed",
@@ -613,13 +609,13 @@ class DefaultPipelinePhaseCoordinator:
                 "final_status": final_status,
             },
         )
-        
+
         # Publish event using outbox pattern for reliability
         await self.event_publisher.publish_batch_event(
             event_envelope=event_envelope,
             key=batch_id,
         )
-        
+
         logger.info(
             f"Published BatchPipelineCompletedV1 for batch {batch_id}",
             extra={
@@ -629,7 +625,7 @@ class DefaultPipelinePhaseCoordinator:
                 "correlation_id": correlation_id,
             },
         )
-        
+
         # Mark batch as ready for new pipeline requests
         # The pipeline completion event signals the end of this pipeline execution
         # Next pipeline request will check completed phases and skip them

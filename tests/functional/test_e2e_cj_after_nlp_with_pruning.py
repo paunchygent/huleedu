@@ -39,7 +39,7 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
 ) -> None:
     """
     Test CJ Assessment pipeline execution after NLP pipeline with proper phase pruning.
-    
+
     This test validates:
     1. NLP pipeline executes successfully (spellcheck + nlp)
     2. CJ Assessment pipeline request after NLP completion
@@ -102,25 +102,30 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
         )
 
         # Verify harness tracked completed phases
-        assert "spellcheck" in harness.completed_phases, "Harness should track spellcheck as completed"
+        assert "spellcheck" in harness.completed_phases, (
+            "Harness should track spellcheck as completed"
+        )
         assert "nlp" in harness.completed_phases, "Harness should track nlp as completed"
-        
+
         # CRITICAL: Wait a moment for BCS to process the phase completion events
         # BCS needs to consume the ELS phase outcome events to know spellcheck is complete
         logger.info("⏳ Waiting for BCS to process phase completion events...")
         import asyncio
+
         await asyncio.sleep(3)  # Give BCS time to consume and record phase completions
-        
+
         # Phase 3: Execute CJ Assessment pipeline
         logger.info("🚀 Phase 3: Executing CJ Assessment pipeline...")
-        logger.info("   BCS should automatically prune spellcheck since it was completed in NLP pipeline")
-        
+        logger.info(
+            "   BCS should automatically prune spellcheck since it was completed in NLP pipeline"
+        )
+
         # The CJ Assessment pipeline configuration includes spellcheck as a dependency
         # But BCS should prune it automatically since it's already complete
         cj_result = await harness.execute_pipeline(
             pipeline_name="cj_assessment",
             expected_steps=["spellcheck", "cj_assessment"],  # BCS will handle pruning
-            expected_completion_event="cj.assessment.completed",
+            expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=False,  # Don't validate manual pruning
             timeout_seconds=120,
         )
@@ -128,12 +133,16 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
         # Validate CJ Assessment pipeline results
         assert cj_result.all_steps_completed, "CJ Assessment pipeline did not complete successfully"
         assert "cj_assessment" in cj_result.executed_steps, "CJ Assessment phase not executed"
-        
+
         # Check if BCS pruned spellcheck (it should if working correctly)
         if "spellcheck" in cj_result.pruned_phases:
-            logger.info(f"✅ BCS correctly pruned spellcheck! Pruned phases: {cj_result.pruned_phases}")
-            assert "spellcheck" not in cj_result.executed_steps, "Spellcheck should NOT be re-executed if pruned"
-            
+            logger.info(
+                f"✅ BCS correctly pruned spellcheck! Pruned phases: {cj_result.pruned_phases}"
+            )
+            assert "spellcheck" not in cj_result.executed_steps, (
+                "Spellcheck should NOT be re-executed if pruned"
+            )
+
             # Validate storage ID reuse if pruning occurred
             if harness.storage_ids.get("spellcheck"):
                 if cj_result.reused_storage_ids.get("spellcheck"):
@@ -158,8 +167,12 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
         # Final validation
         logger.info("=" * 80)
         logger.info("🎉 PRUNING TEST SUCCESS!")
-        logger.info(f"  NLP Pipeline: {nlp_result.executed_steps} in {nlp_result.execution_time_seconds:.2f}s")
-        logger.info(f"  CJ Pipeline: {cj_result.executed_steps} in {cj_result.execution_time_seconds:.2f}s")
+        logger.info(
+            f"  NLP Pipeline: {nlp_result.executed_steps} in {nlp_result.execution_time_seconds:.2f}s"
+        )
+        logger.info(
+            f"  CJ Pipeline: {cj_result.executed_steps} in {cj_result.execution_time_seconds:.2f}s"
+        )
         logger.info(f"  Pruned Phases: {cj_result.pruned_phases}")
         logger.info(f"  Total Completed Phases: {list(harness.completed_phases)}")
         logger.info("=" * 80)
@@ -177,7 +190,7 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
 
 @pytest.mark.slow
 @pytest.mark.e2e
-@pytest.mark.functional  
+@pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_e2e_multiple_cj_runs_with_consistent_pruning(
@@ -185,7 +198,7 @@ async def test_e2e_multiple_cj_runs_with_consistent_pruning(
 ) -> None:
     """
     Test multiple CJ Assessment runs after NLP to ensure consistent pruning behavior.
-    
+
     This validates:
     1. First CJ run after NLP prunes spellcheck
     2. Second CJ run also prunes spellcheck (idempotent behavior)
@@ -201,7 +214,7 @@ async def test_e2e_multiple_cj_runs_with_consistent_pruning(
     # Setup
     auth_manager = AuthTestManager()
     service_manager = ServiceTestManager(auth_manager=auth_manager)
-    
+
     endpoints = await service_manager.get_validated_endpoints()
     assert len(endpoints) >= 4
     logger.info(f"✅ {len(endpoints)} services validated healthy")
@@ -225,43 +238,45 @@ async def test_e2e_multiple_cj_runs_with_consistent_pruning(
         )
         assert nlp_result.all_steps_completed
         assert "spellcheck" in nlp_result.executed_steps
-        
+
         # First CJ Assessment run
         logger.info("🚀 First CJ Assessment run (should prune spellcheck)...")
         cj_result_1 = await harness.execute_pipeline(
             pipeline_name="cj_assessment",
             expected_steps=["cj_assessment"],
-            expected_completion_event="cj.assessment.completed",
+            expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=True,
         )
-        
+
         assert cj_result_1.all_steps_completed
         assert "spellcheck" in cj_result_1.pruned_phases
         assert "cj_assessment" in cj_result_1.executed_steps
-        
+
         # Second CJ Assessment run (should also prune spellcheck)
         logger.info("🚀 Second CJ Assessment run (should also prune spellcheck)...")
         cj_result_2 = await harness.execute_pipeline(
             pipeline_name="cj_assessment",
             expected_steps=["cj_assessment"],
-            expected_completion_event="cj.assessment.completed",
+            expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=True,
         )
-        
+
         assert cj_result_2.all_steps_completed
         assert "spellcheck" in cj_result_2.pruned_phases
         assert "cj_assessment" in cj_result_2.executed_steps
-        
+
         # Verify consistent pruning behavior
         assert cj_result_1.pruned_phases == cj_result_2.pruned_phases, (
             "Pruning should be consistent across multiple runs"
         )
-        
+
         logger.info("=" * 80)
         logger.info("🎉 MULTIPLE CJ RUNS TEST SUCCESS!")
         logger.info(f"  Both CJ runs consistently pruned: {cj_result_1.pruned_phases}")
-        logger.info(f"  Execution times: Run 1={cj_result_1.execution_time_seconds:.2f}s, "
-                   f"Run 2={cj_result_2.execution_time_seconds:.2f}s")
+        logger.info(
+            f"  Execution times: Run 1={cj_result_1.execution_time_seconds:.2f}s, "
+            f"Run 2={cj_result_2.execution_time_seconds:.2f}s"
+        )
         logger.info("=" * 80)
 
     finally:

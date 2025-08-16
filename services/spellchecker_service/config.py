@@ -137,31 +137,31 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
-        
+
         Environment-aware database connection:
         - DEVELOPMENT: Docker container (localhost with unique port)
         - PRODUCTION: External managed database
         """
         import os
-        
+
         # Check for explicit override first (Docker environment, manual config)
-        env_url = os.getenv("SPELLCHECKER_SERVICE_DATABASE_URL") 
+        env_url = os.getenv("SPELLCHECKER_SERVICE_DATABASE_URL")
         if env_url:
             return env_url
-            
+
         # Environment-based configuration
         if self.ENVIRONMENT == "production":
             # Production: External managed database
             prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
             prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
-            prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD") 
-            
+            prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD")
+
             if not all([prod_host, prod_password]):
                 raise ValueError(
                     "Production environment requires HULEEDU_PROD_DB_HOST and "
                     "HULEEDU_PROD_DB_PASSWORD environment variables"
                 )
-                
+
             return (
                 f"postgresql+asyncpg://{self._db_user}:{prod_password}@"
                 f"{prod_host}:{prod_port}/huleedu_spellchecker"
@@ -169,22 +169,23 @@ class Settings(BaseSettings):
         else:
             # Development: Docker container (existing pattern)
             db_user = os.getenv("HULEEDU_DB_USER")
-            db_password = os.getenv("HULEEDU_DB_PASSWORD") 
-            
+            db_password = os.getenv("HULEEDU_DB_PASSWORD")
+
             if not db_user or not db_password:
                 raise ValueError(
                     "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
                     "HULEEDU_DB_PASSWORD are set in your .env file."
                 )
-                
+
             return (
                 f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5437/huleedu_spellchecker"
             )
 
-    @property        
+    @property
     def _db_user(self) -> str:
         """Database user for production connections."""
         import os
+
         return os.getenv("HULEEDU_DB_USER", "huleedu_user")
 
     model_config = SettingsConfigDict(

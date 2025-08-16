@@ -38,12 +38,13 @@ async def postgres_repo():
     """Provide a test PostgreSQL repository."""
     database_url = os.getenv(
         "TEST_DATABASE_URL",
-        "postgresql+asyncpg://huleedu_user:huleedu_pass@localhost:5441/huleedu_batch_conductor"
+        "postgresql+asyncpg://huleedu_user:huleedu_pass@localhost:5441/huleedu_batch_conductor",
     )
     repo = PostgreSQLBatchStateRepositoryImpl(database_url=database_url)
     yield repo
     # Cleanup: Clear test data
     from sqlalchemy import text
+
     async with repo.engine.begin() as conn:
         await conn.execute(text("DELETE FROM phase_completions WHERE batch_id LIKE 'test-%'"))
     await repo.engine.dispose()

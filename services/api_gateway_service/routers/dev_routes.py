@@ -326,9 +326,7 @@ async def trigger_mock_notification(request: MockNotificationRequest) -> dict[st
                 "batch_id": "batch-002",
                 "phase": "ai_feedback",
                 "progress_percentage": 65,
-                "estimated_completion": (
-                    datetime.now(UTC) + timedelta(minutes=15)
-                ).isoformat(),
+                "estimated_completion": (datetime.now(UTC) + timedelta(minutes=15)).isoformat(),
             }
         )
 

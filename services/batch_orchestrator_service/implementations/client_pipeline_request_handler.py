@@ -347,31 +347,61 @@ class ClientPipelineRequestHandler:
             raise ValueError(error_msg) from e
 
     def _has_active_pipeline(self, pipeline_state: ProcessingPipelineState) -> bool:
-        """Check if batch has an active pipeline in progress.
+        """Check if batch has an active pipeline that would conflict with a new request.
 
-        Returns True only if there are phases actively being processed.
-        Completed pipelines and pending pipelines should not block new pipeline requests.
+        Returns True only if there are phases actively being processed that would
+        conflict with a new pipeline request. Allows sequential pipelines when
+        the current pipeline is in its final phase.
         """
         from common_core.pipeline_models import PipelineExecutionStatus
 
         try:
-            # Direct Pydantic model access - no conversion needed
-            state_obj = pipeline_state
+            # If no requested_pipelines, nothing is active
+            if not pipeline_state.requested_pipelines:
+                return False
 
-            # Check if any phase is currently in active processing
-            # PENDING_DEPENDENCIES means configured but not started - should not block
-            active_statuses = {
-                PipelineExecutionStatus.IN_PROGRESS,
-                PipelineExecutionStatus.DISPATCH_INITIATED,
-            }
+            # Check which phases are truly active (not completed/failed/skipped)
+            active_phases = []
+            completed_phases = []
 
-            # Check all phases to see if any are actively processing
-            for phase_name in PhaseName:
-                phase_detail = state_obj.get_pipeline(phase_name.value)
-                if phase_detail and phase_detail.status in active_statuses:
-                    return True
+            for phase_name in pipeline_state.requested_pipelines:
+                phase_detail = pipeline_state.get_pipeline(phase_name)
+                if phase_detail:
+                    if phase_detail.status in {
+                        PipelineExecutionStatus.IN_PROGRESS,
+                        PipelineExecutionStatus.DISPATCH_INITIATED,
+                    }:
+                        active_phases.append(phase_name)
+                    elif phase_detail.status in {
+                        PipelineExecutionStatus.COMPLETED_SUCCESSFULLY,
+                        PipelineExecutionStatus.COMPLETED_WITH_PARTIAL_SUCCESS,
+                        PipelineExecutionStatus.FAILED,
+                    }:
+                        completed_phases.append(phase_name)
 
-            return False
+            # If no active phases, pipeline is not active
+            if not active_phases:
+                return False
+
+            # If all requested phases are complete, pipeline is not active
+            if len(completed_phases) == len(pipeline_state.requested_pipelines):
+                return False
+
+            # Check if we're in the final phase (allowing sequential execution)
+            # If only the last phase is active, consider the pipeline as "completing"
+            if len(active_phases) == 1:
+                last_requested_phase = pipeline_state.requested_pipelines[-1]
+                if active_phases[0] == last_requested_phase:
+                    # Last phase is active - allow sequential pipeline to queue
+                    logger.info(
+                        f"Pipeline in final phase ({last_requested_phase}), "
+                        "allowing sequential pipeline request",
+                        extra={"active_phase": last_requested_phase},
+                    )
+                    return False
+
+            # Multiple phases active or non-final phase active - block new requests
+            return True
 
         except Exception as e:
             logger.warning(f"Error checking pipeline state, assuming not active: {e}")

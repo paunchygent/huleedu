@@ -26,10 +26,10 @@ from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
+from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
-from services.essay_lifecycle_service.domain_services import ContentAssignmentService
 from services.essay_lifecycle_service.implementations.batch_essay_tracker_impl import (
     DefaultBatchEssayTracker,
 )

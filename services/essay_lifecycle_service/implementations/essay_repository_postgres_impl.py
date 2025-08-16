@@ -206,12 +206,14 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
             "updated_at": essay_state.updated_at.replace(tzinfo=None),
         }
 
-    async def get_essay_state(self, essay_id: str, session: AsyncSession | None = None) -> ConcreteEssayState | None:
+    async def get_essay_state(
+        self, essay_id: str, session: AsyncSession | None = None
+    ) -> ConcreteEssayState | None:
         """Retrieve essay state by ID."""
         if session is None:
             async with self.session() as session:
                 return await self.get_essay_state(essay_id, session)
-        
+
         stmt = select(EssayStateDB).where(EssayStateDB.essay_id == essay_id)
         result = await session.execute(stmt)
         db_essay = result.scalars().first()
@@ -653,11 +655,11 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
         self, batch_id: str, session: AsyncSession | None = None
     ) -> dict[EssayStatus, int]:
         """Get status count breakdown for a batch using efficient SQL aggregation.
-        
+
         Args:
             batch_id: The batch ID to get status summary for
             session: Optional session to use for transactional consistency
-            
+
         Returns:
             Dictionary mapping EssayStatus to count
         """

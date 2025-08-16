@@ -170,18 +170,17 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         session: AsyncSession | None = None,
     ) -> None:
         """Dispatch NLP processing request to NLP Service.
-        
+
         Following the architectural pattern established by spellcheck,
         ELS forwards the batch request to NLP service for processing.
         """
-        from datetime import UTC, datetime
-        
+
         from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
         from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
-        
+
         logger = create_service_logger("specialized_service_dispatcher")
-        
+
         logger.info(
             "Dispatching NLP processing request to NLP Service",
             extra={
@@ -191,7 +190,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "correlation_id": str(correlation_id),
             },
         )
-        
+
         try:
             # Create batch NLP processing request
             nlp_request = BatchNlpProcessingRequestedV1(
@@ -202,7 +201,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 language=language.value,
                 batch_id=batch_id,
             )
-            
+
             # Create event envelope
             envelope = EventEnvelope[BatchNlpProcessingRequestedV1](
                 event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
@@ -211,14 +210,14 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 data=nlp_request,
                 metadata={},
             )
-            
+
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
-            
+
             # Publish to outbox for reliable delivery
             topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
             event_data = envelope.model_dump(mode="json")
-            
+
             await self.outbox_repository.add_event(
                 aggregate_id=batch_id,
                 aggregate_type="batch",
@@ -228,7 +227,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 event_key=batch_id,
                 session=session,
             )
-            
+
             logger.info(
                 f"Dispatched NLP processing request for batch {batch_id}",
                 extra={
@@ -238,13 +237,13 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                     "essays_count": len(essays_to_process),
                 },
             )
-            
+
         except Exception as e:
             if hasattr(e, "error_detail"):
                 raise
             else:
                 from huleedu_service_libs.error_handling import raise_processing_error
-                
+
                 raise_processing_error(
                     service="essay_lifecycle_service",
                     operation="dispatch_nlp_requests",

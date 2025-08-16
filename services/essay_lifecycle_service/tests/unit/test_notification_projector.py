@@ -151,22 +151,22 @@ class TestELSNotificationProjector:
         # Verify notification was published
         mock_kafka_publisher.publish.assert_called_once()
         call_args = mock_kafka_publisher.publish.call_args
-        
+
         # Verify topic
         assert call_args[1]["topic"] == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
-        
+
         # Verify envelope structure
         envelope = call_args[1]["envelope"]
         assert envelope.source_service == "essay_lifecycle_service"
         assert envelope.event_type == topic_name(ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED)
-        
+
         # Verify notification data
         notification = envelope.data
         assert notification.teacher_id == "teacher-nlp"
         assert notification.notification_type == "batch_nlp_completed"
         assert notification.priority == NotificationPriority.STANDARD
         assert notification.batch_id == "batch-nlp-123"
-        
+
         # Verify payload
         payload = notification.payload
         assert payload["batch_id"] == "batch-nlp-123"
@@ -175,7 +175,10 @@ class TestELSNotificationProjector:
         assert payload["success_count"] == 2
         assert payload["failed_count"] == 0
         assert payload["total_count"] == 2
-        assert "NLP analysis completed for batch: All 2 essays completed successfully" in payload["message"]
+        assert (
+            "NLP analysis completed for batch: All 2 essays completed successfully"
+            in payload["message"]
+        )
 
     async def test_unknown_phase_name_skips_notification(
         self, notification_projector: ELSNotificationProjector, mock_kafka_publisher: AsyncMock

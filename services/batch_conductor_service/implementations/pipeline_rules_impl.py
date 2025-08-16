@@ -55,6 +55,9 @@ class DefaultPipelineRules(PipelineRulesProtocol):
             "Pipeline steps pruned due to prior completion",
             registry=self._registry,
         )
+        
+        # Track pruned phases from last resolution for event publishing
+        self._last_pruned_phases: list[str] = []
 
     async def resolve_pipeline_dependencies(
         self, requested_pipeline: str, batch_id: str | None = None
@@ -75,10 +78,18 @@ class DefaultPipelineRules(PipelineRulesProtocol):
             # Remove already-completed ones (order preserved)
             if batch_id is not None:
                 before_len = len(ordered_steps)
+                original_steps = ordered_steps.copy()
                 ordered_steps = await self.prune_completed_steps(ordered_steps, batch_id)
                 pruned = before_len - len(ordered_steps)
                 if pruned:
                     self._rules_pruned.inc(pruned)
+                
+                # Store pruned phases for the last resolution (for event publishing)
+                self._last_pruned_phases = [
+                    step for step in original_steps if step not in ordered_steps
+                ]
+            else:
+                self._last_pruned_phases = []
 
             # Success metric
             self._rules_success.inc()
@@ -118,6 +129,10 @@ class DefaultPipelineRules(PipelineRulesProtocol):
                 remaining_steps.append(step)
 
         return remaining_steps
+
+    def get_last_pruned_phases(self) -> list[str]:
+        """Get the phases that were pruned in the last pipeline resolution."""
+        return self._last_pruned_phases.copy()
 
     async def validate_pipeline_compatibility(
         self, pipeline_name: str, correlation_id: UUID, batch_metadata: dict | None = None

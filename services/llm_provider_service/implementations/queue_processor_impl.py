@@ -320,8 +320,28 @@ class QueueProcessorImpl:
                 f"({request.retry_count}/{self.settings.QUEUE_MAX_RETRIES})"
             )
 
-            # Re-enqueue for retry
-            await self.queue_manager.enqueue(request)
+            # Re-enqueue for retry - first remove from queue to avoid "already exists" error
+            try:
+                # Remove the request from queue first to avoid duplicate
+                await self.queue_manager.remove(request.queue_id)
+            except Exception as e:
+                logger.warning(f"Failed to remove request {request.queue_id} before retry: {e}")
+            
+            # Now re-enqueue for retry
+            retry_success = await self.queue_manager.enqueue(request)
+            if not retry_success:
+                logger.error(
+                    f"Failed to re-enqueue request {request.queue_id} for retry, "
+                    f"marking as failed to prevent infinite loop"
+                )
+                # Mark as failed to prevent infinite loop
+                await self.queue_manager.update_status(
+                    queue_id=request.queue_id,
+                    status=QueueStatus.FAILED,
+                    message=f"Failed to re-enqueue for retry: {error_details.message}",
+                )
+                # Publish callback event for error completion
+                await self._publish_callback_event_error(request, error)
         else:
             # Mark as failed
             await self.queue_manager.update_status(

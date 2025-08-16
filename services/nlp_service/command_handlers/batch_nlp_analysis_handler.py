@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
-from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
+from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_external_service_error,

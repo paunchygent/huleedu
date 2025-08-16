@@ -250,12 +250,12 @@ class BatchPipelineCompletedV1(BaseModel):
     Publisher: Batch Orchestrator Service (BOS)
     Consumer: API Gateway, UI Services, Batch Conductor Service (BCS)
     Topic: batch.pipeline.completed
-    
+
     Published when:
     1. All requested pipeline phases have completed (successfully or with failures)
     2. No more phases remain in the requested_pipelines list
     3. Pipeline execution has reached its terminal state
-    
+
     This event enables:
     - Multi-pipeline support by clearing active pipeline state
     - UI notifications of pipeline completion
@@ -277,10 +277,42 @@ class BatchPipelineCompletedV1(BaseModel):
     successful_essay_count: int = Field(
         description="Number of essays that completed successfully across all phases"
     )
-    failed_essay_count: int = Field(
-        description="Number of essays that failed in any phase"
-    )
+    failed_essay_count: int = Field(description="Number of essays that failed in any phase")
     correlation_id: UUID = Field(description="Correlation ID from the original pipeline request")
+    metadata: SystemProcessingMetadata = Field(description="Processing metadata")
+
+
+class PhaseSkippedV1(BaseModel):
+    """
+    Event indicating that a phase was skipped during pipeline resolution due to prior completion.
+
+    Publisher: Batch Conductor Service (BCS)
+    Consumer: Test harnesses, monitoring services, API Gateway
+    Topic: batch.phase.skipped
+
+    Published when:
+    1. BCS resolves a pipeline and finds that a phase was already completed
+    2. The phase is pruned from the execution list
+    3. Results from the previous completion will be reused
+
+    This event enables:
+    - Test harnesses to track which phases were pruned
+    - Monitoring and observability of pipeline optimization
+    - UI to show users which phases were skipped and why
+    """
+
+    event: str = Field(default="batch.phase.skipped", description="Event type identifier")
+    batch_id: str = Field(description="Batch identifier")
+    phase_name: str = Field(description="Name of the phase that was skipped")
+    skip_reason: str = Field(
+        default="already_completed", 
+        description="Reason why phase was skipped (e.g., 'already_completed')"
+    )
+    storage_id: str | None = Field(
+        default=None,
+        description="Storage ID from previous completion that will be reused"
+    )
+    correlation_id: UUID = Field(description="Correlation ID from the pipeline request")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")
 
 
@@ -299,3 +331,4 @@ class BatchCoordinationEventData(BaseModel):
     excess_content_provisioned: ExcessContentProvisionedV1 | None = None
     batch_content_provisioning_completed: BatchContentProvisioningCompletedV1 | None = None
     batch_pipeline_completed: BatchPipelineCompletedV1 | None = None  # Multi-pipeline support
+    phase_skipped: PhaseSkippedV1 | None = None  # Phase pruning support

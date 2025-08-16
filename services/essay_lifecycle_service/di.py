@@ -55,14 +55,14 @@ from services.essay_lifecycle_service.implementations.consumer_recovery_manager_
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.nlp_command_handler import (
-    NlpCommandHandler,
-)
 from services.essay_lifecycle_service.implementations.metrics_collector import (
     DefaultMetricsCollector,
 )
 from services.essay_lifecycle_service.implementations.mock_essay_repository import (
     MockEssayRepository,
+)
+from services.essay_lifecycle_service.implementations.nlp_command_handler import (
+    NlpCommandHandler,
 )
 from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
@@ -435,7 +435,7 @@ class BatchCoordinationProvider(Provider):
     ) -> ContentAssignmentProtocol:
         """Provide content assignment domain service implementation."""
         from services.essay_lifecycle_service.domain_services import ContentAssignmentService
-        
+
         return ContentAssignmentService(
             batch_tracker=batch_tracker,
             repository=repository,

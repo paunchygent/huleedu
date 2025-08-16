@@ -73,9 +73,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
-        await self.nlp_handler.process_initiate_nlp_command(
-            command_data, correlation_id
-        )
+        await self.nlp_handler.process_initiate_nlp_command(command_data, correlation_id)
 
     async def process_initiate_ai_feedback_command(
         self,

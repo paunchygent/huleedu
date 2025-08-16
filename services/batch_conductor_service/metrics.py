@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from prometheus_client import REGISTRY, Counter, Histogram, Gauge
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 
 from huleedu_service_libs.logging_utils import create_service_logger
 

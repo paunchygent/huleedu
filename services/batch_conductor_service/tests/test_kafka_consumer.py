@@ -206,7 +206,9 @@ class TestBCSKafkaConsumerBehavior:
         """Test batch_id extraction from system_metadata fallback."""
         # Arrange - Remove batch_id from direct field but keep in system_metadata
         sample_spellcheck_message_data["data"]["parent_id"] = None
-        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = "batch-from-metadata"
+        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = (
+            "batch-from-metadata"
+        )
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
@@ -233,6 +235,7 @@ class TestBCSKafkaConsumerBehavior:
 
         # Act & Assert - Should raise validation error for invalid JSON structure
         from pydantic import ValidationError
+
         with pytest.raises((json.JSONDecodeError, ValidationError)):
             await kafka_consumer._handle_spellcheck_completed(mock_msg)
 
@@ -302,7 +305,9 @@ class TestBCSKafkaConsumerBehavior:
         """Test handling of CJ assessment with None in successful essay IDs."""
         # Arrange
         sample_cj_assessment_message_data["data"]["processing_summary"]["successful_essay_ids"] = [
-            None, "essay-002", "essay-003"
+            None,
+            "essay-002",
+            "essay-003",
         ]
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_cj_assessment_message_data).encode("utf-8")

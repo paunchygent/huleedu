@@ -36,7 +36,7 @@ async def initialize_metrics(app: Quart, container: AsyncContainer) -> None:
         app.extensions["metrics"] = metrics
 
         logger.info("Batch Conductor Service shared metrics initialized successfully.")
-            
+
     except Exception as e:
         logger.critical("Failed to initialize shared metrics: %s", e, exc_info=True)
         raise

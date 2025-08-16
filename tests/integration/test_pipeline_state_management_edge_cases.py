@@ -89,11 +89,11 @@ class TestPipelineEdgeCases:
         mock_state_manager.update_phase_status_atomically.side_effect = mock_update_phase_status
         # Mock the record_phase_failure method to always succeed
         mock_state_manager.record_phase_failure.return_value = True
-        
+
         # Create mock event publisher
         mock_event_publisher = AsyncMock()
         mock_event_publisher.publish_batch_event = AsyncMock()
-        
+
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,

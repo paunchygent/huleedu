@@ -7,8 +7,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
+from common_core.events.batch_coordination_events import PhaseSkippedV1
 from common_core.events.envelope import EventEnvelope
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import OperationStatus
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.error_handling.batch_conductor_factories import (
     raise_pipeline_dependency_resolution_failed,
 )
@@ -43,11 +47,13 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         pipeline_rules: PipelineRulesProtocol,
         pipeline_generator: PipelineGeneratorProtocol,
         dlq_producer: DlqProducerProtocol,
+        event_publisher: KafkaPublisherProtocol,
         metrics: dict[str, Any],
     ):
         self.pipeline_rules = pipeline_rules
         self.pipeline_generator = pipeline_generator
         self.dlq_producer = dlq_producer
+        self.event_publisher = event_publisher
         self._metrics = metrics
 
     async def resolve_pipeline(
@@ -96,6 +102,13 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                 resolved_pipeline = await self.pipeline_rules.resolve_pipeline_dependencies(
                     requested_pipeline, batch_id
                 )
+
+                # Publish events for any phases that were pruned/skipped
+                pruned_phases = self.pipeline_rules.get_last_pruned_phases()
+                if pruned_phases:
+                    await self._publish_phase_skipped_events(
+                        batch_id, pruned_phases, correlation_id
+                    )
 
                 logger.info(
                     f"Pipeline resolved successfully: {requested_pipeline}",
@@ -265,6 +278,59 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                     "requested_pipeline": requested_pipeline,
                     "failure_reason": failure_reason,
                 },
+                exc_info=True,
+            )
+
+    async def _publish_phase_skipped_events(
+        self, batch_id: str, pruned_phases: list[str], correlation_id: UUID
+    ) -> None:
+        """Publish PhaseSkippedV1 events for phases that were pruned from pipeline execution."""
+        try:
+            metadata = SystemProcessingMetadata(
+                correlation_id=correlation_id,
+                processing_timestamp=datetime.now(UTC),
+                request_context={"batch_id": batch_id, "operation": "pipeline_resolution"},
+            )
+
+            for phase_name in pruned_phases:
+                # Create the phase skipped event
+                event_data = PhaseSkippedV1(
+                    batch_id=batch_id,
+                    phase_name=phase_name,
+                    skip_reason="already_completed",
+                    correlation_id=correlation_id,
+                    metadata=metadata,
+                )
+
+                # Wrap in EventEnvelope
+                envelope = EventEnvelope[PhaseSkippedV1](
+                    event_type=topic_name(ProcessingEvent.BATCH_PHASE_SKIPPED),
+                    source_service="batch_conductor_service",
+                    data=event_data,
+                    correlation_id=correlation_id,
+                )
+
+                # Publish the event
+                await self.event_publisher.publish(
+                    topic=topic_name(ProcessingEvent.BATCH_PHASE_SKIPPED),
+                    envelope=envelope,
+                    key=batch_id,
+                )
+
+                logger.info(
+                    f"Published phase skipped event for {phase_name} in batch {batch_id}",
+                    extra={
+                        "batch_id": batch_id,
+                        "phase_name": phase_name,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+        except Exception as e:
+            # Log error but don't fail pipeline resolution for event publishing failures
+            logger.error(
+                f"Failed to publish phase skipped events for batch {batch_id}: {e}",
+                extra={"batch_id": batch_id, "pruned_phases": pruned_phases},
                 exc_info=True,
             )
 

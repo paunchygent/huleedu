@@ -50,7 +50,9 @@ class EssayRepositoryProtocol(Protocol):
     MockEssayRepository (development/testing) and PostgreSQL (production) implementations.
     """
 
-    async def get_essay_state(self, essay_id: str, session: AsyncSession | None = None) -> EssayState | None:
+    async def get_essay_state(
+        self, essay_id: str, session: AsyncSession | None = None
+    ) -> EssayState | None:
         """Retrieve essay state by ID."""
         ...
 
@@ -606,14 +608,14 @@ class ContentAssignmentProtocol(Protocol):
     ) -> tuple[bool, str | None]:
         """
         Perform atomic content-to-essay assignment with full state coordination.
-        
+
         Args:
             batch_id: The batch ID
             text_storage_id: Storage ID for the essay content
             content_metadata: Content metadata (file_name, size, hash, etc.)
             correlation_id: Operation correlation ID
             session: Database session for atomic operations
-            
+
         Returns:
             Tuple of (was_created, final_essay_id)
             - was_created: True if new assignment, False if idempotent

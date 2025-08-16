@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from common_core.events.batch_coordination_events import BatchEssaysRegistered
     from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 
-from common_core.status_enums import EssayStatus
 
 from huleedu_service_libs.error_handling import (
     HuleEduError,
@@ -116,27 +115,34 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     )
 
                     # Process pending content using proper domain service coordination
-                    pending_content_list = await self.pending_content_ops.get_pending_content(event_data.entity_id)
-                    
+                    pending_content_list = await self.pending_content_ops.get_pending_content(
+                        event_data.entity_id
+                    )
+
                     if pending_content_list:
                         assigned_count = 0
                         for content_metadata in pending_content_list:
                             text_storage_id = content_metadata["text_storage_id"]
-                            
+
                             # Use injected domain service for proper atomic content assignment
-                            was_created, _ = await self.content_assignment_service.assign_content_to_essay(
+                            (
+                                was_created,
+                                _,
+                            ) = await self.content_assignment_service.assign_content_to_essay(
                                 batch_id=event_data.entity_id,
                                 text_storage_id=text_storage_id,
                                 content_metadata=content_metadata,
                                 correlation_id=correlation_id,
                                 session=session,
                             )
-                            
+
                             if was_created:
                                 assigned_count += 1
                                 # Remove from pending since successfully assigned
-                                await self.pending_content_ops.remove_pending_content(event_data.entity_id, text_storage_id)
-                        
+                                await self.pending_content_ops.remove_pending_content(
+                                    event_data.entity_id, text_storage_id
+                                )
+
                         if assigned_count > 0:
                             logger.info(
                                 f"Processed {assigned_count} pending content items for batch using ContentAssignmentService",
@@ -311,7 +317,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 return False
 
             # Step 2: Use ContentAssignmentService for consistent atomic assignment
-            # START UNIT OF WORK  
+            # START UNIT OF WORK
             async with self.session_factory() as session:
                 async with session.begin():
                     content_metadata = {
@@ -322,7 +328,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     }
 
                     # Use domain service for consistent atomic content assignment
-                    was_created, final_essay_id = await self.content_assignment_service.assign_content_to_essay(
+                    (
+                        was_created,
+                        final_essay_id,
+                    ) = await self.content_assignment_service.assign_content_to_essay(
                         batch_id=event_data.entity_id,
                         text_storage_id=event_data.text_storage_id,
                         content_metadata=content_metadata,
@@ -332,10 +341,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
                     # ContentAssignmentService handles all assignment logic including:
                     # - Database updates
-                    # - Event publication  
+                    # - Event publication
                     # - Batch completion checking
                     # - Redis state management
-                    
+
                     logger.info(
                         "Content assignment completed via ContentAssignmentService",
                         extra={
@@ -346,7 +355,6 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             "correlation_id": str(correlation_id),
                         },
                     )
-
 
                     # Transaction commits here
 

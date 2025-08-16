@@ -401,10 +401,10 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
     async def process_pending_content_for_batch(self, batch_id: str) -> int:
         """
         Process any pending content for a newly registered batch.
-        
+
         This method handles only Redis-level slot assignment operations.
         Database coordination is handled separately by the ContentAssignmentService.
-        
+
         Returns:
             Number of pending content items successfully assigned to slots
         """
@@ -446,7 +446,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
 
         self._logger.info(
             f"Processed {assigned_count} pending content items for batch {batch_id}",
-            extra={"batch_id": batch_id, "assigned_count": assigned_count}
+            extra={"batch_id": batch_id, "assigned_count": assigned_count},
         )
 
         return assigned_count

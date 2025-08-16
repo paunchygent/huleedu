@@ -15,7 +15,9 @@ from services.llm_provider_service.api_models import LLMComparisonRequest, LLMCo
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
-from services.llm_provider_service.implementations.trace_context_manager_impl import TraceContextManagerImpl
+from services.llm_provider_service.implementations.trace_context_manager_impl import (
+    TraceContextManagerImpl,
+)
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 from services.llm_provider_service.queue_models import QueuedRequest
 
@@ -99,7 +101,7 @@ class TestQueueProcessorErrorHandling:
                 provider_override=LLMProviderType.MOCK,
             ),
         )
-        
+
         queued_request = QueuedRequest(
             queue_id=request_id,
             request_data=request_data,
@@ -122,7 +124,7 @@ class TestQueueProcessorErrorHandling:
         )
 
         mock_orchestrator.process_queued_request.side_effect = HuleEduError(error_detail)
-        
+
         # Set retry count to max so next error causes immediate failure
         queued_request.retry_count = 3
 
@@ -163,7 +165,7 @@ class TestQueueProcessorErrorHandling:
             callback_topic="llm.comparison.callback",
             correlation_id=correlation_id,
         )
-        
+
         queued_request = QueuedRequest(
             queue_id=request_id,
             request_data=request_data,
@@ -176,7 +178,7 @@ class TestQueueProcessorErrorHandling:
 
         # Configure orchestrator to raise unexpected exception
         mock_orchestrator.process_queued_request.side_effect = RuntimeError("Unexpected error")
-        
+
         # Set retry count to max so next error causes immediate failure
         queued_request.retry_count = 3
 
@@ -217,7 +219,7 @@ class TestQueueProcessorErrorHandling:
             callback_topic="llm.comparison.callback",
             correlation_id=correlation_id,
         )
-        
+
         queued_request = QueuedRequest(
             queue_id=request_id,
             request_data=request_data,
@@ -249,16 +251,17 @@ class TestQueueProcessorErrorHandling:
         # Assert
         # Verify status was updated to PROCESSING then COMPLETED
         assert mock_queue_manager.update_status.call_count >= 2
-        
+
         # Check for PROCESSING status
         mock_queue_manager.update_status.assert_any_call(
             queue_id=request_id,
             status=QueueStatus.PROCESSING,
         )
-        
+
         # Check for COMPLETED status
         completed_calls = [
-            call for call in mock_queue_manager.update_status.call_args_list
+            call
+            for call in mock_queue_manager.update_status.call_args_list
             if call.kwargs.get("status") == QueueStatus.COMPLETED
         ]
         assert len(completed_calls) == 1

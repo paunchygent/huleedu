@@ -106,7 +106,7 @@ class PipelineTestHarness:
         """Start the Kafka consumer for monitoring events."""
         if self.consumer:
             return  # Already started
-            
+
         # Setup Kafka consumer for monitoring
         phase2_topics = [
             "huleedu.batch.student.matching.initiate.command.v1",
@@ -116,11 +116,9 @@ class PipelineTestHarness:
             "huleedu.els.batch.essays.ready.v1",
         ]
         all_topics = list(PIPELINE_TOPICS.values()) + phase2_topics
-        
+
         # Create consumer context
-        self.consumer_context = self.kafka_manager.consumer(
-            "pipeline_test_harness", all_topics
-        )
+        self.consumer_context = self.kafka_manager.consumer("pipeline_test_harness", all_topics)
         self.consumer = await self.consumer_context.__aenter__()
         await self.consumer.seek_to_end()  # Start from latest
         logger.info("📡 Kafka consumer started for pipeline monitoring")
@@ -269,7 +267,7 @@ class PipelineTestHarness:
 
         logger.info("✅ Batch ready for pipeline execution")
         return self.batch_id, self.correlation_id
-        
+
     async def setup_guest_batch(
         self,
         essay_files: list[Path],
@@ -277,29 +275,29 @@ class PipelineTestHarness:
     ) -> tuple[str, str]:
         """
         Setup a GUEST batch (no student matching) for pipeline testing.
-        
+
         Args:
             essay_files: List of essay files to upload
             user: Optional user for batch creation (creates guest user if not provided)
-        
+
         Returns:
             Tuple of (batch_id, correlation_id)
         """
         # Create guest user if not provided
         if not user:
             user = self.auth_manager.create_test_user(role="guest")
-            
-        # Start Kafka consumer if not already started  
+
+        # Start Kafka consumer if not already started
         await self.start_consumer()
-        
+
         # Generate correlation ID
         self.correlation_id = str(uuid.uuid4())
         logger.info(f"🔍 Test correlation ID: {self.correlation_id}")
-        
+
         # Register GUEST batch (NO class_id)
         logger.info("📝 Registering GUEST batch (no class_id)")
         from common_core.domain_enums import CourseCode
-        
+
         self.batch_id, actual_correlation_id = await self.service_manager.create_batch(
             expected_essay_count=len(essay_files),
             course_code=CourseCode.ENG5,
@@ -308,19 +306,19 @@ class PipelineTestHarness:
             enable_cj_assessment=True,
             # NO class_id - this triggers GUEST flow!
         )
-        
+
         # Update correlation ID to match service
         self.correlation_id = actual_correlation_id
-        
+
         logger.info(f"✅ GUEST batch registered: {self.batch_id}")
-        
+
         # Upload essays
         logger.info("🚀 Uploading essays for GUEST batch...")
         files_data = []
         for essay_file in essay_files:
             essay_content = essay_file.read_bytes()
             files_data.append({"name": essay_file.name, "content": essay_content})
-            
+
         upload_result = await self.service_manager.upload_files(
             batch_id=self.batch_id,
             files=files_data,
@@ -328,17 +326,17 @@ class PipelineTestHarness:
             correlation_id=self.correlation_id,
         )
         logger.info(f"✅ File upload successful: {upload_result}")
-        
+
         # Wait for content provisioning and batch to be ready
         logger.info("⏳ Waiting for GUEST batch to be ready...")
         await asyncio.sleep(5)  # Give time for content provisioning
-        
+
         # For GUEST batches, we should receive BatchEssaysReady directly after content provisioning
         ready_received = await self._wait_for_batch_essays_ready(timeout_seconds=15)
-        
+
         if not ready_received:
             logger.warning("BatchEssaysReady not received for GUEST batch, but continuing...")
-            
+
         logger.info("✅ GUEST batch ready for pipeline execution")
         return self.batch_id, self.correlation_id
 
@@ -365,7 +363,7 @@ class PipelineTestHarness:
         """
         if not self.batch_id or not self.correlation_id:
             raise RuntimeError("Must call setup_regular_batch_with_student_matching first")
-            
+
         # Ensure consumer is started
         await self.start_consumer()
 
@@ -623,7 +621,10 @@ class PipelineTestHarness:
                                 phase_status = event_data.get("phase_status")
                                 storage_id = event_data.get("storage_id")
 
-                                if phase_status in ["completed_successfully", "completed_with_failures"]:
+                                if phase_status in [
+                                    "completed_successfully",
+                                    "completed_with_failures",
+                                ]:
                                     tracker.completed_phases.add(phase_name)
                                     if storage_id:
                                         tracker.storage_ids[phase_name] = storage_id
@@ -636,7 +637,9 @@ class PipelineTestHarness:
                                 tracker.pruned_phases.append(phase_name)
                                 if storage_id:
                                     tracker.reused_storage_ids[phase_name] = storage_id
-                                logger.info(f"⏭️ Phase {phase_name} pruned (reusing existing results)")
+                                logger.info(
+                                    f"⏭️ Phase {phase_name} pruned (reusing existing results)"
+                                )
 
                             # Check for completion event
                             if expected_completion_event in event_type:
@@ -644,6 +647,10 @@ class PipelineTestHarness:
                                 if "nlp.analysis.completed" in event_type:
                                     tracker.completed_phases.add("nlp")
                                     logger.info("✅ Phase nlp completed (from completion event)")
+                                # For CJ Assessment pipeline, mark the phase as completed when we get the completion event
+                                elif "cj_assessment.completed" in event_type:
+                                    tracker.completed_phases.add("cj_assessment")
+                                    logger.info("✅ Phase cj_assessment completed (from completion event)")
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
                                 return envelope_data
 
@@ -664,10 +671,8 @@ class PipelineTestHarness:
         for phase in self.completed_phases:
             # Phase should not be initiated if it's already completed and not expected to run again
             if phase not in expected_steps and phase in tracker.initiated_phases:
-                raise AssertionError(
-                    f"Phase {phase} should have been pruned but was initiated"
-                )
-                
+                raise AssertionError(f"Phase {phase} should have been pruned but was initiated")
+
             # Check if storage ID was reused for pruned phases
             if phase in self.storage_ids and phase not in expected_steps:
                 assert tracker.reused_storage_ids.get(phase) == self.storage_ids.get(phase), (

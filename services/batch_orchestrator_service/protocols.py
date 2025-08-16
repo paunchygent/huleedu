@@ -306,12 +306,12 @@ class BatchConductorClientProtocol(Protocol):
     ) -> None:
         """
         Report phase completion to BCS for tracking and dependency resolution.
-        
+
         Args:
             batch_id: The unique identifier of the batch
             completed_phase: The phase that has completed
             success: Whether the phase completed successfully
-            
+
         Note: This is a best-effort operation - failures should be logged but not block.
         """
         pass

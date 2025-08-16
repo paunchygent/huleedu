@@ -190,6 +190,15 @@ async def check_workflow_continuation(
         True if workflow should continue, False otherwise
     """
     async with database.session() as session:
+        # Get batch state to check total expected comparisons
+        batch_state = await get_batch_state(session, batch_id, correlation_id)
+        if not batch_state:
+            logger.warning(
+                f"Batch state not found for batch {batch_id}",
+                extra={"correlation_id": str(correlation_id), "batch_id": batch_id}
+            )
+            return False
+
         # Get count of completed comparisons for this batch
         stmt = select(ComparisonPair).where(
             ComparisonPair.cj_batch_id == batch_id,
@@ -197,19 +206,22 @@ async def check_workflow_continuation(
         )
         result = await session.execute(stmt)
         completed_pairs = result.scalars().all()
+        completed_count = len(completed_pairs)
 
-        # Simple heuristic: continue workflow every 5 completions
-        # This would be replaced with proper batch state management
-        # that integrates with existing workflow logic
-        should_continue = len(completed_pairs) % 5 == 0
+        # Check if ALL expected comparisons are completed
+        should_continue = (
+            batch_state.total_comparisons > 0 and 
+            completed_count >= batch_state.total_comparisons
+        )
 
         logger.info(
-            f"Batch {batch_id} has {len(completed_pairs)} completed comparisons, "
+            f"Batch {batch_id} has {completed_count}/{batch_state.total_comparisons} completed comparisons, "
             f"workflow continuation: {should_continue}",
             extra={
                 "correlation_id": str(correlation_id),
                 "batch_id": batch_id,
-                "completed_pairs": len(completed_pairs),
+                "completed_pairs": completed_count,
+                "total_comparisons": batch_state.total_comparisons,
             },
         )
 
@@ -467,16 +479,16 @@ async def _trigger_batch_scoring_completion(
         # IMPORTANT: Use the original correlation_id from the batch, not the callback's correlation_id
         # This ensures the completion event has the same correlation_id as the original request
         original_correlation_id = UUID(batch_upload.event_correlation_id)
-        
+
         logger.info(
-            f"Publishing completion events with original correlation_id from batch",
+            "Publishing completion events with original correlation_id from batch",
             extra={
                 **log_extra,
                 "original_correlation_id": str(original_correlation_id),
                 "callback_correlation_id": str(correlation_id),
             },
         )
-        
+
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
