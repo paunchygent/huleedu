@@ -54,7 +54,7 @@ The HuleEdu platform consists of several services that frontend applications int
 - **Circuit Breaker**: Automatic failure protection for downstream services
 
 ### **WebSocket Service** (Port 8081)
-- **Real-Time Notifications**: 15+ notification types for teachers
+- **Real-Time Notifications**: 14+ notification types for teachers including pipeline completion events
 - **Connection Management**: JWT authentication via query parameter
 - **Event Categories**: Batch progress, processing results, file operations, class management
 - **Priority Levels**: Critical, immediate, high, standard, low
@@ -84,6 +84,31 @@ The HuleEdu platform consists of several services that frontend applications int
 2. Handle connection lifecycle (connect, disconnect, reconnect)
 3. Process notifications based on type, category, and priority
 4. Update UI state based on real-time events
+
+### **Pipeline Completion Notifications** 🆕
+The platform now supports real-time pipeline completion notifications for enhanced user experience:
+
+#### **Key Events Available:**
+- **`batch_pipeline_completed`**: All requested phases completed (success/failure)
+  - Includes completion statistics, duration, and phase details
+  - High priority notification requiring immediate UI updates
+  - Use for showing final results and enabling result downloads
+
+- **`phase_skipped`**: Phase skipped due to prior completion (optimization)
+  - Low priority notification for transparency
+  - Use for progress indicators and optimization messaging
+
+#### **Integration Benefits:**
+- **Real-time completion status** without polling
+- **Detailed completion metrics** (duration, success/failure counts)
+- **Multi-pipeline support** with individual phase tracking
+- **Performance insights** via skip notifications
+
+#### **Recommended UI Updates:**
+1. **Progress Indicators**: Update completion status immediately
+2. **Result Availability**: Enable download buttons when `batch_pipeline_completed` received
+3. **Performance Metrics**: Display processing duration and success rates
+4. **User Feedback**: Show which phases were skipped for faster processing
 
 ## Best Practices Summary
 

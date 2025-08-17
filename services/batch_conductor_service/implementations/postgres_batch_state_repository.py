@@ -288,27 +288,6 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             )
             return set()
 
-    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
-        """
-        PostgreSQL doesn't clear phase completions - they are permanent records.
-
-        Phase completions in PostgreSQL are never cleared as they represent
-        permanent business facts needed for dependency resolution.
-
-        Args:
-            batch_id: Batch identifier
-
-        Returns:
-            True always (no-op for PostgreSQL)
-        """
-        # Phase completions are permanent in PostgreSQL
-        # This method is a no-op for the PostgreSQL repository
-        logger.debug(
-            f"PostgreSQL: Pipeline completed for batch {batch_id} - "
-            f"phase completions retained permanently",
-            extra={"batch_id": batch_id},
-        )
-        return True
 
     async def close(self) -> None:
         """Close the database connection pool."""

@@ -92,6 +92,9 @@ class TestPipelineProgressionScenarios:
         mock_event_publisher = AsyncMock()
         mock_event_publisher.publish_batch_event = AsyncMock()
 
+        # Create mock notification projector
+        mock_notification_projector = AsyncMock()
+
         return DefaultPipelinePhaseCoordinator(
             batch_repo=batch_repository,
             phase_initiators_map=phase_initiators_map,
@@ -99,6 +102,7 @@ class TestPipelineProgressionScenarios:
             notification_service=notification_service,
             state_manager=mock_state_manager,
             event_publisher=mock_event_publisher,
+            notification_projector=mock_notification_projector,
         )
 
     async def test_spellcheck_to_cj_assessment_pipeline_progression(

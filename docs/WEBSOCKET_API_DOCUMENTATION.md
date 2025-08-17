@@ -39,7 +39,7 @@ wsClient.connect();
 
 ## Notification Event Types
 
-The WebSocket service delivers 12 different notification types based on the `TeacherNotificationRequestedV1` event structure:
+The WebSocket service delivers 14 different notification types based on the `TeacherNotificationRequestedV1` event structure:
 
 ### 1. File Operation Notifications
 
@@ -291,6 +291,54 @@ Notifies when all assessments for a batch are completed.
 }
 ```
 
+### 4. Pipeline Completion Notifications
+
+#### `batch_pipeline_completed`
+
+Notifies when all requested pipeline phases have completed for a batch.
+
+```json
+{
+    "notification_type": "batch_pipeline_completed",
+    "timestamp": "2024-01-15T13:00:00Z",
+    "category": "processing_results",
+    "priority": "high",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "completed_phases": ["spellcheck", "cj_assessment"],
+        "final_status": "COMPLETED_SUCCESSFULLY",
+        "processing_duration_seconds": 1800.5,
+        "successful_essay_count": 15,
+        "failed_essay_count": 0,
+        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+#### `phase_skipped`
+
+Notifies when a pipeline phase is skipped due to prior completion (optimization).
+
+```json
+{
+    "notification_type": "phase_skipped",
+    "timestamp": "2024-01-15T10:05:00Z",
+    "category": "batch_progress",
+    "priority": "low",
+    "action_required": false,
+    "payload": {
+        "batch_id": "batch_123",
+        "phase_name": "spellcheck",
+        "skip_reason": "already_completed",
+        "storage_id": "storage_abc123",
+        "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
 
 ## Error Handling and Reconnection
 
@@ -383,6 +431,177 @@ $effect(() => {
   console.log('Notifications:', wsManager.notifications.length);
 });
 ```
+
+### Pipeline Completion Integration Examples
+
+#### Basic Pipeline Completion Handling
+
+```typescript
+// Subscribe to pipeline completion events
+wsClient.on('batch_pipeline_completed', (data) => {
+  console.log(`Pipeline completed for batch ${data.payload.batch_id}`);
+  console.log(`Status: ${data.payload.final_status}`);
+  console.log(`Duration: ${data.payload.processing_duration_seconds}s`);
+  
+  // Update UI state
+  updateBatchStatus(data.payload.batch_id, 'completed');
+  showCompletionNotification(data.payload);
+  enableResultsDownload(data.payload.batch_id);
+});
+
+// Handle phase skipping for optimization transparency
+wsClient.on('phase_skipped', (data) => {
+  console.log(`Phase ${data.payload.phase_name} skipped for batch ${data.payload.batch_id}`);
+  console.log(`Reason: ${data.payload.skip_reason}`);
+  
+  // Update progress indicator
+  updateProgressIndicator(data.payload.batch_id, data.payload.phase_name, 'skipped');
+});
+```
+
+#### Svelte 5 Reactive Integration
+
+```typescript
+// stores/batch.svelte.ts
+import { writable } from 'svelte/store';
+
+interface BatchState {
+  status: 'processing' | 'completed' | 'failed';
+  completedPhases: string[];
+  stats?: {
+    duration: number;
+    successfulEssays: number;
+    failedEssays: number;
+  };
+}
+
+export const batchStates = $state<Record<string, BatchState>>({});
+
+// WebSocket event handler
+export function handlePipelineCompleted(event: BatchPipelineCompletedData) {
+  const batchId = event.payload.batch_id;
+  
+  batchStates[batchId] = {
+    status: event.payload.final_status === 'COMPLETED_SUCCESSFULLY' ? 'completed' : 'failed',
+    completedPhases: event.payload.completed_phases,
+    stats: {
+      duration: event.payload.processing_duration_seconds,
+      successfulEssays: event.payload.successful_essay_count,
+      failedEssays: event.payload.failed_essay_count,
+    }
+  };
+}
+```
+
+#### React Integration Example
+
+```typescript
+// hooks/usePipelineCompletion.ts
+import { useEffect, useState } from 'react';
+import { wsClient } from '../services/websocket';
+
+interface PipelineStats {
+  batchId: string;
+  status: string;
+  duration: number;
+  successfulEssays: number;
+  failedEssays: number;
+  completedPhases: string[];
+}
+
+export function usePipelineCompletion() {
+  const [completedPipelines, setCompletedPipelines] = useState<PipelineStats[]>([]);
+  
+  useEffect(() => {
+    const handleCompletion = (data: BatchPipelineCompletedData) => {
+      const stats: PipelineStats = {
+        batchId: data.payload.batch_id,
+        status: data.payload.final_status,
+        duration: data.payload.processing_duration_seconds,
+        successfulEssays: data.payload.successful_essay_count,
+        failedEssays: data.payload.failed_essay_count,
+        completedPhases: data.payload.completed_phases,
+      };
+      
+      setCompletedPipelines(prev => [...prev, stats]);
+      
+      // Show user notification
+      if (data.payload.final_status === 'COMPLETED_SUCCESSFULLY') {
+        toast.success(`Pipeline completed successfully for batch ${data.payload.batch_id}`);
+      } else {
+        toast.warning(`Pipeline completed with issues for batch ${data.payload.batch_id}`);
+      }
+    };
+    
+    wsClient.on('batch_pipeline_completed', handleCompletion);
+    
+    return () => {
+      wsClient.off('batch_pipeline_completed', handleCompletion);
+    };
+  }, []);
+  
+  return { completedPipelines };
+}
+```
+
+#### Error Handling and Edge Cases
+
+```typescript
+// Comprehensive event handling with error recovery
+class PipelineCompletionHandler {
+  private batchTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private readonly COMPLETION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  
+  handlePipelineStarted(batchId: string) {
+    // Set timeout for pipeline completion
+    const timeout = setTimeout(() => {
+      this.handlePipelineTimeout(batchId);
+    }, this.COMPLETION_TIMEOUT);
+    
+    this.batchTimeouts.set(batchId, timeout);
+  }
+  
+  handlePipelineCompleted(data: BatchPipelineCompletedData) {
+    const batchId = data.payload.batch_id;
+    
+    // Clear timeout
+    const timeout = this.batchTimeouts.get(batchId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.batchTimeouts.delete(batchId);
+    }
+    
+    // Process completion
+    try {
+      this.updateBatchResults(data);
+      this.notifyUser(data);
+      this.enableDownloads(batchId);
+    } catch (error) {
+      console.error('Error processing pipeline completion:', error);
+      this.handleCompletionError(batchId, error);
+    }
+  }
+  
+  private handlePipelineTimeout(batchId: string) {
+    console.warn(`Pipeline completion timeout for batch ${batchId}`);
+    // Fallback to polling API for status
+    this.pollBatchStatus(batchId);
+  }
+  
+  private async pollBatchStatus(batchId: string) {
+    try {
+      const response = await fetch(`/api/v1/batches/${batchId}/status`);
+      const status = await response.json();
+      
+      if (status.details.status === 'completed') {
+        // Manually trigger completion handling
+        this.handleMissedCompletion(batchId, status);
+      }
+    } catch (error) {
+      console.error('Error polling batch status:', error);
+    }
+  }
+}
 ```
 
 ## Testing WebSocket Connections

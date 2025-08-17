@@ -505,3 +505,57 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 exc_info=True,
             )
             raise
+
+    async def mark_batch_completed(
+        self,
+        batch_id: str,
+        final_status: str,
+        completion_stats: dict,
+    ) -> None:
+        """Mark batch as completed with final statistics."""
+        try:
+            async with self._get_session() as session:
+                result = await session.execute(
+                    select(BatchResult).where(BatchResult.batch_id == batch_id)
+                )
+                batch = result.scalars().first()
+
+                if not batch:
+                    self.logger.warning(f"Batch {batch_id} not found for completion marking")
+                    return
+
+                # Update batch completion fields
+                from common_core.status_enums import BatchStatus
+                batch.overall_status = BatchStatus(final_status)
+                batch.completed_essay_count = completion_stats.get("successful_essays", 0)
+                batch.failed_essay_count = completion_stats.get("failed_essays", 0)
+                batch.processing_completed_at = datetime.utcnow()
+                batch.updated_at = datetime.utcnow()
+                
+                # Store completion statistics in batch metadata
+                current_metadata = batch.batch_metadata or {}
+                current_metadata.update({
+                    "completion_stats": completion_stats,
+                    "completed_at": datetime.utcnow().isoformat(),
+                })
+                batch.batch_metadata = current_metadata
+
+                await session.commit()
+                
+                self.logger.info(
+                    "Marked batch as completed",
+                    batch_id=batch_id,
+                    final_status=final_status,
+                    successful_essays=completion_stats.get("successful_essays", 0),
+                    failed_essays=completion_stats.get("failed_essays", 0),
+                )
+
+        except Exception as e:
+            self._record_error_metrics(type(e).__name__, "mark_batch_completed")
+            self.logger.error(
+                "Failed to mark batch as completed",
+                batch_id=batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise

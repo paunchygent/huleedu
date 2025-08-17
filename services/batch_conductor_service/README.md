@@ -36,6 +36,7 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 
 - **Dynamic Phase Pruning**: Removes already-completed phases from pipelines
 - **Cross-Pipeline Optimization**: Tracks completions across multiple pipeline runs
+- **Cache Persistence**: Redis cache persists across pipeline completions (7-day TTL) for cross-pipeline pruning
 - **Phase Skipped Events**: Publishes events for observability when phases are pruned
 - **Dependency Rules**: ai_feedback/cj_assessment → requires spellcheck
 

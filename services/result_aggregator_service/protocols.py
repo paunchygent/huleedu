@@ -11,6 +11,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.result_events import BatchAssessmentCompletedV1, BatchResultsReadyV1
 from common_core.models.error_models import ErrorDetail
@@ -108,6 +109,15 @@ class BatchRepositoryProtocol(Protocol):
         """Get all essays for a batch."""
         ...
 
+    async def mark_batch_completed(
+        self,
+        batch_id: str,
+        final_status: str,
+        completion_stats: dict,
+    ) -> None:
+        """Mark batch as completed with final statistics."""
+        ...
+
 
 class StateStoreProtocol(Protocol):
     """Protocol for state store operations."""
@@ -158,6 +168,10 @@ class EventProcessorProtocol(Protocol):
         self, envelope: EventEnvelope[AssessmentResultV1], data: AssessmentResultV1
     ) -> None:
         """Process assessment result event with rich business data from CJ Assessment Service."""
+        ...
+
+    async def process_pipeline_completed(self, event: BatchPipelineCompletedV1) -> None:
+        """Process pipeline completion for final result aggregation."""
         ...
 
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.notification_events import TeacherNotificationRequestedV1
 from common_core.pipeline_models import PhaseName
@@ -84,6 +85,73 @@ class NotificationProjector:
                 "requested_pipeline": requested_pipeline,
                 "resolved_pipeline": pipeline_phases,
                 "correlation_id": str(correlation_id),
+            },
+        )
+
+    async def handle_batch_pipeline_completed(
+        self,
+        event: BatchPipelineCompletedV1,
+    ) -> None:
+        """Project pipeline completion to teacher notification."""
+        
+        # Get batch to extract teacher_id from processing_metadata
+        batch = await self.batch_repo.get_batch_by_id(event.batch_id)
+        if not batch:
+            logger.warning(
+                f"Batch {event.batch_id} not found for pipeline completion notification",
+                extra={"batch_id": event.batch_id, "correlation_id": str(event.correlation_id)},
+            )
+            return
+
+        # Extract user_id from processing_metadata JSON field
+        processing_metadata = batch.get("processing_metadata", {})
+        user_id = processing_metadata.get("user_id")
+        if not user_id:
+            logger.warning(
+                f"No user_id found in batch {event.batch_id} processing_metadata",
+                extra={"batch_id": event.batch_id, "correlation_id": str(event.correlation_id)},
+            )
+            return
+
+        # Determine priority based on failures
+        priority = NotificationPriority.IMMEDIATE if event.failed_essay_count > 0 else NotificationPriority.HIGH
+        action_required = event.failed_essay_count > 0
+
+        # Create pipeline completion message
+        if event.failed_essay_count > 0:
+            message = f"Pipeline completed with {event.failed_essay_count} failures: {event.final_status}"
+        else:
+            message = f"Pipeline completed successfully: {event.final_status}"
+
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=user_id,
+            notification_type="pipeline_completed",
+            category=WebSocketEventCategory.BATCH_PROGRESS,
+            priority=priority,
+            payload={
+                "batch_id": event.batch_id,
+                "final_status": event.final_status,
+                "completed_phases": event.completed_phases,
+                "successful_essays": event.successful_essay_count,
+                "failed_essays": event.failed_essay_count,
+                "duration_seconds": event.processing_duration_seconds,
+                "message": message
+            },
+            action_required=action_required,
+            correlation_id=str(event.correlation_id),
+            batch_id=event.batch_id,
+        )
+        
+        await self._publish_notification(notification)
+        
+        logger.info(
+            "Published pipeline_completed notification",
+            extra={
+                "batch_id": event.batch_id,
+                "teacher_id": user_id,
+                "final_status": event.final_status,
+                "failed_essays": event.failed_essay_count,
+                "correlation_id": str(event.correlation_id),
             },
         )
 

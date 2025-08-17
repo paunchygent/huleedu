@@ -185,29 +185,6 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
 
         return True
 
-    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
-        """
-        Clear pipeline state when pipeline completes, preparing for next pipeline.
-
-        Mock implementation for testing.
-
-        Args:
-            batch_id: Batch identifier
-
-        Returns:
-            True if cleared successfully, False otherwise
-        """
-        key = f"bcs:batch:{batch_id}:phases"
-
-        # Remove the phases tracking key if it exists
-        if key in self.batch_summaries:
-            del self.batch_summaries[key]
-
-        # Remove TTL tracking for this key
-        if key in self.ttl_expiry:
-            del self.ttl_expiry[key]
-
-        return True
 
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """

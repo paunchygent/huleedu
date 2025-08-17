@@ -123,7 +123,6 @@ class BCSKafkaConsumer:
             # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
             "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
-            "huleedu.batch.pipeline.completed.v1",  # Pipeline completions for state clearing
             # Add more specialized service result topics as needed
         ]
 
@@ -220,9 +219,6 @@ class BCSKafkaConsumer:
             elif msg.topic == "huleedu.els.batch.phase.outcome.v1":
                 await self._handle_els_batch_phase_outcome(msg)
                 await self._track_event_success("els_batch_phase_outcome")
-            elif msg.topic == "huleedu.batch.pipeline.completed.v1":
-                await self._handle_batch_pipeline_completed(msg)
-                await self._track_event_success("batch_pipeline_completed")
             else:
                 logger.warning(f"Unknown topic: {msg.topic}")
                 await self._track_event_failure(event_type, "unknown_topic")
@@ -434,41 +430,3 @@ class BCSKafkaConsumer:
             logger.error(f"Error processing ELS batch phase outcome: {e}", exc_info=True)
             raise
 
-    async def _handle_batch_pipeline_completed(self, msg: ConsumerRecord) -> None:
-        """
-        Handle batch pipeline completion events to clear state for next pipeline.
-
-        When a pipeline completes, clear the tracked phase completions to enable
-        fresh execution of the next pipeline.
-        """
-        try:
-            # Parse the event envelope
-            envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
-            event: BatchPipelineCompletedV1 = BatchPipelineCompletedV1.model_validate(envelope.data)
-
-            # Clear pipeline state for this batch
-            result = await self.batch_state_repo.clear_batch_pipeline_state(batch_id=event.batch_id)
-
-            if result:
-                logger.info(
-                    f"Cleared pipeline state for batch {event.batch_id} after pipeline completion "
-                    f"(status={event.final_status}, completed_phases={event.completed_phases})",
-                    extra={
-                        "batch_id": event.batch_id,
-                        "final_status": event.final_status,
-                        "completed_phases": event.completed_phases,
-                        "successful_essay_count": event.successful_essay_count,
-                        "failed_essay_count": event.failed_essay_count,
-                        "duration_seconds": event.processing_duration_seconds,
-                        "correlation_id": str(event.correlation_id),
-                    },
-                )
-            else:
-                logger.error(
-                    f"Failed to clear pipeline state for batch {event.batch_id}",
-                    extra={"batch_id": event.batch_id},
-                )
-
-        except Exception as e:
-            logger.error(f"Error processing batch pipeline completed event: {e}", exc_info=True)
-            raise

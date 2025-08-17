@@ -93,17 +93,6 @@ class BatchStateRepositoryProtocol(Protocol):
         """
         ...
 
-    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
-        """
-        Clear pipeline state when pipeline completes, preparing for next pipeline.
-
-        Args:
-            batch_id: Batch identifier
-
-        Returns:
-            True if cleared successfully, False otherwise
-        """
-        ...
 
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """

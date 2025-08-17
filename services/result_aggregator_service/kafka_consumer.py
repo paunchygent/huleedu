@@ -15,6 +15,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.assessment_result_events import AssessmentResultV1
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -53,6 +54,7 @@ class ResultAggregatorKafkaConsumer:
             topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),  # Rich event for business data
+            topic_name(ProcessingEvent.BATCH_PIPELINE_COMPLETED),  # Pipeline completion for result finalization
             # Future topics to add when services are implemented:
             # "huleedu.essay.nlp.completed.v1",
             # "huleedu.essay.aifeedback.completed.v1",
@@ -71,6 +73,8 @@ class ResultAggregatorKafkaConsumer:
                 # Processing completion events (24 hours)
                 "SpellcheckResultDataV1": 86400,
                 "AssessmentResultV1": 86400,  # Rich assessment data from CJ service
+                # Pipeline completion events (72 hours for batch lifecycle)
+                "BatchPipelineCompletedV1": 259200,  # Pipeline completion from BOS
                 # Aggregation completion events (72 hours for batch lifecycle)
                 "ResultAggregatorBatchCompletedV1": 259200,
                 "ResultAggregatorClassSummaryUpdatedV1": 259200,
@@ -230,6 +234,15 @@ class ResultAggregatorKafkaConsumer:
                 )
                 await self.event_processor.process_assessment_result(
                     assessment_envelope, AssessmentResultV1.model_validate(assessment_envelope.data)
+                )
+
+            elif record.topic == topic_name(ProcessingEvent.BATCH_PIPELINE_COMPLETED):
+                # Process pipeline completion for final result aggregation
+                pipeline_envelope = EventEnvelope[BatchPipelineCompletedV1].model_validate_json(
+                    message_value_str
+                )
+                await self.event_processor.process_pipeline_completed(
+                    BatchPipelineCompletedV1.model_validate(pipeline_envelope.data)
                 )
 
             else:

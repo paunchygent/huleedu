@@ -24,6 +24,7 @@ from services.batch_orchestrator_service.implementations.batch_pipeline_state_ma
 from services.batch_orchestrator_service.implementations.notification_service import (
     NotificationService,
 )
+from services.batch_orchestrator_service.notification_projector import NotificationProjector
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
@@ -44,6 +45,7 @@ class DefaultPipelinePhaseCoordinator:
         notification_service: NotificationService,
         state_manager: BatchPipelineStateManager,
         event_publisher: BatchEventPublisherProtocol,
+        notification_projector: NotificationProjector,
     ) -> None:
         self.batch_repo = batch_repo
         self.phase_initiators_map = phase_initiators_map
@@ -51,6 +53,7 @@ class DefaultPipelinePhaseCoordinator:
         self.notification_service = notification_service
         self.state_manager = state_manager
         self.event_publisher = event_publisher
+        self.notification_projector = notification_projector
 
     async def handle_phase_concluded(
         self,
@@ -625,6 +628,9 @@ class DefaultPipelinePhaseCoordinator:
                 "correlation_id": correlation_id,
             },
         )
+
+        # Project completion notification to teacher
+        await self.notification_projector.handle_batch_pipeline_completed(completion_event)
 
         # Mark batch as ready for new pipeline requests
         # The pipeline completion event signals the end of this pipeline execution

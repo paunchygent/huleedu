@@ -209,7 +209,7 @@ async def check_workflow_continuation(
         completed_count = len(completed_pairs)
 
         # Check if ALL expected comparisons are completed
-        should_continue = (
+        should_continue: bool = (
             batch_state.total_comparisons > 0 and completed_count >= batch_state.total_comparisons
         )
 

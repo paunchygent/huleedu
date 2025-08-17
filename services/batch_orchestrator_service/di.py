@@ -413,6 +413,7 @@ class PipelineCoordinationProvider(Provider):
         notification_service: NotificationService,
         state_manager: BatchPipelineStateManager,
         event_publisher: BatchEventPublisherProtocol,
+        notification_projector: NotificationProjector,
     ) -> PipelinePhaseCoordinatorProtocol:
         """Provide pipeline phase coordinator implementation with extracted services."""
         return DefaultPipelinePhaseCoordinator(
@@ -422,6 +423,7 @@ class PipelineCoordinationProvider(Provider):
             notification_service,
             state_manager,
             event_publisher,
+            notification_projector,
         )
 
     @provide(scope=Scope.APP)

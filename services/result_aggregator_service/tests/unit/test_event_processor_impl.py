@@ -673,11 +673,18 @@ class TestProcessSpellcheckCompleted:
     ) -> None:
         """Test error when entity information is missing."""
         # Arrange
-        # The test wants to simulate missing entity_id in system_metadata
-        # Create a minimal system_metadata without entity_id
+        # The test wants to simulate missing entity_id in system_metadata to trigger the error
+        # Code checks: if not data.system_metadata or not data.system_metadata.entity_id
+        # Use model_construct to bypass validation and create invalid data for testing
 
-        mock_metadata = Mock(spec=SystemProcessingMetadata)
-        mock_metadata.entity_id = None  # This simulates missing entity_id
+        # Create a system_metadata with missing entity_id using model_construct
+        # Type ignore needed since we're intentionally bypassing validation for testing
+        system_metadata = SystemProcessingMetadata.model_construct(
+            entity_id=None,  # type: ignore[arg-type]  # This simulates missing entity_id
+            entity_type="essay",
+            parent_id=None,
+            processing_stage=ProcessingStage.COMPLETED,
+        )
 
         data = SpellcheckResultDataV1(
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
@@ -687,7 +694,7 @@ class TestProcessSpellcheckCompleted:
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             original_text_storage_id="original_text_123",
             corrections_made=0,
-            system_metadata=mock_metadata,
+            system_metadata=system_metadata,
         )
 
         envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
@@ -1019,10 +1026,238 @@ class TestProcessAssessmentResult:
             await event_processor.process_assessment_result(envelope, data)
 
 
+class TestProcessPipelineCompleted:
+    """Tests for process_pipeline_completed method."""
+
+    @pytest.mark.asyncio
+    async def test_successful_pipeline_completion(
+        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+    ) -> None:
+        """Test successful pipeline completion processing."""
+        # Arrange
+        batch_id = "test-batch-success"
+        user_id = "teacher-123"
+        correlation_id = uuid4()
+
+        # Mock batch with user_id
+        mock_batch = Mock()
+        mock_batch.user_id = user_id
+        mock_batch_repository.get_batch.return_value = mock_batch
+
+        from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event = BatchPipelineCompletedV1(
+            batch_id=batch_id,
+            completed_phases=["spellcheck", "cj_assessment"],
+            final_status="COMPLETED_SUCCESSFULLY",
+            processing_duration_seconds=45.2,
+            successful_essay_count=25,
+            failed_essay_count=0,
+            correlation_id=correlation_id,
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+            ),
+        )
+
+        # Act
+        await event_processor.process_pipeline_completed(event)
+
+        # Assert
+        # Verify batch completion was marked
+        mock_batch_repository.mark_batch_completed.assert_called_once_with(
+            batch_id=batch_id,
+            final_status="COMPLETED_SUCCESSFULLY",
+            completion_stats={
+                "successful_essays": 25,
+                "failed_essays": 0,
+                "duration_seconds": 45.2,
+                "completed_phases": ["spellcheck", "cj_assessment"],
+            }
+        )
+
+        # Verify cache invalidation
+        mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
+        mock_cache_manager.invalidate_user_batches.assert_called_once_with(user_id)
+
+    @pytest.mark.asyncio
+    async def test_pipeline_completion_with_failures(
+        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+    ) -> None:
+        """Test pipeline completion processing with failures."""
+        # Arrange
+        batch_id = "test-batch-failures"
+        user_id = "teacher-456"
+        correlation_id = uuid4()
+
+        mock_batch = Mock()
+        mock_batch.user_id = user_id
+        mock_batch_repository.get_batch.return_value = mock_batch
+
+        from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event = BatchPipelineCompletedV1(
+            batch_id=batch_id,
+            completed_phases=["spellcheck", "cj_assessment"],
+            final_status="COMPLETED_WITH_FAILURES",
+            processing_duration_seconds=62.8,
+            successful_essay_count=22,
+            failed_essay_count=3,
+            correlation_id=correlation_id,
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+            ),
+        )
+
+        # Act
+        await event_processor.process_pipeline_completed(event)
+
+        # Assert
+        # Verify batch completion was marked with failure status
+        mock_batch_repository.mark_batch_completed.assert_called_once_with(
+            batch_id=batch_id,
+            final_status="COMPLETED_WITH_FAILURES",
+            completion_stats={
+                "successful_essays": 22,
+                "failed_essays": 3,
+                "duration_seconds": 62.8,
+                "completed_phases": ["spellcheck", "cj_assessment"],
+            }
+        )
+
+        # Verify cache invalidation still occurs
+        mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
+        mock_cache_manager.invalidate_user_batches.assert_called_once_with(user_id)
+
+    @pytest.mark.asyncio
+    async def test_pipeline_completion_missing_batch(
+        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+    ) -> None:
+        """Test pipeline completion when batch is not found."""
+        # Arrange
+        batch_id = "nonexistent-batch"
+        correlation_id = uuid4()
+
+        # Mock repository to return None (batch not found)
+        mock_batch_repository.get_batch.return_value = None
+
+        from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event = BatchPipelineCompletedV1(
+            batch_id=batch_id,
+            completed_phases=["spellcheck"],
+            final_status="COMPLETED_SUCCESSFULLY",
+            processing_duration_seconds=30.0,
+            successful_essay_count=10,
+            failed_essay_count=0,
+            correlation_id=correlation_id,
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+            ),
+        )
+
+        # Act
+        await event_processor.process_pipeline_completed(event)
+
+        # Assert
+        # Mark completion should still be called
+        mock_batch_repository.mark_batch_completed.assert_called_once()
+        # Batch invalidation should still occur
+        mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
+        # But user cache invalidation should not occur since no batch found
+        mock_cache_manager.invalidate_user_batches.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_pipeline_completion_batch_repository_error(
+        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+    ) -> None:
+        """Test pipeline completion when batch repository fails."""
+        # Arrange
+        batch_id = "test-batch-error"
+        correlation_id = uuid4()
+
+        # Mock repository to raise exception
+        mock_batch_repository.mark_batch_completed.side_effect = Exception("Database connection failed")
+
+        from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event = BatchPipelineCompletedV1(
+            batch_id=batch_id,
+            completed_phases=["spellcheck"],
+            final_status="COMPLETED_SUCCESSFULLY",
+            processing_duration_seconds=35.0,
+            successful_essay_count=15,
+            failed_essay_count=0,
+            correlation_id=correlation_id,
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+            ),
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Database connection failed"):
+            await event_processor.process_pipeline_completed(event)
+
+    @pytest.mark.asyncio
+    async def test_pipeline_completion_cache_invalidation_error(
+        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+    ) -> None:
+        """Test pipeline completion when cache invalidation fails."""
+        # Arrange
+        batch_id = "test-batch-cache-error"
+        user_id = "teacher-cache"
+        correlation_id = uuid4()
+
+        mock_batch = Mock()
+        mock_batch.user_id = user_id
+        mock_batch_repository.get_batch.return_value = mock_batch
+
+        # Mock cache invalidation to fail
+        mock_state_store.invalidate_batch.side_effect = Exception("Redis connection failed")
+
+        from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+        from common_core.metadata_models import SystemProcessingMetadata
+
+        event = BatchPipelineCompletedV1(
+            batch_id=batch_id,
+            completed_phases=["cj_assessment"],
+            final_status="COMPLETED_SUCCESSFULLY",
+            processing_duration_seconds=50.0,
+            successful_essay_count=20,
+            failed_essay_count=0,
+            correlation_id=correlation_id,
+            metadata=SystemProcessingMetadata(
+                entity_id=batch_id,
+                entity_type="batch",
+            ),
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Redis connection failed"):
+            await event_processor.process_pipeline_completed(event)
+
+        # Verify batch completion was called before cache error
+        mock_batch_repository.mark_batch_completed.assert_called_once()
+
+
 # Test Coverage Summary:
 # - BatchEssaysRegistered: 3 tests (successful, without pipelines, repository error)
 # - ELSBatchPhaseOutcomeV1: 4 tests (successful, with failures, critical failure, repository error)
 # - SpellcheckResultDataV1: 5 tests (with corrections, without corrections, failed, missing entity,
 #   missing batch_id)
 # - AssessmentResultV1: 4 tests (successful, with anchors, empty results, repository error)
-# Total: 16 tests covering all methods in EventProcessorImpl
+# - BatchPipelineCompletedV1: 5 tests (successful, with failures, missing batch, repository error, 
+#   cache error)
+# Total: 21 tests covering all methods in EventProcessorImpl

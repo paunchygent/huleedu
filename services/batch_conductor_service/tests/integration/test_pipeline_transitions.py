@@ -143,13 +143,6 @@ class MockBatchStateRepository(BatchStateRepositoryProtocol):
         # Check if the step/phase has been completed for this batch
         return step_name in self.completed_phases.get(batch_id, set())
 
-    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
-        """Clear batch pipeline state."""
-        if batch_id in self.completed_phases:
-            del self.completed_phases[batch_id]
-        # Remove phase status for this batch
-        self.phase_status = {k: v for k, v in self.phase_status.items() if k[0] != batch_id}
-        return True
 
     def clear(self) -> None:
         """Clear all stored data."""

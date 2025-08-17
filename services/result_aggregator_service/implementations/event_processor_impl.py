@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from common_core.error_enums import ErrorCode
 from common_core.events.assessment_result_events import AssessmentResultV1
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.result_events import (
     BatchAssessmentCompletedV1,
     BatchResultsReadyV1,
@@ -439,6 +440,53 @@ class EventProcessorImpl(EventProcessorProtocol):
             logger.error(
                 "Failed to process assessment results",
                 batch_id=data.batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+    async def process_pipeline_completed(self, event: BatchPipelineCompletedV1) -> None:
+        """Process pipeline completion for final result aggregation."""
+        try:
+            logger.info(
+                "Processing pipeline completion",
+                batch_id=event.batch_id,
+                final_status=event.final_status,
+                successful_essays=event.successful_essay_count,
+                failed_essays=event.failed_essay_count,
+                correlation_id=str(event.correlation_id),
+            )
+            
+            # Mark batch as completed in aggregator
+            await self.batch_repository.mark_batch_completed(
+                batch_id=event.batch_id,
+                final_status=event.final_status,
+                completion_stats={
+                    "successful_essays": event.successful_essay_count,
+                    "failed_essays": event.failed_essay_count,
+                    "duration_seconds": event.processing_duration_seconds,
+                    "completed_phases": event.completed_phases,
+                }
+            )
+            
+            # Invalidate relevant cache entries
+            await self.state_store.invalidate_batch(event.batch_id)
+            
+            # Get batch to find user_id for cache invalidation
+            batch = await self.batch_repository.get_batch(event.batch_id)
+            if batch:
+                await self.cache_manager.invalidate_user_batches(batch.user_id)
+            
+            logger.info(
+                "Pipeline completion processed successfully",
+                batch_id=event.batch_id,
+                final_status=event.final_status,
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Failed to process pipeline completion",
+                batch_id=event.batch_id,
                 error=str(e),
                 exc_info=True,
             )

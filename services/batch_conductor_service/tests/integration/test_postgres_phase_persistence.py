@@ -137,31 +137,6 @@ async def test_postgresql_fallback_when_redis_empty(redis_repo, redis_client):
     assert all(redis_data[phase] == "completed" for phase in phases)
 
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_clear_pipeline_state_preserves_postgresql(redis_repo, postgres_repo, redis_client):
-    """Test that clearing pipeline state only affects Redis, not PostgreSQL."""
-    batch_id = "test-batch-003"
-    phase_name = "spellcheck"
-
-    # Record phase completion
-    await redis_repo.record_batch_phase_completion(
-        batch_id=batch_id,
-        phase_name=phase_name,
-        completed=True,
-    )
-
-    # Clear pipeline state
-    await redis_repo.clear_batch_pipeline_state(batch_id)
-
-    # Verify Redis is cleared
-    redis_key = f"bcs:batch:{batch_id}:phases"
-    redis_data = await redis_client.hgetall(redis_key)
-    assert redis_data == {}
-
-    # Verify PostgreSQL still has the data
-    pg_phases = await postgres_repo.get_completed_phases(batch_id)
-    assert phase_name in pg_phases
 
 
 @pytest.mark.integration

@@ -165,6 +165,35 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 
 # Then access logs: read .cursor/rules/046-docker-container-debugging.mdc to properly debug containers.
 
+#### Development
+
+```bash
+# Main development workflow
+pdm run dev <command> [service]     # Use main dev script
+
+# Building services
+pdm run dev build                   # Build production images with cache
+pdm run dev build clean             # Clean build (no cache) for production
+pdm run dev build dev               # Build ALL dev images with hot-reload support
+pdm run dev build dev nlp_service   # Build specific dev image
+
+# Running services
+pdm run dev dev                     # Start ALL services with hot-reload
+pdm run dev dev nlp_service         # Start specific service with hot-reload
+
+# Utilities
+pdm run dev check                   # Check what needs rebuilding
+pdm run dev incremental             # Incremental build using cache
+
+# Quick commands
+pdm run up                          # Start all services 
+pdm run restart essay_lifecycle_worker      # Restart specific service
+pdm run down                        # Stop all services
+pdm run logs nlp_service         # Follow service logs
+```
+
+#### Production
+
 ```markdown
 - **Rebuild**: `docker compose build --no-cache <service>`
 - **Start**: `docker compose up -d`
@@ -186,6 +215,23 @@ docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_ma
 
 # Database names follow pattern: huleedu_<service_name>
 # Example: huleedu_class_management, huleedu_essay_lifecycle, etc.
+```
+
+### Database Environment Separation
+
+```bash
+# Development (default): Docker containers
+HULEEDU_ENVIRONMENT=development
+
+# Production: External managed databases  
+HULEEDU_ENVIRONMENT=production
+# Requires: HULEEDU_PROD_DB_HOST, HULEEDU_PROD_DB_PASSWORD
+
+# Database management
+pdm run db-reset                    # Reset development databases
+pdm run db-seed                     # Seed development data
+pdm run prod-validate              # Validate production config
+pdm run prod-migrate               # Run production migrations
 ```
 
 ### Service Management
@@ -226,3 +272,5 @@ docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_ma
 - Document all environment variables
 - Include examples in documentation
 ```
+- ALWAYS USE   1. restart - for restarting specific services
+  2. restart-all - for restarting all services

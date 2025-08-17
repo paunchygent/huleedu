@@ -237,7 +237,10 @@ type NotificationType =
   | 'batch_cj_assessment_completed'
   | 'batch_processing_started'
   | 'batch_results_ready'
-  | 'batch_assessment_completed';
+  | 'batch_assessment_completed'
+  // Pipeline Completion
+  | 'batch_pipeline_completed'
+  | 'phase_skipped';
 
 // File Operation Notification Data Types
 interface BatchFilesUploadedData {
@@ -402,6 +405,39 @@ interface BatchAssessmentCompletedData {
   correlation_id: string;
 }
 
+// Pipeline Completion Notification Data Types
+interface BatchPipelineCompletedData {
+  notification_type: 'batch_pipeline_completed';
+  category: 'processing_results';
+  priority: 'high';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    completed_phases: string[];
+    final_status: string;
+    processing_duration_seconds: number;
+    successful_essay_count: number;
+    failed_essay_count: number;
+    correlation_id: string;
+  };
+  correlation_id: string;
+}
+
+interface PhaseSkippedData {
+  notification_type: 'phase_skipped';
+  category: 'batch_progress';
+  priority: 'low';
+  action_required: false;
+  payload: {
+    batch_id: string;
+    phase_name: string;
+    skip_reason: string;
+    storage_id?: string;
+    correlation_id: string;
+  };
+  correlation_id: string;
+}
+
 type NotificationData = 
   // File Operations
   | BatchFilesUploadedData
@@ -417,7 +453,10 @@ type NotificationData =
   | BatchCjAssessmentCompletedData
   | BatchProcessingStartedData
   | BatchResultsReadyData
-  | BatchAssessmentCompletedData;
+  | BatchAssessmentCompletedData
+  // Pipeline Completion
+  | BatchPipelineCompletedData
+  | PhaseSkippedData;
 ```
 
 ### WebSocket Event Handlers
@@ -446,6 +485,10 @@ interface WebSocketEventHandlers {
   batch_processing_started: (data: BatchProcessingStartedData) => void;
   batch_results_ready: (data: BatchResultsReadyData) => void;
   batch_assessment_completed: (data: BatchAssessmentCompletedData) => void;
+  
+  // Pipeline Completion Events
+  batch_pipeline_completed: (data: BatchPipelineCompletedData) => void;
+  phase_skipped: (data: PhaseSkippedData) => void;
   
   // Reconnection Events
   maxReconnectAttemptsReached: (data: { attempts: number }) => void;

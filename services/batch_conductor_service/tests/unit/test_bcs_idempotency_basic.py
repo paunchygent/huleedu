@@ -152,10 +152,6 @@ class MockBatchStateRepository:
         # Mock implementation for testing
         return True
 
-    async def clear_batch_pipeline_state(self, batch_id: str) -> bool:
-        """Clear pipeline state when pipeline completes, preparing for next pipeline."""
-        # Mock implementation for testing
-        return True
 
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """Get all completed phases for a batch."""
