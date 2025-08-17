@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     DB_NAME: str = "huleedu_nlp"
 
     # Kafka Configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event consumption and publishing"
+    )
     CONSUMER_GROUP: str = "nlp-service-consumer-group"
     CONSUMER_CLIENT_ID: str = "nlp-service-consumer"
     PRODUCER_CLIENT_ID: str = "nlp-service-producer"
@@ -42,7 +45,10 @@ class Settings(BaseSettings):
     )
 
     # Redis Configuration
-    REDIS_URL: str = "redis://redis:6379"
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for caching and distributed state"
+    )
 
     # Metrics Configuration
     PROMETHEUS_PORT: int = 9099

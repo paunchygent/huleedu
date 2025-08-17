@@ -29,7 +29,10 @@ class Settings(BaseSettings):
         default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT"
     )
     SERVICE_NAME: str = "batch-service"
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event publishing"
+    )
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
     PORT: int = 5000  # Default port for batch orchestrator service
     HOST: str = "0.0.0.0"
@@ -54,7 +57,10 @@ class Settings(BaseSettings):
     USE_MOCK_REPOSITORY: bool = False  # Set to True to use mock repository for testing
 
     # Redis Configuration
-    REDIS_URL: str = "redis://localhost:6379"  # Development/test default
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for caching and distributed state"
+    )
 
     # Batch Conductor Service Configuration
     BCS_BASE_URL: str = "http://batch_conductor_service:4002"

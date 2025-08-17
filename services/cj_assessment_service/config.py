@@ -22,12 +22,18 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
 
     # Kafka configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event consumption and publishing"
+    )
     CONSUMER_GROUP_ID_CJ: str = "cj_assessment_consumer_group"
     PRODUCER_CLIENT_ID_CJ: str = "cj_assessment_producer"
 
     # Redis configuration for idempotency
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for idempotency and caching"
+    )
 
     # Kafka topic names
     CJ_ASSESSMENT_REQUEST_TOPIC: str = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)

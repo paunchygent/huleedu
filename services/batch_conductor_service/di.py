@@ -154,27 +154,27 @@ class EventDrivenServicesProvider(Provider):
         """Provide Kafka event publisher for BCS phase events."""
         # Use no-op publisher for local/test to avoid Kafka requirement
         if settings.ENV_TYPE not in {"docker", "production"}:
-            
+
             class _NoOpEventPublisher:
                 async def start(self) -> None:
                     pass
-                
+
                 async def stop(self) -> None:
                     pass
-                    
+
                 async def publish(self, topic: str, envelope, key: str | None = None) -> None:
                     pass
-            
+
             return _NoOpEventPublisher()
-        
+
         from huleedu_service_libs.kafka_client import KafkaBus
-        
+
         # Create KafkaBus for event publishing
         kafka_bus = KafkaBus(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             client_id=f"bcs-events-{settings.SERVICE_NAME}",
         )
-        
+
         return kafka_bus
 
 

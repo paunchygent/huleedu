@@ -195,7 +195,7 @@ async def check_workflow_continuation(
         if not batch_state:
             logger.warning(
                 f"Batch state not found for batch {batch_id}",
-                extra={"correlation_id": str(correlation_id), "batch_id": batch_id}
+                extra={"correlation_id": str(correlation_id), "batch_id": batch_id},
             )
             return False
 
@@ -210,8 +210,7 @@ async def check_workflow_continuation(
 
         # Check if ALL expected comparisons are completed
         should_continue = (
-            batch_state.total_comparisons > 0 and 
-            completed_count >= batch_state.total_comparisons
+            batch_state.total_comparisons > 0 and completed_count >= batch_state.total_comparisons
         )
 
         logger.info(

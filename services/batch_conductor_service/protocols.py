@@ -147,6 +147,15 @@ class PipelineRulesProtocol(Protocol):
         """
         ...
 
+    def get_last_pruned_phases(self) -> list[str]:
+        """Get the phases that were pruned in the last pipeline resolution.
+
+        Returns:
+            List of phase names that were pruned during the most recent
+            call to resolve_pipeline_dependencies().
+        """
+        ...
+
 
 class KafkaEventConsumerProtocol(Protocol):
     """

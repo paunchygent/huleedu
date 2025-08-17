@@ -27,14 +27,27 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
         min_length=1,
         max_length=100,
     )
+    correlation_id: str = Field(
+        description="The correlation ID from the original pipeline request for event tracking",
+        min_length=1,
+        max_length=100,
+    )
 
     model_config = {
         "str_strip_whitespace": True,
         "validate_assignment": True,
         "json_schema_extra": {
             "examples": [
-                {"batch_id": "batch_12345", "requested_pipeline": "ai_feedback"},
-                {"batch_id": "batch_67890", "requested_pipeline": "cj_assessment"},
+                {
+                    "batch_id": "batch_12345",
+                    "requested_pipeline": "ai_feedback",
+                    "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                },
+                {
+                    "batch_id": "batch_67890",
+                    "requested_pipeline": "cj_assessment",
+                    "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+                },
             ]
         },
     }

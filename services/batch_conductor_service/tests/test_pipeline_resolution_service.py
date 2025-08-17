@@ -73,6 +73,7 @@ class TestPipelineResolutionServiceBehavior:
                 raise ValueError(f"Unknown pipeline dependencies for: {requested_pipeline}")
 
         mock.resolve_pipeline_dependencies.side_effect = resolve_dependencies
+        mock.get_last_pruned_phases.return_value = []  # No phases pruned by default
         return mock
 
     @pytest.fixture
@@ -102,11 +103,17 @@ class TestPipelineResolutionServiceBehavior:
         }
 
     @pytest.fixture
+    def mock_event_publisher(self) -> AsyncMock:
+        """Mock Kafka event publisher for testing."""
+        return AsyncMock()
+
+    @pytest.fixture
     def service(
         self,
         mock_pipeline_generator: AsyncMock,
         mock_pipeline_rules: AsyncMock,
         mock_dlq_producer: AsyncMock,
+        mock_event_publisher: AsyncMock,
         mock_metrics: dict,
     ) -> DefaultPipelineResolutionService:
         """Create service instance with realistic external dependencies."""
@@ -114,6 +121,7 @@ class TestPipelineResolutionServiceBehavior:
             pipeline_rules=mock_pipeline_rules,
             pipeline_generator=mock_pipeline_generator,
             dlq_producer=mock_dlq_producer,
+            event_publisher=mock_event_publisher,
             metrics=mock_metrics,
         )
 

@@ -650,7 +650,9 @@ class PipelineTestHarness:
                                 # For CJ Assessment pipeline, mark the phase as completed when we get the completion event
                                 elif "cj_assessment.completed" in event_type:
                                     tracker.completed_phases.add("cj_assessment")
-                                    logger.info("✅ Phase cj_assessment completed (from completion event)")
+                                    logger.info(
+                                        "✅ Phase cj_assessment completed (from completion event)"
+                                    )
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
                                 return envelope_data
 

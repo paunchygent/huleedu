@@ -29,7 +29,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "spell-checker-service"
     VERSION: str = "1.0.0"
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event consumption and publishing"
+    )
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
     # Database configuration
@@ -38,7 +41,10 @@ class Settings(BaseSettings):
     DB_NAME: str = "huleedu_spellchecker"
 
     # Redis configuration for idempotency
-    REDIS_URL: str = "redis://redis:6379"
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for idempotency and caching"
+    )
 
     CONSUMER_GROUP: str = "spellchecker-service-group-v1.1"
     PRODUCER_CLIENT_ID: str = "spellchecker-service-producer"

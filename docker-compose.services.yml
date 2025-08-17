@@ -168,12 +168,12 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
-      - LOG_LEVEL=DEBUG
+      - SPELLCHECKER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPELLCHECKER_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+      - SPELLCHECKER_SERVICE_LOG_LEVEL=DEBUG
       # Database configuration
       - SPELLCHECKER_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@spellchecker_db:5432/huleedu_spellchecker
-      - HTTP_PORT=8002
+      - SPELLCHECKER_SERVICE_HTTP_PORT=8002
       - SPELLCHECKER_SERVICE_REDIS_URL=redis://redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=spellchecker_service
@@ -211,10 +211,10 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+      - BATCH_ORCHESTRATOR_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - BATCH_ORCHESTRATOR_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - BATCH_ORCHESTRATOR_SERVICE_PORT=5000
-      - LOG_LEVEL=INFO
+      - BATCH_ORCHESTRATOR_SERVICE_LOG_LEVEL=INFO
       - BATCH_ORCHESTRATOR_SERVICE_REDIS_URL=redis://redis:6379
       - BATCH_ORCHESTRATOR_SERVICE_ENVIRONMENT=${ENVIRONMENT:-production}
       # Database configuration
@@ -262,7 +262,8 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ESSAY_LIFECYCLE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - ESSAY_LIFECYCLE_SERVICE_HTTP_PORT=6000
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
@@ -313,8 +314,9 @@ services:
       - huleedu_internal_network
     environment:
       - ENV_TYPE=docker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+      - ESSAY_LIFECYCLE_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ESSAY_LIFECYCLE_SERVICE_REDIS_URL=redis://redis:6379
+      - ESSAY_LIFECYCLE_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
@@ -452,8 +454,8 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
+      - API_GATEWAY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - API_GATEWAY_LOG_LEVEL=INFO
       - API_GATEWAY_SERVICE_PORT=8080
       - API_GATEWAY_SERVICE_HOST=0.0.0.0
       - API_GATEWAY_SERVICE_REDIS_URL=redis://redis:6379
@@ -494,8 +496,9 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
+      - CLASS_MANAGEMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
+      - CLASS_MANAGEMENT_SERVICE_LOG_LEVEL=INFO
       - CLASS_MANAGEMENT_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@class_management_db:5432/huleedu_class_management
       - CLASS_MANAGEMENT_SERVICE_DB_HOST=class_management_db
       - CLASS_MANAGEMENT_SERVICE_DB_PORT=5432
@@ -537,8 +540,8 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
+      - LLM_PROVIDER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LLM_PROVIDER_SERVICE_LOG_LEVEL=INFO
       - LLM_PROVIDER_SERVICE_PORT=8080
       - LLM_PROVIDER_SERVICE_HOST=0.0.0.0
       - LLM_PROVIDER_SERVICE_REDIS_URL=redis://redis:6379

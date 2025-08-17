@@ -192,7 +192,7 @@ class ClientPipelineRequestHandler:
                     # Request pipeline resolution from BCS
                     try:
                         bcs_response = await self.bcs_client.resolve_pipeline(
-                            batch_id, requested_pipeline_enum
+                            batch_id, requested_pipeline_enum, str(correlation_id)
                         )
                     except Exception as e:
                         error_msg = f"BCS pipeline resolution failed: {e}"

@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # Event-driven architecture configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092", description="Kafka bootstrap servers for event consumption"
+        default="kafka:9092", description="Kafka bootstrap servers for event consumption"
     )
 
     REDIS_URL: str = Field(

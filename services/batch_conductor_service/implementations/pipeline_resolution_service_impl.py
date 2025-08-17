@@ -7,12 +7,11 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import PhaseSkippedV1
 from common_core.events.envelope import EventEnvelope
-from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import OperationStatus
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.error_handling.batch_conductor_factories import (
     raise_pipeline_dependency_resolution_failed,
 )
@@ -22,6 +21,7 @@ from huleedu_service_libs.error_handling.factories import (
 )
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionRequestV1,
     BCSPipelineDefinitionResponseV1,
@@ -190,7 +190,8 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
     ) -> BCSPipelineDefinitionResponseV1:
         """Resolve a complete pipeline request from BOS with duration tracking."""
         start_time = time.time()
-        correlation_id = uuid4()
+        # Use correlation_id from request instead of generating a new one
+        correlation_id = UUID(request.correlation_id)
 
         try:
             resolved_pipeline = await self.resolve_pipeline(
@@ -287,9 +288,10 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         """Publish PhaseSkippedV1 events for phases that were pruned from pipeline execution."""
         try:
             metadata = SystemProcessingMetadata(
-                correlation_id=correlation_id,
-                processing_timestamp=datetime.now(UTC),
-                request_context={"batch_id": batch_id, "operation": "pipeline_resolution"},
+                entity_id=batch_id,
+                entity_type="batch",
+                timestamp=datetime.now(UTC),
+                event=ProcessingEvent.BATCH_PHASE_SKIPPED.value,
             )
 
             for phase_name in pruned_phases:

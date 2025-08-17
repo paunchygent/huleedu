@@ -326,7 +326,7 @@ class QueueProcessorImpl:
                 await self.queue_manager.remove(request.queue_id)
             except Exception as e:
                 logger.warning(f"Failed to remove request {request.queue_id} before retry: {e}")
-            
+
             # Now re-enqueue for retry
             retry_success = await self.queue_manager.enqueue(request)
             if not retry_success:

@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -175,9 +176,16 @@ def mock_dlq_producer() -> MockDlqProducer:
 
 
 @pytest.fixture
+def mock_event_publisher() -> AsyncMock:
+    """Mock Kafka event publisher for integration testing."""
+    return AsyncMock()
+
+
+@pytest.fixture
 async def pipeline_service(
     mock_batch_repo: MockBatchStateRepository,
     mock_dlq_producer: MockDlqProducer,
+    mock_event_publisher: AsyncMock,
 ) -> DefaultPipelineResolutionService:
     """Create pipeline resolution service with mock dependencies."""
     # Create settings with correct pipeline config path
@@ -200,6 +208,7 @@ async def pipeline_service(
         pipeline_rules=pipeline_rules,
         pipeline_generator=pipeline_generator,
         dlq_producer=mock_dlq_producer,
+        event_publisher=mock_event_publisher,
         metrics=metrics,
     )
 
@@ -209,6 +218,7 @@ async def integrated_system(
     mock_batch_repo: MockBatchStateRepository,
     mock_kafka_producer: MockKafkaProducer,
     mock_dlq_producer: MockDlqProducer,
+    mock_event_publisher: AsyncMock,
 ) -> dict[str, Any]:
     """Create integrated system components for end-to-end testing."""
     # Create settings with correct pipeline config path
@@ -232,6 +242,7 @@ async def integrated_system(
         pipeline_rules=pipeline_rules,
         pipeline_generator=pipeline_generator,
         dlq_producer=mock_dlq_producer,
+        event_publisher=mock_event_publisher,
         metrics=metrics,
     )
 
@@ -422,11 +433,13 @@ class TestPipelineTransitions:
 
         # Create a mock DLQ producer for the new service
         dlq_producer = MockDlqProducer()
+        event_publisher = AsyncMock()
 
         new_pipeline_service = DefaultPipelineResolutionService(
             pipeline_rules=pipeline_rules,
             pipeline_generator=pipeline_generator,
             dlq_producer=dlq_producer,
+            event_publisher=event_publisher,
             metrics={},
         )
 

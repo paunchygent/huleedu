@@ -55,7 +55,7 @@ class DefaultPipelineRules(PipelineRulesProtocol):
             "Pipeline steps pruned due to prior completion",
             registry=self._registry,
         )
-        
+
         # Track pruned phases from last resolution for event publishing
         self._last_pruned_phases: list[str] = []
 
@@ -83,7 +83,7 @@ class DefaultPipelineRules(PipelineRulesProtocol):
                 pruned = before_len - len(ordered_steps)
                 if pruned:
                     self._rules_pruned.inc(pruned)
-                
+
                 # Store pruned phases for the last resolution (for event publishing)
                 self._last_pruned_phases = [
                     step for step in original_steps if step not in ordered_steps

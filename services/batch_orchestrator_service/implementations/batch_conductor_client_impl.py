@@ -26,7 +26,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         self.bcs_endpoint = f"{settings.BCS_BASE_URL}{settings.BCS_PIPELINE_ENDPOINT}"
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName
+        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
     ) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
@@ -34,6 +34,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         Args:
             batch_id: The unique identifier of the target batch
             requested_pipeline: The final pipeline phase the user wants to run
+            correlation_id: The correlation ID from the original request for event tracking
 
         Returns:
             BCS response containing resolved pipeline and analysis
@@ -46,6 +47,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         request_data = {
             "batch_id": batch_id,
             "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
+            "correlation_id": correlation_id,  # Pass correlation_id to BCS for event tracking
         }
 
         self.logger.info(
@@ -53,6 +55,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
             extra={
                 "batch_id": batch_id,
                 "requested_pipeline": requested_pipeline.value,
+                "correlation_id": correlation_id,
                 "bcs_endpoint": self.bcs_endpoint,
             },
         )
@@ -75,6 +78,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                         extra={
                             "batch_id": batch_id,
                             "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
                             "status_code": response.status,
                             "response_text": response_text,
                         },
@@ -91,6 +95,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                         extra={
                             "batch_id": batch_id,
                             "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
                             "response_text": response_text,
                         },
                     )
@@ -104,6 +109,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                         extra={
                             "batch_id": batch_id,
                             "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
                             "response_data": response_data,
                         },
                     )
@@ -119,6 +125,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                         extra={
                             "batch_id": batch_id,
                             "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
                             "response_data": response_data,
                         },
                     )
@@ -132,6 +139,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                         extra={
                             "batch_id": batch_id,
                             "requested_pipeline": requested_pipeline,
+                            "correlation_id": correlation_id,
                             "final_pipeline": response_data["final_pipeline"],
                         },
                     )
@@ -142,6 +150,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                     extra={
                         "batch_id": batch_id,
                         "requested_pipeline": requested_pipeline,
+                        "correlation_id": correlation_id,
                         "final_pipeline": response_data["final_pipeline"],
                         "pipeline_length": len(response_data["final_pipeline"]),
                     },
@@ -156,6 +165,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                 extra={
                     "batch_id": batch_id,
                     "requested_pipeline": requested_pipeline,
+                    "correlation_id": correlation_id,
                     "bcs_endpoint": self.bcs_endpoint,
                 },
                 exc_info=True,
@@ -169,6 +179,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
                 extra={
                     "batch_id": batch_id,
                     "requested_pipeline": requested_pipeline,
+                    "correlation_id": correlation_id,
                     "bcs_endpoint": self.bcs_endpoint,
                 },
                 exc_info=True,

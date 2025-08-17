@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
 
     # Kafka Configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event consumption and publishing"
+    )
     CONSUMER_GROUP: str = "essay-lifecycle-service-group-v1.0"
     PRODUCER_CLIENT_ID: str = "essay-lifecycle-service-producer"
     CONSUMER_CLIENT_ID: str = "essay-lifecycle-service-consumer"
@@ -58,7 +61,10 @@ class Settings(BaseSettings):
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
     # Redis Configuration
-    REDIS_URL: str = "redis://localhost:6379"  # Development/test default
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for state management and idempotency"
+    )
 
     # Observability Configuration
     PROMETHEUS_PORT: int = 9090

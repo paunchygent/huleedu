@@ -47,8 +47,14 @@ class Settings(BaseSettings):
     USE_MOCK_LLM: bool = False  # Enable mock LLM for testing (no API calls)
 
     # HuleEdu Service Libs Integration
-    REDIS_URL: str = Field(default="redis://redis:6379/0")
-    KAFKA_BOOTSTRAP_SERVERS: str = Field(default="kafka:9092")
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis URL for caching and rate limiting"
+    )
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event publishing"
+    )
 
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = True

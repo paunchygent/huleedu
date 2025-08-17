@@ -281,7 +281,7 @@ class BatchConductorClientProtocol(Protocol):
     """Protocol for HTTP communication with Batch Conductor Service."""
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName
+        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
     ) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
@@ -289,6 +289,7 @@ class BatchConductorClientProtocol(Protocol):
         Args:
             batch_id: The unique identifier of the target batch
             requested_pipeline: The final pipeline the user wants to run
+            correlation_id: The correlation ID from the original request for event tracking
 
         Returns:
             BCS response containing resolved pipeline and analysis

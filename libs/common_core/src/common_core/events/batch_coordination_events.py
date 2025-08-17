@@ -305,12 +305,11 @@ class PhaseSkippedV1(BaseModel):
     batch_id: str = Field(description="Batch identifier")
     phase_name: str = Field(description="Name of the phase that was skipped")
     skip_reason: str = Field(
-        default="already_completed", 
-        description="Reason why phase was skipped (e.g., 'already_completed')"
+        default="already_completed",
+        description="Reason why phase was skipped (e.g., 'already_completed')",
     )
     storage_id: str | None = Field(
-        default=None,
-        description="Storage ID from previous completion that will be reused"
+        default=None, description="Storage ID from previous completion that will be reused"
     )
     correlation_id: UUID = Field(description="Correlation ID from the pipeline request")
     metadata: SystemProcessingMetadata = Field(description="Processing metadata")

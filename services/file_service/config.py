@@ -30,8 +30,14 @@ class Settings(BaseSettings):
         default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT"
     )
     SERVICE_NAME: str = "file-service"
-    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
-    REDIS_URL: str = "redis://redis:6379"
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers for event publishing"
+    )
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL for caching and distributed locks"
+    )
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
     BOS_URL: str = Field(
         default="http://batch_orchestrator_service:5000",
