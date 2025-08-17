@@ -11,7 +11,7 @@ Central orchestrator for essay batch processing workflows using dynamic pipeline
 
 ### 1. Dynamic Pipeline Orchestration
 - **Phase Initiator Map**: `dict[PhaseName, PipelinePhaseInitiatorProtocol]` enables type-safe dynamic dispatch
-- **Pipeline Resolution**: Uses BCS (Batch Conductor Service) to resolve user-requested pipelines into executable phase sequences
+- **Optimized Execution**: BCS prunes already-completed phases before execution
 - **State Machine**: Each phase transitions through `PipelineExecutionStatus` with atomic repository updates
 
 ### 2. Clean Architecture Implementation
@@ -109,9 +109,10 @@ phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol] = {
 
 ## Service Integration Patterns
 
-### 1. Batch Conductor Service Integration
-- **Pipeline Resolution**: HTTP API resolves user requests into executable phase sequences
-- **Context Enrichment**: Provides educational context (teacher names, class info)
+### 1. Batch Conductor Service Integration  
+- **Phase Pruning**: BCS removes already-completed phases from pipelines (~50% reduction)
+- **Cross-Pipeline Optimization**: Tracks phase completions via Redis + PostgreSQL
+- **Observability**: BCS publishes `PhaseSkippedV1` events for pruned phases
 
 ### 2. Essay Lifecycle Service Coordination
 - **Command Pattern**: Initiates processing via Kafka commands

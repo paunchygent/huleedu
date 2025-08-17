@@ -23,6 +23,10 @@ from services.batch_conductor_service.protocols import (
     PipelineRulesProtocol,
 )
 
+import structlog
+
+logger = structlog.getLogger(__name__)
+
 
 class DefaultPipelineRules(PipelineRulesProtocol):
     """Default implementation of pipeline dependency resolution rules with Prometheus metrics."""
@@ -123,10 +127,44 @@ class DefaultPipelineRules(PipelineRulesProtocol):
         """Remove already-completed steps from pipeline execution list."""
         # Use batch state repository to check completion status
         remaining_steps = []
+        pruned_steps = []
+        
+        logger.info(
+            f"Checking phase completions for batch {batch_id}. Pipeline steps to check: {pipeline_steps}"
+        )
+        
         for step in pipeline_steps:
             is_complete = await self.batch_state_repository.is_batch_step_complete(batch_id, step)
-            if not is_complete:
+            if is_complete:
+                pruned_steps.append(step)
+                logger.info(
+                    f"✅ Phase '{step}' is already complete for batch {batch_id} - will be PRUNED",
+                    extra={"batch_id": batch_id, "step": step, "pruned": True}
+                )
+            else:
                 remaining_steps.append(step)
+                logger.debug(
+                    f"⏳ Phase '{step}' is not complete for batch {batch_id} - will be EXECUTED",
+                    extra={"batch_id": batch_id, "step": step, "pruned": False}
+                )
+        
+        if pruned_steps:
+            logger.info(
+                f"🎯 Phase pruning summary for batch {batch_id}: "
+                f"Pruned {len(pruned_steps)} phases: {pruned_steps}, "
+                f"Will execute {len(remaining_steps)} phases: {remaining_steps}",
+                extra={
+                    "batch_id": batch_id,
+                    "pruned_phases": pruned_steps,
+                    "remaining_phases": remaining_steps,
+                    "original_pipeline": pipeline_steps,
+                }
+            )
+        else:
+            logger.info(
+                f"No phases pruned for batch {batch_id}. All {len(pipeline_steps)} phases will execute: {pipeline_steps}",
+                extra={"batch_id": batch_id, "pipeline_steps": pipeline_steps}
+            )
 
         return remaining_steps
 

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from common_core.events.envelope import EventEnvelope
+from common_core.pipeline_models import PhaseName
 from services.batch_conductor_service.api_models import (
     BCSPipelineDefinitionRequestV1,
     BCSPipelineDefinitionResponseV1,
@@ -36,10 +37,10 @@ class TestPipelineResolutionServiceBehavior:
 
         # Set up realistic pipeline configurations
         pipeline_configs = {
-            "spellcheck": ["spellcheck"],
-            "ai_feedback": ["spellcheck", "ai_feedback"],
-            "cj_assessment": ["spellcheck", "cj_assessment"],
-            "full_analysis": ["spellcheck", "ai_feedback", "cj_assessment", "report_generation"],
+            PhaseName.SPELLCHECK.value: ["spellcheck"],
+            PhaseName.AI_FEEDBACK.value: ["spellcheck", "ai_feedback"],
+            PhaseName.CJ_ASSESSMENT.value: ["spellcheck", "cj_assessment"],
+            PhaseName.STUDENT_MATCHING.value: ["spellcheck", "ai_feedback", "cj_assessment", "report_generation"],
         }
 
         def get_pipeline_steps(pipeline_name: str) -> list[str] | None:
@@ -57,15 +58,15 @@ class TestPipelineResolutionServiceBehavior:
             requested_pipeline: str, batch_id: str | None = None
         ) -> list[str]:
             # Simulate realistic dependency resolution logic
-            if requested_pipeline == "spellcheck":
+            if requested_pipeline == PhaseName.SPELLCHECK.value:
                 return ["spellcheck"]
-            elif requested_pipeline == "ai_feedback":
+            elif requested_pipeline == PhaseName.AI_FEEDBACK.value:
                 # AI feedback requires spellcheck to be complete first
                 return ["spellcheck", "ai_feedback"]
-            elif requested_pipeline == "cj_assessment":
+            elif requested_pipeline == PhaseName.CJ_ASSESSMENT.value:
                 # CJ assessment also requires spellcheck
                 return ["spellcheck", "cj_assessment"]
-            elif requested_pipeline == "full_analysis":
+            elif requested_pipeline == PhaseName.STUDENT_MATCHING.value:
                 # Full analysis requires all components
                 return ["spellcheck", "ai_feedback", "cj_assessment", "report_generation"]
             else:
@@ -133,7 +134,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of simple spellcheck pipeline."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_essays_001", requested_pipeline="spellcheck"
+            batch_id="batch_essays_001", 
+            requested_pipeline=PhaseName.SPELLCHECK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440001"
         )
 
         # Act
@@ -145,7 +148,7 @@ class TestPipelineResolutionServiceBehavior:
         assert response.final_pipeline == ["spellcheck"]
         assert response.analysis_summary is not None
         assert "1 steps" in response.analysis_summary
-        assert "spellcheck" in response.analysis_summary
+        assert "SPELLCHECK" in response.analysis_summary
 
     async def test_ai_feedback_pipeline_with_dependencies(
         self, service: DefaultPipelineResolutionService
@@ -153,7 +156,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of AI feedback pipeline including required spellcheck dependency."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_essays_002", requested_pipeline="ai_feedback"
+            batch_id="batch_essays_002", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440002"
         )
 
         # Act
@@ -164,7 +169,7 @@ class TestPipelineResolutionServiceBehavior:
         assert response.final_pipeline == ["spellcheck", "ai_feedback"]
         assert response.analysis_summary is not None
         assert "2 steps" in response.analysis_summary
-        assert "ai_feedback" in response.analysis_summary
+        assert "AI_FEEDBACK" in response.analysis_summary
 
     async def test_cj_assessment_pipeline_resolution(
         self, service: DefaultPipelineResolutionService
@@ -172,7 +177,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of comparative judgment assessment pipeline."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_cj_study_001", requested_pipeline="cj_assessment"
+            batch_id="batch_cj_study_001", 
+            requested_pipeline=PhaseName.CJ_ASSESSMENT,
+            correlation_id="550e8400-e29b-41d4-a716-446655440003"
         )
 
         # Act
@@ -191,7 +198,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of complex pipeline with multiple dependencies."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_comprehensive_001", requested_pipeline="full_analysis"
+            batch_id="batch_comprehensive_001", 
+            requested_pipeline=PhaseName.STUDENT_MATCHING,
+            correlation_id="550e8400-e29b-41d4-a716-446655440004"
         )
 
         # Act
@@ -212,7 +221,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test graceful handling of unknown pipeline requests."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_unknown_001", requested_pipeline="nonexistent_pipeline"
+            batch_id="batch_unknown_001", 
+            requested_pipeline=PhaseName.NLP,  # Valid enum but may not be configured
+            correlation_id="550e8400-e29b-41d4-a716-446655440005"
         )
 
         # Act
@@ -227,18 +238,20 @@ class TestPipelineResolutionServiceBehavior:
             "pipeline with ID" in response.analysis_summary
             and "not found" in response.analysis_summary
         )
-        assert "nonexistent_pipeline" in response.analysis_summary
+        assert "PhaseName.NLP" in response.analysis_summary
 
     async def test_multiple_unknown_pipeline_requests(
         self, service: DefaultPipelineResolutionService
     ) -> None:
         """Test that multiple unknown pipeline requests are handled consistently."""
-        # Arrange
-        unknown_pipelines = ["invalid_pipe_1", "invalid_pipe_2", "nonexistent_analysis"]
+        # Arrange - Use valid enums that may not be configured in pipeline YAML
+        unknown_pipelines = [PhaseName.NLP, PhaseName.NLP, PhaseName.NLP]  # Test same unknown pipeline multiple times
 
-        for pipeline_name in unknown_pipelines:
+        for i, pipeline_name in enumerate(unknown_pipelines, 6):
             request = BCSPipelineDefinitionRequestV1(
-                batch_id=f"batch_{pipeline_name}", requested_pipeline=pipeline_name
+                batch_id=f"batch_{pipeline_name.value}_{i}", 
+                requested_pipeline=pipeline_name,
+                correlation_id=f"550e8400-e29b-41d4-a716-44665544000{i}"
             )
 
             # Act
@@ -248,7 +261,7 @@ class TestPipelineResolutionServiceBehavior:
             assert response.final_pipeline == []
             assert response.analysis_summary is not None
             assert "Pipeline resolution failed" in response.analysis_summary
-            assert pipeline_name in response.analysis_summary
+            assert str(pipeline_name) in response.analysis_summary  # Will be like "PhaseName.NLP"
 
     # Test Category 3: Dependency Resolution Failures
 
@@ -268,7 +281,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = circular_dependency_error
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_circular_001", requested_pipeline="ai_feedback"
+            batch_id="batch_circular_001", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440009"
         )
 
         # Act
@@ -295,7 +310,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = missing_prerequisites_error
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_missing_prereq_001", requested_pipeline="ai_feedback"
+            batch_id="batch_missing_prereq_001", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440010"
         )
 
         # Act
@@ -318,7 +335,9 @@ class TestPipelineResolutionServiceBehavior:
         )
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_generator_fail_001", requested_pipeline="ai_feedback"
+            batch_id="batch_generator_fail_001", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440011"
         )
 
         # Act
@@ -348,7 +367,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_dlq_producer.publish_to_dlq.side_effect = Exception("DLQ service unavailable")
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_dlq_fail_001", requested_pipeline="ai_feedback"
+            batch_id="batch_dlq_fail_001", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440012"
         )
 
         # Act - Should complete despite DLQ failure
@@ -381,7 +402,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = dependency_failure
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_dlq_test_001", requested_pipeline="cj_assessment"
+            batch_id="batch_dlq_test_001", 
+            requested_pipeline=PhaseName.CJ_ASSESSMENT,
+            correlation_id="550e8400-e29b-41d4-a716-446655440013"
         )
 
         # Act
@@ -417,7 +440,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test that unknown pipeline requests trigger DLQ publication for error tracking."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_no_dlq_001", requested_pipeline="completely_unknown_pipeline"
+            batch_id="batch_no_dlq_001", 
+            requested_pipeline=PhaseName.NLP,  # Valid enum but may not be configured
+            correlation_id="550e8400-e29b-41d4-a716-446655440014"
         )
 
         # Act
@@ -441,7 +466,7 @@ class TestPipelineResolutionServiceBehavior:
         from uuid import uuid4
 
         batch_id = "batch_optimal_001"
-        requested_pipeline = "ai_feedback"
+        requested_pipeline = PhaseName.AI_FEEDBACK.value
         correlation_id = uuid4()
         additional_metadata = {"user_preference": "detailed_analysis", "priority": "high"}
 
@@ -493,13 +518,19 @@ class TestPipelineResolutionServiceBehavior:
         # Arrange - Multiple different requests
         requests = [
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_1", requested_pipeline="spellcheck"
+                batch_id="batch_concurrent_1", 
+                requested_pipeline=PhaseName.SPELLCHECK,
+                correlation_id="550e8400-e29b-41d4-a716-446655440015"
             ),
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_2", requested_pipeline="ai_feedback"
+                batch_id="batch_concurrent_2", 
+                requested_pipeline=PhaseName.AI_FEEDBACK,
+                correlation_id="550e8400-e29b-41d4-a716-446655440016"
             ),
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_3", requested_pipeline="cj_assessment"
+                batch_id="batch_concurrent_3", 
+                requested_pipeline=PhaseName.CJ_ASSESSMENT,
+                correlation_id="550e8400-e29b-41d4-a716-446655440017"
             ),
         ]
 
@@ -534,11 +565,11 @@ class TestPipelineResolutionServiceBehavior:
         ) -> list[str]:
             if batch_id == "batch_already_spellchecked":
                 # This batch already completed spellcheck, so skip it
-                if requested_pipeline == "ai_feedback":
+                if requested_pipeline == PhaseName.AI_FEEDBACK.value:
                     return ["ai_feedback"]  # Skip spellcheck dependency
 
             # Default behavior for other batches
-            if requested_pipeline == "ai_feedback":
+            if requested_pipeline == PhaseName.AI_FEEDBACK.value:
                 return ["spellcheck", "ai_feedback"]
             return [requested_pipeline]
 
@@ -546,10 +577,14 @@ class TestPipelineResolutionServiceBehavior:
 
         # Act - Test both scenarios
         normal_request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_normal_001", requested_pipeline="ai_feedback"
+            batch_id="batch_normal_001", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440018"
         )
         optimized_request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_already_spellchecked", requested_pipeline="ai_feedback"
+            batch_id="batch_already_spellchecked", 
+            requested_pipeline=PhaseName.AI_FEEDBACK,
+            correlation_id="550e8400-e29b-41d4-a716-446655440019"
         )
 
         normal_response = await service.resolve_pipeline_request(normal_request)

@@ -24,6 +24,7 @@ import aiohttp
 import pytest
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
 
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (
@@ -44,12 +45,16 @@ class MockBatchConductorClient:
         self.base_url = base_url
         self.endpoint = f"{base_url}/internal/v1/pipelines/define"
 
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: str) -> dict[str, Any]:
+    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str) -> dict[str, Any]:
         """Resolve pipeline using real HTTP call to BCS."""
         # Build URL for BCS pipeline resolution endpoint
         url = f"{self.base_url}/internal/v1/pipelines/define"
         headers = {"Content-Type": "application/json"}
-        data = {"batch_id": batch_id, "requested_pipeline": requested_pipeline}
+        data = {
+            "batch_id": batch_id, 
+            "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
+            "correlation_id": correlation_id
+        }
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers) as response:
@@ -63,7 +68,7 @@ class MockBatchConductorClient:
     async def report_phase_completion(
         self,
         batch_id: str,
-        completed_phase: Any,  # PhaseName
+        completed_phase: PhaseName,
         success: bool = True,
     ) -> None:
         """Mock implementation of phase completion reporting."""

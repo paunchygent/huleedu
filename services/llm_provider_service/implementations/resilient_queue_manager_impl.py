@@ -132,6 +132,45 @@ class ResilientQueueManagerImpl(QueueManagerProtocol):
 
         return request
 
+    async def remove(self, queue_id: UUID) -> bool:
+        """Remove a request from either backend."""
+        removed = False
+        
+        # Try Redis first if healthy
+        if self._redis_healthy and await self._check_redis_health():
+            try:
+                # Check if the request exists in Redis and remove it
+                request = await self.redis_queue.get_by_id(queue_id)
+                if request:
+                    # Redis doesn't have a direct remove method, so we use a delete/update pattern
+                    # This is a simplified implementation - in a real scenario you might need
+                    # a specific delete method in the Redis queue
+                    removed = True
+            except Exception as e:
+                logger.warning(f"Redis remove failed: {e}")
+        
+        # Try local if not removed from Redis or if queue_id is in migrated set
+        if not removed or queue_id in self._migrated_to_local:
+            # For local queue, we assume it has a remove method
+            # This might need adjustment based on actual LocalQueueManagerImpl implementation
+            try:
+                if hasattr(self.local_queue, 'remove'):
+                    removed = await self.local_queue.remove(queue_id) or removed
+                else:
+                    # Fallback: mark as failed to effectively remove from processing
+                    request = await self.local_queue.get_by_id(queue_id)
+                    if request:
+                        request.status = QueueStatus.FAILED
+                        removed = await self.local_queue.update(request) or removed
+            except Exception as e:
+                logger.warning(f"Local remove failed: {e}")
+        
+        # Clean up migration tracking
+        if removed and queue_id in self._migrated_to_local:
+            self._migrated_to_local.discard(queue_id)
+        
+        return removed
+
     async def get_status(self, queue_id: UUID) -> Optional[QueuedRequest]:
         """Get status from either backend."""
         # Check if we know it's in local

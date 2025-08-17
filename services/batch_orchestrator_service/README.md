@@ -160,7 +160,7 @@ Environment variables (managed via Pydantic `BaseSettings`):
 ### HuleEdu Services
 
 * **Essay Lifecycle Service**: Event coordination and individual essay state management.
-* **Batch Conductor Service (BCS)**: ✅ **INTEGRATED** - HTTP client integration for intelligent pipeline dependency resolution. BOS calls BCS internal API to analyze batch state and resolve optimized pipelines based on current essay processing states.
+* **Batch Conductor Service (BCS)**: ✅ **INTEGRATED** - Pipeline optimization via phase pruning. BCS tracks completed phases across pipelines, removing redundant work (e.g., skips spellcheck in CJ after NLP). Publishes `PhaseSkippedV1` events for observability.
 * **Kafka**: Event publishing and consumption.
 
 ### Core Libraries

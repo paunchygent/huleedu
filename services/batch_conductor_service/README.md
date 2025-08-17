@@ -28,15 +28,16 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 
 ### Event-Driven Architecture
 
-- Consumes `SpellcheckResultDataV1` and `CJAssessmentResultDataV1` events
-- Maintains real-time batch state projection without ELS API polling
-- Structured event processing with correlation ID tracking
+- Consumes completion events from specialized services
+- Maintains real-time batch/phase state via Redis + PostgreSQL persistence
+- Publishes `PhaseSkippedV1` events for pruned phases
 
-### Intelligent Pipeline Resolution  
+### Intelligent Pipeline Resolution & Phase Pruning
 
-- Dependency rules engine (ai_feedback → spellcheck, cj_assessment → spellcheck)
-- Batch state analysis and prerequisite checking
-- Optimized pipeline generation with completed step pruning
+- **Dynamic Phase Pruning**: Removes already-completed phases from pipelines
+- **Cross-Pipeline Optimization**: Tracks completions across multiple pipeline runs
+- **Phase Skipped Events**: Publishes events for observability when phases are pruned
+- **Dependency Rules**: ai_feedback/cj_assessment → requires spellcheck
 
 ### Production Resilience
 
@@ -103,11 +104,11 @@ Default configuration uses Redis-first state management with atomic WATCH/MULTI/
 - `cj_assessment` → requires `spellcheck` completion  
 - `spellcheck` → no dependencies (can run immediately)
 
-### State-Aware Optimization
+### Phase Pruning Examples
 
-- Prunes completed steps from pipeline definitions
-- Validates prerequisites before pipeline construction
-- Handles partial completion scenarios gracefully
+- NLP pipeline runs: `[spellcheck, nlp]`
+- Subsequent CJ pipeline: `[cj_assessment]` (spellcheck pruned)
+- Result: ~50% reduction in redundant processing
 
 ## Development
 

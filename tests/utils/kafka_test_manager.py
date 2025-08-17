@@ -53,6 +53,7 @@ def create_kafka_test_config(
             "cj_assessment_completed": "huleedu.cj_assessment.completed.v1",
             "els_batch_phase_outcome": "huleedu.els.batch.phase.outcome.v1",
             "pipeline_progress": "huleedu.batch.pipeline.progress.updated.v1",
+            "phase_skipped": "huleedu.batch.phase.skipped.v1",  # BCS phase pruning events
         }
     return KafkaTestConfig(bootstrap_servers, topics, assignment_timeout)
 

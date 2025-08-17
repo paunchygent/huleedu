@@ -589,7 +589,7 @@ class PipelineTestHarness:
                             event_type = envelope_data.get("event_type", "")
                             event_data = envelope_data.get("data", {})
 
-                            # Filter by correlation ID
+                            # Filter by correlation ID - STRICT filtering for THIS pipeline request only
                             if event_correlation_id != request_correlation_id:
                                 continue
 
@@ -600,7 +600,7 @@ class PipelineTestHarness:
                                 f"correlation={event_correlation_id[:8]}..."
                             )
 
-                            # Track phase initiations
+                            # Track phase initiations - these determine what's actually executing
                             if "initiate.command" in event_type:
                                 if "spellcheck" in event_type:
                                     tracker.initiated_phases.add("spellcheck")
@@ -608,14 +608,14 @@ class PipelineTestHarness:
                                 elif "nlp" in event_type and "student.matching" not in event_type:
                                     tracker.initiated_phases.add("nlp")
                                     logger.info("📨 NLP analysis phase initiated")
-                                elif "cj.assessment" in event_type:
+                                elif "cj_assessment" in event_type or "cj.assessment" in event_type:
                                     tracker.initiated_phases.add("cj_assessment")
                                     logger.info("📨 CJ Assessment phase initiated")
-                                elif "ai.feedback" in event_type:
+                                elif "ai_feedback" in event_type or "ai.feedback" in event_type:
                                     tracker.initiated_phases.add("ai_feedback")
                                     logger.info("📨 AI Feedback phase initiated")
 
-                            # Track phase completions and storage IDs
+                            # Track phase completions - ONLY count as executed if initiated in THIS pipeline
                             elif "phase.outcome" in event_type:
                                 phase_name = event_data.get("phase_name")
                                 phase_status = event_data.get("phase_status")
@@ -624,14 +624,36 @@ class PipelineTestHarness:
                                 if phase_status in [
                                     "completed_successfully",
                                     "completed_with_failures",
+                                    "COMPLETED_SUCCESSFULLY",
+                                    "COMPLETED_WITH_FAILURES",
                                 ]:
-                                    tracker.completed_phases.add(phase_name)
-                                    if storage_id:
-                                        tracker.storage_ids[phase_name] = storage_id
-                                    logger.info(f"✅ Phase {phase_name} completed")
+                                    # CRITICAL: Only add to completed if it was initiated in THIS pipeline execution
+                                    if phase_name in tracker.initiated_phases:
+                                        tracker.completed_phases.add(phase_name)
+                                        if storage_id:
+                                            tracker.storage_ids[phase_name] = storage_id
+                                        logger.info(f"✅ Phase {phase_name} completed")
+                                    else:
+                                        logger.debug(
+                                            f"⚠️ Ignoring phase completion for {phase_name} - "
+                                            f"not initiated in this pipeline execution"
+                                        )
 
-                            # Check for pruning indicators
-                            elif "phase.reused" in event_type or "phase.skipped" in event_type:
+                            # Check for phase skipped/pruned events
+                            elif "phase.skipped" in event_type:
+                                phase_name = event_data.get("phase_name")
+                                storage_id = event_data.get("storage_id")
+                                skip_reason = event_data.get("skip_reason", "already_completed")
+                                
+                                tracker.pruned_phases.append(phase_name)
+                                if storage_id:
+                                    tracker.reused_storage_ids[phase_name] = storage_id
+                                logger.info(
+                                    f"⏭️ Phase {phase_name} SKIPPED (reason: {skip_reason})"
+                                )
+
+                            # Legacy phase reuse detection (remove once phase.skipped events work)
+                            elif "phase.reused" in event_type:
                                 phase_name = event_data.get("phase_name")
                                 storage_id = event_data.get("storage_id")
                                 tracker.pruned_phases.append(phase_name)
@@ -641,18 +663,24 @@ class PipelineTestHarness:
                                     f"⏭️ Phase {phase_name} pruned (reusing existing results)"
                                 )
 
-                            # Check for completion event
+                            # Check for specific completion events - these indicate pipeline completion
+                            # but should NOT add phases to executed list
                             if expected_completion_event in event_type:
-                                # For NLP pipeline, mark the phase as completed when we get the completion event
-                                if "nlp.analysis.completed" in event_type:
-                                    tracker.completed_phases.add("nlp")
-                                    logger.info("✅ Phase nlp completed (from completion event)")
-                                # For CJ Assessment pipeline, mark the phase as completed when we get the completion event
+                                # Extract phase from completion event type for special handling
+                                if "spellcheck.completed" in event_type:
+                                    # Individual essay completions - don't track as phase completion
+                                    pass
+                                elif "nlp.analysis.completed" in event_type:
+                                    # Only mark nlp as completed if it was initiated in this pipeline
+                                    if "nlp" in tracker.initiated_phases:
+                                        tracker.completed_phases.add("nlp")
+                                        logger.info("✅ Phase nlp completed (from analysis completion)")
                                 elif "cj_assessment.completed" in event_type:
-                                    tracker.completed_phases.add("cj_assessment")
-                                    logger.info(
-                                        "✅ Phase cj_assessment completed (from completion event)"
-                                    )
+                                    # Only mark cj_assessment as completed if it was initiated
+                                    if "cj_assessment" in tracker.initiated_phases:
+                                        tracker.completed_phases.add("cj_assessment")
+                                        logger.info("✅ Phase cj_assessment completed (from assessment completion)")
+                                
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
                                 return envelope_data
 
@@ -664,6 +692,8 @@ class PipelineTestHarness:
                 continue
 
         logger.error(f"Pipeline did not complete within {timeout_seconds} seconds")
+        logger.error(f"Initiated phases: {tracker.initiated_phases}")
+        logger.error(f"Completed phases: {tracker.completed_phases}")
         return None
 
     def _validate_phase_pruning(

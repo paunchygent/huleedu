@@ -150,10 +150,13 @@ class EventDrivenServicesProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def provide_event_publisher(self, settings: Settings) -> KafkaPublisherProtocol:
+    async def provide_event_publisher(self, settings: Settings) -> KafkaPublisherProtocol:
         """Provide Kafka event publisher for BCS phase events."""
         # Use no-op publisher for local/test to avoid Kafka requirement
         if settings.ENV_TYPE not in {"docker", "production"}:
+            from huleedu_service_libs.logging_utils import create_service_logger
+            logger = create_service_logger("bcs.di.event_publisher")
+            logger.info(f"Using NoOpEventPublisher because ENV_TYPE={settings.ENV_TYPE}")
 
             class _NoOpEventPublisher:
                 async def start(self) -> None:
@@ -163,17 +166,25 @@ class EventDrivenServicesProvider(Provider):
                     pass
 
                 async def publish(self, topic: str, envelope, key: str | None = None) -> None:
-                    pass
+                    logger.debug(f"NoOp: Would publish to {topic} with key {key}")
 
             return _NoOpEventPublisher()
 
         from huleedu_service_libs.kafka_client import KafkaBus
+        from huleedu_service_libs.logging_utils import create_service_logger
+        
+        logger = create_service_logger("bcs.di.event_publisher")
+        logger.info(f"Creating real KafkaBus for event publishing (ENV_TYPE={settings.ENV_TYPE})")
 
         # Create KafkaBus for event publishing
         kafka_bus = KafkaBus(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             client_id=f"bcs-events-{settings.SERVICE_NAME}",
         )
+        
+        # Start the publisher immediately since it's APP-scoped
+        await kafka_bus.start()
+        logger.info("KafkaBus event publisher started successfully")
 
         return kafka_bus
 

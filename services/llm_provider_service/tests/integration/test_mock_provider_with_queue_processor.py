@@ -68,6 +68,10 @@ class MockQueueManager:
         """Mock dequeue method."""
         return None
 
+    async def remove(self, queue_id: uuid.UUID) -> bool:
+        """Mock remove method."""
+        return True
+
     async def get_status(self, queue_id: uuid.UUID) -> Optional[Any]:
         """Mock get_status method."""
         return None

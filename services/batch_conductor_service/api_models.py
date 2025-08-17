@@ -10,6 +10,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+from common_core.pipeline_models import PhaseName
+
 class BCSPipelineDefinitionRequestV1(BaseModel):
     """
     Request model for pipeline definition endpoint.
@@ -20,12 +22,10 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
     batch_id: str = Field(
         description="The unique identifier of the target batch.", min_length=1, max_length=255
     )
-    requested_pipeline: str = Field(
+    requested_pipeline: PhaseName = Field(
         description=(
-            "The final pipeline the user wants to run (e.g., 'ai_feedback', 'cj_assessment')."
+            "The final pipeline the user wants to run (e.g., PhaseName.AI_FEEDBACK, PhaseName.CJ_ASSESSMENT)."
         ),
-        min_length=1,
-        max_length=100,
     )
     correlation_id: str = Field(
         description="The correlation ID from the original pipeline request for event tracking",

@@ -35,6 +35,9 @@ class HuleEduApp(Quart):
         tracer: OpenTelemetry tracer for distributed tracing
         consumer_task: Asyncio task for background Kafka consumers
         kafka_consumer: Service-specific Kafka consumer instances
+        event_publisher: Kafka event publisher for outbound events
+        consumer_monitor_task: Monitoring task for Kafka consumer health
+        _consumer_shutdown_requested: Flag for coordinating consumer shutdown
 
     Note:
         This class enforces a stricter contract. All HuleEdu services MUST
@@ -116,6 +119,30 @@ class HuleEduApp(Quart):
     service-specific consumer classes.
     """
 
+    event_publisher: Optional[Any] = None
+    """Kafka event publisher for outbound events.
+
+    OPTIONAL: Used by services that publish events to Kafka.
+    Enables graceful shutdown and lifecycle management of the
+    event publishing infrastructure.
+    """
+
+    consumer_monitor_task: Optional[asyncio.Task[None]] = None
+    """Asyncio task for monitoring Kafka consumer health.
+
+    OPTIONAL: Used by services that implement consumer monitoring.
+    Enables graceful shutdown and task lifecycle management for
+    the consumer monitoring background process.
+    """
+
+    _consumer_shutdown_requested: bool = False
+    """Flag for coordinating consumer shutdown sequence.
+
+    OPTIONAL: Used by services to signal shutdown to background
+    consumer processes. Provides clean coordination between
+    the main application shutdown and consumer task cleanup.
+    """
+
     relay_worker: Optional[Any] = None
     """Event relay worker for outbox pattern implementation.
 
@@ -151,9 +178,12 @@ class HuleEduApp(Quart):
         # database_engine and container MUST be set in create_app()
         self.extensions = {}
 
-        # Optional infrastructure starts as None
+        # Optional infrastructure starts as None or False
         self.tracer = None
         self.consumer_task = None
         self.kafka_consumer = None
+        self.event_publisher = None
+        self.consumer_monitor_task = None
+        self._consumer_shutdown_requested = False
         self.relay_worker = None
         self.relay_task = None

@@ -64,12 +64,12 @@ async def test_circuit_breaker_opens_after_failures(
     # First two calls should fail with ValueError (from the client)
     for i in range(2):
         with pytest.raises(ValueError) as exc_info:
-            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440001")
         assert "BCS returned error status 500" in str(exc_info.value)
 
     # Third call should be blocked by circuit breaker
     with pytest.raises(CircuitBreakerError) as cb_exc_info:
-        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440002")
     assert "Circuit breaker" in str(cb_exc_info.value)
     assert "is OPEN" in str(cb_exc_info.value)
 
@@ -117,22 +117,22 @@ async def test_circuit_breaker_recovers_after_timeout(
     # Fail twice to open circuit
     for _ in range(2):
         with pytest.raises(ValueError):
-            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440003")
 
     # Circuit should be open now
     with pytest.raises(CircuitBreakerError):
-        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440004")
 
     # Wait for recovery timeout
     await asyncio.sleep(1.5)
 
     # Next call should succeed (circuit in half-open, then closes)
-    result = await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+    result = await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440005")
     assert result["batch_id"] == "batch-123"
     assert result["final_pipeline"] == ["SPELLCHECK"]
 
     # Circuit should be closed now, subsequent calls work
-    result = await resilient_client.resolve_pipeline("batch-456", PhaseName.CJ_ASSESSMENT)
+    result = await resilient_client.resolve_pipeline("batch-456", PhaseName.CJ_ASSESSMENT, "550e8400-e29b-41d4-a716-446655440006")
     assert result["batch_id"] == "batch-123"  # Mock always returns same response
 
 
@@ -168,7 +168,7 @@ async def test_circuit_breaker_transparent_when_service_healthy(mock_settings: M
 
     # Make multiple successful calls
     for i in range(10):
-        result = await resilient_client.resolve_pipeline(f"batch-{i}", PhaseName.CJ_ASSESSMENT)
+        result = await resilient_client.resolve_pipeline(f"batch-{i}", PhaseName.CJ_ASSESSMENT, f"550e8400-e29b-41d4-a716-44665544{i:04d}")
         assert result["batch_id"] == "batch-123"
         assert "SPELLCHECK" in result["final_pipeline"]
         assert "CJ_ASSESSMENT" in result["final_pipeline"]
@@ -204,9 +204,9 @@ async def test_circuit_breaker_handles_different_error_types(mock_settings: Mock
     resilient_client = make_resilient(base_client, circuit_breaker)
 
     # These failures won't open the circuit (wrong exception type)
-    for _ in range(3):
+    for i in range(3):
         with pytest.raises(ValueError):
-            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, f"550e8400-e29b-41d4-a716-44665544{i+10:04d}")
 
     # Circuit should still be closed
     assert circuit_breaker.state.value == "closed"
@@ -215,13 +215,13 @@ async def test_circuit_breaker_handles_different_error_types(mock_settings: Mock
     mock_session.post.side_effect = ClientError("Connection failed")
 
     # These failures WILL count
-    for _ in range(2):
+    for i in range(2):
         with pytest.raises(ClientError):
-            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+            await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, f"550e8400-e29b-41d4-a716-44665544{i+13:04d}")
 
     # Circuit should now be open
     assert circuit_breaker.state.value == "open"
 
     # Next call blocked
     with pytest.raises(CircuitBreakerError):
-        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK)
+        await resilient_client.resolve_pipeline("batch-123", PhaseName.SPELLCHECK, "550e8400-e29b-41d4-a716-446655440015")

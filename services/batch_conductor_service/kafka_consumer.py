@@ -82,41 +82,77 @@ class BCSKafkaConsumer:
         self._handle_message_idempotently = handle_message_idempotently
 
     async def start_consuming(self) -> None:
-        """Start consuming Kafka events with topic subscription."""
+        """Start consuming Kafka events with topic subscription and retry on failure."""
         if self._consuming:
             raise RuntimeError("Consumer is already running")
 
+        # Retry configuration
+        max_retries = 10
+        retry_delay = 1.0  # Start with 1 second
+        max_delay = 60.0   # Max 60 seconds between retries
+        
+        for attempt in range(max_retries + 1):
+            try:
+                await self._attempt_start_consuming()
+                # If we get here, connection was successful
+                logger.info(f"BCS Kafka consumer connected successfully on attempt {attempt + 1}")
+                break
+                
+            except Exception as e:
+                if attempt < max_retries:
+                    logger.warning(
+                        f"BCS Kafka consumer connection attempt {attempt + 1}/{max_retries + 1} failed: {e}. "
+                        f"Retrying in {retry_delay:.1f}s..."
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.5, max_delay)  # Exponential backoff with cap
+                else:
+                    logger.error(f"Failed to start BCS Kafka consumer after {max_retries + 1} attempts: {e}", exc_info=True)
+                    if self._consumer:
+                        try:
+                            await self._consumer.stop()
+                        except Exception:
+                            pass  # Best effort cleanup
+                    raise
+
+    async def _attempt_start_consuming(self) -> None:
+        """Single attempt to start consuming with proper cleanup on failure."""
+        # Subscribe to processing result topics
+        topics = [
+            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+            "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
+            "huleedu.batch.pipeline.completed.v1",  # Pipeline completions for state clearing
+            # Add more specialized service result topics as needed
+        ]
+
+        self._consumer = AIOKafkaConsumer(
+            *topics,
+            bootstrap_servers=self.kafka_bootstrap_servers,
+            group_id=self.consumer_group,
+            enable_auto_commit=False,  # Manual commit for reliability
+            auto_offset_reset="latest",  # Only new events
+            value_deserializer=lambda m: m.decode("utf-8"),
+        )
+
         try:
-            # Subscribe to processing result topics
-            topics = [
-                topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
-                # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
-                topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
-                "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
-                "huleedu.batch.pipeline.completed.v1",  # Pipeline completions for state clearing
-                # Add more specialized service result topics as needed
-            ]
-
-            self._consumer = AIOKafkaConsumer(
-                *topics,
-                bootstrap_servers=self.kafka_bootstrap_servers,
-                group_id=self.consumer_group,
-                enable_auto_commit=False,  # Manual commit for reliability
-                auto_offset_reset="latest",  # Only new events
-                value_deserializer=lambda m: m.decode("utf-8"),
-            )
-
             await self._consumer.start()
             self._consuming = True
             logger.info(f"BCS Kafka consumer started, subscribed to topics: {topics}")
 
             # Start consumption loop
             await self._consume_loop()
-
+            
         except Exception as e:
-            logger.error(f"Failed to start BCS Kafka consumer: {e}", exc_info=True)
+            # Cleanup on any failure
+            self._consuming = False
             if self._consumer:
-                await self._consumer.stop()
+                try:
+                    await self._consumer.stop()
+                except Exception:
+                    pass  # Best effort cleanup
+            self._consumer = None
             raise
 
     async def stop_consuming(self) -> None:
@@ -137,15 +173,22 @@ class BCSKafkaConsumer:
     async def is_consuming(self) -> bool:
         """Check if consumer is actively consuming events."""
         return self._consuming
+    
+    async def is_healthy(self) -> bool:
+        """Check if consumer is healthy and connected."""
+        return self._consuming and self._consumer is not None
 
     async def _consume_loop(self) -> None:
-        """Main consumption loop with signal handling."""
+        """Main consumption loop with signal handling and reconnection on failure."""
         if self._consumer is None:
             raise RuntimeError("Consumer not initialized")
 
+        logger.info("BCS Kafka consumer entering consumption loop")
+        
         try:
             async for msg in self._consumer:
                 if self._stop_event.is_set():
+                    logger.info("BCS Kafka consumer stopping due to stop event")
                     break
 
                 try:
@@ -158,6 +201,10 @@ class BCSKafkaConsumer:
 
         except Exception as e:
             logger.error(f"Error in BCS consumption loop: {e}", exc_info=True)
+            self._consuming = False
+            raise  # Let the caller handle reconnection
+        
+        logger.info("BCS Kafka consumer exited consumption loop")
 
     async def _handle_message(self, msg: ConsumerRecord) -> None:
         """Route messages to appropriate handlers based on topic."""
@@ -221,7 +268,7 @@ class BCSKafkaConsumer:
     async def _handle_spellcheck_completed(self, msg: ConsumerRecord) -> None:
         """Handle spellcheck completion events."""
         try:
-            raw_message = msg.value.decode("utf-8")
+            raw_message = msg.value  # Already decoded by deserializer
             envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(raw_message)
 
             spellcheck_data = SpellcheckResultDataV1.model_validate(envelope.data)
@@ -273,7 +320,7 @@ class BCSKafkaConsumer:
     async def _handle_cj_assessment_completed(self, msg: ConsumerRecord) -> None:
         """Handle CJ assessment completion events."""
         try:
-            raw_message = msg.value.decode("utf-8")
+            raw_message = msg.value  # Already decoded by deserializer
             envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(raw_message)
 
             cj_data = CJAssessmentCompletedV1.model_validate(envelope.data)

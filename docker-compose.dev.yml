@@ -109,7 +109,7 @@ services:
       - /app/services/batch_conductor_service/__pycache__
       - /app/services/batch_conductor_service/__pypackages__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 

@@ -241,6 +241,17 @@ class QueueManagerProtocol(Protocol):
         """
         ...
 
+    async def remove(self, queue_id: UUID) -> bool:
+        """Remove a request from the queue by ID.
+
+        Args:
+            queue_id: The queue ID to remove
+
+        Returns:
+            True if removed successfully, False if not found
+        """
+        ...
+
     async def get_status(self, queue_id: UUID) -> Optional[QueuedRequest]:
         """Get status of a queued request.
 
