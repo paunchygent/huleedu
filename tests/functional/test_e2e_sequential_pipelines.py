@@ -193,16 +193,19 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
         logger.info("=" * 60)
         logger.info(f"Pipeline 1 (NLP): {nlp_result.executed_steps} in {nlp_execution_time:.2f}s")
         logger.info(
-            f"Pipeline 2 (CJ): {cj_result.executed_steps} in {cj_result.execution_time_seconds:.2f}s "
-            f"(pruned: {cj_result.pruned_phases})"
+            f"Pipeline 2 (CJ): {cj_result.executed_steps} in "
+            f"{cj_result.execution_time_seconds:.2f}s (pruned: {cj_result.pruned_phases})"
         )
         logger.info(
-            f"Pipeline 3 (AI): {ai_result.executed_steps} in {ai_result.execution_time_seconds:.2f}s "
-            f"(pruned: {ai_result.pruned_phases})"
+            f"Pipeline 3 (AI): {ai_result.executed_steps} in "
+            f"{ai_result.execution_time_seconds:.2f}s (pruned: {ai_result.pruned_phases})"
         )
-        logger.info(
-            f"Total phases executed: {len(nlp_result.executed_steps) + len(cj_result.executed_steps) + len(ai_result.executed_steps)}"
+        total_executed = (
+            len(nlp_result.executed_steps)
+            + len(cj_result.executed_steps)
+            + len(ai_result.executed_steps)
         )
+        logger.info(f"Total phases executed: {total_executed}")
         logger.info(
             f"Total phases pruned: {len(cj_result.pruned_phases) + len(ai_result.pruned_phases)}"
         )

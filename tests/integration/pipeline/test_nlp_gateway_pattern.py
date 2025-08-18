@@ -168,7 +168,9 @@ class TestNlpGatewayPattern:
                 "text_storage_id": f"content-{uuid4()}",
                 "filename": "Alva Lemos (Book Report ES24B).docx",
                 "expected_student": "Alva Lemos",
-                "content_preview": "Student Essay: The Importance of Education in Modern Society...",
+                "content_preview": (
+                    "Student Essay: The Importance of Education in Modern Society..."
+                ),
             },
             {
                 "essay_id": str(uuid4()),

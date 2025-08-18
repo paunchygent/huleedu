@@ -271,7 +271,8 @@ async def _process_cj_assessment_impl(
         # ALL workflows are async - comparisons submitted, results come via callbacks
         # The workflow_result.rankings will ALWAYS be empty at this point
         logger.info(
-            f"CJ assessment batch {converted_request_data['bos_batch_id']} submitted for async processing. "
+            f"CJ assessment batch {converted_request_data['bos_batch_id']} "
+            f"submitted for async processing. "
             "Results will be published when LLM callbacks complete.",
             extra={
                 **log_extra,

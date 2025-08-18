@@ -250,7 +250,8 @@ class CallbackSimulator:
                     if pair.request_correlation_id is None:
                         pair.request_correlation_id = uuid4()
                         logger.debug(
-                            f"Assigned correlation ID {pair.request_correlation_id} to pair ({pair.essay_a_els_id}, {pair.essay_b_els_id})"
+                            f"Assigned correlation ID {pair.request_correlation_id} to pair "
+                            f"({pair.essay_a_els_id}, {pair.essay_b_els_id})"
                         )
 
                 # Commit the correlation IDs

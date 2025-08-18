@@ -92,7 +92,10 @@ def check_database_connection(service: str, config: Dict) -> bool:
     db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
     db_password = os.getenv("HULEEDU_DB_PASSWORD", "REDACTED_DEFAULT_PASSWORD")
 
-    cmd = f"PGPASSWORD={db_password} psql -h localhost -p {config['port']} -U {db_user} -d {config['db_name']} -c '\\dt' 2>&1"
+    cmd = (
+        f"PGPASSWORD={db_password} psql -h localhost -p {config['port']} "
+        f"-U {db_user} -d {config['db_name']} -c '\\dt' 2>&1"
+    )
     success, _, _ = run_command(cmd)
 
     return success

@@ -95,7 +95,8 @@ class TestPipelineResolutionIntegration:
         mock_repo.get_batch_by_id.return_value = {
             "batch_id": "test-batch-integration-001",
             "requested_pipeline": "ai_feedback",
-            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,  # Use correct field and enum value
+            # Use correct field and enum value
+            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
             "resolved_pipeline": None,
             "created_at": "2025-01-01T00:00:00Z",
         }

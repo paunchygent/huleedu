@@ -323,7 +323,8 @@ class BatchProcessor:
                 await session.commit()
 
                 logger.info(
-                    f"Updated batch state to {state.value} with {total_comparisons} total comparisons",
+                    f"Updated batch state to {state.value} "
+                    f"with {total_comparisons} total comparisons",
                     extra={
                         "correlation_id": str(correlation_id),
                         "cj_batch_id": cj_batch_id,

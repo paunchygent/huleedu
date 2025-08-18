@@ -204,7 +204,8 @@ class ErrorTriggeringMockProvider:
         from services.llm_provider_service.internal_models import LLMProviderResponse
 
         print(
-            f"✅ ErrorTriggeringMockProvider: Returning success response for request #{self.request_count}"
+            f"✅ ErrorTriggeringMockProvider: Returning success response for "
+            f"request #{self.request_count}"
         )
         return LLMProviderResponse(
             winner=EssayComparisonWinner.ESSAY_A,  # Fixed: use enum, not .value
@@ -354,7 +355,8 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
                     request_final_status = status
 
             print(
-                f"📊 Request {i + 1} (ID: {request_id}): statuses = {all_statuses_for_request}, final = {request_final_status}"
+                f"📊 Request {i + 1} (ID: {request_id}): "
+                f"statuses = {all_statuses_for_request}, final = {request_final_status}"
             )
 
             if request_final_status == QueueStatus.COMPLETED:
@@ -373,21 +375,25 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
     assert successful_count > 0, "Should have successfully processed some requests"
     assert error_count > 0, "Should have encountered guaranteed errors (every 10th request)"
     assert successful_count + error_count == max_attempts, (
-        f"All requests should be accounted for: {successful_count} + {error_count} != {max_attempts}"
+        f"All requests should be accounted for: "
+        f"{successful_count} + {error_count} != {max_attempts}"
     )
 
-    # With ErrorTriggeringMockProvider, we expect exactly 2 errors (10th and 20th requests out of 25)
+    # With ErrorTriggeringMockProvider, we expect exactly 2 errors
+    # (10th and 20th requests out of 25)
     expected_errors = max_attempts // 10  # Should be 2 for 25 requests
     assert error_count == expected_errors, (
         f"Expected {expected_errors} errors but got {error_count}"
     )
 
     print(
-        f"✅ Successfully processed {max_attempts} requests: {successful_count} successful, {error_count} failed"
+        f"✅ Successfully processed {max_attempts} requests: "
+        f"{successful_count} successful, {error_count} failed"
     )
     print("✅ All errors were handled internally without raising exceptions")
     print(
-        f"✅ Error rate: {error_count}/{max_attempts} = {error_count / max_attempts:.1%} as expected"
+        f"✅ Error rate: {error_count}/{max_attempts} = "
+        f"{error_count / max_attempts:.1%} as expected"
     )
 
 

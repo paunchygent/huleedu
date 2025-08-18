@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core import EssayComparisonWinner, LLMProviderType
+from common_core import LLMProviderType
 from common_core.domain_enums import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from common_core.events.llm_provider_events import LLMComparisonResultV1

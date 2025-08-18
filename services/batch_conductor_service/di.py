@@ -82,18 +82,18 @@ class EventDrivenServicesProvider(Provider):
 
             return mock_batch_state_repository.MockBatchStateRepositoryImpl()
         else:
-            from services.batch_conductor_service.implementations.postgres_batch_state_repository import (
-                PostgreSQLBatchStateRepositoryImpl,
-            )
-            from services.batch_conductor_service.implementations.redis_batch_state_repository import (
-                RedisCachedBatchStateRepositoryImpl,
+            from services.batch_conductor_service.implementations import (
+                postgres_batch_state_repository,
+                redis_batch_state_repository,
             )
 
             # Create PostgreSQL repository for permanent storage
-            postgres_repo = PostgreSQLBatchStateRepositoryImpl(database_url=settings.database_url)
+            postgres_repo = postgres_batch_state_repository.PostgreSQLBatchStateRepositoryImpl(
+                database_url=settings.database_url
+            )
 
             # Create Redis repository with PostgreSQL fallback
-            return RedisCachedBatchStateRepositoryImpl(
+            return redis_batch_state_repository.RedisCachedBatchStateRepositoryImpl(
                 redis_client=redis_client,
                 postgres_repository=postgres_repo,  # Wire both repositories together!
             )

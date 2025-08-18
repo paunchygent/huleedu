@@ -112,7 +112,9 @@ def downgrade() -> None:
         type_=sa.String(3),
         existing_type=sa.String(4),
         existing_nullable=False,
-        postgresql_using="CASE WHEN LENGTH(primary_grade) > 3 THEN LEFT(primary_grade, 1) ELSE primary_grade END",
+        postgresql_using="CASE WHEN LENGTH(primary_grade) > 3 "
+                         "THEN LEFT(primary_grade, 1) "
+                         "ELSE primary_grade END",
         comment=None,
     )
 

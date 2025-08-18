@@ -134,7 +134,8 @@ class TestPipelineResolutionAPI:
             ),  # Empty batch_id
             (
                 {"batch_id": "batch_001", "requested_pipeline": 123, "correlation_id": "test-004"},
-                "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'",
+                "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or "
+                "'student_matching'",
             ),  # Invalid enum value type
             (
                 {"batch_id": "batch_001", "requested_pipeline": "ai_feedback"},
@@ -159,7 +160,8 @@ class TestPipelineResolutionAPI:
     async def test_pipeline_not_found(
         self, app_client: QuartTestClient, mock_pipeline_resolution_service: AsyncMock
     ) -> None:
-        """Test handling of a pipeline resolution that fails because the pipeline configuration is not found."""
+        """Test handling of a pipeline resolution that fails because the
+        pipeline configuration is not found."""
         # Arrange - Use valid enum value but mock service to return failure
         payload = {
             "batch_id": "batch_003",
@@ -229,8 +231,8 @@ class TestPipelineResolutionAPI:
         assert response.headers["Content-Type"] == "application/json"
         assert "detail" in data
         assert any(
-            "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'"
-            in error["msg"]
+            "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or "
+            "'student_matching'" in error["msg"]
             for error in data["detail"]
         )
 

@@ -1,13 +1,13 @@
 """Add email verification tokens table for user email verification workflow."""
 
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
+
 revision = "b467d39e123b"
 down_revision = "20240818_0001"
 branch_labels = None
 depends_on = None
-
-import sqlalchemy as sa
-from alembic import op
-from sqlalchemy.dialects import postgresql
 
 
 def upgrade() -> None:

@@ -207,7 +207,8 @@ class DefaultPipelinePhaseCoordinator:
             try:
                 current_index = requested_pipelines.index(completed_phase.value)
                 logger.info(
-                    f"DEBUG: Found completed phase at index {current_index} of {len(requested_pipelines)}",
+                    f"DEBUG: Found completed phase at index {current_index} of "
+                    f"{len(requested_pipelines)}",
                     extra={
                         "batch_id": batch_id,
                         "current_index": current_index,

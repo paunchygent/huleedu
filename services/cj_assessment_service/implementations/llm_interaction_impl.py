@@ -134,18 +134,21 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                 )
 
                 # Get the unique correlation ID for this specific comparison
-                # If tracking_map is provided, use the unique ID, otherwise use the batch correlation_id
+                # If tracking_map is provided, use the unique ID,
+                # otherwise use the batch correlation_id
                 task_correlation_id = correlation_id
                 if tracking_map:
                     task_key = (task.essay_a.id, task.essay_b.id)
                     task_correlation_id = tracking_map.get(task_key, correlation_id)
                     logger.info(
-                        f"DEBUG: Using tracking_map correlation ID {task_correlation_id} for task {task_key}",
+                        f"DEBUG: Using tracking_map correlation ID {task_correlation_id} "
+                        f"for task {task_key}",
                         extra={"batch_correlation_id": str(correlation_id)},
                     )
                 else:
                     logger.warning(
-                        f"DEBUG: No tracking_map provided, using batch correlation ID {correlation_id}",
+                        f"DEBUG: No tracking_map provided, "
+                        f"using batch correlation ID {correlation_id}",
                         extra={"essay_a": task.essay_a.id, "essay_b": task.essay_b.id},
                     )
 

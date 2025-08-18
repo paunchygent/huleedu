@@ -10,20 +10,7 @@ import types
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
-        BatchRetryProcessor,
-    )
-
-# Module-level placeholders for lazy imports to satisfy type checking
-scoring_ranking: types.ModuleType | None = None
-grade_projector: types.ModuleType | None = None
-
 from common_core.events.llm_provider_events import LLMComparisonResultV1
-
-# EntityReference removed - using primitive parameters
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 
@@ -48,6 +35,17 @@ from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
     ContentClientProtocol,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from services.cj_assessment_service.cj_core_logic.batch_retry_processor import (
+        BatchRetryProcessor,
+    )
+
+# Module-level placeholders for lazy imports to satisfy type checking
+scoring_ranking: types.ModuleType | None = None
+grade_projector: types.ModuleType | None = None
 
 # Import existing proven workflow logic for integration
 
@@ -214,8 +212,8 @@ async def check_workflow_continuation(
         )
 
         logger.info(
-            f"Batch {batch_id} has {completed_count}/{batch_state.total_comparisons} completed comparisons, "
-            f"workflow continuation: {should_continue}",
+            f"Batch {batch_id} has {completed_count}/{batch_state.total_comparisons} completed "
+            f"comparisons, workflow continuation: {should_continue}",
             extra={
                 "correlation_id": str(correlation_id),
                 "batch_id": batch_id,
@@ -475,7 +473,8 @@ async def _trigger_batch_scoring_completion(
             )
 
         # Use centralized dual event publishing function
-        # IMPORTANT: Use the original correlation_id from the batch, not the callback's correlation_id
+        # IMPORTANT: Use the original correlation_id from the batch, not the callback's
+        # correlation_id
         # This ensures the completion event has the same correlation_id as the original request
         original_correlation_id = UUID(batch_upload.event_correlation_id)
 

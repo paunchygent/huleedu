@@ -147,7 +147,8 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
             if harness.storage_ids.get("spellcheck"):
                 if cj_result.reused_storage_ids.get("spellcheck"):
                     logger.info(
-                        f"✅ Spellcheck storage ID properly reused: {cj_result.reused_storage_ids['spellcheck']}"
+                        f"✅ Spellcheck storage ID properly reused: "
+                        f"{cj_result.reused_storage_ids['spellcheck']}"
                     )
         else:
             # BCS might not have pruned if phase tracking isn't working yet
@@ -168,7 +169,8 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
         logger.info("=" * 80)
         logger.info("🎉 PRUNING TEST SUCCESS!")
         logger.info(
-            f"  NLP Pipeline: {nlp_result.executed_steps} in {nlp_result.execution_time_seconds:.2f}s"
+            f"  NLP Pipeline: {nlp_result.executed_steps} in "
+            f"{nlp_result.execution_time_seconds:.2f}s"
         )
         logger.info(
             f"  CJ Pipeline: {cj_result.executed_steps} in {cj_result.execution_time_seconds:.2f}s"

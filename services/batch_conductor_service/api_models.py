@@ -24,7 +24,8 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
     )
     requested_pipeline: PhaseName = Field(
         description=(
-            "The final pipeline the user wants to run (e.g., PhaseName.AI_FEEDBACK, PhaseName.CJ_ASSESSMENT)."
+            "The final pipeline the user wants to run "
+            "(e.g., PhaseName.AI_FEEDBACK, PhaseName.CJ_ASSESSMENT)."
         ),
     )
     correlation_id: str = Field(

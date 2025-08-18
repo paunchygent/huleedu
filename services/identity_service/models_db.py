@@ -38,7 +38,10 @@ class User(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
-        return f"<User id={self.id} email={self.email} org={self.org_id} verified={self.email_verified}>"
+        return (
+            f"<User id={self.id} email={self.email} org={self.org_id} "
+            f"verified={self.email_verified}>"
+        )
 
 
 class RefreshSession(Base):
@@ -78,7 +81,10 @@ class EmailVerificationToken(Base):
     used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
-        return f"<EmailVerificationToken id={self.id} user_id={self.user_id} used={self.used_at is not None}>"
+        return (
+            f"<EmailVerificationToken id={self.id} user_id={self.user_id} "
+            f"used={self.used_at is not None}>"
+        )
 
 
 class PasswordResetToken(Base):
@@ -105,7 +111,10 @@ class PasswordResetToken(Base):
     used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
-        return f"<PasswordResetToken id={self.id} user_id={self.user_id} used={self.used_at is not None}>"
+        return (
+            f"<PasswordResetToken id={self.id} user_id={self.user_id} "
+            f"used={self.used_at is not None}>"
+        )
 
 
 class EventOutbox(Base):

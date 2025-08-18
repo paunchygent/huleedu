@@ -79,7 +79,10 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "G",
-                    "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
+                    "essay_text": (
+                        "Valid essay text with sufficient length for testing "
+                        "validation requirements."
+                    ),
                 },
                 "Invalid grade",
             ),
@@ -87,7 +90,10 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "A+",
-                    "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
+                    "essay_text": (
+                        "Valid essay text with sufficient length for testing "
+                        "validation requirements."
+                    ),
                 },
                 "Invalid grade",
             ),
@@ -95,7 +101,10 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "invalid",
-                    "essay_text": "Valid essay text with sufficient length for testing validation requirements.",
+                    "essay_text": (
+                        "Valid essay text with sufficient length for testing "
+                        "validation requirements."
+                    ),
                 },
                 "Invalid grade",
             ),

@@ -100,8 +100,8 @@ class BCSKafkaConsumer:
             except Exception as e:
                 if attempt < max_retries:
                     logger.warning(
-                        f"BCS Kafka consumer connection attempt {attempt + 1}/{max_retries + 1} failed: {e}. "
-                        f"Retrying in {retry_delay:.1f}s..."
+                        f"BCS Kafka consumer connection attempt {attempt + 1}/{max_retries + 1} "
+                        f"failed: {e}. Retrying in {retry_delay:.1f}s..."
                     )
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 1.5, max_delay)  # Exponential backoff with cap
@@ -411,8 +411,8 @@ class BCSKafkaConsumer:
                 successful_count = len(event.processed_essays)
                 failed_count = len(event.failed_essay_ids)
                 logger.info(
-                    f"Recorded phase {event.phase_name.value} completion for batch {event.batch_id} "
-                    f"(success={success}, successful_essays={successful_count})",
+                    f"Recorded phase {event.phase_name.value} completion for batch {event.batch_id}"
+                    f" (success={success}, successful_essays={successful_count})",
                     extra={
                         "batch_id": event.batch_id,
                         "phase_name": event.phase_name.value,

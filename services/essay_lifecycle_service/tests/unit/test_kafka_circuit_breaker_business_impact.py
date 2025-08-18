@@ -865,12 +865,12 @@ class TestBusinessWorkflowRecoveryScenarios:
             EssayStatus.SPELLCHECKED_SUCCESS,
         ]
 
-        for i, call in enumerate(event_publisher.publish_status_update.call_args_list):
-            assert call.kwargs["essay_id"] == essay_id
-            assert call.kwargs["entity_type"] == entity_type
-            assert call.kwargs["batch_id"] == batch_id
-            assert call.kwargs["status"] == expected_statuses[i]
-            assert call.kwargs["correlation_id"] == correlation_id
+        for i, call_args in enumerate(event_publisher.publish_status_update.call_args_list):
+            assert call_args.kwargs["essay_id"] == essay_id
+            assert call_args.kwargs["entity_type"] == entity_type
+            assert call_args.kwargs["batch_id"] == batch_id
+            assert call_args.kwargs["status"] == expected_statuses[i]
+            assert call_args.kwargs["correlation_id"] == correlation_id
 
         # BUSINESS RECOVERY VERIFICATION:
         # 1. Initial failures captured and logged

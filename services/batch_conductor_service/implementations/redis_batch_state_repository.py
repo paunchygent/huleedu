@@ -279,7 +279,8 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 redis_result = step_summary["completed"] == step_summary["total"]
 
                 logger.debug(
-                    f"Redis: Step {step_name} completion check for batch {batch_id}: {redis_result}",
+                    f"Redis: Step {step_name} completion check for batch {batch_id}: "
+                    f"{redis_result}",
                     extra={
                         "batch_id": batch_id,
                         "step_name": step_name,
@@ -293,7 +294,8 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             # Redis summary missing for this step - fall back to PostgreSQL
             if self.postgres_repository:
                 logger.info(
-                    f"Redis summary missing for step {step_name} in batch {batch_id}, falling back to PostgreSQL",
+                    f"Redis summary missing for step {step_name} in batch {batch_id}, "
+                    f"falling back to PostgreSQL",
                     extra={"batch_id": batch_id, "step_name": step_name},
                 )
 
@@ -302,7 +304,8 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 )
 
                 logger.info(
-                    f"PostgreSQL fallback: Step {step_name} completion for batch {batch_id}: {postgres_result}",
+                    f"PostgreSQL fallback: Step {step_name} completion for batch {batch_id}: "
+                    f"{postgres_result}",
                     extra={
                         "batch_id": batch_id,
                         "step_name": step_name,
@@ -551,7 +554,8 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 }
 
                 logger.debug(
-                    f"Retrieved {len(completed_phases)} completed phases from Redis for batch {batch_id}",
+                    f"Retrieved {len(completed_phases)} completed phases from Redis for batch "
+                    f"{batch_id}",
                     extra={"batch_id": batch_id, "phase_count": len(completed_phases)},
                 )
                 return completed_phases
@@ -573,8 +577,8 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     await self.redis_client.expire(key, self.redis_ttl)
 
                     logger.info(
-                        f"Repopulated Redis cache with {len(completed_phases)} phases from PostgreSQL "
-                        f"for batch {batch_id}",
+                        f"Repopulated Redis cache with {len(completed_phases)} phases "
+                        f"from PostgreSQL for batch {batch_id}",
                         extra={
                             "batch_id": batch_id,
                             "phase_count": len(completed_phases),

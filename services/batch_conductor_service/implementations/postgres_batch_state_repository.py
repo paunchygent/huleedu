@@ -124,7 +124,8 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                 is_complete = completion_record is not None
 
                 logger.debug(
-                    f"PostgreSQL: Step {step_name} completion check for batch {batch_id}: {is_complete}",
+                    f"PostgreSQL: Step {step_name} completion check for batch {batch_id}: "
+                    f"{is_complete}",
                     extra={
                         "batch_id": batch_id,
                         "step_name": step_name,
@@ -136,7 +137,8 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
 
         except Exception as e:
             logger.error(
-                f"PostgreSQL: Failed to check step completion for batch {batch_id}, step {step_name}: {e}",
+                f"PostgreSQL: Failed to check step completion for batch {batch_id}, "
+                f"step {step_name}: {e}",
                 extra={"batch_id": batch_id, "step_name": step_name, "error": str(e)},
                 exc_info=True,
             )
@@ -270,7 +272,8 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     )
 
                 logger.debug(
-                    f"PostgreSQL: Retrieved {len(completed_phases)} completed phases for batch {batch_id}",
+                    f"PostgreSQL: Retrieved {len(completed_phases)} completed phases for batch "
+                    f"{batch_id}",
                     extra={"batch_id": batch_id, "phase_count": len(completed_phases)},
                 )
 

@@ -57,7 +57,8 @@ class Settings(BaseSettings):
             db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
             if not all([prod_host, prod_password]):
                 raise ValueError(
-                    "Production environment requires HULEEDU_PROD_DB_HOST and HULEEDU_PROD_DB_PASSWORD."
+                    "Production environment requires HULEEDU_PROD_DB_HOST and "
+                    "HULEEDU_PROD_DB_PASSWORD."
                 )
             return f"postgresql+asyncpg://{db_user}:{prod_password}@{prod_host}:{prod_port}/huleedu_identity"
         else:
@@ -67,7 +68,8 @@ class Settings(BaseSettings):
 
             if not db_user_env or not db_password_env:
                 raise ValueError(
-                    "Missing required database credentials. Ensure HULEEDU_DB_USER and HULEEDU_DB_PASSWORD are set in .env."
+                    "Missing required database credentials. Ensure HULEEDU_DB_USER and "
+                    "HULEEDU_DB_PASSWORD are set in .env."
                 )
 
             # Type narrowing after validation - mypy now knows these are not None

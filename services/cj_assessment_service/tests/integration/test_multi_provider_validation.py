@@ -115,7 +115,8 @@ class TestMultiProviderValidation:
 
             # Verify async-only architecture: result should be None (queued for processing)
             assert result is None, (
-                f"Expected None result for async-only architecture from {provider_config['description']}"
+                f"Expected None result for async-only architecture from "
+                f"{provider_config['description']}"
             )
 
             print(f"✅ {provider_config['description']} Integration Test Passed:")

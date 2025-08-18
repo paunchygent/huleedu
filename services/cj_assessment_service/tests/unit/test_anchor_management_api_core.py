@@ -79,7 +79,10 @@ class TestAnchorRegistrationEndpoint:
         request_data = {
             "assignment_id": "assignment-123",
             "grade": "A",
-            "essay_text": "This is a well-written essay with sufficient length to pass the minimum requirement of 100 characters for testing purposes.",
+            "essay_text": (
+                "This is a well-written essay with sufficient length to pass the minimum "
+                "requirement of 100 characters for testing purposes."
+            ),
         }
 
         # Act
@@ -120,7 +123,10 @@ class TestAnchorRegistrationEndpoint:
         request_data = {
             "assignment_id": "assignment-test",
             "grade": grade,
-            "essay_text": "Valid essay text with sufficient length to pass validation requirements for the anchor registration test.",
+            "essay_text": (
+                "Valid essay text with sufficient length to pass validation requirements "
+                "for the anchor registration test."
+            ),
         }
 
         # Act
@@ -146,7 +152,10 @@ class TestAnchorRegistrationEndpoint:
         request_data = {
             "assignment_id": "assignment-content-type-test",
             "grade": "B",
-            "essay_text": "Essay content for testing content type specification in the content client integration layer with adequate length.",
+            "essay_text": (
+                "Essay content for testing content type specification in the content client "
+                "integration layer with adequate length."
+            ),
         }
 
         # Act
@@ -189,7 +198,10 @@ class TestAnchorAPIDependencyIntegration:
             request_data = {
                 "assignment_id": "integration-workflow-test",
                 "grade": "B",
-                "essay_text": "Integration test essay content with sufficient length to test the complete workflow including content storage.",
+                "essay_text": (
+                    "Integration test essay content with sufficient length to test the complete "
+                    "workflow including content storage."
+                ),
             }
 
             # Act
@@ -234,7 +246,10 @@ class TestAnchorAPIDependencyIntegration:
             request_data = {
                 "assignment_id": "session-management-test",
                 "grade": "D",
-                "essay_text": "Session management test content with adequate length to ensure proper database transaction handling.",
+                "essay_text": (
+                    "Session management test content with adequate length to ensure proper "
+                    "database transaction handling."
+                ),
             }
 
             # Act

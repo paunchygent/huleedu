@@ -589,7 +589,7 @@ class PipelineTestHarness:
                             event_type = envelope_data.get("event_type", "")
                             event_data = envelope_data.get("data", {})
 
-                            # Filter by correlation ID - STRICT filtering for THIS pipeline request only
+                            # Filter by correlation ID - STRICT filtering for THIS pipeline request
                             if event_correlation_id != request_correlation_id:
                                 continue
 
@@ -615,7 +615,7 @@ class PipelineTestHarness:
                                     tracker.initiated_phases.add("ai_feedback")
                                     logger.info("📨 AI Feedback phase initiated")
 
-                            # Track phase completions - ONLY count as executed if initiated in THIS pipeline
+                            # Track phase completions - ONLY count as executed if initiated
                             elif "phase.outcome" in event_type:
                                 phase_name = event_data.get("phase_name")
                                 phase_status = event_data.get("phase_status")
@@ -627,7 +627,7 @@ class PipelineTestHarness:
                                     "COMPLETED_SUCCESSFULLY",
                                     "COMPLETED_WITH_FAILURES",
                                 ]:
-                                    # CRITICAL: Only add to completed if it was initiated in THIS pipeline execution
+                                    # CRITICAL: Only add to completed if initiated in THIS execution
                                     if phase_name in tracker.initiated_phases:
                                         tracker.completed_phases.add(phase_name)
                                         if storage_id:
@@ -661,7 +661,7 @@ class PipelineTestHarness:
                                     f"⏭️ Phase {phase_name} pruned (reusing existing results)"
                                 )
 
-                            # Check for specific completion events - these indicate pipeline completion
+                            # Check for specific completion events - indicate pipeline completion
                             # but should NOT add phases to executed list
                             if expected_completion_event in event_type:
                                 # Extract phase from completion event type for special handling
@@ -669,7 +669,7 @@ class PipelineTestHarness:
                                     # Individual essay completions - don't track as phase completion
                                     pass
                                 elif "nlp.analysis.completed" in event_type:
-                                    # Only mark nlp as completed if it was initiated in this pipeline
+                                    # Only mark nlp as completed if it was initiated
                                     if "nlp" in tracker.initiated_phases:
                                         tracker.completed_phases.add("nlp")
                                         logger.info(
@@ -680,7 +680,8 @@ class PipelineTestHarness:
                                     if "cj_assessment" in tracker.initiated_phases:
                                         tracker.completed_phases.add("cj_assessment")
                                         logger.info(
-                                            "✅ Phase cj_assessment completed (from assessment completion)"
+                                            "✅ Phase cj_assessment completed "
+                                            "(from assessment completion)"
                                         )
 
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")

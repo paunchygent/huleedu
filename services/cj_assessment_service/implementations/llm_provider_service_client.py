@@ -182,7 +182,8 @@ class LLMProviderServiceClient(LLMProviderProtocol):
                     elif response.status == 200:
                         # This should never happen in production - LLM Provider should always queue
                         logger.error(
-                            "LLM Provider returned 200 (sync) - this is an architectural violation. "
+                            "LLM Provider returned 200 (sync) - "
+                            "this is an architectural violation. "
                             "All LLM calls must be async (202) with Kafka callbacks.",
                             extra={
                                 "correlation_id": str(correlation_id),

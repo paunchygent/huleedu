@@ -75,7 +75,8 @@ async def submit_batch_chunk(
                 )
                 await session.commit()
                 logger.info(
-                    f"DEBUG: Created tracking_map with {len(tracking_map)} entries for batch {cj_batch_id}",
+                    f"DEBUG: Created tracking_map with {len(tracking_map)} entries "
+                    f"for batch {cj_batch_id}",
                     extra={
                         "correlation_id": str(correlation_id),
                         "tracking_map_sample": str(list(tracking_map.items())[:2]),
@@ -337,16 +338,27 @@ async def append_to_failed_pool_atomic(
                         jsonb_build_object(
                             'failed_comparison_pool',
                             CASE
-                                WHEN processing_metadata->'failed_comparison_pool' IS NULL THEN CAST(:entry AS jsonb)
-                                ELSE (processing_metadata->'failed_comparison_pool')::jsonb || CAST(:entry AS jsonb)
+                                WHEN processing_metadata->'failed_comparison_pool' IS NULL
+                                THEN CAST(:entry AS jsonb)
+                                ELSE (processing_metadata->'failed_comparison_pool')::jsonb
+                                     || CAST(:entry AS jsonb)
                             END,
                             'pool_statistics',
                             jsonb_build_object(
-                                'total_failed', COALESCE((processing_metadata->'pool_statistics'->>'total_failed')::int, 0) + 1,
-                                'retry_attempts', COALESCE((processing_metadata->'pool_statistics'->>'retry_attempts')::int, 0),
-                                'last_retry_batch', processing_metadata->'pool_statistics'->>'last_retry_batch',
-                                'successful_retries', COALESCE((processing_metadata->'pool_statistics'->>'successful_retries')::int, 0),
-                                'permanently_failed', COALESCE((processing_metadata->'pool_statistics'->>'permanently_failed')::int, 0)
+                                'total_failed',
+                                COALESCE((processing_metadata->
+                                          'pool_statistics'->>'total_failed')::int, 0) + 1,
+                                'retry_attempts',
+                                COALESCE((processing_metadata->
+                                          'pool_statistics'->>'retry_attempts')::int, 0),
+                                'last_retry_batch',
+                                processing_metadata->'pool_statistics'->>'last_retry_batch',
+                                'successful_retries',
+                                COALESCE((processing_metadata->
+                                          'pool_statistics'->>'successful_retries')::int, 0),
+                                'permanently_failed',
+                                COALESCE((processing_metadata->
+                                          'pool_statistics'->>'permanently_failed')::int, 0)
                             )
                         )
                 END

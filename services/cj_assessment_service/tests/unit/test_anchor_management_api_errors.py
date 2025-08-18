@@ -69,7 +69,10 @@ class TestAnchorAPIErrorHandling:
             request_data = {
                 "assignment_id": "content-failure-test",
                 "grade": "A",
-                "essay_text": "Test content for content service failure scenario with adequate length for testing proper error handling.",
+                "essay_text": (
+                    "Test content for content service failure scenario with adequate length "
+                    "for testing proper error handling."
+                ),
             }
 
             # Act
@@ -107,7 +110,10 @@ class TestAnchorAPIErrorHandling:
             request_data = {
                 "assignment_id": "missing-storage-id-test",
                 "grade": "C",
-                "essay_text": "Test content for missing storage ID scenario with sufficient length to test error handling properly.",
+                "essay_text": (
+                    "Test content for missing storage ID scenario with sufficient length "
+                    "to test error handling properly."
+                ),
             }
 
             # Act
@@ -143,7 +149,10 @@ class TestAnchorAPIErrorHandling:
             request_data = {
                 "assignment_id": "database-failure-test",
                 "grade": "E",
-                "essay_text": "Test content for database failure scenario with appropriate length to ensure proper error handling coverage.",
+                "essay_text": (
+                    "Test content for database failure scenario with appropriate length "
+                    "to ensure proper error handling coverage."
+                ),
             }
 
             # Act
@@ -179,7 +188,10 @@ class TestAnchorAPIErrorHandling:
             request_data = {
                 "assignment_id": "unexpected-error-test",
                 "grade": "F",
-                "essay_text": "Test content for unexpected exception scenario with sufficient length to trigger exception handling path.",
+                "essay_text": (
+                    "Test content for unexpected exception scenario with sufficient length "
+                    "to trigger exception handling path."
+                ),
             }
 
             # Act

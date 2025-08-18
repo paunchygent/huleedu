@@ -142,7 +142,10 @@ Please respond with a JSON object containing:
                 {
                     "queue_id": str(uuid4()),
                     "status": "queued",
-                    "message": "Request queued for processing. Result will be delivered via callback to topic: huleedu.llm_provider.comparison_result.v1",
+                    "message": (
+                        "Request queued for processing. Result will be delivered via "
+                        "callback to topic: huleedu.llm_provider.comparison_result.v1"
+                    ),
                     "estimated_wait_minutes": 2,
                 }
             )

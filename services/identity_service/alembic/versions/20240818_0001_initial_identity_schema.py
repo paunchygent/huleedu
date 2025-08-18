@@ -84,7 +84,8 @@ def upgrade() -> None:
     op.create_index("ix_event_outbox_topic", "event_outbox", ["topic"], unique=False)
     # Partial index for unpublished events (PostgreSQL)
     op.execute(
-        "CREATE INDEX ix_event_outbox_unpublished_topic ON event_outbox (published_at, topic, created_at) WHERE published_at IS NULL"
+        "CREATE INDEX ix_event_outbox_unpublished_topic ON event_outbox "
+        "(published_at, topic, created_at) WHERE published_at IS NULL"
     )
 
 

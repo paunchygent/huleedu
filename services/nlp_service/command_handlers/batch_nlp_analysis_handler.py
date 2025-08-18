@@ -166,7 +166,9 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                             service="nlp_service",
                             operation="fetch_essay_content",
                             external_service="content_service",
-                            message=f"Failed to fetch content for essay {essay_ref.essay_id}: {str(e)}",
+                            message=(
+                                f"Failed to fetch content for essay {essay_ref.essay_id}: {str(e)}"
+                            ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
@@ -214,7 +216,9 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                             service="nlp_service",
                             operation="check_grammar",
                             external_service="language_tool_service",
-                            message=f"Grammar check failed for essay {essay_ref.essay_id}: {str(e)}",
+                            message=(
+                                f"Grammar check failed for essay {essay_ref.essay_id}: {str(e)}"
+                            ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
@@ -275,7 +279,9 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                             service="nlp_service",
                             operation="analyze_essay",
                             stage="nlp_analysis",
-                            message=f"Unexpected error analyzing essay {essay_ref.essay_id}: {str(e)}",
+                            message=(
+                                f"Unexpected error analyzing essay {essay_ref.essay_id}: {str(e)}"
+                            ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
@@ -299,7 +305,8 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
             # Log batch processing summary
             logger.info(
                 f"Completed Phase 2 NLP analysis for batch {batch_id}: "
-                f"{processed_count}/{len(command_data.essays_to_process)} essays processed successfully",
+                f"{processed_count}/{len(command_data.essays_to_process)} essays processed "
+                f"successfully",
                 extra={
                     "batch_id": batch_id,
                     "processed_count": processed_count,

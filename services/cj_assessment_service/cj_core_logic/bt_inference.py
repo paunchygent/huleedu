@@ -53,12 +53,12 @@ def compute_bt_standard_errors(
     H = np.zeros((n_items - 1, n_items - 1), dtype=float)
 
     # Build Fisher Information from pairwise comparisons
-    for w, l in pairs:
-        if w < 0 or w >= n_items or l < 0 or l >= n_items:
-            logger.warning(f"Invalid pair indices: ({w}, {l}) for n_items={n_items}")
+    for winner, loser in pairs:
+        if winner < 0 or winner >= n_items or loser < 0 or loser >= n_items:
+            logger.warning(f"Invalid pair indices: ({winner}, {loser}) for n_items={n_items}")
             continue
 
-        tw, tl = theta[w], theta[l]
+        tw, tl = theta[winner], theta[loser]
 
         # Bradley-Terry probability: P(w > l) = exp(tw) / (exp(tw) + exp(tl))
         # For numerical stability, use log-space computation
@@ -73,15 +73,15 @@ def compute_bt_standard_errors(
         v = p * (1.0 - p)
 
         # Update Hessian matrix
-        if w != ref:
-            iw = active.index(w)
+        if winner != ref:
+            iw = active.index(winner)
             H[iw, iw] += v
-        if l != ref:
-            il = active.index(l)
+        if loser != ref:
+            il = active.index(loser)
             H[il, il] += v
-        if w != ref and l != ref:
-            iw = active.index(w)
-            il = active.index(l)
+        if winner != ref and loser != ref:
+            iw = active.index(winner)
+            il = active.index(loser)
             H[iw, il] -= v
             H[il, iw] -= v
 

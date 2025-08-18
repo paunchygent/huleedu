@@ -269,7 +269,8 @@ class DistributedStateManager:
                     idempotency_keys = [k for k in all_keys if "idempotency" in k]
                     if idempotency_keys:
                         logger.warning(
-                            f"🚨 Found {len(idempotency_keys)} idempotency keys that will cause test failures!"
+                            f"🚨 Found {len(idempotency_keys)} idempotency keys that will "
+                            f"cause test failures!"
                         )
                 else:
                     logger.info("✅ Redis is clean (0 keys)")

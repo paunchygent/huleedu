@@ -186,7 +186,8 @@ class PipelineTestHelper:
             async for msg in consumer:
                 if time.time() - start_time > timeout:
                     print(
-                        f"⏰ Timeout waiting for essay events (found {len(events)}/{expected_count})"
+                        f"⏰ Timeout waiting for essay events "
+                        f"(found {len(events)}/{expected_count})"
                     )
                     break
 
@@ -202,7 +203,8 @@ class PipelineTestHelper:
                     ):
                         events.append(envelope)
                         print(
-                            f"✅ Found essay event {len(events)}/{expected_count}: {envelope.event_id}"
+                            f"✅ Found essay event {len(events)}/{expected_count}: "
+                            f"{envelope.event_id}"
                         )
 
                         if len(events) >= expected_count:

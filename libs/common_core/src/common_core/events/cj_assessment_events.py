@@ -58,7 +58,9 @@ class GradeProjectionSummary(BaseModel):
     )
     calibration_info: dict[str, Any] = Field(
         default_factory=dict,
-        description="Calibration details including grade centers and boundaries derived from anchors",
+        description=(
+            "Calibration details including grade centers and boundaries derived from anchors"
+        ),
     )
     bt_stats: dict[str, dict[str, float]] = Field(
         default_factory=dict,
