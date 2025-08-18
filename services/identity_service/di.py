@@ -11,6 +11,7 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.identity_service.config import Settings, settings
+from services.identity_service.domain_handlers.profile_handler import UserProfileHandler
 from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
@@ -23,6 +24,9 @@ from services.identity_service.implementations.token_issuer_impl import DevToken
 from services.identity_service.implementations.token_issuer_rs256_impl import (
     Rs256TokenIssuer,
 )
+from services.identity_service.implementations.user_profile_repository_sqlalchemy_impl import (
+    PostgresUserProfileRepo,
+)
 from services.identity_service.implementations.user_repository_sqlalchemy_impl import (
     PostgresSessionRepo,
     PostgresUserRepo,
@@ -32,6 +36,7 @@ from services.identity_service.protocols import (
     PasswordHasher,
     SessionRepo,
     TokenIssuer,
+    UserProfileRepositoryProtocol,
     UserRepo,
 )
 
@@ -109,3 +114,13 @@ class IdentityImplementationsProvider(Provider):
         self, outbox_manager: OutboxManager, settings: Settings
     ) -> IdentityEventPublisherProtocol:
         return DefaultIdentityEventPublisher(outbox_manager, settings.SERVICE_NAME)
+
+    @provide(scope=Scope.APP)
+    def provide_user_profile_repository(self, engine: AsyncEngine) -> UserProfileRepositoryProtocol:
+        return PostgresUserProfileRepo(engine)
+
+    @provide(scope=Scope.REQUEST)
+    def provide_profile_handler(
+        self, repository: UserProfileRepositoryProtocol
+    ) -> UserProfileHandler:
+        return UserProfileHandler(repository)

@@ -13,6 +13,7 @@ from huleedu_service_libs.logging_utils import (
 from quart import Quart
 
 from services.identity_service.api.auth_routes import bp as auth_bp
+from services.identity_service.api.profile_routes import bp as profile_bp
 from services.identity_service.api.well_known_routes import bp as well_known_bp
 from services.identity_service.config import settings
 from services.identity_service.startup_setup import initialize_services, shutdown_services
@@ -36,4 +37,5 @@ async def shutdown() -> None:
 
 # Register blueprints
 app.register_blueprint(auth_bp)
+app.register_blueprint(profile_bp)
 app.register_blueprint(well_known_bp)

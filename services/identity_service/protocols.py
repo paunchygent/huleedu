@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, Protocol
+from uuid import UUID
+
+from services.identity_service.models_db import UserProfile
 
 
 class PasswordHasher(Protocol):
@@ -60,3 +63,10 @@ class IdentityEventPublisherProtocol(Protocol):
     ) -> None: ...
 
     async def publish_password_reset_completed(self, user: dict, correlation_id: str) -> None: ...
+
+
+class UserProfileRepositoryProtocol(Protocol):
+    async def get_profile(self, user_id: UUID, correlation_id: UUID) -> UserProfile | None: ...
+    async def upsert_profile(
+        self, user_id: UUID, profile_data: dict, correlation_id: UUID
+    ) -> UserProfile: ...

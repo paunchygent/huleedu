@@ -44,6 +44,35 @@ class User(Base):
         )
 
 
+class UserProfile(Base):
+    """User profile information for teacher names and display preferences."""
+
+    __tablename__ = "user_profiles"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    first_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    locale: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return (
+            f"<UserProfile user_id={self.user_id} first_name={self.first_name} "
+            f"last_name={self.last_name} display_name={self.display_name}>"
+        )
+
+
 class RefreshSession(Base):
     """Refresh token storage for session management."""
 

@@ -71,3 +71,28 @@ class ResetPasswordRequest(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     message: str
+
+
+class PersonNameSchema(BaseModel):
+    """Schema for PersonNameV1 structure."""
+
+    first_name: str
+    last_name: str
+    legal_full_name: str
+
+
+class ProfileResponse(BaseModel):
+    """Response schema for profile operations."""
+
+    person_name: PersonNameSchema
+    display_name: Optional[str] = None
+    locale: Optional[str] = None
+
+
+class ProfileRequest(BaseModel):
+    """Request schema for profile updates."""
+
+    first_name: str
+    last_name: str
+    display_name: Optional[str] = None
+    locale: Optional[str] = None
