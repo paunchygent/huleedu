@@ -545,8 +545,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             course_language=course_language,
             essay_instructions=metadata.get("essay_instructions", ""),
             class_type=class_type,
-            teacher_first_name=None,
-            teacher_last_name=None,
         )
 
         # Extract correlation ID from metadata

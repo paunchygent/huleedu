@@ -65,8 +65,6 @@ class TestEventContractsV2:
             course_language="en",
             essay_instructions="Write about your favorite book",
             class_type="REGULAR",
-            teacher_first_name="Jane",
-            teacher_last_name="Smith",
         )
 
         # Create envelope

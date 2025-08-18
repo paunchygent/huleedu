@@ -491,10 +491,10 @@ class TestAtomicBatchCreationIntegration:
         # Validate error structure
         error = exc_info.value
         assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
-        assert "Unexpected error in batch essays registration" in error.error_detail.message
+        assert "Database error during batch essay creation" in error.error_detail.message
         assert "IntegrityError" in error.error_detail.message
         assert error.error_detail.service == "essay_lifecycle_service"
-        assert error.error_detail.operation == "handle_batch_essays_registered"
+        assert error.error_detail.operation == "create_essay_records_batch"
 
         # Assert - Only the manually created essay should exist (atomic rollback)
         existing_essay = await postgres_repository.get_essay_state("essay_001")

@@ -126,8 +126,7 @@ class TestAIFeedbackInitiatorImpl:
         # Educational context fields use placeholder
         # values until Class Management Service integration
         assert command_data.class_type == "GUEST"
-        assert command_data.teacher_first_name is None
-        assert command_data.teacher_last_name is None
+        assert command_data.owner_user_id == "user_123"
 
     async def test_initiate_phase_wrong_phase_validation(
         self,
@@ -192,8 +191,7 @@ class TestAIFeedbackInitiatorImpl:
         # Verify educational context uses placeholder values
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.class_type == "GUEST"
-        assert published_envelope.data.teacher_first_name is None
-        assert published_envelope.data.teacher_last_name is None
+        assert published_envelope.data.owner_user_id == "user_123"
 
     async def test_language_inference_swedish(
         self,
@@ -287,8 +285,7 @@ class TestAIFeedbackInitiatorImpl:
         )
         # Educational context uses placeholder values until Class Management Service integration
         assert command_data.class_type == "GUEST"
-        assert command_data.teacher_first_name is None
-        assert command_data.teacher_last_name is None
+        assert command_data.owner_user_id == "user_123"
 
     async def test_event_publisher_exception_propagation(
         self,

@@ -38,10 +38,8 @@ class AIFeedbackInputDataV1(BaseModel):
     course_code: CourseCode
     essay_instructions: str
     language: str
-    teacher_name: str | None = None
     class_designation: str | None = None
     user_id_of_batch_owner: str | None = None
-    student_name: str | None = None
 
 
 class AIFeedbackResultDataV1(ProcessingUpdate):

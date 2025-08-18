@@ -299,8 +299,6 @@ class TestBatchDualEventCoordination:
             course_language="en",
             essay_instructions="Write",
             class_type="REGULAR",
-            teacher_first_name="Bob",
-            teacher_last_name="Jones",
         )
 
         success_envelope = EventEnvelope[BatchEssaysReady](

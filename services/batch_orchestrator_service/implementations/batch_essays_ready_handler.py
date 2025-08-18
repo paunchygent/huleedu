@@ -129,12 +129,6 @@ class BatchEssaysReadyHandler:
                             "course_code": str(batch_essays_ready_data.course_code),
                             "course_language": batch_essays_ready_data.course_language,
                             "class_type": batch_essays_ready_data.class_type,
-                            "teacher_first_name": getattr(
-                                batch_essays_ready_data, "teacher_first_name", None
-                            ),
-                            "teacher_last_name": getattr(
-                                batch_essays_ready_data, "teacher_last_name", None
-                            ),
                         },
                     )
 

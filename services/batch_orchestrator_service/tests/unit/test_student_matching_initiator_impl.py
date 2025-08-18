@@ -55,8 +55,6 @@ class TestStudentMatchingInitiatorImpl:
         """Create REGULAR batch context with class_id."""
         return BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
-            teacher_first_name="Jane",
-            teacher_last_name="Smith",
             school_name="Lincoln High",
             essay_instructions="Write about your summer vacation",
             expected_essay_count=3,
@@ -69,8 +67,6 @@ class TestStudentMatchingInitiatorImpl:
         """Create GUEST batch context without class_id."""
         return BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
-            teacher_first_name="John",
-            teacher_last_name="Doe",
             school_name="Guest School",
             essay_instructions="Write a short story",
             expected_essay_count=2,

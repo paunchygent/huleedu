@@ -114,8 +114,6 @@ class TestDualEventPublishing:
             course_language="en",
             essay_instructions="Write an essay",
             class_type="REGULAR",
-            teacher_first_name="John",
-            teacher_last_name="Doe",
         )
 
         # Act

@@ -450,8 +450,6 @@ class TestPhase1CompleteFlowWithNewState:
             course_language="English",
             essay_instructions="Test essay instructions",
             class_type="REGULAR",
-            teacher_first_name="Test",
-            teacher_last_name="Teacher",
         )
 
         # Create envelope for batch ready event

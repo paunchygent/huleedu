@@ -7,6 +7,8 @@ the Batch Orchestrator Service sends to ELS to initiate various processing phase
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from .domain_enums import CourseCode
 from .events.base_event_models import BaseEventData
 from .metadata_models import EssayProcessingInputRefV1
@@ -88,8 +90,7 @@ class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
 
     # Personalization context (from Class Management Service via enhanced BatchEssaysReady)
     class_type: str  # GUEST or REGULAR - determines AI feedback template selection
-    teacher_first_name: str | None = None  # For personalized templates - REGULAR classes only
-    teacher_last_name: str | None = None  # For personalized templates - REGULAR classes only
+    owner_user_id: str = Field(description="User ID of batch owner (teacher). Names are resolved by AI Feedback via Identity; not transmitted on Kafka.")
 
 
 class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):

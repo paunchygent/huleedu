@@ -581,14 +581,20 @@ class TestPostgreSQLEssayRepositoryIntegration:
         ]
 
         # Act & Assert - Batch creation should fail completely due to constraint violation
-        from sqlalchemy.exc import IntegrityError
-
-        with pytest.raises(IntegrityError):
+        with pytest.raises(HuleEduError) as exc_info:
             async with postgres_repository.get_session_factory()() as session:
                 async with session.begin():
                     await postgres_repository.create_essay_records_batch(
                         batch_data, session=session
                     )
+
+        # Validate error structure
+        error = exc_info.value
+        assert error.error_detail.error_code == ErrorCode.PROCESSING_ERROR
+        assert "Database error during batch essay creation" in error.error_detail.message
+        assert "IntegrityError" in error.error_detail.message
+        assert error.error_detail.service == "essay_lifecycle_service"
+        assert error.error_detail.operation == "create_essay_records_batch"
 
         # Assert - No new essays should exist (atomic rollback)
         # The existing essay should still be there

@@ -146,8 +146,6 @@ def sample_batch_essays_ready_event() -> dict:
             "course_language": "en",
             "essay_instructions": "Test instructions for lean flow idempotency testing.",
             "class_type": "GUEST",
-            "teacher_first_name": None,
-            "teacher_last_name": None,
         },
     }
 

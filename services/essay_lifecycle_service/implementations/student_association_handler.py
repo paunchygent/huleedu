@@ -131,8 +131,6 @@ class StudentAssociationHandler:
                         course_language=course_language,
                         essay_instructions="",  # Would get from batch context
                         class_type="REGULAR",  # Always REGULAR for this flow
-                        teacher_first_name=None,  # Would get from class management
-                        teacher_last_name=None,  # Would get from class management
                     )
 
                     # Publish BatchEssaysReady via batch lifecycle publisher

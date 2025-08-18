@@ -125,8 +125,6 @@ class TestDualEventHandling:
             course_language="en",
             essay_instructions="Test instructions",
             class_type="REGULAR",
-            teacher_first_name="John",
-            teacher_last_name="Doe",
         )
 
         success_envelope = EventEnvelope[BatchEssaysReady](
@@ -312,8 +310,6 @@ class TestDualEventHandling:
             course_language="en",
             essay_instructions="Test",
             class_type="REGULAR",
-            teacher_first_name="Jane",
-            teacher_last_name="Doe",
         )
 
         # Create error event for different batch

@@ -131,7 +131,9 @@ class TestDefaultServiceResultHandler:
 
         # Verify
         assert result is True
-        mock_essay_repository.get_essay_state.assert_called_with("test-essay-1")
+        # Check that get_essay_state was called with essay_id (session parameter may be included)
+        call_args = mock_essay_repository.get_essay_state.call_args
+        assert call_args.args[0] == "test-essay-1"
         mock_essay_repository.update_essay_status_via_machine.assert_called_once()
 
         # Check the call arguments (positional args)
@@ -209,7 +211,10 @@ class TestDefaultServiceResultHandler:
 
         # Verify
         assert result is False
-        mock_essay_repository.get_essay_state.assert_called_once_with("test-essay-1")
+        # Check that get_essay_state was called once with essay_id (session parameter may be included)
+        assert mock_essay_repository.get_essay_state.call_count == 1
+        call_args = mock_essay_repository.get_essay_state.call_args
+        assert call_args.args[0] == "test-essay-1"
         mock_essay_repository.update_essay_status_via_machine.assert_not_called()
         mock_batch_coordinator.check_batch_completion.assert_not_called()
 

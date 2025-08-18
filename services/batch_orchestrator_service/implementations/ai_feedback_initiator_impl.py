@@ -106,8 +106,7 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
                 # Educational context - determine from class_id presence
                 # Services needing teacher context should query CMS directly
                 class_type="REGULAR" if batch_context.class_id else "GUEST",
-                teacher_first_name=None,
-                teacher_last_name=None,
+                owner_user_id=batch_context.user_id,
             )
 
             # Create EventEnvelope for AI feedback command

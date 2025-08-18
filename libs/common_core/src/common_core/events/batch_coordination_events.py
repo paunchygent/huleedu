@@ -111,12 +111,6 @@ class BatchEssaysReady(BaseModel):
 
     # Educational context from Class Management Service
     class_type: str = Field(description="GUEST or REGULAR - determines processing behavior")
-    teacher_first_name: str | None = Field(
-        default=None, description="Teacher first name from Class Management Service (REGULAR only)"
-    )
-    teacher_last_name: str | None = Field(
-        default=None, description="Teacher last name from Class Management Service (REGULAR only)"
-    )
 
     # CLEAN ARCHITECTURE: Legacy validation_failures and total_files_processed fields REMOVED
     # Errors now handled via separate BatchValidationErrorsV1 events following structured
