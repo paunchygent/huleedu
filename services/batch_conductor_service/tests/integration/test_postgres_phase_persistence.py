@@ -137,8 +137,6 @@ async def test_postgresql_fallback_when_redis_empty(redis_repo, redis_client):
     assert all(redis_data[phase] == "completed" for phase in phases)
 
 
-
-
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_idempotent_phase_recording(redis_repo, postgres_repo):

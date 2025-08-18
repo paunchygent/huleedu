@@ -36,4 +36,3 @@ class DevInMemoryUserRepo(UserRepo):
             if u["id"] == user_id:
                 u["email_verified"] = True
                 return
-

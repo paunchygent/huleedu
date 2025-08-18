@@ -8,6 +8,7 @@ from typing import Any
 import jwt
 from common_core.identity_models import JwksPublicKeyV1
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
 from services.identity_service.config import settings
 from services.identity_service.implementations.jwks_store import JwksStore
@@ -30,12 +31,15 @@ class Rs256TokenIssuer(TokenIssuer):
         self._kid = settings.JWT_RS256_PUBLIC_JWKS_KID or "identity-rs256-key"
         self._register_jwk()
 
-    def _load_private_key(self):
+    def _load_private_key(self) -> RSAPrivateKey:
         key_path = settings.JWT_RS256_PRIVATE_KEY_PATH
         if not key_path:
             raise RuntimeError("JWT_RS256_PRIVATE_KEY_PATH must be set in production")
         pem = Path(key_path).read_bytes()
-        return serialization.load_pem_private_key(pem, password=None)
+        key = serialization.load_pem_private_key(pem, password=None)
+        if not isinstance(key, RSAPrivateKey):
+            raise RuntimeError("Expected RSA private key, got different key type")
+        return key
 
     def _register_jwk(self) -> None:
         numbers = self._public_key.public_numbers()
@@ -70,8 +74,9 @@ class Rs256TokenIssuer(TokenIssuer):
 
     def verify(self, token: str) -> dict[str, Any]:
         try:
-            return jwt.decode(
+            decoded = jwt.decode(
                 token, self._public_key, algorithms=["RS256"], options={"verify_aud": False}
             )
+            return decoded if isinstance(decoded, dict) else {}
         except Exception:
             return {}

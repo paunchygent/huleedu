@@ -93,7 +93,7 @@ class NotificationProjector:
         event: BatchPipelineCompletedV1,
     ) -> None:
         """Project pipeline completion to teacher notification."""
-        
+
         # Get batch to extract teacher_id from processing_metadata
         batch = await self.batch_repo.get_batch_by_id(event.batch_id)
         if not batch:
@@ -114,12 +114,18 @@ class NotificationProjector:
             return
 
         # Determine priority based on failures
-        priority = NotificationPriority.IMMEDIATE if event.failed_essay_count > 0 else NotificationPriority.HIGH
+        priority = (
+            NotificationPriority.IMMEDIATE
+            if event.failed_essay_count > 0
+            else NotificationPriority.HIGH
+        )
         action_required = event.failed_essay_count > 0
 
         # Create pipeline completion message
         if event.failed_essay_count > 0:
-            message = f"Pipeline completed with {event.failed_essay_count} failures: {event.final_status}"
+            message = (
+                f"Pipeline completed with {event.failed_essay_count} failures: {event.final_status}"
+            )
         else:
             message = f"Pipeline completed successfully: {event.final_status}"
 
@@ -135,15 +141,15 @@ class NotificationProjector:
                 "successful_essays": event.successful_essay_count,
                 "failed_essays": event.failed_essay_count,
                 "duration_seconds": event.processing_duration_seconds,
-                "message": message
+                "message": message,
             },
             action_required=action_required,
             correlation_id=str(event.correlation_id),
             batch_id=event.batch_id,
         )
-        
+
         await self._publish_notification(notification)
-        
+
         logger.info(
             "Published pipeline_completed notification",
             extra={

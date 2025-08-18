@@ -15,7 +15,6 @@ from typing import Any
 from aiokafka import AIOKafkaConsumer, ConsumerRecord
 
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
@@ -89,15 +88,15 @@ class BCSKafkaConsumer:
         # Retry configuration
         max_retries = 10
         retry_delay = 1.0  # Start with 1 second
-        max_delay = 60.0   # Max 60 seconds between retries
-        
+        max_delay = 60.0  # Max 60 seconds between retries
+
         for attempt in range(max_retries + 1):
             try:
                 await self._attempt_start_consuming()
                 # If we get here, connection was successful
                 logger.info(f"BCS Kafka consumer connected successfully on attempt {attempt + 1}")
                 break
-                
+
             except Exception as e:
                 if attempt < max_retries:
                     logger.warning(
@@ -107,7 +106,10 @@ class BCSKafkaConsumer:
                     await asyncio.sleep(retry_delay)
                     retry_delay = min(retry_delay * 1.5, max_delay)  # Exponential backoff with cap
                 else:
-                    logger.error(f"Failed to start BCS Kafka consumer after {max_retries + 1} attempts: {e}", exc_info=True)
+                    logger.error(
+                        f"Failed to start BCS Kafka consumer after {max_retries + 1} attempts: {e}",
+                        exc_info=True,
+                    )
                     if self._consumer:
                         try:
                             await self._consumer.stop()
@@ -142,8 +144,8 @@ class BCSKafkaConsumer:
 
             # Start consumption loop
             await self._consume_loop()
-            
-        except Exception as e:
+
+        except Exception:
             # Cleanup on any failure
             self._consuming = False
             if self._consumer:
@@ -172,7 +174,7 @@ class BCSKafkaConsumer:
     async def is_consuming(self) -> bool:
         """Check if consumer is actively consuming events."""
         return self._consuming
-    
+
     async def is_healthy(self) -> bool:
         """Check if consumer is healthy and connected."""
         return self._consuming and self._consumer is not None
@@ -183,7 +185,7 @@ class BCSKafkaConsumer:
             raise RuntimeError("Consumer not initialized")
 
         logger.info("BCS Kafka consumer entering consumption loop")
-        
+
         try:
             async for msg in self._consumer:
                 if self._stop_event.is_set():
@@ -202,7 +204,7 @@ class BCSKafkaConsumer:
             logger.error(f"Error in BCS consumption loop: {e}", exc_info=True)
             self._consuming = False
             raise  # Let the caller handle reconnection
-        
+
         logger.info("BCS Kafka consumer exited consumption loop")
 
     async def _handle_message(self, msg: ConsumerRecord) -> None:
@@ -429,4 +431,3 @@ class BCSKafkaConsumer:
         except Exception as e:
             logger.error(f"Error processing ELS batch phase outcome: {e}", exc_info=True)
             raise
-

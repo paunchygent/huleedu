@@ -79,22 +79,21 @@ async def handle_business_operation(self, data, correlation_id):
             # Both committed atomically or both rolled back
 ```
 
-### 3.4. Publisher Architecture Pattern
+### 3.4. Service Implementation Pattern
+
+**MANDATORY per-service structure:**
+- `implementations/outbox_manager.py`: `OutboxManager(outbox_repository, redis_client, settings)`
+- `models_db.py`: `EventOutbox` with partial index `ix_event_outbox_unpublished_topic`
+- `di.py`: Provide `OutboxManager` with 3 dependencies
+
+**Publisher Pattern:**
 ```python
-class DomainEventPublisher:
-    """Publisher that always uses outbox for transactional safety."""
+class EventPublisher:
+    def __init__(self, outbox_manager: OutboxManager): ...
     
-    def __init__(self, outbox_manager: OutboxManager):
-        self.outbox_manager = outbox_manager
-        # NO direct Kafka dependency!
-    
-    async def publish_domain_event(self, event_data, correlation_id, session=None):
-        envelope = EventEnvelope(...)
-        
-        # Always use outbox - never direct Kafka
+    async def publish_event(self, event_data, correlation_id, session=None):
         await self.outbox_manager.publish_to_outbox(
-            event_data=envelope,  # Original Pydantic model
-            # ... other params
+            event_data=EventEnvelope(...), session=session
         )
 ```
 
@@ -184,6 +183,12 @@ async def test_business_operation_with_outbox():
 - **business_operation_success_rate**: Overall business operation success
 - **outbox_database_transaction_duration**: Transaction performance
 
-## 9. Reference Implementation
+## 9. Reference Implementations
 
-See `services/essay_lifecycle_service/implementations/batch_lifecycle_publisher.py` for the correct implementation pattern that always uses outbox for transactional safety.
+Established pattern implemented in:
+- `services/class_management_service/implementations/outbox_manager.py`
+- `services/file_service/implementations/outbox_manager.py` 
+- `services/identity_service/implementations/outbox_manager.py`
+- `services/essay_lifecycle_service/implementations/outbox_manager.py`
+
+All follow the same pattern: OutboxManager(outbox_repository, redis_client, settings) with per-service implementations.

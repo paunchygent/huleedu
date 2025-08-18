@@ -40,7 +40,12 @@ class TestPipelineResolutionServiceBehavior:
             PhaseName.SPELLCHECK.value: ["spellcheck"],
             PhaseName.AI_FEEDBACK.value: ["spellcheck", "ai_feedback"],
             PhaseName.CJ_ASSESSMENT.value: ["spellcheck", "cj_assessment"],
-            PhaseName.STUDENT_MATCHING.value: ["spellcheck", "ai_feedback", "cj_assessment", "report_generation"],
+            PhaseName.STUDENT_MATCHING.value: [
+                "spellcheck",
+                "ai_feedback",
+                "cj_assessment",
+                "report_generation",
+            ],
         }
 
         def get_pipeline_steps(pipeline_name: str) -> list[str] | None:
@@ -134,9 +139,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of simple spellcheck pipeline."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_essays_001", 
+            batch_id="batch_essays_001",
             requested_pipeline=PhaseName.SPELLCHECK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440001"
+            correlation_id="550e8400-e29b-41d4-a716-446655440001",
         )
 
         # Act
@@ -156,9 +161,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of AI feedback pipeline including required spellcheck dependency."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_essays_002", 
+            batch_id="batch_essays_002",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440002"
+            correlation_id="550e8400-e29b-41d4-a716-446655440002",
         )
 
         # Act
@@ -177,9 +182,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of comparative judgment assessment pipeline."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_cj_study_001", 
+            batch_id="batch_cj_study_001",
             requested_pipeline=PhaseName.CJ_ASSESSMENT,
-            correlation_id="550e8400-e29b-41d4-a716-446655440003"
+            correlation_id="550e8400-e29b-41d4-a716-446655440003",
         )
 
         # Act
@@ -198,9 +203,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test resolution of complex pipeline with multiple dependencies."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_comprehensive_001", 
+            batch_id="batch_comprehensive_001",
             requested_pipeline=PhaseName.STUDENT_MATCHING,
-            correlation_id="550e8400-e29b-41d4-a716-446655440004"
+            correlation_id="550e8400-e29b-41d4-a716-446655440004",
         )
 
         # Act
@@ -221,9 +226,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test graceful handling of unknown pipeline requests."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_unknown_001", 
+            batch_id="batch_unknown_001",
             requested_pipeline=PhaseName.NLP,  # Valid enum but may not be configured
-            correlation_id="550e8400-e29b-41d4-a716-446655440005"
+            correlation_id="550e8400-e29b-41d4-a716-446655440005",
         )
 
         # Act
@@ -245,13 +250,17 @@ class TestPipelineResolutionServiceBehavior:
     ) -> None:
         """Test that multiple unknown pipeline requests are handled consistently."""
         # Arrange - Use valid enums that may not be configured in pipeline YAML
-        unknown_pipelines = [PhaseName.NLP, PhaseName.NLP, PhaseName.NLP]  # Test same unknown pipeline multiple times
+        unknown_pipelines = [
+            PhaseName.NLP,
+            PhaseName.NLP,
+            PhaseName.NLP,
+        ]  # Test same unknown pipeline multiple times
 
         for i, pipeline_name in enumerate(unknown_pipelines, 6):
             request = BCSPipelineDefinitionRequestV1(
-                batch_id=f"batch_{pipeline_name.value}_{i}", 
+                batch_id=f"batch_{pipeline_name.value}_{i}",
                 requested_pipeline=pipeline_name,
-                correlation_id=f"550e8400-e29b-41d4-a716-44665544000{i}"
+                correlation_id=f"550e8400-e29b-41d4-a716-44665544000{i}",
             )
 
             # Act
@@ -281,9 +290,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = circular_dependency_error
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_circular_001", 
+            batch_id="batch_circular_001",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440009"
+            correlation_id="550e8400-e29b-41d4-a716-446655440009",
         )
 
         # Act
@@ -310,9 +319,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = missing_prerequisites_error
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_missing_prereq_001", 
+            batch_id="batch_missing_prereq_001",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440010"
+            correlation_id="550e8400-e29b-41d4-a716-446655440010",
         )
 
         # Act
@@ -335,9 +344,9 @@ class TestPipelineResolutionServiceBehavior:
         )
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_generator_fail_001", 
+            batch_id="batch_generator_fail_001",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440011"
+            correlation_id="550e8400-e29b-41d4-a716-446655440011",
         )
 
         # Act
@@ -367,9 +376,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_dlq_producer.publish_to_dlq.side_effect = Exception("DLQ service unavailable")
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_dlq_fail_001", 
+            batch_id="batch_dlq_fail_001",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440012"
+            correlation_id="550e8400-e29b-41d4-a716-446655440012",
         )
 
         # Act - Should complete despite DLQ failure
@@ -402,9 +411,9 @@ class TestPipelineResolutionServiceBehavior:
         mock_pipeline_rules.resolve_pipeline_dependencies.side_effect = dependency_failure
 
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_dlq_test_001", 
+            batch_id="batch_dlq_test_001",
             requested_pipeline=PhaseName.CJ_ASSESSMENT,
-            correlation_id="550e8400-e29b-41d4-a716-446655440013"
+            correlation_id="550e8400-e29b-41d4-a716-446655440013",
         )
 
         # Act
@@ -440,9 +449,9 @@ class TestPipelineResolutionServiceBehavior:
         """Test that unknown pipeline requests trigger DLQ publication for error tracking."""
         # Arrange
         request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_no_dlq_001", 
+            batch_id="batch_no_dlq_001",
             requested_pipeline=PhaseName.NLP,  # Valid enum but may not be configured
-            correlation_id="550e8400-e29b-41d4-a716-446655440014"
+            correlation_id="550e8400-e29b-41d4-a716-446655440014",
         )
 
         # Act
@@ -518,19 +527,19 @@ class TestPipelineResolutionServiceBehavior:
         # Arrange - Multiple different requests
         requests = [
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_1", 
+                batch_id="batch_concurrent_1",
                 requested_pipeline=PhaseName.SPELLCHECK,
-                correlation_id="550e8400-e29b-41d4-a716-446655440015"
+                correlation_id="550e8400-e29b-41d4-a716-446655440015",
             ),
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_2", 
+                batch_id="batch_concurrent_2",
                 requested_pipeline=PhaseName.AI_FEEDBACK,
-                correlation_id="550e8400-e29b-41d4-a716-446655440016"
+                correlation_id="550e8400-e29b-41d4-a716-446655440016",
             ),
             BCSPipelineDefinitionRequestV1(
-                batch_id="batch_concurrent_3", 
+                batch_id="batch_concurrent_3",
                 requested_pipeline=PhaseName.CJ_ASSESSMENT,
-                correlation_id="550e8400-e29b-41d4-a716-446655440017"
+                correlation_id="550e8400-e29b-41d4-a716-446655440017",
             ),
         ]
 
@@ -577,14 +586,14 @@ class TestPipelineResolutionServiceBehavior:
 
         # Act - Test both scenarios
         normal_request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_normal_001", 
+            batch_id="batch_normal_001",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440018"
+            correlation_id="550e8400-e29b-41d4-a716-446655440018",
         )
         optimized_request = BCSPipelineDefinitionRequestV1(
-            batch_id="batch_already_spellchecked", 
+            batch_id="batch_already_spellchecked",
             requested_pipeline=PhaseName.AI_FEEDBACK,
-            correlation_id="550e8400-e29b-41d4-a716-446655440019"
+            correlation_id="550e8400-e29b-41d4-a716-446655440019",
         )
 
         normal_response = await service.resolve_pipeline_request(normal_request)

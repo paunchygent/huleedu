@@ -20,4 +20,3 @@ class JwksStore:
 
     def get_jwks(self) -> JwksResponseV1:
         return JwksResponseV1(keys=self._keys)
-

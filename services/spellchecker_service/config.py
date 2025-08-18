@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers for event consumption and publishing"
+        description="Kafka bootstrap servers for event consumption and publishing",
     )
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
@@ -42,8 +42,7 @@ class Settings(BaseSettings):
 
     # Redis configuration for idempotency
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for idempotency and caching"
+        default="redis://localhost:6379", description="Redis URL for idempotency and caching"
     )
 
     CONSUMER_GROUP: str = "spellchecker-service-group-v1.1"

@@ -1031,8 +1031,11 @@ class TestProcessPipelineCompleted:
 
     @pytest.mark.asyncio
     async def test_successful_pipeline_completion(
-        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
-        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+        self,
+        event_processor: EventProcessorImpl,
+        mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock,
+        mock_cache_manager: AsyncMock,
     ) -> None:
         """Test successful pipeline completion processing."""
         # Arrange
@@ -1075,7 +1078,7 @@ class TestProcessPipelineCompleted:
                 "failed_essays": 0,
                 "duration_seconds": 45.2,
                 "completed_phases": ["spellcheck", "cj_assessment"],
-            }
+            },
         )
 
         # Verify cache invalidation
@@ -1084,8 +1087,11 @@ class TestProcessPipelineCompleted:
 
     @pytest.mark.asyncio
     async def test_pipeline_completion_with_failures(
-        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
-        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+        self,
+        event_processor: EventProcessorImpl,
+        mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock,
+        mock_cache_manager: AsyncMock,
     ) -> None:
         """Test pipeline completion processing with failures."""
         # Arrange
@@ -1127,7 +1133,7 @@ class TestProcessPipelineCompleted:
                 "failed_essays": 3,
                 "duration_seconds": 62.8,
                 "completed_phases": ["spellcheck", "cj_assessment"],
-            }
+            },
         )
 
         # Verify cache invalidation still occurs
@@ -1136,8 +1142,11 @@ class TestProcessPipelineCompleted:
 
     @pytest.mark.asyncio
     async def test_pipeline_completion_missing_batch(
-        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
-        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+        self,
+        event_processor: EventProcessorImpl,
+        mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock,
+        mock_cache_manager: AsyncMock,
     ) -> None:
         """Test pipeline completion when batch is not found."""
         # Arrange
@@ -1177,8 +1186,11 @@ class TestProcessPipelineCompleted:
 
     @pytest.mark.asyncio
     async def test_pipeline_completion_batch_repository_error(
-        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
-        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+        self,
+        event_processor: EventProcessorImpl,
+        mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock,
+        mock_cache_manager: AsyncMock,
     ) -> None:
         """Test pipeline completion when batch repository fails."""
         # Arrange
@@ -1186,7 +1198,9 @@ class TestProcessPipelineCompleted:
         correlation_id = uuid4()
 
         # Mock repository to raise exception
-        mock_batch_repository.mark_batch_completed.side_effect = Exception("Database connection failed")
+        mock_batch_repository.mark_batch_completed.side_effect = Exception(
+            "Database connection failed"
+        )
 
         from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
         from common_core.metadata_models import SystemProcessingMetadata
@@ -1211,8 +1225,11 @@ class TestProcessPipelineCompleted:
 
     @pytest.mark.asyncio
     async def test_pipeline_completion_cache_invalidation_error(
-        self, event_processor: EventProcessorImpl, mock_batch_repository: AsyncMock,
-        mock_state_store: AsyncMock, mock_cache_manager: AsyncMock
+        self,
+        event_processor: EventProcessorImpl,
+        mock_batch_repository: AsyncMock,
+        mock_state_store: AsyncMock,
+        mock_cache_manager: AsyncMock,
     ) -> None:
         """Test pipeline completion when cache invalidation fails."""
         # Arrange
@@ -1258,6 +1275,6 @@ class TestProcessPipelineCompleted:
 # - SpellcheckResultDataV1: 5 tests (with corrections, without corrections, failed, missing entity,
 #   missing batch_id)
 # - AssessmentResultV1: 4 tests (successful, with anchors, empty results, repository error)
-# - BatchPipelineCompletedV1: 5 tests (successful, with failures, missing batch, repository error, 
+# - BatchPipelineCompletedV1: 5 tests (successful, with failures, missing batch, repository error,
 #   cache error)
 # Total: 21 tests covering all methods in EventProcessorImpl

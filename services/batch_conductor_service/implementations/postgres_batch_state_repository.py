@@ -288,7 +288,6 @@ class PostgreSQLBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
             )
             return set()
 
-
     async def close(self) -> None:
         """Close the database connection pool."""
         await self.engine.dispose()

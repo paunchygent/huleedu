@@ -248,7 +248,7 @@ async def test_handle_batch_pipeline_completed_successful_completion(
     batch_id = "test-batch-success"
     user_id = "teacher-123"
     correlation_id = uuid4()
-    
+
     # Mock batch repository response with user_id in processing_metadata
     mock_batch_repo.get_batch_by_id.return_value = {
         "batch_id": batch_id,
@@ -275,7 +275,7 @@ async def test_handle_batch_pipeline_completed_successful_completion(
     # Assert
     mock_batch_repo.get_batch_by_id.assert_called_once_with(batch_id)
     mock_event_publisher.publish_batch_event.assert_called_once()
-    
+
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
     notification: TeacherNotificationRequestedV1 = envelope.data
@@ -284,7 +284,9 @@ async def test_handle_batch_pipeline_completed_successful_completion(
     assert notification.teacher_id == user_id
     assert notification.notification_type == "pipeline_completed"
     assert notification.category == WebSocketEventCategory.BATCH_PROGRESS
-    assert notification.priority == NotificationPriority.HIGH  # Successful completion is HIGH priority
+    assert (
+        notification.priority == NotificationPriority.HIGH
+    )  # Successful completion is HIGH priority
     assert notification.action_required is False  # No action required for success
     assert notification.batch_id == batch_id
     assert notification.correlation_id == str(correlation_id)
@@ -311,7 +313,7 @@ async def test_handle_batch_pipeline_completed_with_failures(
     batch_id = "test-batch-failures"
     user_id = "teacher-456"
     correlation_id = uuid4()
-    
+
     # Mock batch repository response
     mock_batch_repo.get_batch_by_id.return_value = {
         "batch_id": batch_id,
@@ -337,16 +339,18 @@ async def test_handle_batch_pipeline_completed_with_failures(
 
     # Assert
     mock_event_publisher.publish_batch_event.assert_called_once()
-    
+
     call_args = mock_event_publisher.publish_batch_event.call_args[0]
     envelope: EventEnvelope = call_args[0]
     notification: TeacherNotificationRequestedV1 = envelope.data
 
     # Verify notification properties for completion with failures
     assert notification.teacher_id == user_id
-    assert notification.priority == NotificationPriority.IMMEDIATE  # Failures are IMMEDIATE priority
+    assert (
+        notification.priority == NotificationPriority.IMMEDIATE
+    )  # Failures are IMMEDIATE priority
     assert notification.action_required is True  # Action required for failures
-    
+
     # Verify payload content shows failures
     payload = notification.payload
     assert payload["final_status"] == "COMPLETED_WITH_FAILURES"
@@ -365,7 +369,7 @@ async def test_handle_batch_pipeline_completed_missing_batch(
     # Arrange
     batch_id = "nonexistent-batch"
     correlation_id = uuid4()
-    
+
     # Mock batch repository to return None (batch not found)
     mock_batch_repo.get_batch_by_id.return_value = None
 
@@ -402,7 +406,7 @@ async def test_handle_batch_pipeline_completed_missing_user_id(
     # Arrange
     batch_id = "test-batch-no-user"
     correlation_id = uuid4()
-    
+
     # Mock batch repository response without user_id in processing_metadata
     mock_batch_repo.get_batch_by_id.return_value = {
         "batch_id": batch_id,
@@ -443,7 +447,7 @@ async def test_handle_batch_pipeline_completed_publish_failure_does_not_raise(
     batch_id = "test-batch-publish-fail"
     user_id = "teacher-789"
     correlation_id = uuid4()
-    
+
     # Mock batch repository response
     mock_batch_repo.get_batch_by_id.return_value = {
         "batch_id": batch_id,
@@ -485,7 +489,7 @@ async def test_handle_batch_pipeline_completed_correct_envelope_structure(
     batch_id = "test-batch-envelope"
     user_id = "teacher-envelope"
     correlation_id = uuid4()
-    
+
     mock_batch_repo.get_batch_by_id.return_value = {
         "batch_id": batch_id,
         "processing_metadata": {"user_id": user_id},

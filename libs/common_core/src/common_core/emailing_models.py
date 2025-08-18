@@ -34,4 +34,3 @@ class EmailDeliveryFailedV1(BaseModel):
     failed_at: datetime
     reason: str
     correlation_id: str
-

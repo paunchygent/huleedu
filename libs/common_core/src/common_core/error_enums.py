@@ -147,3 +147,36 @@ class CJAssessmentErrorCode(str, Enum):
     CJ_CALLBACK_CORRELATION_FAILED = (
         "CJ_CALLBACK_CORRELATION_FAILED"  # Can't match callback to comparison pair
     )
+
+
+class IdentityErrorCode(str, Enum):
+    """
+    Identity Service domain-specific error codes.
+
+    These codes represent errors unique to authentication, user management,
+    and token operations. Generic errors like timeouts or connection failures
+    should use the base ErrorCode enum.
+    """
+
+    # Authentication errors
+    INVALID_CREDENTIALS = "IDENTITY_INVALID_CREDENTIALS"
+    USER_NOT_FOUND = "IDENTITY_USER_NOT_FOUND"
+    USER_ALREADY_EXISTS = "IDENTITY_USER_ALREADY_EXISTS"
+    EMAIL_NOT_VERIFIED = "IDENTITY_EMAIL_NOT_VERIFIED"
+    ACCOUNT_LOCKED = "IDENTITY_ACCOUNT_LOCKED"
+
+    # Token errors
+    TOKEN_EXPIRED = "IDENTITY_TOKEN_EXPIRED"
+    TOKEN_INVALID = "IDENTITY_TOKEN_INVALID"
+    REFRESH_TOKEN_INVALID = "IDENTITY_REFRESH_TOKEN_INVALID"
+    REFRESH_TOKEN_EXPIRED = "IDENTITY_REFRESH_TOKEN_EXPIRED"
+
+    # Email verification errors
+    VERIFICATION_TOKEN_EXPIRED = "IDENTITY_VERIFICATION_TOKEN_EXPIRED"
+    VERIFICATION_TOKEN_INVALID = "IDENTITY_VERIFICATION_TOKEN_INVALID"
+    EMAIL_ALREADY_VERIFIED = "IDENTITY_EMAIL_ALREADY_VERIFIED"
+
+    # Password reset errors
+    RESET_TOKEN_EXPIRED = "IDENTITY_RESET_TOKEN_EXPIRED"
+    RESET_TOKEN_INVALID = "IDENTITY_RESET_TOKEN_INVALID"
+    PASSWORD_RESET_NOT_REQUESTED = "IDENTITY_PASSWORD_RESET_NOT_REQUESTED"

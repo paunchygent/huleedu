@@ -37,3 +37,37 @@ class MeResponse(BaseModel):
     roles: List[str] = []
     email_verified: bool = False
 
+
+class RequestEmailVerificationRequest(BaseModel):
+    pass
+
+
+class RequestEmailVerificationResponse(BaseModel):
+    message: str
+    correlation_id: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+
+
+class RequestPasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class RequestPasswordResetResponse(BaseModel):
+    message: str
+    correlation_id: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

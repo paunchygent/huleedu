@@ -31,12 +31,10 @@ class Settings(BaseSettings):
     )
     SERVICE_NAME: str = "file-service"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092",
-        description="Kafka bootstrap servers for event publishing"
+        default="localhost:9092", description="Kafka bootstrap servers for event publishing"
     )
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for caching and distributed locks"
+        default="redis://localhost:6379", description="Redis URL for caching and distributed locks"
     )
     CONTENT_SERVICE_URL: str = "http://content_service:8001/v1/content"
     BOS_URL: str = Field(

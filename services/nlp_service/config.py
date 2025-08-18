@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Kafka Configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers for event consumption and publishing"
+        description="Kafka bootstrap servers for event consumption and publishing",
     )
     CONSUMER_GROUP: str = "nlp-service-consumer-group"
     CONSUMER_CLIENT_ID: str = "nlp-service-consumer"
@@ -46,8 +46,7 @@ class Settings(BaseSettings):
 
     # Redis Configuration
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for caching and distributed state"
+        default="redis://localhost:6379", description="Redis URL for caching and distributed state"
     )
 
     # Metrics Configuration

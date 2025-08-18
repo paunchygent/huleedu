@@ -84,9 +84,9 @@ class TestPipelineResolutionAPI:
         """Test successful pipeline resolution with valid input (Happy Path)."""
         # Arrange
         payload = {
-            "batch_id": "batch_001", 
+            "batch_id": "batch_001",
             "requested_pipeline": "ai_feedback",
-            "correlation_id": "test-correlation-001"
+            "correlation_id": "test-correlation-001",
         }
         expected_pipeline = ["spellcheck", "nlp", "ai_feedback"]
         mock_response = BCSPipelineDefinitionResponseV1(
@@ -120,8 +120,14 @@ class TestPipelineResolutionAPI:
     @pytest.mark.parametrize(
         "payload, expected_error_part",
         [
-            ({"batch_id": "batch_002", "correlation_id": "test-001"}, "Field required"),  # Missing requested_pipeline
-            ({"requested_pipeline": "ai_feedback", "correlation_id": "test-002"}, "Field required"),  # Missing batch_id
+            (
+                {"batch_id": "batch_002", "correlation_id": "test-001"},
+                "Field required",
+            ),  # Missing requested_pipeline
+            (
+                {"requested_pipeline": "ai_feedback", "correlation_id": "test-002"},
+                "Field required",
+            ),  # Missing batch_id
             (
                 {"batch_id": "", "requested_pipeline": "ai_feedback", "correlation_id": "test-003"},
                 "String should have at least 1 character",
@@ -156,9 +162,9 @@ class TestPipelineResolutionAPI:
         """Test handling of a pipeline resolution that fails because the pipeline configuration is not found."""
         # Arrange - Use valid enum value but mock service to return failure
         payload = {
-            "batch_id": "batch_003", 
+            "batch_id": "batch_003",
             "requested_pipeline": "nlp",  # Valid enum value
-            "correlation_id": "test-correlation-003"
+            "correlation_id": "test-correlation-003",
         }
         mock_response = BCSPipelineDefinitionResponseV1(
             batch_id="batch_003",
@@ -175,7 +181,9 @@ class TestPipelineResolutionAPI:
         assert response.status_code == 400
         assert response.headers["Content-Type"] == "application/json"
         assert "error" in data
-        assert data["detail"] == "Pipeline resolution failed: Unknown pipeline configuration for 'nlp'"
+        assert (
+            data["detail"] == "Pipeline resolution failed: Unknown pipeline configuration for 'nlp'"
+        )
 
     async def test_dlq_producer_on_service_exception(
         self,
@@ -186,9 +194,9 @@ class TestPipelineResolutionAPI:
         """Test that a generic exception from the service layer returns a 500 and calls the DLQ."""
         # Arrange
         payload = {
-            "batch_id": "batch_004", 
+            "batch_id": "batch_004",
             "requested_pipeline": "ai_feedback",
-            "correlation_id": "test-correlation-004"
+            "correlation_id": "test-correlation-004",
         }
         error_message = "Internal service error"
         mock_pipeline_resolution_service.resolve_pipeline_request.side_effect = Exception(
@@ -209,7 +217,7 @@ class TestPipelineResolutionAPI:
         payload = {
             "batch_id": "batch_005",
             "requested_pipeline": "nonexistent_pipeline",  # Invalid enum value
-            "correlation_id": "test-correlation-005"
+            "correlation_id": "test-correlation-005",
         }
 
         # Act
@@ -221,7 +229,8 @@ class TestPipelineResolutionAPI:
         assert response.headers["Content-Type"] == "application/json"
         assert "detail" in data
         assert any(
-            "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'" in error["msg"]
+            "Input should be 'spellcheck', 'ai_feedback', 'cj_assessment', 'nlp' or 'student_matching'"
+            in error["msg"]
             for error in data["detail"]
         )
 

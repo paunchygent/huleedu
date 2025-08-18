@@ -601,4 +601,3 @@ class RedisCachedBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
                     pass
 
             return set()
-

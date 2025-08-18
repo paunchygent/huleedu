@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
 from common_core.pipeline_models import PhaseName
+
 
 class BCSPipelineDefinitionRequestV1(BaseModel):
     """

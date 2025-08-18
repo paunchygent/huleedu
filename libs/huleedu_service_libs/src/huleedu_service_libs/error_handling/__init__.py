@@ -62,6 +62,23 @@ from huleedu_service_libs.error_handling.file_validation_factories import (
     raise_unknown_validation_error,
 )
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+from huleedu_service_libs.error_handling.identity_factories import (
+    raise_account_locked_error,
+    raise_email_already_verified_error,
+    raise_email_not_verified_error,
+    raise_invalid_credentials_error,
+    raise_password_reset_not_requested_error,
+    raise_refresh_token_expired_error,
+    raise_refresh_token_invalid_error,
+    raise_reset_token_expired_error,
+    raise_reset_token_invalid_error,
+    raise_token_expired_error,
+    raise_token_invalid_error,
+    raise_user_already_exists_error,
+    raise_user_not_found_error,
+    raise_verification_token_expired_error,
+    raise_verification_token_invalid_error,
+)
 from huleedu_service_libs.error_handling.logging_utils import format_error_for_logging
 
 # Quart handlers moved to submodule (see comment above)
@@ -133,6 +150,22 @@ __all__ = [
     "raise_cj_score_convergence_failed",
     "raise_cj_comparison_imbalance",
     "raise_cj_callback_correlation_failed",
+    # Identity service error factories
+    "raise_invalid_credentials_error",
+    "raise_user_not_found_error",
+    "raise_user_already_exists_error",
+    "raise_email_not_verified_error",
+    "raise_account_locked_error",
+    "raise_token_expired_error",
+    "raise_token_invalid_error",
+    "raise_refresh_token_invalid_error",
+    "raise_refresh_token_expired_error",
+    "raise_verification_token_expired_error",
+    "raise_verification_token_invalid_error",
+    "raise_email_already_verified_error",
+    "raise_reset_token_expired_error",
+    "raise_reset_token_invalid_error",
+    "raise_password_reset_not_requested_error",
     # Framework-specific handlers moved to submodules (see imports above)
     # Testing utilities
     "assert_raises_huleedu_error",

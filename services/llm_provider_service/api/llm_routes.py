@@ -164,7 +164,8 @@ async def generate_comparison(
                 status=result.status,
                 message=(
                     f"Request queued for processing. "
-                    f"Result will be delivered via callback to topic: {comparison_request.callback_topic}"
+                    f"Result will be delivered via callback to topic: "
+                    f"{comparison_request.callback_topic}"
                 ),
                 estimated_wait_minutes=result.estimated_wait_minutes,
             )

@@ -257,3 +257,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # PostgreSQL database for Identity Service
+  identity_db:
+    image: postgres:15
+    container_name: huleedu_identity_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5442:5432"
+    environment:
+      - POSTGRES_DB=huleedu_identity
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - identity_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_identity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

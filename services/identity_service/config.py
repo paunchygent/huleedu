@@ -18,7 +18,9 @@ class Settings(BaseSettings):
 
     # HTTP
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT")
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT, validation_alias="ENVIRONMENT"
+    )
 
     # Redis / Kafka
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
@@ -60,13 +62,16 @@ class Settings(BaseSettings):
             return f"postgresql+asyncpg://{db_user}:{prod_password}@{prod_host}:{prod_port}/huleedu_identity"
         else:
             # Development: local Docker DB port (next available slot)
-            db_user = os.getenv("HULEEDU_DB_USER")
-            db_password = os.getenv("HULEEDU_DB_PASSWORD")
-            if not db_user or not db_password:
+            db_user_env = os.getenv("HULEEDU_DB_USER")
+            db_password_env = os.getenv("HULEEDU_DB_PASSWORD")
+
+            if not db_user_env or not db_password_env:
                 raise ValueError(
                     "Missing required database credentials. Ensure HULEEDU_DB_USER and HULEEDU_DB_PASSWORD are set in .env."
                 )
-            return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5441/huleedu_identity"
+
+            # Type narrowing after validation - mypy now knows these are not None
+            return f"postgresql+asyncpg://{db_user_env}:{db_password_env}@localhost:5442/huleedu_identity"
 
 
 settings = Settings()

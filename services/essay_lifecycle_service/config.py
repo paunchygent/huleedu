@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     # Kafka Configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers for event consumption and publishing"
+        description="Kafka bootstrap servers for event consumption and publishing",
     )
     CONSUMER_GROUP: str = "essay-lifecycle-service-group-v1.0"
     PRODUCER_CLIENT_ID: str = "essay-lifecycle-service-producer"
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_URL: str = Field(
         default="redis://localhost:6379",
-        description="Redis URL for state management and idempotency"
+        description="Redis URL for state management and idempotency",
     )
 
     # Observability Configuration

@@ -20,4 +20,3 @@ class DevInMemorySessionRepo(SessionRepo):
     async def is_refresh_valid(self, jti: str) -> bool:
         item = self._refresh.get(jti)
         return bool(item and item[1] > int(time.time()))
-

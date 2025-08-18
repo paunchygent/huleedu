@@ -143,7 +143,6 @@ class MockBatchStateRepository(BatchStateRepositoryProtocol):
         # Check if the step/phase has been completed for this batch
         return step_name in self.completed_phases.get(batch_id, set())
 
-
     def clear(self) -> None:
         """Clear all stored data."""
         self.completed_phases.clear()

@@ -23,6 +23,24 @@ from .domain_enums import (
     get_course_level,
     get_course_name,
 )
+from .emailing_models import (
+    EmailDeliveryFailedV1,
+    EmailSentV1,
+    NotificationEmailRequestedV1,
+)
+from .entitlements_models import (
+    CreditBalanceChangedV1,
+    EntitlementDefinitionV1,
+    PlanV1,
+    RateLimitExceededV1,
+    ResourceAccessGrantedV1,
+    SubjectRefV1,
+    SubscriptionActivatedV1,
+    SubscriptionCanceledV1,
+    SubscriptionChangedV1,
+    UsageAuthorizedV1,
+    UsageRecordedV1,
+)
 from .error_enums import ClassManagementErrorCode, ErrorCode, FileValidationErrorCode
 from .essay_service_models import (
     EssayLifecycleAIFeedbackRequestV1,
@@ -64,11 +82,6 @@ from .events.llm_provider_events import (
 )
 from .events.nlp_events import BatchAuthorMatchesSuggestedV1, StudentMatchSuggestion
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
-from .metadata_models import (
-    EssayProcessingInputRefV1,
-    StorageReferenceMetadata,
-    SystemProcessingMetadata,
-)
 from .identity_models import (
     EmailVerificationRequestedV1,
     EmailVerifiedV1,
@@ -79,23 +92,10 @@ from .identity_models import (
     PasswordResetRequestedV1,
     UserRegisteredV1,
 )
-from .emailing_models import (
-    EmailDeliveryFailedV1,
-    EmailSentV1,
-    NotificationEmailRequestedV1,
-)
-from .entitlements_models import (
-    CreditBalanceChangedV1,
-    EntitlementDefinitionV1,
-    PlanV1,
-    RateLimitExceededV1,
-    ResourceAccessGrantedV1,
-    SubjectRefV1,
-    SubscriptionActivatedV1,
-    SubscriptionCanceledV1,
-    SubscriptionChangedV1,
-    UsageAuthorizedV1,
-    UsageRecordedV1,
+from .metadata_models import (
+    EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
+    SystemProcessingMetadata,
 )
 from .models.error_models import ErrorDetail
 from .observability_enums import CacheOperation, MetricName, OperationType

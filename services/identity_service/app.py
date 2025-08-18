@@ -6,12 +6,11 @@ Registers minimal auth routes and sets up service middleware.
 
 from __future__ import annotations
 
-from quart import Quart
-
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
     create_service_logger,
 )
+from quart import Quart
 
 from services.identity_service.api.auth_routes import bp as auth_bp
 from services.identity_service.api.well_known_routes import bp as well_known_bp

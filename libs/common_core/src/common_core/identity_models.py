@@ -36,6 +36,12 @@ class PasswordResetRequestedV1(BaseModel):
     correlation_id: str
 
 
+class PasswordResetCompletedV1(BaseModel):
+    user_id: str
+    reset_at: datetime
+    correlation_id: str
+
+
 class LoginSucceededV1(BaseModel):
     user_id: str
     org_id: Optional[str] = None

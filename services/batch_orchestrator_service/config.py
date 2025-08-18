@@ -30,8 +30,7 @@ class Settings(BaseSettings):
     )
     SERVICE_NAME: str = "batch-service"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092",
-        description="Kafka bootstrap servers for event publishing"
+        default="localhost:9092", description="Kafka bootstrap servers for event publishing"
     )
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
     PORT: int = 5000  # Default port for batch orchestrator service
@@ -58,8 +57,7 @@ class Settings(BaseSettings):
 
     # Redis Configuration
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for caching and distributed state"
+        default="redis://localhost:6379", description="Redis URL for caching and distributed state"
     )
 
     # Batch Conductor Service Configuration

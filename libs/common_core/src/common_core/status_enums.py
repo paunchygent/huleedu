@@ -91,31 +91,31 @@ class BatchStatus(str, Enum):
 class BatchClientStatus(str, Enum):
     """
     Client-facing batch status values for API responses and WebSocket events.
-    
+
     These statuses provide a simplified, semantic view of batch processing state
-    for frontend applications. Values are synchronized between REST API and 
+    for frontend applications. Values are synchronized between REST API and
     WebSocket notifications for consistency.
-    
+
     Processing Flow:
     PENDING_CONTENT → READY → PROCESSING → (COMPLETED_SUCCESSFULLY | COMPLETED_WITH_FAILURES | FAILED)
-    
+
     Terminal States: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED, CANCELLED
     """
 
     # Initial states - batch not yet ready for processing
     PENDING_CONTENT = "pending_content"  # Awaiting content validation or configuration
-    
+
     # Ready state - batch configured and ready to process
     READY = "ready"  # Ready for pipeline execution
-    
+
     # Active processing state
     PROCESSING = "processing"  # Currently being processed (any pipeline phase)
-    
+
     # Terminal success states
     COMPLETED_SUCCESSFULLY = "completed_successfully"  # All essays processed successfully
     COMPLETED_WITH_FAILURES = "completed_with_failures"  # Some essays failed, batch complete
-    
-    # Terminal failure states  
+
+    # Terminal failure states
     FAILED = "failed"  # Critical failure, processing stopped
     CANCELLED = "cancelled"  # Processing cancelled by user or system
 

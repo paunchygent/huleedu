@@ -82,6 +82,7 @@ class ProcessingEvent(str, Enum):
     IDENTITY_EMAIL_VERIFICATION_REQUESTED = "identity.email.verification.requested"
     IDENTITY_EMAIL_VERIFIED = "identity.email.verified"
     IDENTITY_PASSWORD_RESET_REQUESTED = "identity.password.reset.requested"
+    IDENTITY_PASSWORD_RESET_COMPLETED = "identity.password.reset.completed"
     IDENTITY_LOGIN_SUCCEEDED = "identity.login.succeeded"
     IDENTITY_LOGIN_FAILED = "identity.login.failed"
     # -------------  Email service events  -------------#
@@ -170,6 +171,9 @@ _TOPIC_MAPPING = {
     ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED: (
         "huleedu.identity.password.reset.requested.v1"
     ),
+    ProcessingEvent.IDENTITY_PASSWORD_RESET_COMPLETED: (
+        "huleedu.identity.password.reset.completed.v1"
+    ),
     ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED: "huleedu.identity.login.succeeded.v1",
     ProcessingEvent.IDENTITY_LOGIN_FAILED: "huleedu.identity.login.failed.v1",
     # Email topics
@@ -186,12 +190,8 @@ _TOPIC_MAPPING = {
     ProcessingEvent.ENTITLEMENTS_SUBSCRIPTION_CANCELED: (
         "huleedu.entitlements.subscription.canceled.v1"
     ),
-    ProcessingEvent.ENTITLEMENTS_USAGE_AUTHORIZED: (
-        "huleedu.entitlements.usage.authorized.v1"
-    ),
-    ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED: (
-        "huleedu.entitlements.usage.recorded.v1"
-    ),
+    ProcessingEvent.ENTITLEMENTS_USAGE_AUTHORIZED: ("huleedu.entitlements.usage.authorized.v1"),
+    ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED: ("huleedu.entitlements.usage.recorded.v1"),
     ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED: (
         "huleedu.entitlements.credit.balance.changed.v1"
     ),

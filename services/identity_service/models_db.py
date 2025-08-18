@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, String, Text, func, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -30,7 +30,9 @@ class User(Base):
     org_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     roles: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
-    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )
@@ -50,6 +52,60 @@ class RefreshSession(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )
+
+
+class EmailVerificationToken(Base):
+    """Email verification tokens for user account verification."""
+
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<EmailVerificationToken id={self.id} user_id={self.user_id} used={self.used_at is not None}>"
+
+
+class PasswordResetToken(Base):
+    """Password reset tokens for user password reset."""
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<PasswordResetToken id={self.id} user_id={self.user_id} used={self.used_at is not None}>"
 
 
 class EventOutbox(Base):
@@ -94,4 +150,3 @@ class EventOutbox(Base):
         Index("ix_event_outbox_aggregate", "aggregate_type", "aggregate_id"),
         Index("ix_event_outbox_event_type", "event_type"),
     )
-

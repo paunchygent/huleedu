@@ -4,29 +4,27 @@ from __future__ import annotations
 
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
-from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.redis_client import RedisClient
 
 from services.identity_service.config import Settings, settings
 from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
+from services.identity_service.implementations.jwks_store import JwksStore
 from services.identity_service.implementations.outbox_manager import OutboxManager
 from services.identity_service.implementations.password_hasher_impl import (
     Argon2idPasswordHasher,
-)
-from services.identity_service.implementations.user_repository_sqlalchemy_impl import (
-    PostgresSessionRepo,
 )
 from services.identity_service.implementations.token_issuer_impl import DevTokenIssuer
 from services.identity_service.implementations.token_issuer_rs256_impl import (
     Rs256TokenIssuer,
 )
-from services.identity_service.implementations.jwks_store import JwksStore
 from services.identity_service.implementations.user_repository_sqlalchemy_impl import (
+    PostgresSessionRepo,
     PostgresUserRepo,
 )
 from services.identity_service.protocols import (
@@ -52,7 +50,7 @@ class CoreProvider(Provider):
         return ClientSession()
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClient:
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis",
             redis_url=settings.REDIS_URL,
@@ -62,8 +60,13 @@ class CoreProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
-        engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        engine = create_async_engine(settings.database_url, echo=False)
         return engine
+
+    @provide(scope=Scope.APP)
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for outbox configuration."""
+        return settings.SERVICE_NAME
 
 
 class IdentityImplementationsProvider(Provider):
@@ -95,9 +98,11 @@ class IdentityImplementationsProvider(Provider):
     def provide_outbox_manager(
         self,
         outbox_repository: OutboxRepositoryProtocol,
-        redis_client: RedisClient,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
     ) -> OutboxManager:
-        return OutboxManager(outbox_repository=outbox_repository, redis_client=redis_client)
+        """Provide outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(outbox_repository, redis_client, settings)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:2f98818a95eb6cf919734020e842711037910f7f59167d220d6264ccf3729fd3"
+content_hash = "sha256:fd682e81bb0ecb142e2d10d314d57d549227e94a37e755deea1a985628a90203"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.13"
@@ -225,6 +225,44 @@ files = [
 ]
 
 [[package]]
+name = "argon2-cffi"
+version = "25.1.0"
+requires_python = ">=3.8"
+summary = "Argon2 for Python"
+groups = ["dev"]
+dependencies = [
+    "argon2-cffi-bindings",
+]
+files = [
+    {file = "argon2_cffi-25.1.0-py3-none-any.whl", hash = "sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741"},
+    {file = "argon2_cffi-25.1.0.tar.gz", hash = "sha256:694ae5cc8a42f4c4e2bf2ca0e64e51e23a040c6a517a85074683d3959e1346c1"},
+]
+
+[[package]]
+name = "argon2-cffi-bindings"
+version = "25.1.0"
+requires_python = ">=3.9"
+summary = "Low-level CFFI bindings for Argon2"
+groups = ["dev"]
+dependencies = [
+    "cffi>=1.0.1; python_version < \"3.14\"",
+    "cffi>=2.0.0b1; python_version >= \"3.14\"",
+]
+files = [
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:aecba1723ae35330a008418a91ea6cfcedf6d31e5fbaa056a166462ff066d500"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:2630b6240b495dfab90aebe159ff784d08ea999aa4b0d17efa734055a07d2f44"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:7aef0c91e2c0fbca6fc68e7555aa60ef7008a739cbe045541e438373bc54d2b0"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1e021e87faa76ae0d413b619fe2b65ab9a037f24c60a1e6cc43457ae20de6dc6"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d3e924cfc503018a714f94a49a149fdc0b644eaead5d1f089330399134fa028a"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:c87b72589133f0346a1cb8d5ecca4b933e3c9b64656c9d175270a000e73b288d"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:1db89609c06afa1a214a69a462ea741cf735b29a57530478c06eb81dd403de99"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-win32.whl", hash = "sha256:473bcb5f82924b1becbb637b63303ec8d10e84c8d241119419897a26116515d2"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-win_amd64.whl", hash = "sha256:a98cd7d17e9f7ce244c0803cad3c23a7d379c301ba618a5fa76a67d116618b98"},
+    {file = "argon2_cffi_bindings-25.1.0-cp39-abi3-win_arm64.whl", hash = "sha256:b0fdbcf513833809c882823f98dc2f931cf659d9a1429616ac3adebb49f5db94"},
+    {file = "argon2_cffi_bindings-25.1.0.tar.gz", hash = "sha256:b957f3e6ea4d55d820e40ff76f450952807013d361a65d7f28acc0acbf29229d"},
+]
+
+[[package]]
 name = "asgiref"
 version = "3.9.1"
 requires_python = ">=3.9"
@@ -417,7 +455,7 @@ version = "1.17.1"
 requires_python = ">=3.8"
 summary = "Foreign Function Interface for Python calling C code."
 groups = ["dev"]
-marker = "platform_python_implementation != \"PyPy\""
+marker = "python_version < \"3.14\" or platform_python_implementation != \"PyPy\""
 dependencies = [
     "pycparser",
 ]
@@ -1560,6 +1598,35 @@ dependencies = [
     "quart",
     "quart-dishka",
     "sqlalchemy",
+]
+
+[[package]]
+name = "huleedu-identity-service"
+version = "0.1.0"
+requires_python = ">=3.11"
+editable = true
+path = "./services/identity_service"
+summary = "HuleEdu Identity Service for authentication and JWT/JWKS"
+groups = ["dev"]
+dependencies = [
+    "PyJWT",
+    "aiohttp",
+    "aiokafka",
+    "alembic",
+    "argon2-cffi",
+    "asyncpg",
+    "cryptography",
+    "dishka",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "hypercorn",
+    "prometheus-client",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "quart",
+    "quart-dishka",
+    "sqlalchemy[asyncio]",
 ]
 
 [[package]]
@@ -2826,7 +2893,7 @@ version = "2.22"
 requires_python = ">=3.8"
 summary = "C parser in Python"
 groups = ["dev"]
-marker = "platform_python_implementation != \"PyPy\""
+marker = "python_version < \"3.14\" or platform_python_implementation != \"PyPy\""
 files = [
     {file = "pycparser-2.22-py3-none-any.whl", hash = "sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc"},
     {file = "pycparser-2.22.tar.gz", hash = "sha256:491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6"},

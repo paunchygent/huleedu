@@ -48,12 +48,10 @@ class Settings(BaseSettings):
 
     # HuleEdu Service Libs Integration
     REDIS_URL: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis URL for caching and rate limiting"
+        default="redis://localhost:6379/0", description="Redis URL for caching and rate limiting"
     )
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092",
-        description="Kafka bootstrap servers for event publishing"
+        default="localhost:9092", description="Kafka bootstrap servers for event publishing"
     )
 
     # Circuit Breaker Configuration

@@ -5,7 +5,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
-
 SubjectType = Literal["org", "user"]
 
 
@@ -90,4 +89,3 @@ class ResourceAccessGrantedV1(BaseModel):
     rights: List[str] = ["read"]
     expires_at: Optional[datetime] = None
     correlation_id: str
-

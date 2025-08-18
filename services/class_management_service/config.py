@@ -21,12 +21,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: Environment = Environment.DEVELOPMENT
     SERVICE_NAME: str = "class_management_service"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default="localhost:9092",
-        description="Kafka bootstrap servers for event publishing"
+        default="localhost:9092", description="Kafka bootstrap servers for event publishing"
     )
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for caching and distributed state"
+        default="redis://localhost:6379", description="Redis URL for caching and distributed state"
     )
 
     @property

@@ -15,8 +15,8 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
-from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.assessment_result_events import AssessmentResultV1
+from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -54,7 +54,9 @@ class ResultAggregatorKafkaConsumer:
             topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
             topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),  # Rich event for business data
-            topic_name(ProcessingEvent.BATCH_PIPELINE_COMPLETED),  # Pipeline completion for result finalization
+            topic_name(
+                ProcessingEvent.BATCH_PIPELINE_COMPLETED
+            ),  # Pipeline completion for result finalization
             # Future topics to add when services are implemented:
             # "huleedu.essay.nlp.completed.v1",
             # "huleedu.essay.aifeedback.completed.v1",

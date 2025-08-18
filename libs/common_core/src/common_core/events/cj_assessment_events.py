@@ -51,7 +51,10 @@ class GradeProjectionSummary(BaseModel):
     # New fields for enriched statistical data
     grade_probabilities: dict[str, dict[str, float]] = Field(
         default_factory=dict,
-        description="Per-essay probability distribution over grades (e.g. {'essay_id': {'A': 0.7, 'B': 0.3}})",
+        description=(
+            "Per-essay probability distribution over grades "
+            "(e.g. {'essay_id': {'A': 0.7, 'B': 0.3}})"
+        ),
     )
     calibration_info: dict[str, Any] = Field(
         default_factory=dict,

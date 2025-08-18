@@ -644,13 +644,11 @@ class PipelineTestHarness:
                                 phase_name = event_data.get("phase_name")
                                 storage_id = event_data.get("storage_id")
                                 skip_reason = event_data.get("skip_reason", "already_completed")
-                                
+
                                 tracker.pruned_phases.append(phase_name)
                                 if storage_id:
                                     tracker.reused_storage_ids[phase_name] = storage_id
-                                logger.info(
-                                    f"⏭️ Phase {phase_name} SKIPPED (reason: {skip_reason})"
-                                )
+                                logger.info(f"⏭️ Phase {phase_name} SKIPPED (reason: {skip_reason})")
 
                             # Legacy phase reuse detection (remove once phase.skipped events work)
                             elif "phase.reused" in event_type:
@@ -674,13 +672,17 @@ class PipelineTestHarness:
                                     # Only mark nlp as completed if it was initiated in this pipeline
                                     if "nlp" in tracker.initiated_phases:
                                         tracker.completed_phases.add("nlp")
-                                        logger.info("✅ Phase nlp completed (from analysis completion)")
+                                        logger.info(
+                                            "✅ Phase nlp completed (from analysis completion)"
+                                        )
                                 elif "cj_assessment.completed" in event_type:
                                     # Only mark cj_assessment as completed if it was initiated
                                     if "cj_assessment" in tracker.initiated_phases:
                                         tracker.completed_phases.add("cj_assessment")
-                                        logger.info("✅ Phase cj_assessment completed (from assessment completion)")
-                                
+                                        logger.info(
+                                            "✅ Phase cj_assessment completed (from assessment completion)"
+                                        )
+
                                 logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
                                 return envelope_data
 

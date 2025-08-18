@@ -24,15 +24,14 @@ class Settings(BaseSettings):
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
         default="localhost:9092",
-        description="Kafka bootstrap servers for event consumption and publishing"
+        description="Kafka bootstrap servers for event consumption and publishing",
     )
     CONSUMER_GROUP_ID_CJ: str = "cj_assessment_consumer_group"
     PRODUCER_CLIENT_ID_CJ: str = "cj_assessment_producer"
 
     # Redis configuration for idempotency
     REDIS_URL: str = Field(
-        default="redis://localhost:6379",
-        description="Redis URL for idempotency and caching"
+        default="redis://localhost:6379", description="Redis URL for idempotency and caching"
     )
 
     # Kafka topic names

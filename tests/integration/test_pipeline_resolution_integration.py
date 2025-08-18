@@ -45,15 +45,17 @@ class MockBatchConductorClient:
         self.base_url = base_url
         self.endpoint = f"{base_url}/internal/v1/pipelines/define"
 
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str) -> dict[str, Any]:
+    async def resolve_pipeline(
+        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+    ) -> dict[str, Any]:
         """Resolve pipeline using real HTTP call to BCS."""
         # Build URL for BCS pipeline resolution endpoint
         url = f"{self.base_url}/internal/v1/pipelines/define"
         headers = {"Content-Type": "application/json"}
         data = {
-            "batch_id": batch_id, 
+            "batch_id": batch_id,
             "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
-            "correlation_id": correlation_id
+            "correlation_id": correlation_id,
         }
 
         async with aiohttp.ClientSession() as session:

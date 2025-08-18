@@ -50,7 +50,9 @@ class Settings(BaseSettings):
     HTTP_MAX_RETRIES: int = Field(default=3, description="Maximum HTTP client retries")
 
     # Environment type (read without BCS_ prefix to match docker-compose)
-    ENV_TYPE: str = Field(default="development", description="Environment type", validation_alias="ENV_TYPE")
+    ENV_TYPE: str = Field(
+        default="development", description="Environment type", validation_alias="ENV_TYPE"
+    )
 
     # Repository Configuration (standardized with BOS/ELS)
     USE_MOCK_REPOSITORY: bool = Field(

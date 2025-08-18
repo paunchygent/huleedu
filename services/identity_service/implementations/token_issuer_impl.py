@@ -26,7 +26,7 @@ class DevTokenIssuer(TokenIssuer):
         return self._encode(payload)
 
     def issue_refresh_token(self, user_id: str) -> tuple[str, str]:
-        jti = f"r-{int(time.time()*1000)}"
+        jti = f"r-{int(time.time() * 1000)}"
         payload = {
             "sub": user_id,
             "typ": "refresh",
@@ -40,7 +40,8 @@ class DevTokenIssuer(TokenIssuer):
         try:
             _, body_b64, _ = token.split(".")
             padded = body_b64 + "=" * (-len(body_b64) % 4)
-            return json.loads(base64.urlsafe_b64decode(padded))
+            decoded = json.loads(base64.urlsafe_b64decode(padded))
+            return decoded if isinstance(decoded, dict) else {}
         except Exception:
             return {}
 
@@ -51,4 +52,3 @@ class DevTokenIssuer(TokenIssuer):
         # Dev signature placeholder
         sig = base64.urlsafe_b64encode(settings.JWT_DEV_SECRET.encode()).rstrip(b"=")
         return f"{h.decode()}.{b.decode()}.{sig.decode()}"
-

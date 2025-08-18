@@ -1,60 +1,176 @@
+"""
+Outbox pattern and relay worker management for reliable event publishing.
+
+Handles the transactional outbox pattern for Identity Service following
+the TRUE OUTBOX PATTERN with atomic consistency and relay worker coordination.
+"""
+
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 
+if TYPE_CHECKING:
+    from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+    from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+
+    from services.identity_service.config import Settings
+
 logger = create_service_logger("identity_service.outbox_manager")
 
 
 class OutboxManager:
-    """Identity Service outbox manager wrapper following TRUE OUTBOX PATTERN."""
+    """
+    Manages outbox pattern and relay worker coordination for Identity Service.
 
-    def __init__(self, outbox_repository, redis_client) -> None:
+    Provides reliable event publishing through the transactional outbox pattern
+    with atomic consistency between business data and events, following the
+    TRUE OUTBOX PATTERN architecture used across HuleEdu services.
+    """
+
+    def __init__(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> None:
         self.outbox_repository = outbox_repository
         self.redis_client = redis_client
+        self.settings = settings
 
     async def publish_to_outbox(
         self,
         aggregate_type: str,
         aggregate_id: str,
         event_type: str,
-        event_data: Any,
+        event_data: Any,  # EventEnvelope[Any]
         topic: str,
+        session: Any | None = None,  # AsyncSession | None
     ) -> None:
+        """
+        Store event in outbox for reliable delivery.
+
+        This implements the TRUE OUTBOX PATTERN for transactional safety,
+        ensuring events are stored atomically with business data and
+        published asynchronously by the relay worker.
+
+        Args:
+            aggregate_type: Type of aggregate (e.g., "user", "session")
+            aggregate_id: ID of the aggregate that produced the event
+            event_type: Type of event being published
+            event_data: Complete event envelope to publish
+            topic: Kafka topic to publish to
+            session: Optional database session for transactional atomicity
+
+        Raises:
+            HuleEduError: If outbox repository is not configured or storage fails
+        """
         if not self.outbox_repository:
             raise_external_service_error(
                 service="identity_service",
                 operation="publish_to_outbox",
                 external_service="outbox_repository",
-                message="Outbox repository not configured",
-                correlation_id=getattr(event_data, "correlation_id", UUID(int=0)),
+                message="Outbox repository not configured for transactional publishing",
+                correlation_id=event_data.correlation_id
+                if hasattr(event_data, "correlation_id")
+                else UUID("00000000-0000-0000-0000-000000000000"),
                 aggregate_id=aggregate_id,
                 event_type=event_type,
             )
 
-        serialized = (
-            event_data.model_dump(mode="json") if hasattr(event_data, "model_dump") else event_data
-        )
-        key = aggregate_id
-        outbox_id = await self.outbox_repository.add_event(
-            aggregate_id=aggregate_id,
-            aggregate_type=aggregate_type,
-            event_type=event_type,
-            event_data=serialized,
-            topic=topic,
-            event_key=key,
-        )
-        logger.debug(
-            "Stored event in outbox",
-            extra={"outbox_id": str(outbox_id), "aggregate_id": aggregate_id, "topic": topic},
-        )
-        await self.notify_relay_worker()
+        try:
+            # CLEAN ARCHITECTURE: Always expect Pydantic EventEnvelope
+            # Publishers should pass the original envelope, not reconstructed data
+            if not hasattr(event_data, "model_dump"):
+                raise ValueError(
+                    f"OutboxManager expects Pydantic EventEnvelope, got {type(event_data)}"
+                )
+
+            # Serialize the envelope to JSON for storage
+            serialized_data = event_data.model_dump(mode="json")
+
+            # Determine Kafka key from envelope metadata or aggregate ID
+            event_key = aggregate_id
+            if hasattr(event_data, "metadata") and event_data.metadata:
+                event_key = event_data.metadata.get("partition_key", aggregate_id)
+
+            # Store in outbox
+            outbox_id = await self.outbox_repository.add_event(
+                aggregate_id=aggregate_id,
+                aggregate_type=aggregate_type,
+                event_type=event_type,
+                event_data=serialized_data,
+                topic=topic,
+                event_key=event_key,
+                session=session,  # Pass through session for transactional atomicity
+            )
+
+            logger.debug(
+                "Event stored in outbox for transactional safety",
+                extra={
+                    "outbox_id": str(outbox_id),
+                    "event_type": event_type,
+                    "aggregate_id": aggregate_id,
+                    "aggregate_type": aggregate_type,
+                    "topic": topic,
+                    "correlation_id": str(event_data.correlation_id),
+                },
+            )
+
+            # Wake up the relay worker immediately
+            await self.notify_relay_worker()
+
+        except Exception as e:
+            # Re-raise HuleEduError as-is, wrap others
+            if hasattr(e, "error_detail"):
+                raise
+            else:
+                # Extract correlation ID for error context
+                error_correlation_id = UUID("00000000-0000-0000-0000-000000000000")
+                if hasattr(event_data, "correlation_id"):
+                    error_correlation_id = event_data.correlation_id
+                elif isinstance(event_data, dict):
+                    try:
+                        error_correlation_id = UUID(
+                            str(
+                                event_data.get(
+                                    "correlation_id", "00000000-0000-0000-0000-000000000000"
+                                )
+                            )
+                        )
+                    except (ValueError, TypeError):
+                        pass  # Use default UUID
+
+                raise_external_service_error(
+                    service="identity_service",
+                    operation="publish_to_outbox",
+                    external_service="outbox_repository",
+                    message=f"Failed to store event in outbox: {e.__class__.__name__}",
+                    correlation_id=error_correlation_id,
+                    aggregate_id=aggregate_id,
+                    event_type=event_type,
+                    error_type=e.__class__.__name__,
+                    error_details=str(e),
+                )
 
     async def notify_relay_worker(self) -> None:
+        """
+        Notify the relay worker that new events are available in the outbox.
+
+        Uses Redis LPUSH to add a notification that the relay worker can
+        consume with BLPOP for immediate processing.
+        """
         try:
+            # Use LPUSH to add a notification to the wake-up list
+            # The relay worker will use BLPOP to wait for this
             await self.redis_client.lpush("outbox:wake:identity_service", "1")
+            logger.debug("Relay worker notified via Redis")
         except Exception as e:
-            logger.warning("Relay worker notify failed", extra={"error": str(e)})
+            # Log but don't fail - the relay worker will still poll eventually
+            logger.warning(
+                "Failed to notify relay worker via Redis",
+                extra={"error": str(e)},
+            )

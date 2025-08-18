@@ -13,4 +13,3 @@ REQUEST_LATENCY = Histogram(
     "Latency of identity requests",
     labelnames=("route",),
 )
-

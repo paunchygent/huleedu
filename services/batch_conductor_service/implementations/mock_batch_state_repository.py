@@ -185,7 +185,6 @@ class MockBatchStateRepositoryImpl(BatchStateRepositoryProtocol):
 
         return True
 
-
     async def get_completed_phases(self, batch_id: str) -> set[str]:
         """
         Get all completed phases for a batch.

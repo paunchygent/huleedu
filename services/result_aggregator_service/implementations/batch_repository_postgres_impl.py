@@ -526,22 +526,25 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
 
                 # Update batch completion fields
                 from common_core.status_enums import BatchStatus
+
                 batch.overall_status = BatchStatus(final_status)
                 batch.completed_essay_count = completion_stats.get("successful_essays", 0)
                 batch.failed_essay_count = completion_stats.get("failed_essays", 0)
                 batch.processing_completed_at = datetime.utcnow()
                 batch.updated_at = datetime.utcnow()
-                
+
                 # Store completion statistics in batch metadata
                 current_metadata = batch.batch_metadata or {}
-                current_metadata.update({
-                    "completion_stats": completion_stats,
-                    "completed_at": datetime.utcnow().isoformat(),
-                })
+                current_metadata.update(
+                    {
+                        "completion_stats": completion_stats,
+                        "completed_at": datetime.utcnow().isoformat(),
+                    }
+                )
                 batch.batch_metadata = current_metadata
 
                 await session.commit()
-                
+
                 self.logger.info(
                     "Marked batch as completed",
                     batch_id=batch_id,

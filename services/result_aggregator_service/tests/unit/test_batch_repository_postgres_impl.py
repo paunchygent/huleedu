@@ -24,7 +24,7 @@ from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 
 class MockDIProvider(Provider):
     """Mock dependency injection provider for testing BatchRepositoryPostgresImpl.
-    
+
     Following Rule 075 pattern of protocol-based DI testing.
     """
 
@@ -35,7 +35,7 @@ class MockDIProvider(Provider):
         self.mock_settings.DATABASE_URL = "postgresql+asyncpg://test:test@localhost:5432/test"
         self.mock_settings.DATABASE_POOL_SIZE = 5
         self.mock_settings.DATABASE_MAX_OVERFLOW = 10
-        
+
         # Store reference to repository for later patching
         self.repository_instance: BatchRepositoryPostgresImpl | None = None
 
@@ -44,22 +44,20 @@ class MockDIProvider(Provider):
         """Provide mock settings for testing."""
         return self.mock_settings
 
-    @provide(scope=Scope.REQUEST)  
+    @provide(scope=Scope.REQUEST)
     def provide_batch_repository(
         self,
         settings: Settings,
     ) -> BatchRepositoryProtocol:
         """Provide BatchRepositoryPostgresImpl with mocked settings.
-        
+
         Note: We'll patch the internal session management for unit testing.
         """
         # Mock the engine to avoid actual database connection
         mock_engine = AsyncMock()
         mock_session_maker = AsyncMock()
-        
-        repository = BatchRepositoryPostgresImpl(
-            settings=settings, engine=mock_engine
-        )
+
+        repository = BatchRepositoryPostgresImpl(settings=settings, engine=mock_engine)
         # Override the session maker to prevent real database calls
         repository.async_session_maker = mock_session_maker
         self.repository_instance = repository
@@ -111,7 +109,7 @@ def mock_batch_result() -> Mock:
 
 class TestMarkBatchCompleted:
     """Tests for mark_batch_completed method.
-    
+
     Following Rule 075: Focus on behavior verification, not implementation details.
     """
 
@@ -145,9 +143,9 @@ class TestMarkBatchCompleted:
             "duration_seconds": 45.2,
             "completed_phases": ["spellcheck", "cj_assessment"],
         }
-        
+
         mock_batch_result.batch_id = batch_id
-        
+
         # Mock SQLAlchemy query result
         mock_result = Mock()
         mock_scalars = Mock()
@@ -156,33 +154,29 @@ class TestMarkBatchCompleted:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act
             await batch_repository.mark_batch_completed(
-                batch_id=batch_id,
-                final_status=final_status,
-                completion_stats=completion_stats
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
             )
 
         # Assert - Verify business logic behavior
         assert mock_batch_result.overall_status == expected_status
         assert mock_batch_result.completed_essay_count == successful_essays
         assert mock_batch_result.failed_essay_count == failed_essays
-        
+
         # Verify timestamps were set
         assert mock_batch_result.processing_completed_at is not None
         assert mock_batch_result.updated_at is not None
-        
+
         # Verify metadata was updated with completion stats
         assert "completion_stats" in mock_batch_result.batch_metadata
         assert mock_batch_result.batch_metadata["completion_stats"] == completion_stats
         assert "completed_at" in mock_batch_result.batch_metadata
-        
+
         # Verify database operations were called
         mock_session.execute.assert_called_once()
         mock_session.commit.assert_called_once()
@@ -219,7 +213,7 @@ class TestMarkBatchCompleted:
         mock_batch_result = Mock(spec=BatchResult)
         mock_batch_result.batch_id = batch_id
         mock_batch_result.batch_metadata = existing_metadata
-        
+
         # Mock SQLAlchemy query result
         mock_result = Mock()
         mock_scalars = Mock()
@@ -228,17 +222,13 @@ class TestMarkBatchCompleted:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act
             await batch_repository.mark_batch_completed(
-                batch_id=batch_id,
-                final_status=final_status,
-                completion_stats=completion_stats
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
             )
 
         # Assert
@@ -247,12 +237,12 @@ class TestMarkBatchCompleted:
         assert "completion_stats" in mock_batch_result.batch_metadata
         assert "completed_at" in mock_batch_result.batch_metadata
         assert mock_batch_result.batch_metadata["completion_stats"] == completion_stats
-        
+
         # Verify existing metadata was preserved if it existed
         if existing_metadata:
             for key, value in existing_metadata.items():
                 assert mock_batch_result.batch_metadata[key] == value
-        
+
         # Verify correct number of preserved fields plus new completion fields
         expected_total_fields = expected_preserved_fields + 2  # completion_stats + completed_at
         assert len(mock_batch_result.batch_metadata) == expected_total_fields
@@ -274,7 +264,7 @@ class TestMarkBatchCompleted:
             "duration_seconds": 30.0,
             "completed_phases": ["spellcheck"],
         }
-        
+
         # Mock database to return None (batch not found)
         mock_result = Mock()
         mock_scalars = Mock()
@@ -283,17 +273,13 @@ class TestMarkBatchCompleted:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act - should not raise exception
             await batch_repository.mark_batch_completed(
-                batch_id=batch_id,
-                final_status=final_status,
-                completion_stats=completion_stats
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
             )
 
         # Assert
@@ -323,7 +309,7 @@ class TestMarkBatchCompleted:
 
         mock_batch_result.batch_id = batch_id
         mock_batch_result.batch_metadata = {}
-        
+
         mock_result = Mock()
         mock_scalars = Mock()
         mock_scalars.first.return_value = mock_batch_result
@@ -334,18 +320,14 @@ class TestMarkBatchCompleted:
         mock_session.commit.side_effect = Exception("Database connection failed")
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act & Assert
             with pytest.raises(Exception, match="Database connection failed"):
                 await batch_repository.mark_batch_completed(
-                    batch_id=batch_id,
-                    final_status=final_status,
-                    completion_stats=completion_stats
+                    batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
                 )
 
         # Verify batch updates were attempted before failure
@@ -372,11 +354,11 @@ class TestMarkBatchCompleted:
 
         mock_batch_result.batch_id = batch_id
         mock_batch_result.batch_metadata = {"existing": "data"}
-        
+
         # Store original values to verify they changed
         original_completed_at = mock_batch_result.processing_completed_at
         original_updated_at = mock_batch_result.updated_at
-        
+
         mock_result = Mock()
         mock_scalars = Mock()
         mock_scalars.first.return_value = mock_batch_result
@@ -384,40 +366,36 @@ class TestMarkBatchCompleted:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act
             await batch_repository.mark_batch_completed(
-                batch_id=batch_id,
-                final_status=final_status,
-                completion_stats=completion_stats
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
             )
 
         # Assert all field updates
         assert mock_batch_result.overall_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert mock_batch_result.completed_essay_count == 20
         assert mock_batch_result.failed_essay_count == 1
-        
+
         # Verify timestamp fields were updated
         assert mock_batch_result.processing_completed_at != original_completed_at
         assert mock_batch_result.updated_at != original_updated_at
         assert mock_batch_result.processing_completed_at is not None
         assert mock_batch_result.updated_at is not None
-        
+
         # Verify metadata updates
         assert "completion_stats" in mock_batch_result.batch_metadata
         assert "completed_at" in mock_batch_result.batch_metadata
         assert mock_batch_result.batch_metadata["completion_stats"] == completion_stats
-        
+
         # Verify completed_at is ISO format string
         completed_at = mock_batch_result.batch_metadata["completed_at"]
         assert isinstance(completed_at, str)
         # Verify it can be parsed as datetime
-        datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+        datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
 
     @pytest.mark.asyncio
     async def test_mark_batch_completed_enum_conversion(
@@ -440,7 +418,7 @@ class TestMarkBatchCompleted:
 
         mock_batch_result.batch_id = batch_id
         mock_batch_result.batch_metadata = None
-        
+
         mock_result = Mock()
         mock_scalars = Mock()
         mock_scalars.first.return_value = mock_batch_result
@@ -448,26 +426,21 @@ class TestMarkBatchCompleted:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, '_get_session'
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 
             # Act
             await batch_repository.mark_batch_completed(
-                batch_id=batch_id,
-                final_status=final_status,
-                completion_stats=completion_stats
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
             )
 
         # Assert
         # Verify string was converted to enum correctly
         assert mock_batch_result.overall_status == BatchStatus.COMPLETED_WITH_FAILURES
         assert isinstance(mock_batch_result.overall_status, BatchStatus)
-        
+
         # Verify metadata was initialized from None
         assert mock_batch_result.batch_metadata is not None
         assert isinstance(mock_batch_result.batch_metadata, dict)
         assert mock_batch_result.batch_metadata["completion_stats"] == completion_stats
-
