@@ -1,0 +1,51 @@
+[project]
+name = "huleedu-identity-service"
+version = "0.1.0"
+description = "HuleEdu Identity Service for authentication and JWT/JWKS"
+authors = [
+    { name = "HuleEdu Team", email = "dev@huledu.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "aiokafka",
+    "aiohttp",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    "argon2-cffi",  # For Argon2id password hashing
+    "PyJWT",
+    "cryptography",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
+
+[tool.pdm.scripts]
+start = "hypercorn services/identity_service/app:app"
+dev = "quart --app services/identity_service/app:app --debug run -p 7005"
+
+# Alembic database migration commands (ergonomics; see Rule 085 for actual usage)
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"

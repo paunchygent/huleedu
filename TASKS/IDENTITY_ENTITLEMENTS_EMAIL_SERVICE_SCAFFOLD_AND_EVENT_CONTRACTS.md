@@ -13,22 +13,27 @@ Purpose-built scaffolding and contracts to complete the backend skeleton before 
 
 ## Architectural Alignment
 
-- Pattern: Event-driven microservices, DDD, async Python (Quart/FastAPI equivalent patterns), per-service DBs
-- DI: `typing.Protocol` interfaces in `protocols.py`, providers in `di.py`, `APP`/`REQUEST` scopes
+- Pattern: Event-driven microservices, DDD, async Python; per-service PostgreSQL DBs
+- Frameworks: Internal services (Identity, Entitlements, Email) use Quart; API Gateway is FastAPI
+- DI: `typing.Protocol` contracts in `protocols.py`, Dishka providers in `di.py`, with `APP`/`REQUEST` scopes
 - Services:
-  - HTTP services: `app.py` < 150 LoC; routers in `api/`
-  - Workers: `worker_main.py` (lifecycle/DI), `event_processor.py` (core logic)
-- Events: `EventEnvelope` (existing), Kafka topics via `topic_name()`
-- Persistence: SQLAlchemy async, Alembic migrations (per service)
+  - HTTP services: `app.py` < 150 LoC; routes in `api/` per Rule 015
+  - Workers: `worker_main.py` (lifecycle/DI), `kafka_consumer.py` (consume loop), `event_processor.py` (business orchestration)
+  - Outbox: Use `huleedu_service_libs.outbox` for business‑critical events
+    - Do not inject/pass Kafka bus into business logic; publish only via outbox
+    - Include `topic` column + partial index on `(published_at, topic, created_at)` where `published_at IS NULL`
+- Events: `EventEnvelope[T]` (schema_version=int, default 1), publish via `topic_name(ProcessingEvent.X)`
+- Persistence: SQLAlchemy async, Alembic migrations (per service), repository‑managed sessions (Rule 042)
+  - Follow Rule 085: `.env` autoload; no hardcoded DB URLs; share DB session with outbox for atomic writes
 
 ---
 
 ## Common Contracts (Pydantic)
 
-Place under `libs/common_core/src/common_core/models/` as separate modules. Namespaces shown below; adjust imports as needed.
+Place contracts under `libs/common_core/src/common_core/` as separate domain modules (flat layout). Do not create a `models/` subpackage. Namespaces shown below; adjust imports as needed.
 
 ```python
-# libs/common_core/src/common_core/models/identity.py
+# libs/common_core/src/common_core/identity_models.py
 from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
@@ -85,7 +90,7 @@ class JwksResponseV1(BaseModel):
 ```
 
 ```python
-# libs/common_core/src/common_core/models/emailing.py
+# libs/common_core/src/common_core/emailing_models.py
 from __future__ import annotations
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
@@ -114,7 +119,7 @@ class EmailDeliveryFailedV1(BaseModel):
 ```
 
 ```python
-# libs/common_core/src/common_core/models/entitlements.py
+# libs/common_core/src/common_core/entitlements_models.py
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, List
@@ -197,51 +202,74 @@ class ResourceAccessGrantedV1(BaseModel):
 
 ---
 
-## Kafka Topics
+## Event Topics & Enums
 
-- identity.user_registered.v1
-- identity.email_verification_requested.v1
-- identity.email_verified.v1
-- identity.password_reset_requested.v1
-- identity.login_succeeded.v1
-- identity.login_failed.v1
-- email.notification_requested.v1
-- email.sent.v1
-- email.delivery_failed.v1
-- entitlements.subscription_activated.v1
-- entitlements.subscription_changed.v1
-- entitlements.subscription_canceled.v1
-- entitlements.usage_authorized.v1
-- entitlements.usage_recorded.v1
-- entitlements.credit_balance_changed.v1
-- entitlements.rate_limit_exceeded.v1
-- entitlements.resource_access_granted.v1
+Use `ProcessingEvent` + `topic_name()` from `common_core.event_enums`. Extend the enum and mapping with the following entries and always publish via `topic_name(ProcessingEvent.X)`:
 
-Use `topic_name(service="identity", name="user_registered", version=1)` style helper.
+Identity events:
+- `IDENTITY_USER_REGISTERED` → `huleedu.identity.user.registered.v1`
+- `IDENTITY_EMAIL_VERIFICATION_REQUESTED` → `huleedu.identity.email.verification.requested.v1`
+- `IDENTITY_EMAIL_VERIFIED` → `huleedu.identity.email.verified.v1`
+- `IDENTITY_PASSWORD_RESET_REQUESTED` → `huleedu.identity.password.reset.requested.v1`
+- `IDENTITY_LOGIN_SUCCEEDED` → `huleedu.identity.login.succeeded.v1`
+- `IDENTITY_LOGIN_FAILED` → `huleedu.identity.login.failed.v1`
+
+Email events:
+- `EMAIL_NOTIFICATION_REQUESTED` → `huleedu.email.notification.requested.v1`
+- `EMAIL_SENT` → `huleedu.email.sent.v1`
+- `EMAIL_DELIVERY_FAILED` → `huleedu.email.delivery_failed.v1`
+
+Entitlements events:
+- `ENTITLEMENTS_SUBSCRIPTION_ACTIVATED` → `huleedu.entitlements.subscription.activated.v1`
+- `ENTITLEMENTS_SUBSCRIPTION_CHANGED` → `huleedu.entitlements.subscription.changed.v1`
+- `ENTITLEMENTS_SUBSCRIPTION_CANCELED` → `huleedu.entitlements.subscription.canceled.v1`
+- `ENTITLEMENTS_USAGE_AUTHORIZED` → `huleedu.entitlements.usage.authorized.v1`
+- `ENTITLEMENTS_USAGE_RECORDED` → `huleedu.entitlements.usage.recorded.v1`
+- `ENTITLEMENTS_CREDIT_BALANCE_CHANGED` → `huleedu.entitlements.credit.balance.changed.v1`
+- `ENTITLEMENTS_RATE_LIMIT_EXCEEDED` → `huleedu.entitlements.rate_limit.exceeded.v1`
+- `ENTITLEMENTS_RESOURCE_ACCESS_GRANTED` → `huleedu.entitlements.resource.access.granted.v1`
+
+Example usage:
+
+```python
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.envelope import EventEnvelope
+from common_core.identity_models import UserRegisteredV1
+
+payload = UserRegisteredV1(...)
+envelope = EventEnvelope[UserRegisteredV1](
+    event_type=topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED),
+    source_service="identity_service",
+    data=payload,
+)
+```
 
 ---
 
 ## Identity Service — HTTP Scaffold
 
-Directory skeleton (HTTP service):
+Directory skeleton (Quart HTTP service):
 
 ```
 services/identity_service/
-  app.py                     # <150 LoC, DI init, router include
+  app.py                      # <150 LoC; DI init, blueprint registration, middleware
+  startup_setup.py            # DB migration, metrics, tracing setup
+  config.py                   # Pydantic settings
+  metrics.py                  # Prometheus counters/histograms
+  protocols.py                # PasswordHasher, TokenIssuer, UserRepo, SessionRepo
+  di.py                       # Providers (APP/REQUEST scopes)
+  models_db.py                # SQLAlchemy models
   api/
-    auth.py                  # register/login/refresh/logout/verify/reset/me
-  domain/
-    repositories.py          # SQLAlchemy repos
-    services.py              # domain services (registration, sessions)
-    schemas.py               # Pydantic request/response models
-  infra/
-    db.py                    # engine/session
-    models.py                # SQLAlchemy models
-    security.py              # Argon2id, JWT issue/verify
-  protocols.py               # PasswordHasher, TokenIssuer, UserRepo, SessionRepo
-  di.py                      # Providers (APP/REQUEST scopes)
-  migrations/                # Alembic
+    auth_routes.py            # register/login/refresh/logout/verify/reset/me
+  implementations/
+    user_repository_postgres_impl.py
+    session_repository_postgres_impl.py
+    password_hasher_impl.py   # Argon2id
+    token_issuer_impl.py      # HS256 (dev), RS256 + JWKS (prod)
+    event_publisher_impl.py   # Outbox publisher
+  alembic/
   README.md
+  tests/
 ```
 
 Key protocols:
@@ -274,9 +302,9 @@ class SessionRepo(Protocol):
 Pydantic request/response schemas:
 
 ```python
-# services/identity_service/domain/schemas.py
+# services/identity_service/api/schemas.py
 from __future__ import annotations
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 
 class RegisterRequest(BaseModel):
@@ -308,36 +336,43 @@ class MeResponse(BaseModel):
     email_verified: bool = False
 ```
 
-Router outline (Quart/FastAPI-like):
+Router outline (Quart):
 
 ```python
-# services/identity_service/api/auth.py
+# services/identity_service/api/auth_routes.py
 from __future__ import annotations
 from quart import Blueprint, request, jsonify
-from .containers import get_services  # DI helper
-from ..domain.schemas import RegisterRequest, RegisterResponse, LoginRequest, TokenPair, MeResponse
+from quart_dishka import inject
+from dishka import FromDishka
+
+from .schemas import RegisterRequest, RegisterResponse, LoginRequest, TokenPair, MeResponse
+from ..protocols import UserRepo, SessionRepo, PasswordHasher, TokenIssuer
 
 bp = Blueprint("auth", __name__, url_prefix="/v1/auth")
 
 @bp.post("/register")
-async def register():
-    svc = get_services().identity
+@inject
+async def register(user_repo: FromDishka[UserRepo], hasher: FromDishka[PasswordHasher]):
     payload = RegisterRequest(**(await request.get_json()))
-    user = await svc.register(payload)
-    return jsonify(RegisterResponse(**user).model_dump()), 201
+    user = await user_repo.create_user(payload.email, payload.org_id, hasher.hash(payload.password))
+    # enqueue outbox event: IDENTITY_USER_REGISTERED
+    return jsonify(RegisterResponse(**user).model_dump(mode="json")), 201
 
 @bp.post("/login")
-async def login():
-    svc = get_services().identity
+@inject
+async def login(user_repo: FromDishka[UserRepo], tokens: FromDishka[TokenIssuer]):
     payload = LoginRequest(**(await request.get_json()))
-    tokens = await svc.login(payload)
-    return jsonify(TokenPair(**tokens).model_dump())
+    user = await user_repo.get_user_by_email(payload.email)
+    # verify password, build roles/org context, emit login events
+    pair = TokenPair(access_token=tokens.issue_access_token(user["id"], user.get("org_id"), user.get("roles", [])),
+                     refresh_token=tokens.issue_refresh_token(user["id"])[0],
+                     expires_in=3600)
+    return jsonify(pair.model_dump(mode="json"))
 
 @bp.get("/me")
 async def me():
-    svc = get_services().identity
-    user = await svc.me(request)
-    return jsonify(MeResponse(**user).model_dump())
+    # validate bearer via gateway in production; dev helper can be retained under /dev
+    return jsonify(MeResponse(user_id="user_x", email="u@example.com").model_dump(mode="json"))
 ```
 
 JWKS endpoint (RS256 in prod):
@@ -346,37 +381,43 @@ JWKS endpoint (RS256 in prod):
 GET /.well-known/jwks.json → JwksResponseV1
 ```
 
+ - Set `kid` on tokens and expose matching key in JWKS; gateway caches by `kid`
 ---
 
 ## Entitlements Service — HTTP + Worker Scaffold
 
-Single service with HTTP decision endpoints and worker for metering events.
+Single service with Quart HTTP decision endpoints and Kafka worker for metering and ACL events.
 
 ```
 services/entitlements_service/
-  app.py                      # HTTP: decisions, subjects, usage read
+  app.py                       # HTTP: decisions, effective entitlements, usage reads
+  startup_setup.py             # DB init, metrics, tracing
+  config.py                    # Pydantic settings
+  metrics.py                   # Metrics
+  protocols.py                 # repositories + cache + policy loader interfaces
+  di.py                        # Providers
+  models_db.py                 # plans, subscriptions, counters, credits, acl
   api/
-    decisions.py              # /v1/entitlements/* endpoints
-  domain/
-    policies.py               # endpoint→policy mapping loader
-    services.py               # decision engine, rate limit, credits
-    schemas.py                # Pydantic I/O models
-  infra/
-    db.py, models.py          # plans, subscriptions, usage, credits, acl
-    cache.py                  # Redis cache for decisions/limits
-  worker_main.py              # DI + consumer loop
-  event_processor.py          # consume usage/record events, update counters
-  protocols.py                # repositories + cache interfaces
-  di.py                       # providers
-  migrations/
+    decisions_routes.py        # /v1/entitlements/* endpoints
+  implementations/
+    repositories_postgres_impl.py
+    cache_redis_impl.py
+    policy_loader_impl.py
+    event_publisher_impl.py
+  worker_main.py               # DI + lifecycle
+  kafka_consumer.py            # consume loop
+  event_processor.py           # update counters/credits/acl; emit events
+  policies/manifest.example.yaml
+  alembic/
   README.md
+  tests/
 ```
 
 HTTP endpoints (Gateway-facing):
 
 - `POST /v1/entitlements/decision`
   - Input: `{ subject: {type,id}, metric, amount?: int }`
-  - Output: `{ allowed: bool, reason?: str, limit?: {value, window_seconds}, remaining?: int }`
+  - Output: `{ allowed: bool, reason?: str, limit_value?: int, window_seconds?: int, remaining?: int }`
 - `POST /v1/entitlements/authorize`
   - Input: `{ subject, metric, amount?: int }`
   - Output: `{ authorization_id, expires_at? }`
@@ -391,11 +432,11 @@ HTTP endpoints (Gateway-facing):
 Schemas:
 
 ```python
-# services/entitlements_service/domain/schemas.py
+# services/entitlements_service/api/schemas.py
 from __future__ import annotations
 from pydantic import BaseModel
 from typing import Optional
-from common_core.models.entitlements import SubjectRefV1
+from common_core.entitlements_models import SubjectRefV1
 
 class DecisionRequest(BaseModel):
     subject: SubjectRefV1
@@ -426,9 +467,9 @@ class AclCheckResponse(BaseModel):
 ```
 
 Worker responsibilities:
-- Consume `UsageAuthorizedV1` and `UsageRecordedV1` to update counters
-- Emit `RateLimitExceededV1`, `CreditBalanceChangedV1` as needed
-- Maintain ACL grants on `ResourceAccessGrantedV1`
+- Consume `ENTITLEMENTS_USAGE_AUTHORIZED` and `ENTITLEMENTS_USAGE_RECORDED` to update counters
+- Emit `ENTITLEMENTS_RATE_LIMIT_EXCEEDED`, `ENTITLEMENTS_CREDIT_BALANCE_CHANGED` as needed
+- Maintain ACL grants on `ENTITLEMENTS_RESOURCE_ACCESS_GRANTED`
 
 DB tables (Alembic):
 - `plans`, `plan_entitlements(plan_id, feature, limit, window_seconds, cost)`
@@ -443,39 +484,31 @@ DB tables (Alembic):
 
 ## Email Service — Worker + Dev HTTP Scaffold
 
-Primary interaction via events, with optional dev/test HTTP.
+Primary interaction via events; include a minimal dev/test Quart HTTP layer.
 
 ```
 services/email_service/
-  app.py                      # optional dev/test endpoints only
+  app.py                       # optional dev/test endpoints only
+  config.py                    # Pydantic settings (provider, API keys)
+  metrics.py                   # Metrics
+  protocols.py                 # Provider, template renderer, repository
+  di.py                        # Providers
   api/
-    dev.py                    # /v1/emails/dev/send (dev only)
-  domain/
-    templates.py              # Jinja2 renderer
-    services.py               # orchestrates provider send + events
-  infra/
-    providers/
-      base.py                 # MailProvider protocol
-      ses.py | sendgrid.py    # adapters
-    db.py, models.py          # messages, template versions, events
-  worker_main.py
-  event_processor.py          # consume NotificationEmailRequestedV1 → send → emit EmailSent/Failed
-  protocols.py                # MailProvider, TemplateRepo, MessageRepo
-  di.py
-  migrations/
+    dev_routes.py              # /v1/emails/dev/send (dev only)
+  implementations/
+    provider_sendgrid_impl.py | provider_ses_impl.py
+    template_renderer_jinja2.py
+    event_publisher_impl.py
+  worker_main.py               # DI + lifecycle
+  kafka_consumer.py            # consume loop
+  event_processor.py           # orchestrate send + emit events
   README.md
+  tests/
 ```
 
-Provider protocol:
-
-```python
-# services/email_service/infra/providers/base.py
-from __future__ import annotations
-from typing import Protocol, Mapping
-
-class MailProvider(Protocol):
-    async def send(self, to: str, subject: str, html: str, text: str | None = None, headers: Mapping[str, str] = {}) -> str: ...
-```
+Events:
+- Consume: `EMAIL_NOTIFICATION_REQUESTED`
+- Emit: `EMAIL_SENT`, `EMAIL_DELIVERY_FAILED`
 
 Dev endpoint:
 
@@ -485,18 +518,12 @@ POST /v1/emails/dev/send { to, template_id, variables }
 
 ---
 
-## API Gateway Integration Checklist
+## API Gateway Integration
 
-- Identity
-  - Validate JWT via RS256 JWKS (`/.well-known/jwks.json`), cache keys
-  - Expose `/v1/auth/*` by proxying to Identity service or via direct router composition
-  - Include `X-Org-Id`, `X-User-Id`, `X-Correlation-Id` on outgoing requests
-- Entitlements
-  - For protected endpoints, call `POST /v1/entitlements/decision` then optionally `/authorize`
-  - Cache decision for short TTL (e.g., 30–60s) per `{subject, metric}` key
-  - On denial, return structured error with correlation ID
-- Email
-  - Emit `NotificationEmailRequestedV1` for transactional messages (verification/reset/receipts)
+- Authentication: In development, HS256 may be used; in production, validate RS256 JWTs against Identity Service JWKS (`/.well-known/jwks.json`). Cache by `kid` and validate `exp`. Keep API Gateway as the sole public interface.
+- Entitlements guard: Gateway performs preflight checks via Entitlements (`decision`/`authorize`) on expensive endpoints (class creation, batch orchestration, AI/NLP tools). On denial, return structured errors with correlation IDs (Rule 048).
+- ACL enforcement: Before proxying sensitive Result Aggregator queries, call Entitlements `acl/check` using subject and resource identifiers.
+- Correlation IDs: Propagate `X-Correlation-ID` across gateway→service calls and event publications.
 
 ---
 
@@ -537,9 +564,10 @@ Store a manifest file (YAML/JSON) loaded by Entitlements Service to resolve poli
 ## Phased Implementation Plan
 
 1) Identity Minimal (Week 1)
-- Password hashing (Argon2id), HS256 in dev, RS256+JWKS in prod
+- Password hashing (Argon2id), HS256 in dev, RS256 + JWKS in prod
 - Endpoints: register, login, me, verify email (token exchange), request/reset password
-- Emit identity events; add Alembic migrations
+- Emit identity events via outbox; add Alembic migrations
+  - PDM: avoid version pinning; use Docker overrides for local libs
 
 2) Entitlements Core (Week 2)
 - Plans + subscriptions + decision engine + Redis cache
@@ -566,11 +594,12 @@ Store a manifest file (YAML/JSON) loaded by Entitlements Service to resolve poli
 ## Acceptance Criteria
 
 - Services scaffolded with DI and protocols consistent with repo standards
-- Pydantic contracts added to common_core and referenced by services
-- Identity issues tokens and emits events; JWKS available
+- Pydantic contracts added to `common_core` with flat module layout and referenced by services
+- New identity/entitlements/email events added to `ProcessingEvent` + `_TOPIC_MAPPING`, used via `topic_name()`
+- Identity issues tokens and emits events (outbox); JWKS available
 - Entitlements provides decision/authorize and records usage; caches limits
 - Email consumes notification events and records delivery outcomes
-- API Gateway validates JWTs and enforces decisions on protected endpoints
+- API Gateway validates JWTs and enforces decisions/ACL on protected endpoints
 - All new endpoints documented and testable with mocks
 
 ---
@@ -589,4 +618,3 @@ Store a manifest file (YAML/JSON) loaded by Entitlements Service to resolve poli
 - Keep claims minimal: compute entitlements server-side; do not embed entitlements in JWT
 - Use correlation IDs in all requests/events; return them in error responses
 - Dev: retain `/dev/auth/test-token` and mock endpoints to accelerate frontend
-

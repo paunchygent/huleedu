@@ -25,8 +25,12 @@ models_db.py          # SQLAlchemy models + event_outbox
 
 **Base**: `/internal/v1` (requires `X-Internal-API-Key`, `X-Service-ID`)
 
-- `GET /batches/{batch_id}/status`: Comprehensive batch status
+- `GET /batches/{batch_id}/status`: Comprehensive batch status with internal `BatchStatus` enum values
 - `GET /batches/user/{user_id}`: User's batches with pagination
+
+### Status Integration
+
+Provides detailed internal status tracking using 12-value `BatchStatus` enum. API Gateway consumes these endpoints and maps internal statuses to client-facing `BatchClientStatus` values for frontend consistency.
 
 ## Database Schema
 

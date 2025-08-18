@@ -5,7 +5,7 @@
 // API Response Types
 // ============================================================================
 
-export interface BatchClientStatus "available" | "processing"
+export interface BatchClientStatus "pending_content" | "ready" | "processing" | "completed_successfully" | "completed_with_failures" | "failed" | "cancelled"
 
 export interface BatchPipelineRequest {
   batch_id?: string | any;
@@ -23,7 +23,20 @@ export interface HTTPValidationError {
   detail?: ValidationError[]
 }
 
+export interface MockNotificationRequest {
+  notification_type: string;
+  payload?: Record<string, any> | any;
+  user_id?: string | any
+}
+
 export interface PhaseName "spellcheck" | "ai_feedback" | "cj_assessment" | "nlp" | "student_matching"
+
+export interface TestTokenRequest {
+  user_type?: "teacher" | "student" | "admin";
+  class_id?: string | any;
+  expires_minutes?: number;
+  custom_claims?: Record<string, any> | any
+}
 
 export interface ValidationError {
   loc: string | number[];
@@ -52,6 +65,24 @@ export interface testwithauthv1testwithauthgetResponse any
 export interface getbatchstatusv1batchesbatchidstatusgetResponse BatchStatusResponse
 
 export interface requestpipelineexecutionv1batchesbatchidpipelinespostRequest BatchPipelineRequest
+
+export interface getmockclassesdevmockclassesgetResponse Record<string, any>
+
+export interface getmockstudentsdevmockstudentsclassidgetResponse Record<string, any>
+
+export interface getmockessaysbystatusdevmockessaysstatusgetResponse Record<string, any>
+
+export interface getmockbatchesdevmockbatchesgetResponse Record<string, any>
+
+export interface getmockreactivestatedevmockreactivestategetResponse Record<string, any>
+
+export interface triggermocknotificationdevmockwebsockettriggerpostRequest MockNotificationRequest
+
+export interface triggermocknotificationdevmockwebsockettriggerpostResponse Record<string, any>
+
+export interface generatetesttokendevauthtesttokenpostRequest TestTokenRequest
+
+export interface generatetesttokendevauthtesttokenpostResponse Record<string, any>
 
 // ============================================================================
 // Common API Types

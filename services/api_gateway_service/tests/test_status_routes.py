@@ -65,20 +65,199 @@ async def client():
 
 @pytest.mark.asyncio
 async def test_get_batch_status_success(client: AsyncClient, respx_mock: MockRouter):
-    """Test successful retrieval of batch status with correct ownership."""
+    """Test successful retrieval of batch status with status mapping."""
     aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
     mock_route = respx_mock.get(aggregator_url).mock(
-        return_value=Response(200, json={"user_id": USER_ID, "status": "completed"})
+        return_value=Response(200, json={
+            "user_id": USER_ID, 
+            "overall_status": "completed_successfully",
+            "batch_id": BATCH_ID,
+            "essay_count": 5
+        })
     )
 
     response = await client.get(f"/v1/batches/{BATCH_ID}/status")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "available",
-        "details": {"status": "completed"},
-    }
+    response_data = response.json()
+    
+    # Verify status mapping: completed_successfully → completed_successfully
+    assert response_data["status"] == "completed_successfully"
+    
+    # Verify details contain the batch info (minus user_id)
+    assert response_data["details"]["batch_id"] == BATCH_ID
+    assert response_data["details"]["essay_count"] == 5
+    assert "user_id" not in response_data["details"]  # Should be removed
+    
     assert mock_route.called
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_pending_content(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for content validation states."""
+    test_cases = [
+        "awaiting_content_validation",
+        "awaiting_pipeline_configuration"
+    ]
+    
+    for internal_status in test_cases:
+        aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+        respx_mock.get(aggregator_url).mock(
+            return_value=Response(200, json={
+                "user_id": USER_ID,
+                "overall_status": internal_status,
+                "batch_id": BATCH_ID
+            })
+        )
+
+        response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "pending_content"
+
+
+@pytest.mark.asyncio  
+async def test_get_batch_status_mapping_ready(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for ready state."""
+    aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+    respx_mock.get(aggregator_url).mock(
+        return_value=Response(200, json={
+            "user_id": USER_ID,
+            "overall_status": "ready_for_pipeline_execution",
+            "batch_id": BATCH_ID
+        })
+    )
+
+    response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+    
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_processing(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for processing states."""
+    test_cases = [
+        "processing_pipelines",
+        "awaiting_student_validation",
+        "student_validation_completed", 
+        "validation_timeout_processed"
+    ]
+    
+    for internal_status in test_cases:
+        aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+        respx_mock.get(aggregator_url).mock(
+            return_value=Response(200, json={
+                "user_id": USER_ID,
+                "overall_status": internal_status,
+                "batch_id": BATCH_ID
+            })
+        )
+
+        response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "processing"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_completed_with_failures(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for completed with failures."""
+    aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+    respx_mock.get(aggregator_url).mock(
+        return_value=Response(200, json={
+            "user_id": USER_ID,
+            "overall_status": "completed_with_failures",
+            "batch_id": BATCH_ID,
+            "failed_essay_count": 2
+        })
+    )
+
+    response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+    
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["status"] == "completed_with_failures"
+    assert response_data["details"]["failed_essay_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_failed(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for failure states."""
+    test_cases = [
+        "content_ingestion_failed",
+        "failed_critically"
+    ]
+    
+    for internal_status in test_cases:
+        aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+        respx_mock.get(aggregator_url).mock(
+            return_value=Response(200, json={
+                "user_id": USER_ID,
+                "overall_status": internal_status,
+                "batch_id": BATCH_ID
+            })
+        )
+
+        response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+        
+        assert response.status_code == 200
+        assert response.json()["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_cancelled(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for cancelled state."""
+    aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+    respx_mock.get(aggregator_url).mock(
+        return_value=Response(200, json={
+            "user_id": USER_ID,
+            "overall_status": "cancelled",
+            "batch_id": BATCH_ID
+        })
+    )
+
+    response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+    
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_missing_status(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping when overall_status is missing."""
+    aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+    respx_mock.get(aggregator_url).mock(
+        return_value=Response(200, json={
+            "user_id": USER_ID,
+            "batch_id": BATCH_ID
+            # overall_status intentionally missing
+        })
+    )
+
+    response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+    
+    assert response.status_code == 200
+    # Should default to pending_content when status is missing
+    assert response.json()["status"] == "pending_content"
+
+
+@pytest.mark.asyncio
+async def test_get_batch_status_mapping_unknown_status(client: AsyncClient, respx_mock: MockRouter):
+    """Test status mapping for unknown internal status."""
+    aggregator_url = f"{settings.RESULT_AGGREGATOR_URL}/internal/v1/batches/{BATCH_ID}/status"
+    respx_mock.get(aggregator_url).mock(
+        return_value=Response(200, json={
+            "user_id": USER_ID,
+            "overall_status": "unknown_future_status",
+            "batch_id": BATCH_ID
+        })
+    )
+
+    response = await client.get(f"/v1/batches/{BATCH_ID}/status")
+    
+    assert response.status_code == 200
+    # Should default to pending_content for unknown statuses
+    assert response.json()["status"] == "pending_content"
 
 
 @pytest.mark.asyncio

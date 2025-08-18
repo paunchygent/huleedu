@@ -24,7 +24,7 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 ### Batch Management
 
 - `POST /v1/batches/{batch_id}/pipelines` - Request pipeline execution (uses `ClientBatchPipelineRequestV1`)
-- `GET /v1/batches/{batch_id}/status` - Get batch status with ownership validation (proxy to Result Aggregator Service)
+- `GET /v1/batches/{batch_id}/status` - Get batch status with semantic status mapping and ownership validation
 - `GET /v1/batches/{batch_id}/validation-status` - Get validation status for student associations
 
 ### File Operations  
@@ -72,6 +72,24 @@ Uses proper shared contracts from `common_core`:
 - **Pipeline Commands**: `ClientBatchPipelineRequestV1` with user context and retry support
 - **Event Publishing**: `EventEnvelope` format to `huleedu.commands.batch.pipeline.v1` topic
 - **Validation**: Student association handling for class-based batches
+
+## Status Mapping System
+
+### Client-Facing Status Values
+
+The API Gateway maps internal processing states to semantic client statuses for consistent frontend integration:
+
+- `pending_content` - Batch created, awaiting content validation or pipeline configuration
+- `ready` - Files uploaded and validated, ready for processing  
+- `processing` - Currently being processed through pipeline phases
+- `completed_successfully` - All essays processed successfully
+- `completed_with_failures` - Processing completed but some essays failed
+- `failed` - Processing failed with critical errors
+- `cancelled` - Processing cancelled by user or system
+
+### REST/WebSocket Consistency
+
+Status values returned by `/v1/batches/{batch_id}/status` are **identical** to WebSocket notification values, ensuring frontend applications receive consistent status information regardless of communication channel.
 
 ## Svelte Frontend Integration
 

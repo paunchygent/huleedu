@@ -77,6 +77,26 @@ class ProcessingEvent(str, Enum):
     LLM_COST_ALERT = "llm_provider.cost.alert"
     LLM_COST_TRACKING = "llm_provider.cost.tracking"
     LLM_COMPARISON_RESULT = "llm_provider.comparison_result"
+    # -------------  Identity service events  -------------#
+    IDENTITY_USER_REGISTERED = "identity.user.registered"
+    IDENTITY_EMAIL_VERIFICATION_REQUESTED = "identity.email.verification.requested"
+    IDENTITY_EMAIL_VERIFIED = "identity.email.verified"
+    IDENTITY_PASSWORD_RESET_REQUESTED = "identity.password.reset.requested"
+    IDENTITY_LOGIN_SUCCEEDED = "identity.login.succeeded"
+    IDENTITY_LOGIN_FAILED = "identity.login.failed"
+    # -------------  Email service events  -------------#
+    EMAIL_NOTIFICATION_REQUESTED = "email.notification.requested"
+    EMAIL_SENT = "email.sent"
+    EMAIL_DELIVERY_FAILED = "email.delivery_failed"
+    # -------------  Entitlements service events  -------------#
+    ENTITLEMENTS_SUBSCRIPTION_ACTIVATED = "entitlements.subscription.activated"
+    ENTITLEMENTS_SUBSCRIPTION_CHANGED = "entitlements.subscription.changed"
+    ENTITLEMENTS_SUBSCRIPTION_CANCELED = "entitlements.subscription.canceled"
+    ENTITLEMENTS_USAGE_AUTHORIZED = "entitlements.usage.authorized"
+    ENTITLEMENTS_USAGE_RECORDED = "entitlements.usage.recorded"
+    ENTITLEMENTS_CREDIT_BALANCE_CHANGED = "entitlements.credit.balance.changed"
+    ENTITLEMENTS_RATE_LIMIT_EXCEEDED = "entitlements.rate_limit.exceeded"
+    ENTITLEMENTS_RESOURCE_ACCESS_GRANTED = "entitlements.resource.access.granted"
 
 
 # Private mapping for topic_name() function
@@ -141,6 +161,46 @@ _TOPIC_MAPPING = {
     # New dual-event architecture topics
     ProcessingEvent.BATCH_VALIDATION_ERRORS: "huleedu.els.batch.validation.errors.v1",
     ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST: "huleedu.commands.batch.pipeline.v1",
+    # Identity topics
+    ProcessingEvent.IDENTITY_USER_REGISTERED: "huleedu.identity.user.registered.v1",
+    ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED: (
+        "huleedu.identity.email.verification.requested.v1"
+    ),
+    ProcessingEvent.IDENTITY_EMAIL_VERIFIED: "huleedu.identity.email.verified.v1",
+    ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED: (
+        "huleedu.identity.password.reset.requested.v1"
+    ),
+    ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED: "huleedu.identity.login.succeeded.v1",
+    ProcessingEvent.IDENTITY_LOGIN_FAILED: "huleedu.identity.login.failed.v1",
+    # Email topics
+    ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED: "huleedu.email.notification.requested.v1",
+    ProcessingEvent.EMAIL_SENT: "huleedu.email.sent.v1",
+    ProcessingEvent.EMAIL_DELIVERY_FAILED: "huleedu.email.delivery_failed.v1",
+    # Entitlements topics
+    ProcessingEvent.ENTITLEMENTS_SUBSCRIPTION_ACTIVATED: (
+        "huleedu.entitlements.subscription.activated.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_SUBSCRIPTION_CHANGED: (
+        "huleedu.entitlements.subscription.changed.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_SUBSCRIPTION_CANCELED: (
+        "huleedu.entitlements.subscription.canceled.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_USAGE_AUTHORIZED: (
+        "huleedu.entitlements.usage.authorized.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED: (
+        "huleedu.entitlements.usage.recorded.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED: (
+        "huleedu.entitlements.credit.balance.changed.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED: (
+        "huleedu.entitlements.rate_limit.exceeded.v1"
+    ),
+    ProcessingEvent.ENTITLEMENTS_RESOURCE_ACCESS_GRANTED: (
+        "huleedu.entitlements.resource.access.granted.v1"
+    ),
 }
 
 

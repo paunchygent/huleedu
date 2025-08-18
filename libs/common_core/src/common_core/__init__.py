@@ -69,6 +69,34 @@ from .metadata_models import (
     StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
+from .identity_models import (
+    EmailVerificationRequestedV1,
+    EmailVerifiedV1,
+    JwksPublicKeyV1,
+    JwksResponseV1,
+    LoginFailedV1,
+    LoginSucceededV1,
+    PasswordResetRequestedV1,
+    UserRegisteredV1,
+)
+from .emailing_models import (
+    EmailDeliveryFailedV1,
+    EmailSentV1,
+    NotificationEmailRequestedV1,
+)
+from .entitlements_models import (
+    CreditBalanceChangedV1,
+    EntitlementDefinitionV1,
+    PlanV1,
+    RateLimitExceededV1,
+    ResourceAccessGrantedV1,
+    SubjectRefV1,
+    SubscriptionActivatedV1,
+    SubscriptionCanceledV1,
+    SubscriptionChangedV1,
+    UsageAuthorizedV1,
+    UsageRecordedV1,
+)
 from .models.error_models import ErrorDetail
 from .observability_enums import CacheOperation, MetricName, OperationType
 from .pipeline_models import (
@@ -152,6 +180,31 @@ __all__ = [
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
     "AIFeedbackInputDataV1",
+    # Identity models
+    "UserRegisteredV1",
+    "EmailVerificationRequestedV1",
+    "EmailVerifiedV1",
+    "PasswordResetRequestedV1",
+    "LoginSucceededV1",
+    "LoginFailedV1",
+    "JwksPublicKeyV1",
+    "JwksResponseV1",
+    # Emailing models
+    "NotificationEmailRequestedV1",
+    "EmailSentV1",
+    "EmailDeliveryFailedV1",
+    # Entitlements models
+    "SubjectRefV1",
+    "EntitlementDefinitionV1",
+    "PlanV1",
+    "SubscriptionActivatedV1",
+    "SubscriptionChangedV1",
+    "SubscriptionCanceledV1",
+    "UsageAuthorizedV1",
+    "UsageRecordedV1",
+    "CreditBalanceChangedV1",
+    "RateLimitExceededV1",
+    "ResourceAccessGrantedV1",
     "ELS_CJAssessmentRequestV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",

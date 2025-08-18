@@ -13,7 +13,7 @@ alwaysApply: false
 - [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc): DDD, Service Autonomy, Explicit Contracts
 - **Service-Specific Architectures (`020.x`)**
   - [020.1-content-service-architecture.mdc](mdc:020.1-content-service-architecture.mdc): Content Service
-  - [020.2-spell-checker-service-architecture.mdc](mdc:020.2-spell-checker-service-architecture.mdc): Spell Checker Service
+  - [020.2-spellchecker-service-architecture.mdc](mdc:020.2-spellchecker-service-architecture.mdc): Spell Checker Service
   - [020.3-batch-orchestrator-service-architecture.mdc](mdc:020.3-batch-orchestrator-service-architecture.mdc): Batch Orchestrator Service
   - [020.4-common-core-architecture.mdc](mdc:020.4-common-core-architecture.mdc): Common Core Library
   - [020.5-essay-lifecycle-service-architecture.mdc](mdc:020.5-essay-lifecycle-service-architecture.mdc): Essay Lifecycle Service
@@ -21,7 +21,7 @@ alwaysApply: false
   - [020.7-cj-assessment-service.mdc](mdc:020.7-cj-assessment-service.mdc): CJ Assessment Service
   - [020.8-batch-conductor-service.mdc](mdc:020.8-batch-conductor-service.mdc): Batch Conductor Service
   - [020.9-class-management-service.mdc](mdc:020.9-class-management-service.mdc): Class Management Service
-  - [020.10-api-gateway.mdc](mdc:020.10-api-gateway.mdc): API Gateway Service
+  - [020.10-api-gateway-service.mdc](mdc:020.10-api-gateway-service.mdc): API Gateway Service
   - [020.11-service-libraries-architecture.mdc](mdc:020.11-service-libraries-architecture.mdc): Service Libraries (Kafka, Redis, Logging)
   - [020.12-result-aggregator-service-architecture.mdc](mdc:020.12-result-aggregator-service-architecture.mdc): Result Aggregator Service
   - [020.13-llm-provider-service-architecture.mdc](mdc:020.13-llm-provider-service-architecture.mdc): LLM Provider Service (Centralized provider abstraction with queue resilience)
@@ -70,6 +70,10 @@ alwaysApply: false
 - [085-docker-compose-v2-command-reference.mdc](mdc:085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
 - [086-mypy-configuration-standards.mdc](mdc:086-mypy-configuration-standards.mdc): MyPy configuration and monorepo type checking standards with module conflict resolution
 - [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
+
+## Frontend Development Standards
+- [200-frontend-core-rules.mdc](mdc:200-frontend-core-rules.mdc): Core frontend architecture patterns (Svelte 5 + Vite, TypeScript, modular design)
+- [210-frontend-dashboard-rules.mdc](mdc:210-frontend-dashboard-rules.mdc): Teacher dashboard patterns and real-time UI components
 
 ## Terminology & Your Interaction Modes
 - [100-terminology-and-definitions.mdc](mdc:100-terminology-and-definitions.mdc): Shared vocabulary and glossary

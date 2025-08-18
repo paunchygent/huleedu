@@ -118,6 +118,72 @@ class BatchStatusResponse(BaseModel):
     details: dict = Field(..., description="The detailed status information.")
 
 
+def map_to_client_status(internal_status: str | None) -> BatchClientStatus:
+    """
+    Map internal BatchStatus to client-facing BatchClientStatus.
+
+    This function ensures consistency between backend processing states
+    and client API responses. It groups internal states into meaningful
+    client-facing categories that frontend developers can act upon.
+
+    Args:
+        internal_status: The internal BatchStatus value (lowercase string)
+
+    Returns:
+        BatchClientStatus: Corresponding client-facing status
+
+    Mapping Logic:
+    - Content validation states → PENDING_CONTENT
+    - Ready states → READY
+    - All processing phases → PROCESSING
+    - Success completion → COMPLETED_SUCCESSFULLY
+    - Partial completion → COMPLETED_WITH_FAILURES
+    - Critical failures → FAILED
+    - Cancellation → CANCELLED
+    """
+    if not internal_status:
+        return BatchClientStatus.PENDING_CONTENT
+
+    # Content validation and configuration states
+    if internal_status in ["awaiting_content_validation", "awaiting_pipeline_configuration"]:
+        return BatchClientStatus.PENDING_CONTENT
+
+    # Content failure states
+    if internal_status == "content_ingestion_failed":
+        return BatchClientStatus.FAILED
+
+    # Ready for processing
+    if internal_status == "ready_for_pipeline_execution":
+        return BatchClientStatus.READY
+
+    # Active processing states
+    if internal_status in [
+        "processing_pipelines",
+        "awaiting_student_validation",
+        "student_validation_completed",
+        "validation_timeout_processed",
+    ]:
+        return BatchClientStatus.PROCESSING
+
+    # Terminal success states
+    if internal_status == "completed_successfully":
+        return BatchClientStatus.COMPLETED_SUCCESSFULLY
+
+    if internal_status == "completed_with_failures":
+        return BatchClientStatus.COMPLETED_WITH_FAILURES
+
+    # Terminal failure states
+    if internal_status == "failed_critically":
+        return BatchClientStatus.FAILED
+
+    if internal_status == "cancelled":
+        return BatchClientStatus.CANCELLED
+
+    # Fallback for any unmapped states
+    logger.warning(f"Unknown internal status '{internal_status}', defaulting to PENDING_CONTENT")
+    return BatchClientStatus.PENDING_CONTENT
+
+
 @router.get(
     "/batches/{batch_id}/status",
     response_model=BatchStatusResponse,
@@ -130,7 +196,7 @@ class BatchStatusResponse(BaseModel):
             "content": {
                 "application/json": {
                     "example": {
-                        "status": "PROCESSING",
+                        "status": "processing",
                         "details": {
                             "batch_id": "batch_123",
                             "created_at": "2024-01-15T10:30:00Z",
@@ -222,22 +288,24 @@ async def get_batch_status(
     **Ownership Enforcement**: Users can only access batches they own
 
     **Status Information Includes**:
-    - Current processing phase (CREATED, PROCESSING, COMPLETED, FAILED)
+    - Current processing phase (pending_content, ready, processing, completed_successfully, etc.)
     - Progress percentage and essay counts
     - Timestamps for creation and last update
     - Estimated completion time (when processing)
     - Error details (when failed)
 
     **Processing Phases**:
-    - `CREATED`: Batch created, awaiting file upload
-    - `FILES_UPLOADED`: Files uploaded, ready for processing
-    - `PROCESSING`: Currently being processed through pipeline
-    - `COMPLETED`: All processing completed successfully
-    - `FAILED`: Processing failed with errors
-    - `CANCELLED`: Processing cancelled by user or system
+    - `pending_content`: Batch created, awaiting content validation or configuration
+    - `ready`: Files uploaded and validated, ready for processing
+    - `processing`: Currently being processed through pipeline
+    - `completed_successfully`: All processing completed successfully
+    - `completed_with_failures`: Processing completed but some essays failed
+    - `failed`: Processing failed with critical errors
+    - `cancelled`: Processing cancelled by user or system
 
     **Real-time Updates**:
     Status changes are also delivered via WebSocket notifications for real-time updates.
+    The status values are identical between REST API and WebSocket for consistency.
 
     **Error Handling**:
     - Authentication failures return 401
@@ -255,6 +323,13 @@ async def get_batch_status(
 
     const { status, details } = await response.json();
     console.log(`Batch ${details.batch_id} is ${status}`);
+
+    // Handle completion states
+    if (status === 'completed_successfully') {
+        // All essays processed successfully
+    } else if (status === 'completed_with_failures') {
+        // Some essays failed, check details for specifics
+    }
     ```
     """
     endpoint = f"/batches/{batch_id}/status"
@@ -304,12 +379,21 @@ async def get_batch_status(
                     actual_owner=data.get("user_id"),
                 )
 
+            # Extract actual status from RAS response and map to client status
+            actual_status = data.get("overall_status")
+            client_status = map_to_client_status(actual_status)
+
+            logger.debug(
+                f"Status mapping: internal='{actual_status}' → client='{client_status.value}'",
+                batch_id=batch_id,
+            )
+
             # Remove internal user_id from client response
             data.pop("user_id", None)
             metrics.http_requests_total.labels(
                 method="GET", endpoint=endpoint, http_status="200"
             ).inc()
-            return BatchStatusResponse(status=BatchClientStatus.AVAILABLE, details=data)
+            return BatchStatusResponse(status=client_status, details=data)
 
         except HTTPStatusError as e:
             # Pure proxy behavior - simply propagate downstream errors
