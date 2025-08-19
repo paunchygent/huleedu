@@ -8,7 +8,9 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from services.result_aggregator_service.enums_api import BatchStatus, ProcessingPhase
+# Use common_core enums directly (no re-exports)
+from common_core.status_enums import BatchClientStatus
+from common_core.pipeline_models import PhaseName
 
 if TYPE_CHECKING:
     from services.result_aggregator_service.models_db import BatchResult
@@ -41,7 +43,7 @@ class BatchStatusResponse(BaseModel):
 
     batch_id: str
     user_id: str  # Critical for API Gateway security checks
-    overall_status: BatchStatus
+    overall_status: BatchClientStatus
 
     # Counts
     essay_count: int
@@ -50,7 +52,7 @@ class BatchStatusResponse(BaseModel):
 
     # Processing info
     requested_pipeline: Optional[str] = None
-    current_phase: Optional[ProcessingPhase] = None
+    current_phase: Optional[PhaseName] = None
 
     # Essays with results
     essays: List[EssayResultResponse] = Field(default_factory=list)
@@ -66,23 +68,23 @@ class BatchStatusResponse(BaseModel):
         """Convert from domain model."""
         # Map database batch status to client-facing API status
         status_mapping = {
-            "awaiting_content_validation": BatchStatus.PENDING_CONTENT,
-            "content_ingestion_failed": BatchStatus.FAILED,
-            "awaiting_pipeline_configuration": BatchStatus.PENDING_CONTENT,
-            "ready_for_pipeline_execution": BatchStatus.READY,
-            "processing_pipelines": BatchStatus.PROCESSING,
-            "awaiting_student_validation": BatchStatus.PROCESSING,
-            "validation_timeout_processed": BatchStatus.PROCESSING,
-            "guest_class_ready": BatchStatus.PROCESSING,
-            "completed_successfully": BatchStatus.COMPLETED_SUCCESSFULLY,
-            "completed_with_failures": BatchStatus.COMPLETED_WITH_FAILURES,
-            "failed_critically": BatchStatus.FAILED,
-            "cancelled": BatchStatus.CANCELLED,
+            "awaiting_content_validation": BatchClientStatus.PENDING_CONTENT,
+            "content_ingestion_failed": BatchClientStatus.FAILED,
+            "awaiting_pipeline_configuration": BatchClientStatus.PENDING_CONTENT,
+            "ready_for_pipeline_execution": BatchClientStatus.READY,
+            "processing_pipelines": BatchClientStatus.PROCESSING,
+            "awaiting_student_validation": BatchClientStatus.PROCESSING,
+            "validation_timeout_processed": BatchClientStatus.PROCESSING,
+            "guest_class_ready": BatchClientStatus.PROCESSING,
+            "completed_successfully": BatchClientStatus.COMPLETED_SUCCESSFULLY,
+            "completed_with_failures": BatchClientStatus.COMPLETED_WITH_FAILURES,
+            "failed_critically": BatchClientStatus.FAILED,
+            "cancelled": BatchClientStatus.CANCELLED,
         }
 
         api_status = status_mapping.get(
             batch_result.overall_status.value,
-            BatchStatus.PROCESSING,  # Default fallback
+            BatchClientStatus.PROCESSING,  # Default fallback
         )
 
         return cls(
@@ -93,7 +95,7 @@ class BatchStatusResponse(BaseModel):
             completed_essay_count=batch_result.completed_essay_count,
             failed_essay_count=batch_result.failed_essay_count,
             requested_pipeline=batch_result.requested_pipeline,
-            current_phase=ProcessingPhase.SPELLCHECK,  # Derive from data
+            current_phase=PhaseName.SPELLCHECK,  # Derive from data
             essays=[
                 EssayResultResponse(
                     essay_id=essay.essay_id,
