@@ -85,7 +85,8 @@ async def test_batch_results_ready_published_when_all_phases_complete(
     mock_batch = MagicMock()
     mock_batch.batch_id = batch_id
     mock_batch.user_id = user_id
-    mock_batch.processing_started_at = datetime.now(timezone.utc)
+    # Use timezone-naive timestamps to match service duration calculations
+    mock_batch.processing_started_at = datetime.utcnow()
     mock_batch.processing_completed_at = None
 
     # Create mock essays with all phases completed
@@ -93,9 +94,9 @@ async def test_batch_results_ready_published_when_all_phases_complete(
         MagicMock(
             essay_id=f"essay_{i}",
             spellcheck_status=ProcessingStage.COMPLETED,
-            spellcheck_completed_at=datetime.now(timezone.utc),
+            spellcheck_completed_at=datetime.utcnow(),
             cj_assessment_status=ProcessingStage.COMPLETED,
-            cj_assessment_completed_at=datetime.now(timezone.utc),
+            cj_assessment_completed_at=datetime.utcnow(),
         )
         for i in range(3)
     ]
@@ -325,7 +326,8 @@ async def test_batch_results_ready_with_partial_failures(
     mock_batch = MagicMock()
     mock_batch.batch_id = batch_id
     mock_batch.user_id = user_id
-    mock_batch.processing_started_at = datetime.now(timezone.utc)
+    # Use timezone-naive timestamps to match service duration calculations
+    mock_batch.processing_started_at = datetime.utcnow()
     mock_batch.processing_completed_at = None
 
     # Create mock essays with some failures
@@ -333,16 +335,16 @@ async def test_batch_results_ready_with_partial_failures(
         MagicMock(
             essay_id="essay_0",
             spellcheck_status=ProcessingStage.COMPLETED,
-            spellcheck_completed_at=datetime.now(timezone.utc),
+            spellcheck_completed_at=datetime.utcnow(),
             cj_assessment_status=ProcessingStage.COMPLETED,
-            cj_assessment_completed_at=datetime.now(timezone.utc),
+            cj_assessment_completed_at=datetime.utcnow(),
         ),
         MagicMock(
             essay_id="essay_1",
             spellcheck_status=ProcessingStage.FAILED,  # Failed spellcheck
-            spellcheck_completed_at=datetime.now(timezone.utc),
+            spellcheck_completed_at=datetime.utcnow(),
             cj_assessment_status=ProcessingStage.COMPLETED,
-            cj_assessment_completed_at=datetime.now(timezone.utc),
+            cj_assessment_completed_at=datetime.utcnow(),
         ),
         MagicMock(
             essay_id="essay_2",

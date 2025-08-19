@@ -99,6 +99,8 @@ def mock_session() -> AsyncMock:
     session = AsyncMock()
     session.__aenter__.return_value = session
     session.__aexit__.return_value = None
+    # SQLAlchemy AsyncSession.add is a synchronous method; keep it non-awaitable in tests
+    session.add = Mock()
     return session
 
 

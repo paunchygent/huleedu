@@ -341,15 +341,13 @@ async def _handle_spellcheck_result(self, event: SpellcheckResultV1):
 
 ## Risk Mitigation
 
+We are in pure development phase, no production rollout needed. Just do it!
+
 ### Risk 1: Consumer Migration Failures
-**Mitigation**: Keep legacy event publishing during migration, feature flags for rollback
+**Mitigation**: DO NOT keep ANY legacy event publishing during migration, NO feature flags for rollback: CLEAN AND FULL REFACTOR IS THE ONLY ACCEPTABLE APPROACH.
 
 ### Risk 2: Data Contract Mismatches
-**Mitigation**: Extensive integration testing, gradual rollout with monitoring
-
-### Risk 3: Performance Degradation
-**Mitigation**: Load testing before production, canary deployment strategy
-
+**Mitigation**: Extensive integration testing.
 ---
 
 ## Documentation Requirements

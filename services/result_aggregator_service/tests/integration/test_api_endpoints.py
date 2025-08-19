@@ -294,7 +294,7 @@ class TestQueryEndpoints:
         assert response.status_code == 200
         assert data["batch_id"] == batch_id
         assert data["user_id"] == "user-456"
-        assert data["overall_status"] == "COMPLETED"  # API maps COMPLETED_SUCCESSFULLY to COMPLETED
+        assert data["overall_status"] == "completed_successfully"
         assert data["essay_count"] == 2
         assert len(data["essays"]) == 2
         assert data["essays"][0]["essay_id"] == "essay-1"
@@ -411,13 +411,9 @@ class TestQueryEndpoints:
         assert response.status_code == 200
         assert len(data["batches"]) == 2
         assert data["batches"][0]["batch_id"] == "batch-1"
-        assert (
-            data["batches"][0]["overall_status"] == "COMPLETED"
-        )  # API maps COMPLETED_SUCCESSFULLY to COMPLETED
+        assert data["batches"][0]["overall_status"] == "completed_successfully"
         assert data["batches"][1]["batch_id"] == "batch-2"
-        assert (
-            data["batches"][1]["overall_status"] == "PROCESSING"
-        )  # API maps PROCESSING_PIPELINES to PROCESSING
+        assert data["batches"][1]["overall_status"] == "processing"
         assert data["pagination"]["limit"] == 20
         assert data["pagination"]["offset"] == 0
         assert data["pagination"]["total"] == 2
@@ -503,9 +499,7 @@ class TestQueryEndpoints:
         # Assert
         assert response.status_code == 200
         assert len(data["batches"]) == 1
-        assert (
-            data["batches"][0]["overall_status"] == "COMPLETED"
-        )  # API maps completed_successfully to COMPLETED
+        assert data["batches"][0]["overall_status"] == "completed_successfully"
 
         # Verify query service was called with status filter
         test_provider._batch_query_service.get_user_batches.assert_called_once_with(

@@ -595,16 +595,34 @@ class EventProcessorImpl(EventProcessorProtocol):
         if spellcheck_times:
             batch = await self.batch_repository.get_batch(batch_id)
             if batch and batch.processing_started_at:
-                spellcheck_duration = (
-                    max(spellcheck_times) - batch.processing_started_at
-                ).total_seconds()
+                # Normalize timestamps to timezone-naive for arithmetic safety
+                normalized_times = [
+                    t.replace(tzinfo=None) if getattr(t, "tzinfo", None) is not None else t
+                    for t in spellcheck_times
+                ]
+                start_time = (
+                    batch.processing_started_at.replace(tzinfo=None)
+                    if getattr(batch.processing_started_at, "tzinfo", None) is not None
+                    else batch.processing_started_at
+                )
+                spellcheck_duration = (max(normalized_times) - start_time).total_seconds()
 
         cj_times = [e.cj_assessment_completed_at for e in essays if e.cj_assessment_completed_at]
         cj_duration = None
         if cj_times:
             batch = await self.batch_repository.get_batch(batch_id)
             if batch and batch.processing_started_at:
-                cj_duration = (max(cj_times) - batch.processing_started_at).total_seconds()
+                # Normalize timestamps to timezone-naive for arithmetic safety
+                normalized_times = [
+                    t.replace(tzinfo=None) if getattr(t, "tzinfo", None) is not None else t
+                    for t in cj_times
+                ]
+                start_time = (
+                    batch.processing_started_at.replace(tzinfo=None)
+                    if getattr(batch.processing_started_at, "tzinfo", None) is not None
+                    else batch.processing_started_at
+                )
+                cj_duration = (max(normalized_times) - start_time).total_seconds()
 
         return {
             "spellcheck": PhaseResultSummary(
