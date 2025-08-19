@@ -64,18 +64,18 @@ class BatchStatusResponse(BaseModel):
     @classmethod
     def from_domain(cls, batch_result: "BatchResult") -> "BatchStatusResponse":
         """Convert from domain model."""
-        # Map database batch status (lowercase) to API batch status (uppercase)
+        # Map database batch status to client-facing API status
         status_mapping = {
-            "awaiting_content_validation": BatchStatus.REGISTERED,
+            "awaiting_content_validation": BatchStatus.PENDING_CONTENT,
             "content_ingestion_failed": BatchStatus.FAILED,
-            "awaiting_pipeline_configuration": BatchStatus.REGISTERED,
-            "ready_for_pipeline_execution": BatchStatus.REGISTERED,
+            "awaiting_pipeline_configuration": BatchStatus.PENDING_CONTENT,
+            "ready_for_pipeline_execution": BatchStatus.READY,
             "processing_pipelines": BatchStatus.PROCESSING,
             "awaiting_student_validation": BatchStatus.PROCESSING,
             "validation_timeout_processed": BatchStatus.PROCESSING,
             "guest_class_ready": BatchStatus.PROCESSING,
-            "completed_successfully": BatchStatus.COMPLETED,
-            "completed_with_failures": BatchStatus.PARTIALLY_COMPLETED,
+            "completed_successfully": BatchStatus.COMPLETED_SUCCESSFULLY,
+            "completed_with_failures": BatchStatus.COMPLETED_WITH_FAILURES,
             "failed_critically": BatchStatus.FAILED,
             "cancelled": BatchStatus.CANCELLED,
         }

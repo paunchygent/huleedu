@@ -7,6 +7,7 @@ import asyncio
 import dotenv
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -35,11 +36,15 @@ def create_app() -> HuleEduApp:
     """Create and configure the Quart application."""
     app = HuleEduApp(__name__)
 
+    # Initialize relay worker attributes
+    app.relay_worker = None
+    app.relay_task = None
+
     # CORS is handled by API Gateway - internal services don't need it
 
     # IMMEDIATE container initialization - satisfies non-optional contract
     app.container = make_async_container(
-        CoreInfrastructureProvider(), DatabaseProvider(), ServiceProvider()
+        CoreInfrastructureProvider(), DatabaseProvider(), ServiceProvider(), OutboxProvider()
     )
 
     # IMMEDIATE database engine initialization - satisfies non-optional contract
@@ -81,11 +86,17 @@ async def startup() -> None:
             await batch_repository.initialize_schema()
             logger.info("Database schema initialized")
 
-            # Get Kafka consumer
+            # Get Kafka consumer and relay worker
             consumer = await request_container.get(ResultAggregatorKafkaConsumer)
+            app.relay_worker = await request_container.get(EventRelayWorker)
 
         # Start consumer in background
         app.consumer_task = asyncio.create_task(consumer.start())
+
+        # Start outbox relay worker
+        assert app.relay_worker is not None, "Outbox relay worker must be initialized"
+        app.relay_task = asyncio.create_task(app.relay_worker.start())
+        logger.info("Outbox relay worker: running")
 
         logger.info(
             "Result Aggregator Service started",
@@ -93,6 +104,7 @@ async def startup() -> None:
             port=settings.PORT,
             metrics_port=settings.METRICS_PORT,
         )
+        logger.info("Kafka consumer: running")
     except Exception as e:
         logger.critical("Failed to start services", error=str(e), exc_info=True)
         raise
@@ -102,8 +114,22 @@ async def startup() -> None:
 async def shutdown() -> None:
     """Gracefully shutdown services."""
     try:
+        # Stop outbox relay worker
+        if app.relay_worker:
+            logger.info("Stopping outbox relay worker...")
+            await app.relay_worker.stop()
+
+        # Cancel relay task
+        if app.relay_task and not app.relay_task.done():
+            app.relay_task.cancel()
+            try:
+                await app.relay_task
+            except asyncio.CancelledError:
+                logger.info("Relay task cancelled successfully")
+
         # Stop Kafka consumer
         if app.consumer_task is not None:
+            logger.info("Stopping Kafka consumer...")
             async with app.container() as request_container:
                 consumer = await request_container.get(ResultAggregatorKafkaConsumer)
             await consumer.stop()

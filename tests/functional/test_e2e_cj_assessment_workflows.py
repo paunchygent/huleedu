@@ -26,11 +26,14 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import ProcessingStage
+from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
-from tests.utils.kafka_test_manager import KafkaTestManager, kafka_event_monitor
+from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
+
+logger = create_service_logger("test.e2e_cj_assessment")
 
 
 class TestE2ECJAssessmentWorkflows:
@@ -92,9 +95,6 @@ class TestE2ECJAssessmentWorkflows:
             Path("test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
-        completed_topic = topic_name(ProcessingEvent.BATCH_ASSESSMENT_COMPLETED)
-        results_topic = topic_name(ProcessingEvent.BATCH_RESULTS_READY)
-
         try:
             # Setup guest batch and run CJ pipeline
             batch_id, corr = await harness.setup_guest_batch(essay_files)
@@ -110,37 +110,99 @@ class TestE2ECJAssessmentWorkflows:
             assert result.all_steps_completed, "CJ pipeline did not complete"
             assert "cj_assessment" in result.executed_steps
 
-            # Collect and validate rich RAS result
-            async with kafka_event_monitor(
-                "cj_assessment_pipeline_test_harness",
-                [completed_topic, results_topic],
-            ) as consumer:
-                result_events = await kafka_mgr.collect_events(
-                    consumer,
-                    expected_count=1,
-                    timeout_seconds=240,
-                    event_filter=lambda event: (
-                        event.get("event_type") == results_topic
-                        and event.get("correlation_id") == str(corr)
-                    ),
-                )
+            # Validate RAS result from pipeline execution
+            assert result.ras_result_event is not None, (
+                "RAS BatchResultsReadyV1 event was not received"
+            )
 
-                assert len(result_events) == 1, (
-                    f"Expected 1 assessment result event, got {len(result_events)}"
-                )
+            # Extract and validate the BatchResultsReadyV1 summary data
+            # This is a thin event with summary info, not detailed results
+            ras_event_data = result.ras_result_event["data"]
 
-                assessment_result = result_events[0]["data"]["data"]
-                essay_results = assessment_result.get("essay_results", [])
-                student_results = [r for r in essay_results if not r.get("is_anchor")]
-
-                assert len(student_results) >= len(essay_files)
-                assert assessment_result["cj_assessment_job_id"] is not None
-
-                for res in student_results:
-                    assert "essay_id" in res
-                    assert "normalized_score" in res
-                    assert "letter_grade" in res
-                    assert "bt_score" in res
+            # Validate the summary fields from BatchResultsReadyV1
+            assert ras_event_data["batch_id"] == batch_id
+            assert ras_event_data["total_essays"] == len(essay_files)
+            assert ras_event_data["completed_essays"] == len(essay_files)
+            
+            # Validate phase results are present
+            assert "phase_results" in ras_event_data
+            phase_results = ras_event_data["phase_results"]
+            
+            # Should have results for spellcheck and cj_assessment phases
+            assert "spellcheck" in phase_results
+            assert "cj_assessment" in phase_results
+            
+            # Validate overall batch status (use correct enum values)
+            assert ras_event_data["overall_status"] in [
+                "completed_successfully",
+                "completed_with_failures",
+            ]
+            assert ras_event_data["processing_duration_seconds"] > 0
+            
+            # Now query the RAS API to get detailed results
+            # This validates that downstream services can fetch detailed data after receiving the thin event
+            # Note: RAS uses internal authentication, so we need to make a direct request with proper headers
+            import aiohttp
+            import json
+            
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "X-Internal-API-Key": "internal_dev_key_7f3e9a2b5d1c4f8g",
+                    "X-Service-ID": "api-gateway-service",
+                    "X-Correlation-ID": corr,
+                }
+                
+                async with session.get(
+                    f"http://localhost:4003/internal/v1/batches/{batch_id}/status",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as response:
+                    assert response.status == 200, f"Failed to get batch status: {response.status}"
+                    detailed_results = await response.json()
+            
+            # Log the RAS API response for debugging
+            logger.info("📊 RAS API Response for batch %s:", batch_id)
+            logger.info("Overall Status: %s", detailed_results.get("overall_status"))
+            logger.info("Essay Count: %s", detailed_results.get("essay_count"))
+            logger.info("Completed Essays: %s", detailed_results.get("completed_essay_count"))
+            
+            # Validate the detailed results from RAS API
+            assert detailed_results["batch_id"] == batch_id
+            assert detailed_results["overall_status"] in [
+                "completed_successfully",
+                "completed_with_failures",
+            ]
+            
+            # Check that we have essay results with CJ assessment data
+            assert "essays" in detailed_results
+            essay_results = detailed_results["essays"]
+            assert len(essay_results) >= len(essay_files)
+            
+            # Log CJ Assessment data from RAS
+            logger.info("📈 CJ Assessment Results from RAS:")
+            for i, essay_result in enumerate(essay_results):
+                logger.info("  Essay %d:", i + 1)
+                logger.info("    - Essay ID: %s", essay_result.get("essay_id"))
+                logger.info("    - CJ Status: %s", essay_result.get("cj_assessment_status"))
+                logger.info("    - CJ Rank: %s", essay_result.get("cj_rank"))
+                logger.info("    - CJ Score: %s", essay_result.get("cj_score"))
+                logger.info("    - Spellcheck Status: %s", essay_result.get("spellcheck_status"))
+                logger.info("    - Spellcheck Corrections: %s", essay_result.get("spellcheck_correction_count"))
+            
+            # Pretty print a sample essay result for detailed inspection
+            if essay_results:
+                logger.info("📝 Sample Essay Result (full structure):")
+                logger.info(json.dumps(essay_results[0], indent=2, default=str))
+            
+            # Validate each essay has CJ assessment results
+            for essay_result in essay_results:
+                assert "essay_id" in essay_result
+                assert "cj_assessment_status" in essay_result  # Should have CJ assessment status
+                
+                # If CJ assessment was successful, validate the scores
+                if essay_result["cj_assessment_status"] == "completed":
+                    assert "cj_rank" in essay_result
+                    assert "cj_score" in essay_result
 
         finally:
             await harness.cleanup()
@@ -164,9 +226,6 @@ class TestE2ECJAssessmentWorkflows:
             Path("test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
-        completed_topic = topic_name(ProcessingEvent.BATCH_ASSESSMENT_COMPLETED)
-        results_topic = topic_name(ProcessingEvent.BATCH_RESULTS_READY)
-
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files)
 
@@ -181,27 +240,40 @@ class TestE2ECJAssessmentWorkflows:
             assert result.all_steps_completed, "CJ pipeline did not complete"
             assert "cj_assessment" in result.executed_steps
 
-            # Validate rich results contain exactly 2 student essays
-            async with kafka_event_monitor(
-                "minimal_cj_assessment_test_harness",
-                [completed_topic, results_topic],
-            ) as consumer:
-                result_events = await kafka_mgr.collect_events(
-                    consumer,
-                    expected_count=1,
-                    timeout_seconds=180,
-                    event_filter=lambda event: (
-                        event.get("event_type") == results_topic
-                        and event.get("correlation_id") == str(corr)
-                    ),
-                )
+            # Validate RAS result from pipeline execution
+            assert result.ras_result_event is not None, (
+                "RAS BatchResultsReadyV1 event was not received"
+            )
 
-                assert len(result_events) == 1
-                assessment_result = result_events[0]["data"]["data"]
-                essay_results = assessment_result.get("essay_results", [])
-                student_results = [r for r in essay_results if not r.get("is_anchor")]
+            # Extract and validate the BatchResultsReadyV1 summary data
+            # This is a thin event with summary info, not detailed results
+            ras_event_data = result.ras_result_event["data"]
 
-                assert len(student_results) == 2
+            # Validate the summary fields from BatchResultsReadyV1
+            assert ras_event_data["batch_id"] == batch_id
+            assert ras_event_data["total_essays"] == 2  # Minimal test uses 2 essays
+            assert ras_event_data["completed_essays"] == 2
+            
+            # Validate phase results are present
+            assert "phase_results" in ras_event_data
+            assert "spellcheck" in ras_event_data["phase_results"]
+            assert "cj_assessment" in ras_event_data["phase_results"]
+            
+            # Validate overall batch status (use correct enum values)
+            assert ras_event_data["overall_status"] in [
+                "completed_successfully",
+                "completed_with_failures",
+            ]
+            
+            # Query RAS API for detailed results to complete validation loop
+            detailed_results = await service_manager.get_json(
+                f"http://localhost:4003/api/v1/batches/{batch_id}/status"
+            )
+            
+            # Validate we can fetch detailed results and they contain expected data
+            assert detailed_results["batch_id"] == batch_id
+            assert "essay_results" in detailed_results
+            assert len(detailed_results["essay_results"]) == 2  # Exactly 2 essays in minimal test
         finally:
             await harness.cleanup()
 

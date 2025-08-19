@@ -138,6 +138,7 @@ async def event_processor(di_container: AsyncContainer) -> EventProcessorProtoco
     """Provide event processor from DI container."""
     async with di_container(scope=Scope.REQUEST) as request_container:
         from typing import cast
+
         processor = await request_container.get(EventProcessorProtocol)
         return cast(EventProcessorProtocol, processor)
 
@@ -219,7 +220,12 @@ class TestUpdateEssayFileMapping:
             (None, None, "new-storage", "new-storage"),  # Orphaned essay gets text storage
             ("batch-456", "old-storage", "new-storage", "new-storage"),  # Associated essay updates
             (None, "old-storage", None, "old-storage"),  # No text storage provided, keep existing
-            ("batch-789", None, "new-storage", "new-storage"),  # Associated essay gets first text storage
+            (
+                "batch-789",
+                None,
+                "new-storage",
+                "new-storage",
+            ),  # Associated essay gets first text storage
         ],
     )
     @pytest.mark.asyncio
@@ -297,14 +303,10 @@ class TestUpdateEssayFileMapping:
         if test_provider.repository_instance:
             setattr(
                 test_provider.repository_instance,
-                '_record_operation_metrics',
-                mock_record_operation
+                "_record_operation_metrics",
+                mock_record_operation,
             )
-            setattr(
-                test_provider.repository_instance,
-                '_record_error_metrics',
-                mock_record_error
-            )
+            setattr(test_provider.repository_instance, "_record_error_metrics", mock_record_error)
 
         # Patch the internal session management
         with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
@@ -319,9 +321,7 @@ class TestUpdateEssayFileMapping:
                 )
 
         # Verify error metrics were recorded
-        mock_record_error.assert_called_once_with(
-            "Exception", "update_essay_file_mapping"
-        )
+        mock_record_error.assert_called_once_with("Exception", "update_essay_file_mapping")
 
 
 class TestAssociateEssayWithBatch:
@@ -394,7 +394,9 @@ class TestAssociateEssayWithBatch:
             return mock_session
 
         # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session_context:
+        with patch.object(
+            test_provider.repository_instance, "_get_session"
+        ) as mock_get_session_context:
             mock_get_session_context.return_value.__aenter__.return_value = mock_session
             mock_get_session_context.return_value.__aexit__.return_value = None
 
@@ -428,9 +430,7 @@ class TestAssociateEssayWithBatch:
         mock_session.execute.return_value = mock_result
 
         # Patch the internal session management
-        with patch.object(
-            test_provider.repository_instance, "_get_session"
-        ) as mock_get_session:
+        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
             mock_get_session.return_value.__aenter__.return_value = mock_session
             mock_get_session.return_value.__aexit__.return_value = None
 

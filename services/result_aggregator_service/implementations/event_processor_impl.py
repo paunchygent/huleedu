@@ -66,6 +66,7 @@ class EventProcessorImpl(EventProcessorProtocol):
                 batch_id=data.entity_id,  # entity_id is the batch identifier
                 user_id=data.user_id,
                 essay_count=data.expected_essay_count,
+                essay_ids=data.essay_ids if hasattr(data, "essay_ids") else None,
             )
 
             # Create the initial batch record
@@ -80,15 +81,48 @@ class EventProcessorImpl(EventProcessorProtocol):
 
             # Associate any orphaned essays with this batch
             if hasattr(data, "essay_ids") and data.essay_ids:
-                for essay_id in data.essay_ids:
-                    await self.batch_repository.associate_essay_with_batch(
-                        essay_id=essay_id,
-                        batch_id=data.entity_id,
-                    )
                 logger.info(
-                    "Associated orphaned essays with batch",
+                    "Attempting to associate essays with batch",
                     batch_id=data.entity_id,
+                    essay_ids=data.essay_ids,
                     essay_count=len(data.essay_ids),
+                )
+
+                associated_count = 0
+                failed_count = 0
+
+                for essay_id in data.essay_ids:
+                    try:
+                        await self.batch_repository.associate_essay_with_batch(
+                            essay_id=essay_id,
+                            batch_id=data.entity_id,
+                        )
+                        associated_count += 1
+                        logger.debug(
+                            "Successfully associated essay",
+                            essay_id=essay_id,
+                            batch_id=data.entity_id,
+                        )
+                    except Exception as e:
+                        failed_count += 1
+                        logger.warning(
+                            "Failed to associate essay with batch",
+                            essay_id=essay_id,
+                            batch_id=data.entity_id,
+                            error=str(e),
+                        )
+
+                logger.info(
+                    "Essay association complete",
+                    batch_id=data.entity_id,
+                    total_essays=len(data.essay_ids),
+                    associated=associated_count,
+                    failed=failed_count,
+                )
+            else:
+                logger.warning(
+                    "No essay_ids provided in batch registration event",
+                    batch_id=data.entity_id,
                 )
 
             await self.cache_manager.invalidate_user_batches(data.user_id)
@@ -162,6 +196,16 @@ class EventProcessorImpl(EventProcessorProtocol):
                 phase=data.phase_name.value,
                 outcome=data.phase_status.value,
             )
+
+            # Set processing_started_at if this is the first phase event
+            batch = await self.batch_repository.get_batch(data.batch_id)
+            if batch and not batch.processing_started_at:
+                # This is the first phase event - mark processing as started
+                await self.batch_repository.set_batch_processing_started(data.batch_id)
+                logger.info(
+                    "Set processing_started_at for batch",
+                    batch_id=data.batch_id,
+                )
 
             # Update batch status based on phase outcome
             if data.phase_status in [
@@ -596,6 +640,7 @@ class EventProcessorImpl(EventProcessorProtocol):
             return 0.0
 
         # Use completed_at if available, otherwise use current time
-        end_time = batch.processing_completed_at or datetime.now(timezone.utc)
+        # Both timestamps should be timezone-naive for consistency with database storage
+        end_time = batch.processing_completed_at or datetime.now(timezone.utc).replace(tzinfo=None)
         duration = (end_time - batch.processing_started_at).total_seconds()
         return max(0.0, duration)  # Ensure non-negative

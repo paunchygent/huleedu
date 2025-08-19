@@ -90,6 +90,10 @@ class BatchRepositoryProtocol(Protocol):
         """Update batch after phase completion."""
         ...
 
+    async def set_batch_processing_started(self, batch_id: str) -> None:
+        """Set the processing_started_at timestamp for a batch."""
+        ...
+
     async def update_batch_failed(
         self, batch_id: str, error_detail: ErrorDetail, correlation_id: UUID
     ) -> None:

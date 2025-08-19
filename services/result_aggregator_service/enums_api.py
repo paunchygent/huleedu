@@ -2,24 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+# Import shared enums from common_core instead of duplicating them
+from common_core.pipeline_models import PhaseName as ProcessingPhase
+from common_core.status_enums import BatchClientStatus as BatchStatus  # Use client-facing enum for API responses
+from common_core.status_enums import BatchStatus as InternalBatchStatus  # Keep internal status for DB mapping
 
-
-class BatchStatus(str, Enum):
-    """Batch status for API responses."""
-
-    REGISTERED = "REGISTERED"
-    PROCESSING = "PROCESSING"
-    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
-
-
-class ProcessingPhase(str, Enum):
-    """Processing phases for API responses."""
-
-    SPELLCHECK = "SPELLCHECK"
-    CJ_ASSESSMENT = "CJ_ASSESSMENT"
-    NLP_ANALYSIS = "NLP_ANALYSIS"
-    AI_FEEDBACK = "AI_FEEDBACK"
+# Re-export for backward compatibility
+__all__ = ["BatchStatus", "ProcessingPhase", "InternalBatchStatus"]

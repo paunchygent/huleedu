@@ -239,23 +239,36 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             error: Optional error message
         """
         async with self._get_session() as session:
-            # Find or create essay result
+            # Find essay by essay_id only (not batch_id) to handle orphaned essays
             result = await session.execute(
-                select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
-                )
+                select(EssayResult).where(EssayResult.essay_id == essay_id)
             )
             essay = result.scalars().first()
 
             if not essay:
+                # Create new essay if it doesn't exist
                 essay = EssayResult(
                     essay_id=essay_id,
                     batch_id=batch_id,
                     spellcheck_status=status,
                 )
                 session.add(essay)
+                self.logger.info(
+                    "Created new essay result for spellcheck",
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                )
             else:
+                # Update existing essay
                 essay.spellcheck_status = status
+                # Associate with batch if not already associated
+                if essay.batch_id is None:
+                    essay.batch_id = batch_id
+                    self.logger.info(
+                        "Associated orphaned essay with batch during spellcheck update",
+                        essay_id=essay_id,
+                        batch_id=batch_id,
+                    )
 
             # Update spellcheck-specific fields
             if correction_count is not None:
@@ -291,23 +304,36 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             error: Optional error message
         """
         async with self._get_session() as session:
-            # Find or create essay result
+            # Find essay by essay_id only (not batch_id) to handle orphaned essays
             result = await session.execute(
-                select(EssayResult).where(
-                    EssayResult.essay_id == essay_id, EssayResult.batch_id == batch_id
-                )
+                select(EssayResult).where(EssayResult.essay_id == essay_id)
             )
             essay = result.scalars().first()
 
             if not essay:
+                # Create new essay if it doesn't exist
                 essay = EssayResult(
                     essay_id=essay_id,
                     batch_id=batch_id,
                     cj_assessment_status=status,
                 )
                 session.add(essay)
+                self.logger.info(
+                    "Created new essay result for CJ assessment",
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                )
             else:
+                # Update existing essay
                 essay.cj_assessment_status = status
+                # Associate with batch if not already associated
+                if essay.batch_id is None:
+                    essay.batch_id = batch_id
+                    self.logger.info(
+                        "Associated orphaned essay with batch during CJ assessment update",
+                        essay_id=essay_id,
+                        batch_id=batch_id,
+                    )
 
             # Update CJ-specific fields
             if rank is not None:
@@ -320,6 +346,19 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                 essay.cj_assessment_error_detail = error_detail.model_dump(mode="json")
 
             essay.updated_at = datetime.utcnow()
+            await session.commit()
+
+    async def set_batch_processing_started(self, batch_id: str) -> None:
+        """Set the processing_started_at timestamp for a batch."""
+        async with self._get_session() as session:
+            from sqlalchemy import update
+
+            stmt = (
+                update(BatchResult)
+                .where(BatchResult.batch_id == batch_id)
+                .values(processing_started_at=datetime.now(UTC).replace(tzinfo=None))
+            )
+            await session.execute(stmt)
             await session.commit()
 
     async def update_batch_phase_completed(

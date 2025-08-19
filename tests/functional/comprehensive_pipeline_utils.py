@@ -41,6 +41,8 @@ PIPELINE_TOPICS = {
     "batch_nlp_analysis_completed": topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
     # Phase skipping events from BCS (for pruning detection)
     "batch_phase_skipped": topic_name(ProcessingEvent.BATCH_PHASE_SKIPPED),
+    # RAS events for results ready notification
+    "batch_results_ready": "huleedu.ras.batch.results.ready.v1",
 }
 
 

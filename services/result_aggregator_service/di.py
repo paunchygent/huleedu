@@ -11,7 +11,7 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.outbox import OutboxRepositoryProtocol, PostgreSQLOutboxRepository
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import (
     AtomicRedisClientProtocol,
     KafkaPublisherProtocol,
@@ -93,17 +93,21 @@ class CoreInfrastructureProvider(Provider):
         async with aiohttp.ClientSession(timeout=timeout) as session:
             yield session
 
-    @provide
-    async def provide_redis_client(self, settings: Settings) -> AsyncIterator[RedisClientProtocol]:
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
         """Provide Redis client instance."""
         redis_client = RedisClient(
             client_id=f"ras-{settings.SERVICE_NAME}", redis_url=settings.REDIS_URL
         )
         await redis_client.start()
-        try:
-            yield cast(RedisClientProtocol, redis_client)
-        finally:
-            await redis_client.stop()
+        return redis_client
+
+    @provide(scope=Scope.APP)
+    def provide_atomic_redis_client(
+        self, redis_client: RedisClientProtocol
+    ) -> AtomicRedisClientProtocol:
+        """Provide AtomicRedisClientProtocol from the same Redis client instance."""
+        return cast(AtomicRedisClientProtocol, redis_client)
 
     # DLQ handling removed - this is BOS responsibility
 
@@ -196,11 +200,6 @@ class DatabaseProvider(Provider):
             engine=engine, service_name=settings.SERVICE_NAME
         )
 
-    @provide
-    def provide_outbox_repository(self, engine: AsyncEngine) -> OutboxRepositoryProtocol:
-        """Provide outbox repository for transactional outbox pattern."""
-        return PostgreSQLOutboxRepository(engine)
-
 
 # RepositoryProvider removed - batch repository is now provided in DatabaseProvider
 
@@ -209,6 +208,11 @@ class ServiceProvider(Provider):
     """Provider for service implementations."""
 
     scope = Scope.APP
+
+    @provide
+    def provide_service_name(self, settings: Settings) -> str:
+        """Provide service name for outbox and other components."""
+        return settings.SERVICE_NAME
 
     @provide
     def provide_state_store(

@@ -1054,7 +1054,7 @@ class TestProcessPipelineCompleted:
         event = BatchPipelineCompletedV1(
             batch_id=batch_id,
             completed_phases=["spellcheck", "cj_assessment"],
-            final_status="COMPLETED_SUCCESSFULLY",
+            final_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processing_duration_seconds=45.2,
             successful_essay_count=25,
             failed_essay_count=0,
@@ -1072,7 +1072,7 @@ class TestProcessPipelineCompleted:
         # Verify batch completion was marked
         mock_batch_repository.mark_batch_completed.assert_called_once_with(
             batch_id=batch_id,
-            final_status="COMPLETED_SUCCESSFULLY",
+            final_status="completed_successfully",
             completion_stats={
                 "successful_essays": 25,
                 "failed_essays": 0,
@@ -1109,7 +1109,7 @@ class TestProcessPipelineCompleted:
         event = BatchPipelineCompletedV1(
             batch_id=batch_id,
             completed_phases=["spellcheck", "cj_assessment"],
-            final_status="COMPLETED_WITH_FAILURES",
+            final_status=BatchStatus.COMPLETED_WITH_FAILURES,
             processing_duration_seconds=62.8,
             successful_essay_count=22,
             failed_essay_count=3,
@@ -1127,7 +1127,7 @@ class TestProcessPipelineCompleted:
         # Verify batch completion was marked with failure status
         mock_batch_repository.mark_batch_completed.assert_called_once_with(
             batch_id=batch_id,
-            final_status="COMPLETED_WITH_FAILURES",
+            final_status="completed_with_failures",
             completion_stats={
                 "successful_essays": 22,
                 "failed_essays": 3,
@@ -1162,7 +1162,7 @@ class TestProcessPipelineCompleted:
         event = BatchPipelineCompletedV1(
             batch_id=batch_id,
             completed_phases=["spellcheck"],
-            final_status="COMPLETED_SUCCESSFULLY",
+            final_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processing_duration_seconds=30.0,
             successful_essay_count=10,
             failed_essay_count=0,
@@ -1208,7 +1208,7 @@ class TestProcessPipelineCompleted:
         event = BatchPipelineCompletedV1(
             batch_id=batch_id,
             completed_phases=["spellcheck"],
-            final_status="COMPLETED_SUCCESSFULLY",
+            final_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processing_duration_seconds=35.0,
             successful_essay_count=15,
             failed_essay_count=0,
@@ -1250,7 +1250,7 @@ class TestProcessPipelineCompleted:
         event = BatchPipelineCompletedV1(
             batch_id=batch_id,
             completed_phases=["cj_assessment"],
-            final_status="COMPLETED_SUCCESSFULLY",
+            final_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             processing_duration_seconds=50.0,
             successful_essay_count=20,
             failed_essay_count=0,

@@ -66,6 +66,7 @@ class PipelineExecutionResult:
     pruned_phases: list[str] = field(default_factory=list)
     reused_storage_ids: dict[str, str] = field(default_factory=dict)
     completion_event: Optional[dict[str, Any]] = None
+    ras_result_event: Optional[dict[str, Any]] = None  # BatchResultsReadyV1 event from RAS
     student_matches_found: int = 0
     execution_time_seconds: float = 0.0
 
@@ -79,6 +80,7 @@ class PipelineExecutionTracker:
     storage_ids: dict[str, str] = field(default_factory=dict)
     pruned_phases: list[str] = field(default_factory=list)
     reused_storage_ids: dict[str, str] = field(default_factory=dict)
+    ras_result_event: Optional[dict[str, Any]] = None  # Store BatchResultsReadyV1 event
 
 
 class PipelineTestHarness:
@@ -329,13 +331,13 @@ class PipelineTestHarness:
 
         # Wait for content provisioning and batch to be ready
         logger.info("⏳ Waiting for GUEST batch to be ready...")
-        await asyncio.sleep(5)  # Give time for content provisioning
+        await asyncio.sleep(2)  # Small delay for initial processing
 
-        # For GUEST batches, we should receive BatchEssaysReady directly after content provisioning
-        ready_received = await self._wait_for_batch_essays_ready(timeout_seconds=15)
+        # For GUEST batches, wait for BatchContentProvisioningCompleted
+        ready_received = await self._wait_for_guest_batch_ready(timeout_seconds=5)
 
         if not ready_received:
-            logger.warning("BatchEssaysReady not received for GUEST batch, but continuing...")
+            logger.warning("BatchContentProvisioningCompleted not received, but continuing...")
 
         logger.info("✅ GUEST batch ready for pipeline execution")
         return self.batch_id, self.correlation_id
@@ -397,6 +399,7 @@ class PipelineTestHarness:
             pruned_phases=tracker.pruned_phases,
             reused_storage_ids=tracker.reused_storage_ids,
             completion_event=completion_event,
+            ras_result_event=tracker.ras_result_event,  # Include RAS results
             execution_time_seconds=execution_time,
         )
 
@@ -513,6 +516,50 @@ class PipelineTestHarness:
 
         logger.info("✅ Teacher confirmed all student-essay associations")
         return confirm_response
+
+    async def _wait_for_guest_batch_ready(self, timeout_seconds: int = 10) -> bool:
+        """Wait for BatchContentProvisioningCompleted event for GUEST batches."""
+        start_time = asyncio.get_event_loop().time()
+        end_time = start_time + timeout_seconds
+
+        while asyncio.get_event_loop().time() < end_time:
+            try:
+                if not self.consumer:
+                    raise RuntimeError("Consumer not initialized")
+                msg_batch = await self.consumer.getmany(timeout_ms=1000, max_records=10)
+
+                for _topic_partition, messages in msg_batch.items():
+                    for message in messages:
+                        try:
+                            # Parse message
+                            if isinstance(message.value, bytes):
+                                raw_message = message.value.decode("utf-8")
+                            else:
+                                raw_message = message.value
+
+                            envelope_data: dict[str, Any] = json.loads(raw_message)
+                            event_correlation_id = envelope_data.get("correlation_id")
+                            event_type = envelope_data.get("event_type", "")
+
+                            # Check for BatchContentProvisioningCompleted (GUEST batch flow)
+                            if (
+                                event_correlation_id == self.correlation_id
+                                and "batch.content.provisioning.completed" in event_type
+                            ):
+                                logger.info(
+                                    "📨 BatchContentProvisioningCompleted received - "
+                                    "GUEST batch ready for pipeline!"
+                                )
+                                return True
+
+                        except Exception as e:
+                            logger.warning(f"Error parsing message: {e}")
+                            continue
+
+            except asyncio.TimeoutError:
+                continue
+
+        return False
 
     async def _wait_for_batch_essays_ready(self, timeout_seconds: int = 30) -> bool:
         """Wait for BatchEssaysReady event after associations are confirmed."""
@@ -692,9 +739,32 @@ class PipelineTestHarness:
                                             "✅ Phase cj_assessment completed "
                                             "(from assessment completion)"
                                         )
+                                    # For CJ assessment pipelines, we need to wait for RAS results
+                                    # Continue monitoring instead of returning
+                                    logger.info(
+                                        "📊 CJ Assessment completed, waiting for "
+                                        "RAS BatchResultsReadyV1..."
+                                    )
+                                    continue  # Don't return yet for CJ pipelines
+                                else:
+                                    # For non-CJ pipelines, return immediately
+                                    logger.info(
+                                        f"🎯 Pipeline completed: {expected_completion_event}"
+                                    )
+                                    return envelope_data
 
-                                logger.info(f"🎯 Pipeline completed: {expected_completion_event}")
-                                return envelope_data
+                            # Check for BatchResultsReadyV1 event from RAS
+                            # This is the true completion event for CJ assessment pipelines
+                            if "batch.results.ready" in event_type:
+                                # Store the RAS result event for validation
+                                tracker.ras_result_event = envelope_data
+                                logger.info("📊 BatchResultsReadyV1 received from RAS")
+
+                                # If we're waiting for CJ completion and have received RAS results,
+                                # the pipeline is truly complete
+                                if "cj_assessment" in tracker.completed_phases:
+                                    logger.info("🎯 Pipeline fully completed with RAS results")
+                                    return envelope_data
 
                         except Exception as e:
                             logger.warning(f"Error parsing message: {e}")

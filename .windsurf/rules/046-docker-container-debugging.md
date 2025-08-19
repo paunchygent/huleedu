@@ -77,3 +77,45 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service_name>
 4. **USE** correlation IDs to trace across services
 5. **ACCESS** databases with standard pattern above
 6. **USE** development commands for optimized builds (no --no-cache needed)
+
+## 4. Container Log Debugging Best Practices
+
+### 4.1. DO's for Container Logs
+- **Start broad, then narrow**: Get recent logs first, then search
+  ```bash
+  # GOOD - see what's actually happening
+  docker logs <container_name> --tail 200 2>&1 | grep -i processing
+  ```
+- **Use `--since` for time-based filtering**:
+  ```bash
+  docker logs <container_name> --since 1m 2>&1 | tail -50
+  ```
+- **Always redirect stderr**: Use `2>&1` to capture all output
+- **Check container is running first**:
+  ```bash
+  docker ps | grep <service_name>
+  ```
+
+### 4.2. DON'Ts for Container Logs  
+- **Don't grep for overly specific strings** that might not exist:
+  ```bash
+  # BAD - returns nothing even when events exist
+  docker logs <container> | grep "exact string that may not appear"
+  ```
+- **Don't assume no output means no activity** - the log level might be wrong
+- **Don't pipe grep to grep** - use regex patterns instead:
+  ```bash
+  # BAD
+  docker logs <container> | grep ERROR | grep specific_error
+  # GOOD
+  docker logs <container> 2>&1 | grep -E "ERROR.*specific|specific.*ERROR"
+  ```
+
+### 4.3. Kafka Consumer Debugging
+- **Check consumer group status**:
+  ```bash
+  docker exec huleedu_kafka /opt/bitnami/kafka/bin/kafka-consumer-groups.sh \
+    --bootstrap-server localhost:9092 --group <group_name> --describe
+  ```
+- **Look for LAG values** - 0 means all messages consumed
+- **Check if consumer is in the group** - missing means not connected
