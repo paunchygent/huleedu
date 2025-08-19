@@ -113,10 +113,15 @@ class BatchAIFeedbackRequestedV1(BaseEventData):
     Publisher: Essay Lifecycle Service
     Consumer: AI Feedback Service
     Topic: batch.ai.feedback.requested
+    
+    Note: Following DDD Name Propagation Refactor, teacher names are NOT included
+    in events. AI Feedback Service resolves teacher name via Identity Service
+    using owner_user_id. Student names resolved via CMS internal endpoints.
     """
     event_name: ProcessingEvent = ProcessingEvent.BATCH_AI_FEEDBACK_REQUESTED
     batch_id: str = Field(description="Batch identifier")
     essay_refs: list[str] = Field(description="Essay IDs to process")
+    owner_user_id: str = Field(description="Batch owner user ID for teacher name resolution via Identity Service")
     processing_config: dict[str, Any] | None = Field(
         default=None,
         description="Optional overrides: model_selection, temperature, etc."
@@ -164,6 +169,8 @@ services/ai_feedback_service/
 │   ├── result_aggregator_client_impl.py  # Fetch aggregated essay data
 │   ├── content_client_impl.py            # Store feedback artifacts
 │   ├── llm_provider_client_impl.py       # LLM API interactions
+│   ├── identity_client_impl.py           # HTTP client for teacher names (Phase 5)
+│   ├── cms_client_impl.py                # HTTP client for student names (Phase 5)
 │   └── event_publisher_impl.py           # Kafka publishing
 ├── core_logic/
 │   ├── __init__.py
@@ -186,6 +193,230 @@ services/ai_feedback_service/
 - ❌ `class_management_client_impl.py` - Student associations come via Result Aggregator
 - ❌ `text_utils.py` - Text preprocessing done by upstream services
 - ❌ `result_curation.py` - Grammar curation done by NLP Service
+
+### Phase 1.5: DDD Name Resolution HTTP Clients (Phase 5 Implementation)
+
+**Context**: Following the DDD Name Propagation Refactor Plan (Phase 5), AI Feedback Service must resolve names via HTTP calls rather than receiving them in events/data models. This ensures clean bounded contexts and keeps PII out of Kafka.
+
+#### 1.5.1 Identity Client Implementation
+
+**Purpose**: Resolve teacher names using `owner_user_id` from batch commands
+
+**Location**: `implementations/identity_client_impl.py`
+
+```python
+"""HTTP client for Identity Service name resolution."""
+
+from aiohttp import ClientSession, ClientTimeout, ClientError
+from datetime import timedelta
+from uuid import UUID
+from typing import Optional
+
+from common_core.metadata_models import PersonNameV1
+from huleedu_service_libs.resilience import CircuitBreaker
+from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.error_handling import raise_processing_error
+
+from ..protocols import IdentityClientProtocol
+
+logger = create_service_logger("identity_client")
+
+class IdentityClientImpl(IdentityClientProtocol):
+    """HTTP client for resolving teacher names via Identity Service."""
+    
+    def __init__(self, session: ClientSession, settings: Settings):
+        self.session = session
+        self.base_url = settings.IDENTITY_SERVICE_URL
+        self.circuit_breaker = CircuitBreaker(
+            name="ai_feedback.identity",
+            failure_threshold=3,
+            recovery_timeout=timedelta(seconds=30),
+            success_threshold=2,
+            expected_exception=ClientError
+        )
+    
+    async def get_user_person_name(
+        self, user_id: str, correlation_id: UUID
+    ) -> PersonNameV1:
+        """
+        Resolve teacher name via Identity Service profile endpoint.
+        
+        Args:
+            user_id: The owner_user_id from batch command
+            correlation_id: Request correlation ID
+            
+        Returns:
+            PersonNameV1 with teacher name or default on failure
+        """
+        try:
+            async with self.circuit_breaker:
+                url = f"{self.base_url}/v1/users/{user_id}/profile"
+                headers = {"X-Correlation-ID": str(correlation_id)}
+                timeout = ClientTimeout(total=5)
+                
+                async with self.session.get(url, headers=headers, timeout=timeout) as response:
+                    if response.status == 404:
+                        logger.warning(f"Teacher profile not found for user {user_id}")
+                        return self._get_default_teacher_name()
+                    
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    person_name = data.get("person_name", {})
+                    return PersonNameV1(
+                        first_name=person_name.get("first_name", "Unknown"),
+                        last_name=person_name.get("last_name", "Teacher"),
+                        legal_full_name=person_name.get("legal_full_name")
+                    )
+                    
+        except Exception as e:
+            logger.warning(
+                f"Failed to resolve teacher name for user {user_id}: {e}",
+                extra={"user_id": user_id, "correlation_id": str(correlation_id)}
+            )
+            return self._get_default_teacher_name()
+    
+    def _get_default_teacher_name(self) -> PersonNameV1:
+        """Return default teacher name for graceful degradation."""
+        return PersonNameV1(
+            first_name="Unknown",
+            last_name="Teacher", 
+            legal_full_name=None
+        )
+```
+
+#### 1.5.2 CMS Client Implementation
+
+**Purpose**: Resolve student names using essay/batch associations
+
+**Location**: `implementations/cms_client_impl.py`
+
+```python
+"""HTTP client for CMS student name resolution."""
+
+from aiohttp import ClientSession, ClientTimeout, ClientError
+from datetime import timedelta
+from uuid import UUID
+from typing import Optional
+
+from common_core.metadata_models import PersonNameV1
+from huleedu_service_libs.resilience import CircuitBreaker
+from huleedu_service_libs.logging_utils import create_service_logger
+
+from ..protocols import CMSClientProtocol
+
+logger = create_service_logger("cms_client")
+
+class CMSClientImpl(CMSClientProtocol):
+    """HTTP client for resolving student names via CMS internal endpoints."""
+    
+    def __init__(self, session: ClientSession, settings: Settings):
+        self.session = session
+        self.base_url = settings.CMS_SERVICE_URL
+        self.circuit_breaker = CircuitBreaker(
+            name="ai_feedback.cms",
+            failure_threshold=3,
+            recovery_timeout=timedelta(seconds=30),
+            success_threshold=2,
+            expected_exception=ClientError
+        )
+    
+    async def get_batch_student_names(
+        self, batch_id: str, correlation_id: UUID
+    ) -> list[dict]:
+        """
+        Batch resolve all student names for a batch.
+        
+        Args:
+            batch_id: The batch ID
+            correlation_id: Request correlation ID
+            
+        Returns:
+            List of essay->student mappings with PersonNameV1
+        """
+        try:
+            async with self.circuit_breaker:
+                url = f"{self.base_url}/internal/v1/batches/{batch_id}/student-names"
+                headers = {"X-Correlation-ID": str(correlation_id)}
+                timeout = ClientTimeout(total=10)  # Longer for batch operations
+                
+                async with self.session.get(url, headers=headers, timeout=timeout) as response:
+                    if response.status == 404:
+                        logger.info(f"No student associations found for batch {batch_id}")
+                        return []
+                    
+                    response.raise_for_status()
+                    return await response.json()
+                    
+        except Exception as e:
+            logger.warning(
+                f"Failed to resolve batch student names for {batch_id}: {e}",
+                extra={"batch_id": batch_id, "correlation_id": str(correlation_id)}
+            )
+            return []
+    
+    async def get_essay_student_name(
+        self, essay_id: str, correlation_id: UUID
+    ) -> PersonNameV1 | None:
+        """
+        Resolve student name for a single essay.
+        
+        Args:
+            essay_id: The essay ID
+            correlation_id: Request correlation ID
+            
+        Returns:
+            PersonNameV1 with student name or None if not found
+        """
+        try:
+            async with self.circuit_breaker:
+                url = f"{self.base_url}/internal/v1/associations/essay/{essay_id}"
+                headers = {"X-Correlation-ID": str(correlation_id)}
+                timeout = ClientTimeout(total=5)
+                
+                async with self.session.get(url, headers=headers, timeout=timeout) as response:
+                    if response.status == 404:
+                        logger.info(f"No student association found for essay {essay_id}")
+                        return None
+                    
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    person_name = data.get("student_person_name", {})
+                    return PersonNameV1(
+                        first_name=person_name.get("first_name", "Student"),
+                        last_name=person_name.get("last_name", ""),
+                        legal_full_name=person_name.get("legal_full_name")
+                    )
+                    
+        except Exception as e:
+            logger.warning(
+                f"Failed to resolve student name for essay {essay_id}: {e}",
+                extra={"essay_id": essay_id, "correlation_id": str(correlation_id)}
+            )
+            return None
+```
+
+#### 1.5.3 Graceful Degradation Strategy
+
+**Name Resolution Fallback Behavior**:
+
+1. **Teacher Name Resolution Failure**:
+   - Circuit breaker open → Use PersonNameV1("Unknown", "Teacher", None)
+   - Identity Service 404 → Use PersonNameV1("Unknown", "Teacher", None)
+   - Network timeout → Use PersonNameV1("Unknown", "Teacher", None)
+
+2. **Student Name Resolution Failure**:
+   - Circuit breaker open → Use "the student" in prompts
+   - CMS Service empty response → Use "the student" in prompts
+   - Network timeout → Use "the student" in prompts
+
+3. **Observability**:
+   - Log all fallback scenarios with correlation IDs
+   - Metrics track resolution success/failure rates
+   - Structured logs include user_id, essay_id, batch_id context
+
+**Critical Design Principle**: AI Feedback generation continues even when name services are unavailable, ensuring service resilience while maintaining DDD boundaries.
 
 ### Phase 2: Core Logic Implementation
 
@@ -471,7 +702,13 @@ class AESScore(BaseModel):
     feedback_suggestions: list[str]
 
 class AggregatedEssayData(BaseModel):
-    """Complete aggregated data from Result Aggregator."""
+    """Complete aggregated data from Result Aggregator.
+    
+    Note: Following DDD Name Propagation Refactor, names are NOT included in data models.
+    Names are resolved via HTTP:
+    - Teacher names via Identity Service using owner_user_id
+    - Student names via CMS internal endpoints using essay_id/batch_id
+    """
     # Identity
     essay_id: str
     batch_id: str
@@ -481,11 +718,11 @@ class AggregatedEssayData(BaseModel):
     original_text_storage_id: str   # Original submission
     
     # Context
-    student_name: Optional[str]
+    owner_user_id: str  # For teacher name resolution via Identity Service
     course_code: CourseCode
     essay_instructions: str
-    teacher_name: Optional[str]
     class_designation: Optional[str]
+    # Note: student_name and teacher_name removed - resolved via HTTP clients
     
     # Aggregated analyses
     nlp_metrics: NLPMetrics
@@ -855,6 +1092,57 @@ class LLMProviderClientProtocol(Protocol):
         correlation_id: UUID
     ) -> dict[str, Any]:
         """Request essay editing from LLM."""
+        ...
+
+class IdentityClientProtocol(Protocol):
+    """Interface for Identity Service HTTP client (DDD Phase 5)."""
+    
+    async def get_user_person_name(
+        self, user_id: str, correlation_id: UUID
+    ) -> PersonNameV1:
+        """
+        Resolve teacher name via Identity Service using owner_user_id.
+        
+        Args:
+            user_id: The owner_user_id from batch command
+            correlation_id: Request correlation ID
+            
+        Returns:
+            PersonNameV1 with teacher name or default on failure
+        """
+        ...
+
+class CMSClientProtocol(Protocol):
+    """Interface for CMS HTTP client (DDD Phase 5)."""
+    
+    async def get_batch_student_names(
+        self, batch_id: str, correlation_id: UUID
+    ) -> list[dict]:
+        """
+        Batch resolve all student names for a batch.
+        
+        Args:
+            batch_id: The batch ID
+            correlation_id: Request correlation ID
+            
+        Returns:
+            List of essay->student mappings with PersonNameV1
+        """
+        ...
+    
+    async def get_essay_student_name(
+        self, essay_id: str, correlation_id: UUID
+    ) -> PersonNameV1 | None:
+        """
+        Resolve student name for a single essay.
+        
+        Args:
+            essay_id: The essay ID
+            correlation_id: Request correlation ID
+            
+        Returns:
+            PersonNameV1 with student name or None if not found
+        """
         ...
 
 class EventPublisherProtocol(Protocol):
@@ -1384,18 +1672,24 @@ ai_feedback_service:
 ## Success Criteria
 
 1. **Functional Requirements**:
-   - ✅ Consumes BatchAIFeedbackRequestedV1 events from Kafka
+   - ✅ Consumes BatchAIFeedbackRequestedV1 events from Kafka with owner_user_id
    - ✅ Fetches aggregated data from Result Aggregator Service (with all upstream analyses)
+   - ✅ Resolves teacher names via Identity Service HTTP client using owner_user_id
+   - ✅ Resolves student names via CMS internal endpoints using batch_id/essay_id
    - ✅ Builds rich context from NLP grammar, spellcheck errors, CJ rankings
-   - ✅ Generates context-aware teacher feedback and edited essays
+   - ✅ Generates context-aware teacher feedback and edited essays with resolved names
    - ✅ Stores results in Content Service with proper references
    - ✅ Publishes BatchAIFeedbackCompletedV1 events to ELS
+   - ✅ NO PII (names) transmitted in Kafka events (DDD compliance)
 
 2. **Non-Functional Requirements**:
    - ✅ Processes essays concurrently with configurable limits
    - ✅ Implements idempotency for message processing
    - ✅ Provides comprehensive observability (logs, metrics, traces)
    - ✅ Handles failures gracefully with partial batch success
+   - ✅ Implements circuit breakers for HTTP name resolution with 3 failure threshold
+   - ✅ Graceful degradation when name services unavailable (default names)
+   - ✅ HTTP client timeouts: 5s for single requests, 10s for batch operations
    - ✅ Follows all HuleEdu architectural patterns and standards
    - ✅ Maintains single responsibility: prompt curation and orchestration
 
@@ -1406,6 +1700,8 @@ ai_feedback_service:
    - ✅ Context builder for intelligent prompt curation
    - ✅ All prompt templates preserved from prototype
    - ✅ Type hints and documentation throughout
+   - ✅ DDD Name Propagation Refactor compliance (HTTP name resolution)
+   - ✅ Circuit breaker patterns for HTTP client resilience
 
 ## Implementation Order
 

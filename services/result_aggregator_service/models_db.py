@@ -16,7 +16,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy import Enum as SQLAlchemyEnum
@@ -97,10 +96,10 @@ class EssayResult(Base):
 
     # Primary identification
     essay_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    batch_id: Mapped[str] = mapped_column(
+    batch_id: Mapped[Optional[str]] = mapped_column(
         String(255),
         ForeignKey("batch_results.batch_id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,  # Allow essays to exist before batch association
         index=True,
     )
 
@@ -165,13 +164,13 @@ class EssayResult(Base):
     )
 
     # Relationships
-    batch: Mapped["BatchResult"] = relationship("BatchResult", back_populates="essays")
+    batch: Mapped[Optional["BatchResult"]] = relationship("BatchResult", back_populates="essays")
 
     __table_args__ = (
         Index("idx_essay_batch", "batch_id", "essay_id"),
         Index("idx_essay_spellcheck_status", "spellcheck_status"),
         Index("idx_essay_cj_status", "cj_assessment_status"),
-        UniqueConstraint("batch_id", "essay_id", name="uq_batch_essay"),
+        # Removed UniqueConstraint since batch_id can be NULL
     )
 
 

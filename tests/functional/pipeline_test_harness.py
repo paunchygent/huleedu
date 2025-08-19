@@ -590,8 +590,19 @@ class PipelineTestHarness:
                             event_data = envelope_data.get("data", {})
 
                             # Filter by correlation ID - STRICT filtering for THIS pipeline request
+                            # Special-case: CJ completion events may be published with the original
+                            # batch registration correlation_id instead of the pipeline request ID.
                             if event_correlation_id != request_correlation_id:
-                                continue
+                                is_cj_completion = (
+                                    expected_completion_event in event_type
+                                    and "cj_assessment.completed" in event_type
+                                )
+                                if not (
+                                    is_cj_completion
+                                    and self.correlation_id
+                                    and event_correlation_id == self.correlation_id
+                                ):
+                                    continue
 
                             # Debug log ALL events with our correlation ID
                             logger.debug(
@@ -624,8 +635,6 @@ class PipelineTestHarness:
                                 if phase_status in [
                                     "completed_successfully",
                                     "completed_with_failures",
-                                    "COMPLETED_SUCCESSFULLY",
-                                    "COMPLETED_WITH_FAILURES",
                                 ]:
                                     # CRITICAL: Only add to completed if initiated in THIS execution
                                     if phase_name in tracker.initiated_phases:

@@ -389,8 +389,66 @@ Post‑merge verification:
 
 - `libs/common_core/src/common_core/batch_service_models.py`
   - `class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData)`
-    - Field docs: `owner_user_id` → “User ID of batch owner (teacher). Names are resolved by AI Feedback via Identity; not transmitted on Kafka.”
+    - Field docs: `owner_user_id` → "User ID of batch owner (teacher). Names are resolved by AI Feedback via Identity; not transmitted on Kafka."
 - `libs/common_core/src/common_core/events/batch_coordination_events.py`
   - `class BatchEssaysReady` no longer includes teacher fields; downstream services must not rely on them.
 - `libs/common_core/src/common_core/events/ai_feedback_events.py`
   - `class AIFeedbackInputDataV1` no longer includes `teacher_name` or `student_name`; these are resolved at consumption time and used internally only.
+
+## Implementation Status
+
+### Phase 1 — Contracts Cleanup and Call‑Site Updates ✅ COMPLETE
+
+- **Completed**: All teacher name fields removed from orchestration events
+- **Completed**: Added `owner_user_id` to AI Feedback command data
+- **Completed**: Removed name fields from AI Feedback input events  
+- **Completed**: All call sites updated and tests passing
+- **Verification**: `pdm run typecheck-all` and `pdm run test-all` pass
+- **Verification**: No references to removed fields in codebase
+
+### Phase 2 — Identity Profiles (Teacher Names Source of Truth) ✅ COMPLETE
+
+- **Completed**: Database model `UserProfile` added to Identity Service
+  - Fields: `user_id`, `first_name`, `last_name`, `display_name`, `locale`, `created_at`, `updated_at`
+  - Migration: `20250818_2215_adc8538fe76d_add_user_profiles_table.py` applied successfully
+- **Completed**: HTTP API endpoints implemented
+  - `GET /v1/users/{user_id}/profile` — Returns PersonNameV1 compatible data
+  - `PUT /v1/users/{user_id}/profile` — Upsert profile with validation
+- **Completed**: Repository implementation with proper error handling
+  - PostgresUserProfileRepo with SQLAlchemy async patterns
+  - HuleEduError factories for consistent error responses
+- **Completed**: Domain handler pattern for future extraction
+  - UserProfileHandler encapsulates business logic
+  - Routes remain thin and delegate to handler
+- **Completed**: Comprehensive test coverage (55 total tests)
+  - 19 domain handler unit tests (behavior-focused)
+  - 17 repository unit tests (structure and pattern compliance)  
+  - 19 route integration tests (HTTP endpoint behavior with Dishka DI)
+- **Completed**: Unicode and edge case support
+  - Swedish characters (åäöÅÄÖ) tested throughout
+  - Proper handling of None/empty optional fields
+  - Correlation ID propagation and generation
+- **Verification**: All type checking passes (`pdm run typecheck-all`)
+- **Verification**: All tests pass (55/55) with comprehensive coverage
+- **Verification**: Follows established HuleEdu patterns and conventions
+
+### Phase 3 — CMS Internal Endpoints (Student Names by Batch/Essay) 🔄 PENDING
+
+- **Status**: Not yet started
+- **Dependencies**: Requires Phase 2 completion ✅
+
+### Phase 4 — BOS Command Update (IDs Only) 🔄 PENDING
+
+- **Status**: Not yet started  
+- **Dependencies**: Requires Phase 1 completion ✅
+
+### Phase 5 — AI Feedback Name Resolution Clients 🔄 PENDING
+
+- **Status**: Not yet started
+- **Dependencies**: Requires Phase 2 & 3 completion
+
+## Next Steps
+
+Phase 2 is now complete and ready for production use. The Identity Service now serves as the authoritative source for teacher names with PersonNameV1 compliance.
+
+**Ready to proceed with Phase 3**: Implementing CMS internal endpoints for efficient batch resolution of essay→student PersonNameV1 mappings.

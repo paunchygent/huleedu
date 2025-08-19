@@ -109,6 +109,24 @@ class QueuedRequest(BaseModel):
         """Calculate the serialized size of this request."""
         return len(self.model_dump_json())
 
+    def __lt__(self, other: "QueuedRequest") -> bool:
+        """Compare requests for heap ordering (higher priority first, then FIFO)."""
+        if not isinstance(other, QueuedRequest):
+            return False
+
+        # Higher priority comes first (reverse order for min-heap)
+        if self.priority != other.priority:
+            return self.priority > other.priority
+
+        # For same priority, earlier queued time comes first
+        return self.queued_at < other.queued_at
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on queue_id."""
+        if not isinstance(other, QueuedRequest):
+            return False
+        return self.queue_id == other.queue_id
+
 
 class QueueStats(BaseModel):
     """Statistics about the current queue state."""

@@ -564,7 +564,11 @@ class DefaultPipelinePhaseCoordinator:
             processing_duration_seconds = (datetime.now(UTC) - pipeline_start_time).total_seconds()
 
         # Determine final status based on whether there were any failures
-        final_status = "COMPLETED_WITH_FAILURES" if has_any_failures else "COMPLETED_SUCCESSFULLY"
+        final_status = (
+            BatchStatus.COMPLETED_WITH_FAILURES
+            if has_any_failures
+            else BatchStatus.COMPLETED_SUCCESSFULLY
+        )
 
         # Get essay counts from batch context if available
         batch_context = await self.batch_repo.get_batch_context(batch_id)

@@ -127,3 +127,25 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         # Mock implementation returns empty list for now
         # In a more complete mock, this would track associations by batch_id
         return []
+
+    async def get_batch_student_names(
+        self, batch_id: UUID, correlation_id: UUID
+    ) -> list[dict[str, Any]]:
+        """Get all student names for essays in a batch with PersonNameV1 structure.
+
+        Mock implementation returns empty list for testing.
+        """
+        # Mock implementation returns empty list
+        # In a more complete mock, this would return test data
+        return []
+
+    async def get_essay_student_association(
+        self, essay_id: UUID, correlation_id: UUID
+    ) -> dict[str, Any] | None:
+        """Get student association for a single essay with PersonNameV1 structure.
+
+        Mock implementation returns None for testing.
+        """
+        # Mock implementation returns None
+        # In a more complete mock, this could return test data
+        return None

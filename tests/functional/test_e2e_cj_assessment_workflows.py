@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -24,9 +25,11 @@ from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
-from common_core.status_enums import BatchStatus, ProcessingStage
+from common_core.status_enums import ProcessingStage
 
-from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
+from tests.functional.pipeline_test_harness import PipelineTestHarness
+from tests.utils.auth_manager import AuthTestManager
+from tests.utils.kafka_test_manager import KafkaTestManager, kafka_event_monitor
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -69,202 +72,138 @@ class TestE2ECJAssessmentWorkflows:
     @pytest.mark.timeout(300)  # 5 minute timeout for complete CJ pipeline
     async def test_complete_cj_assessment_processing_pipeline(self):
         """
-        Test complete CJ Assessment pipeline: Content upload → Kafka event → Processing → Results
-
-        Uses ServiceTestManager for Content Service interaction and KafkaTestManager for events.
-        Validates the full business workflow:
-        1. Upload multiple real student essays to Content Service (via utility)
-        2. Simulate ELS_CJAssessmentRequestV1 event (via utility)
-        3. Monitor for CJAssessmentCompletedV1 response (via utility)
-        4. Validate CJ rankings and scores stored in Content Service (via utility)
+        Test CJ pipeline end-to-end using the PipelineTestHarness (guest flow):
+        1) Register batch and upload essays via File Service
+        2) Publish client pipeline request for 'cj_assessment'
+        3) Wait for CJ thin completion event (ELS)
+        4) Validate rich AssessmentResult event (RAS)
         """
-        service_manager = ServiceTestManager()
-        correlation_id = str(uuid.uuid4())
-        batch_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
+        # Managers and harness
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        kafka_mgr = KafkaTestManager()
+        harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
-        # Use real student essays for CJ Assessment
+        # Use real student essays (guest flow)
         essay_files = [
-            "test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt",
-            "test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt",
-            "test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt",
-            "test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt",
+            Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMUX 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMUU 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
-        # Step 1: Upload essays to Content Service using utility
-        print(f"📚 Uploading {len(essay_files)} real student essays")
-        essay_storage_refs = []
+        completed_topic = topic_name(ProcessingEvent.BATCH_ASSESSMENT_COMPLETED)
+        results_topic = topic_name(ProcessingEvent.BATCH_RESULTS_READY)
 
-        for i, essay_file in enumerate(essay_files):
-            with open(essay_file, encoding="utf-8") as f:
-                essay_content = f.read()
+        try:
+            # Setup guest batch and run CJ pipeline
+            batch_id, corr = await harness.setup_guest_batch(essay_files)
 
-            try:
-                storage_id = await service_manager.upload_content_directly(essay_content)
-                essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars)
-
-                essay_storage_refs.append(
-                    {
-                        "essay_id": essay_id,
-                        "storage_id": storage_id,
-                        "file_name": essay_file.split("/")[-1],
-                    },
-                )
-
-                print(f"✅ Essay {i + 1} uploaded: {storage_id}")
-            except RuntimeError as e:
-                pytest.fail(f"Essay {i + 1} upload failed: {e}")
-
-        # Step 2: Set up Kafka monitoring for CJ Assessment results using utility
-        completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
-        failed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
-
-        async with kafka_event_monitor(
-            "cj_assessment_pipeline_test",
-            [completed_topic, failed_topic],
-        ) as consumer:
-            # Step 3: Publish ELS_CJAssessmentRequestV1 event using utility
-            cj_request = self._create_cj_assessment_request_event(
-                batch_id=batch_id,
-                essay_storage_refs=essay_storage_refs,
-                correlation_id=correlation_id,
-                language="en",
-                course_code=CourseCode.ENG5,
-                essay_instructions="Write a persuasive essay on your topic.",
+            result = await harness.execute_pipeline(
+                pipeline_name="cj_assessment",
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="cj_assessment.completed",
+                validate_phase_pruning=False,
+                timeout_seconds=240,
             )
 
-            # Publish to the REQUEST topic (CJ Assessment Service listens here)
-            request_topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
-            try:
-                await kafka_manager.publish_event(request_topic, cj_request)
-                print(f"✅ Published CJ Assessment request for batch: {batch_id}")
-            except RuntimeError as e:
-                pytest.fail(f"CJ Assessment event publishing failed: {e}")
+            assert result.all_steps_completed, "CJ pipeline did not complete"
+            assert "cj_assessment" in result.executed_steps
 
-            # Step 4: Monitor for CJAssessmentCompletedV1 response using utility
-            def cj_result_filter(event_data: dict[str, Any]) -> bool:
-                """Filter for CJ assessment results from our specific test by correlation ID."""
-                return "data" in event_data and event_data.get("correlation_id") == correlation_id
-
-            try:
-                # Wait for CJ assessment completion event
-                events = await kafka_manager.collect_events(
+            # Collect and validate rich RAS result
+            async with kafka_event_monitor(
+                "cj_assessment_pipeline_test_harness",
+                [completed_topic, results_topic],
+            ) as consumer:
+                result_events = await kafka_mgr.collect_events(
                     consumer,
                     expected_count=1,
-                    timeout_seconds=240,  # 4 minutes for CJ processing
+                    timeout_seconds=240,
                     event_filter=lambda event: (
-                        event.get("event_type") == "huleedu.cj_assessment.completed.v1"
-                        and event.get("correlation_id") == str(correlation_id)
+                        event.get("event_type") == results_topic
+                        and event.get("correlation_id") == str(corr)
                     ),
                 )
 
-                assert len(events) == 1, f"Expected 1 CJ assessment result, got {len(events)}"
-
-                cj_completed_data = events[0]["data"]["data"]  # CJAssessmentCompletedV1 payload
-
-                assert cj_completed_data["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
-                assert cj_completed_data["rankings"] is not None
-                assert len(cj_completed_data["rankings"]) >= 2  # Should have rankings
-                assert cj_completed_data["cj_assessment_job_id"] is not None
-
-                print(
-                    f"✅ CJ Assessment completed with job ID: "
-                    f"{cj_completed_data['cj_assessment_job_id']}",
+                assert len(result_events) == 1, (
+                    f"Expected 1 assessment result event, got {len(result_events)}"
                 )
-                print(f"📊 Generated {len(cj_completed_data['rankings'])} essay rankings")
 
-                # Step 5: Validate ranking structure and content
-                rankings = cj_completed_data["rankings"]
-                for i, ranking in enumerate(rankings):
-                    assert "els_essay_id" in ranking
-                    assert "rank" in ranking or "score" in ranking
-                    print(f"📝 Essay {i + 1}: {ranking}")
+                assessment_result = result_events[0]["data"]["data"]
+                essay_results = assessment_result.get("essay_results", [])
+                student_results = [r for r in essay_results if not r.get("is_anchor")]
 
-                print("✅ CJ Assessment pipeline validation complete!")
+                assert len(student_results) >= len(essay_files)
+                assert assessment_result["cj_assessment_job_id"] is not None
 
-            except Exception as e:
-                pytest.fail(f"Event collection or validation failed: {e}")
+                for res in student_results:
+                    assert "essay_id" in res
+                    assert "normalized_score" in res
+                    assert "letter_grade" in res
+                    assert "bt_score" in res
+
+        finally:
+            await harness.cleanup()
 
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
     async def test_cj_assessment_pipeline_minimal_essays(self):
         """
-        Test CJ Assessment pipeline with minimal number of essays.
-
-        Uses modern utility patterns throughout.
-        Validates that the pipeline works with just 2 essays (minimum for CJ).
+        Test CJ pipeline end-to-end with minimal essays using PipelineTestHarness (guest flow).
+        Validates thin completion and rich results with exactly 2 student essays.
         """
-        service_manager = ServiceTestManager()
-        correlation_id = str(uuid.uuid4())
-        batch_id = str(uuid.uuid4())  # Use standard UUID format (36 chars) to match database schema
+        auth_manager = AuthTestManager()
+        service_manager = ServiceTestManager(auth_manager=auth_manager)
+        kafka_mgr = KafkaTestManager()
+        harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
-        # Use just 2 essays for minimal CJ
+        # Minimal set: 2 essays
         essay_files = [
-            "test_uploads/real_test_batch/MHHXGLUU 50 (SA24D ENG 5 WRITING 2025).txt",
-            "test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt",
+            Path("test_uploads/real_test_batch/MHHXGLUU 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGLMX 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
-        # Upload essays using utility
-        essay_storage_refs = []
-        for i, essay_file in enumerate(essay_files):
-            with open(essay_file, encoding="utf-8") as f:
-                essay_content = f.read()
+        completed_topic = topic_name(ProcessingEvent.BATCH_ASSESSMENT_COMPLETED)
+        results_topic = topic_name(ProcessingEvent.BATCH_RESULTS_READY)
 
-            try:
-                storage_id = await service_manager.upload_content_directly(essay_content)
-                essay_id = str(uuid.uuid4())  # Use standard UUID format (36 chars)
+        try:
+            batch_id, corr = await harness.setup_guest_batch(essay_files)
 
-                essay_storage_refs.append({"essay_id": essay_id, "storage_id": storage_id})
-            except RuntimeError as e:
-                pytest.fail(f"Minimal essay {i + 1} upload failed: {e}")
-
-        # Set up monitoring using utility
-        completed_topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
-
-        async with kafka_event_monitor("minimal_cj_assessment_test", [completed_topic]) as consumer:
-            # Publish event using utility
-            cj_request = self._create_cj_assessment_request_event(
-                batch_id=batch_id,
-                essay_storage_refs=essay_storage_refs,
-                correlation_id=correlation_id,
-                language="en",
-                course_code=CourseCode.ENG6,
-                essay_instructions="Write a short essay.",
+            result = await harness.execute_pipeline(
+                pipeline_name="cj_assessment",
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="cj_assessment.completed",
+                validate_phase_pruning=False,
+                timeout_seconds=180,
             )
 
-            # Publish to the REQUEST topic (CJ Assessment Service listens here)
-            request_topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
-            try:
-                await kafka_manager.publish_event(request_topic, cj_request)
-            except RuntimeError as e:
-                pytest.fail(f"Minimal CJ Assessment event publishing failed: {e}")
+            assert result.all_steps_completed, "CJ pipeline did not complete"
+            assert "cj_assessment" in result.executed_steps
 
-            # Monitor for results using utility
-            def cj_result_filter(event_data: dict[str, Any]) -> bool:
-                """Filter for CJ assessment results from our specific test by correlation ID."""
-                return "data" in event_data and event_data.get("correlation_id") == correlation_id
-
-            try:
-                events = await kafka_manager.collect_events(
+            # Validate rich results contain exactly 2 student essays
+            async with kafka_event_monitor(
+                "minimal_cj_assessment_test_harness",
+                [completed_topic, results_topic],
+            ) as consumer:
+                result_events = await kafka_mgr.collect_events(
                     consumer,
                     expected_count=1,
-                    timeout_seconds=180,  # 3 minutes for minimal CJ processing
-                    event_filter=cj_result_filter,
+                    timeout_seconds=180,
+                    event_filter=lambda event: (
+                        event.get("event_type") == results_topic
+                        and event.get("correlation_id") == str(corr)
+                    ),
                 )
 
-                assert len(events) == 1
+                assert len(result_events) == 1
+                assessment_result = result_events[0]["data"]["data"]
+                essay_results = assessment_result.get("essay_results", [])
+                student_results = [r for r in essay_results if not r.get("is_anchor")]
 
-                # events[0] is the EventEnvelope, events[0]["data"] is the actual
-                # CJAssessmentCompletedV1 payload
-                event_envelope = events[0]
-                cj_completed_data = event_envelope["data"]["data"]
-
-                assert cj_completed_data["status"] == BatchStatus.COMPLETED_SUCCESSFULLY.value
-                assert len(cj_completed_data["rankings"]) == 2  # Should rank both essays
-                print("✅ Minimal CJ Assessment completed with 2 essays ranked")
-
-            except Exception as e:
-                pytest.fail(f"Minimal CJ Assessment validation failed: {e}")
+                assert len(student_results) == 2
+        finally:
+            await harness.cleanup()
 
     def _create_cj_assessment_request_event(
         self,

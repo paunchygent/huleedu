@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from services.class_management_service.config import Settings, settings
+from services.class_management_service.domain_handlers.student_name_handler import (
+    StudentNameHandler,
+)
 from services.class_management_service.implementations.association_timeout_monitor import (
     AssociationTimeoutMonitor,
 )
@@ -233,6 +236,14 @@ class ServiceProvider(Provider):
             class_repository=class_repository,
             event_publisher=event_publisher,
         )
+
+    @provide(scope=Scope.APP)
+    def provide_student_name_handler(
+        self,
+        class_repository: ClassRepositoryProtocol[UserClass, Student],
+    ) -> StudentNameHandler:
+        """Provide student name handler for Phase 3 internal endpoints."""
+        return StudentNameHandler(repository=class_repository)
 
     async def shutdown_resources(self) -> None:
         """Shutdown Redis and other async resources managed by this provider."""

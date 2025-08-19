@@ -105,6 +105,14 @@ class BatchRepositoryProtocol(Protocol):
         """Update essay with file_upload_id for traceability."""
         ...
 
+    async def associate_essay_with_batch(
+        self,
+        essay_id: str,
+        batch_id: str,
+    ) -> None:
+        """Associate an orphaned essay with its batch."""
+        ...
+
     async def get_batch_essays(self, batch_id: str) -> List["EssayResult"]:
         """Get all essays for a batch."""
         ...

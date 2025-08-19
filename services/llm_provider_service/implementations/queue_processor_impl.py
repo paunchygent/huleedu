@@ -289,6 +289,9 @@ class QueueProcessorImpl:
         # Publish callback event for successful completion
         await self._publish_callback_event(request, result)
 
+        # CRITICAL: Remove completed request from queue to prevent clogging
+        await self.queue_manager.remove(request.queue_id)
+
         self._requests_processed += 1
 
     async def _handle_request_hule_error(self, request: QueuedRequest, error: HuleEduError) -> None:
@@ -369,6 +372,9 @@ class QueueProcessorImpl:
 
             # Publish callback event for error completion
             await self._publish_callback_event_error(request, error)
+
+            # CRITICAL: Remove failed request from queue to prevent clogging
+            await self.queue_manager.remove(request.queue_id)
 
     async def _handle_expired_request(self, request: QueuedRequest) -> None:
         """Handle an expired request.

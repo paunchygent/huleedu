@@ -268,7 +268,7 @@ pythonpath = [
 python_files = "test_*.py *_test.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-s -v --durations=10 --log-cli-level=INFO -m 'not (financial or slow or docker)'"
+addopts = "-s -v --durations=10 --log-cli-level=INFO --import-mode=importlib -m 'not (financial or slow or docker)'"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s:%(filename)s:%(lineno)s %(message)s"

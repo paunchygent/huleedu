@@ -21,6 +21,7 @@ from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_co
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
@@ -145,6 +146,32 @@ class ResultAggregatorKafkaConsumer:
         logger.info("Stopping Result Aggregator Kafka consumer")
         self._running = False
 
+    def _classify_error(self, error: Exception) -> tuple[bool, str]:
+        """
+        Classify an error as retryable or permanent.
+
+        Returns:
+            tuple: (is_retryable, error_type)
+        """
+        # Database integrity errors are permanent - data issues won't fix themselves
+        if isinstance(error, IntegrityError):
+            return False, "database_integrity_error"
+
+        # Validation errors are permanent - bad data won't become valid
+        if isinstance(error, (ValidationError, json.JSONDecodeError)):
+            return False, "validation_error"
+
+        # Value errors are usually permanent (missing required data, etc)
+        if isinstance(error, ValueError):
+            return False, "value_error"
+
+        # Connection errors are retryable
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            return True, "connection_error"
+
+        # Default to permanent to avoid infinite retries
+        return False, "unknown_error"
+
     async def _process_batch(self, messages: Dict[str, List[ConsumerRecord]]) -> None:
         """Process a batch of messages with manual commits."""
         for topic, records in messages.items():
@@ -170,21 +197,35 @@ class ResultAggregatorKafkaConsumer:
                         await self.consumer.commit()
 
                 except Exception as e:
+                    # Classify the error
+                    is_retryable, error_type = self._classify_error(e)
+
                     logger.error(
                         "Failed to process message",
                         topic=topic,
                         partition=record.partition,
                         offset=record.offset,
                         error=str(e),
+                        error_type=error_type,
+                        is_retryable=is_retryable,
                         exc_info=True,
                     )
 
-                    # Log error - DLQ handling is BOS responsibility
+                    # Record metrics
                     self.metrics.consumer_errors.inc()
 
-                    # Still commit to avoid reprocessing
+                    # For permanent errors, commit offset to avoid infinite retry
+                    # For retryable errors, also commit but rely on upstream retry
                     if self.consumer:
                         await self.consumer.commit()
+                        logger.info(
+                            "Committed offset after error",
+                            topic=topic,
+                            partition=record.partition,
+                            offset=record.offset,
+                            error_type=error_type,
+                            is_permanent=not is_retryable,
+                        )
 
     async def _process_message_impl(self, record: ConsumerRecord) -> bool:
         """Process a single message implementation with specific deserialization."""

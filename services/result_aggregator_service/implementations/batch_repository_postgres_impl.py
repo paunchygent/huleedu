@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, AsyncIterator, Dict, List, Optional
 from uuid import UUID
 
@@ -406,13 +406,13 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
                     essay.file_upload_id = file_upload_id
                     if text_storage_id:
                         essay.original_text_storage_id = text_storage_id
-                    essay.updated_at = datetime.utcnow()
+                    essay.updated_at = datetime.now(UTC)
                 else:
-                    # Create new essay record with minimal info
+                    # Create new essay record without batch association
                     # This handles the case where slot assignment happens before batch registration
                     essay = EssayResult(
                         essay_id=essay_id,
-                        batch_id="pending",  # Will be updated when batch is registered
+                        batch_id=None,  # No batch association yet - will be updated when batch is registered
                         file_upload_id=file_upload_id,
                         original_text_storage_id=text_storage_id,
                     )
@@ -447,6 +447,61 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             self.logger.error(
                 "Failed to update essay file mapping",
                 essay_id=essay_id,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+    async def associate_essay_with_batch(
+        self,
+        essay_id: str,
+        batch_id: str,
+    ) -> None:
+        """Associate an orphaned essay with its batch."""
+        start_time = time.perf_counter()
+        try:
+            async with self._get_session() as session:
+                # Update essay with batch association
+                result = await session.execute(
+                    select(EssayResult).where(
+                        (EssayResult.essay_id == essay_id)
+                        & (EssayResult.batch_id.is_(None))  # Only update if not already associated
+                    )
+                )
+                essay = result.scalars().first()
+
+                if essay:
+                    essay.batch_id = batch_id
+                    essay.updated_at = datetime.now(UTC)
+                    await session.commit()
+
+                    self.logger.info(
+                        "Associated essay with batch",
+                        essay_id=essay_id,
+                        batch_id=batch_id,
+                    )
+
+                duration = time.perf_counter() - start_time
+                self._record_operation_metrics(
+                    operation="associate_essay_with_batch",
+                    table="essay_results",
+                    duration=duration,
+                    success=True,
+                )
+
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            self._record_operation_metrics(
+                operation="associate_essay_with_batch",
+                table="essay_results",
+                duration=duration,
+                success=False,
+            )
+            self._record_error_metrics(type(e).__name__, "associate_essay_with_batch")
+            self.logger.error(
+                "Failed to associate essay with batch",
+                essay_id=essay_id,
+                batch_id=batch_id,
                 error=str(e),
                 exc_info=True,
             )

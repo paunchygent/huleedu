@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, Optional, Type, TypeVar, cast
 from uuid import UUID
 
 from common_core.domain_enums import CourseCode
+from common_core.metadata_models import PersonNameV1
 from huleedu_service_libs.database import DatabaseMetricsProtocol
 from huleedu_service_libs.error_handling import (
     raise_course_not_found,
@@ -347,6 +348,174 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             error_type = e.__class__.__name__
             self._record_error_metrics(error_type, operation)
             logger.error(f"Failed to get batch student associations: {error_type}: {e}")
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
+
+    async def get_batch_student_names(
+        self, batch_id: UUID, correlation_id: UUID
+    ) -> list[dict[str, Any]]:
+        """Get all student names for essays in a batch with PersonNameV1 structure.
+
+        Args:
+            batch_id: The batch ID to query
+            correlation_id: Request correlation ID for observability
+
+        Returns:
+            List of dictionaries with essay_id, student_id, student_person_name
+        """
+        start_time = time.time()
+        operation = "get_batch_student_names"
+        table = "essay_student_associations"
+        success = True
+
+        try:
+            async with self.session() as session:
+                # JOIN query to get essay associations with student names
+                stmt = (
+                    select(
+                        EssayStudentAssociation.essay_id,
+                        EssayStudentAssociation.student_id,
+                        Student.first_name,
+                        Student.last_name,
+                        Student.legal_full_name,
+                    )
+                    .join(Student, EssayStudentAssociation.student_id == Student.id)
+                    .where(EssayStudentAssociation.batch_id == batch_id)
+                    .order_by(EssayStudentAssociation.created_at.desc())
+                )
+
+                result = await session.execute(stmt)
+                rows = result.all()
+
+                # Convert to expected format with PersonNameV1
+                batch_names = []
+                for row in rows:
+                    # Create PersonNameV1 compatible structure
+                    person_name = PersonNameV1(
+                        first_name=row.first_name or "",
+                        last_name=row.last_name or "",
+                        legal_full_name=row.legal_full_name,
+                    )
+
+                    batch_names.append(
+                        {
+                            "essay_id": row.essay_id,
+                            "student_id": row.student_id,
+                            "student_person_name": person_name,
+                        }
+                    )
+
+                logger.info(
+                    f"Retrieved {len(batch_names)} student names for batch",
+                    extra={
+                        "batch_id": str(batch_id),
+                        "count": len(batch_names),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+                return batch_names
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(
+                f"Failed to get batch student names: {error_type}: {e}",
+                extra={
+                    "batch_id": str(batch_id),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
+
+    async def get_essay_student_association(
+        self, essay_id: UUID, correlation_id: UUID
+    ) -> dict[str, Any] | None:
+        """Get student association for a single essay with PersonNameV1 structure.
+
+        Args:
+            essay_id: The essay ID to query
+            correlation_id: Request correlation ID for observability
+
+        Returns:
+            Dictionary with essay_id, student_id, student_person_name, or None if not found
+        """
+        start_time = time.time()
+        operation = "get_essay_student_association"
+        table = "essay_student_associations"
+        success = True
+
+        try:
+            async with self.session() as session:
+                # JOIN query to get single essay association with student name
+                stmt = (
+                    select(
+                        EssayStudentAssociation.essay_id,
+                        EssayStudentAssociation.student_id,
+                        Student.first_name,
+                        Student.last_name,
+                        Student.legal_full_name,
+                    )
+                    .join(Student, EssayStudentAssociation.student_id == Student.id)
+                    .where(EssayStudentAssociation.essay_id == essay_id)
+                )
+
+                result = await session.execute(stmt)
+                row = result.first()
+
+                if not row:
+                    logger.info(
+                        "No student association found for essay",
+                        extra={
+                            "essay_id": str(essay_id),
+                            "correlation_id": str(correlation_id),
+                        },
+                    )
+                    return None
+
+                # Create PersonNameV1 compatible structure
+                person_name = PersonNameV1(
+                    first_name=row.first_name or "",
+                    last_name=row.last_name or "",
+                    legal_full_name=row.legal_full_name,
+                )
+
+                association = {
+                    "essay_id": row.essay_id,
+                    "student_id": row.student_id,
+                    "student_person_name": person_name,
+                }
+
+                logger.info(
+                    "Retrieved student association for essay",
+                    extra={
+                        "essay_id": str(essay_id),
+                        "student_id": str(row.student_id),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+                return association
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(
+                f"Failed to get essay student association: {error_type}: {e}",
+                extra={
+                    "essay_id": str(essay_id),
+                    "correlation_id": str(correlation_id),
+                },
+            )
             raise
 
         finally:

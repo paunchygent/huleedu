@@ -15,6 +15,7 @@ import services.class_management_service.startup_setup as startup_setup
 from services.class_management_service.api.batch_routes import batch_bp
 from services.class_management_service.api.class_routes import class_bp
 from services.class_management_service.api.health_routes import health_bp
+from services.class_management_service.api.internal_routes import bp as internal_bp
 from services.class_management_service.api.student_routes import student_bp
 from services.class_management_service.config import settings
 from services.class_management_service.di import create_container
@@ -77,6 +78,7 @@ def create_app() -> ClassManagementApp:
     app.register_blueprint(class_bp, url_prefix="/v1/classes")
     app.register_blueprint(student_bp, url_prefix="/v1/classes")
     app.register_blueprint(batch_bp, url_prefix="/v1/batches")
+    app.register_blueprint(internal_bp)  # Internal routes include /internal/v1 prefix
 
     return app
 

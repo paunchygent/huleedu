@@ -61,6 +61,26 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         """Get all student-essay associations for a batch."""
         ...
 
+    async def get_batch_student_names(
+        self, batch_id: UUID, correlation_id: UUID
+    ) -> list[dict[str, Any]]:
+        """Get all student names for essays in a batch.
+
+        Returns:
+            List of dictionaries with keys: essay_id, student_id, student_person_name
+        """
+        ...
+
+    async def get_essay_student_association(
+        self, essay_id: UUID, correlation_id: UUID
+    ) -> dict[str, Any] | None:
+        """Get student association for a single essay.
+
+        Returns:
+            Dictionary with keys: essay_id, student_id, student_person_name, or None if not found
+        """
+        ...
+
 
 class ClassEventPublisherProtocol(Protocol):
     """Protocol for publishing class management-related events."""

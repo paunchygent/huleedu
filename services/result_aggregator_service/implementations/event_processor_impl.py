@@ -78,6 +78,19 @@ class EventProcessorImpl(EventProcessorProtocol):
                 else None,
             )
 
+            # Associate any orphaned essays with this batch
+            if hasattr(data, "essay_ids") and data.essay_ids:
+                for essay_id in data.essay_ids:
+                    await self.batch_repository.associate_essay_with_batch(
+                        essay_id=essay_id,
+                        batch_id=data.entity_id,
+                    )
+                logger.info(
+                    "Associated orphaned essays with batch",
+                    batch_id=data.entity_id,
+                    essay_count=len(data.essay_ids),
+                )
+
             await self.cache_manager.invalidate_user_batches(data.user_id)
 
             logger.info(

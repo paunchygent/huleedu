@@ -23,6 +23,7 @@ from ..metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,
 )
+from ..status_enums import BatchStatus
 
 # Import for structured error handling (forward reference resolution)
 if TYPE_CHECKING:
@@ -262,8 +263,12 @@ class BatchPipelineCompletedV1(BaseModel):
     completed_phases: list[str] = Field(
         description="List of phase names that were completed in this pipeline execution"
     )
-    final_status: str = Field(
-        description="Final pipeline status: COMPLETED_SUCCESSFULLY or COMPLETED_WITH_FAILURES"
+    final_status: BatchStatus = Field(
+        description=(
+            "Final pipeline status. Must be a BatchStatus enum value "
+            "(e.g., BatchStatus.COMPLETED_SUCCESSFULLY, BatchStatus.COMPLETED_WITH_FAILURES, "
+            "BatchStatus.FAILED_CRITICALLY)"
+        )
     )
     processing_duration_seconds: float = Field(
         description="Total duration of pipeline execution in seconds"
