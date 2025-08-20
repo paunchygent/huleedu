@@ -14,8 +14,12 @@ from uuid import UUID
 
 import pytest
 from common_core.domain_enums import ContentType
-from common_core.event_enums import ProcessingEvent
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.spellcheck_models import (
+    SpellcheckPhaseCompletedV1,
+    SpellcheckResultDataV1,
+    SpellcheckResultV1,
+)
 from common_core.status_enums import EssayStatus, ProcessingStage
 
 from services.spellchecker_service.event_processor import process_single_message
@@ -28,6 +32,8 @@ from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
+SPELLCHECK_PHASE_COMPLETED = ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+SPELLCHECK_RESULTS = ProcessingEvent.SPELLCHECK_RESULTS
 CORRECTED_TEXT_TYPE = ContentType.CORRECTED_TEXT
 
 if TYPE_CHECKING:
@@ -85,7 +91,7 @@ class TestEventContractCompliance:
         # Assert
         assert result is True  # Should commit the message
 
-        # Verify the result was published
+        # Verify the result was published (with dual events)
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
         # Extract the published result from the real spell checking
@@ -156,7 +162,7 @@ class TestEventContractCompliance:
         # Assert
         assert result is True  # Should commit the message
 
-        # Verify the result was published
+        # Verify the result was published (with dual events)
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
         # Extract the correlation_id passed to publisher
@@ -179,3 +185,121 @@ class TestEventContractCompliance:
         assert (
             published_result.entity_id == sample_essay_id
         )  # Should match the essay from the request
+
+    @pytest.mark.asyncio
+    async def test_dual_event_publisher_contract_compliance(
+        self,
+        kafka_message: Any,
+        mock_kafka_bus: Any,
+        mock_http_session: Any,
+        sample_essay_id: str,
+        sample_text: str,
+        corrected_text: str,
+    ) -> None:
+        """Test that event publisher creates both thin and rich events with correct structure."""
+        
+        # 1. Mock Protocol Implementations - only mock external dependencies
+        mock_content_client = AsyncMock(spec=ContentClientProtocol)
+        mock_content_client.fetch_content.return_value = sample_text
+
+        mock_result_store = AsyncMock(spec=ResultStoreProtocol)
+        mock_corrected_storage_id = "corrected_storage_id_dual"
+        mock_result_store.store_content.return_value = mock_corrected_storage_id
+
+        # Use REAL event publisher implementation to test dual event creation
+        from services.spellchecker_service.implementations.event_publisher_impl import (
+            DefaultSpellcheckEventPublisher,
+        )
+        from services.spellchecker_service.implementations.outbox_manager import OutboxManager
+        
+        # Mock the outbox manager
+        mock_outbox_manager = AsyncMock(spec=OutboxManager)
+        
+        real_event_publisher = DefaultSpellcheckEventPublisher(
+            source_service_name="test-spellchecker-service",
+            outbox_manager=mock_outbox_manager,
+        )
+
+        # Use REAL spell logic implementation
+        from services.spellchecker_service.implementations.spell_logic_impl import (
+            DefaultSpellLogic,
+        )
+
+        real_spell_logic = DefaultSpellLogic(
+            result_store=mock_result_store,
+            http_session=mock_http_session,
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
+        )
+
+        # Act - Process message using real implementations
+        result = await process_single_message(
+            kafka_message,
+            mock_http_session,
+            mock_content_client,
+            mock_result_store,
+            real_event_publisher,  # Use real event publisher
+            real_spell_logic,      # Use real spell logic
+            consumer_group_id="test-group",
+        )
+
+        # Assert
+        assert result is True  # Should commit the message
+
+        # Verify the event publisher created BOTH events in outbox
+        assert mock_outbox_manager.publish_to_outbox.call_count == 2
+
+        # Extract the calls
+        thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
+        rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
+
+        # Verify thin event (SPELLCHECK_PHASE_COMPLETED)
+        assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
+        assert thin_call.kwargs["topic"] == topic_name(SPELLCHECK_PHASE_COMPLETED)
+        
+        thin_envelope = thin_call.kwargs["event_data"]
+        assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
+        assert thin_envelope.source_service == "test-spellchecker-service"
+        
+        # Verify thin event data structure compliance
+        thin_data = thin_envelope.data
+        assert isinstance(thin_data, SpellcheckPhaseCompletedV1)
+        assert thin_data.entity_id == sample_essay_id
+        assert thin_data.batch_id is not None  # Should have batch ID from parent_id
+        assert thin_data.status is not None    # Should have processing status
+        assert thin_data.corrected_text_storage_id == mock_corrected_storage_id
+        assert thin_data.processing_duration_ms >= 0
+        assert thin_data.timestamp is not None
+        assert thin_data.correlation_id is not None
+
+        # Verify rich event (SPELLCHECK_RESULTS)
+        assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
+        assert rich_call.kwargs["topic"] == topic_name(SPELLCHECK_RESULTS)
+        
+        rich_envelope = rich_call.kwargs["event_data"]
+        assert rich_envelope.event_type == "SpellcheckResultV1"
+        assert rich_envelope.source_service == "test-spellchecker-service"
+        
+        # Verify rich event data structure compliance
+        rich_data = rich_envelope.data
+        assert isinstance(rich_data, SpellcheckResultV1)
+        assert rich_data.entity_id == sample_essay_id
+        assert rich_data.entity_type == "essay"
+        assert rich_data.corrections_made > 0  # Should have real corrections from spell logic
+        assert rich_data.correction_metrics is not None
+        assert rich_data.original_text_storage_id is not None
+        assert rich_data.corrected_text_storage_id == mock_corrected_storage_id
+        assert rich_data.processing_duration_ms >= 0
+        assert rich_data.processor_version == "pyspellchecker_1.0_L2_swedish"
+        assert rich_data.timestamp is not None
+        assert rich_data.correlation_id is not None
+
+        # Verify both events have the same correlation ID
+        assert thin_data.correlation_id == rich_data.correlation_id
+        
+        # Verify both events have the same entity_id
+        assert thin_data.entity_id == rich_data.entity_id
+
+        # Verify envelope metadata includes partition key
+        assert thin_envelope.metadata["partition_key"] == sample_essay_id
+        assert rich_envelope.metadata["partition_key"] == sample_essay_id

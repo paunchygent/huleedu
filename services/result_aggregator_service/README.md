@@ -43,7 +43,7 @@ Provides detailed internal status tracking using 12-value `BatchStatus` enum. AP
 **Subscribes to**:
 - `huleedu.els.batch.registered.v1`: Creates initial batch
 - `huleedu.els.batch.phase.outcome.v1`: Phase completions
-- `huleedu.essay.spellcheck.completed.v1`: Spell check results
+- `huleedu.essay.spellcheck.results.v1`: Rich spell check results with metrics
 - `huleedu.cj_assessment.completed.v1`: CJ rankings
 
 **Publishes**:
@@ -56,6 +56,19 @@ Provides detailed internal status tracking using 12-value `BatchStatus` enum. AP
 - Redis idempotency with 24-hour TTL
 - Direct notification projector invocation (no Kafka round-trip)
 - DLQ support with manual commit pattern
+
+## Event Consumption Patterns
+
+### Spellchecker Integration
+RAS consumes **rich events** from the spellchecker service for comprehensive business data:
+
+- **Event**: `SpellcheckResultV1`
+- **Topic**: `huleedu.essay.spellcheck.results.v1`
+- **Purpose**: Complete business metrics and correction details
+- **Handler**: `process_spellcheck_result()` and `update_essay_spellcheck_result_with_metrics()`
+- **Data**: Full correction metrics, word counts, L2 vs spelling corrections, correction density, processor version
+
+This rich event pattern provides RAS with all necessary business data for analytics and reporting without requiring additional API calls.
 
 ## Cache Strategy
 

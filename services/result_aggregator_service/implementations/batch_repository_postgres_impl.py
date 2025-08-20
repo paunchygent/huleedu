@@ -281,6 +281,109 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
             essay.updated_at = datetime.utcnow()
             await session.commit()
 
+    async def update_essay_spellcheck_result_with_metrics(
+        self,
+        essay_id: str,
+        batch_id: str,
+        status: ProcessingStage,
+        correlation_id: UUID,
+        correction_count: Optional[int] = None,
+        corrected_text_storage_id: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
+        # Enhanced metrics from rich event
+        l2_corrections: Optional[int] = None,
+        spell_corrections: Optional[int] = None,
+        word_count: Optional[int] = None,
+        correction_density: Optional[float] = None,
+        processing_duration_ms: Optional[int] = None,
+    ) -> None:
+        """Update essay spellcheck results with enhanced metrics from rich event.
+
+        Args:
+            essay_id: ID of the essay to update
+            batch_id: ID of the batch containing the essay
+            status: Processing stage status
+            correction_count: Optional number of corrections made
+            corrected_text_storage_id: Optional storage ID for corrected text
+            error_detail: Optional error detail
+            l2_corrections: Number of L2 dictionary corrections
+            spell_corrections: Number of general spelling corrections
+            word_count: Total word count
+            correction_density: Corrections per 100 words
+            processing_duration_ms: Processing duration in milliseconds
+        """
+        async with self._get_session() as session:
+            # Find essay by essay_id only (not batch_id) to handle orphaned essays
+            result = await session.execute(
+                select(EssayResult).where(EssayResult.essay_id == essay_id)
+            )
+            essay = result.scalars().first()
+
+            if not essay:
+                # Create new essay if it doesn't exist
+                essay = EssayResult(
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                    spellcheck_status=status,
+                )
+                session.add(essay)
+                self.logger.info(
+                    "Created new essay result for spellcheck with metrics",
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                )
+            else:
+                # Update existing essay
+                essay.spellcheck_status = status
+                # Associate with batch if not already associated
+                if essay.batch_id is None:
+                    essay.batch_id = batch_id
+                    self.logger.info(
+                        "Associated orphaned essay with batch during spellcheck update",
+                        essay_id=essay_id,
+                        batch_id=batch_id,
+                    )
+
+            # Update spellcheck-specific fields
+            if correction_count is not None:
+                essay.spellcheck_correction_count = correction_count
+            if corrected_text_storage_id:
+                essay.spellcheck_corrected_text_storage_id = corrected_text_storage_id
+            if error_detail:
+                essay.spellcheck_error_detail = error_detail.model_dump(mode="json")
+
+            # Store enhanced metrics in metadata field
+            if any(
+                [
+                    l2_corrections is not None,
+                    spell_corrections is not None,
+                    word_count is not None,
+                    correction_density is not None,
+                    processing_duration_ms is not None,
+                ]
+            ):
+                spellcheck_metrics = {
+                    "l2_corrections": l2_corrections,
+                    "spell_corrections": spell_corrections,
+                    "word_count": word_count,
+                    "correction_density": correction_density,
+                    "processing_duration_ms": processing_duration_ms,
+                }
+                # Store in metadata field (JSON column)
+                if essay.essay_metadata is None:
+                    essay.essay_metadata = {}
+                essay.essay_metadata["spellcheck_metrics"] = spellcheck_metrics
+
+                self.logger.info(
+                    "Updated essay with enhanced spellcheck metrics",
+                    essay_id=essay_id,
+                    batch_id=batch_id,
+                    metrics=spellcheck_metrics,
+                )
+
+            essay.updated_at = datetime.utcnow()
+            await session.commit()
+
     async def update_essay_cj_assessment_result(
         self,
         essay_id: str,

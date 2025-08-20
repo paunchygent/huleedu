@@ -13,7 +13,6 @@ from common_core.events import (
     BatchEssaysRegistered,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckResultDataV1,
 )
 from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
@@ -53,7 +52,7 @@ class ResultAggregatorKafkaConsumer:
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Add batch registration
             topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),  # Add slot assignment for traceability
             topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
-            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic_name(ProcessingEvent.SPELLCHECK_RESULTS),  # Rich event for business data aggregation
             topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),  # Rich event for business data
             topic_name(
                 ProcessingEvent.BATCH_PIPELINE_COMPLETED
@@ -251,12 +250,15 @@ class ResultAggregatorKafkaConsumer:
                     phase_envelope, ELSBatchPhaseOutcomeV1.model_validate(phase_envelope.data)
                 )
 
-            elif record.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
-                spell_envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(
+            elif record.topic == topic_name(ProcessingEvent.SPELLCHECK_RESULTS):
+                # Import the new rich event model
+                from common_core.events.spellcheck_models import SpellcheckResultV1
+
+                spell_envelope = EventEnvelope[SpellcheckResultV1].model_validate_json(
                     message_value_str
                 )
-                await self.event_processor.process_spellcheck_completed(
-                    spell_envelope, SpellcheckResultDataV1.model_validate(spell_envelope.data)
+                await self.event_processor.process_spellcheck_result(
+                    spell_envelope, SpellcheckResultV1.model_validate(spell_envelope.data)
                 )
 
             elif record.topic == topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED):

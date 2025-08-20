@@ -546,7 +546,7 @@ async def _publish_structured_error_event(
 
         error_sys_meta_update = {
             "processing_stage": ProcessingStage.FAILED,
-            "event": ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
+            "event": ProcessingEvent.SPELLCHECK_PHASE_COMPLETED.value,
             "completed_at": datetime.now(UTC),
             "error_info": structured_error_info,
         }
@@ -581,7 +581,7 @@ async def _publish_structured_error_event(
                 timestamp=processing_started_at,
                 started_at=processing_started_at,
                 processing_stage=ProcessingStage.FAILED,
-                event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
+                event=ProcessingEvent.SPELLCHECK_PHASE_COMPLETED.value,
                 completed_at=datetime.now(UTC),
                 error_info=structured_error_info,
             )

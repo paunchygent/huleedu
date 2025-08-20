@@ -6,7 +6,6 @@ from datetime import timedelta
 
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
-from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
@@ -244,11 +243,9 @@ class SpellCheckerServiceProvider(Provider):
         self,
         outbox_manager: OutboxManager,
     ) -> SpellcheckEventPublisherProtocol:
-        """Provide spellcheck event publisher using TRUE OUTBOX PATTERN."""
+        """Provide spellcheck event publisher using TRUE OUTBOX PATTERN for dual events."""
         return DefaultSpellcheckEventPublisher(
-            kafka_event_type=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             source_service_name="spell-checker-service",
-            kafka_output_topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
             outbox_manager=outbox_manager,
         )
 

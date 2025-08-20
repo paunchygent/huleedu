@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from common_core.error_enums import ErrorCode
+from common_core.events import SpellcheckResultV1
 from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.result_events import (
@@ -398,6 +399,102 @@ class EventProcessorImpl(EventProcessorProtocol):
         except Exception as e:
             logger.error(
                 "Failed to process spellcheck completed",
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+    async def process_spellcheck_result(
+        self, envelope: "EventEnvelope[SpellcheckResultV1]", data: "SpellcheckResultV1"
+    ) -> None:
+        """Process rich spellcheck result event with enhanced metrics."""
+        try:
+            logger.info(
+                "Processing rich spellcheck result",
+                entity_id=data.entity_id,
+                batch_id=data.parent_id,
+                status=data.status,
+                total_corrections=data.corrections_made,
+            )
+
+            # Extract essay_id and batch_id
+            essay_id = data.entity_id
+            batch_id = data.parent_id
+
+            if not essay_id:
+                logger.error("Missing essay_id in spellcheck result")
+                raise ValueError("Missing essay_id in entity reference")
+
+            if not batch_id:
+                logger.error("Missing batch_id in spellcheck result")
+                raise ValueError("Missing batch_id in entity reference")
+
+            # Determine status
+            status = (
+                ProcessingStage.COMPLETED
+                if "SUCCESS" in data.status.upper()
+                else ProcessingStage.FAILED
+            )
+
+            # Extract corrected text storage ID
+            corrected_text_storage_id = data.corrected_text_storage_id
+
+            # Create error detail if spellcheck failed
+            error_detail = None
+            if (
+                status == ProcessingStage.FAILED
+                and data.system_metadata
+                and data.system_metadata.error_info
+            ):
+                error_detail = create_error_detail_with_context(
+                    error_code=ErrorCode.SPELLCHECK_SERVICE_ERROR,
+                    message=str(data.system_metadata.error_info),
+                    service="result_aggregator_service",
+                    operation="process_spellcheck_result",
+                    correlation_id=envelope.correlation_id,
+                    details={
+                        "essay_id": essay_id,
+                        "batch_id": batch_id,
+                        "status": data.status,
+                    },
+                )
+
+            # Extract enhanced metrics from the rich event
+            metrics = data.correction_metrics
+
+            # Update essay result with enhanced metrics
+            await self.batch_repository.update_essay_spellcheck_result_with_metrics(
+                essay_id=essay_id,
+                batch_id=batch_id,
+                status=status,
+                correlation_id=envelope.correlation_id,
+                correction_count=data.corrections_made,
+                corrected_text_storage_id=corrected_text_storage_id,
+                error_detail=error_detail,
+                # Enhanced metrics from rich event
+                l2_corrections=metrics.l2_dictionary_corrections,
+                spell_corrections=metrics.spellchecker_corrections,
+                word_count=metrics.word_count,
+                correction_density=metrics.correction_density,
+                processing_duration_ms=data.processing_duration_ms,
+            )
+
+            # Invalidate cache
+            await self.state_store.invalidate_batch(batch_id)
+
+            logger.info(
+                "Rich spellcheck result processed successfully",
+                essay_id=essay_id,
+                batch_id=batch_id,
+                l2_corrections=metrics.l2_dictionary_corrections,
+                spell_corrections=metrics.spellchecker_corrections,
+                word_count=metrics.word_count,
+                correction_density=metrics.correction_density,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to process rich spellcheck result",
                 error=str(e),
                 exc_info=True,
             )

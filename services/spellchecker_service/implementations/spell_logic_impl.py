@@ -93,7 +93,7 @@ class DefaultSpellLogic(SpellLogicProtocol):
 
         # Perform spell check algorithm
         try:
-            corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+            metrics = await default_perform_spell_check_algorithm(
                 text,
                 self.l2_errors,  # Pass cached dictionary
                 essay_id,
@@ -107,6 +107,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
                 parallel_timeout=settings.PARALLEL_TIMEOUT_SECONDS,
                 min_words_for_parallel=settings.PARALLEL_PROCESSING_MIN_WORDS,
             )
+            corrected_text = metrics.corrected_text
+            corrections_count = metrics.total_corrections
         except Exception as e:
             logger.error(
                 f"Spell check algorithm failed for essay {essay_id}: {e}",
@@ -211,7 +213,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
             },
         )
 
-        return SpellcheckResultDataV1(
+        # Create result with basic fields
+        result = SpellcheckResultDataV1(
             original_text_storage_id=original_text_storage_id,
             storage_metadata=storage_metadata_for_result,
             corrections_made=corrections_count,
@@ -223,3 +226,8 @@ class DefaultSpellLogic(SpellLogicProtocol):
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=final_system_metadata,
         )
+
+        # Enhanced metrics are handled through the service layer
+        # The event publisher will use fallback metrics from the basic result data
+
+        return result

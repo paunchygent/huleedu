@@ -9,7 +9,7 @@ alwaysApply: false
 - Combined worker + health API (Quart) on port 8002
 - Async PostgreSQL persistence via `PostgreSQLSpellcheckRepository`
 - DI with Dishka; `QuartDishka` called before blueprint registration
-- Kafka topics: consume `huleedu.essay.spellcheck.requested.v1`, publish `huleedu.essay.spellcheck.completed.v1`
+- Kafka topics: consume `huleedu.essay.spellcheck.requested.v1`, publish dual events: `huleedu.batch.spellcheck.phase.completed.v1` (thin) and `huleedu.essay.spellcheck.results.v1` (rich)
 - Observability: OTEL env vars + `/metrics` endpoint
 - Container: non-root UID 1000, writable `data/` dir; Postgres sidecar `spellchecker_db` (pg_trgm enabled)
 
@@ -65,12 +65,14 @@ alwaysApply: false
 ## 3. Event-Driven Architecture
 
 **Consumes**: `huleedu.essay_lifecycle.spellcheck.request.v1` (`EssayLifecycleSpellcheckRequestV1`)
-**Publishes**: `huleedu.essay.spellcheck.completed.v1` (via `DefaultSpellcheckEventPublisherImpl` using `SpellcheckResultDataV1`)
+**Publishes**: Dual events via `DefaultSpellcheckEventPublisherImpl`:
+- `huleedu.batch.spellcheck.phase.completed.v1` (`SpellcheckPhaseCompletedV1` - thin event for ELS/BCS)
+- `huleedu.essay.spellcheck.results.v1` (`SpellcheckResultV1` - rich event for RAS)
 **Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
 
 **Integration**: Receives spellcheck requests from Essay Lifecycle Service (ELS) after essay slot assignment coordination with Batch Orchestrator Service (BOS).
 
-**Flow**: `kafka_consumer.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (with language parameter) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_spellcheck_result` ➜ `kafka_consumer.py` commits offset.
+**Flow**: `kafka_consumer.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (with language parameter & metrics extraction) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_dual_events` (thin + rich) ➜ `kafka_consumer.py` commits offset.
 
 ## 4. Integration Points
 
@@ -100,7 +102,9 @@ alwaysApply: false
 ## 8. Data Models
 
 **Input**: `EssayLifecycleSpellcheckRequestV1` with entity_ref, system_metadata, text_storage_id, language (for multilingual support)
-**Output**: `SpellcheckResultDataV1` with entity_ref, system_metadata, storage_metadata, corrections_made
+**Output**: Dual events:
+- `SpellcheckPhaseCompletedV1`: Thin event with entity_id, batch_id, status, corrected_text_storage_id, processing_duration_ms
+- `SpellcheckResultV1`: Rich event with complete metrics, correction details, word counts, L2 vs spelling corrections
 
 ## 9. Deployment
 

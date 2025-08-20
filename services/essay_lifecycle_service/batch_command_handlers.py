@@ -315,22 +315,37 @@ async def _route_event(
             return True
 
         # Handle specialized service result events
-        elif event_type == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
-            from common_core.events.spellcheck_models import SpellcheckResultDataV1
+        elif event_type == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED):
+            from common_core.events.spellcheck_models import SpellcheckPhaseCompletedV1
+            from common_core.status_enums import EssayStatus, ProcessingStatus
 
-            result_data = SpellcheckResultDataV1.model_validate(envelope.data)
+            thin_event = SpellcheckPhaseCompletedV1.model_validate(envelope.data)
 
             # Record spellcheck completion
             if coordination_events_metric:
                 coordination_events_metric.labels(
                     event_type="spellcheck_completed",
-                    batch_id=str(result_data.parent_id),
+                    batch_id=thin_event.batch_id,
                 ).inc()
 
-            spellcheck_result: bool = await service_result_handler.handle_spellcheck_result(
-                result_data=result_data,
-                correlation_id=correlation_id,
-                confirm_idempotency=confirm_idempotency,
+            # Convert thin event to format expected by handler
+            # The handler only needs essay_id, status, and storage_id for state transitions
+            essay_status = (
+                EssayStatus.SPELLCHECKED_SUCCESS
+                if thin_event.status == ProcessingStatus.COMPLETED
+                else EssayStatus.SPELLCHECK_FAILED
+            )
+
+            spellcheck_result: bool = (
+                await service_result_handler.handle_spellcheck_phase_completed(
+                    essay_id=thin_event.entity_id,
+                    batch_id=thin_event.batch_id,
+                    status=essay_status,
+                    corrected_text_storage_id=thin_event.corrected_text_storage_id,
+                    error_code=thin_event.error_code,
+                    correlation_id=correlation_id,
+                    confirm_idempotency=confirm_idempotency,
+                )
             )
             return spellcheck_result
 

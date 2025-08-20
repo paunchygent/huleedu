@@ -151,6 +151,10 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 
 ## Development Workflow (Rule 080)
 
+### Subagents
+
+When asked to launch two or more agents in parallel: launch all agents in a single tool call for parallel execution
+
 ### Code Quality
 
 ```markdown

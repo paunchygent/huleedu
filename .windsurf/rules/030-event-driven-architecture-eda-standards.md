@@ -21,10 +21,19 @@ alwaysApply: true
 **MUST** follow: `<project>.<domain>.<entity>.<action_past_tense>.v<version>`
 Example: `huleedu.essay.spellcheck.requested.v1`
 
-### 2.3. Thin Events Principle
+### 2.3. Event Size Optimization
+
+#### Thin Events Principle
 - Events signal occurrences with identifiers/references
 - **FORBIDDEN**: Large data blobs in events
 - **MUST** use `StorageReferenceMetadata` for data references
+
+#### Dual Event Pattern (Advanced)
+For services requiring both state management and business data:
+- **Thin Event**: Minimal state transition data (~300 bytes) for ELS/BCS consumers
+- **Rich Event**: Complete business metrics for RAS/analytics consumers
+- **Example**: Spellchecker publishes both `SpellcheckPhaseCompletedV1` and `SpellcheckResultV1`
+- **Benefits**: Performance optimization, separation of concerns, network efficiency
 
 ## 3. Event Publishing
 

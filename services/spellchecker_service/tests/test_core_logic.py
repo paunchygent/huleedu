@@ -28,19 +28,19 @@ class TestDefaultImplementations:
 
         # Act
         test_l2_errors = {"teh": "the", "recieve": "receive"}  # Simple test dictionary
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text_with_errors,
             test_l2_errors,
             sample_essay_id,
         )
 
         # Assert - The real L2 + pyspellchecker implementation corrects multiple errors
-        assert "the" in corrected_text  # "teh" should be corrected to "the"
-        assert "receive" in corrected_text  # "recieve" should be corrected to "receive"
+        assert "the" in result.corrected_text  # "teh" should be corrected to "the"
+        assert "receive" in result.corrected_text  # "recieve" should be corrected to "receive"
         assert (
-            "set" in corrected_text
+            "set" in result.corrected_text
         )  # "tset" should be corrected to "set" (pyspellchecker behavior)
         assert (
-            corrections_count >= 2
+            result.total_corrections >= 2
         )  # Should count at least the corrections made by real implementation
         # Note: Exact count may vary based on pyspellchecker behavior and L2 dictionary availability

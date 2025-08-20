@@ -10,6 +10,7 @@ from common_core.events import (
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
     SpellcheckResultDataV1,
+    SpellcheckResultV1,
 )
 from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
@@ -64,6 +65,25 @@ class BatchRepositoryProtocol(Protocol):
         error_detail: Optional[ErrorDetail] = None,
     ) -> None:
         """Update essay spellcheck results."""
+        ...
+
+    async def update_essay_spellcheck_result_with_metrics(
+        self,
+        essay_id: str,
+        batch_id: str,
+        status: ProcessingStage,
+        correlation_id: UUID,
+        correction_count: Optional[int] = None,
+        corrected_text_storage_id: Optional[str] = None,
+        error_detail: Optional[ErrorDetail] = None,
+        # Enhanced metrics from rich event
+        l2_corrections: Optional[int] = None,
+        spell_corrections: Optional[int] = None,
+        word_count: Optional[int] = None,
+        correction_density: Optional[float] = None,
+        processing_duration_ms: Optional[int] = None,
+    ) -> None:
+        """Update essay with detailed spellcheck metrics."""
         ...
 
     async def update_essay_cj_assessment_result(
@@ -174,6 +194,12 @@ class EventProcessorProtocol(Protocol):
         self, envelope: EventEnvelope[SpellcheckResultDataV1], data: SpellcheckResultDataV1
     ) -> None:
         """Process spellcheck completion event."""
+        ...
+
+    async def process_spellcheck_result(
+        self, envelope: EventEnvelope[SpellcheckResultV1], data: SpellcheckResultV1
+    ) -> None:
+        """Process rich spellcheck result event with business metrics."""
         ...
 
     async def process_assessment_result(

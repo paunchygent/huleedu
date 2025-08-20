@@ -47,7 +47,8 @@ ELS participates in these communication patterns:
   - **Phase 1 Commands**: `BatchServiceStudentMatchingInitiateCommandDataV1` from BOS (stateless routing).
   - **Phase 1 Results**: `StudentAssociationsConfirmedV1` from Class Management (stateless routing).
   - **Phase 2+ Commands**: `BatchService...InitiateCommandDataV1` (e.g., for spellcheck, cj_assessment) from BOS.
-  - **Specialized Service Results**: `EssaySpellcheckCompleted`, `CJAssessmentCompleted`, etc.
+  - **Spellcheck Phase Completion**: `SpellcheckPhaseCompletedV1` (thin event for state transitions)
+  - **CJ Assessment Results**: `CJAssessmentCompleted`, etc.
 
 - **Publishes to Kafka**:
   - **Content Readiness**: `BatchContentProvisioningCompletedV1` to BOS when all slots are filled.
@@ -56,6 +57,19 @@ ELS participates in these communication patterns:
   - **Phase 2+ Service Requests**: `EssayLifecycleSpellcheckRequestV1` to specialized services.
   - **Phase Outcome (CRITICAL)**: `ELSBatchPhaseOutcomeV1` to BOS, reporting the result of a completed phase for an entire batch, enabling the next step in the dynamic pipeline.
   - **All events published via Transactional Outbox Pattern** for guaranteed delivery and consistency.
+
+## Event Consumption Patterns
+
+### Spellchecker Integration
+ELS consumes **thin events** from the spellchecker service optimized for state management:
+
+- **Event**: `SpellcheckPhaseCompletedV1`
+- **Topic**: `huleedu.batch.spellcheck.phase.completed.v1`
+- **Purpose**: State transitions only (~300 bytes)
+- **Handler**: `handle_spellcheck_phase_completed()` in `ServiceResultHandlerImpl`
+- **Data**: entity_id, batch_id, status, corrected_text_storage_id, error_code, processing_duration_ms
+
+This thin event pattern ensures ELS receives only the minimal data needed for state management, improving performance and reducing network overhead.
 
 - **HTTP API**:
   - **Query-Only**: Provides read-only access to essay and batch state information.

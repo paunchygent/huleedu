@@ -27,7 +27,7 @@ globs:
 ```python
 ProcessingEvent.BATCH_ESSAYS_REGISTERED    # Initialize batch records
 ProcessingEvent.BATCH_PHASE_OUTCOME        # Phase completion tracking
-ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED # Spellcheck results
+ProcessingEvent.SPELLCHECK_RESULTS         # Rich spellcheck results with metrics
 ProcessingEvent.CJ_ASSESSMENT_COMPLETED    # CJ rankings
 ```
 

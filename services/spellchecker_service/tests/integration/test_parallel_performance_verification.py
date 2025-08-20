@@ -65,7 +65,7 @@ class TestParallelPerformanceVerification:
             correlation_id = uuid4()
 
             # Sequential processing
-            sequential_result, sequential_count = await default_perform_spell_check_algorithm(
+            sequential_result_obj = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id=essay_id,
@@ -75,9 +75,11 @@ class TestParallelPerformanceVerification:
                 enable_parallel=False,  # Force sequential
                 min_words_for_parallel=999,  # Ensure sequential mode
             )
+            sequential_result = sequential_result_obj.corrected_text
+            sequential_count = sequential_result_obj.total_corrections
 
             # Parallel processing
-            parallel_result, parallel_count = await default_perform_spell_check_algorithm(
+            parallel_result_obj = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id=essay_id,
@@ -87,6 +89,8 @@ class TestParallelPerformanceVerification:
                 enable_parallel=True,
                 min_words_for_parallel=1,  # Force parallel mode
             )
+            parallel_result = parallel_result_obj.corrected_text
+            parallel_count = parallel_result_obj.total_corrections
 
             # Results should be identical
             assert sequential_result == parallel_result, (
@@ -126,7 +130,7 @@ class TestParallelPerformanceVerification:
 
         # Measure sequential processing time
         start_time = time.time()
-        sequential_result, sequential_count = await default_perform_spell_check_algorithm(
+        sequential_result_obj = await default_perform_spell_check_algorithm(
             text=long_text,
             l2_errors=l2_errors,
             essay_id="performance_test_sequential",
@@ -137,10 +141,12 @@ class TestParallelPerformanceVerification:
             min_words_for_parallel=999,
         )
         sequential_time = time.time() - start_time
+        sequential_result = sequential_result_obj.corrected_text
+        sequential_count = sequential_result_obj.total_corrections
 
         # Measure parallel processing time
         start_time = time.time()
-        parallel_result, parallel_count = await default_perform_spell_check_algorithm(
+        parallel_result_obj = await default_perform_spell_check_algorithm(
             text=long_text,
             l2_errors=l2_errors,
             essay_id="performance_test_parallel",
@@ -152,6 +158,8 @@ class TestParallelPerformanceVerification:
             max_concurrent=10,
         )
         parallel_time = time.time() - start_time
+        parallel_result = parallel_result_obj.corrected_text
+        parallel_count = parallel_result_obj.total_corrections
 
         # Verify results are identical
         assert sequential_result == parallel_result
@@ -195,7 +203,7 @@ class TestParallelPerformanceVerification:
             "Stockholm and Copenhagen are beautiful cities."
         )
 
-        result, corrections = await default_perform_spell_check_algorithm(
+        result_obj = await default_perform_spell_check_algorithm(
             text=test_text,
             l2_errors=l2_errors,
             essay_id="whitelist_test",
@@ -205,6 +213,8 @@ class TestParallelPerformanceVerification:
             enable_parallel=True,
             min_words_for_parallel=1,
         )
+        result = result_obj.corrected_text
+        corrections = result_obj.total_corrections
 
         # Verify that proper names were preserved
         assert "Ponyboy" in result  # Should be whitelisted

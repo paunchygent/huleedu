@@ -124,7 +124,7 @@ class TestWhitelistIntegration:
 
             # Process WITH whitelist
             start_time = time.time()
-            corrected_with_wl, corrections_with_wl = await default_perform_spell_check_algorithm(
+            result_with_wl = await default_perform_spell_check_algorithm(
                 essay_text,
                 l2_dictionary,
                 essay_id=f"{student_name}_with_whitelist",
@@ -135,7 +135,7 @@ class TestWhitelistIntegration:
 
             # Process WITHOUT whitelist (for comparison)
             start_time = time.time()
-            corrected_no_wl, corrections_no_wl = await default_perform_spell_check_algorithm(
+            result_no_wl = await default_perform_spell_check_algorithm(
                 essay_text,
                 l2_dictionary,
                 essay_id=f"{student_name}_no_whitelist",
@@ -146,14 +146,20 @@ class TestWhitelistIntegration:
 
             # Analyze corrections
             essay_stats = self._analyze_corrections(
-                essay_text, corrected_with_wl, corrected_no_wl, whitelist, l2_dictionary
+                essay_text,
+                result_with_wl.corrected_text,
+                result_no_wl.corrected_text,
+                whitelist,
+                l2_dictionary,
             )
 
             # Update total statistics
             essay_count += 1
             total_l2_corrections += essay_stats["l2_corrections"]
             total_whitelist_hits += essay_stats["whitelist_hits"]
-            total_pyspell_corrections += corrections_with_wl - essay_stats["l2_corrections"]
+            total_pyspell_corrections += (
+                result_with_wl.total_corrections - essay_stats["l2_corrections"]
+            )
             time_per_essay_with_whitelist += time_with_whitelist
             time_per_essay_without_whitelist += time_without_whitelist
             whitelisted_words.update(essay_stats["whitelisted_words"])
@@ -161,7 +167,9 @@ class TestWhitelistIntegration:
             # Print essay statistics
             print(f"  L2 corrections: {essay_stats['l2_corrections']}")
             print(f"  Whitelist hits: {essay_stats['whitelist_hits']}")
-            print(f"  PySpell corrections: {corrections_with_wl - essay_stats['l2_corrections']}")
+            print(
+                f"  PySpell corrections: {result_with_wl.total_corrections - essay_stats['l2_corrections']}"
+            )
             print(f"  Time with whitelist: {time_with_whitelist:.3f}s")
             print(f"  Time without whitelist: {time_without_whitelist:.3f}s")
 

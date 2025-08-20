@@ -13,11 +13,15 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.events.spellcheck_models import (
+    SpellcheckPhaseCompletedV1,
+    SpellcheckResultDataV1,
+    SpellcheckResultV1,
+)
 from common_core.metadata_models import SystemProcessingMetadata
-from common_core.status_enums import EssayStatus, ProcessingStage
+from common_core.status_enums import EssayStatus, ProcessingStage, ProcessingStatus
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.spellchecker_service.config import Settings
@@ -430,3 +434,125 @@ class TestOutboxManagerErrorHandling:
         assert error_detail.service == "spellchecker_service"
         assert error_detail.operation == "publish_to_outbox"
         assert "Failed to store event in outbox" in error_detail.message
+
+    async def test_dual_event_outbox_storage(
+        self,
+        test_settings: Settings,
+        mock_redis_client: AsyncMock,
+    ) -> None:
+        """Test that outbox manager can handle both thin and rich spellcheck events."""
+        # Given
+        mock_repository: AsyncMock = AsyncMock()
+        mock_repository.add_event.return_value = uuid4()
+
+        outbox_manager: OutboxManager = OutboxManager(
+            outbox_repository=mock_repository,
+            redis_client=mock_redis_client,
+            settings=test_settings,
+        )
+
+        correlation_id = uuid4()
+        entity_id = "essay-dual-test"
+        batch_id = "batch-dual-test"
+        corrected_storage_id = "corrected-dual-test"
+
+        # Create thin event (SpellcheckPhaseCompletedV1)
+        thin_event = SpellcheckPhaseCompletedV1(
+            entity_id=entity_id,
+            batch_id=batch_id,
+            correlation_id=str(correlation_id),
+            status=ProcessingStatus.COMPLETED,
+            corrected_text_storage_id=corrected_storage_id,
+            error_code=None,
+            processing_duration_ms=150,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        thin_envelope: EventEnvelope = EventEnvelope(
+            event_type="SpellcheckPhaseCompletedV1",
+            source_service="spell-checker-service",
+            correlation_id=correlation_id,
+            data=thin_event,
+            metadata={"partition_key": entity_id},
+        )
+
+        # Create rich event (SpellcheckResultV1)
+        from common_core.events.spellcheck_models import SpellcheckMetricsV1
+
+        rich_system_metadata = SystemProcessingMetadata(
+            entity_id=entity_id,
+            entity_type="essay",
+            parent_id=batch_id,
+            timestamp=datetime.now(timezone.utc),
+            processing_stage=ProcessingStage.COMPLETED,
+            event=ProcessingEvent.SPELLCHECK_RESULTS.value,
+        )
+
+        rich_event = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
+            entity_id=entity_id,
+            entity_type="essay",
+            parent_id=batch_id,
+            timestamp=datetime.now(timezone.utc),
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=rich_system_metadata,
+            correlation_id=str(correlation_id),
+            corrections_made=5,
+            correction_metrics=SpellcheckMetricsV1(
+                total_corrections=5,
+                l2_dictionary_corrections=3,
+                spellchecker_corrections=2,
+                word_count=100,
+                correction_density=5.0,
+            ),
+            original_text_storage_id="original-dual-test",
+            corrected_text_storage_id=corrected_storage_id,
+            processing_duration_ms=150,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+        )
+
+        rich_envelope: EventEnvelope = EventEnvelope(
+            event_type="SpellcheckResultV1",
+            source_service="spell-checker-service",
+            correlation_id=correlation_id,
+            data=rich_event,
+            metadata={"partition_key": entity_id},
+        )
+
+        # When - Store thin event
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="spellcheck_job",
+            aggregate_id=entity_id,
+            event_type="SpellcheckPhaseCompletedV1",
+            event_data=thin_envelope,
+            topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
+        )
+
+        # Store rich event
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="spellcheck_job",
+            aggregate_id=entity_id,
+            event_type="SpellcheckResultV1",
+            event_data=rich_envelope,
+            topic=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
+        )
+
+        # Then - Verify both events were stored
+        assert mock_repository.add_event.call_count == 2
+
+        # Check thin event storage
+        thin_call = mock_repository.add_event.call_args_list[0]
+        assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
+        assert thin_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+        assert thin_call.kwargs["aggregate_id"] == entity_id
+        assert thin_call.kwargs["event_key"] == entity_id  # From partition_key
+
+        # Check rich event storage
+        rich_call = mock_repository.add_event.call_args_list[1]
+        assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
+        assert rich_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+        assert rich_call.kwargs["aggregate_id"] == entity_id
+        assert rich_call.kwargs["event_key"] == entity_id  # From partition_key
+
+        # Verify Redis notifications were sent for both events
+        assert mock_redis_client.lpush.call_count == 2

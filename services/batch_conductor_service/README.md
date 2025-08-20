@@ -28,7 +28,8 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 
 ### Event-Driven Architecture
 
-- Consumes completion events from specialized services
+- **Spellcheck Completion**: Consumes `SpellcheckPhaseCompletedV1` thin events for state tracking
+- **CJ Assessment Completion**: Consumes completion events from CJ assessment service  
 - Maintains real-time batch/phase state via Redis + PostgreSQL persistence
 - Publishes `PhaseSkippedV1` events for pruned phases
 
@@ -66,6 +67,19 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 **Integration with BOS**: HTTP client integration complete with `BatchConductorClientProtocol` and implementation. BOS calls BCS internal API for pipeline resolution and stores resolved pipeline for execution.
 
 **Event Sources**: Consumes completion events from specialized services to maintain current batch state without synchronous ELS API calls.
+
+## Event Consumption Patterns
+
+### Spellchecker Integration
+BCS consumes **thin events** from the spellchecker service optimized for state tracking:
+
+- **Event**: `SpellcheckPhaseCompletedV1`
+- **Topic**: `huleedu.batch.spellcheck.phase.completed.v1`
+- **Purpose**: Phase completion tracking for pipeline pruning (~300 bytes)
+- **Handler**: `_handle_spellcheck_phase_completed()` in Kafka consumer
+- **Data**: entity_id, batch_id, status, processing_duration_ms
+
+This thin event pattern allows BCS to track phase completions efficiently for intelligent pipeline pruning without processing unnecessary business data.
 
 ## Configuration
 

@@ -6,11 +6,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from common_core.pipeline_models import PhaseName
 
 # Use common_core enums directly (no re-exports)
 from common_core.status_enums import BatchClientStatus
-from common_core.pipeline_models import PhaseName
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from services.result_aggregator_service.models_db import BatchResult

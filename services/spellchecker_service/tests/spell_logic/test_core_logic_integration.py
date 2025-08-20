@@ -23,7 +23,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-simple-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for pure pyspellchecker test
             essay_id,
@@ -32,14 +32,14 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Verify specific corrections (pyspellchecker behavior)
-        assert "This" in corrected_text  # "Thiss" -> "This"
-        assert "document" in corrected_text  # "documment" -> "document"
-        assert "errors" in corrected_text  # "errrors" -> "errors"
-        assert "mistakes" in corrected_text  # "misstakes" -> "mistakes"
+        assert "This" in result.corrected_text  # "Thiss" -> "This"
+        assert "document" in result.corrected_text  # "documment" -> "document"
+        assert "errors" in result.corrected_text  # "errrors" -> "errors"
+        assert "mistakes" in result.corrected_text  # "misstakes" -> "mistakes"
 
         # Should have made several corrections
-        assert corrections_count >= 3
-        assert corrected_text != text  # Text should be changed
+        assert result.total_corrections >= 3
+        assert result.corrected_text != text  # Text should be changed
 
     @pytest.mark.asyncio
     async def test_l2_plus_pyspellchecker_pipeline(self) -> None:
@@ -50,7 +50,7 @@ class TestCoreLogicIntegration:
 
         # Act
         l2_errors = {"recieve": "receive", "becouse": "because"}  # L2 errors for comprehensive test
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             l2_errors,
             essay_id,
@@ -59,14 +59,14 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Should correct both L2 and pyspellchecker errors
-        assert "receive" in corrected_text  # L2 or pyspellchecker: "recieve" -> "receive"
-        assert "document" in corrected_text  # pyspellchecker: "documment" -> "document"
-        assert "because" in corrected_text  # L2: "becouse" -> "because"
-        assert "happened" in corrected_text  # pyspellchecker: "hapened" -> "happened"
+        assert "receive" in result.corrected_text  # L2 or pyspellchecker: "recieve" -> "receive"
+        assert "document" in result.corrected_text  # pyspellchecker: "documment" -> "document"
+        assert "because" in result.corrected_text  # L2: "becouse" -> "because"
+        assert "happened" in result.corrected_text  # pyspellchecker: "hapened" -> "happened"
 
         # Should have made multiple corrections
-        assert corrections_count >= 3
-        assert corrected_text != text
+        assert result.total_corrections >= 3
+        assert result.corrected_text != text
 
     @pytest.mark.asyncio
     async def test_punctuation_and_capitalization_preservation(self) -> None:
@@ -76,7 +76,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-punct-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for punctuation test
             essay_id,
@@ -85,17 +85,17 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Verify punctuation is preserved
-        assert corrected_text.startswith("Hello!")
-        assert ". It's" in corrected_text
-        assert corrected_text.endswith(".")
+        assert result.corrected_text.startswith("Hello!")
+        assert ". It's" in result.corrected_text
+        assert result.corrected_text.endswith(".")
 
         # Verify corrections while maintaining structure
-        assert "This" in corrected_text  # "Thiss" -> "This"
-        assert "document" in corrected_text  # "documment" -> "document"
-        assert "very" in corrected_text  # "verry" -> "very"
-        assert "important" in corrected_text  # "importent" -> "important"
+        assert "This" in result.corrected_text  # "Thiss" -> "This"
+        assert "document" in result.corrected_text  # "documment" -> "document"
+        assert "very" in result.corrected_text  # "verry" -> "very"
+        assert "important" in result.corrected_text  # "importent" -> "important"
 
-        assert corrections_count >= 3
+        assert result.total_corrections >= 3
 
     @pytest.mark.asyncio
     async def test_hyphenated_and_contractions(self) -> None:
@@ -105,7 +105,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-hyphen-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for hyphenation test
             essay_id,
@@ -114,17 +114,17 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Verify contractions are preserved
-        assert "It's" in corrected_text
-        assert "that's" in corrected_text
+        assert "It's" in result.corrected_text
+        assert "that's" in result.corrected_text
 
         # Verify that corrections were made (don't expect specific corrections)
         # The algorithm should correct some misspellings, but exact corrections may vary
-        assert corrections_count >= 2  # At least some corrections expected
-        assert corrected_text != text  # Text should be changed
+        assert result.total_corrections >= 2  # At least some corrections expected
+        assert result.corrected_text != text  # Text should be changed
 
         # Verify the text is still readable and improved
-        assert "well-" in corrected_text  # Hyphenated structure preserved
-        assert len(corrected_text) > 0
+        assert "well-" in result.corrected_text  # Hyphenated structure preserved
+        assert len(result.corrected_text) > 0
 
     @pytest.mark.asyncio
     async def test_no_corrections_needed(self) -> None:
@@ -134,7 +134,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-perfect-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for no-corrections test
             essay_id,
@@ -142,8 +142,8 @@ class TestCoreLogicIntegration:
         )
 
         # Assert
-        assert corrected_text == text  # Should be unchanged
-        assert corrections_count == 0  # No corrections made
+        assert result.corrected_text == text  # Should be unchanged
+        assert result.total_corrections == 0  # No corrections made
 
     @pytest.mark.asyncio
     async def test_empty_text_handling(self) -> None:
@@ -160,11 +160,11 @@ class TestCoreLogicIntegration:
         )
 
         # Assert
-        assert result_empty[0] == ""
-        assert result_empty[1] == 0
+        assert result_empty.corrected_text == ""
+        assert result_empty.total_corrections == 0
 
-        assert result_whitespace[0] == whitespace_text  # Preserved
-        assert result_whitespace[1] == 0
+        assert result_whitespace.corrected_text == whitespace_text  # Preserved
+        assert result_whitespace.total_corrections == 0
 
     @pytest.mark.asyncio
     async def test_different_languages(self) -> None:
@@ -181,11 +181,13 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Both should make some corrections (though results may differ)
-        assert result_en[1] > 0  # Should correct something
-        assert result_es[1] >= 0  # May or may not correct (depends on Spanish dictionary)
+        assert result_en.total_corrections > 0  # Should correct something
+        assert (
+            result_es.total_corrections >= 0
+        )  # May or may not correct (depends on Spanish dictionary)
 
         # Corrected text should be different from original for English
-        assert result_en[0] != text
+        assert result_en.corrected_text != text
 
     @pytest.mark.asyncio
     async def test_performance_with_longer_text(self) -> None:
@@ -201,7 +203,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-long-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for performance test
             essay_id,
@@ -210,20 +212,20 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Should make significant corrections
-        assert corrections_count >= 10  # Many errors to correct
-        assert len(corrected_text) > 0
-        assert corrected_text != text
+        assert result.total_corrections >= 10  # Many errors to correct
+        assert len(result.corrected_text) > 0
+        assert result.corrected_text != text
 
         # Verify that common misspellings were corrected (without expecting exact results)
         # The text should be significantly improved
-        assert "Thiss" not in corrected_text  # Common misspellings should be fixed
-        assert "documment" not in corrected_text
-        assert "containns" not in corrected_text
-        assert "errrors" not in corrected_text
-        assert "misstakes" not in corrected_text
+        assert "Thiss" not in result.corrected_text  # Common misspellings should be fixed
+        assert "documment" not in result.corrected_text
+        assert "containns" not in result.corrected_text
+        assert "errrors" not in result.corrected_text
+        assert "misstakes" not in result.corrected_text
 
         # Verify text is still coherent and readable
-        assert "spellchecker" in corrected_text.lower()  # Key words preserved
+        assert "spellchecker" in result.corrected_text.lower()  # Key words preserved
 
     @pytest.mark.asyncio
     async def test_case_preservation(self) -> None:
@@ -234,7 +236,7 @@ class TestCoreLogicIntegration:
 
         # Act
         l2_errors = {"recieve": "receive"}  # L2 error for case preservation test
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             l2_errors,
             essay_id,
@@ -243,10 +245,10 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Verify case preservation
-        assert "RECEIVE IS" in corrected_text  # Uppercase preserved
-        assert "Receive Is" in corrected_text  # Title case preserved
-        assert "receive is" in corrected_text  # Lowercase preserved
-        assert corrections_count >= 3  # Should correct all three instances
+        assert "RECEIVE IS" in result.corrected_text  # Uppercase preserved
+        assert "Receive Is" in result.corrected_text  # Title case preserved
+        assert "receive is" in result.corrected_text  # Lowercase preserved
+        assert result.total_corrections >= 3  # Should correct all three instances
 
     @pytest.mark.asyncio
     async def test_uppercase_case_normalization(self) -> None:
@@ -256,7 +258,7 @@ class TestCoreLogicIntegration:
         essay_id = "test-uppercase-norm-001"
 
         # Act
-        corrected_text, corrections_count = await default_perform_spell_check_algorithm(
+        result = await default_perform_spell_check_algorithm(
             text,
             {},  # Empty L2 errors for uppercase normalization test
             essay_id,
@@ -265,11 +267,11 @@ class TestCoreLogicIntegration:
 
         # Assert
         # Verify uppercase is preserved in corrections
-        assert "THIS DOCUMENT" in corrected_text  # "THISS DOCUMMENT" -> "THIS DOCUMENT"
-        assert "ERRORS" in corrected_text  # "ERRRORS" -> "ERRORS"
-        assert corrections_count >= 3  # Should correct all three words
-        assert corrected_text != text  # Text should be changed
+        assert "THIS DOCUMENT" in result.corrected_text  # "THISS DOCUMMENT" -> "THIS DOCUMENT"
+        assert "ERRORS" in result.corrected_text  # "ERRRORS" -> "ERRORS"
+        assert result.total_corrections >= 3  # Should correct all three words
+        assert result.corrected_text != text  # Text should be changed
 
         # Verify the entire sentence structure is preserved
-        assert corrected_text.endswith(".")
-        assert corrected_text.startswith("THIS")
+        assert result.corrected_text.endswith(".")
+        assert result.corrected_text.startswith("THIS")

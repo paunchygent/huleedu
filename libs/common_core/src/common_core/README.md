@@ -42,7 +42,7 @@ The Essay Lifecycle Service (ELS) manages the state of individual essays as they
 
 * **`EventEnvelope` Model**: The standard wrapper for all asynchronous messages published to Kafka. It provides common metadata fields like `event_id`, `event_type`, `source_service`, and `correlation_id`.
 
-* **`ProcessingEvent` Enum**: Provides semantic names for specific business occurrences (e.g., `ESSAY_SPELLCHECK_COMPLETED`). These are mapped to Kafka topic names via the `topic_name()` function.
+* **`ProcessingEvent` Enum**: Provides semantic names for specific business occurrences (e.g., `SPELLCHECK_PHASE_COMPLETED`, `SPELLCHECK_RESULTS`). These are mapped to Kafka topic names via the `topic_name()` function.
 
 ### 4. Key Data Payload Models for Orchestration
 

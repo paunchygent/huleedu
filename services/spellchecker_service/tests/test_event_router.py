@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from common_core.domain_enums import ContentType
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, ProcessingStage
 
@@ -33,6 +33,8 @@ from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
+SPELLCHECK_PHASE_COMPLETED = ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+SPELLCHECK_RESULTS = ProcessingEvent.SPELLCHECK_RESULTS
 CORRECTED_TEXT_TYPE = ContentType.CORRECTED_TEXT
 
 
@@ -104,7 +106,7 @@ class TestProcessSingleMessage:
         assert stored_content != sample_text  # Should be corrected text, not original
         assert store_call_args.kwargs["content_type"] == ContentType.CORRECTED_TEXT
 
-        # Verify that the result was published
+        # Verify that the result was published (with dual events)
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
         # Verify the published result contains real spell check results
@@ -170,7 +172,7 @@ class TestProcessSingleMessage:
             mock_spell_check_algo.assert_not_called()
             mock_result_store.store_content.assert_not_called()
 
-            # Verify a failure event was published
+            # Verify a failure event was published (dual events)
             mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
             call_args = mock_event_publisher.publish_spellcheck_result.call_args
@@ -245,7 +247,7 @@ class TestProcessSingleMessage:
         # Verify storage was attempted (and failed) inside the real spell logic
         mock_result_store.store_content.assert_called_once()
 
-        # Verify failure event was published
+        # Verify failure event was published (dual events)
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
     @pytest.mark.asyncio
@@ -297,7 +299,7 @@ class TestProcessSingleMessage:
         # Since spell check failed, storage should not be called
         # (because the real implementation handles storage internally)
 
-        # Verify failure event was published
+        # Verify failure event was published (dual events)
         mock_event_publisher.publish_spellcheck_result.assert_called_once()
 
     @pytest.mark.asyncio
@@ -405,6 +407,6 @@ class TestProcessSingleMessage:
         mock_result_store.store_content.assert_called_once()
 
         # Verify publisher was called twice:
-        # 1. First call for successful spell check result
-        # 2. Second call for failure event (which also fails)
+        # 1. First call for successful spell check result (dual events)
+        # 2. Second call for failure event (which also fails, dual events)
         assert mock_event_publisher.publish_spellcheck_result.call_count == 2

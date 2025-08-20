@@ -265,6 +265,168 @@ class DefaultServiceResultHandler(ServiceResultHandler):
             )
             return False
 
+    async def handle_spellcheck_phase_completed(
+        self,
+        essay_id: str,
+        batch_id: str,
+        status: EssayStatus,
+        corrected_text_storage_id: str | None,
+        error_code: str | None,
+        correlation_id: UUID,
+        confirm_idempotency: Any = None,
+    ) -> bool:
+        """Handle thin spellcheck phase completion event for state transitions.
+
+        This method handles the new thin event from the dual event pattern,
+        containing only the minimal data needed for state transitions.
+        """
+        try:
+            # Determine success from status
+            is_success = status == EssayStatus.SPELLCHECKED_SUCCESS
+
+            logger.info(
+                "Processing spellcheck phase completed (thin event)",
+                extra={
+                    "essay_id": essay_id,
+                    "batch_id": batch_id,
+                    "status": status.value,
+                    "success": is_success,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            # START UNIT OF WORK - Open transaction early for all DB operations
+            async with self.session_factory() as session:
+                async with session.begin():
+                    essay_state = await self.repository.get_essay_state(essay_id, session)
+                    if essay_state is None:
+                        logger.error(
+                            "Essay not found for spellcheck phase completed",
+                            extra={
+                                "essay_id": essay_id,
+                                "batch_id": batch_id,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                        return False
+
+                    # Create state machine and trigger appropriate event
+                    state_machine = EssayStateMachine(
+                        essay_id=essay_id, initial_status=essay_state.current_status
+                    )
+
+                    if is_success:
+                        trigger = EVT_SPELLCHECK_SUCCEEDED
+                        logger.info(
+                            "Spellcheck phase succeeded, transitioning to success state",
+                            extra={
+                                "essay_id": essay_id,
+                                "current_status": essay_state.current_status.value,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                    else:
+                        trigger = EVT_SPELLCHECK_FAILED
+                        logger.warning(
+                            "Spellcheck phase failed, transitioning to failed state",
+                            extra={
+                                "essay_id": essay_id,
+                                "current_status": essay_state.current_status.value,
+                                "error_code": error_code,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+
+                    # Attempt state transition
+                    if state_machine.trigger_event(trigger):
+                        storage_ref_to_add = None
+                        if is_success and corrected_text_storage_id:
+                            storage_ref_to_add = (
+                                ContentType.CORRECTED_TEXT,
+                                corrected_text_storage_id,
+                            )
+                            logger.info(
+                                "Using corrected text storage reference",
+                                extra={
+                                    "storage_id": corrected_text_storage_id,
+                                    "content_type": ContentType.CORRECTED_TEXT.value,
+                                },
+                            )
+
+                        await self.repository.update_essay_status_via_machine(
+                            essay_id,
+                            state_machine.current_status,
+                            {
+                                "spellcheck_result": {
+                                    "success": is_success,
+                                    "status": status.value,
+                                    "corrected_text_storage_id": corrected_text_storage_id,
+                                    "error_code": error_code,
+                                },
+                                "current_phase": "spellcheck",
+                                "phase_outcome_status": status.value,
+                            },
+                            session,
+                            storage_reference=storage_ref_to_add,
+                            correlation_id=correlation_id,
+                        )
+
+                        logger.info(
+                            "Successfully updated essay status via state machine (thin event)",
+                            extra={
+                                "essay_id": essay_id,
+                                "new_status": state_machine.current_status.value,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+
+                        # Check for batch phase completion after individual essay state update
+                        updated_essay_state = await self.repository.get_essay_state(
+                            essay_id, session
+                        )
+                        if updated_essay_state:
+                            await self.batch_coordinator.check_batch_completion(
+                                essay_state=updated_essay_state,
+                                phase_name=PhaseName.SPELLCHECK,
+                                correlation_id=correlation_id,
+                                session=session,
+                            )
+                        # Transaction commits here
+                    else:
+                        logger.error(
+                            f"State machine trigger '{trigger}' failed for essay "
+                            f"{essay_id} from status "
+                            f"{essay_state.current_status.value}.",
+                            extra={"correlation_id": str(correlation_id)},
+                        )
+                        return False
+
+            # Confirm idempotency after successful transaction commit
+            if confirm_idempotency is not None:
+                await confirm_idempotency()
+
+            logger.info(
+                "Successfully processed spellcheck phase completed (thin event)",
+                extra={
+                    "essay_id": essay_id,
+                    "new_status": state_machine.current_status.value,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Error handling spellcheck phase completed",
+                extra={
+                    "essay_id": essay_id,
+                    "error": str(e),
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            return False
+
     async def handle_cj_assessment_completed(
         self,
         result_data: CJAssessmentCompletedV1,

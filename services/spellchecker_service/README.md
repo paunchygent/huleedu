@@ -7,6 +7,29 @@ Exposed HTTP endpoints: `/healthz` and `/metrics`.
 
 The Spell Checker Service processes essay spellchecking requests via Kafka, performs L2-aware spell checking, and stores the results. It follows clean architecture principles with clear separation of concerns and dependency injection.
 
+## Dual Event Publishing Pattern
+
+The service implements a dual event pattern optimized for different consumer needs:
+
+### Thin Event: State Management
+- **Event**: `SpellcheckPhaseCompletedV1`
+- **Topic**: `huleedu.batch.spellcheck.phase.completed.v1`
+- **Consumers**: ELS (Essay Lifecycle Service), BCS (Batch Conductor Service)
+- **Purpose**: Minimal state transition data (~300 bytes)
+- **Fields**: entity_id, batch_id, status, corrected_text_storage_id, error_code, processing_duration_ms
+
+### Rich Event: Business Data
+- **Event**: `SpellcheckResultV1`
+- **Topic**: `huleedu.essay.spellcheck.results.v1`
+- **Consumer**: RAS (Result Aggregator Service)
+- **Purpose**: Complete business metrics and processing details
+- **Fields**: Full correction metrics, word counts, L2 vs spelling corrections, correction density
+
+### Benefits
+- **Performance**: ELS/BCS receive minimal data for state transitions
+- **Separation of Concerns**: State management vs business analytics
+- **Network Efficiency**: Reduces data transfer for state-only consumers
+
 ## Runtime Flow
 
 ```mermaid
@@ -17,7 +40,11 @@ C --> D[fetch essay (Content Service)]
 D --> E[run L2 + pyspellchecker]
 E --> F[store corrected text (Content Service)]
 F --> G[persist meta (PostgreSQL)]
-G -->|publish| H[huleedu.essay.spellcheck.completed.v1]
+G --> H{Dual Event Publishing}
+H -->|thin event| I[huleedu.batch.spellcheck.phase.completed.v1]
+H -->|rich event| J[huleedu.essay.spellcheck.results.v1]
+I --> K[ELS/BCS State Management]
+J --> L[RAS Business Data]
 ```
 
 ## Tech Stack
@@ -167,6 +194,9 @@ Circuit breakers protect Kafka publishing operations and are configured via `SPE
 
 ## Recent Highlights
 
+- **Dual Event Pattern**: Optimized publishing for state management vs business data
+- **Enhanced Metrics**: L2 correction tracking, word counts, correction density
+- **Outbox Pattern**: Reliable dual event publishing via transactional outbox
 - Clean architecture refactor with Dishka DI
 - Async Postgres repository with Alembic migrations
 - OpenTelemetry integration with Jaeger

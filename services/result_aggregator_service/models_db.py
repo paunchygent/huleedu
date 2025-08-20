@@ -151,6 +151,9 @@ class EssayResult(Base):
     # ai_feedback_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     # ai_feedback_error: Mapped[Optional[str]] = mapped_column(String(500))
 
+    # Additional metadata as JSON for flexibility
+    essay_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
     # Audit fields
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, server_default=func.now()

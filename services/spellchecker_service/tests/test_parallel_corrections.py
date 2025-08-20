@@ -71,7 +71,7 @@ class TestParallelCorrections:
             parallel_processor = DefaultParallelProcessor()
 
             # Test with parallel processing enabled
-            corrected_parallel, count_parallel = await default_perform_spell_check_algorithm(
+            result_parallel = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id="test_parallel",
@@ -85,9 +85,11 @@ class TestParallelCorrections:
                 parallel_timeout=5.0,
                 min_words_for_parallel=1,  # Force parallel even for small text
             )
+            corrected_parallel = result_parallel.corrected_text
+            count_parallel = result_parallel.total_corrections
 
             # Test with parallel processing disabled
-            corrected_sequential, count_sequential = await default_perform_spell_check_algorithm(
+            result_sequential = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id="test_sequential",
@@ -101,6 +103,8 @@ class TestParallelCorrections:
                 parallel_timeout=5.0,
                 min_words_for_parallel=1,
             )
+            corrected_sequential = result_sequential.corrected_text
+            count_sequential = result_sequential.total_corrections
 
             # Results should be identical
             assert corrected_parallel == corrected_sequential
@@ -131,7 +135,7 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            corrected_text, correction_count = await default_perform_spell_check_algorithm(
+            result = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id="test_batch",
@@ -145,6 +149,8 @@ class TestParallelCorrections:
                 parallel_timeout=5.0,
                 min_words_for_parallel=1,
             )
+            corrected_text = result.corrected_text
+            correction_count = result.total_corrections
 
             # Should correct all instances
             assert correction_count == 150
@@ -175,7 +181,7 @@ class TestParallelCorrections:
             parallel_processor = DefaultParallelProcessor()
 
             # Test with high threshold (should use sequential)
-            corrected_text, _ = await default_perform_spell_check_algorithm(
+            result = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id="test_threshold",
@@ -186,6 +192,7 @@ class TestParallelCorrections:
                 enable_parallel=True,
                 min_words_for_parallel=10,  # High threshold, should use sequential
             )
+            corrected_text = result.corrected_text
 
             # Should still correct the text
             assert "The" in corrected_text or "the" in corrected_text
@@ -214,7 +221,7 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            corrected_text, correction_count = await default_perform_spell_check_algorithm(
+            result = await default_perform_spell_check_algorithm(
                 text=text,
                 l2_errors=l2_errors,
                 essay_id="test_whitelist",
@@ -225,6 +232,7 @@ class TestParallelCorrections:
                 enable_parallel=True,
                 min_words_for_parallel=1,
             )
+            corrected_text = result.corrected_text
 
             # Should preserve whitelisted words
             assert "Microsoft" in corrected_text

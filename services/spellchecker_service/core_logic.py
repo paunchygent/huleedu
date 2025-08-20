@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict
 from uuid import UUID
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import BaseModel, Field
 
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     get_adaptive_edit_distance,
@@ -15,6 +16,18 @@ if TYPE_CHECKING:
     from services.spellchecker_service.protocols import ParallelProcessorProtocol, WhitelistProtocol
 
 logger = create_service_logger("spellchecker_service.core_logic")
+
+
+class SpellcheckMetrics(BaseModel):
+    """Detailed metrics from spellcheck processing."""
+
+    corrected_text: str = Field(description="The corrected text after all spellcheck operations")
+    total_corrections: int = Field(description="Total number of corrections made")
+    l2_dictionary_corrections: int = Field(description="Number of L2 learner error corrections")
+    spellchecker_corrections: int = Field(description="Number of general spelling corrections")
+    word_count: int = Field(description="Total word count in the text")
+    correction_density: float = Field(description="Corrections per 100 words")
+
 
 # Global cache for SpellChecker instances per language and distance
 # Key format: "{language}_d{distance}" (e.g., "en_d1", "en_d2")
@@ -41,7 +54,7 @@ async def default_perform_spell_check_algorithm(
     batch_size: int = 100,
     parallel_timeout: float = 5.0,
     min_words_for_parallel: int = 5,
-) -> tuple[str, int]:
+) -> SpellcheckMetrics:
     """
     Complete L2 + pyspellchecker pipeline implementation.
 
@@ -463,6 +476,12 @@ async def default_perform_spell_check_algorithm(
     # Combine all corrections for logging
     all_corrections = l2_corrections + pyspellchecker_corrections
 
+    # Calculate word count from already tokenized words
+    word_count = len(words_to_check)
+
+    # Calculate correction density (corrections per 100 words)
+    correction_density = (total_corrections / word_count * 100) if word_count > 0 else 0.0
+
     # Log detailed performance metrics
     logger.info(
         f"{log_prefix}Spell check completed: {total_corrections} total corrections "
@@ -522,4 +541,11 @@ async def default_perform_spell_check_algorithm(
                 extra={**log_extra, "error": str(e)},
             )
 
-    return corrected_text, total_corrections
+    return SpellcheckMetrics(
+        corrected_text=corrected_text,
+        total_corrections=total_corrections,
+        l2_dictionary_corrections=len(l2_corrections),
+        spellchecker_corrections=len(pyspellchecker_corrections),
+        word_count=word_count,
+        correction_density=correction_density,
+    )

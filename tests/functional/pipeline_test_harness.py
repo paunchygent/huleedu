@@ -731,6 +731,11 @@ class PipelineTestHarness:
                                         logger.info(
                                             "✅ Phase nlp completed (from analysis completion)"
                                         )
+                                    # For NLP pipelines, treat analysis completion as terminal
+                                    logger.info(
+                                        f"🎯 Pipeline completed: {expected_completion_event}"
+                                    )
+                                    return envelope_data
                                 elif "cj_assessment.completed" in event_type:
                                     # Only mark cj_assessment as completed if it was initiated
                                     if "cj_assessment" in tracker.initiated_phases:

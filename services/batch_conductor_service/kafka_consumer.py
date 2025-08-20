@@ -60,8 +60,7 @@ class BCSKafkaConsumer:
             # Override specific TTLs for coordination events
             event_type_ttls={
                 # SpellCheck completion events (24 hours - coordination requirements)
-                "SpellcheckResultDataV1": 86400,
-                topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED): 86400,
+                "SpellcheckPhaseCompletedV1": 86400,  # New thin event for state transitions
                 # CJ Assessment completion events (24 hours - coordination requirements)
                 "CJAssessmentCompletedV1": 86400,
                 topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED): 86400,
@@ -121,10 +120,10 @@ class BCSKafkaConsumer:
         """Single attempt to start consuming with proper cleanup on failure."""
         # Subscribe to processing result topics
         topics = [
-            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),  # New thin event for batch coordination
             # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
-            "huleedu.els.batch.phase.outcome.v1",  # ELS phase completions for dependency resolution
+            topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),  # ELS phase completions for dependency resolution
             # Add more specialized service result topics as needed
         ]
 
@@ -212,13 +211,13 @@ class BCSKafkaConsumer:
         event_type = self._extract_event_type_from_topic(msg.topic)
 
         try:
-            if msg.topic == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
-                await self._handle_spellcheck_completed(msg)
-                await self._track_event_success(event_type)
+            if msg.topic == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED):
+                await self._handle_spellcheck_phase_completed(msg)
+                await self._track_event_success("spellcheck_phase_completed")
             elif msg.topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
                 await self._handle_cj_assessment_completed(msg)
                 await self._track_event_success(event_type)
-            elif msg.topic == "huleedu.els.batch.phase.outcome.v1":
+            elif msg.topic == topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME):
                 await self._handle_els_batch_phase_outcome(msg)
                 await self._track_event_success("els_batch_phase_outcome")
             else:
@@ -313,6 +312,60 @@ class BCSKafkaConsumer:
 
         except Exception as e:
             logger.error(f"Error processing spellcheck completion: {e}", exc_info=True)
+            raise
+
+    async def _handle_spellcheck_phase_completed(self, msg: ConsumerRecord) -> None:
+        """Handle thin spellcheck phase completion events from dual event pattern."""
+        try:
+            from common_core.events.spellcheck_models import SpellcheckPhaseCompletedV1
+            from common_core.status_enums import ProcessingStatus
+
+            raw_message = msg.value  # Already decoded by deserializer
+            envelope = EventEnvelope[SpellcheckPhaseCompletedV1].model_validate_json(raw_message)
+
+            thin_event = SpellcheckPhaseCompletedV1.model_validate(envelope.data)
+            essay_id = thin_event.entity_id
+            batch_id = thin_event.batch_id
+
+            if not essay_id:
+                logger.error("Cannot process spellcheck phase result: entity_id (essay_id) is None")
+                return
+
+            if not batch_id:
+                logger.error(
+                    f"Cannot determine batch_id for spellcheck phase result for essay {essay_id}"
+                )
+                return
+
+            # Determine success based on status
+            is_success = thin_event.status == ProcessingStatus.COMPLETED
+
+            # Record completion in batch state
+            success = await self.batch_state_repo.record_essay_step_completion(
+                batch_id=batch_id,
+                essay_id=essay_id,
+                step_name="spellcheck",
+                metadata={
+                    "completion_status": "success" if is_success else "failed",
+                    "status": thin_event.status.value,
+                    "event_id": str(envelope.event_id),
+                    "timestamp": envelope.event_timestamp.isoformat(),
+                    "processing_duration_ms": thin_event.processing_duration_ms,
+                },
+            )
+
+            if success:
+                logger.info(
+                    f"Recorded spellcheck phase completion for essay {essay_id} in batch {batch_id}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to record spellcheck phase completion for essay {essay_id} in batch {batch_id} "
+                    f"(might already be recorded)"
+                )
+
+        except Exception as e:
+            logger.error(f"Error handling spellcheck phase completed: {e}", exc_info=True)
             raise
 
     async def _handle_cj_assessment_completed(self, msg: ConsumerRecord) -> None:
