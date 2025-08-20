@@ -173,7 +173,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         thin_envelope = EventEnvelope[SpellcheckPhaseCompletedV1](
-            event_type="SpellcheckPhaseCompletedV1",
+            event_type=thin_topic,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=thin_event,
@@ -186,11 +186,11 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         inject_trace_context(thin_envelope.metadata)
         thin_envelope.metadata["partition_key"] = str(entity_id)
 
-        # Store thin event in outbox
+        # Store thin event in outbox - USE TOPIC NAME AS EVENT_TYPE
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="spellcheck_job",
             aggregate_id=str(entity_id),
-            event_type="SpellcheckPhaseCompletedV1",
+            event_type=thin_topic,  # Use topic name, not class name!
             event_data=thin_envelope,
             topic=thin_topic,
         )
@@ -200,7 +200,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
             extra={
                 "correlation_id": str(correlation_id),
                 "entity_id": entity_id,
-                "event_type": "SpellcheckPhaseCompletedV1",
+                "event_type": thin_topic,  # Log the actual topic name
                 "topic": thin_topic,
             },
         )
@@ -210,7 +210,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
 
         rich_envelope = EventEnvelope[SpellcheckResultV1](
-            event_type="SpellcheckResultV1",
+            event_type=rich_topic,
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=rich_event,
@@ -223,11 +223,11 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         inject_trace_context(rich_envelope.metadata)
         rich_envelope.metadata["partition_key"] = str(entity_id)
 
-        # Store rich event in outbox
+        # Store rich event in outbox - USE TOPIC NAME AS EVENT_TYPE
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="spellcheck_job",
             aggregate_id=str(entity_id),
-            event_type="SpellcheckResultV1",
+            event_type=rich_topic,  # Use topic name, not class name!
             event_data=rich_envelope,
             topic=rich_topic,
         )
@@ -237,7 +237,7 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
             extra={
                 "correlation_id": str(correlation_id),
                 "entity_id": entity_id,
-                "event_type": "SpellcheckResultV1",
+                "event_type": rich_topic,  # Log the actual topic name
                 "topic": rich_topic,
             },
         )

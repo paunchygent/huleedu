@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import AsyncGenerator
 
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
@@ -117,7 +118,7 @@ class SpellCheckerServiceProvider(Provider):
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaPublisherProtocol:
+    ) -> AsyncGenerator[KafkaPublisherProtocol, None]:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
@@ -148,17 +149,31 @@ class SpellCheckerServiceProvider(Provider):
             kafka_publisher = base_kafka_bus
 
         await kafka_publisher.start()
-        return kafka_publisher
+        try:
+            yield kafka_publisher  # type: ignore[misc]
+        finally:
+            try:
+                await kafka_publisher.stop()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
-        """Provide Redis client for idempotency operations."""
+    async def provide_redis_client(
+        self, settings: Settings
+    ) -> AsyncGenerator[AtomicRedisClientProtocol, None]:
+        """Provide Redis client for idempotency operations with cleanup."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis",
             redis_url=settings.REDIS_URL,
         )
         await redis_client.start()
-        return redis_client
+        try:
+            yield redis_client  # type: ignore[misc]
+        finally:
+            try:
+                await redis_client.stop()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
     async def provide_base_redis_client(
@@ -168,9 +183,16 @@ class SpellCheckerServiceProvider(Provider):
         return atomic_redis_client
 
     @provide(scope=Scope.APP)
-    async def provide_http_session(self) -> ClientSession:
-        """Provide HTTP client session."""
-        return ClientSession()
+    async def provide_http_session(self) -> AsyncGenerator[ClientSession, None]:
+        """Provide HTTP client session with cleanup."""
+        session = ClientSession()
+        try:
+            yield session  # type: ignore[misc]
+        finally:
+            try:
+                await session.close()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
     def provide_content_client(self, settings: Settings) -> ContentClientProtocol:

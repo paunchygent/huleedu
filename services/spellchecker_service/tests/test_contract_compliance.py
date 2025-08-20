@@ -197,7 +197,7 @@ class TestEventContractCompliance:
         corrected_text: str,
     ) -> None:
         """Test that event publisher creates both thin and rich events with correct structure."""
-        
+
         # 1. Mock Protocol Implementations - only mock external dependencies
         mock_content_client = AsyncMock(spec=ContentClientProtocol)
         mock_content_client.fetch_content.return_value = sample_text
@@ -211,10 +211,10 @@ class TestEventContractCompliance:
             DefaultSpellcheckEventPublisher,
         )
         from services.spellchecker_service.implementations.outbox_manager import OutboxManager
-        
+
         # Mock the outbox manager
         mock_outbox_manager = AsyncMock(spec=OutboxManager)
-        
+
         real_event_publisher = DefaultSpellcheckEventPublisher(
             source_service_name="test-spellchecker-service",
             outbox_manager=mock_outbox_manager,
@@ -239,7 +239,7 @@ class TestEventContractCompliance:
             mock_content_client,
             mock_result_store,
             real_event_publisher,  # Use real event publisher
-            real_spell_logic,      # Use real spell logic
+            real_spell_logic,  # Use real spell logic
             consumer_group_id="test-group",
         )
 
@@ -256,17 +256,17 @@ class TestEventContractCompliance:
         # Verify thin event (SPELLCHECK_PHASE_COMPLETED)
         assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
         assert thin_call.kwargs["topic"] == topic_name(SPELLCHECK_PHASE_COMPLETED)
-        
+
         thin_envelope = thin_call.kwargs["event_data"]
         assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
         assert thin_envelope.source_service == "test-spellchecker-service"
-        
+
         # Verify thin event data structure compliance
         thin_data = thin_envelope.data
         assert isinstance(thin_data, SpellcheckPhaseCompletedV1)
         assert thin_data.entity_id == sample_essay_id
         assert thin_data.batch_id is not None  # Should have batch ID from parent_id
-        assert thin_data.status is not None    # Should have processing status
+        assert thin_data.status is not None  # Should have processing status
         assert thin_data.corrected_text_storage_id == mock_corrected_storage_id
         assert thin_data.processing_duration_ms >= 0
         assert thin_data.timestamp is not None
@@ -275,11 +275,11 @@ class TestEventContractCompliance:
         # Verify rich event (SPELLCHECK_RESULTS)
         assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
         assert rich_call.kwargs["topic"] == topic_name(SPELLCHECK_RESULTS)
-        
+
         rich_envelope = rich_call.kwargs["event_data"]
         assert rich_envelope.event_type == "SpellcheckResultV1"
         assert rich_envelope.source_service == "test-spellchecker-service"
-        
+
         # Verify rich event data structure compliance
         rich_data = rich_envelope.data
         assert isinstance(rich_data, SpellcheckResultV1)
@@ -296,7 +296,7 @@ class TestEventContractCompliance:
 
         # Verify both events have the same correlation ID
         assert thin_data.correlation_id == rich_data.correlation_id
-        
+
         # Verify both events have the same entity_id
         assert thin_data.entity_id == rich_data.entity_id
 

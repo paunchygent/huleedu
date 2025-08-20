@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from common_core.domain_enums import ContentType
-from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.status_enums import EssayStatus, ProcessingStage
 

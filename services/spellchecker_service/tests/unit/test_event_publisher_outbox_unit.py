@@ -71,7 +71,7 @@ class TestDefaultSpellcheckEventPublisher:
         """Verify SpellcheckResultDataV1 publishes both thin and rich events to outbox."""
         # Given
         from common_core.domain_enums import ContentType
-        
+
         system_metadata = SystemProcessingMetadata(
             entity_id=sample_entity_id,
             entity_type="essay",
@@ -82,9 +82,7 @@ class TestDefaultSpellcheckEventPublisher:
         )
 
         storage_metadata = StorageReferenceMetadata(
-            references={
-                ContentType.CORRECTED_TEXT: {"default": "corrected-text-456"}
-            }
+            references={ContentType.CORRECTED_TEXT: {"default": "corrected-text-456"}}
         )
 
         event_data = SpellcheckResultDataV1(
@@ -105,14 +103,14 @@ class TestDefaultSpellcheckEventPublisher:
 
         # Then - Verify TWO events were published to outbox
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Check thin event (first call)
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         assert thin_call.kwargs["aggregate_type"] == "spellcheck_job"
         assert thin_call.kwargs["aggregate_id"] == sample_entity_id
         assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
         assert thin_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
-        
+
         thin_envelope = thin_call.kwargs["event_data"]
         assert isinstance(thin_envelope, EventEnvelope)
         assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
@@ -123,14 +121,14 @@ class TestDefaultSpellcheckEventPublisher:
         assert thin_envelope.data.batch_id == "batch-456"
         assert thin_envelope.data.status == ProcessingStatus.COMPLETED
         assert thin_envelope.data.corrected_text_storage_id == "corrected-text-456"
-        
+
         # Check rich event (second call)
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         assert rich_call.kwargs["aggregate_type"] == "spellcheck_job"
         assert rich_call.kwargs["aggregate_id"] == sample_entity_id
         assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
         assert rich_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
-        
+
         rich_envelope = rich_call.kwargs["event_data"]
         assert isinstance(rich_envelope, EventEnvelope)
         assert rich_envelope.event_type == "SpellcheckResultV1"
@@ -217,7 +215,7 @@ class TestDefaultSpellcheckEventPublisher:
 
         # Then - Verify TWO envelopes were passed to OutboxManager
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Check thin event envelope
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         thin_envelope = thin_call.kwargs["event_data"]
@@ -228,7 +226,7 @@ class TestDefaultSpellcheckEventPublisher:
         assert isinstance(thin_envelope.data, SpellcheckPhaseCompletedV1)
         assert thin_envelope.metadata is not None
         assert thin_envelope.metadata["partition_key"] == sample_entity_id
-        
+
         # Check rich event envelope
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         rich_envelope = rich_call.kwargs["event_data"]
@@ -278,7 +276,7 @@ class TestDefaultSpellcheckEventPublisher:
 
         # Then - Verify both envelopes are serializable
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Check thin event serialization
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         thin_envelope = thin_call.kwargs["event_data"]
@@ -289,7 +287,7 @@ class TestDefaultSpellcheckEventPublisher:
         assert thin_envelope_data["correlation_id"] == str(sample_correlation_id)
         json_thin = json.dumps(thin_envelope_data)
         assert json_thin  # Should not raise exception
-        
+
         # Check rich event serialization
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         rich_envelope = rich_call.kwargs["event_data"]
@@ -337,13 +335,13 @@ class TestDefaultSpellcheckEventPublisher:
 
         # Then - Verify partition key was added to both envelopes
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Check thin event partition key
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         thin_envelope = thin_call.kwargs["event_data"]
         assert thin_envelope.metadata is not None
         assert thin_envelope.metadata["partition_key"] == sample_entity_id
-        
+
         # Check rich event partition key
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         rich_envelope = rich_call.kwargs["event_data"]
@@ -366,7 +364,7 @@ class TestDefaultSpellcheckEventPublisher:
             timestamp=datetime.now(timezone.utc),
             processing_stage=ProcessingStage.FAILED,
             event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
-            error_info={"error_code": "SPELLCHECK_FAILED", "error_message": "Processing failed"}
+            error_info={"error_code": "SPELLCHECK_FAILED", "error_message": "Processing failed"},
         )
 
         event_data = SpellcheckResultDataV1(
@@ -387,7 +385,7 @@ class TestDefaultSpellcheckEventPublisher:
 
         # Then - Verify both events are published with failure status
         assert mock_outbox_manager.publish_to_outbox.call_count == 2
-        
+
         # Check thin event has failure status
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         thin_envelope = thin_call.kwargs["event_data"]
@@ -396,7 +394,7 @@ class TestDefaultSpellcheckEventPublisher:
         assert thin_envelope.data.error_code is not None
         assert "SPELLCHECK_FAILED" in thin_envelope.data.error_code
         assert thin_envelope.data.corrected_text_storage_id is None
-        
+
         # Check rich event has failure status
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         rich_envelope = rich_call.kwargs["event_data"]

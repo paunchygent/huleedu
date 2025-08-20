@@ -120,10 +120,14 @@ class BCSKafkaConsumer:
         """Single attempt to start consuming with proper cleanup on failure."""
         # Subscribe to processing result topics
         topics = [
-            topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),  # New thin event for batch coordination
+            topic_name(
+                ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+            ),  # New thin event for batch coordination
             # topic_name(ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED),  # Not implemented yet
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
-            topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),  # ELS phase completions for dependency resolution
+            topic_name(
+                ProcessingEvent.ELS_BATCH_PHASE_OUTCOME
+            ),  # ELS phase completions for dependency resolution
             # Add more specialized service result topics as needed
         ]
 

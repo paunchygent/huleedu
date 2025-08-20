@@ -353,6 +353,15 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                 },
                             )
 
+                        # Preserve existing commanded_phases metadata
+                        existing_commanded_phases = essay_state.processing_metadata.get(
+                            "commanded_phases", []
+                        )
+
+                        # Ensure spellcheck is in commanded_phases
+                        if "spellcheck" not in existing_commanded_phases:
+                            existing_commanded_phases.append("spellcheck")
+
                         await self.repository.update_essay_status_via_machine(
                             essay_id,
                             state_machine.current_status,
@@ -364,6 +373,7 @@ class DefaultServiceResultHandler(ServiceResultHandler):
                                     "error_code": error_code,
                                 },
                                 "current_phase": "spellcheck",
+                                "commanded_phases": existing_commanded_phases,
                                 "phase_outcome_status": status.value,
                             },
                             session,

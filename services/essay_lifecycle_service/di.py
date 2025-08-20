@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -150,7 +151,7 @@ class CoreInfrastructureProvider(Provider):
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaPublisherProtocol:
+    ) -> AsyncGenerator[KafkaPublisherProtocol, None]:
         """Provide Kafka bus for event publishing with optional circuit breaker protection."""
         # Create base KafkaBus instance
         base_kafka_bus = KafkaBus(
@@ -181,29 +182,44 @@ class CoreInfrastructureProvider(Provider):
             kafka_publisher = base_kafka_bus
 
         await kafka_publisher.start()
-        return kafka_publisher
+
+        try:
+            # Yield for container usage; Dishka will run finalizer after container closes
+            yield kafka_publisher  # type: ignore[misc]
+        finally:
+            try:
+                await kafka_publisher.stop()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
-    async def provide_http_session(self) -> ClientSession:
-        """Provide HTTP client session."""
-        return ClientSession()
+    async def provide_http_session(self) -> AsyncGenerator[ClientSession, None]:
+        """Provide HTTP client session with automatic cleanup."""
+        session = ClientSession()
+        try:
+            yield session  # type: ignore[misc]
+        finally:
+            try:
+                await session.close()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
-        """Provide Redis client for idempotency and pub/sub operations."""
+    async def provide_redis_client(
+        self, settings: Settings
+    ) -> AsyncGenerator[AtomicRedisClientProtocol, None]:
+        """Provide Redis client for idempotency and pub/sub operations with cleanup."""
         redis_client = RedisClient(
             client_id=f"{settings.SERVICE_NAME}-redis", redis_url=settings.REDIS_URL
         )
         await redis_client.start()
-
-        # Register shutdown finalizer to prevent connection leaks
-        async def _shutdown_redis() -> None:
-            await redis_client.stop()
-
-        # TODO Note: In production, this would be registered with the app lifecycle
-        # For now, we rely on container cleanup
-
-        return redis_client
+        try:
+            yield redis_client  # type: ignore[misc]
+        finally:
+            try:
+                await redis_client.stop()
+            except Exception:
+                pass
 
     @provide(scope=Scope.APP)
     def provide_database_engine(self, settings: Settings) -> AsyncEngine:

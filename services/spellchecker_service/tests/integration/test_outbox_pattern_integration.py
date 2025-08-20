@@ -141,9 +141,7 @@ class OutboxIntegrationTestProvider(Provider):
     ) -> SpellcheckEventPublisherProtocol:
         """Provide event publisher."""
         return DefaultSpellcheckEventPublisher(
-            kafka_event_type="huleedu.essay.spellcheck.completed.v1",
             source_service_name="spell-checker-service",
-            kafka_output_topic="huleedu.essay.spellcheck.completed.v1",
             outbox_manager=outbox_manager,
         )
 

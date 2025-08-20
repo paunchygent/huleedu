@@ -69,7 +69,9 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
     """Create and configure Kafka consumer."""
     # Define topics using topic_name() function for consistency
     topics = [
-        topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),  # New thin event for state transitions
+        topic_name(
+            ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+        ),  # New thin event for state transitions
         topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),
         topic_name(ProcessingEvent.ESSAY_CONTENT_PROVISIONED),
         topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED),  # Added for validation coordination

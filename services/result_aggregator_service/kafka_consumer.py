@@ -52,7 +52,9 @@ class ResultAggregatorKafkaConsumer:
             topic_name(ProcessingEvent.BATCH_ESSAYS_REGISTERED),  # Add batch registration
             topic_name(ProcessingEvent.ESSAY_SLOT_ASSIGNED),  # Add slot assignment for traceability
             topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
-            topic_name(ProcessingEvent.SPELLCHECK_RESULTS),  # Rich event for business data aggregation
+            topic_name(
+                ProcessingEvent.SPELLCHECK_RESULTS
+            ),  # Rich event for business data aggregation
             topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),  # Rich event for business data
             topic_name(
                 ProcessingEvent.BATCH_PIPELINE_COMPLETED
