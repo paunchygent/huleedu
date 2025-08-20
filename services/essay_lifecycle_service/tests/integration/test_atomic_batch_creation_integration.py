@@ -22,7 +22,7 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -45,6 +45,7 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
 from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
     RedisPendingContentOperations,
 )
+from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import EventPublisher
 
 
@@ -232,12 +233,14 @@ class TestAtomicBatchCreationIntegration:
     @pytest.fixture
     async def postgres_repository(self, test_settings: Settings) -> PostgreSQLEssayRepository:
         """Create PostgreSQL repository with test database."""
-        repository = PostgreSQLEssayRepository(test_settings)
-        await repository.initialize_db_schema()
-        await repository.run_migrations()  # Add foreign key constraints
+        engine = create_async_engine(test_settings.DATABASE_URL, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        repository = PostgreSQLEssayRepository(session_factory)
 
         # Clean up any existing data to ensure test isolation
-        async with repository.session() as session:
+        async with repository.get_session_factory()() as session:
             from sqlalchemy import delete
 
             from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
@@ -269,7 +272,9 @@ class TestAtomicBatchCreationIntegration:
         self, test_settings: Settings, postgres_repository: PostgreSQLEssayRepository
     ) -> BatchTrackerPersistence:
         """Create real batch tracker persistence with PostgreSQL."""
-        return BatchTrackerPersistence(postgres_repository.engine)
+        # Use the engine from the session factory
+        engine = create_async_engine(test_settings.DATABASE_URL, echo=False)
+        return BatchTrackerPersistence(engine)
 
     @pytest.fixture
     async def redis_script_manager(self, redis_client: AtomicRedisClientProtocol) -> Any:
@@ -453,7 +458,7 @@ class TestAtomicBatchCreationIntegration:
         # Arrange - First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
 
-        async with postgres_repository.session() as session:
+        async with postgres_repository.get_session_factory()() as session:
             batch_tracker_record = BatchEssayTracker(
                 batch_id=sample_batch_event.entity_id,
                 expected_essay_ids=sample_batch_event.essay_ids,

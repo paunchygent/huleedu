@@ -22,6 +22,7 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.redis_client import RedisClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -60,6 +61,7 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
+from services.essay_lifecycle_service.models_db import Base
 
 logger = create_service_logger("test.redis_transaction_db_update")
 
@@ -105,11 +107,13 @@ class TestRedisTransactionAndDatabaseUpdate:
             failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
             slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
-            repository = PostgreSQLEssayRepository(settings)
-            await repository.initialize_db_schema()
-            await repository.run_migrations()
+            engine = create_async_engine(settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            repository = PostgreSQLEssayRepository(session_factory)
 
-            persistence = BatchTrackerPersistence(repository.engine)
+            persistence = BatchTrackerPersistence(engine)
 
             # Create mock pending content ops for testing
             mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
@@ -161,7 +165,7 @@ class TestRedisTransactionAndDatabaseUpdate:
 
             # Cleanup
             await redis_client.stop()
-            await repository.engine.dispose()
+            await engine.dispose()
 
     async def test_slot_assignment_with_content_provisioning(
         self, test_infrastructure: dict[str, Any]

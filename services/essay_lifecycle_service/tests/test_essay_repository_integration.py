@@ -19,12 +19,14 @@ from common_core.error_enums import ErrorCode
 # EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from services.essay_lifecycle_service.models_db import Base
 
 
 class TestPostgreSQLEssayRepositoryIntegration:
@@ -80,14 +82,19 @@ class TestPostgreSQLEssayRepositoryIntegration:
     @pytest.fixture
     async def postgres_repository(self, test_settings: Settings) -> PostgreSQLEssayRepository:
         """Create PostgreSQL repository with test database."""
-        repository = PostgreSQLEssayRepository(test_settings)
+        # Create engine and session factory
+        engine = create_async_engine(test_settings.DATABASE_URL, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
         # Initialize the database schema
-        await repository.initialize_db_schema()
-        # Run migrations to apply constraints
-        await repository.run_migrations()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Create repository with session factory
+        repository = PostgreSQLEssayRepository(session_factory)
 
         # Clean up any existing data to ensure test isolation
-        async with repository.session() as session:
+        async with session_factory() as session:
             from sqlalchemy import delete
 
             from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB

@@ -82,7 +82,9 @@ async def test_kafka_bus_with_circuit_breaker(
         patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start,
         patch.object(KafkaBus, "stop", new_callable=AsyncMock),
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
+        # Handle async generator properly
+        kafka_gen = provider.provide_kafka_bus(mock_settings, registry)
+        kafka_bus = await kafka_gen.__anext__()
 
         try:
             # Should return ResilientKafkaPublisher when circuit breaker is enabled
@@ -109,6 +111,7 @@ async def test_kafka_bus_with_circuit_breaker(
         finally:
             # Cleanup to avoid pending tasks
             await kafka_bus.stop()
+            await kafka_gen.aclose()
 
 
 @pytest.mark.asyncio
@@ -121,16 +124,21 @@ async def test_kafka_bus_without_circuit_breaker(
 
     # Mock the KafkaBus.start method to avoid actual Kafka connection
     with patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start:
-        kafka_bus = await provider.provide_kafka_bus(mock_settings_disabled, registry)
+        # Handle async generator properly
+        kafka_gen = provider.provide_kafka_bus(mock_settings_disabled, registry)
+        kafka_bus = await kafka_gen.__anext__()
 
-        # Should return base KafkaBus when circuit breaker is disabled
-        assert isinstance(kafka_bus, KafkaBus)
-        assert not isinstance(kafka_bus, ResilientKafkaPublisher)
-        assert kafka_bus.client_id == "test-essay-lifecycle-producer"
-        assert kafka_bus.bootstrap_servers == "localhost:9092"
+        try:
+            # Should return base KafkaBus when circuit breaker is disabled
+            assert isinstance(kafka_bus, KafkaBus)
+            assert not isinstance(kafka_bus, ResilientKafkaPublisher)
+            assert kafka_bus.client_id == "test-essay-lifecycle-producer"
+            assert kafka_bus.bootstrap_servers == "localhost:9092"
 
-        # Verify start was called
-        mock_start.assert_called_once()
+            # Verify start was called
+            mock_start.assert_called_once()
+        finally:
+            await kafka_gen.aclose()
 
 
 @pytest.mark.asyncio
@@ -141,18 +149,23 @@ async def test_circuit_breaker_configuration(
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
     with patch.object(KafkaBus, "start", new_callable=AsyncMock):
-        await provider.provide_kafka_bus(mock_settings, registry)
+        # Handle async generator properly
+        kafka_gen = provider.provide_kafka_bus(mock_settings, registry)
+        kafka_bus = await kafka_gen.__anext__()
 
-        # Get the circuit breaker from registry
-        circuit_breaker = registry.get("kafka_producer")
-        assert circuit_breaker is not None
-        assert isinstance(circuit_breaker, CircuitBreaker)
+        try:
+            # Get the circuit breaker from registry
+            circuit_breaker = registry.get("kafka_producer")
+            assert circuit_breaker is not None
+            assert isinstance(circuit_breaker, CircuitBreaker)
 
-        # Verify configuration matches settings
-        assert circuit_breaker.failure_threshold == 5
-        assert circuit_breaker.recovery_timeout == timedelta(seconds=30)
-        assert circuit_breaker.success_threshold == 2
-        assert circuit_breaker.name == "essay-lifecycle-service.kafka_producer"
+            # Verify configuration matches settings
+            assert circuit_breaker.failure_threshold == 5
+            assert circuit_breaker.recovery_timeout == timedelta(seconds=30)
+            assert circuit_breaker.success_threshold == 2
+            assert circuit_breaker.name == "essay-lifecycle-service.kafka_producer"
+        finally:
+            await kafka_gen.aclose()
 
 
 @pytest.mark.asyncio
@@ -188,11 +201,16 @@ async def test_lifecycle_cleanup(
         patch.object(KafkaBus, "start", new_callable=AsyncMock),
         patch.object(KafkaBus, "stop", new_callable=AsyncMock) as mock_stop,
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
+        # Handle async generator properly
+        kafka_gen = provider.provide_kafka_bus(mock_settings, registry)
+        kafka_bus = await kafka_gen.__anext__()
 
-        # Test cleanup
-        await kafka_bus.stop()
-        mock_stop.assert_called_once()
+        try:
+            # Test cleanup
+            await kafka_bus.stop()
+            mock_stop.assert_called_once()
+        finally:
+            await kafka_gen.aclose()
 
 
 def test_env_prefix() -> None:
@@ -225,8 +243,11 @@ async def test_integration_with_existing_providers(
         patch.object(KafkaBus, "start", new_callable=AsyncMock),
         patch.object(KafkaBus, "stop", new_callable=AsyncMock),
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, cb_registry)
+        # Handle async generator properly
+        kafka_gen = provider.provide_kafka_bus(mock_settings, cb_registry)
+        kafka_bus = await kafka_gen.__anext__()
         try:
             assert kafka_bus is not None
         finally:
             await kafka_bus.stop()
+            await kafka_gen.aclose()

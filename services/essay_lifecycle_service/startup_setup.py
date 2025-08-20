@@ -8,6 +8,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.di import (
@@ -20,6 +21,7 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.metrics import get_http_metrics
+from services.essay_lifecycle_service.models_db import Base
 
 logger = create_service_logger("els.startup")
 
@@ -60,10 +62,14 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
         if settings.ENVIRONMENT != "testing" and not getattr(
             settings, "USE_MOCK_REPOSITORY", False
         ):
-            # Create temporary repository instance to initialize schema and get engine
-            temp_repo = PostgreSQLEssayRepository(settings)
-            await temp_repo.initialize_db_schema()
-            app.database_engine = temp_repo.engine
+            # Create engine and session factory for schema initialization
+            engine = create_async_engine(settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            # Create temporary repository instance with session factory
+            temp_repo = PostgreSQLEssayRepository(session_factory)
+            app.database_engine = engine
             logger.info("Database schema initialized and engine stored for health checks")
 
         logger.info(

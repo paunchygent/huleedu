@@ -16,12 +16,14 @@ import pytest
 
 # EntityReference removed - using primitive parameters
 from common_core.status_enums import EssayStatus
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
+from services.essay_lifecycle_service.models_db import Base
 
 
 class TestBatchStatusPerformanceIntegration:
@@ -59,8 +61,11 @@ class TestBatchStatusPerformanceIntegration:
         db_url = postgres_container.get_connection_url().replace("psycopg2", "asyncpg")
         settings = self.PostgreSQLTestSettings(db_url)
 
-        repository = PostgreSQLEssayRepository(settings)
-        await repository.initialize_db_schema()
+        engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        repository = PostgreSQLEssayRepository(session_factory)
         return repository
 
     async def test_batch_status_performance_realistic_batch_size(
@@ -73,7 +78,7 @@ class TestBatchStatusPerformanceIntegration:
         # First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
 
-        async with postgres_repository.session() as session:
+        async with postgres_repository.get_session_factory()() as session:
             batch_tracker = BatchEssayTracker(
                 batch_id=batch_id,
                 expected_essay_ids=[f"essay-{i:03d}" for i in range(essay_count)],
@@ -166,7 +171,7 @@ class TestBatchStatusPerformanceIntegration:
         # First create the batch tracker record to satisfy foreign key constraint
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
 
-        async with postgres_repository.session() as session:
+        async with postgres_repository.get_session_factory()() as session:
             batch_tracker = BatchEssayTracker(
                 batch_id=batch_id,
                 expected_essay_ids=[f"large-essay-{i:03d}" for i in range(essay_count)],

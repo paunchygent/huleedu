@@ -249,23 +249,33 @@ class CoreInfrastructureProvider(Provider):
         return async_sessionmaker(engine, expire_on_commit=False)
 
     @provide(scope=Scope.APP)
+    async def initialize_database_schema(self, engine: AsyncEngine, settings: Settings) -> None:
+        """Initialize database schema at startup."""
+        if settings.ENVIRONMENT != "testing":
+            from services.essay_lifecycle_service.models_db import Base
+
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+    @provide(scope=Scope.APP)
     async def provide_essay_repository(
-        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
+        self,
+        session_factory: async_sessionmaker,
+        database_metrics: DatabaseMetrics,
+        settings: Settings,
     ) -> EssayRepositoryProtocol:
         """
         Provide essay repository implementation with environment-based selection.
 
         Uses MockEssayRepository for development/testing and PostgreSQL for production,
-        following the three-tier repository pattern established in Phase 0-2.
+        following the session factory injection pattern.
         """
         if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
             # Development/testing: use fast in-memory mock implementation
             return MockEssayRepository()
         else:
-            # Production: use PostgreSQL implementation with database metrics
-            postgres_repo = PostgreSQLEssayRepository(settings, database_metrics)
-            await postgres_repo.initialize_db_schema()
-            return postgres_repo
+            # Production: use PostgreSQL implementation with injected session factory
+            return PostgreSQLEssayRepository(session_factory, database_metrics)
 
     @provide(scope=Scope.APP)
     def provide_service_name(self, settings: Settings) -> str:

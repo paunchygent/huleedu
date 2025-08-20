@@ -22,6 +22,7 @@ from common_core.domain_enums import CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import SystemProcessingMetadata
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -60,6 +61,7 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
+from services.essay_lifecycle_service.models_db import Base
 
 from .test_utils import DistributedTestSettings, PerformanceMetrics
 
@@ -121,11 +123,13 @@ class TestDistributedPerformance:
             await redis_client.stop()
 
             # Clean PostgreSQL - with proper engine disposal
-            repository = PostgreSQLEssayRepository(performance_settings)
+            engine = create_async_engine(performance_settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            repository = PostgreSQLEssayRepository(session_factory)
             try:
-                await repository.initialize_db_schema()
-
-                async with repository.session() as session:
+                async with repository.get_session_factory()() as session:
                     from sqlalchemy import delete
 
                     from services.essay_lifecycle_service.models_db import (
@@ -138,7 +142,7 @@ class TestDistributedPerformance:
                     await session.commit()
             finally:
                 # CRITICAL: Dispose cleanup repository engine to prevent leakage
-                await repository.engine.dispose()
+                await engine.dispose()
 
             # Force garbage collection
             import gc
@@ -163,7 +167,11 @@ class TestDistributedPerformance:
             )
             await redis_client.start()
 
-            repo = PostgreSQLEssayRepository(performance_settings)
+            engine = create_async_engine(performance_settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            repo = PostgreSQLEssayRepository(session_factory)
 
             # Create modular Redis components
             redis_script_manager = RedisScriptManager(redis_client)
@@ -172,7 +180,7 @@ class TestDistributedPerformance:
             failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
             slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
-            batch_tracker_persistence = BatchTrackerPersistence(repo.engine)
+            batch_tracker_persistence = BatchTrackerPersistence(engine)
 
             # Create mock pending content ops for testing
             mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
@@ -237,9 +245,7 @@ class TestDistributedPerformance:
             engines_to_dispose = set()
             for i, handler in enumerate(instances):
                 try:
-                    # Collect all unique engines
-                    if hasattr(handler, "repository") and hasattr(handler.repository, "engine"):
-                        engines_to_dispose.add(handler.repository.engine)
+                    # Collect all unique engines from batch tracker persistence only
                     if hasattr(handler.batch_tracker, "_persistence") and hasattr(
                         handler.batch_tracker._persistence, "engine"
                     ):

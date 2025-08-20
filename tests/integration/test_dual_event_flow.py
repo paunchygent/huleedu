@@ -302,7 +302,10 @@ class TestDualEventPatternIntegration:
         spellchecker_engine = create_async_engine(postgres_url, echo=False)
 
         # Force ELS to use the test engine and a real Postgres repo via context overrides
-        postgres_repo = PostgreSQLEssayRepository(els_settings, database_metrics=None)
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        session_factory = async_sessionmaker(els_engine, expire_on_commit=False)
+        postgres_repo = PostgreSQLEssayRepository(session_factory, database_metrics=None)
 
         els_container = make_async_container(
             CoreInfrastructureProvider(),
@@ -368,7 +371,7 @@ class TestDualEventPatternIntegration:
             async for msg in els_consumer:
                 try:
                     # Deserialize envelope and event
-                    envelope = EventEnvelope.model_validate_json(msg.value)
+                    envelope: EventEnvelope = EventEnvelope.model_validate_json(msg.value)
                     event = SpellcheckPhaseCompletedV1.model_validate(envelope.data)
 
                     # Map thin event ProcessingStatus to ELS EssayStatus

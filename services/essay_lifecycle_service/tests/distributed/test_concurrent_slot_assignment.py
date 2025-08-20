@@ -21,6 +21,7 @@ from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -59,6 +60,7 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
+from services.essay_lifecycle_service.models_db import Base
 
 from .test_sync_utils import wait_for_batch_ready, wait_for_condition
 from .test_utils import DistributedTestSettings, PerformanceMetrics
@@ -118,10 +120,13 @@ class TestConcurrentSlotAssignment:
             await redis_client.stop()
 
         # Clean PostgreSQL
-        repository = PostgreSQLEssayRepository(distributed_settings)
-        await repository.initialize_db_schema()
+        engine = create_async_engine(distributed_settings.DATABASE_URL, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        repository = PostgreSQLEssayRepository(session_factory)
 
-        async with repository.session() as session:
+        async with repository.get_session_factory()() as session:
             from sqlalchemy import delete
 
             from services.essay_lifecycle_service.models_db import BatchEssayTracker, EssayStateDB
@@ -130,6 +135,7 @@ class TestConcurrentSlotAssignment:
             await session.execute(delete(BatchEssayTracker))
             await session.commit()
 
+        await engine.dispose()
         yield
 
     @pytest.fixture
@@ -154,7 +160,11 @@ class TestConcurrentSlotAssignment:
             await redis_client.start()
 
             # Shared PostgreSQL repository
-            repository = PostgreSQLEssayRepository(distributed_settings)
+            engine = create_async_engine(distributed_settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            repository = PostgreSQLEssayRepository(session_factory)
 
             # Create modular Redis components
             redis_script_manager = RedisScriptManager(redis_client)
@@ -164,7 +174,7 @@ class TestConcurrentSlotAssignment:
             slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
 
             # Batch tracker with modular DI components
-            batch_tracker_persistence = BatchTrackerPersistence(repository.engine)
+            batch_tracker_persistence = BatchTrackerPersistence(engine)
 
             # Create mock pending content ops for testing
             mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)

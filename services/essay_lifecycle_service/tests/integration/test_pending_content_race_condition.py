@@ -27,6 +27,7 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.redis_client import RedisClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -65,6 +66,7 @@ from services.essay_lifecycle_service.implementations.redis_script_manager impor
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
 )
+from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import TopicNamingProtocol
 
 logger = create_service_logger("test_pending_content_race_condition")
@@ -86,6 +88,7 @@ class TestPendingContentRaceCondition:
 
         redis_client = None
         repository = None
+        engine = None
 
         try:
             # Connection strings
@@ -118,11 +121,13 @@ class TestPendingContentRaceCondition:
             pending_content_ops = RedisPendingContentOperations(redis_client)
 
             # Initialize repository
-            repository = PostgreSQLEssayRepository(settings)
-            await repository.initialize_db_schema()
-            await repository.run_migrations()
+            engine = create_async_engine(settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            repository = PostgreSQLEssayRepository(session_factory)
 
-            persistence = BatchTrackerPersistence(repository.engine)
+            persistence = BatchTrackerPersistence(engine)
 
             # Initialize batch tracker with REAL pending content ops (not mocked)
             batch_tracker = DefaultBatchEssayTracker(
@@ -187,8 +192,8 @@ class TestPendingContentRaceCondition:
             # Cleanup
             if redis_client:
                 await redis_client.stop()
-            if repository:
-                await repository.engine.dispose()
+            if engine:
+                await engine.dispose()
             postgres_container.stop()
             redis_container.stop()
 

@@ -7,7 +7,7 @@ missing entities, invalid states, and orphaned essays scenarios.
 
 from __future__ import annotations
 
-from unittest.mock import ANY, AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -406,9 +406,14 @@ class TestServiceResultHandlerSpellcheckEdgeCases:
     ) -> None:
         """Test handling when session factory fails to create session."""
         # Arrange - Simulate session factory failure
-        handler.session_factory = AsyncMock(
+        # Use Mock (not AsyncMock) because session_factory() call should be synchronous
+        failed_session_factory = Mock(
             side_effect=Exception("Failed to create database session")
         )
+
+        # Replace session factory on both the main handler and its delegate
+        handler.session_factory = failed_session_factory
+        handler.spellcheck_handler.session_factory = failed_session_factory
 
         # Act
         result = await handler.handle_spellcheck_phase_completed(

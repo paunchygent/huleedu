@@ -1,134 +1,205 @@
-# T014 — ELS Repository and Service Results SRP/DDD Refactor
+T014 — ELS Repository and Service Results SRP/DDD Refactor (REVISED)
 
-## Context
+  Context
 
-The Essay Lifecycle Service has two large modules that concentrate multiple concerns:
+  The Essay Lifecycle Service has two large modules that violate SRP:
+  - services/essay_lifecycle_service/implementations/essay_repository_postg
+  res_impl.py (~1062 LoC)
+  - services/essay_lifecycle_service/implementations/service_result_handler
+  _impl.py (~858 LoC)
 
-- `services/essay_lifecycle_service/implementations/essay_repository_postgres_impl.py` (~1062 LoC)
-- `services/essay_lifecycle_service/implementations/service_result_handler_impl.py` (~858 LoC)
+  Following our established patterns from Spellchecker and Result
+  Aggregator services, we will split these into focused modules while
+  maintaining flat implementation structure and consistent DI patterns.
 
-They currently mix responsibilities across connection/session lifecycle, schema bootstrap, data mapping, CRUD and query operations, idempotency workflows, event-orchestration, tracing, and batch completion coordination. This violates SRP and increases cognitive load, making the code harder to evolve and test.
+  Goals
 
-This task performs a clean refactor aligned with our architectural mandates (Rules 010, 020, 030, 042, 048, 050), keeping the public Protocols and DI contracts intact while splitting responsibilities into focused modules. We explicitly avoid rollback strategies, legacy pathways, or temporary compatibility layers.
+  - Enforce SRP within ELS persistence and event result handling layers
+  - Preserve public interfaces: EssayRepositoryProtocol and
+  ServiceResultHandler
+  - Follow established service patterns (flat implementations directory, no
+   nested structures)
+  - Inject async_sessionmaker instead of creating engines in repositories
+  - Maintain separation between thin events (ELS) and rich events (RAS) per
+   dual-event pattern
 
-## Goals
+  Non-Goals
 
-- Enforce SRP within ELS persistence and event result handling layers.
-- Preserve the public interfaces: `EssayRepositoryProtocol` and `ServiceResultHandler`.
-- Move infra/bootstrap concerns to DI and APP-scoped providers per Rule 042.
-- Separate read vs write responsibilities (CQRS-lite) inside the repository implementation.
-- Keep orchestration separate from domain transitions via `EssayStateMachine`.
-- Maintain structured error handling and metrics instrumentation.
+  - No nested directory structures under implementations
+  - No backward compatibility layers or legacy shims
+  - No changes to event contracts or Kafka topics
+  - No modification of the dual-event pattern
 
-## Non-Goals
+  End-State Architecture
 
-- No rollback plan, legacy shims, or backward-compat layers for old module paths.
-- No changes to event contracts or Kafka topics.
-- No redesign of domain types or state machine semantics.
+  Repository Implementation (Flat Structure)
 
-## End-State Architecture (High-Level)
+  services/essay_lifecycle_service/implementations/
+  ├── essay_repository_postgres_impl.py    # Facade (~200 LoC)
+  ├── essay_repository_queries.py          # Read/write operations (~400 
+  LoC)
+  ├── essay_repository_mappers.py          # DB↔domain mapping (~150 LoC)
+  ├── essay_repository_idempotency.py      # Content idempotency & slot ops
+   (~200 LoC)
 
-Public contracts remain unchanged:
+  Service Result Handler Implementation (Flat Structure)
 
-- `services.essay_lifecycle_service.protocols.EssayRepositoryProtocol`
-- `services.essay_lifecycle_service.protocols.ServiceResultHandler`
+  services/essay_lifecycle_service/implementations/
+  ├── service_result_handler_impl.py       # Facade (~150 LoC)
+  ├── spellcheck_result_handler.py         # SpellcheckPhaseCompletedV1 
+  handler (~200 LoC)
+  ├── cj_result_handler.py                 # CJ assessment handler (~250 
+  LoC)
+  ├── nlp_result_handler.py                # NLP completion handler (~200 
+  LoC)
+  ├── state_transition_handler.py          # State machine operations (~150
+   LoC)
 
-Implementation is split by concern:
+  Implementation Details
 
-1) Repository (Infrastructure Layer)
+  1. Repository Refactoring
 
-- `implementations/repository/postgres_repository.py` (facade implementing the Protocol; delegates)
-- `implementations/repository/session_and_monitoring.py` (engine/session/metrics wiring; APP scope)
-- `implementations/repository/bootstrap.py` (schema init + test bootstrap helpers; APP scope)
-- `implementations/repository/mappers.py` (DB↔domain mapping)
-- `implementations/repository/queries_read.py` (read operations; CQRS-lite)
-- `implementations/repository/queries_write.py` (mutations)
-- `implementations/repository/idempotency_ops.py` (content idempotency + slot assignment)
+  essay_repository_postgres_impl.py (Facade):
+  class PostgreSQLEssayRepository(EssayRepositoryProtocol):
+      """Facade for PostgreSQL essay repository."""
 
-2) Service Results (Application Layer)
+      def __init__(
+          self,
+          session_factory: async_sessionmaker,
+          database_metrics: DatabaseMetrics | None = None,
+      ):
+          self.session_factory = session_factory
+          self.database_metrics = database_metrics
+          self.queries = EssayRepositoryQueries(session_factory)
+          self.mappers = EssayRepositoryMappers()
+          self.idempotency = EssayIdempotencyOperations(session_factory)
 
-- `implementations/service_results/spellcheck_handler.py`
-- `implementations/service_results/cj_handler.py`
-- `implementations/service_results/nlp_handler.py`
-- `implementations/service_results/state_transition.py` (build machine + trigger)
-- `implementations/service_results/metadata_utils.py` (merge/normalize processing metadata)
-- Optional: `implementations/service_results/uow.py` (minimal UoW helpers if beneficial)
+  Key Changes:
+  - Remove engine creation from repository
+  - Inject async_sessionmaker from DI
+  - Delegate to specialized modules
+  - Keep facade thin (~200 LoC)
 
-`DefaultServiceResultHandler` remains the façade but delegates to the modules above.
+  2. Service Result Handler Refactoring
 
-## Scope of Changes
+  service_result_handler_impl.py (Facade):
+  class DefaultServiceResultHandler(ServiceResultHandler):
+      """Facade for service result handling."""
 
-1) Repository Refactor
+      def __init__(
+          self,
+          repository: EssayRepositoryProtocol,
+          batch_coordinator: BatchCoordinationHandler,
+          session_factory: async_sessionmaker,
+      ):
+          self.repository = repository
+          self.batch_coordinator = batch_coordinator
+          self.session_factory = session_factory
 
-- Extract engine/session/metrics to `session_and_monitoring.py` (APP-scoped provider in DI)
-- Extract schema init and test-only bootstrap SQL to `bootstrap.py` (APP-scoped, called in DI)
-- Keep `PostgreSQLEssayRepository` as a thin façade in `postgres_repository.py`, injected with `async_sessionmaker` from DI (stop creating engine inside the class)
-- Move mapping helpers to `mappers.py`
-- Split reads into `queries_read.py` and writes into `queries_write.py`
-- Move content idempotency/slot-assign flows to `idempotency_ops.py`
+          # Delegate handlers
+          self.spellcheck_handler = SpellcheckResultHandler(
+              repository, batch_coordinator, session_factory
+          )
+          self.cj_handler = CJResultHandler(
+              repository, batch_coordinator, session_factory
+          )
+          self.nlp_handler = NLPResultHandler(
+              repository, batch_coordinator, session_factory
+          )
 
-2) Service Result Handling Refactor
+  spellcheck_result_handler.py:
+  """
+  Handler for SpellcheckPhaseCompletedV1 (thin event) for state 
+  transitions.
+  Part of dual-event pattern where RAS handles rich SpellcheckResultV1.
+  """
+  class SpellcheckResultHandler:
+      async def handle_spellcheck_phase_completed(
+          self,
+          essay_id: str,
+          batch_id: str,
+          status: EssayStatus,
+          corrected_text_storage_id: str | None,
+          error_code: str | None,
+          correlation_id: UUID,
+          confirm_idempotency: Callable | None = None,
+      ) -> bool:
+          # Existing logic from service_result_handler_impl.py lines 
+  267-437
 
-- Keep `DefaultServiceResultHandler` signatures; move logic:
-  - Spellcheck → `spellcheck_handler.py`
-  - CJ Assessment (completed/failed) → `cj_handler.py`
-  - NLP completion → `nlp_handler.py`
-  - Shared: state machine build/trigger, metadata utilities
-- Remove any HTTP-coupling (e.g., `current_app.tracer` checks); prefer injected tracer or OTEL global tracer from DI where available.
+  3. DI Provider Updates
 
-3) DI Adjustments (Rule 042)
+  services/essay_lifecycle_service/di.py:
+  @provide(scope=Scope.APP)
+  def provide_database_engine(self, settings: Settings) -> AsyncEngine:
+      """Provide database engine."""
+      return create_async_engine(
+          settings.DATABASE_URL,
+          echo=False,
+          pool_size=settings.DATABASE_POOL_SIZE,
+          max_overflow=settings.DATABASE_MAX_OVERFLOW,
+      )
 
-- Provide `AsyncEngine` and `async_sessionmaker` at APP scope (already present, verify usage)
-- Call `bootstrap.initialize_db_schema` in DI startup path (APP scope) where applicable
-- Provide the repository façade with injected `session_factory` (instead of self-creating engine)
-- Keep `ServiceResultHandler` provider but construct it with delegates (or pass delegates into its constructor)
+  @provide(scope=Scope.APP)
+  def provide_session_factory(self, engine: AsyncEngine) -> 
+  async_sessionmaker:
+      """Provide async session factory."""
+      return async_sessionmaker(engine, expire_on_commit=False)
 
-## Acceptance Criteria
+  @provide(scope=Scope.APP)
+  async def provide_essay_repository(
+      self,
+      session_factory: async_sessionmaker,
+      database_metrics: DatabaseMetrics,
+  ) -> EssayRepositoryProtocol:
+      """Provide repository with injected session factory."""
+      if settings.ENVIRONMENT == "testing":
+          return MockEssayRepository()
 
-- Public Protocols unchanged (`EssayRepositoryProtocol`, `ServiceResultHandler`)
-- `DefaultServiceResultHandler` class remains importable at its current path
-- Repository implementation moved under `implementations/repository/` with the façade class implementing the Protocol
-- Service result handling split into event-specific modules; façade delegates
-- No references to engine creation inside the repository façade
-- DI providers instantiate engine/session and inject them into repository façade
-- Structured errors and metrics remain active
-- All tests pass: `pdm run test-all`
-- Linting/type checks pass: `pdm run lint` and `pdm run typecheck-all`
+      return PostgreSQLEssayRepository(session_factory, database_metrics)
 
-## Implementation Plan
+  @provide(scope=Scope.APP)
+  async def initialize_database_schema(
+      self, engine: AsyncEngine, settings: Settings
+  ) -> None:
+      """Initialize database schema at startup."""
+      if settings.ENVIRONMENT != "testing":
+          async with engine.begin() as conn:
+              await conn.run_sync(Base.metadata.create_all)
 
-1) Prepare repository module structure
+  Migration Plan
 
-- Create `implementations/repository/` package with the files listed above
-- Move code from `essay_repository_postgres_impl.py` into the appropriate modules
-- Convert `PostgreSQLEssayRepository` to depend on DI-provided `async_sessionmaker`
-- Remove engine creation and monitoring from the class; wire via DI
+  Phase 1: Repository Refactoring
 
-2) Prepare service results structure
+  1. Create new files: essay_repository_queries.py,
+  essay_repository_mappers.py, essay_repository_idempotency.py
+  2. Move code from essay_repository_postgres_impl.py to appropriate
+  modules
+  3. Update PostgreSQLEssayRepository to be a facade that delegates
+  4. Update DI to inject session_factory instead of settings
 
-- Create `implementations/service_results/` package and move per-event logic
-- Add `state_transition.py` and `metadata_utils.py` for shared concerns
-- Refactor `DefaultServiceResultHandler` to delegate to the new modules
+  Phase 2: Service Result Handler Refactoring
 
-3) Update DI providers
+  1. Create new files: spellcheck_result_handler.py, cj_result_handler.py,
+  nlp_result_handler.py, state_transition_handler.py
+  2. Move handler logic from service_result_handler_impl.py
+  3. Update DefaultServiceResultHandler to delegate to new handlers
+  4. Verify event routing in batch_command_handlers.py still works
 
-- Ensure APP-scoped engine and session factory providers are used by repository façade
-- Move schema bootstrap (and test helpers) to DI bootstrap path via `bootstrap.py`
-- Inject tracer via DI where needed (fall back to global OTEL tracer), avoid HTTP app context
+  Phase 3: Validation
 
-4) Validate
+  1. Run pdm run lint and fix any issues
+  2. Run pdm run typecheck-all and fix type errors
+  3. Run pdm run test-all to ensure all tests pass
+  4. Test with Docker: pdm run dev dev essay_lifecycle_service
 
-- Run `pdm run lint`, `pdm run typecheck-all`, and `pdm run test-all`
-- Verify event routes (`batch_command_handlers.py`) and `worker_main.py` continue to operate
-- Scan for any imports that still point to old monolith modules and update them
+  Acceptance Criteria
 
-## Risks and Considerations
-
-- Large file moves will impact import paths; we are intentionally not adding legacy re-exports to avoid back-compat layers in this prototype.
-- Keep transaction boundaries consistent: repository methods continue to accept `session` for UoW orchestration by handlers.
-- Maintain the “no business data persistence in ELS for CJ” rule; only state/metadata changes.
-
-## Follow-ups (Optional, Not Required for This Task)
-
-- Consider introducing a separate Query Protocol if read models grow further (explicit CQRS boundary).
-- Add contract tests around repository façade to lock behavior.
+  ✅ Public protocols unchanged (EssayRepositoryProtocol,
+  ServiceResultHandler)✅ Flat implementation structure (no
+  subdirectories)✅ Repository uses injected session_factory, not
+  self-created engine✅ Schema initialization happens in DI startup✅ All
+  handler methods preserve exact signatures✅ Dual-event pattern preserved
+  (thin events for ELS, rich for RAS)✅ All tests pass: pdm run test-all✅
+  Linting passes: pdm run lint✅ Type checking passes: pdm run 
+  typecheck-all
