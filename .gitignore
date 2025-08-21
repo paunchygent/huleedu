@@ -17,6 +17,14 @@ cj_essay_assessment/
 cj_ai_essay_assessment/*.xml
 /*.xml
 
+# Security - JWT and other secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
 # Service data directories
 scripts/utils/md-to-html-converter
 services/spellchecker_service/data/corrected_essays
