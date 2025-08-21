@@ -3,6 +3,7 @@
 Handles email verification token generation and validation.
 All business logic is delegated to VerificationHandler.
 """
+
 from __future__ import annotations
 
 from dishka import FromDishka
@@ -39,7 +40,7 @@ async def request_email_verification(
         jwt_token = extract_jwt_token()
         if not jwt_token:
             return jsonify({"error": "Authorization token required"}), 401
-        
+
         try:
             claims = token_issuer.verify(jwt_token)
             user_id = claims.get("sub")

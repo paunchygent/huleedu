@@ -30,15 +30,16 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
         # Check database connectivity
         checks = {"service_responsive": True, "dependencies_available": True}
         dependencies = {}
-        
+
         # Get database engine from HuleEduApp
         if TYPE_CHECKING:
             assert isinstance(current_app, HuleEduApp)
         engine = current_app.database_engine  # Guaranteed to exist with HuleEduApp
-        
+
         try:
             # Simple database check
             from sqlalchemy import text
+
             async with engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
             dependencies["database"] = {"status": "healthy"}
@@ -46,7 +47,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
             logger.warning(f"Database health check failed: {e}")
             dependencies["database"] = {"status": "unhealthy", "error": str(e)}
             checks["dependencies_available"] = False
-        
+
         # Build response
         status = "healthy" if all(checks.values()) else "unhealthy"
         response_data = {
@@ -56,14 +57,10 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
             "checks": checks,
             "dependencies": dependencies,
         }
-        
+
         status_code = 200 if status == "healthy" else 503
         return jsonify(response_data), status_code
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return jsonify({
-            "service": "identity_service",
-            "status": "unhealthy",
-            "error": str(e)
-        }), 503
+        return jsonify({"service": "identity_service", "status": "unhealthy", "error": str(e)}), 503

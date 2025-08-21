@@ -8,6 +8,7 @@ Encapsulates email verification business logic including:
 
 This handler follows the established domain handler pattern from class_management_service.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -37,10 +38,10 @@ logger = create_service_logger("identity_service.domain_handlers.verification")
 
 class RequestVerificationResult:
     """Result model for email verification request operations."""
-    
+
     def __init__(self, response: RequestEmailVerificationResponse):
         self.response = response
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return self.response.model_dump(mode="json")
@@ -48,10 +49,10 @@ class RequestVerificationResult:
 
 class VerifyEmailResult:
     """Result model for email verification operations."""
-    
+
     def __init__(self, response: VerifyEmailResponse):
         self.response = response
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return self.response.model_dump(mode="json")
@@ -59,7 +60,7 @@ class VerifyEmailResult:
 
 class VerificationHandler:
     """Encapsulates email verification business logic for Identity Service.
-    
+
     Handles email verification workflow with:
     - Token generation with configurable expiration (24 hours)
     - Email already verified validation
@@ -68,7 +69,7 @@ class VerificationHandler:
     - Event publishing for downstream services
     - Comprehensive audit logging
     """
-    
+
     def __init__(
         self,
         user_repo: UserRepo,
@@ -76,7 +77,7 @@ class VerificationHandler:
     ):
         self._user_repo = user_repo
         self._event_publisher = event_publisher
-    
+
     async def request_email_verification(
         self,
         request_data: RequestEmailVerificationRequest,
@@ -84,15 +85,15 @@ class VerificationHandler:
         correlation_id: UUID,
     ) -> RequestVerificationResult:
         """Request email verification token for a user.
-        
+
         Args:
             request_data: Verification request data
             user_id: User ID from authenticated context (JWT/session)
             correlation_id: Request correlation ID for observability
-            
+
         Returns:
             RequestVerificationResult with success message
-            
+
         Raises:
             HuleEduError: If email already verified or user not found
         """
@@ -105,7 +106,7 @@ class VerificationHandler:
                 extra={
                     "user_id": user_id,
                     "correlation_id": str(correlation_id),
-                }
+                },
             )
             raise_verification_token_invalid_error(
                 service="identity_service",
@@ -154,21 +155,21 @@ class VerificationHandler:
             correlation_id=str(correlation_id),
         )
         return RequestVerificationResult(response)
-    
+
     async def verify_email(
         self,
         verify_request: VerifyEmailRequest,
         correlation_id: UUID,
     ) -> VerifyEmailResult:
         """Verify email using verification token.
-        
+
         Args:
             verify_request: Verification token request
             correlation_id: Request correlation ID for observability
-            
+
         Returns:
             VerifyEmailResult with success message
-            
+
         Raises:
             HuleEduError: If token invalid, expired, used, or email already verified
         """

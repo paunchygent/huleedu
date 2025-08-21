@@ -8,7 +8,6 @@ Tests actual password hashing with Argon2id algorithm.
 from __future__ import annotations
 
 import re
-from typing import Any
 
 import pytest
 
@@ -47,10 +46,10 @@ class TestArgon2idPasswordHasher:
 
             # Argon2id hashes start with $argon2id$
             assert result.startswith("$argon2id$")
-            
+
             # Validate full Argon2id format: $argon2id$v=version$m=memory,t=time,p=parallelism$salt$hash
             argon2id_pattern = re.compile(
-                r'^\$argon2id\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$'
+                r"^\$argon2id\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$"
             )
             assert argon2id_pattern.match(result), f"Invalid Argon2id format: {result}"
 
@@ -59,10 +58,10 @@ class TestArgon2idPasswordHasher:
         ) -> None:
             """Should produce different hashes for same password due to salt uniqueness."""
             password = "testpassword123"
-            
+
             hash1 = hasher.hash(password)
             hash2 = hasher.hash(password)
-            
+
             assert hash1 != hash2, "Same password should produce different hashes"
             assert hash1.startswith("$argon2id$")
             assert hash2.startswith("$argon2id$")
@@ -70,13 +69,11 @@ class TestArgon2idPasswordHasher:
         def test_hash_handles_empty_password(self, hasher: Argon2idPasswordHasher) -> None:
             """Should handle empty password without error."""
             result = hasher.hash("")
-            
+
             assert result.startswith("$argon2id$")
             assert len(result) > 50  # Argon2id hashes are substantial
 
-        def test_hash_handles_unicode_passwords(
-            self, hasher: Argon2idPasswordHasher
-        ) -> None:
+        def test_hash_handles_unicode_passwords(self, hasher: Argon2idPasswordHasher) -> None:
             """Should properly handle Unicode characters in passwords."""
             unicode_passwords = [
                 "café_password",  # accented chars
@@ -85,7 +82,7 @@ class TestArgon2idPasswordHasher:
                 "🌟⭐🎉",  # Emoji only
                 "Mixed_åäö_🔐_密码",  # Mixed unicode
             ]
-            
+
             for password in unicode_passwords:
                 result = hasher.hash(password)
                 assert result.startswith("$argon2id$")
@@ -103,27 +100,23 @@ class TestArgon2idPasswordHasher:
             return password, hash_value
 
         def test_verify_returns_true_for_correct_password(
-            self, 
-            hasher: Argon2idPasswordHasher, 
-            password_and_hash: tuple[str, str]
+            self, hasher: Argon2idPasswordHasher, password_and_hash: tuple[str, str]
         ) -> None:
             """Should return True when password matches hash."""
             password, hash_value = password_and_hash
-            
+
             result = hasher.verify(hash_value, password)
-            
+
             assert result is True
 
         def test_verify_returns_false_for_incorrect_password(
-            self, 
-            hasher: Argon2idPasswordHasher, 
-            password_and_hash: tuple[str, str]
+            self, hasher: Argon2idPasswordHasher, password_and_hash: tuple[str, str]
         ) -> None:
             """Should return False when password doesn't match hash."""
             _, hash_value = password_and_hash
-            
+
             result = hasher.verify(hash_value, "wrong_password")
-            
+
             assert result is False
 
         @pytest.mark.parametrize(
@@ -137,16 +130,16 @@ class TestArgon2idPasswordHasher:
             ],
         )
         def test_verify_returns_false_for_various_wrong_passwords(
-            self, 
-            hasher: Argon2idPasswordHasher, 
+            self,
+            hasher: Argon2idPasswordHasher,
             password_and_hash: tuple[str, str],
-            wrong_password: str
+            wrong_password: str,
         ) -> None:
             """Should return False for various incorrect passwords."""
             _, hash_value = password_and_hash
-            
+
             result = hasher.verify(hash_value, wrong_password)
-            
+
             assert result is False
 
         def test_verify_handles_empty_password_verification(
@@ -155,23 +148,21 @@ class TestArgon2idPasswordHasher:
             """Should handle verification of empty password correctly."""
             empty_password = ""
             hash_value = hasher.hash(empty_password)
-            
+
             # Correct verification
             assert hasher.verify(hash_value, empty_password) is True
-            
+
             # Incorrect verification
             assert hasher.verify(hash_value, "not_empty") is False
 
-        def test_verify_handles_unicode_passwords(
-            self, hasher: Argon2idPasswordHasher
-        ) -> None:
+        def test_verify_handles_unicode_passwords(self, hasher: Argon2idPasswordHasher) -> None:
             """Should properly verify Unicode passwords."""
             unicode_password = "Kära_användare_🔐_密码"
             hash_value = hasher.hash(unicode_password)
-            
+
             # Correct verification
             assert hasher.verify(hash_value, unicode_password) is True
-            
+
             # Incorrect verification with similar Unicode
             assert hasher.verify(hash_value, "Kära_användare_🗝️_密码") is False
 
@@ -190,7 +181,7 @@ class TestArgon2idPasswordHasher:
         ) -> None:
             """Should return False for invalid hash formats without raising exceptions."""
             result = hasher.verify(invalid_hash, "any_password")
-            
+
             assert result is False
 
         def test_verify_round_trip_with_complex_passwords(
@@ -204,7 +195,7 @@ class TestArgon2idPasswordHasher:
                 "very_long_password_with_many_chars_" * 5,
                 "Mixed-Cases_123_åäö_🔐",
             ]
-            
+
             for password in complex_passwords:
                 hash_value = hasher.hash(password)
                 assert hasher.verify(hash_value, password) is True

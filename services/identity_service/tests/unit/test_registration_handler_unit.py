@@ -70,7 +70,7 @@ class TestRegistrationHandler:
     def sample_user_dict(self) -> dict:
         """Create sample user dict as returned by repository."""
         return {
-            "user_id": str(uuid4()),
+            "id": str(uuid4()),
             "email": "test@example.com",
             "org_id": "test-org",
             "email_verification_required": True,
@@ -83,7 +83,7 @@ class TestRegistrationHandler:
         def valid_register_request(self) -> RegisterRequest:
             """Create valid registration request."""
             return RegisterRequest(
-                email=EmailStr("test@example.com"),
+                email="test@example.com",
                 password="SecurePass123!",
                 org_id="test-org",
             )
@@ -92,7 +92,7 @@ class TestRegistrationHandler:
         def swedish_register_request(self) -> RegisterRequest:
             """Create registration request with Swedish characters in email domain."""
             return RegisterRequest(
-                email=EmailStr("åsa.öberg@skolan.se"),
+                email="åsa.öberg@skolan.se",
                 password="SecurePass123!",
                 org_id="swedish-school",
             )
@@ -118,15 +118,13 @@ class TestRegistrationHandler:
             # Verify return value
             assert isinstance(result, RegistrationResult)
             assert isinstance(result.response, RegisterResponse)
-            assert result.response.user_id == sample_user_dict["user_id"]
+            assert result.response.user_id == sample_user_dict["id"]
             assert str(result.response.email) == sample_user_dict["email"]
             assert result.response.org_id == sample_user_dict["org_id"]
             assert result.response.email_verification_required is True
 
             # Verify repository interactions
-            mock_user_repo.get_user_by_email.assert_called_once_with(
-                valid_register_request.email
-            )
+            mock_user_repo.get_user_by_email.assert_called_once_with(valid_register_request.email)
             mock_user_repo.create_user.assert_called_once_with(
                 valid_register_request.email,
                 valid_register_request.org_id,
@@ -134,9 +132,7 @@ class TestRegistrationHandler:
             )
 
             # Verify password hashing
-            mock_password_hasher.hash.assert_called_once_with(
-                valid_register_request.password
-            )
+            mock_password_hasher.hash.assert_called_once_with(valid_register_request.password)
 
             # Verify event publishing
             mock_event_publisher.publish_user_registered.assert_called_once_with(
@@ -154,7 +150,7 @@ class TestRegistrationHandler:
         ) -> None:
             """Should handle Swedish characters in email addresses correctly."""
             swedish_user_dict = {
-                "user_id": str(uuid4()),
+                "id": str(uuid4()),
                 "email": "åsa.öberg@skolan.se",
                 "org_id": "swedish-school",
                 "email_verification_required": True,
@@ -172,7 +168,7 @@ class TestRegistrationHandler:
 
             # Verify Swedish email passed correctly to repository
             mock_user_repo.get_user_by_email.assert_called_once_with(
-                EmailStr("åsa.öberg@skolan.se")
+                "åsa.öberg@skolan.se"
             )
 
         async def test_raises_error_when_user_already_exists(
@@ -211,13 +207,13 @@ class TestRegistrationHandler:
         ) -> None:
             """Should handle None org_id in registration request."""
             request = RegisterRequest(
-                email=EmailStr("freelancer@example.com"),
+                email="freelancer@example.com",
                 password="SecurePass789!",
                 org_id=None,
             )
 
             user_dict_no_org = {
-                "user_id": str(uuid4()),
+                "id": str(uuid4()),
                 "email": "freelancer@example.com",
                 "org_id": None,
                 "email_verification_required": True,
@@ -260,13 +256,13 @@ class TestRegistrationHandler:
         ) -> None:
             """Should handle various valid email formats and organization IDs."""
             request = RegisterRequest(
-                email=EmailStr(email),
+                email=email,
                 password=password,
                 org_id=org_id,
             )
 
             user_dict = {
-                "user_id": str(uuid4()),
+                "id": str(uuid4()),
                 "email": email,
                 "org_id": org_id,
                 "email_verification_required": True,
@@ -347,9 +343,9 @@ class TestRegistrationHandler:
             result = await handler.register_user(valid_register_request, correlation_id)
 
             result_dict = result.to_dict()
-            
+
             assert isinstance(result_dict, dict)
-            assert result_dict["user_id"] == sample_user_dict["user_id"]
+            assert result_dict["user_id"] == sample_user_dict["id"]
             assert result_dict["email"] == sample_user_dict["email"]
             assert result_dict["org_id"] == sample_user_dict["org_id"]
             assert result_dict["email_verification_required"] is True

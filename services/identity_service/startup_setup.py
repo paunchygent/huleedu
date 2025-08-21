@@ -14,7 +14,11 @@ from quart import Quart
 from quart_dishka import QuartDishka
 
 from services.identity_service.config import Settings
-from services.identity_service.di import CoreProvider, IdentityImplementationsProvider, DomainHandlerProvider
+from services.identity_service.di import (
+    CoreProvider,
+    DomainHandlerProvider,
+    IdentityImplementationsProvider,
+)
 
 logger = create_service_logger("identity_service.startup")
 

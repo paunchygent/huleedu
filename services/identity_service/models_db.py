@@ -36,14 +36,12 @@ class User(Base):
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )
-    
+
     # Security fields
     failed_login_attempts: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0")
     )
-    locked_until: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -203,6 +201,7 @@ class EventOutbox(Base):
         Index("ix_event_outbox_event_type", "event_type"),
     )
 
+
 class AuditLog(Base):
     """Audit log for security events and user actions."""
 
@@ -218,7 +217,9 @@ class AuditLog(Base):
     details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)  # IPv6 support
     user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    correlation_id: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), nullable=True)
+    correlation_id: Mapped[Optional[UUID]] = mapped_column(
+        PostgresUUID(as_uuid=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )

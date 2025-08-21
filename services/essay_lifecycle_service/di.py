@@ -411,6 +411,7 @@ class CommandHandlerProvider(Provider):
         from services.essay_lifecycle_service.implementations import (
             student_matching_command_handler,
         )
+
         StudentMatchingCommandHandler = (
             student_matching_command_handler.StudentMatchingCommandHandler
         )

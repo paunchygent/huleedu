@@ -75,41 +75,37 @@ class UserProfileRepositoryProtocol(Protocol):
         self, user_id: UUID, profile_data: dict, correlation_id: UUID
     ) -> UserProfile: ...
 
+
 class RateLimiterProtocol(Protocol):
     """Protocol for rate limiting functionality."""
-    
-    async def check_rate_limit(
-        self, 
-        key: str, 
-        limit: int, 
-        window_seconds: int
-    ) -> tuple[bool, int]:
+
+    async def check_rate_limit(self, key: str, limit: int, window_seconds: int) -> tuple[bool, int]:
         """
         Check if a rate limit allows the operation.
-        
+
         Args:
             key: The rate limit key (e.g., "login:ip:192.168.1.1")
             limit: Maximum number of attempts allowed
             window_seconds: Time window in seconds
-            
+
         Returns:
             Tuple of (allowed, remaining_attempts)
         """
         ...
-    
+
     async def increment(self, key: str, window_seconds: int) -> int:
         """
         Increment the counter for a rate limit key.
-        
+
         Args:
             key: The rate limit key
             window_seconds: TTL for the key
-            
+
         Returns:
             New count after increment
         """
         ...
-    
+
     async def reset(self, key: str) -> bool:
         """Reset a rate limit key."""
         ...
@@ -117,7 +113,7 @@ class RateLimiterProtocol(Protocol):
 
 class AuditLoggerProtocol(Protocol):
     """Protocol for audit logging functionality."""
-    
+
     async def log_action(
         self,
         action: str,
@@ -125,11 +121,11 @@ class AuditLoggerProtocol(Protocol):
         details: dict[str, Any] | None,
         ip_address: str | None,
         user_agent: str | None,
-        correlation_id: UUID
+        correlation_id: UUID,
     ) -> None:
         """
         Log an audit event.
-        
+
         Args:
             action: The action being performed (e.g., "login_attempt", "password_reset")
             user_id: User ID if authenticated
@@ -139,7 +135,7 @@ class AuditLoggerProtocol(Protocol):
             correlation_id: Request correlation ID
         """
         ...
-    
+
     async def log_login_attempt(
         self,
         email: str,
@@ -148,21 +144,17 @@ class AuditLoggerProtocol(Protocol):
         ip_address: str | None,
         user_agent: str | None,
         correlation_id: UUID,
-        failure_reason: str | None = None
+        failure_reason: str | None = None,
     ) -> None:
         """Log a login attempt."""
         ...
-    
+
     async def log_password_change(
-        self,
-        user_id: UUID,
-        ip_address: str | None,
-        user_agent: str | None,
-        correlation_id: UUID
+        self, user_id: UUID, ip_address: str | None, user_agent: str | None, correlation_id: UUID
     ) -> None:
         """Log a password change."""
         ...
-    
+
     async def log_token_operation(
         self,
         operation: str,
@@ -170,7 +162,7 @@ class AuditLoggerProtocol(Protocol):
         jti: str | None,
         ip_address: str | None,
         user_agent: str | None,
-        correlation_id: UUID
+        correlation_id: UUID,
     ) -> None:
         """Log token operations (refresh, revoke, etc.)."""
         ...
@@ -178,7 +170,7 @@ class AuditLoggerProtocol(Protocol):
 
 class UserSessionRepositoryProtocol(Protocol):
     """Protocol for user session management with device tracking."""
-    
+
     async def create_session(
         self,
         user_id: UUID,
@@ -187,31 +179,31 @@ class UserSessionRepositoryProtocol(Protocol):
         device_name: str | None,
         device_type: str | None,
         ip_address: str | None,
-        user_agent: str | None
+        user_agent: str | None,
     ) -> None:
         """Create a new user session."""
         ...
-    
+
     async def get_user_sessions(self, user_id: UUID) -> list[dict[str, Any]]:
         """Get all active sessions for a user."""
         ...
-    
+
     async def revoke_session(self, jti: str) -> bool:
         """Revoke a specific session."""
         ...
-    
+
     async def revoke_all_user_sessions(self, user_id: UUID) -> int:
         """Revoke all sessions for a user."""
         ...
-    
+
     async def update_last_activity(self, jti: str) -> bool:
         """Update the last activity timestamp for a session."""
         ...
-    
+
     async def get_session(self, jti: str) -> dict[str, Any] | None:
         """Get session details by JTI."""
         ...
-    
+
     async def cleanup_expired_sessions(self) -> int:
         """Remove expired sessions from the database."""
         ...

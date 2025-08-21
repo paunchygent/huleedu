@@ -5,6 +5,7 @@ All business logic is delegated to SessionManagementHandler.
 
 New endpoints for production-ready session management.
 """
+
 from __future__ import annotations
 
 from dishka import FromDishka
@@ -18,22 +19,26 @@ from services.identity_service.api.request_utils import (
     extract_correlation_id,
     extract_jwt_token,
 )
-from services.identity_service.domain_handlers.session_management_handler import SessionManagementHandler
+from services.identity_service.domain_handlers.session_management_handler import (
+    SessionManagementHandler,
+)
 from services.identity_service.protocols import TokenIssuer
 
 bp = Blueprint("sessions", __name__, url_prefix="/v1/auth")
 logger = create_service_logger("identity_service.api.session_routes")
 
 
-def _extract_user_from_jwt(token_issuer: TokenIssuer, jwt_token: str | None) -> tuple[str | None, str | None]:
+def _extract_user_from_jwt(
+    token_issuer: TokenIssuer, jwt_token: str | None
+) -> tuple[str | None, str | None]:
     """Extract user ID and JTI from JWT token.
-    
+
     Returns:
         tuple: (user_id, jti) or (None, None) if invalid
     """
     if not jwt_token:
         return None, None
-    
+
     try:
         claims = token_issuer.verify(jwt_token)
         user_id = claims.get("sub")
@@ -52,11 +57,11 @@ async def list_sessions(
     """List all active sessions for the authenticated user."""
     try:
         correlation_id = extract_correlation_id()
-        
+
         # Extract user ID from JWT token
         jwt_token = extract_jwt_token()
         user_id, current_jti = _extract_user_from_jwt(token_issuer, jwt_token)
-        
+
         if not user_id:
             return jsonify({"error": "Invalid or expired token"}), 401
 
@@ -101,11 +106,11 @@ async def revoke_session(
     try:
         correlation_id = extract_correlation_id()
         ip_address, _ = extract_client_info()
-        
+
         # Extract user ID from JWT token
         jwt_token = extract_jwt_token()
         user_id, _ = _extract_user_from_jwt(token_issuer, jwt_token)
-        
+
         if not user_id:
             return jsonify({"error": "Invalid or expired token"}), 401
 
@@ -150,11 +155,11 @@ async def revoke_all_sessions(
     try:
         correlation_id = extract_correlation_id()
         ip_address, _ = extract_client_info()
-        
+
         # Extract user ID from JWT token
         jwt_token = extract_jwt_token()
         user_id, current_jti = _extract_user_from_jwt(token_issuer, jwt_token)
-        
+
         if not user_id:
             return jsonify({"error": "Invalid or expired token"}), 401
 
@@ -203,11 +208,11 @@ async def get_active_session_count(
     """Get count of active sessions for the authenticated user."""
     try:
         correlation_id = extract_correlation_id()
-        
+
         # Extract user ID from JWT token
         jwt_token = extract_jwt_token()
         user_id, _ = _extract_user_from_jwt(token_issuer, jwt_token)
-        
+
         if not user_id:
             return jsonify({"error": "Invalid or expired token"}), 401
 

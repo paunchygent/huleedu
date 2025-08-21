@@ -204,9 +204,7 @@ class TestAuthenticationHandler:
                 org_id=sample_user["org_id"],
                 roles=sample_user["roles"],
             )
-            mock_token_issuer.issue_refresh_token.assert_called_once_with(
-                user_id=sample_user["id"]
-            )
+            mock_token_issuer.issue_refresh_token.assert_called_once_with(user_id=sample_user["id"])
 
             # Verify session storage
             mock_session_repo.store_refresh.assert_called_once()

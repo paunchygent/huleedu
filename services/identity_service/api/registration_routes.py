@@ -3,6 +3,7 @@
 Handles user registration operations.
 All business logic is delegated to RegistrationHandler.
 """
+
 from __future__ import annotations
 
 from dishka import FromDishka

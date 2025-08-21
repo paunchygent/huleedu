@@ -56,6 +56,7 @@ class BatchLifecycleHandler:
             from services.result_aggregator_service.implementations import (
                 batch_completion_calculator,
             )
+
             BatchCompletionCalculator = batch_completion_calculator.BatchCompletionCalculator
 
             completion_calculator = BatchCompletionCalculator(batch_repository)

@@ -9,6 +9,7 @@ Encapsulates session management business logic including:
 
 This handler follows the established domain handler pattern from class_management_service.
 """
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -25,7 +26,7 @@ logger = create_service_logger("identity_service.domain_handlers.session_managem
 
 class SessionInfo:
     """Model for session information responses."""
-    
+
     def __init__(
         self,
         jti: str,
@@ -45,7 +46,7 @@ class SessionInfo:
         self.last_activity = last_activity
         self.expires_at = expires_at
         self.is_current = is_current
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -62,10 +63,10 @@ class SessionInfo:
 
 class SessionListResult:
     """Result model for session list operations."""
-    
+
     def __init__(self, sessions: list[SessionInfo]):
         self.sessions = sessions
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -76,11 +77,11 @@ class SessionListResult:
 
 class SessionActionResult:
     """Result model for session action operations."""
-    
+
     def __init__(self, message: str, sessions_affected: int = 1):
         self.message = message
         self.sessions_affected = sessions_affected
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -91,10 +92,10 @@ class SessionActionResult:
 
 class ActiveSessionCountResult:
     """Result model for active session count operations."""
-    
+
     def __init__(self, active_sessions: int):
         self.active_sessions = active_sessions
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -104,7 +105,7 @@ class ActiveSessionCountResult:
 
 class SessionManagementHandler:
     """Encapsulates session management business logic for Identity Service.
-    
+
     Handles session operations with:
     - Complete session listing with device information
     - Individual session revocation for security
@@ -113,7 +114,7 @@ class SessionManagementHandler:
     - Comprehensive audit logging for security events
     - Current session identification (optional)
     """
-    
+
     def __init__(
         self,
         user_session_repo: UserSessionRepositoryProtocol,
@@ -121,7 +122,7 @@ class SessionManagementHandler:
     ):
         self._user_session_repo = user_session_repo
         self._audit_logger = audit_logger
-    
+
     async def list_user_sessions(
         self,
         user_id: str,
@@ -129,23 +130,23 @@ class SessionManagementHandler:
         correlation_id: UUID,
     ) -> SessionListResult:
         """List all active sessions for a user.
-        
+
         Args:
             user_id: User ID from authenticated context
             current_jti: JTI of current session to mark as current (optional)
             correlation_id: Request correlation ID for observability
-            
+
         Returns:
             SessionListResult with list of active sessions
-            
+
         Raises:
             HuleEduError: If user validation fails
         """
         user_uuid = UUID(user_id)
-        
+
         # Get all active sessions for the user
         session_data = await self._user_session_repo.get_user_sessions(user_uuid)
-        
+
         # Convert to SessionInfo objects
         sessions = []
         for session in session_data:
@@ -155,15 +156,17 @@ class SessionManagementHandler:
                 device_type=session.get("device_type"),
                 ip_address=session.get("ip_address"),
                 created_at=session["created_at"].isoformat() if session.get("created_at") else "",
-                last_activity=session["last_activity"].isoformat() if session.get("last_activity") else None,
+                last_activity=session["last_activity"].isoformat()
+                if session.get("last_activity")
+                else None,
                 expires_at=session["expires_at"].isoformat() if session.get("expires_at") else "",
                 is_current=session["jti"] == current_jti if current_jti else False,
             )
             sessions.append(session_info)
-        
+
         # Sort by creation date (newest first)
         sessions.sort(key=lambda s: s.created_at, reverse=True)
-        
+
         logger.info(
             "User sessions listed successfully",
             extra={
@@ -172,9 +175,9 @@ class SessionManagementHandler:
                 "correlation_id": str(correlation_id),
             },
         )
-        
+
         return SessionListResult(sessions)
-    
+
     async def revoke_session(
         self,
         user_id: str,
@@ -183,22 +186,22 @@ class SessionManagementHandler:
         ip_address: str | None = None,
     ) -> SessionActionResult:
         """Revoke a specific session.
-        
+
         Args:
             user_id: User ID from authenticated context
             session_id: JTI of session to revoke
             correlation_id: Request correlation ID for observability
             ip_address: Client IP address for audit logging
-            
+
         Returns:
             SessionActionResult with success message
-            
+
         Raises:
             HuleEduError: If session not found or doesn't belong to user
         """
         # Get session details for validation and audit
         session = await self._user_session_repo.get_session(session_id)
-        
+
         if not session:
             logger.warning(
                 "Attempt to revoke non-existent session",
@@ -206,10 +209,10 @@ class SessionManagementHandler:
                     "user_id": user_id,
                     "session_id": session_id,
                     "correlation_id": str(correlation_id),
-                }
+                },
             )
             return SessionActionResult("Session not found or already revoked", 0)
-        
+
         # Verify session belongs to the authenticated user
         if str(session.get("user_id")) != user_id:
             await self._audit_logger.log_action(
@@ -221,9 +224,9 @@ class SessionManagementHandler:
                 },
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             logger.warning(
                 "Unauthorized attempt to revoke session",
                 extra={
@@ -231,13 +234,13 @@ class SessionManagementHandler:
                     "session_id": session_id,
                     "session_owner": session.get("user_id"),
                     "correlation_id": str(correlation_id),
-                }
+                },
             )
             return SessionActionResult("Session not found or already revoked", 0)
-        
+
         # Revoke the session
         revoked = await self._user_session_repo.revoke_session(session_id)
-        
+
         if revoked:
             # Audit log successful session revocation
             await self._audit_logger.log_action(
@@ -250,9 +253,9 @@ class SessionManagementHandler:
                 },
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             logger.info(
                 "Session revoked successfully",
                 extra={
@@ -262,7 +265,7 @@ class SessionManagementHandler:
                     "correlation_id": str(correlation_id),
                 },
             )
-            
+
             return SessionActionResult("Session revoked successfully", 1)
         else:
             logger.warning(
@@ -271,10 +274,10 @@ class SessionManagementHandler:
                     "user_id": user_id,
                     "session_id": session_id,
                     "correlation_id": str(correlation_id),
-                }
+                },
             )
             return SessionActionResult("Session not found or already revoked", 0)
-    
+
     async def revoke_all_sessions(
         self,
         user_id: str,
@@ -284,29 +287,29 @@ class SessionManagementHandler:
         ip_address: str | None = None,
     ) -> SessionActionResult:
         """Revoke all sessions for a user (logout from all devices).
-        
+
         Args:
             user_id: User ID from authenticated context
             exclude_current: Whether to exclude current session from revocation
             current_jti: JTI of current session to exclude (if exclude_current=True)
             correlation_id: Request correlation ID for observability
             ip_address: Client IP address for audit logging
-            
+
         Returns:
             SessionActionResult with count of revoked sessions
-            
+
         Raises:
             HuleEduError: If user validation fails
         """
         user_uuid = UUID(user_id)
-        
+
         # Get current sessions for audit logging before revocation
         sessions_before = await self._user_session_repo.get_user_sessions(user_uuid)
-        
+
         if exclude_current and current_jti:
             # Filter out current session for counting and audit
             sessions_to_revoke = [s for s in sessions_before if s["jti"] != current_jti]
-            
+
             # Revoke all except current
             revoked_count = 0
             for session in sessions_to_revoke:
@@ -315,7 +318,7 @@ class SessionManagementHandler:
         else:
             # Revoke all sessions including current
             revoked_count = await self._user_session_repo.revoke_all_user_sessions(user_uuid)
-        
+
         # Audit log bulk session revocation
         await self._audit_logger.log_action(
             action="all_sessions_revoked",
@@ -327,9 +330,9 @@ class SessionManagementHandler:
             },
             ip_address=ip_address,
             user_agent=None,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
-        
+
         logger.info(
             "All sessions revoked successfully",
             extra={
@@ -339,36 +342,36 @@ class SessionManagementHandler:
                 "correlation_id": str(correlation_id),
             },
         )
-        
+
         message = f"Successfully revoked {revoked_count} session(s)"
         if exclude_current and current_jti:
             message += " (excluding current session)"
-        
+
         return SessionActionResult(message, revoked_count)
-    
+
     async def get_active_session_count(
         self,
         user_id: str,
         correlation_id: UUID,
     ) -> ActiveSessionCountResult:
         """Get count of active sessions for a user.
-        
+
         Args:
             user_id: User ID from authenticated context
             correlation_id: Request correlation ID for observability
-            
+
         Returns:
             ActiveSessionCountResult with session count
-            
+
         Raises:
             HuleEduError: If user validation fails
         """
         user_uuid = UUID(user_id)
-        
+
         # Get all active sessions for counting
         sessions = await self._user_session_repo.get_user_sessions(user_uuid)
         active_count = len(sessions)
-        
+
         logger.debug(
             "Active session count retrieved",
             extra={
@@ -377,5 +380,5 @@ class SessionManagementHandler:
                 "correlation_id": str(correlation_id),
             },
         )
-        
+
         return ActiveSessionCountResult(active_count)

@@ -10,6 +10,7 @@ Encapsulates password reset business logic including:
 
 This handler follows the established domain handler pattern from class_management_service.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -40,10 +41,10 @@ logger = create_service_logger("identity_service.domain_handlers.password_reset"
 
 class RequestPasswordResetResult:
     """Result model for password reset request operations."""
-    
+
     def __init__(self, response: RequestPasswordResetResponse):
         self.response = response
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return self.response.model_dump(mode="json")
@@ -51,10 +52,10 @@ class RequestPasswordResetResult:
 
 class ResetPasswordResult:
     """Result model for password reset operations."""
-    
+
     def __init__(self, response: ResetPasswordResponse):
         self.response = response
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return self.response.model_dump(mode="json")
@@ -62,7 +63,7 @@ class ResetPasswordResult:
 
 class PasswordResetHandler:
     """Encapsulates password reset business logic for Identity Service.
-    
+
     Handles password reset workflow with security-first approach:
     - Email lookup without revealing user existence (security best practice)
     - Token generation with 1-hour expiration for security
@@ -72,7 +73,7 @@ class PasswordResetHandler:
     - Event publishing for downstream services
     - Comprehensive audit logging for security monitoring
     """
-    
+
     def __init__(
         self,
         user_repo: UserRepo,
@@ -84,7 +85,7 @@ class PasswordResetHandler:
         self._password_hasher = password_hasher
         self._event_publisher = event_publisher
         self._audit_logger = audit_logger
-    
+
     async def request_password_reset(
         self,
         reset_request: RequestPasswordResetRequest,
@@ -92,18 +93,18 @@ class PasswordResetHandler:
         ip_address: str | None = None,
     ) -> RequestPasswordResetResult:
         """Request password reset token for a user.
-        
+
         Security note: Always returns success regardless of whether email exists.
         This prevents email enumeration attacks.
-        
+
         Args:
             reset_request: Password reset request with email
             correlation_id: Request correlation ID for observability
             ip_address: Client IP address for audit logging
-            
+
         Returns:
             RequestPasswordResetResult with generic success message
-            
+
         Raises:
             HuleEduError: Only for unexpected errors, not for user validation
         """
@@ -141,7 +142,7 @@ class PasswordResetHandler:
                 },
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
 
             # Publish password reset requested event
@@ -166,9 +167,9 @@ class PasswordResetHandler:
                 details={"email": reset_request.email},
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             logger.info(
                 "Password reset requested for non-existent email (security: no revelation)",
                 extra={
@@ -178,7 +179,7 @@ class PasswordResetHandler:
             )
 
         return RequestPasswordResetResult(response)
-    
+
     async def reset_password(
         self,
         reset_request: ResetPasswordRequest,
@@ -186,15 +187,15 @@ class PasswordResetHandler:
         ip_address: str | None = None,
     ) -> ResetPasswordResult:
         """Reset password using valid reset token.
-        
+
         Args:
             reset_request: Password reset with token and new password
             correlation_id: Request correlation ID for observability
             ip_address: Client IP address for audit logging
-            
+
         Returns:
             ResetPasswordResult with success message
-            
+
         Raises:
             HuleEduError: If token invalid, expired, used, or user not found
         """
@@ -208,9 +209,9 @@ class PasswordResetHandler:
                 details={"token": reset_request.token[:8] + "..."},
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             raise_verification_token_invalid_error(
                 service="identity_service",
                 operation="reset_password",
@@ -228,9 +229,9 @@ class PasswordResetHandler:
                 },
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             raise_verification_token_invalid_error(
                 service="identity_service",
                 operation="reset_password",
@@ -248,9 +249,9 @@ class PasswordResetHandler:
                 },
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             raise_verification_token_expired_error(
                 service="identity_service",
                 operation="reset_password",
@@ -267,9 +268,9 @@ class PasswordResetHandler:
                 details={"token_id": token_record["id"]},
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             raise_verification_token_invalid_error(
                 service="identity_service",
                 operation="reset_password",
@@ -290,7 +291,7 @@ class PasswordResetHandler:
             details={"email": user["email"], "token_id": token_record["id"]},
             ip_address=ip_address,
             user_agent=None,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         # Publish password reset completed event
@@ -308,7 +309,7 @@ class PasswordResetHandler:
 
         response = ResetPasswordResponse(message="Password reset successfully")
         return ResetPasswordResult(response)
-    
+
     async def change_password(
         self,
         user_id: str,
@@ -318,17 +319,17 @@ class PasswordResetHandler:
         ip_address: str | None = None,
     ) -> ResetPasswordResult:
         """Change password for authenticated user (optional future endpoint).
-        
+
         Args:
             user_id: Authenticated user ID from JWT/session
             current_password: Current password for verification
             new_password: New password to set
             correlation_id: Request correlation ID for observability
             ip_address: Client IP address for audit logging
-            
+
         Returns:
             ResetPasswordResult with success message
-            
+
         Raises:
             HuleEduError: If current password invalid or user not found
         """
@@ -349,9 +350,9 @@ class PasswordResetHandler:
                 details={"email": user["email"]},
                 ip_address=ip_address,
                 user_agent=None,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
-            
+
             raise_verification_token_invalid_error(
                 service="identity_service",
                 operation="change_password",
@@ -369,7 +370,7 @@ class PasswordResetHandler:
             details={"email": user["email"]},
             ip_address=ip_address,
             user_agent=None,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         logger.info(

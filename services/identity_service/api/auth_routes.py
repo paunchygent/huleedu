@@ -5,6 +5,7 @@ All business logic is delegated to AuthenticationHandler.
 
 This replaces the monolithic auth_routes.py with focused, thin routes.
 """
+
 from __future__ import annotations
 
 from dishka import FromDishka
@@ -39,9 +40,9 @@ async def login(
         correlation_id = extract_correlation_id()
         ip_address, user_agent = extract_client_info()
         device_name, device_type = parse_device_info(user_agent)
-        
+
         payload = LoginRequest(**(await request.get_json()))
-        
+
         # Delegate to authentication handler
         login_result = await auth_handler.login(
             login_request=payload,
@@ -51,7 +52,7 @@ async def login(
             device_name=device_name,
             device_type=device_type,
         )
-        
+
         return jsonify(login_result.to_dict())
 
     except HuleEduError as e:
@@ -84,10 +85,10 @@ async def logout(
     """User logout with token revocation."""
     try:
         correlation_id = extract_correlation_id()
-        
+
         # Get token from Authorization header first
         token = extract_token_from_body_or_header()
-        
+
         # If not in header, check request body
         if not token:
             try:
@@ -95,15 +96,15 @@ async def logout(
                 token = data.get("refresh_token")
             except Exception:
                 pass  # Invalid JSON or no body
-        
+
         # Delegate to authentication handler
         logout_result = await auth_handler.logout(
             token=token or "",
             correlation_id=correlation_id,
         )
-        
+
         return jsonify(logout_result.to_dict())
-        
+
     except HuleEduError as e:
         logger.warning(
             f"Authentication error during logout: {e.error_detail.message}",
@@ -114,7 +115,7 @@ async def logout(
             },
         )
         return jsonify({"error": e.error_detail.model_dump()}), 400
-        
+
     except Exception as e:
         correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
         logger.error(
@@ -133,17 +134,17 @@ async def refresh_token(
     """Exchange refresh token for new access token."""
     try:
         correlation_id = extract_correlation_id()
-        
+
         payload = RefreshTokenRequest(**(await request.get_json()))
-        
+
         # Delegate to authentication handler
         refresh_result = await auth_handler.refresh_token(
             refresh_request=payload,
             correlation_id=correlation_id,
         )
-        
+
         return jsonify(refresh_result.to_dict())
-        
+
     except HuleEduError as e:
         logger.warning(
             f"Authentication error during token refresh: {e.error_detail.message}",
@@ -154,7 +155,7 @@ async def refresh_token(
             },
         )
         return jsonify({"error": e.error_detail.model_dump()}), 401
-        
+
     except Exception as e:
         correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
         logger.error(
