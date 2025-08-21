@@ -91,7 +91,10 @@ class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
     # Personalization context (from Class Management Service via enhanced BatchEssaysReady)
     class_type: str  # GUEST or REGULAR - determines AI feedback template selection
     owner_user_id: str = Field(
-        description="User ID of batch owner (teacher). Names are resolved by AI Feedback via Identity; not transmitted on Kafka."
+        description=(
+            "User ID of batch owner (teacher). Names are resolved by AI Feedback "
+            "via Identity; not transmitted on Kafka."
+        )
     )
 
 

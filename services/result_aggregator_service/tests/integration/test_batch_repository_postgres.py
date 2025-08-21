@@ -9,7 +9,12 @@ import pytest
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from testcontainers.postgres import PostgresContainer
 
 from services.result_aggregator_service.config import Settings
@@ -87,9 +92,17 @@ def test_settings(postgres_container: PostgresContainer) -> Settings:
 @pytest.fixture
 async def batch_repository(
     test_settings: Settings,
+    async_engine: AsyncEngine,
 ) -> AsyncGenerator[BatchRepositoryPostgresImpl, None]:
     """Create batch repository instance."""
-    repo = BatchRepositoryPostgresImpl(test_settings)
+    # Create session factory from the test engine
+    session_factory = async_sessionmaker(
+        async_engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+
+    repo = BatchRepositoryPostgresImpl(session_factory=session_factory, metrics=None)
     await repo.initialize_schema()
     yield repo
 

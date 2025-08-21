@@ -21,7 +21,7 @@ from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.redis_set_operations import RedisSetOperations
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from prometheus_client import REGISTRY, CollectorRegistry
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from services.result_aggregator_service.config import Settings
 from services.result_aggregator_service.implementations.aggregator_service_impl import (
@@ -175,10 +175,21 @@ class DatabaseProvider(Provider):
 
     @provide
     def provide_batch_repository(
-        self, settings: Settings, database_metrics: DatabaseMetrics, engine: AsyncEngine
+        self, session_factory: async_sessionmaker, database_metrics: DatabaseMetrics
     ) -> BatchRepositoryProtocol:
         """Provide batch repository implementation with metrics."""
-        return BatchRepositoryPostgresImpl(settings, database_metrics, engine)
+        return BatchRepositoryPostgresImpl(session_factory, database_metrics)
+
+    @provide
+    def provide_session_factory(self, engine: AsyncEngine) -> async_sessionmaker:
+        """Provide async session factory for database operations."""
+        from sqlalchemy.ext.asyncio import AsyncSession
+
+        return async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
 
     @provide
     def provide_database_engine(self, settings: Settings) -> AsyncEngine:

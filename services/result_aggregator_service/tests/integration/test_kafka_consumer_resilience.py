@@ -39,8 +39,10 @@ class TestKafkaConsumerResilience:
         kafka_consumer: ResultAggregatorKafkaConsumer,
         mock_event_processor: AsyncMock,
     ) -> None:
-        """Test that consumer recovers from foreign key violations caused by old batch_id='pending' logic."""
-        # Arrange - Mock consumer for commit verification and event processor to simulate FK violation
+        """Test that consumer recovers from foreign key violations caused by old
+        batch_id='pending' logic."""
+        # Arrange - Mock consumer for commit verification and event processor to simulate
+        # FK violation
         mock_kafka_consumer = AsyncMock()
         kafka_consumer.consumer = mock_kafka_consumer
 
@@ -425,7 +427,8 @@ class TestErrorClassification:
         kafka_consumer: ResultAggregatorKafkaConsumer,
         mock_event_processor: AsyncMock,
     ) -> None:
-        """Test that assessment results can be processed even when essay has no batch association."""
+        """Test that assessment results can be processed even when essay has no
+        batch association."""
         # Arrange - Assessment result for essay not yet associated with batch
         essay_id = str(uuid4())
         batch_id = str(uuid4())

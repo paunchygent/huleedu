@@ -408,8 +408,11 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> Any:  # StudentMatchingCommandHandler
         """Provide student matching command handler for Phase 1 NLP integration."""
-        from services.essay_lifecycle_service.implementations.student_matching_command_handler import (
-            StudentMatchingCommandHandler,
+        from services.essay_lifecycle_service.implementations import (
+            student_matching_command_handler,
+        )
+        StudentMatchingCommandHandler = (
+            student_matching_command_handler.StudentMatchingCommandHandler
         )
 
         return StudentMatchingCommandHandler(

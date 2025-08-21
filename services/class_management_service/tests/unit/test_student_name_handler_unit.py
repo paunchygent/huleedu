@@ -128,7 +128,8 @@ class TestStudentNameHandler:
             batch_id: str,
             correlation_id: UUID,
         ) -> None:
-            """Should return BatchStudentNamesResponse with multiple items when multiple associations exist."""
+            """Should return BatchStudentNamesResponse with multiple items
+            when multiple associations exist."""
             mappings = [
                 {
                     "essay_id": uuid4(),

@@ -234,7 +234,9 @@ async def request_pipeline_execution(
             # Construct ClientBatchPipelineRequestV1 with authenticated user_id
             client_request = ClientBatchPipelineRequestV1(
                 batch_id=batch_id,  # Always use path batch_id
-                requested_pipeline=pipeline_request.requested_pipeline.value,  # Convert enum to string
+                requested_pipeline=(
+                    pipeline_request.requested_pipeline.value
+                ),  # Convert enum to string
                 client_correlation_id=correlation_id,
                 user_id=user_id,  # From authentication
                 is_retry=pipeline_request.is_retry,

@@ -335,7 +335,8 @@ async def get_batch_status(
     endpoint = f"/batches/{batch_id}/status"
 
     logger.info(
-        f"Batch status request: batch_id='{batch_id}', user_id='{user_id}', correlation_id='{correlation_id}'"
+        f"Batch status request: batch_id='{batch_id}', user_id='{user_id}', "
+        f"correlation_id='{correlation_id}'"
     )
 
     with metrics.http_request_duration_seconds.labels(method="GET", endpoint=endpoint).time():

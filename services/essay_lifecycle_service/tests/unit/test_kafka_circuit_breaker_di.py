@@ -151,7 +151,7 @@ async def test_circuit_breaker_configuration(
     with patch.object(KafkaBus, "start", new_callable=AsyncMock):
         # Handle async generator properly
         kafka_gen = provider.provide_kafka_bus(mock_settings, registry)
-        kafka_bus = await kafka_gen.__anext__()
+        await kafka_gen.__anext__()
 
         try:
             # Get the circuit breaker from registry

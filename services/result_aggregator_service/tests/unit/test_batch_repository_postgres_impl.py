@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, AsyncGenerator
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from common_core.status_enums import BatchStatus
@@ -22,13 +22,27 @@ from services.result_aggregator_service.models_db import BatchResult
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 
 
+def create_mock_session_factory(mock_session: AsyncMock) -> MagicMock:
+    """Create a mock session factory that returns an async context manager.
+
+    Following proper DI pattern from Rule 042.
+    """
+    mock_context_manager = AsyncMock()
+    mock_context_manager.__aenter__.return_value = mock_session
+    mock_context_manager.__aexit__.return_value = None
+
+    mock_factory = MagicMock()
+    mock_factory.return_value = mock_context_manager
+    return mock_factory
+
+
 class MockDIProvider(Provider):
     """Mock dependency injection provider for testing BatchRepositoryPostgresImpl.
 
     Following Rule 075 pattern of protocol-based DI testing.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, mock_session: AsyncMock) -> None:
         super().__init__()
         # Create mock settings with proper PostgreSQL test URL
         self.mock_settings = Mock(spec=Settings)
@@ -36,8 +50,8 @@ class MockDIProvider(Provider):
         self.mock_settings.DATABASE_POOL_SIZE = 5
         self.mock_settings.DATABASE_MAX_OVERFLOW = 10
 
-        # Store reference to repository for later patching
-        self.repository_instance: BatchRepositoryPostgresImpl | None = None
+        # Store the mock session for injection
+        self.mock_session = mock_session
 
     @provide(scope=Scope.REQUEST)
     def provide_settings(self) -> Settings:
@@ -49,25 +63,21 @@ class MockDIProvider(Provider):
         self,
         settings: Settings,
     ) -> BatchRepositoryProtocol:
-        """Provide BatchRepositoryPostgresImpl with mocked settings.
+        """Provide BatchRepositoryPostgresImpl with properly mocked session factory.
 
-        Note: We'll patch the internal session management for unit testing.
+        Following Rule 042: Inject mocks through constructor, not patching.
         """
-        # Mock the engine to avoid actual database connection
-        mock_engine = AsyncMock()
-        mock_session_maker = AsyncMock()
+        # Create a proper mock session factory that returns async context manager
+        mock_session_factory = create_mock_session_factory(self.mock_session)
 
-        repository = BatchRepositoryPostgresImpl(settings=settings, engine=mock_engine)
-        # Override the session maker to prevent real database calls
-        repository.async_session_maker = mock_session_maker
-        self.repository_instance = repository
+        repository = BatchRepositoryPostgresImpl(session_factory=mock_session_factory, metrics=None)
         return repository
 
 
 @pytest.fixture
-def test_provider() -> MockDIProvider:
-    """Provide test provider instance."""
-    return MockDIProvider()
+def test_provider(mock_session: AsyncMock) -> MockDIProvider:
+    """Provide test provider instance with mock session."""
+    return MockDIProvider(mock_session)
 
 
 @pytest.fixture
@@ -80,13 +90,11 @@ async def di_container(test_provider: MockDIProvider) -> AsyncGenerator[AsyncCon
 
 @pytest.fixture
 async def batch_repository(
-    di_container: AsyncContainer, test_provider: MockDIProvider
+    di_container: AsyncContainer,
 ) -> AsyncGenerator[BatchRepositoryProtocol, None]:
     """Provide batch repository from DI container."""
     async with di_container(scope=Scope.REQUEST) as request_container:
         repository = await request_container.get(BatchRepositoryProtocol)
-        # Store reference for access in tests
-        test_provider.repository_instance = repository
         yield repository
 
 
@@ -126,7 +134,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_success_scenarios(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         mock_batch_result: Mock,
         final_status: str,
@@ -153,15 +160,10 @@ class TestMarkBatchCompleted:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.mark_batch_completed(
-                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.mark_batch_completed(
+            batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+        )
 
         # Assert - Verify business logic behavior
         assert mock_batch_result.overall_status == expected_status
@@ -194,7 +196,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_metadata_handling(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         existing_metadata: dict[str, Any] | None,
         expected_preserved_fields: int,
@@ -221,15 +222,10 @@ class TestMarkBatchCompleted:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.mark_batch_completed(
-                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.mark_batch_completed(
+            batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+        )
 
         # Assert
         # Verify metadata is a dict and contains completion data
@@ -251,7 +247,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_batch_not_found(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test graceful handling when batch is not found."""
@@ -272,15 +267,10 @@ class TestMarkBatchCompleted:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act - should not raise exception
-            await batch_repository.mark_batch_completed(
-                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-            )
+        # Act - should not raise exception
+        await batch_repository.mark_batch_completed(
+            batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+        )
 
         # Assert
         # Verify database was queried
@@ -292,7 +282,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_database_transaction_failure(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         mock_batch_result: Mock,
     ) -> None:
@@ -319,16 +308,11 @@ class TestMarkBatchCompleted:
         # Mock commit to raise exception
         mock_session.commit.side_effect = Exception("Database connection failed")
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act & Assert
-            with pytest.raises(Exception, match="Database connection failed"):
-                await batch_repository.mark_batch_completed(
-                    batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-                )
+        # Act & Assert - No patching needed, mock is injected through DI
+        with pytest.raises(Exception, match="Database connection failed"):
+            await batch_repository.mark_batch_completed(
+                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+            )
 
         # Verify batch updates were attempted before failure
         assert mock_batch_result.overall_status == BatchStatus.COMPLETED_SUCCESSFULLY
@@ -337,7 +321,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_field_updates(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         mock_batch_result: Mock,
     ) -> None:
@@ -365,15 +348,10 @@ class TestMarkBatchCompleted:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.mark_batch_completed(
-                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.mark_batch_completed(
+            batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+        )
 
         # Assert all field updates
         assert mock_batch_result.overall_status == BatchStatus.COMPLETED_SUCCESSFULLY
@@ -401,7 +379,6 @@ class TestMarkBatchCompleted:
     async def test_mark_batch_completed_enum_conversion(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         mock_batch_result: Mock,
     ) -> None:
@@ -425,15 +402,10 @@ class TestMarkBatchCompleted:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.mark_batch_completed(
-                batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.mark_batch_completed(
+            batch_id=batch_id, final_status=final_status, completion_stats=completion_stats
+        )
 
         # Assert
         # Verify string was converted to enum correctly

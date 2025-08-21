@@ -407,9 +407,7 @@ class TestServiceResultHandlerSpellcheckEdgeCases:
         """Test handling when session factory fails to create session."""
         # Arrange - Simulate session factory failure
         # Use Mock (not AsyncMock) because session_factory() call should be synchronous
-        failed_session_factory = Mock(
-            side_effect=Exception("Failed to create database session")
-        )
+        failed_session_factory = Mock(side_effect=Exception("Failed to create database session"))
 
         # Replace session factory on both the main handler and its delegate
         handler.session_factory = failed_session_factory

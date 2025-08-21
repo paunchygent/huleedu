@@ -364,8 +364,8 @@ class BCSKafkaConsumer:
                 )
             else:
                 logger.warning(
-                    f"Failed to record spellcheck phase completion for essay {essay_id} in batch {batch_id} "
-                    f"(might already be recorded)"
+                    f"Failed to record spellcheck phase completion for essay {essay_id} "
+                    f"in batch {batch_id} (might already be recorded)"
                 )
 
         except Exception as e:

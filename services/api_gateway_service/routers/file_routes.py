@@ -404,7 +404,10 @@ async def upload_batch_files(
                 raise_authentication_error(
                     service="api_gateway_service",
                     operation="upload_batch_files",
-                    message="Access denied: You don't have permission to upload files to this batch",
+                    message=(
+                        "Access denied: You don't have permission to upload files "
+                        "to this batch"
+                    ),
                     correlation_id=correlation_id,
                     reason="permission_denied",
                     batch_id=batch_id,

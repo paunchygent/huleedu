@@ -163,7 +163,8 @@ class TestStudentAssociationHandler:
         sample_essay_states: list[EssayStateDB],
         batch_status: BatchEssayTrackerDB,
     ) -> None:
-        """Test that handler acts as stateless router, publishing BatchEssaysReady without updating essay state."""
+        """Test that handler acts as stateless router, publishing BatchEssaysReady
+        without updating essay state."""
         # Arrange
         correlation_id = uuid4()
 

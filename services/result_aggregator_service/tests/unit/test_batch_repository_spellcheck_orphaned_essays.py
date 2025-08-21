@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -25,13 +25,27 @@ from services.result_aggregator_service.models_db import EssayResult
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 
 
+def create_mock_session_factory(mock_session: AsyncMock) -> MagicMock:
+    """Create a mock session factory that returns an async context manager.
+
+    Following proper DI pattern from Rule 042.
+    """
+    mock_context_manager = AsyncMock()
+    mock_context_manager.__aenter__.return_value = mock_session
+    mock_context_manager.__aexit__.return_value = None
+
+    mock_factory = MagicMock()
+    mock_factory.return_value = mock_context_manager
+    return mock_factory
+
+
 class MockDIProvider(Provider):
     """Mock dependency injection provider for testing spellcheck orphaned essay handling.
 
     Following Rule 075 pattern of protocol-based DI testing.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, mock_session: AsyncMock) -> None:
         super().__init__()
         # Create mock settings with proper PostgreSQL test URL
         self.mock_settings = Mock(spec=Settings)
@@ -39,8 +53,8 @@ class MockDIProvider(Provider):
         self.mock_settings.DATABASE_POOL_SIZE = 5
         self.mock_settings.DATABASE_MAX_OVERFLOW = 10
 
-        # Store reference to repository for later patching
-        self.repository_instance: BatchRepositoryPostgresImpl | None = None
+        # Store the mock session for injection
+        self.mock_session = mock_session
 
     @provide(scope=Scope.REQUEST)
     def provide_settings(self) -> Settings:
@@ -52,25 +66,21 @@ class MockDIProvider(Provider):
         self,
         settings: Settings,
     ) -> BatchRepositoryProtocol:
-        """Provide BatchRepositoryPostgresImpl with mocked settings.
+        """Provide BatchRepositoryPostgresImpl with properly mocked session factory.
 
-        Note: We'll patch the internal session management for unit testing.
+        Following Rule 042: Inject mocks through constructor, not patching.
         """
-        # Mock the engine to avoid actual database connection
-        mock_engine = AsyncMock()
-        mock_session_maker = AsyncMock()
+        # Create a proper mock session factory that returns async context manager
+        mock_session_factory = create_mock_session_factory(self.mock_session)
 
-        repository = BatchRepositoryPostgresImpl(settings=settings, engine=mock_engine)
-        # Override the session maker to prevent real database calls
-        repository.async_session_maker = mock_session_maker
-        self.repository_instance = repository
+        repository = BatchRepositoryPostgresImpl(session_factory=mock_session_factory, metrics=None)
         return repository
 
 
 @pytest.fixture
-def test_provider() -> MockDIProvider:
-    """Provide test provider instance."""
-    return MockDIProvider()
+def test_provider(mock_session: AsyncMock) -> MockDIProvider:
+    """Provide test provider instance with mock session."""
+    return MockDIProvider(mock_session)
 
 
 @pytest.fixture
@@ -83,13 +93,11 @@ async def di_container(test_provider: MockDIProvider) -> AsyncGenerator[AsyncCon
 
 @pytest.fixture
 async def batch_repository(
-    di_container: AsyncContainer, test_provider: MockDIProvider
+    di_container: AsyncContainer,
 ) -> AsyncGenerator[BatchRepositoryProtocol, None]:
     """Provide batch repository from DI container."""
     async with di_container(scope=Scope.REQUEST) as request_container:
         repository = await request_container.get(BatchRepositoryProtocol)
-        # Store reference for access in tests
-        test_provider.repository_instance = repository
         yield repository
 
 
@@ -137,13 +145,13 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_orphaned_essay_associated_with_batch_during_spellcheck_update(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         correction_count: Optional[int],
         corrected_text_storage_id: Optional[str],
         expected_status: ProcessingStage,
     ) -> None:
-        """Test that orphaned essay (batch_id=NULL) gets associated with batch during spellcheck update."""
+        """Test that orphaned essay (batch_id=NULL) gets associated with batch
+        during spellcheck update."""
         # Arrange
         essay_id = "orphaned-essay-123"
         batch_id = "target-batch-456"
@@ -164,20 +172,15 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=expected_status,
-                correlation_id=correlation_id,
-                correction_count=correction_count,
-                corrected_text_storage_id=corrected_text_storage_id,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=expected_status,
+            correlation_id=correlation_id,
+            correction_count=correction_count,
+            corrected_text_storage_id=corrected_text_storage_id,
+        )
 
         # Assert - Verify essay was associated with batch
         assert mock_essay.batch_id == batch_id, (
@@ -211,7 +214,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_creates_new_essay_when_nonexistent_during_spellcheck_update(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         correction_count: Optional[int],
         corrected_text_storage_id: Optional[str],
@@ -245,21 +247,16 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                correction_count=correction_count,
-                corrected_text_storage_id=corrected_text_storage_id,
-                error_detail=error_detail,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            correction_count=correction_count,
+            corrected_text_storage_id=corrected_text_storage_id,
+            error_detail=error_detail,
+        )
 
         # Assert - Verify new essay was created with proper batch association
         mock_session.add.assert_called_once()
@@ -287,7 +284,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_batch_association_logic_during_spellcheck_update(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         existing_batch_id: Optional[str],
         target_batch_id: str,
@@ -315,20 +311,15 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=target_batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                correction_count=5,
-                corrected_text_storage_id="storage-test",
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=target_batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            correction_count=5,
+            corrected_text_storage_id="storage-test",
+        )
 
         # Assert batch association behavior
         if should_associate:
@@ -351,7 +342,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_spellcheck_error_handling_with_orphaned_essay(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         sample_error_detail: ErrorDetail,
     ) -> None:
@@ -375,19 +365,14 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                error_detail=sample_error_detail,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            error_detail=sample_error_detail,
+        )
 
         # Assert - Verify error handling and batch association
         assert mock_essay.batch_id == batch_id, "Orphaned essay should be associated despite error"
@@ -422,7 +407,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_spellcheck_field_updates_for_orphaned_essay(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         field_updates: Dict[str, Any],
         expected_values: Dict[str, Any],
@@ -448,20 +432,15 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                correction_count=field_updates["correction_count"],
-                corrected_text_storage_id=field_updates["corrected_text_storage_id"],
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            correction_count=field_updates["correction_count"],
+            corrected_text_storage_id=field_updates["corrected_text_storage_id"],
+        )
 
         # Assert - Verify field updates
         assert mock_essay.batch_id == batch_id, "Essay should be associated with batch"
@@ -491,7 +470,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_database_transaction_failure_during_spellcheck_update(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test handling of database transaction failures during spellcheck update."""
@@ -516,20 +494,15 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         # Mock commit to raise exception
         mock_session.commit.side_effect = Exception("Database transaction failed")
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act & Assert
-            with pytest.raises(Exception, match="Database transaction failed"):
-                await batch_repository.update_essay_spellcheck_result(
-                    essay_id=essay_id,
-                    batch_id=batch_id,
-                    status=status,
-                    correlation_id=correlation_id,
-                    correction_count=5,
-                )
+        # Act & Assert - No patching needed, mock is injected through DI
+        with pytest.raises(Exception, match="Database transaction failed"):
+            await batch_repository.update_essay_spellcheck_result(
+                essay_id=essay_id,
+                batch_id=batch_id,
+                status=status,
+                correlation_id=correlation_id,
+                correction_count=5,
+            )
 
         # Verify essay updates were attempted before failure
         assert mock_essay.batch_id == batch_id
@@ -539,7 +512,6 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
     async def test_finds_essay_by_essay_id_only_not_batch_id(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test that method finds essay by essay_id only, ignoring batch_id in query."""
@@ -561,19 +533,14 @@ class TestUpdateEssaySpellcheckResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_spellcheck_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                correction_count=3,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_spellcheck_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            correction_count=3,
+        )
 
         # Assert - Verify query was made by essay_id only
         mock_session.execute.assert_called_once()

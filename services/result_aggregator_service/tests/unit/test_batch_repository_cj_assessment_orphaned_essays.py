@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import AsyncGenerator, Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -25,13 +25,27 @@ from services.result_aggregator_service.models_db import EssayResult
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 
 
+def create_mock_session_factory(mock_session: AsyncMock) -> MagicMock:
+    """Create a mock session factory that returns an async context manager.
+
+    Following proper DI pattern from Rule 042.
+    """
+    mock_context_manager = AsyncMock()
+    mock_context_manager.__aenter__.return_value = mock_session
+    mock_context_manager.__aexit__.return_value = None
+
+    mock_factory = MagicMock()
+    mock_factory.return_value = mock_context_manager
+    return mock_factory
+
+
 class MockDIProvider(Provider):
     """Mock dependency injection provider for testing BatchRepositoryPostgresImpl.
 
     Following Rule 075 pattern of protocol-based DI testing.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, mock_session: AsyncMock) -> None:
         super().__init__()
         # Create mock settings with proper PostgreSQL test URL
         self.mock_settings = Mock(spec=Settings)
@@ -39,8 +53,8 @@ class MockDIProvider(Provider):
         self.mock_settings.DATABASE_POOL_SIZE = 5
         self.mock_settings.DATABASE_MAX_OVERFLOW = 10
 
-        # Store reference to repository for later patching
-        self.repository_instance: BatchRepositoryPostgresImpl | None = None
+        # Store the mock session for injection
+        self.mock_session = mock_session
 
     @provide(scope=Scope.REQUEST)
     def provide_settings(self) -> Settings:
@@ -52,25 +66,21 @@ class MockDIProvider(Provider):
         self,
         settings: Settings,
     ) -> BatchRepositoryProtocol:
-        """Provide BatchRepositoryPostgresImpl with mocked settings.
+        """Provide BatchRepositoryPostgresImpl with properly mocked session factory.
 
-        Note: We'll patch the internal session management for unit testing.
+        Following Rule 042: Inject mocks through constructor, not patching.
         """
-        # Mock the engine to avoid actual database connection
-        mock_engine = AsyncMock()
-        mock_session_maker = AsyncMock()
+        # Create a proper mock session factory that returns async context manager
+        mock_session_factory = create_mock_session_factory(self.mock_session)
 
-        repository = BatchRepositoryPostgresImpl(settings=settings, engine=mock_engine)
-        # Override the session maker to prevent real database calls
-        repository.async_session_maker = mock_session_maker
-        self.repository_instance = repository
+        repository = BatchRepositoryPostgresImpl(session_factory=mock_session_factory, metrics=None)
         return repository
 
 
 @pytest.fixture
-def test_provider() -> MockDIProvider:
-    """Provide test provider instance."""
-    return MockDIProvider()
+def test_provider(mock_session: AsyncMock) -> MockDIProvider:
+    """Provide test provider instance with mock session."""
+    return MockDIProvider(mock_session)
 
 
 @pytest.fixture
@@ -83,13 +93,11 @@ async def di_container(test_provider: MockDIProvider) -> AsyncGenerator[AsyncCon
 
 @pytest.fixture
 async def batch_repository(
-    di_container: AsyncContainer, test_provider: MockDIProvider
+    di_container: AsyncContainer,
 ) -> AsyncGenerator[BatchRepositoryProtocol, None]:
     """Provide batch repository from DI container."""
     async with di_container(scope=Scope.REQUEST) as request_container:
         repository = await request_container.get(BatchRepositoryProtocol)
-        # Store reference for access in tests
-        test_provider.repository_instance = repository
         yield repository
 
 
@@ -143,7 +151,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_orphaned_essay_association_with_batch(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         rank: Optional[int],
         score: Optional[float],
@@ -166,21 +173,16 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                rank=rank,
-                score=score,
-                comparison_count=comparison_count,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            rank=rank,
+            score=score,
+            comparison_count=comparison_count,
+        )
 
         # Assert - Verify orphaned essay was associated with batch
         assert orphaned_essay.batch_id == batch_id
@@ -214,7 +216,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_nonexistent_essay_creation(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         rank: Optional[int],
         score: Optional[float],
@@ -247,22 +248,17 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=status,
-                correlation_id=correlation_id,
-                rank=rank,
-                score=score,
-                comparison_count=comparison_count,
-                error_detail=error_detail,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=status,
+            correlation_id=correlation_id,
+            rank=rank,
+            score=score,
+            comparison_count=comparison_count,
+            error_detail=error_detail,
+        )
 
         # Assert - Verify new essay was created and added to session
         # The method should create an EssayResult object and add it to the session
@@ -276,7 +272,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_existing_essay_with_batch_id_preserved(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test that existing essays with batch_id keep their association."""
@@ -301,21 +296,16 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=new_batch_id,
-                status=ProcessingStage.COMPLETED,
-                correlation_id=correlation_id,
-                rank=1,
-                score=95.0,
-                comparison_count=20,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=new_batch_id,
+            status=ProcessingStage.COMPLETED,
+            correlation_id=correlation_id,
+            rank=1,
+            score=95.0,
+            comparison_count=20,
+        )
 
         # Assert - Verify existing batch association is preserved
         assert existing_essay.batch_id == original_batch_id  # Should NOT change
@@ -334,7 +324,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_essay_search_by_essay_id_only(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test that essay lookup uses essay_id only, not batch_id for orphaned essay handling."""
@@ -351,20 +340,15 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=ProcessingStage.COMPLETED,
-                correlation_id=correlation_id,
-                rank=2,
-                score=88.5,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=ProcessingStage.COMPLETED,
+            correlation_id=correlation_id,
+            rank=2,
+            score=88.5,
+        )
 
         # Assert - Verify SQLAlchemy query was constructed correctly
         # The execute call should contain a select statement filtering by essay_id only
@@ -387,7 +371,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_error_detail_handling(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
         has_error_detail: bool,
         error_message: Optional[str],
@@ -416,19 +399,14 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=ProcessingStage.FAILED if has_error_detail else ProcessingStage.COMPLETED,
-                correlation_id=correlation_id,
-                error_detail=error_detail,
-            )
+        # Act - No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=ProcessingStage.FAILED if has_error_detail else ProcessingStage.COMPLETED,
+            correlation_id=correlation_id,
+            error_detail=error_detail,
+        )
 
         # Assert
         if has_error_detail:
@@ -445,7 +423,6 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
     async def test_optional_fields_partial_update(
         self,
         batch_repository: BatchRepositoryProtocol,
-        test_provider: MockDIProvider,
         mock_session: AsyncMock,
     ) -> None:
         """Test that only provided optional fields are updated."""
@@ -469,21 +446,17 @@ class TestUpdateEssayCjAssessmentResultOrphanedEssays:
         mock_result.scalars.return_value = mock_scalars
         mock_session.execute.return_value = mock_result
 
-        # Patch the internal session management
-        with patch.object(test_provider.repository_instance, "_get_session") as mock_get_session:
-            mock_get_session.return_value.__aenter__.return_value = mock_session
-            mock_get_session.return_value.__aexit__.return_value = None
-
-            # Act - Update only rank and score, not comparison_count
-            await batch_repository.update_essay_cj_assessment_result(
-                essay_id=essay_id,
-                batch_id=batch_id,
-                status=ProcessingStage.COMPLETED,
-                correlation_id=correlation_id,
-                rank=1,
-                score=92.5,
-                # comparison_count not provided - should preserve existing value
-            )
+        # Act - Update only rank and score, not comparison_count
+        # No patching needed, mock is injected through DI
+        await batch_repository.update_essay_cj_assessment_result(
+            essay_id=essay_id,
+            batch_id=batch_id,
+            status=ProcessingStage.COMPLETED,
+            correlation_id=correlation_id,
+            rank=1,
+            score=92.5,
+            # comparison_count not provided - should preserve existing value
+        )
 
         # Assert
         assert existing_essay.batch_id == batch_id

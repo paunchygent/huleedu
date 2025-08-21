@@ -68,7 +68,7 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             # Create temporary repository instance with session factory
-            temp_repo = PostgreSQLEssayRepository(session_factory)
+            PostgreSQLEssayRepository(session_factory)
             app.database_engine = engine
             logger.info("Database schema initialized and engine stored for health checks")
 

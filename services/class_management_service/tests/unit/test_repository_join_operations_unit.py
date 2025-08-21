@@ -159,7 +159,8 @@ class TestPostgreSQLClassRepositoryJoinOperations:
     def test_error_handling_patterns_for_get_essay_student_association(
         self, essay_id: UUID, correlation_id: UUID
     ) -> None:
-        """Test error handling business logic for get_essay_student_association without database calls."""
+        """Test error handling business logic for get_essay_student_association
+        without database calls."""
         # This tests the error raising pattern using the factory function directly
         with pytest.raises(HuleEduError) as exc_info:
             # Trigger the error using the factory function directly

@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 from aiokafka import ConsumerRecord
+from pydantic import ValidationError
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
@@ -306,7 +307,10 @@ async def test_duplicate_event_processing_idempotency(
 
     # Pre-populate Redis with existing key to simulate duplicate
     deterministic_id = generate_deterministic_event_id(record.value)
-    existing_key = f"huleedu:idempotency:v2:batch-conductor-service:SpellcheckPhaseCompletedV1:{deterministic_id}"
+    existing_key = (
+        f"huleedu:idempotency:v2:batch-conductor-service:"
+        f"SpellcheckPhaseCompletedV1:{deterministic_id}"
+    )
     mock_redis_client.keys[existing_key] = json.dumps(
         {
             "status": "completed",
@@ -483,7 +487,7 @@ async def test_invalid_event_data_handling(
     )
 
     # Act & Assert - Should handle validation error gracefully
-    with pytest.raises(Exception):  # Pydantic validation error
+    with pytest.raises(ValidationError):  # Pydantic validation error
         await bcs_kafka_consumer_with_errors._handle_spellcheck_phase_completed(record)
 
     # No completions should be recorded due to invalid data
@@ -515,7 +519,7 @@ async def test_malformed_json_handling(
     )
 
     # Act & Assert - Should handle JSON parsing error
-    with pytest.raises(Exception):  # Pydantic ValidationError for invalid JSON
+    with pytest.raises(ValidationError):  # Pydantic ValidationError for invalid JSON
         await bcs_kafka_consumer_with_errors._handle_spellcheck_phase_completed(record)
 
     # No completions should be recorded due to malformed JSON

@@ -91,7 +91,8 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     )
 
                     # Create all essay data dictionaries for atomic batch operation
-                    # Note: Protocol expects str | None values, but in this context all values are guaranteed non-None
+                    # Note: Protocol expects str | None values, but in this context
+                    # all values are guaranteed non-None
                     typed_essay_data: list[dict[str, str | None]] = [
                         {
                             "entity_id": essay_id,
@@ -145,7 +146,8 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
 
                         if assigned_count > 0:
                             logger.info(
-                                f"Processed {assigned_count} pending content items for batch using ContentAssignmentService",
+                                f"Processed {assigned_count} pending content items for batch "
+                                f"using ContentAssignmentService",
                                 extra={
                                     "batch_id": event_data.entity_id,
                                     "assigned_count": assigned_count,
@@ -163,7 +165,8 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         publish_correlation_id = original_correlation_id or correlation_id
 
                         logger.info(
-                            "Batch is immediately complete, publishing BatchContentProvisioningCompletedV1 event",
+                            "Batch is immediately complete, publishing "
+                            "BatchContentProvisioningCompletedV1 event",
                             extra={
                                 "batch_id": batch_ready_event.batch_id,
                                 "ready_count": len(batch_ready_event.ready_essays),

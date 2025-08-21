@@ -128,8 +128,10 @@ class TestE2ECJAssessmentWorkflows:
             assert ras_event_data["processing_duration_seconds"] > 0
 
             # Now query the RAS API to get detailed results
-            # This validates that downstream services can fetch detailed data after receiving the thin event
-            # Note: RAS uses internal authentication, so we need to make a direct request with proper headers
+            # This validates that downstream services can
+            # fetch detailed data after receiving the thin event
+            # Note: RAS uses internal authentication,
+            # so we need to make a direct request with proper headers
             import json
 
             import aiohttp

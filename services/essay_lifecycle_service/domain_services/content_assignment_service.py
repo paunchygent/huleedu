@@ -149,7 +149,8 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             publish_correlation_id = original_correlation_id or correlation_id
 
             logger.info(
-                "Batch completed during content assignment, publishing BatchContentProvisioningCompletedV1",
+                "Batch completed during content assignment, publishing "
+                "BatchContentProvisioningCompletedV1",
                 extra={
                     "batch_id": batch_ready_event.batch_id,
                     "ready_count": len(batch_ready_event.ready_essays),
@@ -186,7 +187,8 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             if batch_ready_event.class_type == "GUEST":
                 await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
                 logger.info(
-                    f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after BatchContentProvisioningCompleted publication"
+                    f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up "
+                    f"after BatchContentProvisioningCompleted publication"
                 )
 
         logger.info(

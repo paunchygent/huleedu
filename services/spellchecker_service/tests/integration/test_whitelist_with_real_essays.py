@@ -168,7 +168,8 @@ class TestWhitelistIntegration:
             print(f"  L2 corrections: {essay_stats['l2_corrections']}")
             print(f"  Whitelist hits: {essay_stats['whitelist_hits']}")
             print(
-                f"  PySpell corrections: {result_with_wl.total_corrections - essay_stats['l2_corrections']}"
+                f"  PySpell corrections: "
+                f"{result_with_wl.total_corrections - essay_stats['l2_corrections']}"
             )
             print(f"  Time with whitelist: {time_with_whitelist:.3f}s")
             print(f"  Time without whitelist: {time_without_whitelist:.3f}s")

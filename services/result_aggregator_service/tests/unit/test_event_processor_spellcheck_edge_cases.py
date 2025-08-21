@@ -1,4 +1,5 @@
-"""Unit tests for EventProcessorImpl spellcheck result processing - edge cases and special scenarios."""
+"""Unit tests for EventProcessorImpl spellcheck result processing - edge cases
+and special scenarios."""
 
 from __future__ import annotations
 

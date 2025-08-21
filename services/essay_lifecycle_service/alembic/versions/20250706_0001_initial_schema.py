@@ -22,7 +22,11 @@ def upgrade() -> None:
     """Create initial schema for Essay Lifecycle Service."""
     # Create essay_status_enum
     op.execute(
-        "CREATE TYPE essay_status_enum AS ENUM ('unregistered', 'awaiting_content', 'content_provided', 'processing', 'spellcheck_complete', 'nlp_complete', 'cj_assessment_complete', 'ai_feedback_complete', 'completed', 'failed')"
+        "CREATE TYPE essay_status_enum AS ENUM ("
+        "'unregistered', 'awaiting_content', 'content_provided', 'processing', "
+        "'spellcheck_complete', 'nlp_complete', 'cj_assessment_complete', "
+        "'ai_feedback_complete', 'completed', 'failed'"
+        ")"
     )
 
     # Create essay_states table

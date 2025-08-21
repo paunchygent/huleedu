@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:fd682e81bb0ecb142e2d10d314d57d549227e94a37e755deea1a985628a90203"
+content_hash = "sha256:11a3a0059540be6ff24fed6632584229c44646f7d235693e26b678c97b0e8784"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.13"
@@ -579,7 +579,7 @@ version = "0.4.6"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 summary = "Cross-platform colored terminal text."
 groups = ["default", "dev", "monorepo-tools"]
-marker = "sys_platform == \"win32\" or platform_system == \"Windows\""
+marker = "sys_platform == \"win32\" or python_version > \"3.4\" or platform_system == \"Windows\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
@@ -642,6 +642,7 @@ requires_python = ">=3.9"
 summary = "Code coverage measurement for Python"
 groups = ["monorepo-tools"]
 dependencies = [
+    "coverage==7.10.4",
     "coverage==7.10.4",
     "tomli; python_full_version <= \"3.11.0a6\"",
 ]
@@ -774,6 +775,7 @@ requires_python = ">=3.10"
 summary = "Cute DI framework with scopes and agreeable API"
 groups = ["dev"]
 dependencies = [
+    "dishka==1.6.0",
     "dishka==1.6.0",
 ]
 files = [
@@ -1080,6 +1082,7 @@ requires_python = ">=3.7"
 summary = "Google API client core library"
 groups = ["dev"]
 dependencies = [
+    "google-api-core==2.25.1",
     "google-api-core==2.25.1",
     "grpcio-status<2.0.0,>=1.33.2",
     "grpcio-status<2.0.0,>=1.49.1; python_version >= \"3.11\"",
@@ -2088,6 +2091,21 @@ files = [
 ]
 
 [[package]]
+name = "mando"
+version = "0.7.1"
+summary = "Create Python CLI apps with little to no effort at all!"
+groups = ["dev"]
+dependencies = [
+    "argparse; python_version <= \"2.6\"",
+    "funcsigs; python_version <= \"3.2\"",
+    "six",
+]
+files = [
+    {file = "mando-0.7.1-py2.py3-none-any.whl", hash = "sha256:26ef1d70928b6057ee3ca12583d73c63e05c49de8972d620c278a7b206581a8a"},
+    {file = "mando-0.7.1.tar.gz", hash = "sha256:18baa999b4b613faefb00eac4efadcf14f510b59b924b66e08289aa1de8c3500"},
+]
+
+[[package]]
 name = "marisa-trie"
 version = "1.3.0"
 requires_python = ">=3.9"
@@ -2626,6 +2644,7 @@ groups = ["dev"]
 dependencies = [
     "bcrypt>=3.1.0",
     "passlib==1.7.4",
+    "passlib==1.7.4",
 ]
 files = [
     {file = "passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1"},
@@ -2992,6 +3011,7 @@ groups = ["dev"]
 dependencies = [
     "email-validator>=2.0.0",
     "pydantic==2.11.7",
+    "pydantic==2.11.7",
 ]
 files = [
     {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
@@ -3240,6 +3260,7 @@ groups = ["dev"]
 dependencies = [
     "cryptography>=3.4.0",
     "python-jose==3.5.0",
+    "python-jose==3.5.0",
 ]
 files = [
     {file = "python_jose-3.5.0-py2.py3-none-any.whl", hash = "sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771"},
@@ -3362,6 +3383,21 @@ files = [
 ]
 
 [[package]]
+name = "radon"
+version = "6.0.1"
+summary = "Code Metrics in Python"
+groups = ["dev"]
+dependencies = [
+    "colorama==0.4.1; python_version <= \"3.4\"",
+    "colorama>=0.4.1; python_version > \"3.4\"",
+    "mando<0.8,>=0.6",
+]
+files = [
+    {file = "radon-6.0.1-py2.py3-none-any.whl", hash = "sha256:632cc032364a6f8bb1010a2f6a12d0f14bc7e5ede76585ef29dc0cecf4cd8859"},
+    {file = "radon-6.0.1.tar.gz", hash = "sha256:d1ac0053943a893878940fedc8b19ace70386fc9c9bf0a09229a44125ebf45b5"},
+]
+
+[[package]]
 name = "rapidfuzz"
 version = "3.13.0"
 requires_python = ">=3.9"
@@ -3430,6 +3466,7 @@ summary = "Python client for Redis database and key-value store"
 groups = ["dev"]
 dependencies = [
     "hiredis>=3.2.0",
+    "redis==6.4.0",
     "redis==6.4.0",
 ]
 files = [
@@ -3793,6 +3830,7 @@ groups = ["dev"]
 dependencies = [
     "spacy-lookups-data<1.1.0,>=1.0.3",
     "spacy==3.8.7",
+    "spacy==3.8.7",
 ]
 files = [
     {file = "spacy-3.8.7-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:bdff8b9b556468a6dd527af17f0ddf9fb0b0bee92ee7703339ddf542361cff98"},
@@ -3853,6 +3891,7 @@ summary = "Database Abstraction Library"
 groups = ["dev"]
 dependencies = [
     "greenlet>=1",
+    "sqlalchemy==2.0.43",
     "sqlalchemy==2.0.43",
 ]
 files = [
@@ -3980,6 +4019,7 @@ summary = "Python library for throwaway instances of anything that can run in a 
 groups = ["monorepo-tools"]
 dependencies = [
     "redis",
+    "testcontainers==4.12.0",
     "testcontainers==4.12.0",
 ]
 files = [
@@ -4207,6 +4247,7 @@ dependencies = [
     "httptools>=0.6.3",
     "python-dotenv>=0.13",
     "pyyaml>=5.1",
+    "uvicorn==0.35.0",
     "uvicorn==0.35.0",
     "uvloop>=0.15.1; (sys_platform != \"cygwin\" and sys_platform != \"win32\") and platform_python_implementation != \"PyPy\"",
     "watchfiles>=0.13",
