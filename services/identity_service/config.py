@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env file from repository root
@@ -27,13 +27,52 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = Field(default="localhost:9092")
 
     # JWT configuration
-    JWT_DEV_SECRET: str = "dev-secret-change-me"
+    JWT_DEV_SECRET: SecretStr = Field(
+        default=SecretStr("dev-secret-change-me"),
+        description="JWT signing secret for development environment"
+    )
     JWT_ACCESS_TOKEN_EXPIRES_SECONDS: int = 3600
 
     # RS256 / JWKS (prod)
-    JWT_RS256_PRIVATE_KEY_PATH: str | None = None
+    JWT_RS256_PRIVATE_KEY_PATH: SecretStr | None = Field(
+        default=None,
+        description="Path to RS256 private key for production JWT signing"
+    )
     JWT_RS256_PUBLIC_JWKS_KID: str | None = None
 
+    def is_production(self) -> bool:
+        """Check if running in production environment."""
+        return self.ENVIRONMENT == Environment.PRODUCTION
+    
+    def is_development(self) -> bool:
+        """Check if running in development environment."""
+        return self.ENVIRONMENT == Environment.DEVELOPMENT
+    
+    def is_testing(self) -> bool:
+        """Check if running in testing environment."""
+        return self.ENVIRONMENT == Environment.TESTING
+    
+    def get_jwt_secret(self) -> SecretStr:
+        """Get environment-appropriate JWT secret."""
+        if self.is_production() and self.JWT_RS256_PRIVATE_KEY_PATH:
+            # Production uses RS256 with private key
+            return self.JWT_RS256_PRIVATE_KEY_PATH
+        return self.JWT_DEV_SECRET
+    
+    def __str__(self) -> str:
+        """Secure string representation that masks sensitive data."""
+        return (
+            f"{self.__class__.__name__}("
+            f"service={self.SERVICE_NAME}, "
+            f"version={self.SERVICE_VERSION}, "
+            f"environment={self.ENVIRONMENT.value}, "
+            f"secrets=***MASKED***)"
+        )
+    
+    def __repr__(self) -> str:
+        """Secure repr for debugging that masks sensitive data."""
+        return self.__str__()
+    
     @property
     def database_url(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
@@ -50,7 +89,7 @@ class Settings(BaseSettings):
         if env_url:
             return env_url
 
-        if str(self.ENVIRONMENT) == "production":
+        if self.is_production():
             prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
             prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
             prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD")
@@ -74,6 +113,14 @@ class Settings(BaseSettings):
 
             # Type narrowing after validation - mypy now knows these are not None
             return f"postgresql+asyncpg://{db_user_env}:{db_password_env}@localhost:5442/huleedu_identity"
+    
+    @property
+    def database_url_masked(self) -> str:
+        """Return database URL with masked password for logging."""
+        import re
+        url = self.database_url
+        # Mask password in URL: user:password@ becomes user:***@
+        return re.sub(r'://([^:]+):[^@]+@', r'://\1:***@', url)
 
 
 settings = Settings()

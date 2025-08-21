@@ -53,6 +53,7 @@ alwaysApply: false
 - [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E) with Prometheus registry handling
 - [070.1-performance-testing-methodology.mdc](mdc:070.1-performance-testing-methodology.mdc): Performance testing methodology and patterns
 - [075-test-creation-methodology.mdc](mdc:075-test-creation-methodology.mdc): Systematic test creation methodology for comprehensive, maintainable test coverage following battle-tested patterns
+- [075.1-parallel-test-creation-methodology.mdc](mdc:075.1-parallel-test-creation-methodology.mdc): Parallel test creation with mandatory architect validation
 - **Observability (071.x)**
   - [071-observability-index.mdc](mdc:071-observability-index.mdc): Observability patterns index
   - [071-observability-core-patterns.mdc](mdc:071-observability-core-patterns.mdc): Core observability patterns
