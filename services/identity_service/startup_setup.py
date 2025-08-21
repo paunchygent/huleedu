@@ -14,7 +14,7 @@ from quart import Quart
 from quart_dishka import QuartDishka
 
 from services.identity_service.config import Settings
-from services.identity_service.di import CoreProvider, IdentityImplementationsProvider
+from services.identity_service.di import CoreProvider, IdentityImplementationsProvider, DomainHandlerProvider
 
 logger = create_service_logger("identity_service.startup")
 
@@ -27,6 +27,7 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     container = make_async_container(
         CoreProvider(),
         IdentityImplementationsProvider(),
+        DomainHandlerProvider(),
         OutboxProvider(),
     )
     QuartDishka(app=app, container=container)

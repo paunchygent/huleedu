@@ -172,3 +172,15 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
             event_data=envelope,
             topic=topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_COMPLETED),
         )
+
+    async def publish_user_logged_out(self, user_id: str, correlation_id: str) -> None:
+        # For now, we'll log the event since UserLoggedOutV1 may not exist yet
+        logger.info(
+            "User logged out",
+            extra={
+                "user_id": user_id,
+                "correlation_id": correlation_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+        # In production, this would publish a UserLoggedOutV1 event similar to the others

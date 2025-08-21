@@ -8,10 +8,19 @@ from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from prometheus_client import REGISTRY, CollectorRegistry
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from services.identity_service.config import Settings, settings
 from services.identity_service.domain_handlers.profile_handler import UserProfileHandler
+
+# TYPE_CHECKING imports for domain handlers (avoid circular imports)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from services.identity_service.domain_handlers.authentication_handler import AuthenticationHandler
+    from services.identity_service.domain_handlers.registration_handler import RegistrationHandler
+    from services.identity_service.domain_handlers.verification_handler import VerificationHandler
+    from services.identity_service.domain_handlers.password_reset_handler import PasswordResetHandler
+    from services.identity_service.domain_handlers.session_management_handler import SessionManagementHandler
 from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
@@ -31,13 +40,21 @@ from services.identity_service.implementations.user_repository_sqlalchemy_impl i
     PostgresSessionRepo,
     PostgresUserRepo,
 )
+from services.identity_service.implementations.rate_limiter_impl import RateLimiterImpl
+from services.identity_service.implementations.audit_logger_impl import AuditLoggerImpl
+from services.identity_service.implementations.user_session_repository_impl import (
+    UserSessionRepositoryImpl,
+)
 from services.identity_service.protocols import (
+    AuditLoggerProtocol,
     IdentityEventPublisherProtocol,
     PasswordHasher,
+    RateLimiterProtocol,
     SessionRepo,
     TokenIssuer,
     UserProfileRepositoryProtocol,
     UserRepo,
+    UserSessionRepositoryProtocol,
 )
 
 
@@ -124,3 +141,120 @@ class IdentityImplementationsProvider(Provider):
         self, repository: UserProfileRepositoryProtocol
     ) -> UserProfileHandler:
         return UserProfileHandler(repository)
+
+    @provide(scope=Scope.APP)
+    def provide_session_factory(self, engine: AsyncEngine) -> async_sessionmaker:
+        """Provide SQLAlchemy async session factory."""
+        return async_sessionmaker(engine, expire_on_commit=False)
+    
+    @provide(scope=Scope.APP)
+    def provide_rate_limiter(
+        self, redis_client: AtomicRedisClientProtocol
+    ) -> RateLimiterProtocol:
+        """Provide rate limiter for security."""
+        return RateLimiterImpl(redis_client)
+    
+    @provide(scope=Scope.APP)
+    def provide_audit_logger(
+        self, session_factory: async_sessionmaker
+    ) -> AuditLoggerProtocol:
+        """Provide audit logger for security events."""
+        return AuditLoggerImpl(session_factory)
+    
+    @provide(scope=Scope.APP)
+    def provide_user_session_repository(
+        self, session_factory: async_sessionmaker
+    ) -> UserSessionRepositoryProtocol:
+        """Provide user session repository with device tracking."""
+        return UserSessionRepositoryImpl(session_factory)
+
+
+class DomainHandlerProvider(Provider):
+    """Provider for domain handler dependencies with REQUEST scope.
+    
+    All handlers are scoped to REQUEST for proper session management
+    and to ensure each request gets fresh handler instances.
+    """
+    
+    @provide(scope=Scope.REQUEST)
+    def provide_authentication_handler(
+        self,
+        user_repo: UserRepo,
+        token_issuer: TokenIssuer,
+        password_hasher: PasswordHasher,
+        session_repo: SessionRepo,
+        user_session_repo: UserSessionRepositoryProtocol,
+        event_publisher: IdentityEventPublisherProtocol,
+        rate_limiter: RateLimiterProtocol,
+        audit_logger: AuditLoggerProtocol,
+    ) -> "AuthenticationHandler":
+        """Provide authentication handler for login/logout/refresh operations."""
+        from services.identity_service.domain_handlers.authentication_handler import AuthenticationHandler
+        return AuthenticationHandler(
+            user_repo=user_repo,
+            token_issuer=token_issuer,
+            password_hasher=password_hasher,
+            session_repo=session_repo,
+            user_session_repo=user_session_repo,
+            event_publisher=event_publisher,
+            rate_limiter=rate_limiter,
+            audit_logger=audit_logger,
+        )
+    
+    @provide(scope=Scope.REQUEST)
+    def provide_registration_handler(
+        self,
+        user_repo: UserRepo,
+        password_hasher: PasswordHasher,
+        event_publisher: IdentityEventPublisherProtocol,
+    ) -> "RegistrationHandler":
+        """Provide registration handler for user registration operations."""
+        from services.identity_service.domain_handlers.registration_handler import RegistrationHandler
+        return RegistrationHandler(
+            user_repo=user_repo,
+            password_hasher=password_hasher,
+            event_publisher=event_publisher,
+        )
+    
+    @provide(scope=Scope.REQUEST)
+    def provide_verification_handler(
+        self,
+        user_repo: UserRepo,
+        event_publisher: IdentityEventPublisherProtocol,
+    ) -> "VerificationHandler":
+        """Provide verification handler for email verification operations."""
+        from services.identity_service.domain_handlers.verification_handler import VerificationHandler
+        return VerificationHandler(
+            user_repo=user_repo,
+            event_publisher=event_publisher,
+        )
+    
+    @provide(scope=Scope.REQUEST)
+    def provide_password_reset_handler(
+        self,
+        user_repo: UserRepo,
+        password_hasher: PasswordHasher,
+        event_publisher: IdentityEventPublisherProtocol,
+        audit_logger: AuditLoggerProtocol,
+    ) -> "PasswordResetHandler":
+        """Provide password reset handler for password reset operations."""
+        from services.identity_service.domain_handlers.password_reset_handler import PasswordResetHandler
+        return PasswordResetHandler(
+            user_repo=user_repo,
+            password_hasher=password_hasher,
+            event_publisher=event_publisher,
+            audit_logger=audit_logger,
+        )
+    
+    @provide(scope=Scope.REQUEST)
+    def provide_session_management_handler(
+        self,
+        user_session_repo: UserSessionRepositoryProtocol,
+        audit_logger: AuditLoggerProtocol,
+    ) -> "SessionManagementHandler":
+        """Provide session management handler for session operations."""
+        from services.identity_service.domain_handlers.session_management_handler import SessionManagementHandler
+        return SessionManagementHandler(
+            user_session_repo=user_session_repo,
+            audit_logger=audit_logger,
+        )

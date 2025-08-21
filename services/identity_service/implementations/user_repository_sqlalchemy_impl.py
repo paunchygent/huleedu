@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -44,6 +44,23 @@ class PostgresUserRepo(UserRepo):
     async def get_user_by_email(self, email: str) -> Optional[dict]:
         async with self._session_factory() as session:
             stmt = select(User).where(User.email == email.lower())
+            res = await session.execute(stmt)
+            user = res.scalar_one_or_none()
+            if not user:
+                return None
+            return {
+                "id": str(user.id),
+                "email": user.email,
+                "org_id": user.org_id,
+                "roles": user.roles or [],
+                "email_verified": user.email_verified,
+                "registered_at": user.registered_at,
+                "password_hash": user.password_hash,
+            }
+
+    async def get_user_by_id(self, user_id: str) -> Optional[dict]:
+        async with self._session_factory() as session:
+            stmt = select(User).where(User.id == UUID(str(user_id)))
             res = await session.execute(stmt)
             user = res.scalar_one_or_none()
             if not user:
@@ -195,6 +212,13 @@ class PostgresUserRepo(UserRepo):
                 .where(User.id == UUID(str(user_id)))
                 .values(password_hash=password_hash)
             )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def update_security_fields(self, user_id: str, fields: dict[str, Any]) -> None:
+        """Update security-related fields for a user."""
+        async with self._session_factory() as session:
+            stmt = update(User).where(User.id == user_id).values(**fields)
             await session.execute(stmt)
             await session.commit()
 

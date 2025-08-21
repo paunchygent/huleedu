@@ -36,11 +36,25 @@ class User(Base):
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
     )
+    
+    # Security fields
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    locked_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_failed_login_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return (
             f"<User id={self.id} email={self.email} org={self.org_id} "
-            f"verified={self.email_verified}>"
+            f"verified={self.email_verified} locked_until={self.locked_until}>"
         )
 
 
@@ -188,3 +202,67 @@ class EventOutbox(Base):
         Index("ix_event_outbox_aggregate", "aggregate_type", "aggregate_id"),
         Index("ix_event_outbox_event_type", "event_type"),
     )
+
+class AuditLog(Base):
+    """Audit log for security events and user actions."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)  # IPv6 support
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    correlation_id: Mapped[Optional[UUID]] = mapped_column(PostgresUUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+
+    __table_args__ = (
+        Index("idx_audit_logs_user_id", "user_id"),
+        Index("idx_audit_logs_action", "action"),
+        Index("idx_audit_logs_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<AuditLog id={self.id} action={self.action} user_id={self.user_id}>"
+
+
+class UserSession(Base):
+    """Enhanced session tracking for user authentication."""
+
+    __tablename__ = "user_sessions"
+
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    jti: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    device_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    device_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_activity: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_user_sessions_user_id", "user_id"),
+        Index("idx_user_sessions_jti", "jti"),
+        Index("idx_user_sessions_expires_at", "expires_at"),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<UserSession id={self.id} user_id={self.user_id} jti={self.jti[:8]}... revoked={self.revoked_at is not None}>"

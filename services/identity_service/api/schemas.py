@@ -73,6 +73,16 @@ class ResetPasswordResponse(BaseModel):
     message: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+
+
 class PersonNameSchema(BaseModel):
     """Schema for PersonNameV1 structure."""
 

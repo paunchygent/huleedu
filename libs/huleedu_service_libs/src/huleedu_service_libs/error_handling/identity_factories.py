@@ -291,3 +291,41 @@ def raise_password_reset_not_requested_error(
         details={"email": email, **additional_context},
     )
     raise HuleEduError(error_detail)
+
+
+def raise_invalid_token_error(
+    service: str,
+    operation: str,
+    message: str,
+    correlation_id: UUID,
+    **additional_context: Any,
+) -> NoReturn:
+    """Create and raise a generic invalid token error."""
+    error_detail = create_error_detail_with_context(
+        error_code=IdentityErrorCode.TOKEN_INVALID,
+        message=message,
+        service=service,
+        operation=operation,
+        correlation_id=correlation_id,
+        details=additional_context,
+    )
+    raise HuleEduError(error_detail)
+
+
+def raise_missing_token_error(
+    service: str,
+    operation: str,
+    message: str,
+    correlation_id: UUID,
+    **additional_context: Any,
+) -> NoReturn:
+    """Create and raise a missing token error."""
+    error_detail = create_error_detail_with_context(
+        error_code=IdentityErrorCode.TOKEN_INVALID,
+        message=message,
+        service=service,
+        operation=operation,
+        correlation_id=correlation_id,
+        details=additional_context,
+    )
+    raise HuleEduError(error_detail)
