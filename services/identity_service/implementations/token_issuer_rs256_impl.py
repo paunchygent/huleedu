@@ -35,7 +35,7 @@ class Rs256TokenIssuer(TokenIssuer):
         key_path = settings.JWT_RS256_PRIVATE_KEY_PATH
         if not key_path:
             raise RuntimeError("JWT_RS256_PRIVATE_KEY_PATH must be set in production")
-        pem = Path(key_path).read_bytes()
+        pem = Path(key_path.get_secret_value()).read_bytes()
         key = serialization.load_pem_private_key(pem, password=None)
         if not isinstance(key, RSAPrivateKey):
             raise RuntimeError("Expected RSA private key, got different key type")

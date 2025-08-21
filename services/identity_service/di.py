@@ -106,7 +106,7 @@ class IdentityImplementationsProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_token_issuer(self, settings: Settings, jwks_store: JwksStore) -> TokenIssuer:
         # Production: RS256 with JWKS exposure
-        if str(settings.ENVIRONMENT) == "production" and settings.JWT_RS256_PRIVATE_KEY_PATH:
+        if settings.is_production() and settings.JWT_RS256_PRIVATE_KEY_PATH:
             return Rs256TokenIssuer(jwks_store)
         # Development fallback: HS256-like dev tokens
         return DevTokenIssuer()

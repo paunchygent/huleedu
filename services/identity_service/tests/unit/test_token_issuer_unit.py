@@ -265,8 +265,9 @@ class TestRs256TokenIssuer:
     @pytest.fixture
     def mock_settings(self) -> MagicMock:
         """Mock settings for RS256 testing."""
+        from pydantic import SecretStr
         mock = MagicMock()
-        mock.JWT_RS256_PRIVATE_KEY_PATH = "/test/key.pem"
+        mock.JWT_RS256_PRIVATE_KEY_PATH = SecretStr("/test/key.pem")
         mock.JWT_RS256_PUBLIC_JWKS_KID = "test-kid"
         mock.JWT_ACCESS_TOKEN_EXPIRES_SECONDS = 3600
         mock.SERVICE_NAME = "identity_service"

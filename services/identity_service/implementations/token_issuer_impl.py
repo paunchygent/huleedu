@@ -50,5 +50,5 @@ class DevTokenIssuer(TokenIssuer):
         h = base64.urlsafe_b64encode(json.dumps(header).encode()).rstrip(b"=")
         b = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=")
         # Dev signature placeholder
-        sig = base64.urlsafe_b64encode(settings.JWT_DEV_SECRET.encode()).rstrip(b"=")
+        sig = base64.urlsafe_b64encode(settings.JWT_DEV_SECRET.get_secret_value().encode()).rstrip(b"=")
         return f"{h.decode()}.{b.decode()}.{sig.decode()}"
