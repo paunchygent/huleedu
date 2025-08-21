@@ -1,7 +1,7 @@
 """
 Unit tests for registration routes in Identity Service.
 
-Tests the POST /v1/auth/register endpoint following the established 
+Tests the POST /v1/auth/register endpoint following the established
 Quart+Dishka testing patterns with proper DI mocking and error handling.
 """
 
@@ -20,8 +20,8 @@ from huleedu_service_libs.error_handling.identity_factories import (
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
-from services.identity_service.app import app
 from services.identity_service.api.schemas import RegisterResponse
+from services.identity_service.app import app
 from services.identity_service.domain_handlers.registration_handler import (
     RegistrationHandler,
     RegistrationResult,
@@ -75,7 +75,7 @@ class TestRegistrationRoutes:
         email = "åsa.öberg@skolan.se"  # Swedish characters
         password = "SecureP@ssw0rd123"
         org_id = "school-123"
-        
+
         registration_response = RegisterResponse(
             user_id="user-456",
             email=email,
@@ -110,7 +110,7 @@ class TestRegistrationRoutes:
         call_args = mock_registration_handler.register_user.call_args
         register_request = call_args.kwargs["register_request"]
         correlation_id = call_args.kwargs["correlation_id"]
-        
+
         assert register_request.email == email
         assert register_request.password == password
         assert register_request.org_id == org_id
@@ -126,7 +126,7 @@ class TestRegistrationRoutes:
         email = "erik.lundström@university.se"
         password = "TestPassword123!"
         correlation_id_str = "12345678-1234-5678-9abc-123456789abc"
-        
+
         registration_response = RegisterResponse(
             user_id="user-789",
             email=email,
@@ -194,7 +194,7 @@ class TestRegistrationRoutes:
         email = "existing.user@test.com"
         password = "Password123!"
         correlation_id = uuid4()
-        
+
         def mock_user_exists(*args: Any, **kwargs: Any) -> NoReturn:
             raise_user_already_exists_error(
                 service="identity_service",
@@ -234,8 +234,10 @@ class TestRegistrationRoutes:
         # Arrange
         email = "test.user@example.com"
         password = "Password123!"
-        
-        mock_registration_handler.register_user.side_effect = Exception("Database connection failed")
+
+        mock_registration_handler.register_user.side_effect = Exception(
+            "Database connection failed"
+        )
 
         request_data = {
             "email": email,

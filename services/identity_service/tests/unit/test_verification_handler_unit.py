@@ -81,7 +81,7 @@ class TestVerificationHandler:
         """Create sample verified user dict."""
         return {
             "id": user_id,
-            "email": "verified@example.com", 
+            "email": "verified@example.com",
             "org_id": "test-org",
             "email_verified": True,
         }
@@ -156,7 +156,7 @@ class TestVerificationHandler:
             mock_event_publisher.publish_email_verification_requested.assert_called_once()
             event_call = mock_event_publisher.publish_email_verification_requested.call_args
             assert event_call[0][0] == sample_user_dict  # user dict
-            assert event_call[0][1] == sample_token_dict["id"]  # token_id  
+            assert event_call[0][1] == sample_token_dict["id"]  # token_id
             assert isinstance(event_call[0][2], datetime)  # expires_at (datetime)
             assert event_call[0][3] == str(correlation_id)  # correlation_id
 
@@ -271,7 +271,9 @@ class TestVerificationHandler:
             assert result.response.message == "Email verified successfully"
 
             # Verify repository interactions
-            mock_user_repo.get_email_verification_token.assert_called_once_with(verify_request.token)
+            mock_user_repo.get_email_verification_token.assert_called_once_with(
+                verify_request.token
+            )
             mock_user_repo.get_user_by_id.assert_called_once_with(sample_token_dict["user_id"])
             mock_user_repo.mark_token_used.assert_called_once_with(sample_token_dict["id"])
             mock_user_repo.set_email_verified.assert_called_once_with(sample_user_dict["id"])

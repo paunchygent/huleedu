@@ -117,6 +117,6 @@ class RegistrationHandler:
             "org_id": user["org_id"],
             "email_verification_required": user.get("email_verification_required", True),
         }
-        
+
         response = RegisterResponse(**response_data)
         return RegistrationResult(response)

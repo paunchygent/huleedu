@@ -466,7 +466,9 @@ class TestPasswordResetHandler:
                 user_id=UUID(user_id_str) if isinstance(user_id_str, str) else None,
                 details={
                     "token_id": expired_token_record["id"],
-                    "expires_at": expires_at_dt.isoformat() if hasattr(expires_at_dt, "isoformat") else str(expires_at_dt),
+                    "expires_at": expires_at_dt.isoformat()
+                    if hasattr(expires_at_dt, "isoformat")
+                    else str(expires_at_dt),
                 },
                 ip_address="192.168.1.1",
                 user_agent=None,
@@ -515,7 +517,9 @@ class TestPasswordResetHandler:
                 user_id=UUID(user_id_str) if isinstance(user_id_str, str) else None,
                 details={
                     "token_id": used_token_record["id"],
-                    "used_at": used_at_dt.isoformat() if hasattr(used_at_dt, "isoformat") else str(used_at_dt),
+                    "used_at": used_at_dt.isoformat()
+                    if hasattr(used_at_dt, "isoformat")
+                    else str(used_at_dt),
                 },
                 ip_address="192.168.1.1",
                 user_agent=None,

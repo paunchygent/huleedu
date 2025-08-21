@@ -11,10 +11,15 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
-from huleedu_service_libs.error_handling import raise_authentication_error, raise_validation_error
+from huleedu_service_libs.error_handling.identity_factories import (
+    raise_email_already_verified_error,
+    raise_verification_token_expired_error,
+    raise_verification_token_invalid_error,
+)
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
@@ -25,6 +30,7 @@ from services.identity_service.api.schemas import (
 from services.identity_service.app import app
 from services.identity_service.domain_handlers.verification_handler import (
     RequestVerificationResult,
+    VerificationHandler,
     VerifyEmailResult,
 )
 from services.identity_service.protocols import TokenIssuer
@@ -36,7 +42,10 @@ class TestVerificationRoutes:
     @pytest.fixture
     def mock_verification_handler(self) -> AsyncMock:
         """Create mock verification handler."""
-        from services.identity_service.domain_handlers.verification_handler import VerificationHandler
+        from services.identity_service.domain_handlers.verification_handler import (
+            VerificationHandler,
+        )
+
         return AsyncMock(spec=VerificationHandler)
 
     @pytest.fixture
@@ -58,7 +67,7 @@ class TestVerificationRoutes:
         # 1. Define a test-specific provider that provides our mocks
         class TestProvider(Provider):
             @provide(scope=Scope.REQUEST)
-            def provide_verification_handler(self) -> Any:  # VerificationHandler
+            def provide_verification_handler(self) -> VerificationHandler:
                 return mock_verification_handler
 
             @provide(scope=Scope.APP)
@@ -202,12 +211,11 @@ class TestVerificationRoutes:
 
         # Mock handler raising HuleEduError
         def mock_error(*_: Any, **__: Any) -> None:
-            raise_validation_error(
+            raise_email_already_verified_error(
                 service="identity_service",
                 operation="request_email_verification",
-                message="Email already verified",
-                correlation_id=correlation_id,
                 email="test@example.com",
+                correlation_id=UUID(correlation_id),
             )
 
         mock_verification_handler.request_email_verification.side_effect = mock_error
@@ -226,8 +234,8 @@ class TestVerificationRoutes:
         assert response.status_code == 400
         data = await response.get_json()
         error_detail = data["error"]
-        assert "Email already verified" in error_detail["message"]
-        assert error_detail["error_code"] == "VALIDATION_ERROR"
+        assert "Email is already verified" in error_detail["message"]
+        assert error_detail["error_code"] == "IDENTITY_EMAIL_ALREADY_VERIFIED"
 
     async def test_request_email_verification_swedish_user(
         self,
@@ -315,11 +323,10 @@ class TestVerificationRoutes:
 
         # Mock handler raising HuleEduError for invalid token
         def mock_error(*_: Any, **__: Any) -> None:
-            raise_validation_error(
+            raise_verification_token_invalid_error(
                 service="identity_service",
                 operation="verify_email",
-                message="Invalid verification token",
-                correlation_id=correlation_id,
+                correlation_id=UUID(correlation_id),
             )
 
         mock_verification_handler.verify_email.side_effect = mock_error
@@ -335,8 +342,8 @@ class TestVerificationRoutes:
         assert response.status_code == 400
         data = await response.get_json()
         error_detail = data["error"]
-        assert "Invalid verification token" in error_detail["message"]
-        assert error_detail["error_code"] == "VALIDATION_ERROR"
+        assert "Email verification token is invalid" in error_detail["message"]
+        assert error_detail["error_code"] == "IDENTITY_VERIFICATION_TOKEN_INVALID"
 
     async def test_verify_email_expired_token(
         self,
@@ -350,11 +357,10 @@ class TestVerificationRoutes:
 
         # Mock handler raising HuleEduError for expired token
         def mock_error(*_: Any, **__: Any) -> None:
-            raise_authentication_error(
+            raise_verification_token_expired_error(
                 service="identity_service",
                 operation="verify_email",
-                message="Verification token has expired",
-                correlation_id=correlation_id,
+                correlation_id=UUID(correlation_id),
             )
 
         mock_verification_handler.verify_email.side_effect = mock_error
@@ -370,8 +376,8 @@ class TestVerificationRoutes:
         assert response.status_code == 400
         data = await response.get_json()
         error_detail = data["error"]
-        assert "Verification token has expired" in error_detail["message"]
-        assert error_detail["error_code"] == "AUTHENTICATION_ERROR"
+        assert "Email verification token has expired" in error_detail["message"]
+        assert error_detail["error_code"] == "IDENTITY_VERIFICATION_TOKEN_EXPIRED"
 
     async def test_verify_email_missing_token(
         self,
@@ -441,7 +447,7 @@ class TestVerificationRoutes:
         """Test proper correlation ID handling across verification endpoints."""
         # Arrange
         verification_token = "test-token"
-        correlation_id = "custom-correlation-id"
+        correlation_id = "12345678-1234-5678-9abc-123456789abc"
 
         # Mock verification handler result
         response_data = VerifyEmailResponse(message="Email verified successfully")

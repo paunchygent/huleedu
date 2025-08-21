@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from huleedu_service_libs.error_handling import HuleEduError
-from pydantic import EmailStr
 
 from services.identity_service.api.schemas import (
     RegisterRequest,
@@ -167,9 +166,7 @@ class TestRegistrationHandler:
             assert result.response.org_id == "swedish-school"
 
             # Verify Swedish email passed correctly to repository
-            mock_user_repo.get_user_by_email.assert_called_once_with(
-                "åsa.öberg@skolan.se"
-            )
+            mock_user_repo.get_user_by_email.assert_called_once_with("åsa.öberg@skolan.se")
 
         async def test_raises_error_when_user_already_exists(
             self,

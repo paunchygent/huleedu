@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 # TYPE_CHECKING imports for domain handlers (avoid circular imports)
-from typing import TYPE_CHECKING
-
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol

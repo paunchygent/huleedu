@@ -1,13 +1,11 @@
 """
 Unit tests for API schemas validation behavior.
 
-Tests focus on Pydantic schema validation patterns including Swedish character 
+Tests focus on Pydantic schema validation patterns including Swedish character
 support and field validation rules following established testing patterns.
 """
 
 from __future__ import annotations
-
-from typing import Any, Dict
 
 import pytest
 from pydantic import ValidationError
@@ -24,7 +22,6 @@ from services.identity_service.api.schemas import (
     RegisterResponse,
     RequestEmailVerificationResponse,
     RequestPasswordResetRequest,
-    RequestPasswordResetResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
     TokenPair,
@@ -75,7 +72,7 @@ class TestRequestSchemas:
                 ("märta.ängström@skola.se", "password123", True),
                 ("björn.öberg@universitet.se", "securePass456", True),
                 ("åsa.åkerström@gymnasium.se", "testPass789", True),
-                # Standard valid emails  
+                # Standard valid emails
                 ("teacher@school.edu", "myPassword", True),
                 ("student@college.org", "studentPass", True),
                 # Invalid formats
@@ -99,7 +96,7 @@ class TestRequestSchemas:
             """Test that email and password are required fields."""
             with pytest.raises(ValidationError) as exc_info:
                 LoginRequest()  # type: ignore
-                
+
             errors = exc_info.value.errors()
             error_fields = {error["loc"][0] for error in errors}
             assert "email" in error_fields
@@ -118,7 +115,7 @@ class TestRequestSchemas:
             """Test ResetPasswordRequest field validation."""
             token = "reset_token_abc123"
             new_password = "newSecurePassword456"
-            
+
             request = ResetPasswordRequest(token=token, new_password=new_password)
             assert request.token == token
             assert request.new_password == new_password
@@ -127,7 +124,7 @@ class TestRequestSchemas:
             """Test that both token and new_password are required."""
             with pytest.raises(ValidationError):
                 ResetPasswordRequest(token="test_token")  # type: ignore
-                
+
             with pytest.raises(ValidationError):
                 ResetPasswordRequest(new_password="password")  # type: ignore
 
@@ -156,15 +153,15 @@ class TestResponseSchemas:
         def test_token_pair_creation_with_defaults(self) -> None:
             """Test TokenPair with default token_type value."""
             access_token = "access_token_123"
-            refresh_token = "refresh_token_456" 
+            refresh_token = "refresh_token_456"
             expires_in = 3600
-            
+
             token_pair = TokenPair(
                 access_token=access_token,
                 refresh_token=refresh_token,
                 expires_in=expires_in,
             )
-            
+
             assert token_pair.access_token == access_token
             assert token_pair.refresh_token == refresh_token
             assert token_pair.token_type == "Bearer"  # Default value
@@ -189,7 +186,7 @@ class TestResponseSchemas:
             swedish_email = "gunnar.åström@skolan.se"
             org_id = "org_456"
             roles = ["teacher", "admin"]
-            
+
             response = MeResponse(
                 user_id=user_id,
                 email=swedish_email,
@@ -197,7 +194,7 @@ class TestResponseSchemas:
                 roles=roles,
                 email_verified=True,
             )
-            
+
             assert response.user_id == user_id
             assert response.email == swedish_email
             assert response.org_id == org_id
@@ -210,7 +207,7 @@ class TestResponseSchemas:
                 user_id="user_789",
                 email="test@example.com",
             )
-            
+
             assert response.org_id is None
             assert response.roles == []
             assert response.email_verified is False
@@ -220,14 +217,14 @@ class TestResponseSchemas:
             user_id = "user_abc"
             email = "new.user@domain.com"
             org_id = "organization_123"
-            
+
             response = RegisterResponse(
                 user_id=user_id,
                 email=email,
                 org_id=org_id,
                 email_verification_required=False,
             )
-            
+
             assert response.user_id == user_id
             assert response.email == email
             assert response.org_id == org_id
@@ -241,13 +238,13 @@ class TestResponseSchemas:
             first_name = "Åsa"
             last_name = "Öberg-Ström"
             legal_full_name = "Åsa Margareta Öberg-Ström"
-            
+
             person_name = PersonNameSchema(
                 first_name=first_name,
                 last_name=last_name,
                 legal_full_name=legal_full_name,
             )
-            
+
             assert person_name.first_name == first_name
             assert person_name.last_name == last_name
             assert person_name.legal_full_name == legal_full_name
@@ -258,14 +255,14 @@ class TestResponseSchemas:
             last_name = "Lindström"
             display_name = "Erik L."
             locale = "sv_SE"
-            
+
             request = ProfileRequest(
                 first_name=first_name,
                 last_name=last_name,
                 display_name=display_name,
                 locale=locale,
             )
-            
+
             assert request.first_name == first_name
             assert request.last_name == last_name
             assert request.display_name == display_name
@@ -278,13 +275,13 @@ class TestResponseSchemas:
                 last_name="Andersson",
                 legal_full_name="Anna Margareta Andersson",
             )
-            
+
             response = ProfileResponse(
                 person_name=person_name,
                 display_name="Anna A.",
                 locale="sv_SE",
             )
-            
+
             assert response.person_name.first_name == "Anna"
             assert response.person_name.last_name == "Andersson"
             assert response.display_name == "Anna A."
@@ -317,16 +314,14 @@ class TestFieldValidation:
                 ("user@.com", False),
             ],
         )
-        def test_email_validation_patterns(
-            self, email: str, should_be_valid: bool
-        ) -> None:
+        def test_email_validation_patterns(self, email: str, should_be_valid: bool) -> None:
             """Test email validation patterns including Swedish characters."""
             if should_be_valid:
                 # Test with RegisterRequest
                 request = RegisterRequest(email=email, password="testpass")
                 assert request.email == email
-                
-                # Test with LoginRequest  
+
+                # Test with LoginRequest
                 login = LoginRequest(email=email, password="testpass")
                 assert login.email == email
             else:
@@ -343,7 +338,7 @@ class TestFieldValidation:
             # Empty email should fail validation (EmailStr type)
             with pytest.raises(ValidationError):
                 LoginRequest(email="", password="password")
-                
+
             # Empty password is allowed by Pydantic (str type)
             request = LoginRequest(email="test@domain.com", password="")
             assert request.password == ""
@@ -357,11 +352,11 @@ class TestFieldValidation:
                 "jwt.token.with.dots",
                 "very-long-token-string-with-hyphens-and-underscores_123",
             ]
-            
+
             for token in token_values:
                 request = VerifyEmailRequest(token=token)
                 assert request.token == token
-                
+
                 refresh_request = RefreshTokenRequest(refresh_token=token)
                 assert refresh_request.refresh_token == token
 
@@ -372,12 +367,12 @@ class TestFieldValidation:
             """Test message and correlation_id field serialization."""
             message = "Email verification sent successfully"
             correlation_id = "corr_123_abc"
-            
+
             response = RequestEmailVerificationResponse(
                 message=message,
                 correlation_id=correlation_id,
             )
-            
+
             # Test dict serialization
             response_dict = response.model_dump()
             assert response_dict["message"] == message
@@ -385,14 +380,10 @@ class TestFieldValidation:
 
         def test_password_reset_response_serialization(self) -> None:
             """Test password reset response field handling."""
-            reset_response = ResetPasswordResponse(
-                message="Password reset successfully"
-            )
-            
-            verify_response = VerifyEmailResponse(
-                message="Email verified successfully"  
-            )
-            
+            reset_response = ResetPasswordResponse(message="Password reset successfully")
+
+            verify_response = VerifyEmailResponse(message="Email verified successfully")
+
             # Test serialization
             assert reset_response.model_dump()["message"] == "Password reset successfully"
             assert verify_response.model_dump()["message"] == "Email verified successfully"
@@ -401,16 +392,16 @@ class TestFieldValidation:
             """Test RefreshTokenResponse default values."""
             access_token = "new_access_token_123"
             expires_in = 1800
-            
+
             response = RefreshTokenResponse(
                 access_token=access_token,
                 expires_in=expires_in,
             )
-            
+
             assert response.access_token == access_token
             assert response.token_type == "Bearer"  # Default value
             assert response.expires_in == expires_in
-            
+
             # Test serialization includes defaults
             response_dict = response.model_dump()
             assert response_dict["token_type"] == "Bearer"

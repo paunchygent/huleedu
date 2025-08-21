@@ -8,7 +8,7 @@ without database dependencies. Uses DI principles with AsyncMock for database op
 from __future__ import annotations
 
 import inspect
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -16,17 +16,18 @@ import pytest
 from huleedu_service_libs.error_handling import HuleEduError, raise_processing_error
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from services.identity_service.implementations.user_repository_postgres_impl import DevInMemoryUserRepo
+from services.identity_service.implementations.user_repository_postgres_impl import (
+    DevInMemoryUserRepo,
+)
 from services.identity_service.implementations.user_repository_sqlalchemy_impl import (
     PostgresSessionRepo,
     PostgresUserRepo,
 )
-from services.identity_service.protocols import SessionRepo, UserRepo
 
 
 class TestDevInMemoryUserRepo:
     """Tests for DevInMemoryUserRepo behavioral patterns and structure.
-    
+
     Note: DevInMemoryUserRepo is a development scaffold with limited implementation.
     Tests focus only on implemented methods.
     """
@@ -73,13 +74,21 @@ class TestDevInMemoryUserRepo:
         "email, org_id, expected_email_key",
         [
             ("åsa.öberg@skolan.se", "org-123", "åsa.öberg@skolan.se"),  # Swedish characters
-            ("KARL.ÄNGSTRÖM@UNIVERSITY.SE", None, "karl.ängström@university.se"),  # Case normalization
+            (
+                "KARL.ÄNGSTRÖM@UNIVERSITY.SE",
+                None,
+                "karl.ängström@university.se",
+            ),  # Case normalization
             ("teacher@example.com", "org-456", "teacher@example.com"),  # Standard ASCII
             ("josé.garcía@escuela.es", "org-789", "josé.garcía@escuela.es"),  # Spanish characters
         ],
     )
     async def test_create_user_handles_unicode_and_case_normalization(
-        self, repository: DevInMemoryUserRepo, email: str, org_id: str | None, expected_email_key: str
+        self,
+        repository: DevInMemoryUserRepo,
+        email: str,
+        org_id: str | None,
+        expected_email_key: str,
     ) -> None:
         """Test create_user handles Swedish characters and case normalization correctly."""
         # Arrange
@@ -126,7 +135,11 @@ class TestDevInMemoryUserRepo:
         ],
     )
     async def test_get_user_by_email_case_insensitive_lookup(
-        self, repository: DevInMemoryUserRepo, lookup_email: str, stored_email: str, should_find: bool
+        self,
+        repository: DevInMemoryUserRepo,
+        lookup_email: str,
+        stored_email: str,
+        should_find: bool,
     ) -> None:
         """Test get_user_by_email performs case-insensitive lookup correctly."""
         # Arrange - create user with stored email
@@ -149,7 +162,7 @@ class TestDevInMemoryUserRepo:
         """Test set_email_verified updates the correct user's verification status."""
         # Arrange - create multiple users
         user1 = await repository.create_user("user1@example.com", None, "hash1")
-        user2 = await repository.create_user("user2@example.com", None, "hash2")
+        await repository.create_user("user2@example.com", None, "hash2")
 
         # Act - verify one user
         await repository.set_email_verified(user1["id"])
@@ -235,11 +248,20 @@ class TestPostgresUserRepo:
 
         # Verify all methods are async
         for method_name in [
-            "create_user", "get_user_by_email", "get_user_by_id", "set_email_verified",
-            "create_email_verification_token", "get_email_verification_token",
-            "mark_token_used", "invalidate_user_tokens", "create_password_reset_token",
-            "get_password_reset_token", "mark_reset_token_used", "invalidate_password_reset_tokens",
-            "update_user_password", "update_security_fields"
+            "create_user",
+            "get_user_by_email",
+            "get_user_by_id",
+            "set_email_verified",
+            "create_email_verification_token",
+            "get_email_verification_token",
+            "mark_token_used",
+            "invalidate_user_tokens",
+            "create_password_reset_token",
+            "get_password_reset_token",
+            "mark_reset_token_used",
+            "invalidate_password_reset_tokens",
+            "update_user_password",
+            "update_security_fields",
         ]:
             method = getattr(repository, method_name)
             assert inspect.iscoroutinefunction(method)

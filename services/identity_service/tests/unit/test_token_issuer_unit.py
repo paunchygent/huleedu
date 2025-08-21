@@ -247,7 +247,11 @@ class TestDevTokenIssuer:
 
             # Dev mode doesn't check expiration
             assert result["sub"] == sample_user_id
-            assert result["exp"] == 1000000000 + issuer._encode.__globals__["settings"].JWT_ACCESS_TOKEN_EXPIRES_SECONDS
+            assert (
+                result["exp"]
+                == 1000000000
+                + issuer._encode.__globals__["settings"].JWT_ACCESS_TOKEN_EXPIRES_SECONDS
+            )
 
 
 class TestRs256TokenIssuer:
@@ -273,7 +277,7 @@ class TestRs256TokenIssuer:
         """Generate a test RSA private key for testing."""
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import rsa
-        
+
         private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048,
@@ -281,7 +285,7 @@ class TestRs256TokenIssuer:
         return private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
     @pytest.fixture
@@ -289,8 +293,13 @@ class TestRs256TokenIssuer:
         self, mock_jwks_store: MagicMock, mock_settings: MagicMock, sample_private_key_pem: bytes
     ) -> Rs256TokenIssuer:
         """Create Rs256TokenIssuer instance for testing."""
-        with patch("services.identity_service.implementations.token_issuer_rs256_impl.settings", mock_settings), \
-             patch("pathlib.Path.read_bytes", return_value=sample_private_key_pem):
+        with (
+            patch(
+                "services.identity_service.implementations.token_issuer_rs256_impl.settings",
+                mock_settings,
+            ),
+            patch("pathlib.Path.read_bytes", return_value=sample_private_key_pem),
+        ):
             return Rs256TokenIssuer(mock_jwks_store)
 
     @pytest.fixture
@@ -328,7 +337,7 @@ class TestRs256TokenIssuer:
 
             # Decode payload without verification for testing
             payload = jwt.decode(token, options={"verify_signature": False})
-            
+
             assert payload["sub"] == sample_user_id
             assert payload["org"] == sample_org_id
             assert payload["roles"] == roles
@@ -336,11 +345,19 @@ class TestRs256TokenIssuer:
             assert "exp" in payload
 
         def test_registers_jwk_on_initialization(
-            self, mock_jwks_store: MagicMock, mock_settings: MagicMock, sample_private_key_pem: bytes
+            self,
+            mock_jwks_store: MagicMock,
+            mock_settings: MagicMock,
+            sample_private_key_pem: bytes,
         ) -> None:
             """Should register JWK with JWKS store during initialization."""
-            with patch("services.identity_service.implementations.token_issuer_rs256_impl.settings", mock_settings), \
-                 patch("pathlib.Path.read_bytes", return_value=sample_private_key_pem):
+            with (
+                patch(
+                    "services.identity_service.implementations.token_issuer_rs256_impl.settings",
+                    mock_settings,
+                ),
+                patch("pathlib.Path.read_bytes", return_value=sample_private_key_pem),
+            ):
                 Rs256TokenIssuer(mock_jwks_store)
 
             # Should have called add_key with proper JWK
@@ -402,14 +419,14 @@ class TestRs256TokenIssuer:
         ) -> None:
             """Should return empty dict for tokens with invalid signatures."""
             # Create a token with wrong signature
-            invalid_token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0In0.invalid_signature"
+            invalid_token = (
+                "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0In0.invalid_signature"
+            )
 
             result = issuer.verify(invalid_token)
             assert result == {}
 
-        def test_handles_malformed_tokens_gracefully(
-            self, issuer: Rs256TokenIssuer
-        ) -> None:
+        def test_handles_malformed_tokens_gracefully(self, issuer: Rs256TokenIssuer) -> None:
             """Should handle malformed tokens without raising exceptions."""
             malformed_tokens = [
                 "not.a.token",
@@ -438,14 +455,15 @@ class TestRs256TokenIssuer:
     class TestRs256KeyHandling:
         """Tests for RSA key handling in Rs256TokenIssuer."""
 
-        def test_raises_error_for_missing_key_path(
-            self, mock_jwks_store: MagicMock
-        ) -> None:
+        def test_raises_error_for_missing_key_path(self, mock_jwks_store: MagicMock) -> None:
             """Should raise error when private key path is not configured."""
             mock_settings = MagicMock()
             mock_settings.JWT_RS256_PRIVATE_KEY_PATH = None
 
-            with patch("services.identity_service.implementations.token_issuer_rs256_impl.settings", mock_settings):
+            with patch(
+                "services.identity_service.implementations.token_issuer_rs256_impl.settings",
+                mock_settings,
+            ):
                 with pytest.raises(RuntimeError, match="JWT_RS256_PRIVATE_KEY_PATH must be set"):
                     Rs256TokenIssuer(mock_jwks_store)
 
@@ -456,15 +474,20 @@ class TestRs256TokenIssuer:
             # Generate EC key instead of RSA
             from cryptography.hazmat.primitives import serialization
             from cryptography.hazmat.primitives.asymmetric import ec
-            
+
             ec_key = ec.generate_private_key(ec.SECP256R1())
             ec_key_pem = ec_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption()
+                encryption_algorithm=serialization.NoEncryption(),
             )
 
-            with patch("services.identity_service.implementations.token_issuer_rs256_impl.settings", mock_settings), \
-                 patch("pathlib.Path.read_bytes", return_value=ec_key_pem):
+            with (
+                patch(
+                    "services.identity_service.implementations.token_issuer_rs256_impl.settings",
+                    mock_settings,
+                ),
+                patch("pathlib.Path.read_bytes", return_value=ec_key_pem),
+            ):
                 with pytest.raises(RuntimeError, match="Expected RSA private key"):
                     Rs256TokenIssuer(mock_jwks_store)

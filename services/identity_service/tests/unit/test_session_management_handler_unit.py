@@ -8,17 +8,15 @@ Swedish character support included for device information.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from huleedu_service_libs.error_handling import HuleEduError
 
 from services.identity_service.domain_handlers.session_management_handler import (
     ActiveSessionCountResult,
     SessionActionResult,
-    SessionInfo,
     SessionListResult,
     SessionManagementHandler,
 )
@@ -72,7 +70,7 @@ def sample_session_data() -> list[dict]:
         {
             "jti": "session-1",
             "device_name": "Erik's MacBook",
-            "device_type": "laptop", 
+            "device_type": "laptop",
             "ip_address": "192.168.1.100",
             "created_at": datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC),
             "last_activity": datetime(2024, 1, 15, 15, 30, 0, tzinfo=UTC),
@@ -118,18 +116,18 @@ class TestListUserSessions:
         # Assert
         assert isinstance(result, SessionListResult)
         assert len(result.sessions) == 2
-        
+
         # Verify sessions are sorted by creation date (newest first)
         assert result.sessions[0].jti == "session-1"
         assert result.sessions[1].jti == "session-2"
-        
+
         # Verify current session is marked correctly
         assert result.sessions[0].is_current is True
         assert result.sessions[1].is_current is False
-        
+
         # Verify Swedish characters are preserved
         assert result.sessions[1].device_name == "Åsa's iPhone"
-        
+
         # Verify repository call
         mock_user_session_repo.get_user_sessions.assert_called_once_with(UUID(sample_user_id))
 
@@ -155,7 +153,7 @@ class TestListUserSessions:
         # Assert
         assert isinstance(result, SessionListResult)
         assert len(result.sessions) == 2
-        
+
         # Verify no session is marked as current
         assert all(not session.is_current for session in result.sessions)
 
@@ -218,7 +216,7 @@ class TestRevokeSession:
             "device_name": "Lars' MacBook Pro",
             "device_type": "laptop",
         }
-        
+
         mock_user_session_repo.get_session.return_value = session_data
         mock_user_session_repo.revoke_session.return_value = True
 
@@ -234,11 +232,11 @@ class TestRevokeSession:
         assert isinstance(result, SessionActionResult)
         assert result.message == "Session revoked successfully"
         assert result.sessions_affected == 1
-        
+
         # Verify repository calls
         mock_user_session_repo.get_session.assert_called_once_with(session_id)
         mock_user_session_repo.revoke_session.assert_called_once_with(session_id)
-        
+
         # Verify audit logging
         mock_audit_logger.log_action.assert_called_once_with(
             action="session_revoked",
@@ -277,7 +275,7 @@ class TestRevokeSession:
         assert isinstance(result, SessionActionResult)
         assert result.message == "Session not found or already revoked"
         assert result.sessions_affected == 0
-        
+
         # Verify no audit logging for non-existent session
         mock_audit_logger.log_action.assert_not_called()
 
@@ -300,7 +298,7 @@ class TestRevokeSession:
             "device_name": "Unauthorized Device",
             "device_type": "laptop",
         }
-        
+
         mock_user_session_repo.get_session.return_value = session_data
 
         # Act
@@ -315,7 +313,7 @@ class TestRevokeSession:
         assert isinstance(result, SessionActionResult)
         assert result.message == "Session not found or already revoked"
         assert result.sessions_affected == 0
-        
+
         # Verify unauthorized attempt is logged
         mock_audit_logger.log_action.assert_called_once_with(
             action="session_revoke_unauthorized",
@@ -346,7 +344,7 @@ class TestRevokeSession:
             "device_name": "Test Device",
             "device_type": "laptop",
         }
-        
+
         mock_user_session_repo.get_session.return_value = session_data
         mock_user_session_repo.revoke_session.return_value = False
 
@@ -361,7 +359,7 @@ class TestRevokeSession:
         assert isinstance(result, SessionActionResult)
         assert result.message == "Session not found or already revoked"
         assert result.sessions_affected == 0
-        
+
         # Verify no audit logging for failed revocation
         mock_audit_logger.log_action.assert_not_called()
 
@@ -382,7 +380,7 @@ class TestRevokeAllSessions:
         # Arrange
         current_jti = "session-1"
         ip_address = "192.168.1.100"
-        
+
         mock_user_session_repo.get_user_sessions.return_value = sample_session_data
         mock_user_session_repo.revoke_session.return_value = True
 
@@ -400,10 +398,10 @@ class TestRevokeAllSessions:
         assert "Successfully revoked 1 session(s)" in result.message
         assert "(excluding current session)" in result.message
         assert result.sessions_affected == 1
-        
+
         # Verify only non-current session was revoked
         mock_user_session_repo.revoke_session.assert_called_once_with("session-2")
-        
+
         # Verify audit logging
         mock_audit_logger.log_action.assert_called_once_with(
             action="all_sessions_revoked",
@@ -443,10 +441,12 @@ class TestRevokeAllSessions:
         assert result.message == "Successfully revoked 3 session(s)"
         assert "(excluding current session)" not in result.message
         assert result.sessions_affected == 3
-        
+
         # Verify all sessions revoked
-        mock_user_session_repo.revoke_all_user_sessions.assert_called_once_with(UUID(sample_user_id))
-        
+        mock_user_session_repo.revoke_all_user_sessions.assert_called_once_with(
+            UUID(sample_user_id)
+        )
+
         # Verify audit logging
         mock_audit_logger.log_action.assert_called_once_with(
             action="all_sessions_revoked",
@@ -511,7 +511,7 @@ class TestGetActiveSessionCount:
         # Assert
         assert isinstance(result, ActiveSessionCountResult)
         assert result.active_sessions == 2
-        
+
         # Verify repository call
         mock_user_session_repo.get_user_sessions.assert_called_once_with(UUID(sample_user_id))
 

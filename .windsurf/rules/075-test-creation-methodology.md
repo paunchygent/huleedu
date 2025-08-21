@@ -46,7 +46,7 @@ class TestFunctionName:
 ### 3.1. Parametrized Testing (Preferred)
 - **MUST** use `@pytest.mark.parametrize` for comprehensive test coverage
 - **MUST** include edge cases, boundary conditions, and realistic scenarios
-- **MUST** test Swedish characters and locale-specific scenarios where applicable
+- **MUST** test Swedish characters and locale-specific scenarios *where applicable*
 
 ### 3.2. Behavioral Testing Requirements
 - **MUST** test actual behavior and side effects

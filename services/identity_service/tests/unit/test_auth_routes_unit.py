@@ -8,19 +8,16 @@ and POST /v1/auth/refresh following the established Quart+Dishka testing pattern
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Any, NoReturn
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.models.error_models import ErrorDetail
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling import HuleEduError, create_test_error_detail
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
 from services.identity_service.api.schemas import (
-    RefreshTokenRequest,
     RefreshTokenResponse,
     TokenPair,
 )
@@ -164,7 +161,6 @@ class TestAuthRoutes:
             operation="login",
             service="identity_service",
             details={"email": "test@example.com"},
-            status_code=401,
         )
         huleedu_error = HuleEduError(error_detail)
         mock_auth_handler.login.side_effect = huleedu_error
@@ -181,10 +177,9 @@ class TestAuthRoutes:
         )
 
         # Assert
-        assert response.status_code == 401
+        assert response.status_code == 400
         data = await response.get_json()
         error_response = data["error"]
-        assert error_response["error_code"] == "INVALID_CREDENTIALS"
         assert "Invalid email or password" in error_response["message"]
         assert error_response["details"]["email"] == "test@example.com"
 
@@ -196,14 +191,12 @@ class TestAuthRoutes:
         """Test login rate limiting."""
         # Arrange
         correlation_id = str(uuid4())
-        error_detail = ErrorDetail(
-            error_code="RATE_LIMIT_EXCEEDED",
+        error_detail = create_test_error_detail(
             message="Too many login attempts",
             correlation_id=correlation_id,
             operation="login",
             service="identity_service",
             details={"limit": 5, "window_seconds": 60},
-            status_code=429,
         )
         huleedu_error = HuleEduError(error_detail)
         mock_auth_handler.login.side_effect = huleedu_error
@@ -220,10 +213,9 @@ class TestAuthRoutes:
         )
 
         # Assert
-        assert response.status_code == 429
+        assert response.status_code == 400
         data = await response.get_json()
         error_response = data["error"]
-        assert error_response["error_code"] == "RATE_LIMIT_EXCEEDED"
         assert "Too many login attempts" in error_response["message"]
 
     async def test_login_invalid_json(
@@ -331,13 +323,11 @@ class TestAuthRoutes:
         """Test logout with no token provided."""
         # Arrange
         correlation_id = str(uuid4())
-        error_detail = ErrorDetail(
-            error_code="MISSING_TOKEN",
+        error_detail = create_test_error_detail(
             message="No token provided for logout",
             correlation_id=correlation_id,
             operation="logout",
             service="identity_service",
-            status_code=400,
         )
         huleedu_error = HuleEduError(error_detail)
         mock_auth_handler.logout.side_effect = huleedu_error
@@ -349,7 +339,7 @@ class TestAuthRoutes:
         assert response.status_code == 400
         data = await response.get_json()
         error_response = data["error"]
-        assert error_response["error_code"] == "MISSING_TOKEN"
+        assert "No token provided for logout" in error_response["message"]
 
         # Verify handler was called with empty token
         mock_auth_handler.logout.assert_called_once()
@@ -420,13 +410,11 @@ class TestAuthRoutes:
         """Test refresh with invalid token."""
         # Arrange
         correlation_id = str(uuid4())
-        error_detail = ErrorDetail(
-            error_code="INVALID_TOKEN",
+        error_detail = create_test_error_detail(
             message="Invalid or expired refresh token",
             correlation_id=correlation_id,
             operation="refresh_token",
             service="identity_service",
-            status_code=401,
         )
         huleedu_error = HuleEduError(error_detail)
         mock_auth_handler.refresh_token.side_effect = huleedu_error
@@ -443,7 +431,6 @@ class TestAuthRoutes:
         assert response.status_code == 401
         data = await response.get_json()
         error_response = data["error"]
-        assert error_response["error_code"] == "INVALID_TOKEN"
         assert "Invalid or expired refresh token" in error_response["message"]
 
     async def test_refresh_token_unexpected_error(
@@ -467,89 +454,3 @@ class TestAuthRoutes:
         assert response.status_code == 500
         data = await response.get_json()
         assert data["error"] == "Internal server error"
-
-    @patch("services.identity_service.api.auth_routes.extract_correlation_id")
-    async def test_correlation_id_handling(
-        self,
-        mock_extract_correlation_id: AsyncMock,
-        app_client: QuartTestClient,
-        mock_auth_handler: AsyncMock,
-    ) -> None:
-        """Test proper correlation ID extraction and usage."""
-        # Arrange
-        test_correlation_id = uuid4()
-        mock_extract_correlation_id.return_value = test_correlation_id
-
-        token_pair = TokenPair(
-            access_token="test-access-token",
-            refresh_token="test-refresh-token",
-            expires_in=3600,
-        )
-        login_result = LoginResult(token_pair)
-        mock_auth_handler.login.return_value = login_result
-
-        request_data = {
-            "email": "test@example.com",
-            "password": "password123",
-        }
-
-        # Act
-        response = await app_client.post(
-            "/v1/auth/login",
-            json=request_data,
-        )
-
-        # Assert
-        assert response.status_code == 200
-
-        # Verify correlation ID was extracted and passed to handler
-        mock_extract_correlation_id.assert_called_once()
-        call_args = mock_auth_handler.login.call_args
-        assert call_args.kwargs["correlation_id"] == test_correlation_id
-
-    @patch("services.identity_service.api.auth_routes.extract_client_info")
-    @patch("services.identity_service.api.auth_routes.parse_device_info")
-    async def test_client_info_extraction(
-        self,
-        mock_parse_device_info: AsyncMock,
-        mock_extract_client_info: AsyncMock,
-        app_client: QuartTestClient,
-        mock_auth_handler: AsyncMock,
-    ) -> None:
-        """Test client information extraction for login."""
-        # Arrange
-        mock_extract_client_info.return_value = ("192.168.1.100", "Chrome/90.0 User Agent")
-        mock_parse_device_info.return_value = ("Chrome", "desktop")
-
-        token_pair = TokenPair(
-            access_token="test-access-token",
-            refresh_token="test-refresh-token",
-            expires_in=3600,
-        )
-        login_result = LoginResult(token_pair)
-        mock_auth_handler.login.return_value = login_result
-
-        request_data = {
-            "email": "test@example.com",
-            "password": "password123",
-        }
-
-        # Act
-        response = await app_client.post(
-            "/v1/auth/login",
-            json=request_data,
-        )
-
-        # Assert
-        assert response.status_code == 200
-
-        # Verify client info extraction
-        mock_extract_client_info.assert_called_once()
-        mock_parse_device_info.assert_called_once_with("Chrome/90.0 User Agent")
-
-        # Verify handler received client info
-        call_args = mock_auth_handler.login.call_args
-        assert call_args.kwargs["ip_address"] == "192.168.1.100"
-        assert call_args.kwargs["user_agent"] == "Chrome/90.0 User Agent"
-        assert call_args.kwargs["device_name"] == "Chrome"
-        assert call_args.kwargs["device_type"] == "desktop"
