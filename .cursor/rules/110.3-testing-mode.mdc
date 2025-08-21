@@ -85,23 +85,42 @@ mock_service.update_status.assert_called_with(
 - **MUST** ensure test containers clean up automatically
 - **PATTERN**: Use pytest fixture scopes appropriately
 
-## 8. Performance Testing Mode
+## 8. AI Agent Testing Coordination
 
-### 8.1. When to Use Performance Testing
-- **MUST** use performance testing for infrastructure validation
-- **REQUIRED**: Use real infrastructure (Redis, Kafka, PostgreSQL) with mock LLM providers
-- **PATTERN**: Performance testing avoids API costs while providing realistic infrastructure metrics
+### 8.1. Agent Behavior Expectations
 
-### 8.2. Performance Testing Implementation
-- **MUST** follow the Testing Strategy Matrix in [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
-- **PATTERN**: Use `MockProviderImpl` with `performance_mode=True` to disable error simulation
-- **REQUIRED**: Implement proper resource cleanup to prevent warnings
+#### Test Creation Agents (test-engineer)
+- **Compliance**: Strict adherence to Rules 075 and 075.1 methodologies
+- **Pattern Following**: Use established protocol-based mocking from existing test files
+- **DI Principles**: AsyncMock(spec=Protocol) only, zero @patch usage
+- **Domain Context**: Swedish character support, HuleEdu education patterns
+- **Error Handling**: Structured HuleEduError patterns, behavioral testing focus
 
-### 8.3. Performance Test Categories
-- **Load Testing**: Sustained request rates over time
-- **Stress Testing**: Concurrent operations with varying load  
-- **Endurance Testing**: Mixed workload types over extended periods
-- **Integration Performance**: Real infrastructure with mock external services
+#### Architecture Review Agents (lead-architect-planner)  
+- **Mandatory Execution**: After each Rule 075.1 batch regardless of test results
+- **Analysis Scope**: Test quality, implementation validation, root cause identification
+- **Quality Gates**: Verify Rule 075 compliance, DI patterns, Swedish locale support
+- **Bug Classification**: Distinguish test creation issues from implementation bugs
+
+### 8.2. User Collaboration Pattern
+- **Transparency**: Report all validation results (pass/fail status, quality issues)
+- **Issue Resolution**: Present architect analysis before proposing fixes
+- **Progress Communication**: Use TodoWrite for visible progress tracking
+- **Implementation Priority**: Fix code bugs before test modifications
+
+### 8.3. Common AI Pitfalls - Avoidance Protocol
+- **Never**: Use @patch decorators in test files
+- **Never**: Test implementation details over business behavior  
+- **Never**: Assume test failures are test issues without architect analysis
+- **Always**: Validate DI compliance after test creation
+- **Always**: Include Swedish character testing in domain-specific tests
+- **Always**: Launch architect review regardless of apparent test success
+
+### 8.4. Quality Assurance Behavior
+- **Batch Validation**: Execute complete quality gate sequence per Rule 075.1
+- **Type Safety**: Verify zero type errors before batch completion
+- **Pattern Consistency**: Follow exact patterns from existing codebase test files
+- **Implementation Feedback**: Report discovered code bugs to user for resolution priority
 
 ## 9. Debugging and Error Analysis
 

@@ -1,0 +1,38 @@
+# Rule 075.1: Parallel Test Creation Methodology
+
+## Batch Execution Pattern
+- **Batch Size**: 3 test files per execution cycle
+- **Agent Launch**: Single tool call with 3 parallel test-engineer agents
+- **Target Scope**: Related components (handlers, repositories, schemas)
+- **File Limits**: 500 LoC maximum per Rule 075
+
+## Mandatory Validation Gates
+
+### Post-Batch Architect Review (Required)
+```bash
+# After each batch completion, launch architect agent regardless of pass/fail status
+Task(subagent_type="lead-architect-planner", ...)
+```
+**Purpose**: Validate test quality, identify implementation bugs, ensure Rule 075 compliance
+
+### Quality Gate Sequence
+1. **Architect Analysis**: Test quality, root cause identification, implementation validation
+2. **DI Compliance**: `grep -r "@patch|mock\.patch"` → zero results required  
+3. **Test Execution**: `pdm run pytest batch_files -v` → 100% pass rate required
+4. **Type Safety**: `pdm run typecheck-all` → zero errors required
+
+## Implementation Bug Protocol
+- **Detection**: Tests may reveal implementation bugs vs test issues
+- **Priority**: Fix implementation first, validate tests second  
+- **Validation**: Re-run tests after implementation fixes
+
+## Agent Coordination
+- **Test Prompts**: Include Rule 075 requirements, DI patterns, Swedish character support
+- **Error Handling**: Use architect agent for root cause analysis before fixes
+- **Progress Tracking**: TodoWrite tool for batch status and validation checkpoints
+
+## Success Criteria
+- All tests pass (100% rate)
+- Zero DI violations (@patch usage)
+- Rule 075 behavioral testing compliance
+- Implementation bugs identified and resolved
