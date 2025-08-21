@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from argon2 import PasswordHasher as Argon2Hasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from services.identity_service.protocols import PasswordHasher
 
@@ -19,5 +19,5 @@ class Argon2idPasswordHasher(PasswordHasher):
     def verify(self, hash: str, password: str) -> bool:
         try:
             return self._hasher.verify(hash, password)
-        except VerifyMismatchError:
+        except (VerifyMismatchError, InvalidHashError, VerificationError):
             return False

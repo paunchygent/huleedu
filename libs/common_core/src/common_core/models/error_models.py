@@ -14,6 +14,7 @@ from common_core.error_enums import (
     ClassManagementErrorCode,
     ErrorCode,
     FileValidationErrorCode,
+    IdentityErrorCode,
     LLMErrorCode,
     SpellcheckerErrorCode,
 )
@@ -25,6 +26,7 @@ ErrorCodeType = Union[
     CJAssessmentErrorCode,
     ClassManagementErrorCode,
     FileValidationErrorCode,
+    IdentityErrorCode,
     LLMErrorCode,
     SpellcheckerErrorCode,
 ]
