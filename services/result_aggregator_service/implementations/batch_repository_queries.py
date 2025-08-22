@@ -222,9 +222,9 @@ class BatchRepositoryQueries:
 
             if batch:
                 if processing_started and not batch.processing_started_at:
-                    batch.processing_started_at = datetime.now(UTC)
+                    batch.processing_started_at = datetime.now(UTC).replace(tzinfo=None)
                 if processing_completed:
-                    batch.processing_completed_at = datetime.now(UTC)
+                    batch.processing_completed_at = datetime.now(UTC).replace(tzinfo=None)
 
                 await session.commit()
 

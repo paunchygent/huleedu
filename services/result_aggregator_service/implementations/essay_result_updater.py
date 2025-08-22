@@ -92,7 +92,7 @@ class EssayResultUpdater:
             if error_detail:
                 essay.spellcheck_error_detail = error_detail.model_dump(mode="json")
 
-            essay.updated_at = datetime.now(UTC)
+            essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
 
     async def update_essay_spellcheck_result_with_metrics(
@@ -196,7 +196,7 @@ class EssayResultUpdater:
                     metrics=spellcheck_metrics,
                 )
 
-            essay.updated_at = datetime.now(UTC)
+            essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
 
     async def update_essay_cj_assessment_result(
@@ -264,7 +264,7 @@ class EssayResultUpdater:
             if error_detail:
                 essay.cj_assessment_error_detail = error_detail.model_dump(mode="json")
 
-            essay.updated_at = datetime.now(UTC)
+            essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
 
     async def update_essay_file_mapping(
@@ -292,7 +292,7 @@ class EssayResultUpdater:
                 essay.file_upload_id = file_upload_id
                 if text_storage_id:
                     essay.original_text_storage_id = text_storage_id
-                essay.updated_at = datetime.now(UTC)
+                essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
             else:
                 # Create new essay record without batch association
                 # This handles the case where slot assignment happens before batch registration
@@ -337,7 +337,7 @@ class EssayResultUpdater:
 
             if essay:
                 essay.batch_id = batch_id
-                essay.updated_at = datetime.now(UTC)
+                essay.updated_at = datetime.now(UTC).replace(tzinfo=None)
                 await session.commit()
 
                 self.logger.info(
