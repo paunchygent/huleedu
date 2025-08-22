@@ -183,6 +183,7 @@ class TestAuthFlowIntegration:
     def mock_profile_repo(self) -> AsyncMock:
         """Mock profile repository for user profile operations."""
         from services.identity_service.protocols import UserProfileRepositoryProtocol
+
         return AsyncMock(spec=UserProfileRepositoryProtocol)
 
     @pytest.fixture
@@ -299,9 +300,7 @@ class TestAuthFlowIntegration:
         async with session_factory() as session:
             # Update user to mark email as verified
             user_update_stmt = (
-                update(User)
-                .where(User.id == UUID(user_id))
-                .values(email_verified=True)
+                update(User).where(User.id == UUID(user_id)).values(email_verified=True)
             )
             await session.execute(user_update_stmt)
             await session.commit()
@@ -535,9 +534,7 @@ class TestAuthFlowIntegration:
         # Verify email for first user (for integration test - bypass actual verification flow)
         async with session_factory() as session:
             user_update_stmt = (
-                update(User)
-                .where(User.id == UUID(created_users[0][0]))
-                .values(email_verified=True)
+                update(User).where(User.id == UUID(created_users[0][0])).values(email_verified=True)
             )
             await session.execute(user_update_stmt)
             await session.commit()

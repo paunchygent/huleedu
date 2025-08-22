@@ -31,7 +31,7 @@ def upgrade() -> None:
         existing_type=sa.UUID(),
         existing_nullable=False,
     )
-    
+
     # Add missing UUID default to password_reset_tokens.id column
     op.alter_column(
         "password_reset_tokens",
@@ -52,7 +52,7 @@ def downgrade() -> None:
         existing_type=sa.UUID(),
         existing_nullable=False,
     )
-    
+
     # Remove UUID default from email_verification_tokens.id column
     op.alter_column(
         "email_verification_tokens",

@@ -31,7 +31,7 @@ async def request_email_verification(
     token_issuer: FromDishka[TokenIssuer],
 ) -> tuple[Response, int]:
     """Request email verification token.
-    
+
     Supports two flows:
     1. Authenticated (JWT required): For logged-in users changing email or re-verification
     2. Public (no auth): For initial verification after registration
@@ -42,7 +42,7 @@ async def request_email_verification(
 
         # Try to get JWT token (optional)
         jwt_token = extract_jwt_token()
-        
+
         if jwt_token:
             # Authenticated flow: User is logged in, verify token and use user_id
             try:
@@ -50,14 +50,14 @@ async def request_email_verification(
                 user_id = claims.get("sub")
                 if not user_id:
                     return jsonify({"error": "Invalid token"}), 401
-                
+
                 # Use authenticated method
                 verification_result = await verification_handler.request_email_verification(
                     request_data=payload,
                     user_id=user_id,
                     correlation_id=correlation_id,
                 )
-                
+
             except Exception as e:
                 if isinstance(e, HuleEduError):
                     raise  # Let outer handler catch business errors
@@ -66,10 +66,10 @@ async def request_email_verification(
             # Public flow: No authentication, use email from request
             request_data = await request.get_json() or {}
             email = request_data.get("email")
-            
+
             if not email:
                 return jsonify({"error": "Email is required for public verification request"}), 400
-                
+
             # Use public method
             verification_result = await verification_handler.request_email_verification_by_email(
                 email=email,
@@ -138,6 +138,7 @@ async def verify_email(
         )
         return jsonify({"error": "Internal server error"}), 500
 
+
 @bp.post("/resend-verification")
 @inject
 async def resend_verification(
@@ -150,7 +151,7 @@ async def resend_verification(
         # Get email from request body
         data = await request.get_json()
         email = data.get("email")
-        
+
         if not email:
             return jsonify({"error": "Email is required"}), 400
 

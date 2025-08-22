@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr
+from common_core.metadata_models import PersonNameV1
+
+# Reuse the cross-cutting person name model from common_core
+# Keep the historical name for backward compatibility in imports/tests
+PersonNameSchema = PersonNameV1
 
 
 class RegisterRequest(BaseModel):
@@ -85,12 +90,28 @@ class RefreshTokenResponse(BaseModel):
     expires_in: int
 
 
-class PersonNameSchema(BaseModel):
-    """Schema for PersonNameV1 structure."""
+class IntrospectRequest(BaseModel):
+    token: str
 
-    first_name: str
-    last_name: str
-    legal_full_name: str
+
+class IntrospectResponse(BaseModel):
+    active: bool
+    sub: str | None = None
+    exp: int | None = None
+    iat: int | None = None
+    jti: str | None = None
+    org_id: str | None = None
+    roles: list[str] = []
+    token_type: str = "access_token"
+
+
+class RevokeTokenRequest(BaseModel):
+    token: str
+    token_type_hint: str = "refresh_token"
+
+
+class RevokeTokenResponse(BaseModel):
+    revoked: bool
 
 
 class ProfileResponse(BaseModel):

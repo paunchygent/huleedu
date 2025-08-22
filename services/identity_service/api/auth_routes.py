@@ -21,8 +21,12 @@ from services.identity_service.api.request_utils import (
     parse_device_info,
 )
 from services.identity_service.api.schemas import (
+    IntrospectRequest,
+    IntrospectResponse,
     LoginRequest,
     RefreshTokenRequest,
+    RevokeTokenRequest,
+    RevokeTokenResponse,
 )
 from services.identity_service.domain_handlers.authentication_handler import AuthenticationHandler
 
@@ -160,6 +164,87 @@ async def refresh_token(
         correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
         logger.error(
             f"Unexpected error during token refresh: {e}",
+            exc_info=True,
+            extra={"correlation_id": correlation_id_str},
+        )
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@bp.post("/introspect")
+@inject
+async def introspect_token(
+    auth_handler: FromDishka[AuthenticationHandler],
+) -> Response | tuple[Response, int]:
+    """Introspect token status for other services."""
+    try:
+        correlation_id = extract_correlation_id()
+
+        payload = IntrospectRequest(**(await request.get_json()))
+
+        # Delegate to authentication handler
+        introspect_result = await auth_handler.introspect_token(
+            token=payload.token,
+            correlation_id=correlation_id,
+        )
+
+        return jsonify(introspect_result.to_dict())
+
+    except HuleEduError as e:
+        logger.warning(
+            f"Authentication error during token introspection: {e.error_detail.message}",
+            extra={
+                "correlation_id": str(e.error_detail.correlation_id),
+                "error_code": e.error_detail.error_code,
+                "operation": e.error_detail.operation,
+            },
+        )
+        return jsonify({"error": e.error_detail.model_dump()}), 400
+
+    except Exception as e:
+        correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
+        logger.error(
+            f"Unexpected error during token introspection: {e}",
+            exc_info=True,
+            extra={"correlation_id": correlation_id_str},
+        )
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@bp.post("/revoke")
+@inject
+async def revoke_token(
+    auth_handler: FromDishka[AuthenticationHandler],
+) -> Response | tuple[Response, int]:
+    """Revoke specific token by JTI."""
+    try:
+        correlation_id = extract_correlation_id()
+
+        payload = RevokeTokenRequest(**(await request.get_json()))
+
+        # Delegate to authentication handler
+        revoke_result = await auth_handler.revoke_token(
+            token=payload.token,
+            token_type_hint=payload.token_type_hint,
+            correlation_id=correlation_id,
+        )
+
+        return jsonify(revoke_result.to_dict())
+
+    except HuleEduError as e:
+        logger.warning(
+            f"Authentication error during token revocation: {e.error_detail.message}",
+            extra={
+                "correlation_id": str(e.error_detail.correlation_id),
+                "error_code": e.error_detail.error_code,
+                "operation": e.error_detail.operation,
+            },
+        )
+        return jsonify({"error": e.error_detail.model_dump()}), 400
+
+    except Exception as e:
+        correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
+        logger.error(
+            f"Unexpected error during token revocation: {e}",
             exc_info=True,
             extra={"correlation_id": correlation_id_str},
         )

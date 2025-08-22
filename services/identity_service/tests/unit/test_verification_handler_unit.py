@@ -156,7 +156,7 @@ class TestVerificationHandler:
             mock_event_publisher.publish_email_verification_requested.assert_called_once()
             event_call = mock_event_publisher.publish_email_verification_requested.call_args
             assert event_call[0][0] == sample_user_dict  # user dict
-            
+
             # The generated token should match what was passed to create_email_verification_token
             generated_token = create_call[0][1]  # token passed to repository
             assert event_call[0][1] == generated_token  # same token passed to event publisher
@@ -191,7 +191,7 @@ class TestVerificationHandler:
             mock_event_publisher.publish_email_verification_requested.assert_called_once()
             event_call = mock_event_publisher.publish_email_verification_requested.call_args
             assert event_call[0][0] == swedish_user_dict  # user dict with Swedish email
-            
+
             # Verify that the same generated token was passed to both repository and event publisher
             create_call = mock_user_repo.create_email_verification_token.call_args
             generated_token = create_call[0][1]  # token passed to repository

@@ -27,9 +27,11 @@ from huleedu_service_libs.error_handling.identity_factories import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.identity_service.api.schemas import (
+    IntrospectResponse,
     LoginRequest,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    RevokeTokenResponse,
     TokenPair,
 )
 from services.identity_service.implementations.rate_limiter_impl import create_rate_limit_key
@@ -73,6 +75,28 @@ class RefreshResult:
     """Result model for token refresh operations."""
 
     def __init__(self, response: RefreshTokenResponse):
+        self.response = response
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return self.response.model_dump(mode="json")
+
+
+class IntrospectResult:
+    """Result model for token introspection operations."""
+
+    def __init__(self, response: IntrospectResponse):
+        self.response = response
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return self.response.model_dump(mode="json")
+
+
+class RevokeResult:
+    """Result model for token revocation operations."""
+
+    def __init__(self, response: RevokeTokenResponse):
         self.response = response
 
     def to_dict(self) -> dict:
@@ -601,3 +625,150 @@ class AuthenticationHandler:
             expires_in=3600,  # 1 hour
         )
         return RefreshResult(response)
+
+    async def introspect_token(
+        self,
+        token: str,
+        correlation_id: UUID,
+    ) -> IntrospectResult:
+        """Introspect token status for other services.
+
+        Args:
+            token: Token to introspect
+            correlation_id: Request correlation ID for observability
+
+        Returns:
+            IntrospectResult with token status and claims
+
+        Raises:
+            HuleEduError: If token format is invalid
+        """
+        try:
+            # Verify the token
+            claims = self._token_issuer.verify(token)
+
+            # If claims are empty, token is invalid
+            if not claims:
+                response = IntrospectResponse(active=False)
+                return IntrospectResult(response)
+
+            # Extract claims
+            user_id = claims.get("sub")
+            exp = claims.get("exp")
+            iat = claims.get("iat")
+            jti = claims.get("jti")
+            org_id = claims.get("org_id")
+            roles = claims.get("roles", [])
+
+            # For refresh tokens, check if they're still valid in session store
+            if jti and not await self._session_repo.is_refresh_valid(jti):
+                response = IntrospectResponse(active=False)
+                return IntrospectResult(response)
+
+            logger.info(
+                "Token introspected successfully",
+                extra={
+                    "user_id": user_id,
+                    "token_type": "refresh_token" if jti else "access_token",
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            response = IntrospectResponse(
+                active=True,
+                sub=user_id,
+                exp=exp,
+                iat=iat,
+                jti=jti,
+                org_id=org_id,
+                roles=roles,
+                token_type="refresh_token" if jti else "access_token",
+            )
+            return IntrospectResult(response)
+
+        except Exception as e:
+            logger.warning(
+                f"Token introspection failed: {e}",
+                extra={"correlation_id": str(correlation_id)},
+            )
+            response = IntrospectResponse(active=False)
+            return IntrospectResult(response)
+
+    async def revoke_token(
+        self,
+        token: str,
+        token_type_hint: str,
+        correlation_id: UUID,
+    ) -> RevokeResult:
+        """Revoke specific token by JTI.
+
+        Args:
+            token: Token to revoke
+            token_type_hint: Hint about token type (refresh_token or access_token)
+            correlation_id: Request correlation ID for observability
+
+        Returns:
+            RevokeResult indicating if revocation was successful
+
+        Raises:
+            HuleEduError: If token format is invalid
+        """
+        try:
+            # Verify the token to extract claims
+            claims = self._token_issuer.verify(token)
+
+            if not claims:
+                logger.warning(
+                    "Invalid token provided for revocation",
+                    extra={"correlation_id": str(correlation_id)},
+                )
+                # RFC 7009: Invalid tokens should return success for security
+                response = RevokeTokenResponse(revoked=True)
+                return RevokeResult(response)
+
+            jti = claims.get("jti")
+            user_id = claims.get("sub")
+
+            # If it's a refresh token (has JTI), revoke it from session store
+            if jti and user_id:
+                await self._session_repo.revoke_refresh(jti)
+
+                # Publish token revoked event
+                await self._event_publisher.publish_token_revoked(
+                    user_id=user_id,
+                    jti=jti,
+                    reason="user_request",
+                    correlation_id=correlation_id,
+                )
+
+                logger.info(
+                    "Refresh token revoked successfully",
+                    extra={
+                        "user_id": user_id,
+                        "jti": jti,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+            else:
+                # For access tokens, we can't really revoke them as they're stateless
+                # But we return success for consistency
+                logger.info(
+                    "Access token revocation requested (stateless token)",
+                    extra={
+                        "user_id": user_id,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+            response = RevokeTokenResponse(revoked=True)
+            return RevokeResult(response)
+
+        except Exception as e:
+            logger.error(
+                f"Token revocation failed: {e}",
+                exc_info=True,
+                extra={"correlation_id": str(correlation_id)},
+            )
+            # RFC 7009: Return success even on errors for security
+            response = RevokeTokenResponse(revoked=True)
+            return RevokeResult(response)

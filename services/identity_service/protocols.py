@@ -69,6 +69,10 @@ class IdentityEventPublisherProtocol(Protocol):
 
     async def publish_user_logged_out(self, user_id: str, correlation_id: str) -> None: ...
 
+    async def publish_token_revoked(
+        self, user_id: str, jti: str, reason: str, correlation_id: UUID
+    ) -> None: ...
+
 
 class UserProfileRepositoryProtocol(Protocol):
     async def get_profile(self, user_id: UUID, correlation_id: UUID) -> UserProfile | None: ...

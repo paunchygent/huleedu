@@ -349,8 +349,8 @@ class TestRegistrationRoutes:
             "email": email,
             "password": password,
             "person_name": {
-                "first_name": email.split('.')[0].title(),  # Extract from email
-                "last_name": email.split('.')[1].split('@')[0].title(),
+                "first_name": email.split(".")[0].title(),  # Extract from email
+                "last_name": email.split(".")[1].split("@")[0].title(),
                 "legal_full_name": f"{email.split('.')[0].title()} {email.split('.')[1].split('@')[0].title()}",
             },
             "organization_name": "Test Organization",

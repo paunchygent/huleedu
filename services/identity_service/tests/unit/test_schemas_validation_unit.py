@@ -63,7 +63,7 @@ class TestRequestSchemas:
                         legal_full_name="Test User",
                     ),
                     organization_name="Test Organization",
-                    org_id=org_id
+                    org_id=org_id,
                 )
                 assert request.email == email
                 assert request.password == password
@@ -81,7 +81,7 @@ class TestRequestSchemas:
                             legal_full_name="Test User",
                         ),
                         organization_name="Test Organization",
-                        org_id=org_id
+                        org_id=org_id,
                     )
 
     class TestLoginRequest:
@@ -348,7 +348,7 @@ class TestFieldValidation:
                         last_name="User",
                         legal_full_name="Test User",
                     ),
-                    organization_name="Test Organization"
+                    organization_name="Test Organization",
                 )
                 assert request.email == email
 
@@ -365,7 +365,7 @@ class TestFieldValidation:
                             last_name="User",
                             legal_full_name="Test User",
                         ),
-                        organization_name="Test Organization"
+                        organization_name="Test Organization",
                     )
                 with pytest.raises(ValidationError):
                     LoginRequest(email=email, password="testpass")

@@ -39,7 +39,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[UserRegisteredV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -60,7 +62,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[LoginSucceededV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -83,7 +87,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[LoginFailedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_LOGIN_FAILED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -107,7 +113,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[EmailVerificationRequestedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -127,7 +135,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[EmailVerifiedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFIED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -151,7 +161,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[PasswordResetRequestedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -171,7 +183,9 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[PasswordResetCompletedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_COMPLETED),
             source_service=self.source_service_name,
-            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
+            correlation_id=UUID(correlation_id)
+            if isinstance(correlation_id, str)
+            else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -191,5 +205,24 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
                 "correlation_id": correlation_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
+        )
+
+    async def publish_token_revoked(
+        self, user_id: str, jti: str, reason: str, correlation_id: UUID
+    ) -> None:
+        """Publish token revoked event."""        
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="User",
+            aggregate_id=user_id,
+            event_type="TokenRevokedV1",
+            event_data={
+                "user_id": user_id,
+                "jti": jti,
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "correlation_id": str(correlation_id),
+                "source_service": self.source_service_name,
+            },
+            topic="huleedu.identity.token.revoked.v1",  # Direct topic name until ProcessingEvent is updated
         )
         # In production, this would publish a UserLoggedOutV1 event similar to the others

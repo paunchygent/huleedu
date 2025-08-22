@@ -31,6 +31,7 @@ from services.identity_service.protocols import (
 
 # Import VerificationHandler - late import to avoid circular dependency
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from services.identity_service.domain_handlers.verification_handler import VerificationHandler
 
@@ -115,11 +116,9 @@ class RegistrationHandler:
             "display_name": None,  # Can be set later via profile update
             "locale": None,  # Can be set later via profile update
         }
-        
+
         user_uuid = UUID(user["id"])
-        await self._profile_repository.upsert_profile(
-            user_uuid, profile_data, correlation_id
-        )
+        await self._profile_repository.upsert_profile(user_uuid, profile_data, correlation_id)
 
         logger.info(
             "User profile created during registration",

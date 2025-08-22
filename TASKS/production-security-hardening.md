@@ -16,7 +16,9 @@ A comprehensive security audit revealed severe vulnerabilities across the HuleEd
 ### 🔴 CRITICAL - Immediate Action Required
 
 #### 1. LLM Provider Service - Exposed API Keys
+
 **Location**: `services/llm_provider_service/config.py`
+
 - **Exposed Secrets**:
   - `OPENAI_API_KEY` - Plain text
   - `ANTHROPIC_API_KEY` - Plain text  
@@ -27,7 +29,9 @@ A comprehensive security audit revealed severe vulnerabilities across the HuleEd
 - **Impact**: $10,000+ potential financial loss per compromised key
 
 #### 2. Database Credentials - All Services
+
 **Location**: All `services/*/config.py` files
+
 - **Exposed Secrets**:
   - `HULEEDU_DB_PASSWORD` - Plain text across all services
   - `HULEEDU_PROD_DB_PASSWORD` - Production database password
@@ -36,7 +40,9 @@ A comprehensive security audit revealed severe vulnerabilities across the HuleEd
 - **Impact**: Total system compromise, GDPR violations, data loss
 
 #### 3. Internal Service Authentication
+
 **Location**: Multiple service configurations
+
 - **Exposed Secrets**:
   - `HULEEDU_INTERNAL_API_KEY` - Plain text
   - Service-to-service authentication tokens
@@ -46,31 +52,40 @@ A comprehensive security audit revealed severe vulnerabilities across the HuleEd
 ### 🟠 HIGH PRIORITY
 
 #### 4. API Gateway Service
+
 **Location**: `services/api_gateway_service/config.py`
+
 - External-facing service without proper secret management
 - Missing rate limiting secrets
 - No API key rotation mechanism
 
 #### 5. Monitoring Credentials
+
 **Location**: `.env` and various configs
+
 - `GRAFANA_ADMIN_PASSWORD` - Plain text
 - Prometheus metrics potentially exposing secrets
 
 #### 6. Configuration String Representations
+
 **Location**: All service configs
+
 - Missing `__str__` and `__repr__` methods
 - Default Pydantic behavior exposes all fields in logs
 
 ### 🟡 MEDIUM PRIORITY
 
 #### 7. Environment Detection Issues
+
 **[Detailed Task Document: environment-detection-standardization.md](./environment-detection-standardization.md)**
+
 - 8 services use unsafe string comparison: `if self.ENVIRONMENT == "production"`
 - Should use `Environment` enum from `common_core.config_enums`
 - Identity Service has correct implementation as reference
 - **Security Risk**: Typos or case mismatches silently disable production security
 
 #### 8. Secret Management Infrastructure
+
 - No centralized secret management
 - Missing rotation mechanisms
 - No audit trail for secret access
@@ -80,6 +95,7 @@ A comprehensive security audit revealed severe vulnerabilities across the HuleEd
 ### Phase 1: Critical Secret Protection (4 hours)
 
 #### 1.1 Create Base Secure Configuration Class
+
 ```python
 # libs/huleedu_service_libs/src/huleedu_service_libs/config/secure_base.py
 from common_core.config_enums import Environment
@@ -144,6 +160,7 @@ class SecureServiceSettings(BaseSettings):
 ```
 
 **Benefits of this approach:**
+
 - Single source of truth for shared secrets and environment
 - All services inherit consistent security configuration
 - Environment detection helpers available to all services
@@ -151,20 +168,30 @@ class SecureServiceSettings(BaseSettings):
 - Clean separation between shared and service-specific configuration
 
 #### 1.2 Update LLM Provider Service
+
 - Convert all API keys to `SecretStr`
 - Add secure string representation
 - Update all `.get_secret_value()` calls
 - Test with masked logging
 
-#### 1.3 Update Database Configurations
-- Apply `SecretStr` to all DB passwords
-- Update connection string builders
-- Test database connections
+#### 1.3 Update API Gateway and WebSocket Services (JWT)
+
+- Convert `JWT_SECRET_KEY` to `SecretStr` in API Gateway and WebSocket services
+- Add secure `__str__/__repr__` that mask secrets
+- Ensure any usage extracts secrets via `.get_secret_value()`
+
+#### 1.4 Update Database Configurations
+
+- Prefer `DB_PASSWORD: SecretStr` fields in settings and use `.get_secret_value()` when building URLs, OR
+- Add a `database_url_masked` accessor and never log `database_url` directly
+- Test database connections end-to-end
 
 ### Phase 2: Service-Wide Security (3 hours)
 
 #### 2.1 Update All Service Configs
+
 Services requiring updates:
+
 - [ ] api_gateway_service
 - [ ] batch_conductor_service
 - [ ] batch_orchestrator_service
@@ -175,16 +202,20 @@ Services requiring updates:
 - [ ] llm_provider_service
 - [ ] nlp_service
 - [ ] result_aggregator_service
-- [ ] spell_checker_service
+- [ ] spellchecker_service
 - [ ] websocket_service
+- [ ] cj_assessment_service
 
 For each service:
+
 1. Inherit from `SecureServiceSettings`
 2. Convert service-specific secrets to `SecretStr`
 3. Add/update `__str__` and `__repr__` methods
 4. Update code using secrets to call `.get_secret_value()`
+5. If using `SettingsConfigDict(env_prefix=...)`, set `ENVIRONMENT: Environment = Field(..., validation_alias="ENVIRONMENT")` so the global `ENVIRONMENT` is respected
 
 #### 2.2 Fix Environment Detection
+
 - Standardize on `Environment` enum
 - Use `.is_production()` helper methods
 - Remove string comparisons
@@ -192,58 +223,75 @@ For each service:
 ### Phase 3: Infrastructure Hardening (2 hours)
 
 #### 3.1 Clean Up Environment Variables
+
 - Remove redundant `HULEEDU_ENVIRONMENT` from .env (keep only `ENVIRONMENT`)
 - Ensure all services use `validation_alias="ENVIRONMENT"` for consistent environment detection
 - Document that `ENVIRONMENT` is the single source of truth for all services
+- Deprecate service-local `ENV_TYPE` strings and migrate to the `Environment` enum + helpers
 
-#### 3.2 Update .gitignore
-- Add patterns for all secret files
-- Ensure no keys can be committed
+#### 3.2 Secrets Hygiene and Rotation
 
-#### 3.2 Create Secret Rotation Support
+- Ensure `.env` and secret materials are untracked by Git; purge any previously committed secrets from history
+- Immediately rotate all secrets currently present in `.env` (LLM keys, Grafana, internal API key)
+- Keep only non-sensitive `env.example` committed
+
+#### 3.3 Create Secret Rotation Support
+
 - Add version/rotation fields to configs
 - Document rotation procedures
 - Implement graceful rotation
 
-#### 3.3 Add Security Monitoring
-- Log access to `.get_secret_value()`
-- Alert on potential secret exposure
-- Add metrics for secret usage
+#### 3.4 Add Security Monitoring
+
+- Add a structured-logging scrubbing processor (e.g., structlog) to mask fields matching patterns like `*_API_KEY`, `*_PASSWORD`, `*_SECRET*`, `INTERNAL_API_KEY`
+- Forbid logging of settings objects except via masked `__str__/__repr__`
+- Alert on potential secret exposure (e.g., detection of known secret patterns in logs); add basic metrics
 
 ### Phase 4: Testing & Validation (3 hours)
 
 #### 4.1 Security Testing Suite
+
 Create `tests/security/test_secret_masking.py`:
+
 - Test all configs mask secrets
 - Verify no secrets in error messages
 - Check log output for leaks
 
 #### 4.2 Integration Testing
+
 - Test all services with new configs
 - Verify service-to-service auth
 - Check database connections
 
 #### 4.3 Production Simulation
+
 - Run with `ENVIRONMENT=production`
 - Check all security features active
 - Verify no regression in functionality
+- Verify services with `env_prefix` correctly read global `ENVIRONMENT` via `validation_alias`
 
 ## Success Criteria
 
 ### Must Have (Before Production)
+
 - [ ] All API keys use `SecretStr`
 - [ ] All passwords use `SecretStr`
 - [ ] All configs have secure `__str__/__repr__`
 - [ ] No secrets visible in logs
 - [ ] All tests passing with security updates
+- [ ] `.env` untracked and all committed secrets rotated
+- [ ] Services using `env_prefix` read global `ENVIRONMENT` via `validation_alias`
 
 ### Should Have
+
 - [ ] Centralized secure config base class
 - [ ] Consistent environment detection
 - [ ] Secret rotation mechanism
 - [ ] Security test suite
+- [ ] `database_url_masked` used anywhere DB URLs are logged
 
 ### Nice to Have
+
 - [ ] Secret access auditing
 - [ ] Automated secret scanning in CI
 - [ ] Key rotation automation
@@ -251,16 +299,19 @@ Create `tests/security/test_secret_masking.py`:
 ## Testing Checklist
 
 ### Unit Tests
+
 - [ ] Each service config masks secrets
 - [ ] SecretStr extraction works correctly
 - [ ] Environment detection consistent
 
 ### Integration Tests
+
 - [ ] Services start with secure configs
 - [ ] Database connections work
 - [ ] API integrations functional
 
 ### Security Tests
+
 - [ ] No secrets in logs
 - [ ] No secrets in error messages
 - [ ] No secrets in stack traces
@@ -288,6 +339,7 @@ class Settings(BaseSettings):
 ```
 
 Usage pattern:
+
 ```python
 # Accessing secrets
 actual_secret = settings.JWT_DEV_SECRET.get_secret_value()
@@ -296,12 +348,14 @@ actual_secret = settings.JWT_DEV_SECRET.get_secret_value()
 ## Risks of Not Completing
 
 ### Immediate Risks
+
 - **API Key Theft**: Exposed keys in logs could cost $10,000+ in unauthorized usage
 - **Data Breach**: Database passwords in logs enable complete data access
 - **Compliance Violations**: GDPR/privacy law violations from data exposure
 - **Reputation Damage**: Security breach would damage trust irreparably
 
 ### Long-term Risks
+
 - **Technical Debt**: Retrofitting security is harder than building it in
 - **Audit Failures**: Would fail any security audit
 - **Insurance Issues**: Negligent security practices void coverage
@@ -309,6 +363,7 @@ actual_secret = settings.JWT_DEV_SECRET.get_secret_value()
 ## Appendix: Affected Files
 
 ### Configuration Files Requiring Updates
+
 ```
 services/api_gateway_service/config.py
 services/batch_conductor_service/config.py
@@ -320,11 +375,13 @@ services/file_service/config.py
 services/llm_provider_service/config.py
 services/nlp_service/config.py
 services/result_aggregator_service/config.py
-services/spell_checker_service/config.py
+services/spellchecker_service/config.py
 services/websocket_service/config.py
+services/cj_assessment_service/config.py
 ```
 
 ### Implementation Files Requiring Updates
+
 - All files using `settings.<SECRET_FIELD>` must add `.get_secret_value()`
 - Database connection builders
 - HTTP client initializations with API keys
@@ -338,6 +395,7 @@ services/websocket_service/config.py
 - Test thoroughly - security bugs are worse than feature bugs
 
 ## Related Tasks
+
 - [Identity Service Infrastructure Testing](./identity-service-comprehensive-testing.md) - Completed, provides reference patterns
 
 ---
