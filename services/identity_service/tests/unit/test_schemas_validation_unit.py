@@ -54,13 +54,35 @@ class TestRequestSchemas:
         ) -> None:
             """Test RegisterRequest field validation including Swedish emails."""
             if should_pass:
-                request = RegisterRequest(email=email, password=password, org_id=org_id)
+                request = RegisterRequest(
+                    email=email,
+                    password=password,
+                    person_name=PersonNameSchema(
+                        first_name="Test",
+                        last_name="User",
+                        legal_full_name="Test User",
+                    ),
+                    organization_name="Test Organization",
+                    org_id=org_id
+                )
                 assert request.email == email
                 assert request.password == password
+                assert request.person_name.first_name == "Test"
+                assert request.organization_name == "Test Organization"
                 assert request.org_id == org_id
             else:
                 with pytest.raises(ValidationError):
-                    RegisterRequest(email=email, password=password, org_id=org_id)
+                    RegisterRequest(
+                        email=email,
+                        password=password,
+                        person_name=PersonNameSchema(
+                            first_name="Test",
+                            last_name="User",
+                            legal_full_name="Test User",
+                        ),
+                        organization_name="Test Organization",
+                        org_id=org_id
+                    )
 
     class TestLoginRequest:
         """Tests for LoginRequest schema validation."""
@@ -318,7 +340,16 @@ class TestFieldValidation:
             """Test email validation patterns including Swedish characters."""
             if should_be_valid:
                 # Test with RegisterRequest
-                request = RegisterRequest(email=email, password="testpass")
+                request = RegisterRequest(
+                    email=email,
+                    password="testpass",
+                    person_name=PersonNameSchema(
+                        first_name="Test",
+                        last_name="User",
+                        legal_full_name="Test User",
+                    ),
+                    organization_name="Test Organization"
+                )
                 assert request.email == email
 
                 # Test with LoginRequest
@@ -326,7 +357,16 @@ class TestFieldValidation:
                 assert login.email == email
             else:
                 with pytest.raises(ValidationError):
-                    RegisterRequest(email=email, password="testpass")
+                    RegisterRequest(
+                        email=email,
+                        password="testpass",
+                        person_name=PersonNameSchema(
+                            first_name="Test",
+                            last_name="User",
+                            legal_full_name="Test User",
+                        ),
+                        organization_name="Test Organization"
+                    )
                 with pytest.raises(ValidationError):
                     LoginRequest(email=email, password="testpass")
 

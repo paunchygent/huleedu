@@ -200,12 +200,12 @@ class TestDefaultIdentityEventPublisher:
     ) -> None:
         """Test email verification request event includes token details."""
         # Arrange
-        token_id = str(uuid4())
+        verification_token = str(uuid4())
         expires_at = datetime.now(UTC) + timedelta(hours=24)
 
         # Act
         await event_publisher.publish_email_verification_requested(
-            sample_user_data, token_id, expires_at, correlation_id
+            sample_user_data, verification_token, expires_at, correlation_id
         )
 
         # Assert
@@ -215,7 +215,7 @@ class TestDefaultIdentityEventPublisher:
         assert isinstance(envelope.data, EmailVerificationRequestedV1)
         assert envelope.data.user_id == sample_user_data["id"]
         assert envelope.data.email == sample_user_data["email"]
-        assert envelope.data.token_id == token_id
+        assert envelope.data.verification_token == verification_token
         assert envelope.data.expires_at == expires_at
         assert envelope.data.correlation_id == correlation_id
 
@@ -371,7 +371,7 @@ class TestDefaultIdentityEventPublisher:
     ) -> None:
         """Test that correlation_id is properly propagated in all event types."""
         # Arrange
-        test_correlation_id = "test-correlation-123"
+        test_correlation_id = "12345678-1234-5678-9abc-123456789abc"
 
         # Act - Test each method that should propagate correlation_id
         await event_publisher.publish_user_registered(sample_user_data, test_correlation_id)

@@ -19,7 +19,7 @@ class UserRegisteredV1(BaseModel):
 class EmailVerificationRequestedV1(BaseModel):
     user_id: str
     email: EmailStr
-    token_id: str
+    verification_token: str
     expires_at: datetime
     correlation_id: str
 

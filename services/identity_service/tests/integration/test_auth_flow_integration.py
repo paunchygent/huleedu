@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -28,6 +28,7 @@ from testcontainers.postgres import PostgresContainer
 
 from services.identity_service.api.schemas import (
     LoginRequest,
+    PersonNameSchema,
     RefreshTokenRequest,
     RegisterRequest,
 )
@@ -179,19 +180,27 @@ class TestAuthFlowIntegration:
         return PostgresUserRepo(database_engine)
 
     @pytest.fixture
+    def mock_profile_repo(self) -> AsyncMock:
+        """Mock profile repository for user profile operations."""
+        from services.identity_service.protocols import UserProfileRepositoryProtocol
+        return AsyncMock(spec=UserProfileRepositoryProtocol)
+
+    @pytest.fixture
     def registration_handler(
         self,
         user_repo: PostgresUserRepo,
         password_hasher: Argon2idPasswordHasher,
         mock_event_publisher: AsyncMock,
+        mock_profile_repo: AsyncMock,
     ) -> RegistrationHandler:
-        """Registration handler with real database and mocked event publisher."""
+        """Registration handler with real database and mocked dependencies."""
         mock_verification_handler = AsyncMock()
         return RegistrationHandler(
             user_repo=user_repo,
             password_hasher=password_hasher,
             event_publisher=mock_event_publisher,
             verification_handler=mock_verification_handler,
+            profile_repository=mock_profile_repo,
         )
 
     @pytest.fixture
@@ -249,6 +258,12 @@ class TestAuthFlowIntegration:
         register_request = RegisterRequest(
             email=email,
             password=password,
+            person_name=PersonNameSchema(
+                first_name="Test",
+                last_name="User",
+                legal_full_name="Test User",
+            ),
+            organization_name="Test Organization",
             org_id=org_id,
         )
 
@@ -279,6 +294,17 @@ class TestAuthFlowIntegration:
             assert created_user.org_id == org_id
             assert created_user.roles == ["teacher"]
             assert created_user.email_verified is False
+
+        # Step 1.5: Verify email (for integration test - bypass actual verification flow)
+        async with session_factory() as session:
+            # Update user to mark email as verified
+            user_update_stmt = (
+                update(User)
+                .where(User.id == UUID(user_id))
+                .values(email_verified=True)
+            )
+            await session.execute(user_update_stmt)
+            await session.commit()
 
         # Step 2: User login
         login_request = LoginRequest(email=email, password=password)
@@ -354,6 +380,12 @@ class TestAuthFlowIntegration:
         register_request = RegisterRequest(
             email="nils.bergström@example.com",
             password="TestPass456!",
+            person_name=PersonNameSchema(
+                first_name="Nils",
+                last_name="Bergström",
+                legal_full_name="Nils Bergström",
+            ),
+            organization_name="Svenska Skolan",
             org_id="edu-org",
         )
 
@@ -393,6 +425,7 @@ class TestAuthFlowIntegration:
         auth_handler: AuthenticationHandler,
         registration_handler: RegistrationHandler,
         mock_session_repo: AsyncMock,
+        session_factory: async_sessionmaker[AsyncSession],
     ) -> None:
         """Test session management with device tracking and cleanup."""
         correlation_id = uuid4()
@@ -401,12 +434,29 @@ class TestAuthFlowIntegration:
         register_request = RegisterRequest(
             email="erik.öhman@example.com",
             password="SessionTest789!",
+            person_name=PersonNameSchema(
+                first_name="Erik",
+                last_name="Öhman",
+                legal_full_name="Erik Öhman",
+            ),
+            organization_name="Svenska Skolan",
             org_id="session-org",
         )
 
         registration_result = await registration_handler.register_user(
             register_request, correlation_id
         )
+
+        # Verify email (for integration test - bypass actual verification flow)
+        async with session_factory() as session:
+            # Update user to mark email as verified
+            user_update_stmt = (
+                update(User)
+                .where(User.id == UUID(registration_result.response.user_id))
+                .values(email_verified=True)
+            )
+            await session.execute(user_update_stmt)
+            await session.commit()
 
         # Login with device info
         login_request = LoginRequest(email="erik.öhman@example.com", password="SessionTest789!")
@@ -455,6 +505,12 @@ class TestAuthFlowIntegration:
             register_request = RegisterRequest(
                 email=email,
                 password=password,
+                person_name=PersonNameSchema(
+                    first_name="Maria" if "maria" in email else "Lars",
+                    last_name="Åkerlund" if "maria" in email else "Holm",
+                    legal_full_name="Maria Åkerlund" if "maria" in email else "Lars Holm",
+                ),
+                organization_name="Svenska Skolan",
                 org_id=org_id,
             )
             result = await registration_handler.register_user(register_request, correlation_id)
@@ -475,6 +531,16 @@ class TestAuthFlowIntegration:
                 assert user.email == email
                 assert user.email_verified is False
                 assert user.failed_login_attempts == 0
+
+        # Verify email for first user (for integration test - bypass actual verification flow)
+        async with session_factory() as session:
+            user_update_stmt = (
+                update(User)
+                .where(User.id == UUID(created_users[0][0]))
+                .values(email_verified=True)
+            )
+            await session.execute(user_update_stmt)
+            await session.commit()
 
         # Login first user and verify state changes
         login_request = LoginRequest(email=created_users[0][1], password=created_users[0][2])

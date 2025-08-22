@@ -187,7 +187,7 @@ class TestEmailVerificationContracts:
         valid_event_data = {
             "user_id": str(uuid4()),
             "email": "test@example.com",
-            "token_id": str(uuid4()),
+            "verification_token": str(uuid4()),
             "expires_at": datetime.now(timezone.utc).isoformat(),
             "correlation_id": str(uuid4()),
         }
@@ -195,7 +195,7 @@ class TestEmailVerificationContracts:
         event = EmailVerificationRequestedV1(**valid_event_data)
 
         assert event.user_id == valid_event_data["user_id"]
-        assert event.token_id == valid_event_data["token_id"]
+        assert event.verification_token == valid_event_data["verification_token"]
         assert event.expires_at
 
     def test_email_verified_schema(self) -> None:

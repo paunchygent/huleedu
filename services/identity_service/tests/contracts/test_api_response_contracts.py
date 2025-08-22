@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from services.identity_service.api.schemas import (
     LoginRequest,
     MeResponse,
+    PersonNameSchema,
     ProfileResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,
@@ -230,6 +231,12 @@ class TestRequestSchemaContracts:
         valid_data = {
             "email": "test@example.com",
             "password": "SecurePassword123!",
+            "person_name": {
+                "first_name": "Test",
+                "last_name": "User",
+                "legal_full_name": "Test User",
+            },
+            "organization_name": "Test Organization",
             "org_id": "org_123",
         }
 
@@ -237,6 +244,10 @@ class TestRequestSchemaContracts:
 
         assert request.email == valid_data["email"]
         assert request.password == valid_data["password"]
+        assert request.person_name.first_name == "Test"
+        assert request.person_name.last_name == "User"
+        assert request.person_name.legal_full_name == "Test User"
+        assert request.organization_name == "Test Organization"
         assert request.org_id == valid_data["org_id"]
 
     def test_refresh_token_request_schema(self) -> None:

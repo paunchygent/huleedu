@@ -95,12 +95,12 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         )
 
     async def publish_email_verification_requested(
-        self, user: dict, token_id: str, expires_at: datetime, correlation_id: str
+        self, user: dict, verification_token: str, expires_at: datetime, correlation_id: str
     ) -> None:
         payload = EmailVerificationRequestedV1(
             user_id=user["id"],
             email=user["email"],
-            token_id=token_id,
+            verification_token=verification_token,
             expires_at=expires_at,
             correlation_id=correlation_id,
         )

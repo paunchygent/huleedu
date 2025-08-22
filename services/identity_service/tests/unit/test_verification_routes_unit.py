@@ -138,17 +138,17 @@ class TestVerificationRoutes:
         self,
         app_client: QuartTestClient,
     ) -> None:
-        """Test email verification request without Authorization header."""
-        # Act
+        """Test email verification request without Authorization header (public flow)."""
+        # Act - No auth header and no email triggers bad request
         response = await app_client.post(
             "/v1/auth/request-email-verification",
             json={},
         )
 
-        # Assert
-        assert response.status_code == 401
+        # Assert - Public flow requires email in request body
+        assert response.status_code == 400
         data = await response.get_json()
-        assert data["error"] == "Authorization token required"
+        assert "Email is required for public verification request" in data["error"]
 
     async def test_request_email_verification_invalid_jwt(
         self,

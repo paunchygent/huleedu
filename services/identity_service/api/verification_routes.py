@@ -58,7 +58,9 @@ async def request_email_verification(
                     correlation_id=correlation_id,
                 )
                 
-            except Exception:
+            except Exception as e:
+                if isinstance(e, HuleEduError):
+                    raise  # Let outer handler catch business errors
                 return jsonify({"error": "Invalid or expired token"}), 401
         else:
             # Public flow: No authentication, use email from request

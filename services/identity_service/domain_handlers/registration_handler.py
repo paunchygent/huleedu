@@ -26,6 +26,7 @@ from services.identity_service.protocols import (
     IdentityEventPublisherProtocol,
     PasswordHasher,
     UserRepo,
+    UserProfileRepositoryProtocol,
 )
 
 # Import VerificationHandler - late import to avoid circular dependency
@@ -54,6 +55,7 @@ class RegistrationHandler:
     - Email uniqueness validation
     - Secure password hashing
     - Transactional user creation
+    - User profile creation with person_name data
     - Event publishing for downstream services
     - Comprehensive audit logging
     """
@@ -64,28 +66,30 @@ class RegistrationHandler:
         password_hasher: PasswordHasher,
         event_publisher: IdentityEventPublisherProtocol,
         verification_handler: "VerificationHandler",
+        profile_repository: UserProfileRepositoryProtocol,
     ):
         self._user_repo = user_repo
         self._password_hasher = password_hasher
         self._event_publisher = event_publisher
         self._verification_handler = verification_handler
+        self._profile_repository = profile_repository
 
     async def register_user(
         self,
         register_request: RegisterRequest,
         correlation_id: UUID,
     ) -> RegistrationResult:
-        """Process user registration.
+        """Process user registration with profile creation.
 
         Args:
-            register_request: Registration data with email, org_id, and password
+            register_request: Registration data with email, password, person_name, and organization
             correlation_id: Request correlation ID for observability
 
         Returns:
             RegistrationResult with created user data
 
         Raises:
-            HuleEduError: If user already exists or validation fails
+            HuleEduError: If user already exists, validation fails, or profile creation fails
         """
         # Check if user already exists
         existing_user = await self._user_repo.get_user_by_email(register_request.email)
@@ -102,6 +106,29 @@ class RegistrationHandler:
             register_request.email,
             register_request.org_id,
             self._password_hasher.hash(register_request.password),
+        )
+
+        # Create user profile with person_name data
+        profile_data = {
+            "first_name": register_request.person_name.first_name,
+            "last_name": register_request.person_name.last_name,
+            "display_name": None,  # Can be set later via profile update
+            "locale": None,  # Can be set later via profile update
+        }
+        
+        user_uuid = UUID(user["id"])
+        await self._profile_repository.upsert_profile(
+            user_uuid, profile_data, correlation_id
+        )
+
+        logger.info(
+            "User profile created during registration",
+            extra={
+                "user_id": user["id"],
+                "first_name": register_request.person_name.first_name,
+                "last_name": register_request.person_name.last_name,
+                "correlation_id": str(correlation_id),
+            },
         )
 
         # Publish user registered event

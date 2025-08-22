@@ -14,6 +14,7 @@ import pytest
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.identity_service.api.schemas import (
+    PersonNameSchema,
     RegisterRequest,
     RegisterResponse,
 )
@@ -25,6 +26,7 @@ from services.identity_service.protocols import (
     IdentityEventPublisherProtocol,
     PasswordHasher,
     UserRepo,
+    UserProfileRepositoryProtocol,
 )
 
 
@@ -52,6 +54,7 @@ class TestRegistrationHandler:
         mock_user_repo: AsyncMock,
         mock_password_hasher: AsyncMock,
         mock_event_publisher: AsyncMock,
+        mock_profile_repository: AsyncMock,
     ) -> RegistrationHandler:
         """Create handler with mocked dependencies."""
         mock_verification_handler = AsyncMock()
@@ -60,7 +63,13 @@ class TestRegistrationHandler:
             password_hasher=mock_password_hasher,
             event_publisher=mock_event_publisher,
             verification_handler=mock_verification_handler,
+            profile_repository=mock_profile_repository,
         )
+
+    @pytest.fixture
+    def mock_profile_repository(self) -> AsyncMock:
+        """Create mock profile repository following protocol."""
+        return AsyncMock(spec=UserProfileRepositoryProtocol)
 
     @pytest.fixture
     def correlation_id(self) -> UUID:
@@ -86,6 +95,12 @@ class TestRegistrationHandler:
             return RegisterRequest(
                 email="test@example.com",
                 password="SecurePass123!",
+                person_name=PersonNameSchema(
+                    first_name="Test",
+                    last_name="User",
+                    legal_full_name="Test User",
+                ),
+                organization_name="Test Organization",
                 org_id="test-org",
             )
 
@@ -95,6 +110,12 @@ class TestRegistrationHandler:
             return RegisterRequest(
                 email="åsa.öberg@skolan.se",
                 password="SecurePass123!",
+                person_name=PersonNameSchema(
+                    first_name="Åsa",
+                    last_name="Öberg",
+                    legal_full_name="Åsa Öberg",
+                ),
+                organization_name="Skolan Sverige",
                 org_id="swedish-school",
             )
 
@@ -208,6 +229,12 @@ class TestRegistrationHandler:
             request = RegisterRequest(
                 email="freelancer@example.com",
                 password="SecurePass789!",
+                person_name=PersonNameSchema(
+                    first_name="Jane",
+                    last_name="Freelancer",
+                    legal_full_name="Jane Freelancer",
+                ),
+                organization_name="Independent Professional",
                 org_id=None,
             )
 
@@ -257,6 +284,12 @@ class TestRegistrationHandler:
             request = RegisterRequest(
                 email=email,
                 password=password,
+                person_name=PersonNameSchema(
+                    first_name="John",
+                    last_name="Doe",
+                    legal_full_name="John Doe",
+                ),
+                organization_name="Test Organization",
                 org_id=org_id,
             )
 

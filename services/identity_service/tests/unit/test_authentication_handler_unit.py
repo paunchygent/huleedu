@@ -128,6 +128,7 @@ class TestAuthenticationHandler:
             "failed_login_attempts": 0,
             "last_login_at": None,
             "locked_until": None,
+            "email_verified": True,
         }
 
     @pytest.fixture
@@ -781,6 +782,7 @@ class TestAuthenticationHandler:
                 "failed_login_attempts": 0,
                 "last_login_at": None,
                 "locked_until": None,
+                "email_verified": True,
             }
 
             mock_rate_limiter.check_rate_limit.return_value = (True, 4)

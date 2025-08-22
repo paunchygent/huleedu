@@ -8,6 +8,8 @@ from pydantic import BaseModel, EmailStr
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+    person_name: PersonNameSchema
+    organization_name: str
     org_id: Optional[str] = None
 
 

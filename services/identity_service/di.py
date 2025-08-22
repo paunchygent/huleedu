@@ -246,6 +246,7 @@ class DomainHandlerProvider(Provider):
         password_hasher: PasswordHasher,
         event_publisher: IdentityEventPublisherProtocol,
         verification_handler: VerificationHandler,
+        profile_repository: UserProfileRepositoryProtocol,
     ) -> "RegistrationHandler":
         """Provide registration handler for user registration operations."""
         from services.identity_service.domain_handlers.registration_handler import (
@@ -257,6 +258,7 @@ class DomainHandlerProvider(Provider):
             password_hasher=password_hasher,
             event_publisher=event_publisher,
             verification_handler=verification_handler,
+            profile_repository=profile_repository,
         )
 
     @provide(scope=Scope.REQUEST)

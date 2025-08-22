@@ -88,6 +88,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": email,
             "password": password,
+            "person_name": {
+                "first_name": "Åsa",
+                "last_name": "Öberg",
+                "legal_full_name": "Åsa Öberg",
+            },
+            "organization_name": "Test School",
             "org_id": org_id,
         }
 
@@ -139,6 +145,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": email,
             "password": password,
+            "person_name": {
+                "first_name": "Erik",
+                "last_name": "Lundström",
+                "legal_full_name": "Erik Lundström",
+            },
+            "organization_name": "Test University",
         }
 
         # Act
@@ -170,6 +182,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": "not-an-email",  # Invalid email format
             "password": "pwd",
+            "person_name": {
+                "first_name": "Test",
+                "last_name": "User",
+                "legal_full_name": "Test User",
+            },
+            "organization_name": "Test Org",
         }
 
         # Act
@@ -208,6 +226,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": email,
             "password": password,
+            "person_name": {
+                "first_name": "Existing",
+                "last_name": "User",
+                "legal_full_name": "Existing User",
+            },
+            "organization_name": "Existing Org",
         }
 
         # Act
@@ -242,6 +266,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": email,
             "password": password,
+            "person_name": {
+                "first_name": "Test",
+                "last_name": "User",
+                "legal_full_name": "Test User",
+            },
+            "organization_name": "Test Organization",
         }
 
         # Act
@@ -264,6 +294,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": "test@example.com",
             # password missing
+            "person_name": {
+                "first_name": "Test",
+                "last_name": "User",
+                "legal_full_name": "Test User",
+            },
+            "organization_name": "Test Organization",
         }
 
         # Act
@@ -312,6 +348,12 @@ class TestRegistrationRoutes:
         request_data = {
             "email": email,
             "password": password,
+            "person_name": {
+                "first_name": email.split('.')[0].title(),  # Extract from email
+                "last_name": email.split('.')[1].split('@')[0].title(),
+                "legal_full_name": f"{email.split('.')[0].title()} {email.split('.')[1].split('@')[0].title()}",
+            },
+            "organization_name": "Test Organization",
         }
         if org_id:
             request_data["org_id"] = org_id

@@ -65,7 +65,7 @@ class BatchStatisticsCalculator:
                 batch.overall_status = batch_status
                 if error_detail:
                     batch.batch_error_detail = error_detail.model_dump(mode="json")
-                batch.updated_at = datetime.now(UTC)
+                batch.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
                 await session.commit()
                 return True
@@ -140,7 +140,7 @@ class BatchStatisticsCalculator:
                     else:
                         batch.overall_status = BatchStatus.COMPLETED_WITH_FAILURES
 
-                batch.updated_at = datetime.now(UTC)
+                batch.updated_at = datetime.now(UTC).replace(tzinfo=None)
                 await session.commit()
 
     async def update_batch_failed(
@@ -162,7 +162,7 @@ class BatchStatisticsCalculator:
             if batch:
                 batch.overall_status = BatchStatus.FAILED_CRITICALLY
                 batch.batch_error_detail = error_detail.model_dump(mode="json")
-                batch.updated_at = datetime.now(UTC)
+                batch.updated_at = datetime.now(UTC).replace(tzinfo=None)
                 await session.commit()
 
     async def mark_batch_completed(
@@ -192,8 +192,8 @@ class BatchStatisticsCalculator:
             batch.overall_status = BatchStatus(final_status)
             batch.completed_essay_count = completion_stats.get("successful_essays", 0)
             batch.failed_essay_count = completion_stats.get("failed_essays", 0)
-            batch.processing_completed_at = datetime.now(UTC)
-            batch.updated_at = datetime.now(UTC)
+            batch.processing_completed_at = datetime.now(UTC).replace(tzinfo=None)
+            batch.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
             # Store completion statistics in batch metadata
             current_metadata = batch.batch_metadata or {}
