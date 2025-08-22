@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
+from common_core.identity_enums import LoginFailureReason
 from common_core.identity_models import (
     EmailVerificationRequestedV1,
     EmailVerifiedV1,
@@ -37,6 +39,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[UserRegisteredV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -57,6 +60,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[LoginSucceededV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -68,7 +72,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         )
 
     async def publish_login_failed(
-        self, email: str, failure_reason: str, correlation_id: str
+        self, email: str, failure_reason: LoginFailureReason, correlation_id: str
     ) -> None:
         payload = LoginFailedV1(
             email=email,
@@ -79,6 +83,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[LoginFailedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_LOGIN_FAILED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -102,6 +107,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[EmailVerificationRequestedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -121,6 +127,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[EmailVerifiedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFIED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -144,6 +151,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[PasswordResetRequestedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(
@@ -163,6 +171,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         envelope = EventEnvelope[PasswordResetCompletedV1](
             event_type=topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_COMPLETED),
             source_service=self.source_service_name,
+            correlation_id=UUID(correlation_id) if isinstance(correlation_id, str) else correlation_id,
             data=payload,
         )
         await self.outbox_manager.publish_to_outbox(

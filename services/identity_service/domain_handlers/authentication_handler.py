@@ -14,9 +14,11 @@ import time
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from common_core.identity_enums import LoginFailureReason
 from huleedu_service_libs.error_handling.factories import raise_rate_limit_error
 from huleedu_service_libs.error_handling.identity_factories import (
     raise_account_locked_error,
+    raise_email_not_verified_error,
     raise_invalid_credentials_error,
     raise_invalid_token_error,
     raise_missing_token_error,
@@ -141,7 +143,7 @@ class AuthenticationHandler:
         email_rate_key = create_rate_limit_key("login", login_request.email)
 
         # Check IP rate limit (5 attempts per minute)
-        ip_allowed, ip_remaining = await self._rate_limiter.check_rate_limit(
+        ip_allowed, _ = await self._rate_limiter.check_rate_limit(
             ip_rate_key, limit=5, window_seconds=60
         )
 
@@ -153,7 +155,7 @@ class AuthenticationHandler:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 correlation_id=correlation_id,
-                failure_reason="rate_limit_exceeded_ip",
+                failure_reason=LoginFailureReason.RATE_LIMIT_EXCEEDED,
             )
 
             logger.warning(
@@ -176,7 +178,7 @@ class AuthenticationHandler:
             )
 
         # Check email rate limit (5 attempts per minute)
-        email_allowed, email_remaining = await self._rate_limiter.check_rate_limit(
+        email_allowed, _ = await self._rate_limiter.check_rate_limit(
             email_rate_key, limit=5, window_seconds=60
         )
 
@@ -188,7 +190,7 @@ class AuthenticationHandler:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 correlation_id=correlation_id,
-                failure_reason="rate_limit_exceeded_email",
+                failure_reason=LoginFailureReason.RATE_LIMIT_EXCEEDED,
             )
 
             logger.warning(
@@ -225,12 +227,12 @@ class AuthenticationHandler:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 correlation_id=correlation_id,
-                failure_reason="user_not_found",
+                failure_reason=LoginFailureReason.USER_NOT_FOUND,
             )
 
             # Publish login failed event
             await self._event_publisher.publish_login_failed(
-                login_request.email, "user_not_found", str(correlation_id)
+                login_request.email, LoginFailureReason.USER_NOT_FOUND, str(correlation_id)
             )
 
             logger.warning(
@@ -261,7 +263,7 @@ class AuthenticationHandler:
                         ip_address=ip_address,
                         user_agent=user_agent,
                         correlation_id=correlation_id,
-                        failure_reason="account_locked",
+                        failure_reason=LoginFailureReason.ACCOUNT_LOCKED,
                     )
 
                     logger.warning(
@@ -320,12 +322,12 @@ class AuthenticationHandler:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 correlation_id=correlation_id,
-                failure_reason="invalid_password",
+                failure_reason=LoginFailureReason.INVALID_PASSWORD,
             )
 
             # Publish login failed event
             await self._event_publisher.publish_login_failed(
-                login_request.email, "invalid_password", str(correlation_id)
+                login_request.email, LoginFailureReason.INVALID_PASSWORD, str(correlation_id)
             )
 
             logger.warning(
@@ -344,6 +346,43 @@ class AuthenticationHandler:
                 message="Invalid email or password",
                 correlation_id=correlation_id,
                 email=login_request.email,
+            )
+
+        # Check email verification status (SECURITY: Email must be verified to login)
+        # TODO: When email service is implemented, E2E tests can verify real email delivery
+        # and check actual verification links sent to test email addresses
+        if not user.get("email_verified", False):
+            # Audit log failed attempt for unverified email
+            await self._audit_logger.log_login_attempt(
+                email=login_request.email,
+                success=False,
+                user_id=user["id"],
+                ip_address=ip_address,
+                user_agent=user_agent,
+                correlation_id=correlation_id,
+                failure_reason=LoginFailureReason.EMAIL_UNVERIFIED,
+            )
+
+            # Publish login failed event
+            await self._event_publisher.publish_login_failed(
+                login_request.email, LoginFailureReason.EMAIL_UNVERIFIED, str(correlation_id)
+            )
+
+            logger.warning(
+                "Login attempt with unverified email",
+                extra={
+                    "user_id": user["id"],
+                    "email": login_request.email,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+            raise_email_not_verified_error(
+                service="identity_service",
+                operation="login",
+                email=login_request.email,
+                correlation_id=correlation_id,
+                message="Email verification required. Please verify your email before logging in.",
             )
 
         # Successful login - reset failed attempts and update last login

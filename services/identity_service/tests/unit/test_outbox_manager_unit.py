@@ -130,9 +130,7 @@ class TestOutboxManager:
         assert "åäö" in event_data["data"]["message"]
 
         # Assert - Redis notification sent
-        mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:identity_service", "1"
-        )
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
 
     async def test_publish_to_outbox_success_without_session(
         self,
@@ -286,7 +284,9 @@ class TestOutboxManager:
         assert error_detail.details["external_service"] == "outbox_repository"
         assert "Failed to store event in outbox: ValueError" in error_detail.message
         assert error_detail.details["error_type"] == "ValueError"
-        assert "OutboxManager expects Pydantic EventEnvelope" in error_detail.details["error_details"]
+        assert (
+            "OutboxManager expects Pydantic EventEnvelope" in error_detail.details["error_details"]
+        )
 
     async def test_publish_to_outbox_repository_storage_failure(
         self,
@@ -327,6 +327,7 @@ class TestOutboxManager:
         """Test HuleEduError from repository is re-raised as-is."""
         # Arrange
         from huleedu_service_libs.error_handling import raise_external_service_error
+
         try:
             raise_external_service_error(
                 service="identity_service",
@@ -359,6 +360,7 @@ class TestOutboxManager:
         mock_redis_client: AsyncMock,
     ) -> None:
         """Test correlation ID extraction when event_data has no correlation_id."""
+
         # Arrange - Object without correlation_id and without model_dump
         class MockEventWithoutCorrelationId:
             def __init__(self) -> None:
@@ -420,9 +422,7 @@ class TestOutboxManager:
         await outbox_manager.notify_relay_worker()
 
         # Assert
-        mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:identity_service", "1"
-        )
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
 
     async def test_notify_relay_worker_redis_failure_logs_warning(
         self,
@@ -437,9 +437,7 @@ class TestOutboxManager:
         await outbox_manager.notify_relay_worker()
 
         # Assert
-        mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:identity_service", "1"
-        )
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
 
     async def test_publish_to_outbox_serialization_preserves_swedish_characters(
         self,
@@ -481,4 +479,3 @@ class TestOutboxManager:
         assert event_data_dict["data"]["action"] == "lösenord_återställning"
         assert "åäöÅÄÖ" in event_data_dict["data"]["message"]
         assert event_data_dict["metadata"]["locale"] == "sv_SE"
-

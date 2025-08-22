@@ -28,6 +28,11 @@ from services.identity_service.protocols import (
     UserRepo,
 )
 
+# Import VerificationHandler - late import to avoid circular dependency
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from services.identity_service.domain_handlers.verification_handler import VerificationHandler
+
 logger = create_service_logger("identity_service.domain_handlers.registration")
 
 
@@ -58,10 +63,12 @@ class RegistrationHandler:
         user_repo: UserRepo,
         password_hasher: PasswordHasher,
         event_publisher: IdentityEventPublisherProtocol,
+        verification_handler: "VerificationHandler",
     ):
         self._user_repo = user_repo
         self._password_hasher = password_hasher
         self._event_publisher = event_publisher
+        self._verification_handler = verification_handler
 
     async def register_user(
         self,
@@ -99,6 +106,33 @@ class RegistrationHandler:
 
         # Publish user registered event
         await self._event_publisher.publish_user_registered(user, str(correlation_id))
+
+        # Automatically send email verification (best practice: verify before login)
+        try:
+            await self._verification_handler.request_email_verification_by_email(
+                email=register_request.email,
+                correlation_id=correlation_id,
+            )
+            logger.info(
+                "Email verification sent automatically after registration",
+                extra={
+                    "user_id": user["id"],
+                    "email": register_request.email,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+        except Exception as e:
+            # Log warning but don't fail registration if verification email fails
+            logger.warning(
+                "Failed to send automatic verification email after registration",
+                extra={
+                    "user_id": user["id"],
+                    "email": register_request.email,
+                    "correlation_id": str(correlation_id),
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
 
         logger.info(
             "User registered successfully",

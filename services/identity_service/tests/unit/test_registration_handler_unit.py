@@ -54,10 +54,12 @@ class TestRegistrationHandler:
         mock_event_publisher: AsyncMock,
     ) -> RegistrationHandler:
         """Create handler with mocked dependencies."""
+        mock_verification_handler = AsyncMock()
         return RegistrationHandler(
             user_repo=mock_user_repo,
             password_hasher=mock_password_hasher,
             event_publisher=mock_event_publisher,
+            verification_handler=mock_verification_handler,
         )
 
     @pytest.fixture

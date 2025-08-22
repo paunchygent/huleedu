@@ -53,6 +53,7 @@ class ServiceTestManager:
         ServiceEndpoint("cj_assessment_service", 9095, has_http_api=True, has_metrics=True),
         ServiceEndpoint("class_management_service", 5002, has_http_api=True, has_metrics=True),
         ServiceEndpoint("result_aggregator_service", 4003, has_http_api=True, has_metrics=True),
+        ServiceEndpoint("identity_service", 7005, has_http_api=True, has_metrics=True),
     ]
 
     def __init__(self, auth_manager: Optional[AuthTestManager] = None):

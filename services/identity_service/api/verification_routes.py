@@ -30,31 +30,49 @@ async def request_email_verification(
     verification_handler: FromDishka[VerificationHandler],
     token_issuer: FromDishka[TokenIssuer],
 ) -> tuple[Response, int]:
-    """Request email verification token for authenticated user."""
+    """Request email verification token.
+    
+    Supports two flows:
+    1. Authenticated (JWT required): For logged-in users changing email or re-verification
+    2. Public (no auth): For initial verification after registration
+    """
     try:
         correlation_id = extract_correlation_id()
-
         payload = RequestEmailVerificationRequest(**(await request.get_json() or {}))
 
-        # Extract user ID from JWT token
+        # Try to get JWT token (optional)
         jwt_token = extract_jwt_token()
-        if not jwt_token:
-            return jsonify({"error": "Authorization token required"}), 401
-
-        try:
-            claims = token_issuer.verify(jwt_token)
-            user_id = claims.get("sub")
-            if not user_id:
-                return jsonify({"error": "Invalid token"}), 401
-        except Exception:
-            return jsonify({"error": "Invalid or expired token"}), 401
-
-        # Delegate to verification handler
-        verification_result = await verification_handler.request_email_verification(
-            request_data=payload,
-            user_id=user_id,
-            correlation_id=correlation_id,
-        )
+        
+        if jwt_token:
+            # Authenticated flow: User is logged in, verify token and use user_id
+            try:
+                claims = token_issuer.verify(jwt_token)
+                user_id = claims.get("sub")
+                if not user_id:
+                    return jsonify({"error": "Invalid token"}), 401
+                
+                # Use authenticated method
+                verification_result = await verification_handler.request_email_verification(
+                    request_data=payload,
+                    user_id=user_id,
+                    correlation_id=correlation_id,
+                )
+                
+            except Exception:
+                return jsonify({"error": "Invalid or expired token"}), 401
+        else:
+            # Public flow: No authentication, use email from request
+            request_data = await request.get_json() or {}
+            email = request_data.get("email")
+            
+            if not email:
+                return jsonify({"error": "Email is required for public verification request"}), 400
+                
+            # Use public method
+            verification_result = await verification_handler.request_email_verification_by_email(
+                email=email,
+                correlation_id=correlation_id,
+            )
 
         return jsonify(verification_result.to_dict()), 200
 
@@ -113,6 +131,50 @@ async def verify_email(
         correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
         logger.error(
             f"Unexpected error during email verification: {e}",
+            exc_info=True,
+            extra={"correlation_id": correlation_id_str},
+        )
+        return jsonify({"error": "Internal server error"}), 500
+
+@bp.post("/resend-verification")
+@inject
+async def resend_verification(
+    verification_handler: FromDishka[VerificationHandler],
+) -> tuple[Response, int]:
+    """Resend email verification (public endpoint for unverified users)."""
+    try:
+        correlation_id = extract_correlation_id()
+
+        # Get email from request body
+        data = await request.get_json()
+        email = data.get("email")
+        
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
+        # Delegate to verification handler (public method)
+        verification_result = await verification_handler.request_email_verification_by_email(
+            email=email,
+            correlation_id=correlation_id,
+        )
+
+        return jsonify(verification_result.to_dict()), 200
+
+    except HuleEduError as e:
+        logger.warning(
+            f"Resend verification error: {e.error_detail.message}",
+            extra={
+                "correlation_id": str(e.error_detail.correlation_id),
+                "error_code": e.error_detail.error_code,
+                "operation": e.error_detail.operation,
+            },
+        )
+        return jsonify({"error": e.error_detail.model_dump()}), 400
+
+    except Exception as e:
+        correlation_id_str = str(correlation_id) if "correlation_id" in locals() else "unknown"
+        logger.error(
+            f"Unexpected error during resend verification: {e}",
             exc_info=True,
             extra={"correlation_id": correlation_id_str},
         )

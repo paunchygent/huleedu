@@ -9,12 +9,13 @@ Following Rule 075 test creation methodology with protocol-based DI patterns.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.identity_enums import LoginFailureReason
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.identity_service.implementations.audit_logger_impl import AuditLoggerImpl
 from services.identity_service.models_db import AuditLog
@@ -30,7 +31,7 @@ class TestAuditLoggerImpl:
     def mock_session(self) -> AsyncMock:
         """Create a mock AsyncSession with proper spec."""
         from unittest.mock import MagicMock
-        
+
         session = AsyncMock(spec=AsyncSession)
         # Mock the add and commit methods - add is sync, commit is async
         session.add = MagicMock()
@@ -40,11 +41,11 @@ class TestAuditLoggerImpl:
     @pytest.fixture
     def mock_session_factory(self, mock_session: AsyncMock) -> MagicMock:
         """Create a mock session factory that returns the mock session."""
-        
+
         # Configure the session mock to be an async context manager
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
-        
+
         # Create the factory that returns the session when called - use MagicMock not AsyncMock
         factory = MagicMock()
         factory.return_value = mock_session
@@ -125,7 +126,7 @@ class TestAuditLoggerImpl:
 
         # Verify session factory was called
         mock_session_factory.assert_called_once()
-        
+
         # Verify session context manager was entered
         context_manager = mock_session_factory.return_value
         context_manager.__aenter__.assert_called_once()
@@ -134,7 +135,7 @@ class TestAuditLoggerImpl:
         # Verify AuditLog was added to session
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         # Verify AuditLog properties
         assert isinstance(added_audit_log, AuditLog)
         assert added_audit_log.action == action
@@ -179,7 +180,7 @@ class TestAuditLoggerImpl:
         """Test that database errors don't fail operations and audit logic continues."""
         # Configure session.commit to raise an exception
         mock_session.commit.side_effect = Exception("Database connection failed")
-        
+
         correlation_id = uuid4()
         user_id = uuid4()
 
@@ -196,7 +197,7 @@ class TestAuditLoggerImpl:
         # Verify audit log creation was attempted but failed gracefully
         mock_session.add.assert_called_once()
         mock_session.commit.assert_called_once()
-        
+
         # Verify the audit log object was correctly created despite database failure
         added_audit_log = mock_session.add.call_args[0][0]
         assert isinstance(added_audit_log, AuditLog)
@@ -220,7 +221,7 @@ class TestAuditLoggerImpl:
                 "erik.johansson@skola.se",
                 False,
                 None,
-                "invalid_password",
+                LoginFailureReason.INVALID_PASSWORD,
                 "login_failure",
                 {
                     "email": "erik.johansson@skola.se",
@@ -233,7 +234,7 @@ class TestAuditLoggerImpl:
                 "maja.ström@universitet.se",
                 False,
                 None,
-                "account_locked",
+                LoginFailureReason.ACCOUNT_LOCKED,
                 "login_failure",
                 {
                     "email": "maja.ström@universitet.se",
@@ -259,7 +260,7 @@ class TestAuditLoggerImpl:
         email: str,
         success: bool,
         user_id: UUID | None,
-        failure_reason: str | None,
+        failure_reason: LoginFailureReason | None,
         expected_action: str,
         expected_details: dict[str, Any],
     ) -> None:
@@ -281,7 +282,7 @@ class TestAuditLoggerImpl:
         # Verify audit log creation
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         assert added_audit_log.action == expected_action
         assert added_audit_log.user_id == user_id
         assert added_audit_log.details == expected_details
@@ -310,7 +311,7 @@ class TestAuditLoggerImpl:
         # Verify audit log properties
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         assert added_audit_log.action == "password_change"
         assert added_audit_log.user_id == user_id
         assert added_audit_log.details == {"event": "Password successfully changed"}
@@ -360,18 +361,18 @@ class TestAuditLoggerImpl:
         # Verify audit log creation
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         assert added_audit_log.action == expected_action
         assert added_audit_log.user_id == user_id
         assert added_audit_log.ip_address == ip_address
         assert added_audit_log.user_agent == user_agent
         assert added_audit_log.correlation_id == correlation_id
-        
+
         # Verify details structure and JTI handling
         expected_details = {"operation": operation}
         if expected_jti_prefix:
             expected_details["jti_prefix"] = expected_jti_prefix
-            
+
         assert added_audit_log.details == expected_details
 
     async def test_log_token_operation_without_jti(
@@ -395,7 +396,7 @@ class TestAuditLoggerImpl:
         # Verify audit log details don't include jti_prefix when JTI is None
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         assert added_audit_log.details == {"operation": "logout"}
         assert "jti_prefix" not in added_audit_log.details
 
@@ -406,7 +407,7 @@ class TestAuditLoggerImpl:
         """Test resilience when session factory itself fails."""
         # Configure session factory to raise exception
         mock_session_factory.side_effect = Exception("Session factory initialization failed")
-        
+
         audit_logger = AuditLoggerImpl(session_factory=mock_session_factory)
         correlation_id = uuid4()
 
@@ -461,7 +462,7 @@ class TestAuditLoggerImpl:
         # Verify Swedish characters are preserved in audit log
         mock_session.add.assert_called_once()
         added_audit_log = mock_session.add.call_args[0][0]
-        
+
         # Verify email in details contains Swedish characters
         assert test_scenario["email"] in str(added_audit_log.details)
         assert added_audit_log.details["email"] == test_scenario["email"]

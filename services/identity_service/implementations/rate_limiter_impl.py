@@ -12,7 +12,7 @@ logger = create_service_logger("identity_service.rate_limiter")
 
 class RateLimiterImpl(RateLimiterProtocol):
     """Redis-based rate limiter implementation with robust data validation."""
-    
+
     # Validation constants
     MIN_VALID_COUNT = 0
     MAX_VALID_COUNT = 1_000_000  # Reasonable upper bound to prevent overflow
@@ -48,21 +48,17 @@ class RateLimiterImpl(RateLimiterProtocol):
 
             try:
                 current_count = int(current_value)
-                
+
                 # Validate count is within reasonable bounds
                 if current_count < self.MIN_VALID_COUNT:
                     logger.warning(
                         "Rate limit corrupted: negative count detected",
-                        extra={
-                            "key": key,
-                            "invalid_count": current_count,
-                            "action": "resetting"
-                        }
+                        extra={"key": key, "invalid_count": current_count, "action": "resetting"},
                     )
                     # Treat negative as corrupted data - reset
                     await self.redis.delete_key(key)
                     return True, limit - 1
-                    
+
                 if current_count > self.MAX_VALID_COUNT:
                     logger.warning(
                         "Rate limit suspiciously high count",
@@ -70,21 +66,17 @@ class RateLimiterImpl(RateLimiterProtocol):
                             "key": key,
                             "count": current_count,
                             "max_valid": self.MAX_VALID_COUNT,
-                            "action": "capping"
-                        }
+                            "action": "capping",
+                        },
                     )
                     # Cap at maximum to prevent overflow
                     current_count = self.MAX_VALID_COUNT
-                    
+
             except (ValueError, TypeError):
                 # Invalid value, reset
                 logger.warning(
                     "Rate limit invalid value in Redis",
-                    extra={
-                        "key": key,
-                        "value": current_value,
-                        "action": "resetting"
-                    }
+                    extra={"key": key, "value": current_value, "action": "resetting"},
                 )
                 await self.redis.delete_key(key)
                 return True, limit - 1
@@ -145,7 +137,7 @@ class RateLimiterImpl(RateLimiterProtocol):
             # Increment existing value
             try:
                 current_count = int(current_value)
-                
+
                 # Validate current count
                 if current_count < self.MIN_VALID_COUNT:
                     logger.warning(
@@ -153,34 +145,30 @@ class RateLimiterImpl(RateLimiterProtocol):
                         extra={
                             "key": key,
                             "invalid_count": current_count,
-                            "action": "resetting_to_1"
-                        }
+                            "action": "resetting_to_1",
+                        },
                     )
                     # Reset to 1 for corrupted data
                     await self.redis.setex(key, window_seconds, "1")
                     return 1
-                    
+
                 if current_count >= self.MAX_VALID_COUNT:
                     logger.warning(
                         "Rate limit increment: at maximum, not incrementing",
                         extra={
                             "key": key,
                             "count": current_count,
-                            "max_valid": self.MAX_VALID_COUNT
-                        }
+                            "max_valid": self.MAX_VALID_COUNT,
+                        },
                     )
                     # Don't increment beyond maximum
                     return current_count
-                    
+
             except (ValueError, TypeError):
                 # Invalid value, reset to 1
                 logger.warning(
                     "Rate limit increment: invalid value, resetting",
-                    extra={
-                        "key": key,
-                        "value": current_value,
-                        "action": "resetting_to_1"
-                    }
+                    extra={"key": key, "value": current_value, "action": "resetting_to_1"},
                 )
                 await self.redis.setex(key, window_seconds, "1")
                 return 1

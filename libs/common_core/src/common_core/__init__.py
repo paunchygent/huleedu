@@ -82,6 +82,7 @@ from .events.llm_provider_events import (
 )
 from .events.nlp_events import BatchAuthorMatchesSuggestedV1, StudentMatchSuggestion
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
+from .identity_enums import LoginFailureReason
 from .identity_models import (
     EmailVerificationRequestedV1,
     EmailVerifiedV1,
@@ -180,7 +181,8 @@ __all__ = [
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
     "AIFeedbackInputDataV1",
-    # Identity models
+    # Identity models and enums
+    "LoginFailureReason",
     "UserRegisteredV1",
     "EmailVerificationRequestedV1",
     "EmailVerifiedV1",

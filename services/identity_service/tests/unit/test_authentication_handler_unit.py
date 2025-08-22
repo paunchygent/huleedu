@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
+from common_core.identity_enums import LoginFailureReason
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.identity_service.api.schemas import (
@@ -260,12 +261,12 @@ class TestAuthenticationHandler:
                 ip_address="192.168.1.100",
                 user_agent="Mozilla/5.0 Chrome/91.0",
                 correlation_id=correlation_id,
-                failure_reason="user_not_found",
+                failure_reason=LoginFailureReason.USER_NOT_FOUND,
             )
 
             # Verify event publishing
             mock_event_publisher.publish_login_failed.assert_called_once_with(
-                login_request.email, "user_not_found", str(correlation_id)
+                login_request.email, LoginFailureReason.USER_NOT_FOUND, str(correlation_id)
             )
 
         async def test_login_fails_for_invalid_password(
@@ -313,12 +314,12 @@ class TestAuthenticationHandler:
                 ip_address="192.168.1.100",
                 user_agent="Mozilla/5.0 Chrome/91.0",
                 correlation_id=correlation_id,
-                failure_reason="invalid_password",
+                failure_reason=LoginFailureReason.INVALID_PASSWORD,
             )
 
             # Verify event publishing
             mock_event_publisher.publish_login_failed.assert_called_once_with(
-                login_request.email, "invalid_password", str(correlation_id)
+                login_request.email, LoginFailureReason.INVALID_PASSWORD, str(correlation_id)
             )
 
         async def test_login_triggers_account_lockout_after_five_failures(
@@ -391,7 +392,7 @@ class TestAuthenticationHandler:
                 ip_address="192.168.1.100",
                 user_agent="Mozilla/5.0 Chrome/91.0",
                 correlation_id=correlation_id,
-                failure_reason="account_locked",
+                failure_reason=LoginFailureReason.ACCOUNT_LOCKED,
             )
 
         async def test_login_blocked_by_ip_rate_limit(
@@ -426,7 +427,7 @@ class TestAuthenticationHandler:
                 ip_address="192.168.1.100",
                 user_agent="Mozilla/5.0 Chrome/91.0",
                 correlation_id=correlation_id,
-                failure_reason="rate_limit_exceeded_ip",
+                failure_reason=LoginFailureReason.RATE_LIMIT_EXCEEDED,
             )
 
         async def test_login_blocked_by_email_rate_limit(
@@ -461,7 +462,7 @@ class TestAuthenticationHandler:
                 ip_address="192.168.1.100",
                 user_agent="Mozilla/5.0 Chrome/91.0",
                 correlation_id=correlation_id,
-                failure_reason="rate_limit_exceeded_email",
+                failure_reason=LoginFailureReason.RATE_LIMIT_EXCEEDED,
             )
 
     class TestLogout:

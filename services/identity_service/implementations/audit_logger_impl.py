@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from common_core.identity_enums import LoginFailureReason
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -90,7 +91,7 @@ class AuditLoggerImpl(AuditLoggerProtocol):
         ip_address: str | None,
         user_agent: str | None,
         correlation_id: UUID,
-        failure_reason: str | None = None,
+        failure_reason: LoginFailureReason | None = None,
     ) -> None:
         """
         Log a login attempt.
@@ -112,7 +113,7 @@ class AuditLoggerImpl(AuditLoggerProtocol):
         }
 
         if failure_reason:
-            details["failure_reason"] = failure_reason
+            details["failure_reason"] = failure_reason.value
 
         await self.log_action(
             action=action,

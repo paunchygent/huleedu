@@ -39,12 +39,12 @@ class TestRateLimiterImpl:
             "current_count, limit, expected_allowed, expected_remaining",
             [
                 (None, 5, True, 4),  # First attempt, key doesn't exist
-                (0, 5, True, 4),     # Zero count (edge case)
-                (1, 5, True, 3),     # Under limit
-                (2, 5, True, 2),     # Under limit 
-                (4, 5, True, 0),     # At threshold, last allowed attempt
-                (5, 5, False, 0),    # At limit, should deny
-                (10, 5, False, 0),   # Over limit, should deny
+                (0, 5, True, 4),  # Zero count (edge case)
+                (1, 5, True, 3),  # Under limit
+                (2, 5, True, 2),  # Under limit
+                (4, 5, True, 0),  # At threshold, last allowed attempt
+                (5, 5, False, 0),  # At limit, should deny
+                (10, 5, False, 0),  # Over limit, should deny
                 (100, 5, False, 0),  # Way over limit
             ],
         )
@@ -61,7 +61,9 @@ class TestRateLimiterImpl:
             # Arrange
             key = "login:ip:192.168.1.1"
             window_seconds = 300
-            mock_redis_client.get.return_value = str(current_count) if current_count is not None else None
+            mock_redis_client.get.return_value = (
+                str(current_count) if current_count is not None else None
+            )
 
             # Act
             allowed, remaining = await rate_limiter.check_rate_limit(key, limit, window_seconds)
@@ -194,7 +196,7 @@ class TestRateLimiterImpl:
             """Should handle various rate limit configurations correctly."""
             # Test cases: (limit, expected_remaining)
             test_cases = [(1, 0), (10, 9), (100, 99), (1000, 999)]
-            
+
             for limit, expected_remaining in test_cases:
                 mock_redis_client.reset_mock()
                 mock_redis_client.get.return_value = None
@@ -227,7 +229,9 @@ class TestRateLimiterImpl:
             # Assert
             assert count == 1
             mock_redis_client.get.assert_called_once_with(key)
-            mock_redis_client.set_if_not_exists.assert_called_once_with(key, "1", ttl_seconds=window_seconds)
+            mock_redis_client.set_if_not_exists.assert_called_once_with(
+                key, "1", ttl_seconds=window_seconds
+            )
 
         async def test_increment_race_condition_handling(
             self,
@@ -247,7 +251,9 @@ class TestRateLimiterImpl:
             # Assert
             assert count == 2  # Got the value set by the other process
             assert mock_redis_client.get.call_count == 2
-            mock_redis_client.set_if_not_exists.assert_called_once_with(key, "1", ttl_seconds=window_seconds)
+            mock_redis_client.set_if_not_exists.assert_called_once_with(
+                key, "1", ttl_seconds=window_seconds
+            )
 
         async def test_increment_race_condition_with_invalid_value(
             self,
@@ -276,7 +282,7 @@ class TestRateLimiterImpl:
         ) -> None:
             """Should correctly increment existing valid values."""
             test_cases = [("1", 2), ("5", 6), ("10", 11), ("99", 100), ("0", 1)]
-            
+
             for current_value, expected_new_count in test_cases:
                 mock_redis_client.reset_mock()
                 mock_redis_client.get.return_value = current_value
@@ -295,7 +301,7 @@ class TestRateLimiterImpl:
         ) -> None:
             """Should reset invalid values to 1 and update with TTL."""
             invalid_values = ["not_a_number", "", "null", "1.5", "1e10", "abc"]
-            
+
             for invalid_value in invalid_values:
                 mock_redis_client.reset_mock()
                 mock_redis_client.get.return_value = invalid_value
@@ -423,12 +429,12 @@ class TestRateLimiterImpl:
             """Should handle reset for various key formats including Swedish characters."""
             key_patterns = [
                 "login:ip:203.0.113.42",
-                "register:email:test@domain.se", 
+                "register:email:test@domain.se",
                 "password_reset:user:åsa_andersson",
                 "api:token:very-long-token-123456789",
                 "verification:session:session_åäö_123",
             ]
-            
+
             for key_pattern in key_patterns:
                 mock_redis_client.reset_mock()
                 mock_redis_client.delete_key.return_value = 1
@@ -446,8 +452,18 @@ class TestCreateRateLimitKey:
         "action, identifier, namespace, expected_key",
         [
             ("login", "192.168.1.1", "identity", "identity:rate_limit:login:192.168.1.1"),
-            ("register", "user@example.com", "auth", "auth:rate_limit:register:user_at_example.com"),
-            ("password_reset", "test@domain.se", "security", "security:rate_limit:password_reset:test_at_domain.se"),
+            (
+                "register",
+                "user@example.com",
+                "auth",
+                "auth:rate_limit:register:user_at_example.com",
+            ),
+            (
+                "password_reset",
+                "test@domain.se",
+                "security",
+                "security:rate_limit:password_reset:test_at_domain.se",
+            ),
             ("api_call", "token:123:456", "api", "api:rate_limit:api_call:token_123_456"),
         ],
     )
@@ -482,7 +498,7 @@ class TestCreateRateLimitKey:
             ("complex::case@@test", "complex__case_at__at_test"),
             ("åsa@skolan.se", "åsa_at_skolan.se"),  # Swedish chars preserved
         ]
-        
+
         for identifier, expected_safe in test_cases:
             result = create_rate_limit_key("test_action", identifier)
             expected = f"identity:rate_limit:test_action:{expected_safe}"
@@ -491,10 +507,12 @@ class TestCreateRateLimitKey:
     def test_create_rate_limit_key_edge_cases(self) -> None:
         """Should handle Swedish characters and empty values gracefully."""
         # Swedish characters preserved
-        result1 = create_rate_limit_key("email_verification", "åsa.andersson@skolan.se", "education")
+        result1 = create_rate_limit_key(
+            "email_verification", "åsa.andersson@skolan.se", "education"
+        )
         assert result1 == "education:rate_limit:email_verification:åsa.andersson_at_skolan.se"
         assert "åsa" in result1 and "_at_" in result1
-        
+
         # Empty values handling
         assert create_rate_limit_key("", "identifier") == "identity:rate_limit::identifier"
         assert create_rate_limit_key("action", "") == "identity:rate_limit:action:"

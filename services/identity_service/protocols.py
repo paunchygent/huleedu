@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Optional, Protocol
 from uuid import UUID
 
+from common_core.identity_enums import LoginFailureReason
 from services.identity_service.models_db import UserProfile
 
 
@@ -51,7 +52,7 @@ class IdentityEventPublisherProtocol(Protocol):
     async def publish_login_succeeded(self, user: dict, correlation_id: str) -> None: ...
 
     async def publish_login_failed(
-        self, email: str, failure_reason: str, correlation_id: str
+        self, email: str, failure_reason: LoginFailureReason, correlation_id: str
     ) -> None: ...
 
     async def publish_email_verification_requested(
@@ -144,7 +145,7 @@ class AuditLoggerProtocol(Protocol):
         ip_address: str | None,
         user_agent: str | None,
         correlation_id: UUID,
-        failure_reason: str | None = None,
+        failure_reason: LoginFailureReason | None = None,
     ) -> None:
         """Log a login attempt."""
         ...

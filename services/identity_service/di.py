@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 # TYPE_CHECKING imports for domain handlers (avoid circular imports)
+from datetime import timedelta
+
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
+from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
@@ -92,6 +97,37 @@ class CoreProvider(Provider):
     def provide_service_name(self, settings: Settings) -> str:
         """Provide service name for outbox configuration."""
         return settings.SERVICE_NAME
+
+    @provide(scope=Scope.APP)
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaBus:
+        """Provide Kafka bus for event publishing."""
+        kafka_bus = KafkaBus(
+            client_id=f"{settings.SERVICE_NAME}_producer",
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        )
+        await kafka_bus.start()
+        return kafka_bus
+
+    @provide(scope=Scope.APP)
+    def provide_circuit_breaker(self) -> CircuitBreaker:
+        """Provide circuit breaker for resilient operations."""
+        return CircuitBreaker(
+            failure_threshold=3,
+            recovery_timeout=timedelta(seconds=30),
+            name="kafka_publisher_circuit",
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_kafka_publisher(
+        self, kafka_bus: KafkaBus, circuit_breaker: CircuitBreaker
+    ) -> KafkaPublisherProtocol:
+        """Provide resilient Kafka publisher with circuit breaker pattern."""
+        return ResilientKafkaPublisher(
+            delegate=kafka_bus,
+            circuit_breaker=circuit_breaker,
+            fallback_handler=None,
+            retry_interval=30,
+        )
 
 
 class IdentityImplementationsProvider(Provider):
@@ -209,6 +245,7 @@ class DomainHandlerProvider(Provider):
         user_repo: UserRepo,
         password_hasher: PasswordHasher,
         event_publisher: IdentityEventPublisherProtocol,
+        verification_handler: VerificationHandler,
     ) -> "RegistrationHandler":
         """Provide registration handler for user registration operations."""
         from services.identity_service.domain_handlers.registration_handler import (
@@ -219,6 +256,7 @@ class DomainHandlerProvider(Provider):
             user_repo=user_repo,
             password_hasher=password_hasher,
             event_publisher=event_publisher,
+            verification_handler=verification_handler,
         )
 
     @provide(scope=Scope.REQUEST)

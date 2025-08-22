@@ -653,3 +653,60 @@ services:
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
 
+  identity_service:
+    build:
+      context: .
+      dockerfile: services/identity_service/Dockerfile
+    container_name: huleedu_identity_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      identity_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "7005:7005"  # HTTP API port
+      - "9097:9097"  # Prometheus metrics port
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - IDENTITY_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@identity_db:5432/huleedu_identity
+      - IDENTITY_SERVICE_DB_HOST=identity_db
+      - IDENTITY_SERVICE_DB_PORT=5432
+      - IDENTITY_SERVICE_DB_NAME=huleedu_identity
+      - IDENTITY_SERVICE_DB_USER=${HULEEDU_DB_USER}
+      - IDENTITY_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - IDENTITY_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - IDENTITY_REDIS_URL=redis://redis:6379
+      - IDENTITY_LOG_LEVEL=INFO
+      - IDENTITY_SERVICE_HOST=0.0.0.0
+      - IDENTITY_SERVICE_HTTP_PORT=7005
+      - IDENTITY_SERVICE_PROMETHEUS_PORT=9097
+      # JWT Configuration
+      - IDENTITY_SERVICE_JWT_ACCESS_TOKEN_TTL_SECONDS=900  # 15 minutes
+      - IDENTITY_SERVICE_JWT_REFRESH_TOKEN_TTL_SECONDS=604800  # 7 days
+      - IDENTITY_SERVICE_JWT_RSA_KEY_SIZE=2048
+      - IDENTITY_SERVICE_JWT_ISSUER=huleedu-identity-service
+      - IDENTITY_SERVICE_JWT_AUDIENCE=huleedu-platform
+      # Security Configuration
+      - IDENTITY_SERVICE_BCRYPT_ROUNDS=12
+      - IDENTITY_SERVICE_MAX_LOGIN_ATTEMPTS=5
+      - IDENTITY_SERVICE_LOCKOUT_DURATION_SECONDS=1800  # 30 minutes
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=identity_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7005/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+

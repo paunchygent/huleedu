@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
+from common_core.identity_enums import LoginFailureReason
 from common_core.identity_models import (
     EmailVerificationRequestedV1,
     EmailVerifiedV1,
@@ -44,8 +45,7 @@ class TestDefaultIdentityEventPublisher:
     def event_publisher(self, mock_outbox_manager: AsyncMock) -> DefaultIdentityEventPublisher:
         """Create event publisher with mocked dependencies."""
         return DefaultIdentityEventPublisher(
-            outbox_manager=mock_outbox_manager,
-            source_service_name="identity_service"
+            outbox_manager=mock_outbox_manager, source_service_name="identity_service"
         )
 
     @pytest.fixture
@@ -73,11 +73,11 @@ class TestDefaultIdentityEventPublisher:
         }
 
     async def test_publish_user_registered_creates_correct_envelope(
-        self, 
-        event_publisher: DefaultIdentityEventPublisher, 
+        self,
+        event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test user registration event creates proper envelope and calls outbox manager."""
         # Act
@@ -90,7 +90,9 @@ class TestDefaultIdentityEventPublisher:
         # Verify outbox manager call parameters
         assert call_args.kwargs["aggregate_type"] == "user"
         assert call_args.kwargs["aggregate_id"] == sample_user_data["id"]
-        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.IDENTITY_USER_REGISTERED
+        )
         assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)
 
         # Verify event envelope structure
@@ -98,7 +100,7 @@ class TestDefaultIdentityEventPublisher:
         assert isinstance(envelope, EventEnvelope)
         assert envelope.event_type == topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)
         assert envelope.source_service == "identity_service"
-        
+
         # Verify event data payload
         assert isinstance(envelope.data, UserRegisteredV1)
         assert envelope.data.user_id == sample_user_data["id"]
@@ -111,7 +113,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data_no_org: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test user registration event handles missing org_id correctly."""
         # Act
@@ -127,7 +129,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test successful login event creates proper envelope with timestamp."""
         # Act
@@ -140,7 +142,9 @@ class TestDefaultIdentityEventPublisher:
         # Verify call parameters
         assert call_args.kwargs["aggregate_type"] == "user"
         assert call_args.kwargs["aggregate_id"] == sample_user_data["id"]
-        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED)
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.IDENTITY_LOGIN_SUCCEEDED
+        )
 
         # Verify envelope and payload
         envelope = call_args.kwargs["event_data"]
@@ -153,10 +157,10 @@ class TestDefaultIdentityEventPublisher:
     @pytest.mark.parametrize(
         "email, failure_reason",
         [
-            ("failed@huledu.se", "invalid_credentials"),
-            ("äcklig@test.com", "locked"),  # Swedish character
-            ("ölöl@domain.se", "unverified"),  # More Swedish chars
-            ("normal@test.com", "other"),
+            ("failed@huledu.se", LoginFailureReason.INVALID_PASSWORD),
+            ("äcklig@test.com", LoginFailureReason.ACCOUNT_LOCKED),  # Swedish character
+            ("ölöl@domain.se", LoginFailureReason.EMAIL_UNVERIFIED),  # More Swedish chars
+            ("normal@test.com", LoginFailureReason.RATE_LIMIT_EXCEEDED),
         ],
     )
     async def test_publish_login_failed_handles_various_scenarios(
@@ -165,7 +169,7 @@ class TestDefaultIdentityEventPublisher:
         mock_outbox_manager: AsyncMock,
         correlation_id: str,
         email: str,
-        failure_reason: str
+        failure_reason: LoginFailureReason,
     ) -> None:
         """Test failed login event handles various failure scenarios and Swedish characters."""
         # Act
@@ -192,7 +196,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test email verification request event includes token details."""
         # Arrange
@@ -207,7 +211,7 @@ class TestDefaultIdentityEventPublisher:
         # Assert
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         envelope = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
-        
+
         assert isinstance(envelope.data, EmailVerificationRequestedV1)
         assert envelope.data.user_id == sample_user_data["id"]
         assert envelope.data.email == sample_user_data["email"]
@@ -220,7 +224,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test email verification completion event includes verification timestamp."""
         # Act
@@ -229,7 +233,7 @@ class TestDefaultIdentityEventPublisher:
         # Assert
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         envelope = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
-        
+
         assert isinstance(envelope.data, EmailVerifiedV1)
         assert envelope.data.user_id == sample_user_data["id"]
         assert envelope.data.correlation_id == correlation_id
@@ -240,7 +244,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test password reset request event includes token and expiration details."""
         # Arrange
@@ -256,8 +260,10 @@ class TestDefaultIdentityEventPublisher:
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         call_args = mock_outbox_manager.publish_to_outbox.call_args
 
-        assert call_args.kwargs["event_type"] == topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED)
-        
+        assert call_args.kwargs["event_type"] == topic_name(
+            ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED
+        )
+
         envelope = call_args.kwargs["event_data"]
         assert isinstance(envelope.data, PasswordResetRequestedV1)
         assert envelope.data.user_id == sample_user_data["id"]
@@ -271,7 +277,7 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test password reset completion event includes reset timestamp."""
         # Act
@@ -280,7 +286,7 @@ class TestDefaultIdentityEventPublisher:
         # Assert
         mock_outbox_manager.publish_to_outbox.assert_called_once()
         envelope = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
-        
+
         assert isinstance(envelope.data, PasswordResetCompletedV1)
         assert envelope.data.user_id == sample_user_data["id"]
         assert envelope.data.correlation_id == correlation_id
@@ -290,7 +296,7 @@ class TestDefaultIdentityEventPublisher:
         self,
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test user logout does not publish to outbox (only logs)."""
         # Arrange
@@ -301,7 +307,7 @@ class TestDefaultIdentityEventPublisher:
 
         # Assert no outbox interaction - focus on behavioral testing
         mock_outbox_manager.publish_to_outbox.assert_not_called()
-        
+
         # The method should complete successfully without exceptions
         # (Testing behavior: method completes, no outbox publishing)
 
@@ -310,19 +316,18 @@ class TestDefaultIdentityEventPublisher:
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
         sample_user_data: dict,
-        correlation_id: str
+        correlation_id: str,
     ) -> None:
         """Test that outbox manager failures are properly propagated as HuleEduError."""
         # Arrange
         mock_outbox_manager.publish_to_outbox.side_effect = create_test_huleedu_error(
-            message="Outbox storage failed",
-            service="outbox_manager"
+            message="Outbox storage failed", service="outbox_manager"
         )
 
         # Act & Assert
         with pytest.raises(HuleEduError) as exc_info:
             await event_publisher.publish_user_registered(sample_user_data, correlation_id)
-        
+
         assert exc_info.value.error_detail.service == "outbox_manager"
         assert "Outbox storage failed" in str(exc_info.value)
 
@@ -342,7 +347,7 @@ class TestDefaultIdentityEventPublisher:
         sample_user_data: dict,
         correlation_id: str,
         method_name: str,
-        args: Callable
+        args: Callable,
     ) -> None:
         """Test that all user-related events use 'user' as aggregate_type."""
         # Arrange
@@ -362,7 +367,7 @@ class TestDefaultIdentityEventPublisher:
         self,
         event_publisher: DefaultIdentityEventPublisher,
         mock_outbox_manager: AsyncMock,
-        sample_user_data: dict
+        sample_user_data: dict,
     ) -> None:
         """Test that correlation_id is properly propagated in all event types."""
         # Arrange
@@ -370,7 +375,7 @@ class TestDefaultIdentityEventPublisher:
 
         # Act - Test each method that should propagate correlation_id
         await event_publisher.publish_user_registered(sample_user_data, test_correlation_id)
-        
+
         # Reset mock for next call
         mock_outbox_manager.reset_mock()
         await event_publisher.publish_login_succeeded(sample_user_data, test_correlation_id)

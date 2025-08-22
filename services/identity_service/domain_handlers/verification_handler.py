@@ -17,6 +17,7 @@ from uuid import UUID
 
 from huleedu_service_libs.error_handling.identity_factories import (
     raise_email_already_verified_error,
+    raise_user_not_found_error,
     raise_verification_token_expired_error,
     raise_verification_token_invalid_error,
 )
@@ -142,6 +143,85 @@ class VerificationHandler:
 
         logger.info(
             "Email verification requested successfully",
+            extra={
+                "user_id": user["id"],
+                "email": user["email"],
+                "token_id": token_record["id"],
+                "correlation_id": str(correlation_id),
+            },
+        )
+
+        response = RequestEmailVerificationResponse(
+            message="Email verification token generated successfully",
+            correlation_id=str(correlation_id),
+        )
+        return RequestVerificationResult(response)
+
+    async def request_email_verification_by_email(
+        self,
+        email: str,
+        correlation_id: UUID,
+    ) -> RequestVerificationResult:
+        """Request email verification token for a user by email (public endpoint).
+
+        This method is used for initial verification requests from unregistered users
+        or users who need to resend their verification email.
+
+        Args:
+            email: Email address to send verification to
+            correlation_id: Request correlation ID for observability
+
+        Returns:
+            RequestVerificationResult with success message
+
+        Raises:
+            HuleEduError: If email already verified or user not found
+        """
+        # Get user by email
+        user = await self._user_repo.get_user_by_email(email)
+        if not user:
+            logger.warning(
+                "Verification requested for non-existent user",
+                extra={
+                    "email": email,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+            raise_user_not_found_error(
+                service="identity_service",
+                operation="request_email_verification_by_email",
+                identifier=email,
+                correlation_id=correlation_id,
+            )
+
+        # Check if email is already verified
+        if user["email_verified"]:
+            raise_email_already_verified_error(
+                service="identity_service",
+                operation="request_email_verification_by_email",
+                email=user["email"],
+                correlation_id=correlation_id,
+            )
+
+        # Invalidate existing tokens for this user
+        await self._user_repo.invalidate_user_tokens(user["id"])
+
+        # Generate new verification token
+        token = str(uuid.uuid4())
+        expires_at = datetime.now(UTC) + timedelta(hours=24)
+
+        # Create verification token
+        token_record = await self._user_repo.create_email_verification_token(
+            user["id"], token, expires_at
+        )
+
+        # Publish email verification requested event
+        await self._event_publisher.publish_email_verification_requested(
+            user, token_record["id"], expires_at, str(correlation_id)
+        )
+
+        logger.info(
+            "Email verification requested successfully (public)",
             extra={
                 "user_id": user["id"],
                 "email": user["email"],

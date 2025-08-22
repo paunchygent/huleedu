@@ -5,6 +5,8 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr
 
+from common_core.identity_enums import LoginFailureReason
+
 
 class UserRegisteredV1(BaseModel):
     user_id: str
@@ -51,7 +53,7 @@ class LoginSucceededV1(BaseModel):
 
 class LoginFailedV1(BaseModel):
     email: EmailStr
-    reason: Literal["invalid_credentials", "locked", "unverified", "other"]
+    reason: LoginFailureReason
     timestamp: datetime
     correlation_id: str
 

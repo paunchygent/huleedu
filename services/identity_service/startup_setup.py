@@ -42,8 +42,14 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
     app.extensions["tracer"] = tracer
     setup_tracing_middleware(app, tracer)
 
-    # Start outbox relay worker
+    # Start outbox relay worker and set database engine
     async with container() as request_container:
+        from sqlalchemy.ext.asyncio import AsyncEngine
+
+        # Get database engine for health checks
+        database_engine = await request_container.get(AsyncEngine)
+        app.database_engine = database_engine  # type: ignore
+
         relay_worker = await request_container.get(EventRelayWorker)
         await relay_worker.start()
         app.extensions["relay_worker"] = relay_worker
