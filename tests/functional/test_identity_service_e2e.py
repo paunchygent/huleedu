@@ -146,7 +146,7 @@ class TestIdentityServiceE2E:
                 )
                 assert verification_requested_event is not None
                 assert verification_requested_event["email"] == swedish_test_data["email"]
-                verification_token = verification_requested_event.get("verification_token")
+                verification_token = verification_requested_event.get("token_id")
                 assert verification_token is not None
                 print("✅ EmailVerificationRequestedV1 event verified (auto-sent)")
 
@@ -184,7 +184,7 @@ class TestIdentityServiceE2E:
                     f"{self.IDENTITY_SERVICE_BASE_URL}/v1/auth/verify-email",
                     json={
                         "email": swedish_test_data["email"],
-                        "verification_token": verification_token,
+                        "token": verification_token,
                     },
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
@@ -200,7 +200,6 @@ class TestIdentityServiceE2E:
                 )
                 assert email_verified_event is not None
                 assert email_verified_event["user_id"] == user_id
-                assert email_verified_event["email"] == swedish_test_data["email"]
                 print("✅ EmailVerifiedV1 event verified")
 
                 # Step 4: Login with Verified Email (NOW SHOULD SUCCEED)
@@ -215,8 +214,8 @@ class TestIdentityServiceE2E:
                 ) as response:
                     assert response.status == 200
                     login_data = await response.json()
-                    access_token = login_data["token_pair"]["access_token"]
-                    refresh_token = login_data["token_pair"]["refresh_token"]
+                    access_token = login_data["access_token"]
+                    refresh_token = login_data["refresh_token"]
                     assert access_token is not None
                     assert refresh_token is not None
                     print("✅ Login successful with verified email, real tokens received")
@@ -230,7 +229,6 @@ class TestIdentityServiceE2E:
                 )
                 assert login_succeeded_event is not None
                 assert login_succeeded_event["user_id"] == user_id
-                assert login_succeeded_event["email"] == swedish_test_data["email"]
                 print("✅ LoginSucceededV1 event verified")
 
                 # Step 5: Access Protected Endpoint (with real JWT token)

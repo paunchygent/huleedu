@@ -138,7 +138,7 @@ class VerificationHandler:
 
         # Publish email verification requested event
         await self._event_publisher.publish_email_verification_requested(
-            user, token_record["id"], expires_at, str(correlation_id)
+            user, token, expires_at, str(correlation_id)
         )
 
         logger.info(
@@ -217,7 +217,7 @@ class VerificationHandler:
 
         # Publish email verification requested event
         await self._event_publisher.publish_email_verification_requested(
-            user, token_record["id"], expires_at, str(correlation_id)
+            user, token, expires_at, str(correlation_id)
         )
 
         logger.info(
