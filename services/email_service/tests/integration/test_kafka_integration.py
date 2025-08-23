@@ -536,7 +536,7 @@ class TestKafkaIntegration:
             email_request = NotificationEmailRequestedV1(
                 message_id=message_id,
                 template_id="welcome",
-                to=EmailStr(f"teacher{i}@björkskolan.se"),
+                to=f"teacher{i}@björkskolan.se",
                 variables={
                     "name": name,
                     "school": f"Björkskolan {i+1}",
@@ -588,7 +588,7 @@ class TestKafkaIntegration:
         email_request = NotificationEmailRequestedV1(
             message_id=message_id,
             template_id="verification",
-            to=EmailStr("användare@åäötest.se"),
+            to="användare@åäötest.se",
             variables={
                 "full_name": "Åsa Öhman-Ström",
                 "course": "Avancerad Matematik för Årskurs 9",
