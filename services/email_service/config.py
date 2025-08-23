@@ -48,6 +48,17 @@ class Settings(SecureServiceSettings):
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_RECYCLE: int = 3600
 
+    # Infrastructure configuration
+    REDIS_URL: str = "redis://redis:6379/0"  # Docker service name
+    KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"  # Docker service name
+    PRODUCER_CLIENT_ID_EMAIL: str = "email-service-producer"
+
+    # Circuit breaker configuration
+    CIRCUIT_BREAKER_ENABLED: bool = True
+    KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 3
+    KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 30  # seconds
+    KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
+
     # Logging configuration
     LOG_LEVEL: str = "INFO"
 

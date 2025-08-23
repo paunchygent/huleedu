@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from uuid import uuid4
 
 # Basic text conversion without external dependencies
 from huleedu_service_libs.error_handling import raise_validation_error
@@ -101,14 +102,18 @@ class JinjaTemplateRenderer(TemplateRenderer):
             raise_validation_error(
                 service="email_service",
                 operation="render_template",
-                detail=f"Template not found: {template_id}",
+                field="template_id",
+                message=f"Template not found: {template_id}",
+                correlation_id=uuid4(),
             )
         except Exception as e:
             logger.error(f"Error rendering template {template_filename}: {e}", exc_info=True)
             raise_validation_error(
                 service="email_service",
                 operation="render_template",
-                detail=f"Template rendering failed: {e}",
+                field="template_rendering",
+                message=f"Template rendering failed: {e}",
+                correlation_id=uuid4(),
             )
 
     async def template_exists(self, template_id: str) -> bool:

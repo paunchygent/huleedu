@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import random
 from datetime import datetime
+from typing import Any
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import EmailStr
@@ -28,7 +29,7 @@ class MockEmailProvider(EmailProvider):
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._sent_emails = []  # Store sent emails for inspection
+        self._sent_emails: list[dict[str, Any]] = []  # Store sent emails for inspection
 
     async def send_email(
         self,

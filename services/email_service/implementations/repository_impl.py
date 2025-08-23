@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
+from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -32,13 +33,17 @@ class PostgreSQLEmailRepository(EmailRepository):
     - Proper error handling and logging
     """
 
-    def __init__(self, engine: AsyncEngine) -> None:
+    def __init__(
+        self, engine: AsyncEngine, database_metrics: Optional[DatabaseMetrics] = None
+    ) -> None:
         """Initialize the repository with injected database engine.
 
         Args:
             engine: AsyncEngine injected from DI container
+            database_metrics: Optional database metrics for monitoring
         """
         self.engine = engine
+        self.database_metrics = database_metrics
         self.logger = create_service_logger("email_service.repository.postgres")
 
         # Create session maker following CJ Assessment pattern

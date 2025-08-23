@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import Any, Optional
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
     Index,
+    Integer,
     String,
     Text,
     text,
@@ -21,8 +24,10 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLAlchemyEnum,
 )
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.sql import func
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -96,42 +101,51 @@ class EmailRecord(Base):
     )
 
 
-class EmailOutboxEvent(Base):
-    """Outbox pattern for reliable event publishing.
+class EventOutbox(Base):
+    """Transactional Outbox table for reliable event publishing.
 
-    Ensures email events are published atomically with database transactions
-    following Rule 022 with topic column and proper indexing.
+    Standard outbox pattern following established architecture across all services.
+    Ensures events are published atomically with database transactions.
     """
 
-    __tablename__ = "email_outbox_events"
+    __tablename__ = "event_outbox"
 
     # Primary key
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
-
-    # Event metadata
-    topic: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    source_service: Mapped[str] = mapped_column(String(50), nullable=False, default="email_service")
-    correlation_id: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    # Event payload
-    event_data: Mapped[dict] = mapped_column(JSON, nullable=False)
-
-    # Publishing status
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text("NOW()")
+    id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False
     )
 
-    # Optimization indexes per Rule 022
+    # Aggregate tracking
+    aggregate_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # Event details
+    event_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    event_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    topic: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Publishing state
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Retry handling
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         Index(
-            "ix_email_outbox_unpublished_priority",
+            "ix_event_outbox_unpublished_topic",
             "published_at",
             "topic",
             "created_at",
+            postgresql_where=text("published_at IS NULL"),
         ),
-        Index("ix_email_outbox_correlation", "correlation_id"),
+        Index("ix_event_outbox_topic", "topic"),
+        Index("ix_event_outbox_aggregate", "aggregate_type", "aggregate_id"),
+        Index("ix_event_outbox_event_type", "event_type"),
     )
 
 

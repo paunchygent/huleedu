@@ -6,16 +6,25 @@ following established patterns for APP and REQUEST scopes.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
+from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol, RedisClient
+from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
 from services.email_service.implementations.outbox_manager import OutboxManager
 from services.email_service.kafka_consumer import EmailKafkaConsumer
+from services.email_service.metrics import setup_email_service_database_monitoring
 from services.email_service.protocols import EmailProvider, EmailRepository, TemplateRenderer
 
 
@@ -35,6 +44,76 @@ class CoreProvider(Provider):
         return settings.SERVICE_NAME
 
     @provide
+    def provide_metrics_registry(self) -> CollectorRegistry:
+        """Provide Prometheus metrics registry."""
+        return REGISTRY
+
+    @provide
+    def provide_database_metrics(self, engine: AsyncEngine, settings: Settings) -> DatabaseMetrics:
+        """Provide database metrics monitoring for Email Service."""
+        return setup_email_service_database_monitoring(engine=engine, service_name="email_service")
+
+    @provide
+    def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
+        """Provide centralized circuit breaker registry."""
+        registry = CircuitBreakerRegistry()
+
+        # Only register circuit breakers if enabled
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            # Future: Add more circuit breakers here as needed
+            pass
+
+        return registry
+
+    @provide
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
+        """Provide Redis client for idempotency and caching."""
+        client = RedisClient(
+            client_id=f"{settings.SERVICE_NAME}-redis",
+            redis_url=settings.REDIS_URL,
+        )
+        await client.start()
+        return client
+
+    @provide
+    async def provide_kafka_publisher(
+        self,
+        settings: Settings,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> KafkaPublisherProtocol:
+        """Provide Kafka publisher for event publishing with optional circuit breaker protection."""
+        # Create base KafkaBus instance
+        base_kafka_bus = KafkaBus(
+            client_id=settings.PRODUCER_CLIENT_ID_EMAIL,
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        )
+
+        # Wrap with circuit breaker protection if enabled
+        kafka_publisher: KafkaPublisherProtocol
+        if settings.CIRCUIT_BREAKER_ENABLED:
+            kafka_circuit_breaker = CircuitBreaker(
+                name=f"{settings.SERVICE_NAME}.kafka_producer",
+                failure_threshold=settings.KAFKA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                recovery_timeout=timedelta(seconds=settings.KAFKA_CIRCUIT_BREAKER_RECOVERY_TIMEOUT),
+                success_threshold=settings.KAFKA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                expected_exception=KafkaError,
+            )
+            circuit_breaker_registry.register("kafka_producer", kafka_circuit_breaker)
+
+            # Create resilient wrapper using composition
+            kafka_publisher = ResilientKafkaPublisher(
+                delegate=base_kafka_bus,
+                circuit_breaker=kafka_circuit_breaker,
+                retry_interval=30,
+            )
+        else:
+            # Use base KafkaBus without circuit breaker
+            kafka_publisher = base_kafka_bus
+
+        await kafka_publisher.start()
+        return kafka_publisher
+
+    @provide
     def provide_session_maker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
         """Provide SQLAlchemy session maker."""
         return async_sessionmaker(
@@ -47,17 +126,18 @@ class CoreProvider(Provider):
 class ImplementationProvider(Provider):
     """Implementation providers for protocol contracts."""
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.APP)
     def provide_email_repository(
         self,
-        session_maker: async_sessionmaker[AsyncSession],
+        engine: AsyncEngine,
+        database_metrics: DatabaseMetrics,
     ) -> EmailRepository:
         """Provide email repository implementation."""
         from services.email_service.implementations.repository_impl import (
             PostgreSQLEmailRepository,
         )
 
-        return PostgreSQLEmailRepository(session_maker)
+        return PostgreSQLEmailRepository(engine, database_metrics)
 
     @provide(scope=Scope.APP)
     def provide_template_renderer(self, settings: Settings) -> TemplateRenderer:
@@ -66,7 +146,7 @@ class ImplementationProvider(Provider):
             JinjaTemplateRenderer,
         )
 
-        return JinjaTemplateRenderer(settings)
+        return JinjaTemplateRenderer(settings.TEMPLATE_PATH)
 
     @provide(scope=Scope.APP)
     def provide_email_provider(self, settings: Settings) -> EmailProvider:
@@ -77,20 +157,13 @@ class ImplementationProvider(Provider):
             )
 
             return MockEmailProvider(settings)
-        elif settings.EMAIL_PROVIDER == "sendgrid":
-            from services.email_service.implementations.provider_sendgrid_impl import (
-                SendGridEmailProvider,
-            )
-
-            return SendGridEmailProvider(settings)
-        elif settings.EMAIL_PROVIDER == "ses":
-            from services.email_service.implementations.provider_ses_impl import (
-                SESEmailProvider,
-            )
-
-            return SESEmailProvider(settings)
         else:
-            raise ValueError(f"Unknown email provider: {settings.EMAIL_PROVIDER}")
+            # For now, only mock provider is implemented
+            # TODO: Add SendGrid and SES providers when needed
+            raise ValueError(
+                f"Email provider '{settings.EMAIL_PROVIDER}' is not yet implemented. "
+                "Currently only 'mock' provider is available."
+            )
 
 
 class ServiceProvider(Provider):
@@ -106,7 +179,7 @@ class ServiceProvider(Provider):
         """Provide outbox manager for transactional event publishing."""
         return OutboxManager(outbox_repository, redis_client, settings)
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.APP)
     def provide_event_processor(
         self,
         email_repository: EmailRepository,
@@ -127,15 +200,15 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_kafka_consumer(
         self,
-        kafka_bus: KafkaBus,
-        redis_client: RedisClient,
         settings: Settings,
+        event_processor: EmailEventProcessor,
+        redis_client: AtomicRedisClientProtocol,
     ) -> EmailKafkaConsumer:
         """Provide Kafka consumer for email processing."""
         return EmailKafkaConsumer(
-            kafka_bus=kafka_bus,
-            redis_client=redis_client,
             settings=settings,
+            event_processor=event_processor,
+            redis_client=redis_client,
         )
 
 

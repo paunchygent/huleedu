@@ -7,6 +7,7 @@ template rendering, email sending, and event publishing.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from common_core.emailing_models import (
     EmailDeliveryFailedV1,
@@ -27,6 +28,7 @@ from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,
     EmailRepository,
+    EmailSendResult,
     TemplateRenderer,
 )
 
@@ -78,8 +80,9 @@ class EmailEventProcessor:
                 raise_validation_error(
                     service="email_service",
                     operation="process_email_request",
-                    detail=f"Template not found: {request.template_id}",
-                    correlation_id=request.correlation_id,
+                    field="template_id",
+                    message=f"Template not found: {request.template_id}",
+                    correlation_id=UUID(request.correlation_id),
                 )
 
             # 2. Create initial email record
@@ -162,14 +165,14 @@ class EmailEventProcessor:
             raise_processing_error(
                 service="email_service",
                 operation="process_email_request",
-                detail=f"Email processing failed: {e}",
-                correlation_id=request.correlation_id,
+                message=f"Email processing failed: {e}",
+                correlation_id=UUID(request.correlation_id),
             )
 
     async def _handle_send_success(
         self,
         request: NotificationEmailRequestedV1,
-        send_result,
+        send_result: EmailSendResult,
         rendered_subject: str,
     ) -> None:
         """Handle successful email send."""
@@ -210,7 +213,7 @@ class EmailEventProcessor:
     async def _handle_send_failure(
         self,
         request: NotificationEmailRequestedV1,
-        send_result,
+        send_result: EmailSendResult,
     ) -> None:
         """Handle failed email send."""
         logger.warning(

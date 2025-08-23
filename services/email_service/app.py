@@ -184,6 +184,9 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     return app
 
 
+# Create module-level app instance for Hypercorn
+app = create_app()
+
 # For direct execution
 if __name__ == "__main__":
     import hypercorn.asyncio

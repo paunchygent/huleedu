@@ -7,7 +7,7 @@ These routes should only be available in development environments.
 from __future__ import annotations
 
 from dishka import FromDishka
-from quart import Blueprint, jsonify, request
+from quart import Blueprint, Response, jsonify, request
 from quart_dishka import inject
 
 from services.email_service.config import Settings
@@ -22,7 +22,7 @@ async def send_dev_email(
     email_provider: FromDishka[EmailProvider],
     template_renderer: FromDishka[TemplateRenderer],
     settings: FromDishka[Settings],
-):
+) -> Response | tuple[Response, int]:
     """Send a test email for development purposes.
 
     Only available in development mode.
@@ -69,7 +69,7 @@ async def send_dev_email(
 async def list_templates(
     template_renderer: FromDishka[TemplateRenderer],
     settings: FromDishka[Settings],
-):
+) -> Response | tuple[Response, int]:
     """List available email templates for development."""
     if settings.is_production():
         return jsonify({"error": "Development endpoint not available in production"}), 403
