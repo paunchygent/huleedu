@@ -41,6 +41,7 @@ alwaysApply: false
 - [044.1-circuit-breaker-observability.mdc](mdc:044.1-circuit-breaker-observability.mdc): Circuit breaker observability patterns and metrics integration standards
 - [045-retry-logic.mdc](mdc:045-retry-logic.mdc): Natural retry via idempotency and user-initiated retry patterns
 - [046-docker-container-debugging.mdc](mdc:046-docker-container-debugging.mdc): Systematic Docker container discovery and debugging protocol
+- [047-security-configuration-standards.mdc](mdc:047-security-configuration-standards.mdc): Security configuration patterns for JWT, secrets management, and environment-aware security controls
 - [048-structured-error-handling-standards.mdc](mdc:048-structured-error-handling-standards.mdc): Structured error handling patterns and observability integration standards
 - [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc): Pydantic v2 usage patterns, serialization, and configuration standards
@@ -70,6 +71,7 @@ alwaysApply: false
 - [084-docker-containerization-standards.mdc](mdc:084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
 - [085-docker-compose-v2-command-reference.mdc](mdc:085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
 - [086-mypy-configuration-standards.mdc](mdc:086-mypy-configuration-standards.mdc): MyPy configuration and monorepo type checking standards with module conflict resolution
+- [087-docker-development-container-patterns.mdc](mdc:087-docker-development-container-patterns.mdc): Docker development container patterns and optimization standards for layer caching and hot-reload
 - [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
 
 ## Frontend Development Standards
