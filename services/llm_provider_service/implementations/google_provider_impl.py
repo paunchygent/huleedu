@@ -41,7 +41,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.api_key = settings.GOOGLE_API_KEY
+        self.api_key = settings.GOOGLE_API_KEY.get_secret_value()
         self.project_id = settings.GOOGLE_PROJECT_ID
         self.api_base = "https://generativelanguage.googleapis.com/v1beta"
 

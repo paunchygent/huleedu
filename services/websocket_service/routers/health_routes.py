@@ -27,6 +27,7 @@ async def health_check(
     return {
         "service": settings.SERVICE_NAME,
         "status": "healthy",
+        "message": "WebSocket Service is healthy",
         "environment": settings.ENVIRONMENT.value,
         "timestamp": datetime.now(UTC).isoformat(),
         "uptime_seconds": int(time.time() - SERVICE_START_TIME),

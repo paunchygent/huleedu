@@ -1,5 +1,6 @@
 """Middleware for API Gateway Service."""
 
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from fastapi import Request
@@ -43,7 +44,7 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 class DevelopmentMiddleware(BaseHTTPMiddleware):
     """Middleware for development-specific features and debugging."""
 
-    def __init__(self, app, settings=None):
+    def __init__(self, app: Any, settings: Optional[Any] = None) -> None:
         """Initialize development middleware with settings."""
         super().__init__(app)
         self.settings = settings
@@ -52,7 +53,8 @@ class DevelopmentMiddleware(BaseHTTPMiddleware):
         """Check if running in development environment."""
         if not self.settings:
             return False
-        return self.settings.ENV_TYPE.lower() in ["development", "dev", "local"]
+        # Ensure we return a proper boolean, not Any
+        return bool(self.settings.is_development())
 
     async def dispatch(self, request: Request, call_next):
         """Add development-specific features and headers."""

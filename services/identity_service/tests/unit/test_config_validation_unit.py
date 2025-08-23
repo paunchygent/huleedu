@@ -345,8 +345,8 @@ class TestIdentityServiceSettings:
             assert "identity_service" in settings_str
             assert "development" in settings_str
 
-            # Database URL masking can be tested separately with database_url_masked property
-            masked_url = settings.database_url_masked
+            # Database URL masking can be tested separately with get_database_url_masked method
+            masked_url = settings.get_database_url_masked()
             assert "super_secret_db_password" not in masked_url
             assert "***" in masked_url
 

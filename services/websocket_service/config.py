@@ -4,11 +4,12 @@ from functools import lru_cache
 
 from common_core.config_enums import Environment
 from common_core.event_enums import ProcessingEvent, topic_name
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from huleedu_service_libs.config import SecureServiceSettings
+from pydantic import Field, SecretStr
+from pydantic_settings import SettingsConfigDict
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -18,9 +19,7 @@ class Settings(BaseSettings):
 
     # Service Identity
     SERVICE_NAME: str = Field(default="websocket_service", description="Service identifier")
-    ENVIRONMENT: Environment = Field(
-        default=Environment.DEVELOPMENT, description="Runtime environment"
-    )
+    # ENVIRONMENT inherited from SecureServiceSettings
 
     # WebSocket Configuration
     WEBSOCKET_PORT: int = Field(default=8080, description="Port for WebSocket service")
@@ -62,9 +61,9 @@ class Settings(BaseSettings):
         return topic_name(ProcessingEvent.BATCH_FILE_REMOVED)
 
     # JWT Configuration
-    JWT_SECRET_KEY: str = Field(
-        default="your-secret-key-here",  # TODO: Move to secrets manager
-        description="Secret key for JWT validation",
+    JWT_SECRET_KEY: SecretStr = Field(
+        default=SecretStr("your-secret-key-here"),
+        description="Secret key for JWT validation"
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
 

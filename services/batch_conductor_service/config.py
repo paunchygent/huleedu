@@ -8,15 +8,16 @@ from __future__ import annotations
 
 from dotenv import find_dotenv, load_dotenv
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
 
 from common_core.config_enums import Environment
+from huleedu_service_libs.config import SecureServiceSettings
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """Configuration settings for Batch Conductor Service."""
 
     model_config = SettingsConfigDict(
@@ -28,6 +29,13 @@ class Settings(BaseSettings):
 
     # Service identity
     SERVICE_NAME: str = "batch-conductor-service"
+    
+    # ENVIRONMENT inherited from SecureServiceSettings with validation_alias for env_prefix
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
+        description="Runtime environment for the service"
+    )
 
     # Pipeline configuration
     PIPELINE_CONFIG_PATH: str = "pipelines.yaml"
@@ -49,16 +57,10 @@ class Settings(BaseSettings):
     HTTP_TIMEOUT: int = Field(default=30, description="HTTP client timeout in seconds")
     HTTP_MAX_RETRIES: int = Field(default=3, description="Maximum HTTP client retries")
 
-    # Environment type (read without BCS_ prefix to match docker-compose)
-    ENV_TYPE: str = Field(
-        default="development", description="Environment type", validation_alias="ENV_TYPE"
-    )
-
     # Repository Configuration (standardized with BOS/ELS)
     USE_MOCK_REPOSITORY: bool = Field(
         default=False, description="Use mock repository for development/testing"
     )
-    ENVIRONMENT: Environment = Environment.DEVELOPMENT
 
     # Event-driven architecture configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(

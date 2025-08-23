@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from quart import Blueprint, Response, current_app, jsonify
 from quart_dishka import inject
 
@@ -54,6 +55,7 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
             "service": "identity_service",
             "status": status,
             "environment": settings.ENVIRONMENT,
+            "message": f"Identity Service is {status}",
             "checks": checks,
             "dependencies": dependencies,
         }
@@ -63,4 +65,21 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return jsonify({"service": "identity_service", "status": "unhealthy", "error": str(e)}), 503
+        return jsonify({
+            "service": "identity_service", 
+            "status": "unhealthy", 
+            "message": "Identity Service is unhealthy",
+            "error": str(e)
+        }), 503
+
+
+@bp.route("/metrics")
+@inject
+async def metrics(registry: FromDishka[CollectorRegistry]) -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        metrics_data = generate_latest(registry)
+        return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        logger.error(f"Error generating metrics: {e}")
+        return Response("Error generating metrics", status=500)

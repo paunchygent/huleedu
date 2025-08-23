@@ -41,7 +41,7 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.api_key = settings.ANTHROPIC_API_KEY
+        self.api_key = settings.ANTHROPIC_API_KEY.get_secret_value()
         self.api_base = "https://api.anthropic.com/v1"
 
     async def generate_comparison(

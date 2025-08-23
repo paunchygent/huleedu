@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
+from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """
     Configuration settings for the Class Management Service.
 
@@ -43,7 +44,7 @@ class Settings(BaseSettings):
             return env_url
 
         # Environment-based configuration
-        if self.ENVIRONMENT == "production":
+        if self.is_production():
             # Production: External managed database
             prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
             prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")

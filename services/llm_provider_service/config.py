@@ -6,7 +6,8 @@ from typing import Any, Dict, Optional
 
 from common_core import LLMProviderType
 from common_core.config_enums import Environment
-from pydantic import Field, field_validator
+from huleedu_service_libs.config import SecureServiceSettings
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,13 +34,18 @@ class ProviderConfig(BaseSettings):
     cost_per_1k_output_tokens: Optional[float] = None
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """Configuration settings for the LLM Provider Service."""
 
     # Service Identity
     SERVICE_NAME: str = "llm_provider_service"
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Environment.DEVELOPMENT
+    # ENVIRONMENT inherited from SecureServiceSettings with validation_alias
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
+        description="Runtime environment for the service"
+    )
     PORT: int = 8080
     HOST: str = "0.0.0.0"
 
@@ -97,23 +103,35 @@ class Settings(BaseSettings):
 
     # Provider-specific configurations
     # These can be overridden via environment variables or API calls
-    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="Anthropic API key for Claude models"
+    )
     ANTHROPIC_BASE_URL: Optional[str] = None
     ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-haiku-20241022"
     ANTHROPIC_ENABLED: bool = True
 
-    OPENAI_API_KEY: str = ""
+    OPENAI_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="OpenAI API key for GPT models"
+    )
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_DEFAULT_MODEL: str = "gpt-5-mini-2025-08-07"
     OPENAI_ORG_ID: Optional[str] = None
     OPENAI_ENABLED: bool = True
 
-    GOOGLE_API_KEY: str = ""
+    GOOGLE_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="Google API key for Gemini models"
+    )
     GOOGLE_PROJECT_ID: str = ""
     GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash-preview-05-20"
     GOOGLE_ENABLED: bool = True
 
-    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="OpenRouter API key for various models"
+    )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-5-haiku-20241022"
     OPENROUTER_ENABLED: bool = True
@@ -121,7 +139,10 @@ class Settings(BaseSettings):
     # Internal/Self-hosted Model Support
     INTERNAL_MODEL_ENABLED: bool = False
     INTERNAL_MODEL_BASE_URL: Optional[str] = None
-    INTERNAL_MODEL_API_KEY: Optional[str] = None
+    INTERNAL_MODEL_API_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="API key for internal/self-hosted models"
+    )
     INTERNAL_MODEL_TYPE: str = Field(
         default="vllm", description="Type of internal model: vllm, ollama, custom"
     )
@@ -196,7 +217,10 @@ class Settings(BaseSettings):
 
     # Admin API Configuration
     ADMIN_API_ENABLED: bool = True
-    ADMIN_API_KEY: Optional[str] = None
+    ADMIN_API_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Admin API key for administrative endpoints"
+    )
     ADMIN_ALLOWED_IPS: list[str] = Field(default_factory=list)
 
     # Dynamic Configuration
@@ -236,9 +260,16 @@ class Settings(BaseSettings):
     def get_provider_config(self, provider: str) -> ProviderConfig:
         """Get configuration for a specific provider."""
         provider_upper = provider.upper()
+        api_key_field = getattr(self, f"{provider_upper}_API_KEY", SecretStr(""))
+        
+        # Extract secret value safely
+        api_key_value = ""
+        if api_key_field is not None:
+            api_key_value = api_key_field.get_secret_value() if hasattr(api_key_field, 'get_secret_value') else str(api_key_field)
+        
         return ProviderConfig(
             enabled=getattr(self, f"{provider_upper}_ENABLED", True),
-            api_key=getattr(self, f"{provider_upper}_API_KEY", ""),
+            api_key=api_key_value,
             base_url=getattr(self, f"{provider_upper}_BASE_URL", None),
             timeout=self.LLM_REQUEST_TIMEOUT,
             max_concurrent_requests=self.LLM_MAX_CONCURRENT_REQUESTS,

@@ -51,19 +51,19 @@ async def health_check(
     providers = {
         "anthropic": {
             "enabled": settings.ANTHROPIC_ENABLED,
-            "configured": bool(settings.ANTHROPIC_API_KEY),
+            "configured": bool(settings.ANTHROPIC_API_KEY.get_secret_value()),
         },
         "openai": {
             "enabled": settings.OPENAI_ENABLED,
-            "configured": bool(settings.OPENAI_API_KEY),
+            "configured": bool(settings.OPENAI_API_KEY.get_secret_value()),
         },
         "google": {
             "enabled": settings.GOOGLE_ENABLED,
-            "configured": bool(settings.GOOGLE_API_KEY),
+            "configured": bool(settings.GOOGLE_API_KEY.get_secret_value()),
         },
         "openrouter": {
             "enabled": settings.OPENROUTER_ENABLED,
-            "configured": bool(settings.OPENROUTER_API_KEY),
+            "configured": bool(settings.OPENROUTER_API_KEY.get_secret_value()),
         },
     }
     health_status["providers"] = providers

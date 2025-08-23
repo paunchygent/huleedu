@@ -7,11 +7,13 @@ FastAPI-specific settings and Svelte 5 + Vite frontend integration.
 
 from __future__ import annotations
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from common_core.config_enums import Environment
+from huleedu_service_libs.config import SecureServiceSettings
+from pydantic import Field, SecretStr
+from pydantic_settings import SettingsConfigDict
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """Configuration settings for API Gateway Service."""
 
     model_config = SettingsConfigDict(
@@ -23,6 +25,13 @@ class Settings(BaseSettings):
 
     # Service identity
     SERVICE_NAME: str = "api-gateway-service"
+    
+    # ENVIRONMENT inherited from SecureServiceSettings with validation_alias
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
+        description="Runtime environment for the service"
+    )
 
     # HTTP server configuration
     HTTP_HOST: str = Field(default="0.0.0.0", description="HTTP server host")
@@ -53,7 +62,10 @@ class Settings(BaseSettings):
     )
 
     # Security
-    JWT_SECRET_KEY: str = "a-very-secret-key-that-must-be-in-secrets-manager"
+    JWT_SECRET_KEY: SecretStr = Field(
+        default=SecretStr("a-very-secret-key-that-must-be-in-secrets-manager"),
+        description="JWT secret key for token signing and validation"
+    )
     JWT_ALGORITHM: str = "HS256"
 
     # HTTP Client Timeouts
@@ -86,8 +98,7 @@ class Settings(BaseSettings):
     )
     RATE_LIMIT_WINDOW: int = Field(default=60, description="Rate limit window in seconds")
 
-    # Environment type
-    ENV_TYPE: str = Field(default="development", description="Environment type")
+    # Environment type (removed - using ENVIRONMENT enum from SecureServiceSettings)
 
     # Circuit breaker configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(

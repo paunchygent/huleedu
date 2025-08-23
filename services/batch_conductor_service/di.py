@@ -101,8 +101,8 @@ class EventDrivenServicesProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_dlq_producer(self, settings: Settings) -> DlqProducerProtocol:
         """Provide Kafka DLQ producer implementation."""
-        # Use in-memory no-op producer for local/test to avoid Kafka requirement
-        if settings.ENV_TYPE not in {"docker", "production"}:
+        # Use in-memory no-op producer for development/testing to avoid Kafka requirement
+        if settings.is_development() or settings.is_testing():
 
             class _NoOpDlqProducer:
                 async def publish_to_dlq(
@@ -152,12 +152,12 @@ class EventDrivenServicesProvider(Provider):
     @provide(scope=Scope.APP)
     async def provide_event_publisher(self, settings: Settings) -> KafkaPublisherProtocol:
         """Provide Kafka event publisher for BCS phase events."""
-        # Use no-op publisher for local/test to avoid Kafka requirement
-        if settings.ENV_TYPE not in {"docker", "production"}:
+        # Use no-op publisher for development/testing to avoid Kafka requirement
+        if settings.is_development() or settings.is_testing():
             from huleedu_service_libs.logging_utils import create_service_logger
 
             logger = create_service_logger("bcs.di.event_publisher")
-            logger.info(f"Using NoOpEventPublisher because ENV_TYPE={settings.ENV_TYPE}")
+            logger.info(f"Using NoOpEventPublisher for {settings.ENVIRONMENT.value} environment")
 
             class _NoOpEventPublisher:
                 async def start(self) -> None:
@@ -175,7 +175,7 @@ class EventDrivenServicesProvider(Provider):
         from huleedu_service_libs.logging_utils import create_service_logger
 
         logger = create_service_logger("bcs.di.event_publisher")
-        logger.info(f"Creating real KafkaBus for event publishing (ENV_TYPE={settings.ENV_TYPE})")
+        logger.info(f"Creating real KafkaBus for event publishing in {settings.ENVIRONMENT.value} environment")
 
         # Create KafkaBus for event publishing
         kafka_bus = KafkaBus(

@@ -10,6 +10,7 @@ import httpx
 from dishka import Provider, Scope, provide
 from fastapi import Request
 from prometheus_client import CollectorRegistry
+from pydantic import SecretStr
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -75,7 +76,7 @@ class InfrastructureTestProvider(Provider):
             RESULT_AGGREGATOR_URL="http://localhost:8084",
             CMS_API_URL="http://localhost:8085",
             FILE_SERVICE_URL="http://localhost:8086",
-            JWT_SECRET_KEY="test-secret-key",
+            JWT_SECRET_KEY=SecretStr("test-secret-key"),
             JWT_ALGORITHM="HS256",
         )
 
@@ -144,7 +145,7 @@ class HttpClientTestProvider(Provider):
             RESULT_AGGREGATOR_URL="http://localhost:8084",
             CMS_API_URL="http://localhost:8085",
             FILE_SERVICE_URL="http://localhost:8086",
-            JWT_SECRET_KEY="test-secret-key",
+            JWT_SECRET_KEY=SecretStr("test-secret-key"),
             JWT_ALGORITHM="HS256",
         )
 

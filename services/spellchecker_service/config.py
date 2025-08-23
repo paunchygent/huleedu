@@ -11,14 +11,15 @@ from pathlib import Path
 
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
+from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """
     Configuration settings for the Spell Checker Service.
 
@@ -26,7 +27,11 @@ class Settings(BaseSettings):
     """
 
     LOG_LEVEL: str = "INFO"
-    ENVIRONMENT: Environment = Environment.DEVELOPMENT
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
+        description="Runtime environment for the service"
+    )
     SERVICE_NAME: str = "spell-checker-service"
     VERSION: str = "1.0.0"
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
@@ -155,7 +160,7 @@ class Settings(BaseSettings):
             return env_url
 
         # Environment-based configuration
-        if self.ENVIRONMENT == "production":
+        if self.is_production():
             # Production: External managed database
             prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
             prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")

@@ -16,6 +16,7 @@ import pytest
 import redis.client
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from fastapi import FastAPI
+from pydantic import SecretStr
 from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry
@@ -368,7 +369,7 @@ class MockWebSocketServiceProvider(Provider):
         """Provide test settings."""
         return Settings(
             SERVICE_NAME="websocket_service",
-            JWT_SECRET_KEY="test-secret",
+            JWT_SECRET_KEY=SecretStr("test-secret"),
             REDIS_URL="redis://localhost:6379",
             WEBSOCKET_MAX_CONNECTIONS_PER_USER=5,
         )

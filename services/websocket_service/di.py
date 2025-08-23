@@ -55,7 +55,7 @@ class WebSocketServiceProvider(Provider):
     def provide_jwt_validator(self, config: Settings) -> JWTValidatorProtocol:
         """Provide JWT token validator."""
         return JWTValidator(
-            secret_key=config.JWT_SECRET_KEY,
+            secret_key=config.JWT_SECRET_KEY.get_secret_value(),
             algorithm=config.JWT_ALGORITHM,
         )
 

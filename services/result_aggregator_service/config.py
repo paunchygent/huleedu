@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
+from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     """Service configuration."""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -19,7 +20,11 @@ class Settings(BaseSettings):
     # Service Identity
     SERVICE_NAME: str = Field(default="result_aggregator_service")
     SERVICE_VERSION: str = Field(default="1.0.0")
-    ENVIRONMENT: Environment = Environment.DEVELOPMENT
+    ENVIRONMENT: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
+        description="Runtime environment for the service"
+    )
 
     # HTTP API Configuration
     HOST: str = Field(default="0.0.0.0")
@@ -41,7 +46,7 @@ class Settings(BaseSettings):
             return env_url
 
         # Environment-based configuration
-        if self.ENVIRONMENT == "production":
+        if self.is_production():
             # Production: External managed database
             prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
             prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
@@ -93,9 +98,7 @@ class Settings(BaseSettings):
     REDIS_IDEMPOTENCY_TTL_SECONDS: int = Field(default=86400)  # 24 hours
 
     # Security Configuration
-    INTERNAL_API_KEY: str = Field(
-        default="dev-internal-api-key", description="Shared secret for service-to-service auth"
-    )
+    # INTERNAL_API_KEY inherited from SecureServiceSettings as SecretStr
     ALLOWED_SERVICE_IDS: list[str] = Field(
         default=["api-gateway-service", "admin-dashboard-service"],
         description="Services allowed to query this API",

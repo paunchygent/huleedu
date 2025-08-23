@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from common_core.config_enums import Environment
 from dotenv import find_dotenv, load_dotenv
+from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(BaseSettings):
+class Settings(SecureServiceSettings):
     model_config = SettingsConfigDict(env_prefix="IDENTITY_", extra="ignore")
 
     # Service identity
@@ -113,14 +114,9 @@ class Settings(BaseSettings):
             # Type narrowing after validation - mypy now knows these are not None
             return f"postgresql+asyncpg://{db_user_env}:{db_password_env}@localhost:5442/huleedu_identity"
 
-    @property
-    def database_url_masked(self) -> str:
+    def get_database_url_masked(self) -> str:
         """Return database URL with masked password for logging."""
-        import re
-
-        url = self.database_url
-        # Mask password in URL: user:password@ becomes user:***@
-        return re.sub(r"://([^:]+):[^@]+@", r"://\1:***@", url)
+        return self.database_url_masked(self.database_url)
 
 
 settings = Settings()

@@ -291,7 +291,7 @@ class ServiceProvider(Provider):
     def provide_security_service(self, settings: Settings) -> SecurityServiceProtocol:
         """Provide security service implementation."""
         return SecurityServiceImpl(
-            internal_api_key=settings.INTERNAL_API_KEY,
+            internal_api_key=settings.get_internal_api_key(),
             allowed_service_ids=settings.ALLOWED_SERVICE_IDS,
         )
 

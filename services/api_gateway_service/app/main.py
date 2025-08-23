@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIDMiddleware)
 
     # Add Development Middleware (only in development environment)
-    if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
+    if settings.is_development():
         from .middleware import DevelopmentMiddleware
 
         app.add_middleware(DevelopmentMiddleware, settings=settings)
@@ -90,7 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(file_routes.router, prefix="/v1", tags=["Files"])
 
     # Include development routes (only in development environment)
-    if settings.ENV_TYPE.lower() in ["development", "dev", "local"]:
+    if settings.is_development():
         from ..routers import dev_routes
 
         app.include_router(dev_routes.router, prefix="/dev", tags=["Development"])

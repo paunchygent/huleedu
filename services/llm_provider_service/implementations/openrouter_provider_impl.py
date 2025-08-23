@@ -48,7 +48,7 @@ class OpenRouterProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.api_key = settings.OPENROUTER_API_KEY
+        self.api_key = settings.OPENROUTER_API_KEY.get_secret_value()
         self.api_base = settings.OPENROUTER_BASE_URL
 
     async def generate_comparison(

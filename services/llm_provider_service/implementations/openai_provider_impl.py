@@ -41,7 +41,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         self.session = session
         self.settings = settings
         self.retry_manager = retry_manager
-        self.api_key = settings.OPENAI_API_KEY
+        self.api_key = settings.OPENAI_API_KEY.get_secret_value()
         self.api_base = "https://api.openai.com/v1"
 
     async def generate_comparison(
