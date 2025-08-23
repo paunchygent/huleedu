@@ -65,7 +65,7 @@ docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table
 | `spellchecker_service` | `huleedu_spellchecker_db` | `huleedu_spellchecker` | 5437 |
 | `file_service` | `huleedu_file_service_db` | `huleedu_file_service` | 5439 |
 | `nlp_service` | `huleedu_nlp_db` | `huleedu_nlp` | 5440 |
-| `email_service` | `huleedu_email_db` | `huleedu_email` | 5441 |
+| `email_service` | `huleedu_email_db` | `huleedu_email` | 5443 |
 
 ## 6. Secure Configuration Pattern (MANDATORY)
 
@@ -121,7 +121,7 @@ def database_url(self) -> str:
 | `result_aggregator_service` | 5436 | ✅ OPERATIONAL | ✅ SECURE |
 | `spellchecker_service` | 5437 | ✅ OPERATIONAL | ✅ SECURE |
 | `nlp_service` | 5440 | ✅ OPERATIONAL | ✅ SECURE |
-| `email_service` | 5441 | ⚠️ SETUP | ⚠️ SETUP |
+| `email_service` | 5443 | ⚠️ SETUP | ⚠️ SETUP |
 
 **Integration verified:** All services successfully execute `../../.venv/bin/alembic current`
 **Security verified:** No hardcoded secrets in any configuration files

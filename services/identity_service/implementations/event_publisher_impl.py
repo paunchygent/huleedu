@@ -210,7 +210,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
     async def publish_token_revoked(
         self, user_id: str, jti: str, reason: str, correlation_id: UUID
     ) -> None:
-        """Publish token revoked event."""        
+        """Publish token revoked event."""
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="User",
             aggregate_id=user_id,

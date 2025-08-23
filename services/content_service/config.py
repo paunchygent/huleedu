@@ -24,13 +24,13 @@ class Settings(SecureServiceSettings):
 
     # Service identity
     SERVICE_NAME: str = "content-service"
-    
+
     LOG_LEVEL: str = "INFO"
     # ENVIRONMENT inherited from SecureServiceSettings with validation_alias
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT,
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
-        description="Runtime environment for the service"
+        description="Runtime environment for the service",
     )
     CONTENT_STORE_ROOT_PATH: Path = Path("./.local_content_store_mvp")
     HOST: str = "0.0.0.0"

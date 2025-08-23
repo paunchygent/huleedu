@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 
 class SecureServiceSettings(BaseSettings):
     """Base settings with security defaults and shared configuration for all services.
-    
+
     This class provides:
     - Secure string representations that mask all secrets
     - Shared environment configuration with proper enum usage
@@ -23,21 +23,21 @@ class SecureServiceSettings(BaseSettings):
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT,
         validation_alias="ENVIRONMENT",  # Always read from global ENVIRONMENT var
-        description="Runtime environment for the service"
+        description="Runtime environment for the service",
     )
-    
+
     # Shared database password
     DB_PASSWORD: SecretStr = Field(
         default=SecretStr(""),
         validation_alias="HULEEDU_DB_PASSWORD",
-        description="Shared database password for all services"
+        description="Shared database password for all services",
     )
-    
+
     # Internal API authentication
     INTERNAL_API_KEY: SecretStr = Field(
         default=SecretStr(""),
         validation_alias="HULEEDU_INTERNAL_API_KEY",
-        description="Internal service authentication key"
+        description="Internal service authentication key",
     )
 
     def is_production(self) -> bool:
@@ -58,7 +58,7 @@ class SecureServiceSettings(BaseSettings):
 
     def requires_security(self) -> bool:
         """Check if environment requires full security measures.
-        
+
         Production and staging require full security (encrypted secrets, etc.)
         """
         return self.ENVIRONMENT in {Environment.PRODUCTION, Environment.STAGING}
@@ -78,10 +78,10 @@ class SecureServiceSettings(BaseSettings):
 
     def database_url_masked(self, database_url: str) -> str:
         """Return database URL with masked password for safe logging.
-        
+
         Args:
             database_url: The full database URL
-            
+
         Returns:
             Database URL with password replaced by ***
         """
@@ -98,54 +98,51 @@ class SecureServiceSettings(BaseSettings):
 
     def get_shared_database_credentials(self) -> dict[str, str]:
         """Get shared database credentials from environment.
-        
+
         Returns:
             Dictionary with db_user and db_password
-            
+
         Raises:
             ValueError: If required credentials are missing
         """
         import os
-        
+
         db_user = os.getenv("HULEEDU_DB_USER")
         db_password = self.get_db_password()
-        
+
         if not db_user or not db_password:
             raise ValueError(
                 "Missing required database credentials. Ensure HULEEDU_DB_USER and "
                 "HULEEDU_DB_PASSWORD are set in .env."
             )
-            
+
         return {"db_user": db_user, "db_password": db_password}
 
     def get_production_database_credentials(self) -> dict[str, Optional[str]]:
         """Get production database credentials from environment.
-        
+
         Returns:
             Dictionary with production database connection details
-            
+
         Raises:
             ValueError: If required production credentials are missing
         """
         import os
-        
+
         if not self.is_production():
-            raise ValueError("Production credentials should only be accessed in production environment")
-            
+            raise ValueError(
+                "Production credentials should only be accessed in production environment"
+            )
+
         prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
         prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
         prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD")
         db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
-        
+
         if not all([prod_host, prod_password]):
             raise ValueError(
                 "Production environment requires HULEEDU_PROD_DB_HOST and "
                 "HULEEDU_PROD_DB_PASSWORD environment variables"
             )
-            
-        return {
-            "host": prod_host,
-            "port": prod_port,
-            "password": prod_password,
-            "user": db_user
-        }
+
+        return {"host": prod_host, "port": prod_port, "password": prod_password, "user": db_user}

@@ -175,7 +175,9 @@ class EventDrivenServicesProvider(Provider):
         from huleedu_service_libs.logging_utils import create_service_logger
 
         logger = create_service_logger("bcs.di.event_publisher")
-        logger.info(f"Creating real KafkaBus for event publishing in {settings.ENVIRONMENT.value} environment")
+        logger.info(
+            f"Creating real KafkaBus for event publishing in {settings.ENVIRONMENT.value} environment"
+        )
 
         # Create KafkaBus for event publishing
         kafka_bus = KafkaBus(

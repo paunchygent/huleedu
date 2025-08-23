@@ -29,9 +29,11 @@ async def seed_courses():
     # Get database credentials from environment
     db_user = os.getenv("HULEEDU_DB_USER")
     db_password = os.getenv("HULEEDU_DB_PASSWORD")
-    
+
     if not db_user or not db_password:
-        raise ValueError("HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set")
+        raise ValueError(
+            "HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set"
+        )
     db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
     db_port = os.getenv("CLASS_MANAGEMENT_DB_PORT", "5435")
     db_name = "huleedu_class_management"

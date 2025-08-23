@@ -11,9 +11,8 @@ This test suite ensures that:
 from __future__ import annotations
 
 import pytest
-from pydantic import SecretStr
-
 from huleedu_service_libs.config import SecureServiceSettings
+from pydantic import SecretStr
 
 # Import all service configs to test them
 from services.api_gateway_service.config import Settings as APIGatewaySettings
@@ -30,7 +29,6 @@ from services.nlp_service.config import Settings as NLPSettings
 from services.result_aggregator_service.config import Settings as ResultAggregatorSettings
 from services.spellchecker_service.config import Settings as SpellcheckerSettings
 from services.websocket_service.config import Settings as WebSocketSettings
-
 
 # All service configurations to test
 ALL_SERVICE_CONFIGS = [
@@ -199,7 +197,7 @@ class TestSecretMasking:
         # Get secret values for comparison (skip if empty)
         openai_key = settings.OPENAI_API_KEY.get_secret_value()
         anthropic_key = settings.ANTHROPIC_API_KEY.get_secret_value()
-        
+
         # Skip test if secrets are empty (default values)
         if not openai_key or not anthropic_key:
             pytest.skip("API keys are empty, skipping secret leak test")

@@ -1,6 +1,6 @@
 """Middleware for API Gateway Service."""
 
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import Request
@@ -44,7 +44,7 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 class DevelopmentMiddleware(BaseHTTPMiddleware):
     """Middleware for development-specific features and debugging."""
 
-    def __init__(self, app: Any, settings: Optional[Any] = None) -> None:
+    def __init__(self, app: Any, settings: Any | None = None) -> None:
         """Initialize development middleware with settings."""
         super().__init__(app)
         self.settings = settings

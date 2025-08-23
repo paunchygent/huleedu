@@ -75,7 +75,9 @@ class AuthProvider(Provider):
         try:
             # Decode and validate JWT
             payload = jwt.decode(
-                token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM]
+                token,
+                settings.JWT_SECRET_KEY.get_secret_value(),
+                algorithms=[settings.JWT_ALGORITHM],
             )
 
             # CRITICAL: Validate token expiry (Architect Feedback #2)

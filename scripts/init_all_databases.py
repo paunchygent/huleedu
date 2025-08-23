@@ -91,9 +91,11 @@ def check_database_connection(service: str, config: Dict) -> bool:
     """Check if database is accessible."""
     db_user = os.getenv("HULEEDU_DB_USER")
     db_password = os.getenv("HULEEDU_DB_PASSWORD")
-    
+
     if not db_user or not db_password:
-        raise ValueError("HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set")
+        raise ValueError(
+            "HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set"
+        )
 
     cmd = (
         f"PGPASSWORD={db_password} psql -h localhost -p {config['port']} "
@@ -155,9 +157,11 @@ async def seed_courses():
 
     db_user = os.getenv("HULEEDU_DB_USER")
     db_password = os.getenv("HULEEDU_DB_PASSWORD")
-    
+
     if not db_user or not db_password:
-        raise ValueError("HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set")
+        raise ValueError(
+            "HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set"
+        )
     database_url = (
         f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5435/huleedu_class_management"
     )

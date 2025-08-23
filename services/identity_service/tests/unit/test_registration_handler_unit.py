@@ -25,8 +25,8 @@ from services.identity_service.domain_handlers.registration_handler import (
 from services.identity_service.protocols import (
     IdentityEventPublisherProtocol,
     PasswordHasher,
-    UserRepo,
     UserProfileRepositoryProtocol,
+    UserRepo,
 )
 
 

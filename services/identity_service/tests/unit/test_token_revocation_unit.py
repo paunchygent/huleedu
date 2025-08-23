@@ -520,7 +520,7 @@ class TestRevokeTokenSchemas:
         """Test RevokeTokenRequest validation fails without required token."""
         # Act & Assert - empty string is valid, only missing field should raise
         from pydantic import ValidationError
-        
+
         with pytest.raises(ValidationError):
             # Use model_validate with a dict missing the required token field
             RevokeTokenRequest.model_validate({"token_type_hint": "refresh_token"})
@@ -529,7 +529,7 @@ class TestRevokeTokenSchemas:
         """Test RevokeTokenRequest accepts empty token string."""
         # Act
         request = RevokeTokenRequest(token="", token_type_hint="refresh_token")
-        
+
         # Assert
         assert request.token == ""
         assert request.token_type_hint == "refresh_token"

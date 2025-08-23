@@ -372,7 +372,7 @@ class TestIntrospectSchemas:
         "token_value",
         [
             "",  # Empty string - valid but not useful
-            "   ",  # Whitespace only - valid but not useful  
+            "   ",  # Whitespace only - valid but not useful
             "very-long-jwt-token-that-could-be-real",  # Long token
         ],
     )
@@ -389,7 +389,7 @@ class TestIntrospectSchemas:
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
             IntrospectRequest(token=None)  # type: ignore
-        
+
         # Verify the validation error
         error = exc_info.value
         assert "string_type" in str(error)

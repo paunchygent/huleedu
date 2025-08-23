@@ -5,7 +5,6 @@ conform to the expected structure and contain the required claims
 that downstream services depend on for authentication and authorization.
 """
 
-import json
 from datetime import datetime, timezone
 from uuid import uuid4
 

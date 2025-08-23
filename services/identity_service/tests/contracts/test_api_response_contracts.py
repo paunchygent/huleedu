@@ -5,17 +5,17 @@ and conform to the expected contracts that API consumers depend on.
 """
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from common_core.error_enums import ErrorCode, IdentityErrorCode
 from common_core.models.error_models import ErrorDetail
 from huleedu_service_libs.error_handling import HuleEduError
 from pydantic import ValidationError
+
 from services.identity_service.api.schemas import (
     LoginRequest,
     MeResponse,
-    PersonNameSchema,
     ProfileResponse,
     RefreshTokenRequest,
     RefreshTokenResponse,

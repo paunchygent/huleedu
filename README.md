@@ -46,7 +46,7 @@ Hybrid HTTP (port 8000) + Kafka service for essay state management. Phase 1: sta
 Events: Consumes BOS commands, publishes essay state transitions.
 
 ### Batch Orchestrator Service (BOS)
-HTTP service (port 5000) for batch-level coordination. Routes GUEST batches (no class_id) directly to pipeline. Routes REGULAR batches (has class_id) through Phase 1 student matching first.
+HTTP service (port 5001) for batch-level coordination. Routes GUEST batches (no class_id) directly to pipeline. Routes REGULAR batches (has class_id) through Phase 1 student matching first.
 
 ### Batch Conductor Service (BCS)
 HTTP service (port 4002) for dynamic pipeline dependency resolution. Uses Redis to track batch completion state and determine next processing phase.
@@ -180,6 +180,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Result Aggregator (RAS)**: 4003, 9096 (metrics)
 - **API Gateway**: 8080
 - **WebSocket Service**: 8081
+- **Email Service**: 8082 (API), 9098 (metrics)
 
 ### Databases (PostgreSQL)
 - **Essay Lifecycle DB**: 5433
@@ -192,6 +193,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **NLP DB**: 5440
 - **Batch Conductor DB**: 5441
 - **Identity DB**: 5442
+- **Email DB**: 5443
 
 ### Infrastructure
 - **Kafka**: 9092-9093
@@ -265,7 +267,7 @@ pdm run test-sequential    # Force sequential
 
 # Health checks
 docker-compose ps          # Container status
-curl localhost:5000/healthz  # BOS health
+curl localhost:5001/healthz  # BOS health
 curl localhost:8000/healthz  # ELS health
 ```
 

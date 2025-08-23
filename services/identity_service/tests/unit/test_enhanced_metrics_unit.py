@@ -192,7 +192,7 @@ class TestMetricsBehavior:
         """Test FAILED_LOGIN_ATTEMPTS histogram buckets failed attempts correctly."""
         # Arrange - record initial sum value
         initial_sum = FAILED_LOGIN_ATTEMPTS._sum._value
-        
+
         # Act
         FAILED_LOGIN_ATTEMPTS.observe(attempt_count)
 
@@ -205,7 +205,7 @@ class TestMetricsBehavior:
                 bucket_found = True
                 break
         assert bucket_found, f"Bucket {expected_bucket} not found"
-        
+
         # Verify that the histogram recorded the observation by checking sum increase
         assert FAILED_LOGIN_ATTEMPTS._sum._value == initial_sum + attempt_count
 
@@ -297,7 +297,7 @@ class TestTokenRevokedEventPublishing:
 
         # Verify call structure
         assert call_kwargs["event_type"] == "TokenRevokedV1"
-        
+
         # Verify event data
         event_data = call_kwargs["event_data"]
         assert event_data["correlation_id"] == str(correlation_id)
@@ -360,14 +360,14 @@ class TestTokenRevokedEventPublishing:
         # Assert
         after_time = datetime.now(UTC)
         event_data = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
-        
+
         # Verify timestamp is present and properly formatted
         assert "timestamp" in event_data
         timestamp_str = event_data["timestamp"]
         assert isinstance(timestamp_str, str)
-        
+
         # Verify timestamp is in ISO format and within expected range
-        event_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        event_time = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
         assert before_time <= event_time <= after_time
 
     async def test_publish_token_revoked_propagates_outbox_errors(

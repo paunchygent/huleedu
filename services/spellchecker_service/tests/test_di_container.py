@@ -50,9 +50,10 @@ async def patch_settings(
 
     # Create test settings with proper DB_PASSWORD construction
     from pydantic import SecretStr
+
     test_settings = TestSettings(
         DB_PASSWORD=SecretStr(parsed.password or "postgres"),
-        HULEEDU_DB_PASSWORD=parsed.password or "postgres"  # For the validation_alias
+        HULEEDU_DB_PASSWORD=parsed.password or "postgres",  # For the validation_alias
     )
     # replace singletons in both modules
     monkeypatch.setattr("services.spellchecker_service.config.settings", test_settings)

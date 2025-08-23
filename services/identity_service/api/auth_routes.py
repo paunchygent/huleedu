@@ -22,11 +22,9 @@ from services.identity_service.api.request_utils import (
 )
 from services.identity_service.api.schemas import (
     IntrospectRequest,
-    IntrospectResponse,
     LoginRequest,
     RefreshTokenRequest,
     RevokeTokenRequest,
-    RevokeTokenResponse,
 )
 from services.identity_service.domain_handlers.authentication_handler import AuthenticationHandler
 

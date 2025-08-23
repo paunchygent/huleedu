@@ -49,6 +49,7 @@ class FunctionalTestSettings(Settings):
         self.CACHE_ENABLED = True
         self.REDIS_CACHE_TTL_SECONDS = 60  # Shorter TTL for testing
         from pydantic import SecretStr
+
         self.INTERNAL_API_KEY = SecretStr("test-api-key")
         self.ALLOWED_SERVICE_IDS = ["test-service"]
 

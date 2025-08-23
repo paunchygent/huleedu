@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr
 from common_core.metadata_models import PersonNameV1
+from pydantic import BaseModel, EmailStr
 
 # Reuse the cross-cutting person name model from common_core
 # Keep the historical name for backward compatibility in imports/tests

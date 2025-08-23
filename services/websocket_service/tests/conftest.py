@@ -16,10 +16,10 @@ import pytest
 import redis.client
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from fastapi import FastAPI
-from pydantic import SecretStr
 from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import CollectorRegistry
+from pydantic import SecretStr
 
 from services.websocket_service.config import Settings
 from services.websocket_service.metrics import WebSocketMetrics

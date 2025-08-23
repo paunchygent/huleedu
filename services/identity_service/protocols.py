@@ -5,6 +5,7 @@ from typing import Any, Optional, Protocol
 from uuid import UUID
 
 from common_core.identity_enums import LoginFailureReason
+
 from services.identity_service.models_db import UserProfile
 
 

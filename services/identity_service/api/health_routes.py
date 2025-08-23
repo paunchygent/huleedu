@@ -65,12 +65,14 @@ async def health_check(settings: FromDishka[Settings]) -> Response | tuple[Respo
 
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return jsonify({
-            "service": "identity_service", 
-            "status": "unhealthy", 
-            "message": "Identity Service is unhealthy",
-            "error": str(e)
-        }), 503
+        return jsonify(
+            {
+                "service": "identity_service",
+                "status": "unhealthy",
+                "message": "Identity Service is unhealthy",
+                "error": str(e),
+            }
+        ), 503
 
 
 @bp.route("/metrics")

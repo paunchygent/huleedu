@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from common_core.config_enums import Environment
 from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field, SecretStr
@@ -62,8 +61,7 @@ class Settings(SecureServiceSettings):
 
     # JWT Configuration
     JWT_SECRET_KEY: SecretStr = Field(
-        default=SecretStr("your-secret-key-here"),
-        description="Secret key for JWT validation"
+        default=SecretStr("your-secret-key-here"), description="Secret key for JWT validation"
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
 

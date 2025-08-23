@@ -7,10 +7,11 @@ FastAPI-specific settings and Svelte 5 + Vite frontend integration.
 
 from __future__ import annotations
 
-from common_core.config_enums import Environment
-from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field, SecretStr
 from pydantic_settings import SettingsConfigDict
+
+from common_core.config_enums import Environment
+from huleedu_service_libs.config import SecureServiceSettings
 
 
 class Settings(SecureServiceSettings):
@@ -25,12 +26,12 @@ class Settings(SecureServiceSettings):
 
     # Service identity
     SERVICE_NAME: str = "api-gateway-service"
-    
+
     # ENVIRONMENT inherited from SecureServiceSettings with validation_alias
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT,
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
-        description="Runtime environment for the service"
+        description="Runtime environment for the service",
     )
 
     # HTTP server configuration
@@ -64,7 +65,7 @@ class Settings(SecureServiceSettings):
     # Security
     JWT_SECRET_KEY: SecretStr = Field(
         default=SecretStr("a-very-secret-key-that-must-be-in-secrets-manager"),
-        description="JWT secret key for token signing and validation"
+        description="JWT secret key for token signing and validation",
     )
     JWT_ALGORITHM: str = "HS256"
 

@@ -61,7 +61,8 @@ class MockDIProvider(Provider):
         # Configure the mock to return True for valid credentials
         self._security_service.validate_service_credentials.side_effect = (
             lambda api_key, service_id: (
-                api_key == settings.get_internal_api_key() and service_id in settings.ALLOWED_SERVICE_IDS
+                api_key == settings.get_internal_api_key()
+                and service_id in settings.ALLOWED_SERVICE_IDS
             )
         )
         return self._security_service

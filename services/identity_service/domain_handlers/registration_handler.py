@@ -11,6 +11,8 @@ This handler follows the established domain handler pattern from class_managemen
 
 from __future__ import annotations
 
+# Import VerificationHandler - late import to avoid circular dependency
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from huleedu_service_libs.error_handling.identity_factories import (
@@ -25,12 +27,9 @@ from services.identity_service.api.schemas import (
 from services.identity_service.protocols import (
     IdentityEventPublisherProtocol,
     PasswordHasher,
-    UserRepo,
     UserProfileRepositoryProtocol,
+    UserRepo,
 )
-
-# Import VerificationHandler - late import to avoid circular dependency
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.identity_service.domain_handlers.verification_handler import VerificationHandler

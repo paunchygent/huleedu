@@ -267,6 +267,25 @@ services:
       - LOG_LEVEL=DEBUG
       - IDENTITY_SERVICE_LOG_LEVEL=DEBUG
 
+  # Email Service with development optimizations
+  email_service:
+    build:
+      context: .
+      dockerfile: services/email_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/email_service:/app/services/email_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/email_service/__pycache__
+      - /app/services/email_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - EMAIL_SERVICE_LOG_LEVEL=DEBUG
+      - EMAIL_EMAIL_PROVIDER=mock  # Always use mock in development
+
 # Development-specific volumes for faster file watching
 volumes:
   # Use local driver with better performance for development

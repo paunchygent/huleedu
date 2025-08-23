@@ -102,7 +102,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
 
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
-    
+
     # Register dev blueprint for development endpoints
     if not settings.is_production():
         app.register_blueprint(dev_bp)

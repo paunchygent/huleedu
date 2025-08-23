@@ -279,3 +279,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # PostgreSQL database for Email Service
+  email_db:
+    image: postgres:15
+    container_name: huleedu_email_db
+    restart: unless-stopped
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "5443:5432"
+    environment:
+      - POSTGRES_DB=huleedu_email
+      - POSTGRES_USER=${HULEEDU_DB_USER}
+      - POSTGRES_PASSWORD=${HULEEDU_DB_PASSWORD}
+    volumes:
+      - email_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HULEEDU_DB_USER} -d huleedu_email"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

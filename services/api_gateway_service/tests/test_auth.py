@@ -25,17 +25,23 @@ class TestJWTAuthentication:
     def create_test_token(self, user_id: str, exp_delta: timedelta | None = None) -> str:
         """Helper method to create test JWT tokens."""
         payload = {"sub": user_id, "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
-        return jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        return jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
 
     def create_token_without_exp(self, user_id: str) -> str:
         """Helper method to create JWT token without expiration claim."""
         payload = {"sub": user_id}
-        return jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        return jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
 
     def create_token_without_sub(self, exp_delta: timedelta | None = None) -> str:
         """Helper method to create JWT token without subject claim."""
         payload = {"exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
-        return jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        return jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
 
     def _create_mock_request(self, authorization_header: str | None = None) -> Mock:
         """Create a mock request with the given authorization header."""
@@ -175,7 +181,9 @@ class TestJWTAuthentication:
         user_id = "test_user_123"
         payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(hours=1)}
         # Create token with different algorithm
-        wrong_algorithm_token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm="HS512")
+        wrong_algorithm_token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm="HS512"
+        )
         mock_request = self._create_mock_request(f"Bearer {wrong_algorithm_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -212,7 +220,9 @@ class TestJWTAuthentication:
             "role": "admin",
             "permissions": ["read", "write"],
         }
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         result = await self._test_auth_through_container(mock_request)
@@ -224,7 +234,9 @@ class TestJWTAuthentication:
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
         payload = {"sub": None, "exp": datetime.now(UTC) + timedelta(hours=1)}
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -238,7 +250,9 @@ class TestJWTAuthentication:
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
         payload = {"sub": "", "exp": datetime.now(UTC) + timedelta(hours=1)}
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:

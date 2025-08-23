@@ -44,7 +44,7 @@ class Settings(SecureServiceSettings):
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT,
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
-        description="Runtime environment for the service"
+        description="Runtime environment for the service",
     )
     PORT: int = 8080
     HOST: str = "0.0.0.0"
@@ -104,16 +104,14 @@ class Settings(SecureServiceSettings):
     # Provider-specific configurations
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: SecretStr = Field(
-        default=SecretStr(""),
-        description="Anthropic API key for Claude models"
+        default=SecretStr(""), description="Anthropic API key for Claude models"
     )
     ANTHROPIC_BASE_URL: Optional[str] = None
     ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-haiku-20241022"
     ANTHROPIC_ENABLED: bool = True
 
     OPENAI_API_KEY: SecretStr = Field(
-        default=SecretStr(""),
-        description="OpenAI API key for GPT models"
+        default=SecretStr(""), description="OpenAI API key for GPT models"
     )
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_DEFAULT_MODEL: str = "gpt-5-mini-2025-08-07"
@@ -121,16 +119,14 @@ class Settings(SecureServiceSettings):
     OPENAI_ENABLED: bool = True
 
     GOOGLE_API_KEY: SecretStr = Field(
-        default=SecretStr(""),
-        description="Google API key for Gemini models"
+        default=SecretStr(""), description="Google API key for Gemini models"
     )
     GOOGLE_PROJECT_ID: str = ""
     GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash-preview-05-20"
     GOOGLE_ENABLED: bool = True
 
     OPENROUTER_API_KEY: SecretStr = Field(
-        default=SecretStr(""),
-        description="OpenRouter API key for various models"
+        default=SecretStr(""), description="OpenRouter API key for various models"
     )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-5-haiku-20241022"
@@ -140,8 +136,7 @@ class Settings(SecureServiceSettings):
     INTERNAL_MODEL_ENABLED: bool = False
     INTERNAL_MODEL_BASE_URL: Optional[str] = None
     INTERNAL_MODEL_API_KEY: Optional[SecretStr] = Field(
-        default=None,
-        description="API key for internal/self-hosted models"
+        default=None, description="API key for internal/self-hosted models"
     )
     INTERNAL_MODEL_TYPE: str = Field(
         default="vllm", description="Type of internal model: vllm, ollama, custom"
@@ -218,8 +213,7 @@ class Settings(SecureServiceSettings):
     # Admin API Configuration
     ADMIN_API_ENABLED: bool = True
     ADMIN_API_KEY: Optional[SecretStr] = Field(
-        default=None,
-        description="Admin API key for administrative endpoints"
+        default=None, description="Admin API key for administrative endpoints"
     )
     ADMIN_ALLOWED_IPS: list[str] = Field(default_factory=list)
 
@@ -261,12 +255,16 @@ class Settings(SecureServiceSettings):
         """Get configuration for a specific provider."""
         provider_upper = provider.upper()
         api_key_field = getattr(self, f"{provider_upper}_API_KEY", SecretStr(""))
-        
+
         # Extract secret value safely
         api_key_value = ""
         if api_key_field is not None:
-            api_key_value = api_key_field.get_secret_value() if hasattr(api_key_field, 'get_secret_value') else str(api_key_field)
-        
+            api_key_value = (
+                api_key_field.get_secret_value()
+                if hasattr(api_key_field, "get_secret_value")
+                else str(api_key_field)
+            )
+
         return ProviderConfig(
             enabled=getattr(self, f"{provider_upper}_ENABLED", True),
             api_key=api_key_value,

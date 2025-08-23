@@ -23,7 +23,7 @@ class Settings(SecureServiceSettings):
     ENVIRONMENT: Environment = Field(
         default=Environment.DEVELOPMENT,
         validation_alias="ENVIRONMENT",  # Read from global ENVIRONMENT var
-        description="Runtime environment for the service"
+        description="Runtime environment for the service",
     )
 
     # HTTP API Configuration

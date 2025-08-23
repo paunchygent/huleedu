@@ -29,7 +29,7 @@ async def initialize_services(
         logger.info("Database schema initialized successfully")
 
         # Initialize metrics with guaranteed infrastructure
-        async with container() as request_container:
+        async with container():
             # Metrics will be set up by the standard middleware
             pass
 
