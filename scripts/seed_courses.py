@@ -27,8 +27,11 @@ from services.class_management_service.models_db import Course  # noqa: E402
 async def seed_courses():
     """Seed all courses defined in CourseCode enum."""
     # Get database credentials from environment
-    db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
-    db_password = os.getenv("HULEEDU_DB_PASSWORD", "REDACTED_DEFAULT_PASSWORD")
+    db_user = os.getenv("HULEEDU_DB_USER")
+    db_password = os.getenv("HULEEDU_DB_PASSWORD")
+    
+    if not db_user or not db_password:
+        raise ValueError("HULEEDU_DB_USER and HULEEDU_DB_PASSWORD environment variables must be set")
     db_host = os.getenv("HULEEDU_DB_HOST", "localhost")
     db_port = os.getenv("CLASS_MANAGEMENT_DB_PORT", "5435")
     db_name = "huleedu_class_management"
