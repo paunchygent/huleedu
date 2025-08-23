@@ -129,6 +129,7 @@ module = [
     "services.websocket_service.*",
     "services.nlp_service.*",
     "services.identity_service.*",
+    "services.email_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -261,7 +262,8 @@ testpaths = [
     "services/llm_provider_service/tests",
     "services/websocket_service/tests",
     "services/nlp_service/tests",
-    "services/identity_service/tests"
+    "services/identity_service/tests",
+    "services/email_service/tests"
 ]
 pythonpath = [
     "."
@@ -364,6 +366,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/websocket_service",
     "-e file:///${PROJECT_ROOT}/services/nlp_service",
     "-e file:///${PROJECT_ROOT}/services/identity_service",
+    "-e file:///${PROJECT_ROOT}/services/email_service",
 ]
 [build-system]
 requires = ["pdm-backend"]

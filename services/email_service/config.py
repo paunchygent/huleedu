@@ -8,8 +8,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+from dotenv import find_dotenv, load_dotenv
 from huleedu_service_libs.config import SecureServiceSettings
 from pydantic_settings import SettingsConfigDict
+
+# Load .env file from repository root, regardless of current working directory
+load_dotenv(find_dotenv(".env"))
 
 
 class Settings(SecureServiceSettings):
@@ -91,7 +95,7 @@ class Settings(SecureServiceSettings):
                 )
             
             return (
-                f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5448/huleedu_email"
+                f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5443/huleedu_email"
             )
     
     @property

@@ -1,0 +1,51 @@
+[project]
+name = "huleedu-email-service"
+version = "0.1.0"
+description = "HuleEdu Email Service for notification delivery and template rendering"
+authors = [
+    { name = "HuleEdu Team", email = "dev@huledu.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "aiokafka",
+    "aiohttp",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+    # Email-specific dependencies
+    "jinja2",  # Template rendering
+    "aiofiles",  # Async file operations for templates
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
+
+[tool.pdm.scripts]
+start = "hypercorn app:app --bind 0.0.0.0:8080"
+dev = "quart --app app:app --debug run -p 8080"
+
+# Alembic database migration commands (ergonomics; see Rule 085 for actual usage)
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"

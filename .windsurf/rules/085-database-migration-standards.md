@@ -65,6 +65,7 @@ docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table
 | `spellchecker_service` | `huleedu_spellchecker_db` | `huleedu_spellchecker` | 5437 |
 | `file_service` | `huleedu_file_service_db` | `huleedu_file_service` | 5439 |
 | `nlp_service` | `huleedu_nlp_db` | `huleedu_nlp` | 5440 |
+| `email_service` | `huleedu_email_db` | `huleedu_email` | 5441 |
 
 ## 6. Secure Configuration Pattern (MANDATORY)
 
@@ -109,7 +110,7 @@ def database_url(self) -> str:
 
 ## 7. Operational Services (VERIFIED)
 
-**All 7 Alembic-enabled services are fully operational with secure configuration:**
+**All 8 Alembic-enabled services are fully operational with secure configuration:**
 
 | Service | Database Port | Status | Security Status |
 |---------|---------------|--------|-----------------|
@@ -120,6 +121,7 @@ def database_url(self) -> str:
 | `result_aggregator_service` | 5436 | ✅ OPERATIONAL | ✅ SECURE |
 | `spellchecker_service` | 5437 | ✅ OPERATIONAL | ✅ SECURE |
 | `nlp_service` | 5440 | ✅ OPERATIONAL | ✅ SECURE |
+| `email_service` | 5441 | ⚠️ SETUP | ⚠️ SETUP |
 
 **Integration verified:** All services successfully execute `../../.venv/bin/alembic current`
 **Security verified:** No hardcoded secrets in any configuration files
