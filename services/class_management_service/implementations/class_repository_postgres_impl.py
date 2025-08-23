@@ -522,6 +522,41 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
             duration = time.time() - start_time
             self._record_operation_metrics(operation, table, duration, success)
 
+    async def list_classes_by_owner(self, user_id: str, limit: int, offset: int) -> list[T]:
+        """List classes created by a specific user with related course and students preloaded."""
+        start_time = time.time()
+        operation = "list_classes_by_owner"
+        table = "classes"
+        success = True
+
+        try:
+            async with self.session() as session:
+                stmt = (
+                    select(UserClass)
+                    .where(UserClass.created_by_user_id == user_id)
+                    .options(selectinload(UserClass.course), selectinload(UserClass.students))
+                    .order_by(UserClass.created_at.desc())
+                    .limit(limit)
+                    .offset(offset)
+                )
+                result = await session.execute(stmt)
+                classes = result.scalars().all()
+                return cast(list[T], list(classes))
+
+        except Exception as e:
+            success = False
+            error_type = e.__class__.__name__
+            self._record_error_metrics(error_type, operation)
+            logger.error(
+                f"Failed to list classes by owner: {error_type}: {e}",
+                extra={"user_id": user_id, "limit": limit, "offset": offset},
+            )
+            raise
+
+        finally:
+            duration = time.time() - start_time
+            self._record_operation_metrics(operation, table, duration, success)
+
     async def _validate_and_get_course(
         self, session: AsyncSession, course_codes: list[CourseCode], correlation_id: UUID
     ) -> Course:

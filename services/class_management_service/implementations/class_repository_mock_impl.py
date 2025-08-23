@@ -149,3 +149,10 @@ class MockClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
         # Mock implementation returns None
         # In a more complete mock, this could return test data
         return None
+
+    async def list_classes_by_owner(self, user_id: str, limit: int, offset: int) -> list[T]:
+        """Return classes filtered by created_by_user_id in insertion order (mock)."""
+        owned = [c for c in self.classes.values() if c.created_by_user_id == user_id]
+        # Simulate ordering by created_at descending is not tracked; return slice only
+        sliced = owned[offset : offset + limit]
+        return cast(list[T], list(sliced))

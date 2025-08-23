@@ -197,6 +197,7 @@ class EmailEventProcessor:
         envelope = EventEnvelope[EmailSentV1](
             event_type=topic_name(ProcessingEvent.EMAIL_SENT),
             source_service="email_service",
+            correlation_id=UUID(request.correlation_id),
             data=event_data,
         )
 
@@ -251,6 +252,7 @@ class EmailEventProcessor:
         envelope = EventEnvelope[EmailDeliveryFailedV1](
             event_type=topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED),
             source_service="email_service",
+            correlation_id=UUID(request.correlation_id),
             data=event_data,
         )
 

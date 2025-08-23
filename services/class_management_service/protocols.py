@@ -81,6 +81,16 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         """
         ...
 
+    async def list_classes_by_owner(
+        self, user_id: str, limit: int, offset: int
+    ) -> list[T]:
+        """List classes created by a specific user.
+
+        Returns:
+            A list of UserClass instances owned by the user.
+        """
+        ...
+
 
 class ClassEventPublisherProtocol(Protocol):
     """Protocol for publishing class management-related events."""
@@ -160,6 +170,10 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
         self, batch_id: UUID, confirmations: dict[str, Any], correlation_id: UUID
     ) -> dict[str, Any]:
         """Process teacher confirmations and publish StudentAssociationsConfirmed event."""
+        ...
+
+    async def list_classes_for_user(self, user_id: str, limit: int, offset: int) -> list[T]:
+        """List classes for the given user (owner)."""
         ...
 
 

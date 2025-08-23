@@ -88,10 +88,10 @@ class EmailRecord(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text("NOW()"), index=True
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()"), index=True
     )
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    failed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Optimization indexes
     __table_args__ = (
@@ -172,10 +172,10 @@ class EmailTemplate(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text("NOW()")
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=text("NOW()"),
         onupdate=text("NOW()"),

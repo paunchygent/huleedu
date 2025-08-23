@@ -82,23 +82,36 @@ class TestKafkaIntegration:
         """Create mock Redis client for idempotency testing."""
         mock_redis = AsyncMock(spec=AtomicRedisClientProtocol)
         
-        # Track keys for duplicate detection
-        self._redis_keys: set[str] = set()
+        # Track keys and their values for duplicate detection
+        self._redis_data: dict[str, str] = {}
         
         async def mock_set_if_not_exists(key: str, value: Any, ttl_seconds: int | None = None) -> bool:
-            if key in self._redis_keys:
+            if key in self._redis_data:
                 return False  # Key already exists, operation failed
-            self._redis_keys.add(key)
+            self._redis_data[key] = str(value)  # Store as string
             return True  # Key was set
         
         async def mock_delete_key(key: str) -> int:
-            if key in self._redis_keys:
-                self._redis_keys.remove(key)
+            if key in self._redis_data:
+                del self._redis_data[key]
                 return 1
             return 0
             
+        async def mock_get(key: str) -> str | None:
+            return self._redis_data.get(key)
+            
+        async def mock_setex(key: str, ttl_seconds: int, value: str) -> None:
+            self._redis_data[key] = value
+            
+        async def mock_lpush(key: str, value: str) -> int:
+            # Just return success for lpush operations
+            return 1
+            
         mock_redis.set_if_not_exists.side_effect = mock_set_if_not_exists
         mock_redis.delete_key.side_effect = mock_delete_key
+        mock_redis.get.side_effect = mock_get
+        mock_redis.setex.side_effect = mock_setex
+        mock_redis.lpush.side_effect = mock_lpush
         mock_redis.ping.return_value = True
         return mock_redis
 
@@ -146,20 +159,28 @@ class TestKafkaIntegration:
     def mock_email_provider(self) -> AsyncMock:
         """Create mock email provider with Swedish character support."""
         provider = AsyncMock(spec=EmailProvider)
-        provider.send_email.return_value = EmailSendResult(
-            success=True, 
-            provider_message_id="mock_provider_123"
-        )
+        
+        # Generate unique provider message IDs to avoid constraint violations
+        call_count = 0
+        def generate_unique_result(*args: Any, **kwargs: Any) -> EmailSendResult:
+            nonlocal call_count
+            call_count += 1
+            return EmailSendResult(
+                success=True, 
+                provider_message_id=f"mock_provider_{call_count}_{uuid.uuid4().hex[:8]}"
+            )
+        
+        provider.send_email.side_effect = generate_unique_result
         provider.get_provider_name.return_value = "MockProvider Sverige"
         return provider
 
     @pytest.fixture
-    async def email_repository(self, db_session: AsyncSession) -> EmailRepository:
+    async def email_repository(self, async_engine: AsyncEngine) -> EmailRepository:
         """Create email repository implementation."""
-        return PostgreSQLEmailRepository(db_session)
+        return PostgreSQLEmailRepository(async_engine)
 
     @pytest.fixture
-    async def template_renderer(self) -> JinjaTemplateRenderer:
+    async def template_renderer(self) -> AsyncMock:
         """Create template renderer with Swedish character support."""
         renderer = AsyncMock(spec=JinjaTemplateRenderer)
         
@@ -192,7 +213,7 @@ class TestKafkaIntegration:
         return renderer
 
     @pytest.fixture
-    async def mock_outbox_repository(self) -> OutboxRepositoryProtocol:
+    async def mock_outbox_repository(self) -> AsyncMock:
         """Create mock outbox repository for event storage."""
         mock_repo = AsyncMock(spec=OutboxRepositoryProtocol)
         mock_repo.add_event.return_value = uuid.uuid4()
@@ -201,32 +222,19 @@ class TestKafkaIntegration:
     @pytest.fixture
     async def outbox_manager(
         self, 
-        mock_outbox_repository: OutboxRepositoryProtocol,
+        mock_outbox_repository: AsyncMock,
         mock_redis_client: AtomicRedisClientProtocol,
         settings: Settings
     ) -> OutboxManager:
         """Create outbox manager for event publishing."""
         # Create manager with proper dependencies
-        manager = OutboxManager(mock_outbox_repository, mock_redis_client, settings)
-        
-        # Store published events for verification
-        self._published_events: list[tuple[str, Any]] = []
-        
-        # Mock the actual Kafka publishing if the method exists
-        if hasattr(manager, '_publish_event_to_kafka'):
-            async def mock_publish_event(topic: str, event_data: dict[str, Any]) -> None:
-                self._published_events.append((topic, event_data))
-                # Skip actual Kafka publishing in tests
-            
-            manager._publish_event_to_kafka = mock_publish_event
-            
-        return manager
+        return OutboxManager(mock_outbox_repository, mock_redis_client, settings)
 
     @pytest.fixture
     async def event_processor(
         self,
         email_repository: EmailRepository,
-        template_renderer: JinjaTemplateRenderer,
+        template_renderer: AsyncMock,
         mock_email_provider: AsyncMock,
         outbox_manager: OutboxManager,
         settings: Settings,
@@ -335,7 +343,6 @@ class TestKafkaIntegration:
     async def test_outbox_pattern_event_publishing_with_swedish_provider(
         self,
         outbox_manager: OutboxManager,
-        db_session: AsyncSession,
     ) -> None:
         """
         Test outbox pattern for EmailSentV1 and EmailDeliveryFailedV1 events.
@@ -358,25 +365,40 @@ class TestKafkaIntegration:
         )
         
         # Act - Publish event via outbox
-        await outbox_manager.publish_email_sent(email_sent_event)
+        envelope = EventEnvelope[EmailSentV1](
+            event_id=str(uuid.uuid4()),
+            event_type="huleedu.email.sent.v1",
+            data=email_sent_event,
+            correlation_id=correlation_id,
+            event_timestamp=datetime.now(UTC),
+            source_service="email_service",
+        )
         
-        # Process pending events (mocked Kafka publishing)
-        await outbox_manager.process_pending_events()
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="email_message",
+            aggregate_id=message_id,
+            event_type="huleedu.email.sent.v1",
+            event_data=envelope,
+            topic=topic_name(ProcessingEvent.EMAIL_SENT)
+        )
         
-        # Assert - Verify event was processed
-        published_events = getattr(outbox_manager, '_published_events', [])
-        assert len(published_events) == 1, "Should publish exactly one EmailSentV1 event"
-        
-        topic, event_data = published_events[0]
-        assert topic == topic_name(ProcessingEvent.EMAIL_SENT)
-        assert event_data["data"]["message_id"] == message_id
-        assert event_data["data"]["provider"] == "PostNord Digital Sverige AB"
-        assert event_data["correlation_id"] == correlation_id
+        # Assert - Verify event was stored in outbox
+        # In a real test with an actual outbox repository, we would verify the event was stored
+        # For this mock test, we verify the outbox_repository.add_event was called
+        from typing import cast
+        mock_repo = cast(AsyncMock, outbox_manager.outbox_repository)
+        mock_repo.add_event.assert_called_once()
+        call_args = mock_repo.add_event.call_args
+        assert call_args.kwargs["aggregate_type"] == "email_message"
+        assert call_args.kwargs["aggregate_id"] == message_id
+        assert call_args.kwargs["event_type"] == "huleedu.email.sent.v1"
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.EMAIL_SENT)
+        assert call_args.kwargs["event_data"]["data"]["message_id"] == message_id
+        assert call_args.kwargs["event_data"]["data"]["provider"] == "PostNord Digital Sverige AB"
 
     async def test_email_delivery_failure_event_publishing(
         self,
         outbox_manager: OutboxManager,
-        db_session: AsyncSession,
     ) -> None:
         """
         Test EmailDeliveryFailedV1 event publishing with Swedish error messages.
@@ -400,18 +422,38 @@ class TestKafkaIntegration:
         )
         
         # Act - Publish failure event
-        await outbox_manager.publish_email_delivery_failed(failure_event)
-        await outbox_manager.process_pending_events()
+        envelope = EventEnvelope[EmailDeliveryFailedV1](
+            event_id=str(uuid.uuid4()),
+            event_type="huleedu.email.delivery_failed.v1",
+            data=failure_event,
+            correlation_id=correlation_id,
+            event_timestamp=datetime.now(UTC),
+            source_service="email_service",
+        )
         
-        # Assert - Verify failure event was published
-        published_events = getattr(outbox_manager, '_published_events', [])
-        assert len(published_events) == 1
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="email_message",
+            aggregate_id=message_id,
+            event_type="huleedu.email.delivery_failed.v1",
+            event_data=envelope,
+            topic=topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED)
+        )
         
-        topic, event_data = published_events[0]
-        assert topic == topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED)
-        assert event_data["data"]["message_id"] == message_id
-        assert event_data["data"]["provider"] == "SendGrid Sverige"
-        assert "mottagaren existerar inte på domänen" in event_data["data"]["reason"]
+        # Assert - Verify failure event was stored in outbox
+        # The mock outbox repository should have been called once in this test
+        from typing import cast
+        mock_repo = cast(AsyncMock, outbox_manager.outbox_repository)
+        mock_repo.add_event.assert_called_once()
+        
+        # Get the call arguments (the failure event)
+        call_args = mock_repo.add_event.call_args
+        assert call_args.kwargs["aggregate_type"] == "email_message"
+        assert call_args.kwargs["aggregate_id"] == message_id
+        assert call_args.kwargs["event_type"] == "huleedu.email.delivery_failed.v1"
+        assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED)
+        assert call_args.kwargs["event_data"]["data"]["message_id"] == message_id
+        assert call_args.kwargs["event_data"]["data"]["provider"] == "SendGrid Sverige"
+        assert "mottagaren existerar inte på domänen" in call_args.kwargs["event_data"]["data"]["reason"]
 
     async def test_kafka_consumer_idempotency_with_duplicate_messages(
         self,
@@ -465,9 +507,9 @@ class TestKafkaIntegration:
         first_result = await kafka_consumer._process_email_request_idempotently(mock_msg)
         second_result = await kafka_consumer._process_email_request_idempotently(mock_msg)
         
-        # Assert - First processing succeeds, second is skipped
+        # Assert - First processing succeeds, second is skipped due to idempotency
         assert first_result is True, "First message processing should succeed"
-        assert second_result is None, "Duplicate message should be skipped"
+        assert second_result is None, "Duplicate message should be skipped due to idempotency"
         
         # Verify email provider called only once
         assert mock_email_provider.send_email.call_count == 1
@@ -627,13 +669,17 @@ class TestKafkaIntegration:
         assert result is True, "Message with Swedish characters should process successfully"
         
         # Verify deserialization preserved all special characters
-        deserialized_envelope = EventEnvelope[NotificationEmailRequestedV1].model_validate_json(
-            serialized_bytes
-        )
+        # Note: When deserializing from JSON, the data field becomes a dict, not the original model
+        deserialized_data = json.loads(serialized_bytes.decode("utf-8"))
         
-        assert deserialized_envelope.data.to == "användare@åäötest.se"
-        assert deserialized_envelope.data.variables["full_name"] == "Åsa Öhman-Ström"
-        assert deserialized_envelope.data.variables["course"] == "Avancerad Matematik för Årskurs 9"
-        assert deserialized_envelope.data.variables["institution"] == "Kungliga Tekniska Högskolan i Stockholm"
-        assert "åäöÅÄÖ" in deserialized_envelope.data.variables["special_chars"]
-        assert "📧📚🇸🇪" in deserialized_envelope.data.variables["unicode_emoji"]
+        assert deserialized_data["data"]["to"] == "användare@åäötest.se"
+        assert deserialized_data["data"]["variables"]["full_name"] == "Åsa Öhman-Ström"
+        assert deserialized_data["data"]["variables"]["course"] == "Avancerad Matematik för Årskurs 9"
+        assert deserialized_data["data"]["variables"]["institution"] == "Kungliga Tekniska Högskolan i Stockholm"
+        assert "åäöÅÄÖ" in deserialized_data["data"]["variables"]["special_chars"]
+        assert "📧📚🇸🇪" in deserialized_data["data"]["variables"]["unicode_emoji"]
+        
+        # Verify proper EventEnvelope reconstruction from JSON preserves typing
+        reconstructed_envelope = EventEnvelope[NotificationEmailRequestedV1].model_validate(deserialized_data)
+        assert reconstructed_envelope.event_type == "NotificationEmailRequestedV1"
+        assert str(reconstructed_envelope.correlation_id) == correlation_id

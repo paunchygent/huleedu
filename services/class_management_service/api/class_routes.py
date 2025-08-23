@@ -22,6 +22,67 @@ logger = create_service_logger("class_management_service.api.class")
 class_bp = Blueprint("class_routes", __name__)
 
 
+@class_bp.route("/", methods=["GET"])
+@inject
+async def list_classes(
+    service: FromDishka[ClassManagementServiceProtocol[UserClass, Student]],
+    metrics: FromDishka[CmsMetrics],
+) -> Response | tuple[Response, int]:
+    """List classes for the authenticated owner.
+
+    Query params:
+      - limit: int (default 20)
+      - offset: int (default 0)
+    """
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        return jsonify({"error": "User authentication required"}), 401
+
+    # Parse pagination params
+    try:
+        limit = request.args.get("limit", 20, type=int)  # type: ignore[arg-type]
+        offset = request.args.get("offset", 0, type=int)  # type: ignore[arg-type]
+        if limit is None or limit <= 0:
+            limit = 20
+        if offset is None or offset < 0:
+            offset = 0
+    except Exception:
+        # Fallback defaults on parsing issues
+        limit, offset = 20, 0
+
+    endpoint_label = "/v1/classes/"
+    with metrics.http_request_duration_seconds.labels(method="GET", endpoint=endpoint_label).time():
+        try:
+            classes = await service.list_classes_for_user(user_id=user_id, limit=limit, offset=offset)
+
+            # Build response with fields present in UserClass and related entities
+            items = []
+            for cls in classes:
+                items.append(
+                    {
+                        "id": str(cls.id),
+                        "name": cls.name,
+                        "course_code": cls.course.course_code if cls.course else None,
+                        "student_count": len(cls.students) if hasattr(cls, "students") and cls.students is not None else 0,
+                        "created_at": cls.created_at.isoformat() if hasattr(cls, "created_at") and cls.created_at is not None else None,
+                    }
+                )
+
+            response = {
+                "classes": items,
+                "pagination": {"limit": limit, "offset": offset, "returned": len(items)},
+            }
+
+            metrics.http_requests_total.labels(method="GET", endpoint=endpoint_label, http_status=200).inc()
+            return jsonify(response), 200
+
+        except Exception as e:
+            logger.error(f"Error listing classes for user {user_id}: {e}", exc_info=True)
+            metrics.http_requests_total.labels(method="GET", endpoint=endpoint_label, http_status=500).inc()
+            metrics.api_errors_total.labels(endpoint=endpoint_label, error_type="server_error").inc()
+            return jsonify({"error": "Internal server error"}), 500
+
+
 @class_bp.route("/", methods=["POST"])
 @inject
 async def create_class(

@@ -271,3 +271,10 @@ class ClassManagementServiceImpl(ClassManagementServiceProtocol, Generic[T, U]):
             "associations_confirmed": validation_summary["confirmed"],
             "associations_rejected": validation_summary["rejected"],
         }
+
+    async def list_classes_for_user(self, user_id: str, limit: int, offset: int) -> list[T]:
+        """List classes owned by the specified user.
+
+        Delegates to repository. No events are published.
+        """
+        return await self.repo.list_classes_by_owner(user_id=user_id, limit=limit, offset=offset)
