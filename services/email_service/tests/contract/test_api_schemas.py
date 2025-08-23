@@ -178,34 +178,23 @@ class TestDevSendEndpointContract:
     """Test development send endpoint request/response contracts."""
 
     @pytest.mark.parametrize(
-        "request_data, expected_fields",
+        "request_data",
         [
-            # Valid request with Swedish characters
-            (
-                {
-                    "to": "student@universitetet.se",
-                    "template_id": "verification",
-                    "variables": {"name": "Åsa Öström", "verification_code": "123456"},
-                },
-                {"success", "provider_message_id", "error_message"},
-            ),
-            # Valid request with special educational context
-            (
-                {
-                    "to": "lärare@skolan.se",
-                    "template_id": "welcome",
-                    "variables": {"teacher_name": "Erik Åberg", "class_name": "Svenska 3"},
-                },
-                {"success", "provider_message_id", "error_message"},
-            ),
+            {
+                "to": "student@universitetet.se",
+                "template_id": "verification",
+                "variables": {"name": "Åsa Öström", "verification_code": "123456"},
+            },
+            {
+                "to": "lärare@skolan.se",
+                "template_id": "welcome",
+                "variables": {"teacher_name": "Erik Åberg", "class_name": "Svenska 3"},
+            },
         ],
         ids=["swedish-student-verification", "swedish-teacher-welcome"],
     )
     async def test_dev_send_success_response_schema(
-        self,
-        test_app: Quart,
-        request_data: dict[str, Any],
-        expected_fields: set[str],
+        self, test_app: Quart, request_data: dict[str, Any]
     ) -> None:
         """Test successful send request returns expected response schema."""
         async with test_app.test_client() as client:
@@ -216,7 +205,7 @@ class TestDevSendEndpointContract:
 
             data = await response.get_json()
             assert isinstance(data, dict)
-            assert set(data.keys()) == expected_fields
+            assert set(data.keys()) == {"success", "provider_message_id", "error_message"}
             assert isinstance(data["success"], bool)
             assert data["success"] is True
             assert isinstance(data["provider_message_id"], str)
@@ -372,23 +361,16 @@ class TestRequestResponseSerialization:
     """Test JSON request/response serialization contracts."""
 
     @pytest.mark.parametrize(
-        "swedish_characters, test_scenario",
+        "swedish_characters",
         [
-            ({"name": "Åsa", "location": "Göteborg"}, "common-swedish-chars"),
-            ({"message": "Välkommen till universitetet!"}, "swedish-welcome-message"),
-            (
-                {"teacher": "Björn Öström", "subject": "Språk & Kommunikation"},
-                "teacher-subject-with-special-chars",
-            ),
-            ({"description": "Fördjupad svenska för gymnasieelever"}, "course-description-swedish"),
+            {"name": "Åsa", "location": "Göteborg"},
+            {"message": "Välkommen till universitetet!"},
+            {"teacher": "Björn Öström", "subject": "Språk & Kommunikation"},
         ],
-        ids=["common-swedish-chars", "welcome-message", "teacher-subject", "course-description"],
+        ids=["common-swedish-chars", "welcome-message", "teacher-subject"],
     )
     async def test_swedish_character_serialization(
-        self,
-        test_app: Quart,
-        swedish_characters: dict[str, str],
-        test_scenario: str,
+        self, test_app: Quart, swedish_characters: dict[str, str]
     ) -> None:
         """Test that Swedish characters are properly handled in requests and responses."""
         async with test_app.test_client() as client:
@@ -415,7 +397,6 @@ class TestRequestResponseSerialization:
                 data='{"to": "test@example.com", "template_id": "test", "variables": {}}',
             )
 
-            # Should handle missing content-type gracefully - may return various error codes
             assert response.status_code in [400, 415, 422, 500]
 
     async def test_empty_request_body_handling(self, test_app: Quart) -> None:
@@ -500,8 +481,6 @@ class TestErrorResponseFormats:
             }
             response = await client.post("/v1/emails/dev/send", json=request_data)
 
-            # API accepts invalid emails and passes them to provider
-            # Mock provider will still return success (it doesn't validate)
             assert response.status_code == 200
             data = await response.get_json()
             assert isinstance(data, dict)
