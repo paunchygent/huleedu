@@ -53,6 +53,8 @@ from services.identity_service.implementations.user_repository_sqlalchemy_impl i
 from services.identity_service.implementations.user_session_repository_impl import (
     UserSessionRepositoryImpl,
 )
+from services.identity_service.kafka_consumer import IdentityKafkaConsumer
+from services.identity_service.notification_orchestrator import NotificationOrchestrator
 from services.identity_service.protocols import (
     AuditLoggerProtocol,
     IdentityEventPublisherProtocol,
@@ -202,6 +204,23 @@ class IdentityImplementationsProvider(Provider):
     ) -> UserSessionRepositoryProtocol:
         """Provide user session repository with device tracking."""
         return UserSessionRepositoryImpl(session_factory)
+
+    @provide(scope=Scope.APP)
+    def provide_notification_orchestrator(
+        self, outbox_manager: OutboxManager
+    ) -> NotificationOrchestrator:
+        """Provide notification orchestrator for email service integration."""
+        return NotificationOrchestrator(outbox_manager)
+
+    @provide(scope=Scope.APP)
+    def provide_kafka_consumer(
+        self,
+        settings: Settings,
+        notification_orchestrator: NotificationOrchestrator,
+        redis_client: AtomicRedisClientProtocol,
+    ) -> IdentityKafkaConsumer:
+        """Provide Kafka consumer for internal Identity Service event processing."""
+        return IdentityKafkaConsumer(settings, notification_orchestrator, redis_client)
 
 
 class DomainHandlerProvider(Provider):

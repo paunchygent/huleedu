@@ -44,7 +44,6 @@ from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from prometheus_client import REGISTRY
-from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -60,7 +59,7 @@ from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,
 )
 from services.email_service.kafka_consumer import EmailKafkaConsumer
-from services.email_service.models_db import Base, EmailRecord, EmailStatus
+from services.email_service.models_db import Base
 from services.email_service.protocols import (
     EmailProvider,
     EmailRepository,
@@ -72,8 +71,8 @@ from services.email_service.protocols import (
 class TestKafkaIntegration:
     """
     Comprehensive integration tests for Kafka consumer/producer interactions.
-    
-    Tests focus on business logic validation, message flow integrity, and Swedish 
+
+    Tests focus on business logic validation, message flow integrity, and Swedish
     character handling with mocked external dependencies for reliable test execution.
     """
 
@@ -81,32 +80,34 @@ class TestKafkaIntegration:
     async def mock_redis_client(self) -> AtomicRedisClientProtocol:
         """Create mock Redis client for idempotency testing."""
         mock_redis = AsyncMock(spec=AtomicRedisClientProtocol)
-        
+
         # Track keys and their values for duplicate detection
         self._redis_data: dict[str, str] = {}
-        
-        async def mock_set_if_not_exists(key: str, value: Any, ttl_seconds: int | None = None) -> bool:
+
+        async def mock_set_if_not_exists(
+            key: str, value: Any, ttl_seconds: int | None = None
+        ) -> bool:
             if key in self._redis_data:
                 return False  # Key already exists, operation failed
             self._redis_data[key] = str(value)  # Store as string
             return True  # Key was set
-        
+
         async def mock_delete_key(key: str) -> int:
             if key in self._redis_data:
                 del self._redis_data[key]
                 return 1
             return 0
-            
+
         async def mock_get(key: str) -> str | None:
             return self._redis_data.get(key)
-            
+
         async def mock_setex(key: str, ttl_seconds: int, value: str) -> None:
             self._redis_data[key] = value
-            
+
         async def mock_lpush(key: str, value: str) -> int:
             # Just return success for lpush operations
             return 1
-            
+
         mock_redis.set_if_not_exists.side_effect = mock_set_if_not_exists
         mock_redis.delete_key.side_effect = mock_delete_key
         mock_redis.get.side_effect = mock_get
@@ -122,11 +123,11 @@ class TestKafkaIntegration:
             "sqlite+aiosqlite:///:memory:",
             echo=False,
         )
-        
+
         # Create all tables
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        
+
         yield engine
         await engine.dispose()
 
@@ -159,17 +160,18 @@ class TestKafkaIntegration:
     def mock_email_provider(self) -> AsyncMock:
         """Create mock email provider with Swedish character support."""
         provider = AsyncMock(spec=EmailProvider)
-        
+
         # Generate unique provider message IDs to avoid constraint violations
         call_count = 0
+
         def generate_unique_result(*args: Any, **kwargs: Any) -> EmailSendResult:
             nonlocal call_count
             call_count += 1
             return EmailSendResult(
-                success=True, 
-                provider_message_id=f"mock_provider_{call_count}_{uuid.uuid4().hex[:8]}"
+                success=True,
+                provider_message_id=f"mock_provider_{call_count}_{uuid.uuid4().hex[:8]}",
             )
-        
+
         provider.send_email.side_effect = generate_unique_result
         provider.get_provider_name.return_value = "MockProvider Sverige"
         return provider
@@ -183,7 +185,7 @@ class TestKafkaIntegration:
     async def template_renderer(self) -> AsyncMock:
         """Create template renderer with Swedish character support."""
         renderer = AsyncMock(spec=JinjaTemplateRenderer)
-        
+
         async def mock_render(template_id: str, variables: dict[str, str]) -> RenderedTemplate:
             # Support Swedish characters in template rendering
             subject_map = {
@@ -191,23 +193,23 @@ class TestKafkaIntegration:
                 "password_reset": f"Återställ lösenord för {variables.get('name', 'Användare')}",
                 "welcome": f"Välkommen till HuleEdu, {variables.get('name', 'Användare')}!",
             }
-            
+
             html_content = f"""
             <html>
                 <body>
-                    <h1>{subject_map.get(template_id, 'Standard ämne')}</h1>
-                    <p>Hej {variables.get('name', 'Användare')}!</p>
+                    <h1>{subject_map.get(template_id, "Standard ämne")}</h1>
+                    <p>Hej {variables.get("name", "Användare")}!</p>
                     <p>Detta är ett mejl på svenska med åäöÅÄÖ.</p>
                 </body>
             </html>
             """
-            
+
             return RenderedTemplate(
                 subject=subject_map.get(template_id, "Standard ämne"),
                 html_content=html_content,
-                text_content=f"Hej {variables.get('name', 'Användare')}! Detta är ett textmejl på svenska."
+                text_content=f"Hej {variables.get('name', 'Användare')}! Detta är ett textmejl på svenska.",
             )
-        
+
         renderer.render.side_effect = mock_render
         renderer.template_exists.return_value = True
         return renderer
@@ -221,10 +223,10 @@ class TestKafkaIntegration:
 
     @pytest.fixture
     async def outbox_manager(
-        self, 
+        self,
         mock_outbox_repository: AsyncMock,
         mock_redis_client: AtomicRedisClientProtocol,
-        settings: Settings
+        settings: Settings,
     ) -> OutboxManager:
         """Create outbox manager for event publishing."""
         # Create manager with proper dependencies
@@ -276,7 +278,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test EmailKafkaConsumer processing NotificationEmailRequestedV1 with Swedish content.
-        
+
         Validates:
         - Message deserialization from EventEnvelope
         - Swedish character handling in variables and email addresses
@@ -286,22 +288,22 @@ class TestKafkaIntegration:
         # Arrange - Create message with comprehensive Swedish content
         correlation_id = str(uuid.uuid4())
         message_id = f"msg_{uuid.uuid4()}"
-        
+
         email_request = NotificationEmailRequestedV1(
             message_id=message_id,
             template_id="verification",
             to="erik.öhman@björkskolan.se",
             variables={
                 "name": "Erik Öhman-Åslund",
-                "school": "Björkskolan i Västerås", 
+                "school": "Björkskolan i Västerås",
                 "subject": "Naturvetenskap och Matematik",
                 "verification_url": "https://huledu.se/verify?token=åäöÅÄÖ123",
-                "expires_at": "31 december 2024 kl 23:59"
+                "expires_at": "31 december 2024 kl 23:59",
             },
             category="verification",
             correlation_id=correlation_id,
         )
-        
+
         envelope = EventEnvelope[NotificationEmailRequestedV1](
             event_id=str(uuid.uuid4()),
             event_type="NotificationEmailRequestedV1",
@@ -310,20 +312,20 @@ class TestKafkaIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="identity-service",
         )
-        
+
         # Create mock Kafka message
         mock_msg = Mock(spec=ConsumerRecord)
         mock_msg.topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
         mock_msg.partition = 0
         mock_msg.offset = 123
         mock_msg.value = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        
+
         # Act - Process message through consumer
         result = await kafka_consumer._process_message(mock_msg)
-        
+
         # Assert - Verify successful processing
         assert result is True, "Message processing should succeed"
-        
+
         # Verify email record was created with Swedish characters preserved
         email_record = await email_repository.get_by_message_id(message_id)
         assert email_record is not None, "Email record should be created"
@@ -334,7 +336,7 @@ class TestKafkaIntegration:
         assert email_record.variables["school"] == "Björkskolan i Västerås"
         assert email_record.variables["subject"] == "Naturvetenskap och Matematik"
         assert "åäöÅÄÖ123" in email_record.variables["verification_url"]
-        
+
         # Verify email provider was called with Swedish content
         mock_email_provider.send_email.assert_called_once()
         call_args = mock_email_provider.send_email.call_args
@@ -346,7 +348,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test outbox pattern for EmailSentV1 and EmailDeliveryFailedV1 events.
-        
+
         Validates:
         - Event serialization with Swedish provider names
         - Transactional outbox processing
@@ -356,14 +358,14 @@ class TestKafkaIntegration:
         # Arrange - Create email sent event with Swedish provider
         correlation_id = str(uuid.uuid4())
         message_id = f"msg_{uuid.uuid4()}"
-        
+
         email_sent_event = EmailSentV1(
             message_id=message_id,
             provider="PostNord Digital Sverige AB",
             sent_at=datetime.now(UTC),
             correlation_id=correlation_id,
         )
-        
+
         # Act - Publish event via outbox
         envelope = EventEnvelope[EmailSentV1](
             event_id=str(uuid.uuid4()),
@@ -373,19 +375,20 @@ class TestKafkaIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="email_service",
         )
-        
+
         await outbox_manager.publish_to_outbox(
             aggregate_type="email_message",
             aggregate_id=message_id,
             event_type="huleedu.email.sent.v1",
             event_data=envelope,
-            topic=topic_name(ProcessingEvent.EMAIL_SENT)
+            topic=topic_name(ProcessingEvent.EMAIL_SENT),
         )
-        
+
         # Assert - Verify event was stored in outbox
         # In a real test with an actual outbox repository, we would verify the event was stored
         # For this mock test, we verify the outbox_repository.add_event was called
         from typing import cast
+
         mock_repo = cast(AsyncMock, outbox_manager.outbox_repository)
         mock_repo.add_event.assert_called_once()
         call_args = mock_repo.add_event.call_args
@@ -402,7 +405,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test EmailDeliveryFailedV1 event publishing with Swedish error messages.
-        
+
         Validates:
         - Failure event creation and publishing
         - Swedish error message handling
@@ -412,7 +415,7 @@ class TestKafkaIntegration:
         # Arrange - Create delivery failure event with Swedish error
         correlation_id = str(uuid.uuid4())
         message_id = f"msg_{uuid.uuid4()}"
-        
+
         failure_event = EmailDeliveryFailedV1(
             message_id=message_id,
             provider="SendGrid Sverige",
@@ -420,7 +423,7 @@ class TestKafkaIntegration:
             reason="E-postadress kunde inte hittas: mottagaren existerar inte på domänen",
             correlation_id=correlation_id,
         )
-        
+
         # Act - Publish failure event
         envelope = EventEnvelope[EmailDeliveryFailedV1](
             event_id=str(uuid.uuid4()),
@@ -430,21 +433,22 @@ class TestKafkaIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="email_service",
         )
-        
+
         await outbox_manager.publish_to_outbox(
             aggregate_type="email_message",
             aggregate_id=message_id,
             event_type="huleedu.email.delivery_failed.v1",
             event_data=envelope,
-            topic=topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED)
+            topic=topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED),
         )
-        
+
         # Assert - Verify failure event was stored in outbox
         # The mock outbox repository should have been called once in this test
         from typing import cast
+
         mock_repo = cast(AsyncMock, outbox_manager.outbox_repository)
         mock_repo.add_event.assert_called_once()
-        
+
         # Get the call arguments (the failure event)
         call_args = mock_repo.add_event.call_args
         assert call_args.kwargs["aggregate_type"] == "email_message"
@@ -453,7 +457,10 @@ class TestKafkaIntegration:
         assert call_args.kwargs["topic"] == topic_name(ProcessingEvent.EMAIL_DELIVERY_FAILED)
         assert call_args.kwargs["event_data"]["data"]["message_id"] == message_id
         assert call_args.kwargs["event_data"]["data"]["provider"] == "SendGrid Sverige"
-        assert "mottagaren existerar inte på domänen" in call_args.kwargs["event_data"]["data"]["reason"]
+        assert (
+            "mottagaren existerar inte på domänen"
+            in call_args.kwargs["event_data"]["data"]["reason"]
+        )
 
     async def test_kafka_consumer_idempotency_with_duplicate_messages(
         self,
@@ -463,7 +470,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test Kafka consumer idempotency with duplicate message processing.
-        
+
         Validates:
         - First message processing succeeds
         - Duplicate message detection via Redis
@@ -473,7 +480,7 @@ class TestKafkaIntegration:
         # Arrange - Create identical messages
         correlation_id = str(uuid.uuid4())
         message_id = f"msg_{uuid.uuid4()}"
-        
+
         email_request = NotificationEmailRequestedV1(
             message_id=message_id,
             template_id="password_reset",
@@ -481,12 +488,12 @@ class TestKafkaIntegration:
             variables={
                 "name": "Anna Svensson",
                 "reset_link": "https://huledu.se/reset?token=xyz789",
-                "expires_in": "30 minuter"
+                "expires_in": "30 minuter",
             },
             category="password_reset",
             correlation_id=correlation_id,
         )
-        
+
         envelope = EventEnvelope[NotificationEmailRequestedV1](
             event_id=str(uuid.uuid4()),
             event_type="NotificationEmailRequestedV1",
@@ -495,25 +502,25 @@ class TestKafkaIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="identity-service",
         )
-        
+
         # Create mock Kafka message
         mock_msg = Mock(spec=ConsumerRecord)
         mock_msg.topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
         mock_msg.partition = 0
         mock_msg.offset = 456
         mock_msg.value = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
-        
+
         # Act - Process the same message twice
         first_result = await kafka_consumer._process_email_request_idempotently(mock_msg)
         second_result = await kafka_consumer._process_email_request_idempotently(mock_msg)
-        
+
         # Assert - First processing succeeds, second is skipped due to idempotency
         assert first_result is True, "First message processing should succeed"
         assert second_result is None, "Duplicate message should be skipped due to idempotency"
-        
+
         # Verify email provider called only once
         assert mock_email_provider.send_email.call_count == 1
-        
+
         # Verify only one email record exists
         email_records = await email_repository.get_by_correlation_id(correlation_id)
         assert len(email_records) == 1, "Should have exactly one email record"
@@ -526,7 +533,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test Kafka consumer error handling with malformed messages.
-        
+
         Validates:
         - Invalid JSON message handling
         - Invalid EventEnvelope structure
@@ -539,13 +546,13 @@ class TestKafkaIntegration:
         mock_msg.partition = 0
         mock_msg.offset = 789
         mock_msg.value = b'{"invalid": "json structure", "missing_required_fields": true}'
-        
+
         # Act - Process invalid message
         result = await kafka_consumer._process_message(mock_msg)
-        
+
         # Assert - Processing should fail gracefully
         assert result is False, "Invalid message processing should fail"
-        
+
         # Verify no email provider calls
         mock_email_provider.send_email.assert_not_called()
 
@@ -557,7 +564,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test concurrent processing of multiple email requests with Swedish content.
-        
+
         Validates:
         - Multiple email requests processed concurrently
         - Swedish character preservation across concurrent operations
@@ -567,12 +574,9 @@ class TestKafkaIntegration:
         # Arrange - Create multiple email requests with Swedish content
         correlation_id = str(uuid.uuid4())
         email_requests = []
-        
-        swedish_names = [
-            "Åsa Öhman", "Erik Åslund", "Märta Ström", 
-            "Björn Löfgren", "Astrid Öberg"
-        ]
-        
+
+        swedish_names = ["Åsa Öhman", "Erik Åslund", "Märta Ström", "Björn Löfgren", "Astrid Öberg"]
+
         for i, name in enumerate(swedish_names):
             message_id = f"msg_{uuid.uuid4()}"
             email_request = NotificationEmailRequestedV1(
@@ -581,32 +585,32 @@ class TestKafkaIntegration:
                 to=f"teacher{i}@björkskolan.se",
                 variables={
                     "name": name,
-                    "school": f"Björkskolan {i+1}",
+                    "school": f"Björkskolan {i + 1}",
                     "subject": "Matematik och Naturvetenskap",
-                    "welcome_message": "Välkommen till vårt digitala lärandesystem!"
+                    "welcome_message": "Välkommen till vårt digitala lärandesystem!",
                 },
                 category="verification",
                 correlation_id=correlation_id,
             )
             email_requests.append(email_request)
-        
+
         # Act - Process all requests concurrently
         tasks = []
         for request in email_requests:
             task = event_processor.process_email_request(request)
             tasks.append(task)
-        
+
         await asyncio.gather(*tasks)
-        
+
         # Assert - All emails processed successfully
         email_records = await email_repository.get_by_correlation_id(correlation_id)
         assert len(email_records) == 5, "Should process all 5 email requests"
-        
+
         # Verify Swedish characters preserved
         for record in email_records:
             assert "Björkskolan" in record.variables["school"]
             assert "Välkommen" in record.variables["welcome_message"]
-        
+
         # Verify all provider calls made
         assert mock_email_provider.send_email.call_count == 5
 
@@ -616,7 +620,7 @@ class TestKafkaIntegration:
     ) -> None:
         """
         Test EventEnvelope serialization/deserialization with special characters.
-        
+
         Validates:
         - JSON serialization preserves Swedish characters
         - EventEnvelope structure validation
@@ -626,7 +630,7 @@ class TestKafkaIntegration:
         # Arrange - Create envelope with comprehensive Swedish content
         correlation_id = str(uuid.uuid4())
         message_id = f"msg_{uuid.uuid4()}"
-        
+
         email_request = NotificationEmailRequestedV1(
             message_id=message_id,
             template_id="verification",
@@ -641,7 +645,7 @@ class TestKafkaIntegration:
             category="verification",
             correlation_id=correlation_id,
         )
-        
+
         envelope = EventEnvelope[NotificationEmailRequestedV1](
             event_id=str(uuid.uuid4()),
             event_type="NotificationEmailRequestedV1",
@@ -650,36 +654,43 @@ class TestKafkaIntegration:
             event_timestamp=datetime.now(UTC),
             source_service="test-service",
         )
-        
+
         # Act - Serialize and deserialize envelope
         serialized = json.dumps(envelope.model_dump(mode="json"))
         serialized_bytes = serialized.encode("utf-8")
-        
+
         # Simulate Kafka message
         mock_msg = Mock(spec=ConsumerRecord)
         mock_msg.value = serialized_bytes
         mock_msg.topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
         mock_msg.partition = 0
         mock_msg.offset = 999
-        
+
         # Process message (this involves deserialization)
         result = await kafka_consumer._process_message(mock_msg)
-        
+
         # Assert - Verify successful processing with character preservation
         assert result is True, "Message with Swedish characters should process successfully"
-        
+
         # Verify deserialization preserved all special characters
         # Note: When deserializing from JSON, the data field becomes a dict, not the original model
         deserialized_data = json.loads(serialized_bytes.decode("utf-8"))
-        
+
         assert deserialized_data["data"]["to"] == "användare@åäötest.se"
         assert deserialized_data["data"]["variables"]["full_name"] == "Åsa Öhman-Ström"
-        assert deserialized_data["data"]["variables"]["course"] == "Avancerad Matematik för Årskurs 9"
-        assert deserialized_data["data"]["variables"]["institution"] == "Kungliga Tekniska Högskolan i Stockholm"
+        assert (
+            deserialized_data["data"]["variables"]["course"] == "Avancerad Matematik för Årskurs 9"
+        )
+        assert (
+            deserialized_data["data"]["variables"]["institution"]
+            == "Kungliga Tekniska Högskolan i Stockholm"
+        )
         assert "åäöÅÄÖ" in deserialized_data["data"]["variables"]["special_chars"]
         assert "📧📚🇸🇪" in deserialized_data["data"]["variables"]["unicode_emoji"]
-        
+
         # Verify proper EventEnvelope reconstruction from JSON preserves typing
-        reconstructed_envelope = EventEnvelope[NotificationEmailRequestedV1].model_validate(deserialized_data)
+        reconstructed_envelope = EventEnvelope[NotificationEmailRequestedV1].model_validate(
+            deserialized_data
+        )
         assert reconstructed_envelope.event_type == "NotificationEmailRequestedV1"
         assert str(reconstructed_envelope.correlation_id) == correlation_id

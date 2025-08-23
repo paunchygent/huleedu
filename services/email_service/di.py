@@ -157,12 +157,26 @@ class ImplementationProvider(Provider):
             )
 
             return MockEmailProvider(settings)
+
+        elif settings.EMAIL_PROVIDER == "smtp":
+            # Validate SMTP configuration before creating provider
+            if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
+                raise ValueError(
+                    "SMTP provider requires EMAIL_SMTP_USERNAME and EMAIL_SMTP_PASSWORD "
+                    "environment variables to be set"
+                )
+
+            from services.email_service.implementations.provider_smtp_impl import (
+                SMTPEmailProvider,
+            )
+
+            return SMTPEmailProvider(settings)
+
         else:
-            # For now, only mock provider is implemented
-            # TODO: Add SendGrid and SES providers when needed
+            # Other providers not yet implemented
             raise ValueError(
                 f"Email provider '{settings.EMAIL_PROVIDER}' is not yet implemented. "
-                "Currently only 'mock' provider is available."
+                f"Available providers: 'mock', 'smtp'"
             )
 
 

@@ -24,15 +24,19 @@ class Settings(SecureServiceSettings):
     SERVICE_NAME: str = "email_service"
 
     # Email provider configuration
-    EMAIL_PROVIDER: Literal["mock", "sendgrid", "ses"] = "mock"
-    SENDGRID_API_KEY: str | None = None
-    AWS_ACCESS_KEY_ID: str | None = None
-    AWS_SECRET_ACCESS_KEY: str | None = None
-    AWS_REGION: str = "us-east-1"
+    EMAIL_PROVIDER: Literal["mock", "smtp"] = "mock"
+
+    # SMTP Configuration (Namecheap Private Email)
+    SMTP_HOST: str = "mail.privateemail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_USE_TLS: bool = True
+    SMTP_TIMEOUT: int = 30
 
     # Template configuration
     TEMPLATE_PATH: str = "templates"
-    DEFAULT_FROM_EMAIL: str = "noreply@huleedu.com"
+    DEFAULT_FROM_EMAIL: str = "noreply@hule.education"
     DEFAULT_FROM_NAME: str = "HuleEdu"
 
     # Email processing settings

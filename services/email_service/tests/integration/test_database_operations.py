@@ -12,13 +12,10 @@ import asyncio
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 from huleedu_service_libs.database import DatabaseMetrics
-from huleedu_service_libs.protocols import KafkaPublisherProtocol
-from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
 from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import (
@@ -34,7 +31,6 @@ from services.email_service.implementations.repository_impl import PostgreSQLEma
 from services.email_service.models_db import (
     Base,
     EmailStatus,
-    EventOutbox,
 )
 from services.email_service.models_db import (
     EmailRecord as DbEmailRecord,
@@ -147,7 +143,7 @@ class TestEmailServiceDatabaseOperations:
         defaults = {
             "message_id": message_id or str(uuid4()),
             "to_address": "test@example.com",
-            "from_address": "noreply@huleedu.com", 
+            "from_address": "noreply@huleedu.com",
             "from_name": "HuleEdu Test",
             "subject": subject,
             "template_id": template_id,
@@ -155,10 +151,10 @@ class TestEmailServiceDatabaseOperations:
             "variables": variables or {},
             "correlation_id": str(uuid4()),
         }
-        
+
         # Merge kwargs, allowing them to override defaults
         defaults.update(kwargs)
-        
+
         return ProtocolEmailRecord(**defaults)
 
     @pytest.mark.integration
@@ -168,8 +164,8 @@ class TestEmailServiceDatabaseOperations:
         async with database_engine.connect() as conn:
             # Verify core tables exist
             tables_query = text("""
-                SELECT table_name 
-                FROM information_schema.tables 
+                SELECT table_name
+                FROM information_schema.tables
                 WHERE table_schema = 'public'
                 ORDER BY table_name
             """)
@@ -182,8 +178,8 @@ class TestEmailServiceDatabaseOperations:
 
             # Verify email_records table structure
             email_records_columns = text("""
-                SELECT column_name, data_type, is_nullable 
-                FROM information_schema.columns 
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
                 WHERE table_name = 'email_records'
                 ORDER BY column_name
             """)
@@ -200,8 +196,8 @@ class TestEmailServiceDatabaseOperations:
 
             # Verify indexes exist
             indexes_query = text("""
-                SELECT indexname 
-                FROM pg_indexes 
+                SELECT indexname
+                FROM pg_indexes
                 WHERE tablename = 'email_records'
             """)
             result = await conn.execute(indexes_query)

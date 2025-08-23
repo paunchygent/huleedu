@@ -45,7 +45,7 @@ from services.email_service.protocols import EmailProvider, EmailRepository, Tem
 
 class TestOutboxPublishingIntegration:
     """Integration tests for transactional outbox pattern with real PostgreSQL."""
-    
+
     # Class-level counter to ensure unique provider message IDs across all tests
     _provider_message_counter = 0
 
@@ -135,7 +135,7 @@ class TestOutboxPublishingIntegration:
     def mock_template_renderer(self) -> AsyncMock:
         """Mock template renderer with Swedish character support."""
         from services.email_service.protocols import RenderedTemplate
-        
+
         mock = AsyncMock(spec=TemplateRenderer)
         mock.template_exists = AsyncMock(return_value=True)
         mock.render = AsyncMock(
@@ -153,21 +153,23 @@ class TestOutboxPublishingIntegration:
         from services.email_service.protocols import EmailSendResult
 
         mock = AsyncMock(spec=EmailProvider)
-        
+
         # Default behavior for send_email (can be overridden in tests with side_effect)
         def create_default_result(*args: Any, **kwargs: Any) -> EmailSendResult:
             TestOutboxPublishingIntegration._provider_message_counter += 1
             return EmailSendResult(
                 success=True,
-                provider_message_id=f"test-provider-msg-{TestOutboxPublishingIntegration._provider_message_counter}"
+                provider_message_id=f"test-provider-msg-{TestOutboxPublishingIntegration._provider_message_counter}",
             )
-        
+
         mock.send_email = AsyncMock(side_effect=create_default_result)
         mock.get_provider_name = lambda: "mock_provider"  # Non-async method
         return mock
 
     @pytest.fixture(autouse=True)
-    async def clean_database_tables(self, database_engine: AsyncEngine) -> AsyncGenerator[None, None]:
+    async def clean_database_tables(
+        self, database_engine: AsyncEngine
+    ) -> AsyncGenerator[None, None]:
         """Clean database tables before and after each test for isolation."""
         # Clean before test
         async with database_engine.begin() as conn:
@@ -312,13 +314,13 @@ class TestOutboxPublishingIntegration:
         )
 
         # Act - Process should fail and rollback
-        with pytest.raises(Exception):  # Processing should fail (HuleEduError or its base Exception)
+        with pytest.raises(
+            Exception
+        ):  # Processing should fail (HuleEduError or its base Exception)
             await email_processor.process_email_request(email_request)
 
         # Assert - Verify no email record was persisted after rollback
-        email_stmt = select(DbEmailRecord).where(
-            DbEmailRecord.message_id == message_id
-        )
+        email_stmt = select(DbEmailRecord).where(DbEmailRecord.message_id == message_id)
         email_result = await db_session.execute(email_stmt)
         email_record = email_result.scalar_one_or_none()
 
@@ -451,7 +453,7 @@ class TestOutboxPublishingIntegration:
         """
         # Arrange - Configure template renderer with Swedish content
         from services.email_service.protocols import RenderedTemplate
-        
+
         mock_template_renderer.render.return_value = RenderedTemplate(
             subject="Välkommen! Din ansökan till Göteborgs Högskola",  # Swedish subject
             html_content="<p>Hej <strong>Åsa</strong>! Ditt konto för <em>Växjö Universitet</em> är klart.</p>",
@@ -478,9 +480,7 @@ class TestOutboxPublishingIntegration:
         await email_processor.process_email_request(email_request)
 
         # Assert - Verify Swedish characters in email record
-        email_stmt = select(DbEmailRecord).where(
-            DbEmailRecord.message_id == message_id
-        )
+        email_stmt = select(DbEmailRecord).where(DbEmailRecord.message_id == message_id)
         email_result = await db_session.execute(email_stmt)
         email_record = email_result.scalar_one()
 
@@ -492,16 +492,14 @@ class TestOutboxPublishingIntegration:
         assert "åäöÅÄÖ" in email_record.variables["specialtecken"]
 
         # Assert - Verify Swedish characters in outbox event data
-        outbox_stmt = select(EventOutbox).where(
-            EventOutbox.aggregate_id == message_id
-        )
+        outbox_stmt = select(EventOutbox).where(EventOutbox.aggregate_id == message_id)
         outbox_result = await db_session.execute(outbox_stmt)
         outbox_event = outbox_result.scalar_one()
 
         event_data = outbox_event.event_data
         # Check for Swedish characters in message_id (which is part of EmailSentV1)
         assert message_id in str(event_data) or "åäöÅÄÖ" in str(event_data)
-        
+
         # Verify that the message_id field itself contains the correct value
         assert event_data["data"]["message_id"] == message_id
 
@@ -709,16 +707,16 @@ class TestOutboxPublishingIntegration:
         # Count successful events
         success_stmt = select(func.count(EventOutbox.id)).where(
             EventOutbox.aggregate_id == message_id,
-            EventOutbox.event_type == "huleedu.email.sent.v1"
+            EventOutbox.event_type == "huleedu.email.sent.v1",
         )
         success_result = await db_session.execute(success_stmt)
         success_count = success_result.scalar()
         assert success_count == 1  # Should have exactly 1 successful send
-        
-        # Count failure events  
+
+        # Count failure events
         failure_stmt = select(func.count(EventOutbox.id)).where(
             EventOutbox.aggregate_id == message_id,
-            EventOutbox.event_type == "huleedu.email.delivery_failed.v1"
+            EventOutbox.event_type == "huleedu.email.delivery_failed.v1",
         )
         failure_result = await db_session.execute(failure_stmt)
         failure_count = failure_result.scalar()

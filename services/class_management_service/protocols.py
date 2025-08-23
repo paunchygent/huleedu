@@ -20,8 +20,8 @@ from services.class_management_service.api_models import (
 )
 from services.class_management_service.models_db import Student, UserClass
 
-T = TypeVar("T", bound=UserClass, covariant=True)  # For UserClass types
-U = TypeVar("U", bound=Student, covariant=True)  # For Student types
+T = TypeVar("T", bound=UserClass)  # For UserClass types
+U = TypeVar("U", bound=Student, covariant=True)  # For Student types - output only
 
 
 class ClassRepositoryProtocol(Protocol, Generic[T, U]):
@@ -29,31 +29,25 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
 
     async def create_class(
         self, user_id: str, class_data: CreateClassRequest, correlation_id: UUID
-    ) -> T:  # Returns type T (UserClass or subclass)
-        ...
+    ) -> T: ...
 
-    async def get_class_by_id(self, class_id: uuid.UUID) -> T | None:  # Returns type T or None
-        ...
+    async def get_class_by_id(self, class_id: uuid.UUID) -> T | None: ...
 
     async def update_class(
         self, class_id: uuid.UUID, class_data: UpdateClassRequest, correlation_id: UUID
-    ) -> T | None:  # Returns type T or None
-        ...
+    ) -> T | None: ...
 
     async def delete_class(self, class_id: uuid.UUID) -> bool: ...
 
     async def create_student(
         self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
-    ) -> U:  # Returns type U (Student or subclass)
-        ...
+    ) -> U: ...
 
-    async def get_student_by_id(self, student_id: uuid.UUID) -> U | None:  # Returns type U or None
-        ...
+    async def get_student_by_id(self, student_id: uuid.UUID) -> U | None: ...
 
     async def update_student(
         self, student_id: uuid.UUID, student_data: UpdateStudentRequest, correlation_id: UUID
-    ) -> U | None:  # Returns type U or None
-        ...
+    ) -> U | None: ...
 
     async def delete_student(self, student_id: uuid.UUID) -> bool: ...
 
@@ -81,9 +75,7 @@ class ClassRepositoryProtocol(Protocol, Generic[T, U]):
         """
         ...
 
-    async def list_classes_by_owner(
-        self, user_id: str, limit: int, offset: int
-    ) -> list[T]:
+    async def list_classes_by_owner(self, user_id: str, limit: int, offset: int) -> list[T]:
         """List classes created by a specific user.
 
         Returns:
@@ -118,8 +110,7 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
 
     async def register_new_class(
         self, user_id: str, request: CreateClassRequest, correlation_id: uuid.UUID
-    ) -> T:  # Returns type T (UserClass or subclass)
-        ...
+    ) -> T: ...
 
     async def get_class_by_id(self, class_id: uuid.UUID) -> T | None:
         """Retrieve a class by its ID."""
@@ -141,8 +132,7 @@ class ClassManagementServiceProtocol(Protocol, Generic[T, U]):
 
     async def add_student_to_class(
         self, user_id: str, request: CreateStudentRequest, correlation_id: uuid.UUID
-    ) -> U:  # Returns type U (Student or subclass)
-        ...
+    ) -> U: ...
 
     async def get_student_by_id(self, student_id: uuid.UUID) -> U | None:
         """Retrieve a student by their ID."""

@@ -25,6 +25,7 @@ dependencies = [
     # Email-specific dependencies
     "jinja2",  # Template rendering
     "aiofiles",  # Async file operations for templates
+    "aiosmtplib",  # SMTP client for email delivery
 ]
 
 [build-system]

@@ -8,23 +8,17 @@ Focus on component integration, Swedish character support, and E2E workflow vali
 from __future__ import annotations
 
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 from common_core.emailing_models import (
-    EmailDeliveryFailedV1,
-    EmailSentV1,
     NotificationEmailRequestedV1,
 )
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError
-from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
-from pydantic import EmailStr
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
@@ -32,8 +26,6 @@ from services.email_service.implementations.outbox_manager import OutboxManager
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,
 )
-from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
-
 from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,
@@ -618,7 +610,7 @@ class TestEmailWorkflowIntegration:
         event_data = outbox_call.kwargs["event_data"]
 
         # Check if Swedish characters exist in the overall event (they should be in correlation with variables)
-        event_str = str(event_data)
+        str(event_data)
         for swedish_word in expected_swedish_chars:
             # Swedish characters should be preserved in the serialized data
             assert swedish_word in sent_html  # Indirect verification through email content

@@ -53,7 +53,9 @@ async def list_classes(
     endpoint_label = "/v1/classes/"
     with metrics.http_request_duration_seconds.labels(method="GET", endpoint=endpoint_label).time():
         try:
-            classes = await service.list_classes_for_user(user_id=user_id, limit=limit, offset=offset)
+            classes = await service.list_classes_for_user(
+                user_id=user_id, limit=limit, offset=offset
+            )
 
             # Build response with fields present in UserClass and related entities
             items = []
@@ -63,8 +65,12 @@ async def list_classes(
                         "id": str(cls.id),
                         "name": cls.name,
                         "course_code": cls.course.course_code if cls.course else None,
-                        "student_count": len(cls.students) if hasattr(cls, "students") and cls.students is not None else 0,
-                        "created_at": cls.created_at.isoformat() if hasattr(cls, "created_at") and cls.created_at is not None else None,
+                        "student_count": len(cls.students)
+                        if hasattr(cls, "students") and cls.students is not None
+                        else 0,
+                        "created_at": cls.created_at.isoformat()
+                        if hasattr(cls, "created_at") and cls.created_at is not None
+                        else None,
                     }
                 )
 
@@ -73,13 +79,19 @@ async def list_classes(
                 "pagination": {"limit": limit, "offset": offset, "returned": len(items)},
             }
 
-            metrics.http_requests_total.labels(method="GET", endpoint=endpoint_label, http_status=200).inc()
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=endpoint_label, http_status=200
+            ).inc()
             return jsonify(response), 200
 
         except Exception as e:
             logger.error(f"Error listing classes for user {user_id}: {e}", exc_info=True)
-            metrics.http_requests_total.labels(method="GET", endpoint=endpoint_label, http_status=500).inc()
-            metrics.api_errors_total.labels(endpoint=endpoint_label, error_type="server_error").inc()
+            metrics.http_requests_total.labels(
+                method="GET", endpoint=endpoint_label, http_status=500
+            ).inc()
+            metrics.api_errors_total.labels(
+                endpoint=endpoint_label, error_type="server_error"
+            ).inc()
             return jsonify({"error": "Internal server error"}), 500
 
 
