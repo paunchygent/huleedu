@@ -42,6 +42,9 @@ class Settings(SecureServiceSettings):
     # Email processing settings
     MAX_RETRY_ATTEMPTS: int = 3
     RETRY_DELAY_SECONDS: int = 60
+    
+    # Mock provider settings (for testing)
+    MOCK_PROVIDER_FAILURE_RATE: float = 0.0  # Default 0% for deterministic tests
 
     # Metrics port (inherited from SecureServiceSettings but can override)
     METRICS_PORT: int = 8080

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from dishka import make_async_container
 from huleedu_service_libs import init_tracing
 from huleedu_service_libs.logging_utils import (
@@ -19,6 +21,7 @@ from services.identity_service.di import (
     DomainHandlerProvider,
     IdentityImplementationsProvider,
 )
+from services.identity_service.kafka_consumer import IdentityKafkaConsumer
 
 logger = create_service_logger("identity_service.startup")
 
@@ -55,9 +58,33 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         app.extensions["relay_worker"] = relay_worker
         logger.info("EventRelayWorker started for outbox pattern")
 
+        # Start IdentityKafkaConsumer for internal event processing
+        identity_kafka_consumer = await request_container.get(IdentityKafkaConsumer)
+        consumer_task = asyncio.create_task(identity_kafka_consumer.start_consumer())
+        app.extensions["identity_kafka_consumer"] = identity_kafka_consumer
+        app.extensions["identity_kafka_consumer_task"] = consumer_task
+        logger.info("IdentityKafkaConsumer started for internal event processing")
+
 
 async def shutdown_services(app: Quart | None = None) -> None:
-    if app and hasattr(app, "extensions") and "relay_worker" in app.extensions:
-        relay_worker = app.extensions["relay_worker"]
-        await relay_worker.stop()
+    if app and hasattr(app, "extensions"):
+        # Stop IdentityKafkaConsumer
+        if "identity_kafka_consumer" in app.extensions:
+            identity_kafka_consumer = app.extensions["identity_kafka_consumer"]
+            await identity_kafka_consumer.stop_consumer()
+            logger.info("IdentityKafkaConsumer stopped")
+            
+        if "identity_kafka_consumer_task" in app.extensions:
+            consumer_task = app.extensions["identity_kafka_consumer_task"]
+            consumer_task.cancel()
+            try:
+                await consumer_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("IdentityKafkaConsumer task cancelled")
+        
+        # Stop relay worker
+        if "relay_worker" in app.extensions:
+            relay_worker = app.extensions["relay_worker"]
+            await relay_worker.stop()
     logger.info("Identity Service shutdown complete")

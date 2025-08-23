@@ -67,8 +67,8 @@ class MockEmailProvider(EmailProvider):
         }
         self._sent_emails.append(email_details)
 
-        # Simulate occasional failures (5% failure rate)
-        if random.random() < 0.05:
+        # Simulate failures based on configured rate (default 0% for deterministic tests)
+        if random.random() < self.settings.MOCK_PROVIDER_FAILURE_RATE:
             error_message = "Mock provider: Simulated delivery failure"
             logger.warning(f"Mock email send failed: {error_message}")
             return EmailSendResult(

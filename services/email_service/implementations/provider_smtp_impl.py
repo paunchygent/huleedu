@@ -75,6 +75,9 @@ class SMTPEmailProvider(EmailProvider):
                 timeout=self.settings.SMTP_TIMEOUT,
             ) as smtp:
                 # Authenticate with SMTP server
+                if self.settings.SMTP_USERNAME is None or self.settings.SMTP_PASSWORD is None:
+                    raise ValueError("SMTP username and password are required for authentication")
+                
                 await smtp.login(
                     self.settings.SMTP_USERNAME,
                     self.settings.SMTP_PASSWORD,
@@ -84,10 +87,13 @@ class SMTPEmailProvider(EmailProvider):
                 send_errors = await smtp.send_message(msg)
 
                 if send_errors:
-                    # Handle partial failures
-                    error_details = "; ".join(
-                        f"{addr}: {error}" for addr, error in send_errors.items()
-                    )
+                    # Handle partial failures - send_errors is a dict of address -> error tuples
+                    if isinstance(send_errors, dict):
+                        error_details = "; ".join(
+                            f"{addr}: {error}" for addr, error in send_errors.items()
+                        )
+                    else:
+                        error_details = str(send_errors)
                     logger.error(f"SMTP partial send failure to {to}: {error_details}")
                     return EmailSendResult(
                         success=False,

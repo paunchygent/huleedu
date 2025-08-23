@@ -36,13 +36,14 @@ monorepo-tools = [
     "pytest-xdist",
     "httpx",
     "pre-commit",
-    "testcontainers[postgres,kafka,redis]",  # For PostgreSQL, Kafka, and Redis integration tests
+    "testcontainers[postgres,kafka,redis]",
     "kafka-python",
     "respx",
-    "freezegun",  # For time-based testing
-    "types-psutil",  # Type stubs for psutil
-    "reportlab",  # For PDF generation in file service integration tests
-    "types-reportlab",  # Type stubs for reportlab
+    "freezegun",
+    "types-psutil",
+    "reportlab",
+    "types-reportlab",
+    "aiosmtplib>=4.0.1",
 ]
 
 # Install all services and common_core for unified development

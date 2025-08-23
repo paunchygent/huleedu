@@ -29,6 +29,7 @@ class TestMockEmailProviderCompliance:
         settings = AsyncMock(spec=Settings)
         settings.DEFAULT_FROM_EMAIL = "noreply@huledu.com"
         settings.DEFAULT_FROM_NAME = "HuleEdu"
+        settings.MOCK_PROVIDER_FAILURE_RATE = 0.0  # Deterministic tests by default
         return settings
 
     @pytest.fixture
@@ -142,6 +143,7 @@ class TestSwedishCharacterSupport:
         settings = AsyncMock(spec=Settings)
         settings.DEFAULT_FROM_EMAIL = "noreply@huledu.com"
         settings.DEFAULT_FROM_NAME = "HuleEdu"
+        settings.MOCK_PROVIDER_FAILURE_RATE = 0.0  # Deterministic tests by default
         return MockEmailProvider(settings=settings)
 
     @pytest.mark.parametrize(
@@ -201,10 +203,11 @@ class TestNetworkBehaviorAndFailures:
 
     @pytest.fixture
     def email_provider(self) -> MockEmailProvider:
-        """Create MockEmailProvider instance."""
+        """Create MockEmailProvider instance with 5% failure rate for testing statistical behavior."""
         settings = AsyncMock(spec=Settings)
         settings.DEFAULT_FROM_EMAIL = "noreply@huledu.com"
         settings.DEFAULT_FROM_NAME = "HuleEdu"
+        settings.MOCK_PROVIDER_FAILURE_RATE = 0.05  # 5% failure rate for statistical testing
         return MockEmailProvider(settings=settings)
 
     async def test_network_delay_behavior(self, email_provider: MockEmailProvider) -> None:
@@ -292,6 +295,7 @@ class TestEmailStorageAndInspection:
         settings = AsyncMock(spec=Settings)
         settings.DEFAULT_FROM_EMAIL = "noreply@huledu.com"
         settings.DEFAULT_FROM_NAME = "HuleEdu"
+        settings.MOCK_PROVIDER_FAILURE_RATE = 0.0  # Deterministic tests by default
         return MockEmailProvider(settings=settings)
 
     async def test_email_storage_functionality(self, email_provider: MockEmailProvider) -> None:
