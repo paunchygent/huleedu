@@ -13,6 +13,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol, RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -20,9 +21,11 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.entitlements_service.config import Settings
+from services.entitlements_service.implementations.outbox_manager import OutboxManager
 from services.entitlements_service.protocols import (
     CreditManagerProtocol,
     EntitlementsRepositoryProtocol,
+    EventPublisherProtocol,
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
@@ -189,6 +192,37 @@ class ImplementationProvider(Provider):
             redis_client=redis_client,
             policy_loader=policy_loader,
             enabled=settings.RATE_LIMIT_ENABLED,
+        )
+
+    @provide
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
+        """Provide outbox manager implementation."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            settings=settings,
+        )
+
+    @provide
+    def provide_event_publisher(
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
+    ) -> EventPublisherProtocol:
+        """Provide event publisher implementation."""
+        # Import here to avoid circular dependencies
+        from services.entitlements_service.implementations.event_publisher_impl import (
+            EventPublisherImpl,
+        )
+
+        return EventPublisherImpl(
+            outbox_manager=outbox_manager,
+            settings=settings,
         )
 
 

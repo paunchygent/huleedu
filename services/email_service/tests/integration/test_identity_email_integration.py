@@ -102,9 +102,10 @@ class MockEmailRepository:
 @pytest.fixture
 def mock_settings() -> Settings:
     """Create settings for integration testing."""
+    # EmailStr is a type annotation, not a constructor
     return Settings(
         EMAIL_PROVIDER="mock",
-        DEFAULT_FROM_EMAIL="noreply@hule.education",  # EmailStr is a type annotation, not a constructor
+        DEFAULT_FROM_EMAIL="noreply@hule.education",
         DEFAULT_FROM_NAME="HuleEdu",
         TEMPLATE_DIRECTORY="templates",
     )

@@ -176,7 +176,8 @@ class EventDrivenServicesProvider(Provider):
 
         logger = create_service_logger("bcs.di.event_publisher")
         logger.info(
-            f"Creating real KafkaBus for event publishing in {settings.ENVIRONMENT.value} environment"
+            "Creating real KafkaBus for event publishing in "
+            f"{settings.ENVIRONMENT.value} environment"
         )
 
         # Create KafkaBus for event publishing

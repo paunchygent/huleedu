@@ -167,7 +167,8 @@ class TestIdentityServiceE2E:
                     assert response.status == 400  # Should fail with EMAIL_NOT_VERIFIED
                     error_data = await response.json()
                     print(
-                        f"✅ Login correctly blocked: {error_data.get('error', {}).get('message', 'Unknown error')}"
+                        "✅ Login correctly blocked: "
+                        f"{error_data.get('error', {}).get('message', 'Unknown error')}"
                     )
 
                 # Verify LoginFailedV1 event with EMAIL_UNVERIFIED reason

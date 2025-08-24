@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from dishka import FromDishka
-from quart_dishka import inject
 from huleedu_service_libs.error_handling import raise_validation_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
@@ -74,8 +73,6 @@ async def adjust_credits(
         adjustment_request = CreditAdjustmentRequest(**data)
 
         # Perform adjustment
-        from uuid import uuid4
-
         correlation_id = str(uuid4())
 
         new_balance = await credit_manager.adjust_balance(

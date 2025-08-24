@@ -15,7 +15,6 @@ from common_core.entitlements_models import (
     CreditConsumptionV1,
 )
 from dishka import FromDishka
-from quart_dishka import inject
 from huleedu_service_libs.error_handling import raise_validation_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
@@ -196,22 +195,22 @@ async def get_balance(
     """
     try:
         # Get user balance
-        user_balance = await credit_manager.get_balance(
-            subject_type="user",
-            subject_id=user_id,
+        balances = await credit_manager.get_balance(
+            user_id=user_id,
+            org_id=None,
         )
 
         # TODO: Get org_id from user context/token
         # For now, return user balance only
         response = BalanceResponse(
-            user_balance=user_balance,
-            org_balance=None,
-            org_id=None,
+            user_balance=balances.user_balance,
+            org_balance=balances.org_balance,
+            org_id=balances.org_id,
         )
 
         logger.info(
-            f"Balance query for {user_id}: {user_balance}",
-            extra={"user_id": user_id, "balance": user_balance},
+            f"Balance query for {user_id}: {balances.user_balance}",
+            extra={"user_id": user_id, "balance": balances.user_balance},
         )
 
         return response.model_dump(), 200

@@ -266,4 +266,7 @@ class UserSession(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
-        return f"<UserSession id={self.id} user_id={self.user_id} jti={self.jti[:8]}... revoked={self.revoked_at is not None}>"
+        return (
+            f"<UserSession id={self.id} user_id={self.user_id} "
+            f"jti={self.jti[:8]}... revoked={self.revoked_at is not None}>"
+        )

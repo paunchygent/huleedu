@@ -130,13 +130,19 @@ class TestSMTPProviderCore:
             # Mixed Swedish and English content
             (
                 "English Subject with Swedish names: Björk & Andersson",
-                "<div>Student Märta Öhman completed the Swedish grammar test with excellent results.</div>",
+                (
+                    "<div>Student Märta Öhman completed the Swedish grammar test "
+                    "with excellent results.</div>"
+                ),
                 ["Björk", "Andersson"],
                 ["Märta", "Öhman"],
             ),
             # Long subject with Swedish characters (>78 chars)
             (
-                "Meddelande från HuleEdu om språkutveckling och grammatikkontroll för elever i klass 7-9 på Stockholms skolor",
+                (
+                    "Meddelande från HuleEdu om språkutveckling och grammatikkontroll "
+                    "för elever i klass 7-9 på Stockholms skolor"
+                ),
                 "<p>Detta är ett långt meddelande med svenska tecken: åäöÅÄÖ</p>",
                 ["språkutveckling", "grammatikkontroll"],
                 ["åäöÅÄÖ"],

@@ -324,7 +324,10 @@ class TestTokenRevokedEventPublishing:
         jti: str,
         reason: str,
     ) -> None:
-        """Test publish_token_revoked handles various user scenarios including Swedish characters."""
+        """Test token_revoked handles various scenarios.
+
+        Includes Swedish characters in user data.
+        """
         # Act
         await event_publisher.publish_token_revoked(
             user_id=user_id, jti=jti, reason=reason, correlation_id=correlation_id

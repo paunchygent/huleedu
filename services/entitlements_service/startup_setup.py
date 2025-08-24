@@ -77,8 +77,23 @@ async def initialize_services(
                 logger.error(f"Failed to load policies: {e}", exc_info=True)
                 raise
 
-        # Note: EventRelayWorker will be added in Phase 2 for outbox pattern
-        # Note: Kafka consumer will be added in Phase 2 for event consumption
+            # Initialize EventRelayWorker for outbox pattern
+            try:
+                from huleedu_service_libs.outbox.relay import EventRelayWorker
+
+                app.relay_worker = await request_container.get(EventRelayWorker)
+
+                # Ensure the relay worker was created
+                assert app.relay_worker is not None, "EventRelayWorker must be initialized"
+
+                # Start the relay worker
+                await app.relay_worker.start()
+                logger.info("EventRelayWorker started for outbox pattern processing")
+            except Exception as e:
+                logger.error(f"Failed to initialize EventRelayWorker: {e}", exc_info=True)
+                raise
+
+        # Note: Kafka consumer will be added in Phase 3 for event consumption
 
         logger.info("All Entitlements Service components initialized successfully")
 

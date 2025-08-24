@@ -203,7 +203,10 @@ class TestNetworkBehaviorAndFailures:
 
     @pytest.fixture
     def email_provider(self) -> MockEmailProvider:
-        """Create MockEmailProvider instance with 5% failure rate for testing statistical behavior."""
+        """Create MockEmailProvider with 5% failure rate.
+
+        Used for testing statistical behavior.
+        """
         settings = AsyncMock(spec=Settings)
         settings.DEFAULT_FROM_EMAIL = "noreply@huledu.com"
         settings.DEFAULT_FROM_NAME = "HuleEdu"

@@ -13,9 +13,12 @@ ARCHITECTURAL FLOW:
 5. Email Service publishes completion events (EmailSentV1/EmailDeliveryFailedV1)
 
 TEST SCENARIOS:
-1. User Registration → Welcome Email (UserRegisteredV1 → NotificationEmailRequestedV1)
-2. Email Verification Request → Verification Email (EmailVerificationRequestedV1 → NotificationEmailRequestedV1)
-3. Password Reset Request → Reset Email (PasswordResetRequestedV1 → NotificationEmailRequestedV1)
+1. User Registration → Welcome Email
+   (UserRegisteredV1 → NotificationEmailRequestedV1)
+2. Email Verification Request → Verification Email
+   (EmailVerificationRequestedV1 → NotificationEmailRequestedV1)
+3. Password Reset Request → Reset Email
+   (PasswordResetRequestedV1 → NotificationEmailRequestedV1)
 
 DEBUGGING FEATURES:
 - Docker container log monitoring for service verification
@@ -178,7 +181,10 @@ class TestIdentityEmailIntegrationE2E:
                 current_time = asyncio.get_event_loop().time()
                 if current_time - start_time > timeout:
                     print(
-                        f"⏰ Timeout waiting for events. Found {len(found_events)}/{len(expected_events)}"
+                        (
+                            "⏰ Timeout waiting for events. Found "
+                            f"{len(found_events)}/{len(expected_events)}"
+                        )
                     )
                     break
 
@@ -295,11 +301,16 @@ class TestIdentityEmailIntegrationE2E:
                     "NotificationEmailRequestedV1 event not found"
                 )
 
-                # Registration triggers BOTH welcome and verification emails, verify we got at least one
+                # Registration triggers BOTH welcome and verification emails,
+                # verify we got at least one
                 notification_event = found_events[notification_topic]
                 assert notification_event["to"] == swedish_test_data["email"]
-                assert notification_event["template_id"] in ["welcome", "verification"], (
-                    f"Expected welcome or verification template, got {notification_event['template_id']}"
+                assert notification_event["template_id"] in [
+                    "welcome",
+                    "verification",
+                ], (
+                    "Expected welcome or verification template, got "
+                    f"{notification_event['template_id']}"
                 )
 
                 # Check template-specific variables
@@ -392,7 +403,8 @@ class TestIdentityEmailIntegrationE2E:
                     json=verification_payload,
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
-                    # Note: This endpoint will return 400 if user doesn't exist, but event may still be published
+                    # Note: This endpoint will return 400 if user doesn't exist,
+                    # but event may still be published
                     print(f"📮 Verification request status: {response.status}")
 
                     # Even if API returns error, we should still monitor for events
@@ -538,7 +550,8 @@ class TestIdentityEmailIntegrationE2E:
                         assert "reset_link" in notification_event["variables"]
                         assert "expires_in" in notification_event["variables"]
                         print(
-                            "✅ NotificationEmailRequestedV1 event verified (password_reset template)"
+                            "✅ NotificationEmailRequestedV1 event verified "
+                            "(password_reset template)"
                         )
 
                         # Step 5: Verify EmailSentV1 event

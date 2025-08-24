@@ -813,6 +813,11 @@ services:
       - ENTITLEMENTS_METRICS_PORT=8083
       - ENTITLEMENTS_POLICY_FILE=policies/default.yaml
       - ENTITLEMENTS_POLICY_CACHE_TTL=300
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=entitlements_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/healthz"]
       interval: 30s

@@ -223,6 +223,7 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
                 "correlation_id": str(correlation_id),
                 "source_service": self.source_service_name,
             },
-            topic="huleedu.identity.token.revoked.v1",  # Direct topic name until ProcessingEvent is updated
+            # Direct topic name until ProcessingEvent is updated
+            topic="huleedu.identity.token.revoked.v1",
         )
         # In production, this would publish a UserLoggedOutV1 event similar to the others

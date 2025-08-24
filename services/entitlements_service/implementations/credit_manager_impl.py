@@ -12,7 +12,7 @@ from services.entitlements_service.protocols import (
     CreditAdjustment,
     CreditBalanceInfo,
     CreditCheckResponse,
-    CreditConsumption,
+    CreditConsumptionResult,
     EntitlementsRepositoryProtocol,
     PolicyLoaderProtocol,
     RateLimiterProtocol,
@@ -87,7 +87,10 @@ class CreditManagerImpl:
             rate_check = await self.rate_limiter.check_rate_limit(user_id, metric, amount)
             if not rate_check.allowed:
                 logger.info(
-                    f"Rate limit exceeded for {metric}: {rate_check.current_count}/{rate_check.limit}",
+                    (
+                        f"Rate limit exceeded for {metric}: "
+                        f"{rate_check.current_count}/{rate_check.limit}"
+                    ),
                     extra={
                         "user_id": user_id,
                         "metric": metric,
@@ -135,8 +138,14 @@ class CreditManagerImpl:
                 )
 
             # Insufficient credits in both accounts
+            org_current_balance = (
+                await self.repository.get_credit_balance("org", org_id) if org_id else 0
+            )
             logger.info(
-                f"Insufficient credits: user={user_balance}, org={await self.repository.get_credit_balance('org', org_id) if org_id else 0}, required={total_cost}",
+                (
+                    f"Insufficient credits: user={user_balance}, org={org_current_balance}, "
+                    f"required={total_cost}"
+                ),
                 extra={
                     "user_id": user_id,
                     "org_id": org_id,
@@ -163,7 +172,15 @@ class CreditManagerImpl:
                 available_credits=0,
             )
 
-    async def consume_credits(self, consumption: CreditConsumption) -> bool:
+    async def consume_credits(
+        self,
+        user_id: str,
+        org_id: str | None,
+        metric: str,
+        amount: int,
+        batch_id: str | None,
+        correlation_id: str,
+    ) -> CreditConsumptionResult:
         """Consume credits for completed operation.
 
         Uses optimistic approach: record consumption even if it fails,
@@ -176,15 +193,14 @@ class CreditManagerImpl:
             True if consumption successful, False otherwise
         """
         logger.debug(
-            f"Credit consumption: user={consumption.user_id}, org={consumption.org_id}, "
-            f"metric={consumption.metric}, amount={consumption.amount}, "
-            f"correlation_id={consumption.correlation_id}"
+            f"Credit consumption: user={user_id}, org={org_id}, "
+            f"metric={metric}, amount={amount}, correlation_id={correlation_id}"
         )
 
         try:
             # Get cost per unit from policy
-            cost_per_unit = await self.policy_loader.get_cost(consumption.metric)
-            total_cost = cost_per_unit * consumption.amount
+            cost_per_unit = await self.policy_loader.get_cost(metric)
+            total_cost = cost_per_unit * amount
 
             logger.debug(f"Total consumption cost: {total_cost} credits")
 
@@ -193,20 +209,26 @@ class CreditManagerImpl:
                 logger.debug("Free operation - no credits consumed")
                 await self.repository.record_operation(
                     subject_type="user",
-                    subject_id=consumption.user_id,
-                    metric=consumption.metric,
+                    subject_id=user_id,
+                    metric=metric,
                     amount=0,
                     consumed_from="none",
-                    correlation_id=consumption.correlation_id,
-                    batch_id=consumption.batch_id,
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                     status="completed",
                 )
-                return True
+                # Return current user balance for reference on free ops
+                current_balance = await self.repository.get_credit_balance("user", user_id)
+                return CreditConsumptionResult(
+                    success=True,
+                    new_balance=current_balance,
+                    consumed_from="none",
+                )
 
             # Determine credit source using same logic as check_credits
             source, subject_id = await self._resolve_credit_source(
-                consumption.user_id,
-                consumption.org_id,
+                user_id,
+                org_id,
                 total_cost,
             )
 
@@ -218,94 +240,104 @@ class CreditManagerImpl:
                     subject_type=source,
                     subject_id=subject_id,
                     delta=-total_cost,  # Negative for consumption
-                    correlation_id=consumption.correlation_id,
+                    correlation_id=correlation_id,
                 )
 
                 # Record successful operation
                 await self.repository.record_operation(
                     subject_type=source,
                     subject_id=subject_id,
-                    metric=consumption.metric,
+                    metric=metric,
                     amount=total_cost,
                     consumed_from=source,
-                    correlation_id=consumption.correlation_id,
-                    batch_id=consumption.batch_id,
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                     status="completed",
                 )
 
                 # Record rate limiting usage
-                await self.rate_limiter.record_usage(
-                    consumption.user_id,
-                    consumption.metric,
-                    consumption.amount,
-                )
+                await self.rate_limiter.record_usage(user_id, metric, amount)
 
                 logger.info(
-                    f"Credits consumed successfully: {total_cost} from {source}, new balance: {new_balance}",
+                    (
+                        f"Credits consumed successfully: {total_cost} from {source}, "
+                        f"new balance: {new_balance}"
+                    ),
                     extra={
-                        "user_id": consumption.user_id,
-                        "org_id": consumption.org_id,
-                        "metric": consumption.metric,
+                        "user_id": user_id,
+                        "org_id": org_id,
+                        "metric": metric,
                         "amount": total_cost,
                         "source": source,
                         "new_balance": new_balance,
-                        "correlation_id": consumption.correlation_id,
+                        "correlation_id": correlation_id,
                     },
                 )
 
-                return True
+                return CreditConsumptionResult(
+                    success=True,
+                    new_balance=new_balance,
+                    consumed_from=source,
+                )
 
             except ValueError as e:
                 # Balance would go negative - record as failed operation
                 logger.warning(
                     f"Credit consumption failed - insufficient balance: {e}",
                     extra={
-                        "user_id": consumption.user_id,
-                        "org_id": consumption.org_id,
-                        "metric": consumption.metric,
-                        "correlation_id": consumption.correlation_id,
+                        "user_id": user_id,
+                        "org_id": org_id,
+                        "metric": metric,
+                        "correlation_id": correlation_id,
                     },
                 )
 
                 await self.repository.record_operation(
                     subject_type=source,
                     subject_id=subject_id,
-                    metric=consumption.metric,
+                    metric=metric,
                     amount=total_cost,
                     consumed_from=source,
-                    correlation_id=consumption.correlation_id,
-                    batch_id=consumption.batch_id,
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                     status="failed",
                 )
 
-                return False
+                current_balance = await self.repository.get_credit_balance(source, subject_id)
+                return CreditConsumptionResult(
+                    success=False,
+                    new_balance=current_balance,
+                    consumed_from=source,
+                )
 
         except Exception as e:
             logger.error(
                 f"Error consuming credits: {e}",
                 exc_info=True,
-                extra={
-                    "user_id": consumption.user_id,
-                    "correlation_id": consumption.correlation_id,
-                },
+                extra={"user_id": user_id, "correlation_id": correlation_id},
             )
 
             # Record failed operation for audit trail
             try:
                 await self.repository.record_operation(
                     subject_type="user",
-                    subject_id=consumption.user_id,
-                    metric=consumption.metric,
+                    subject_id=user_id,
+                    metric=metric,
                     amount=0,
                     consumed_from="error",
-                    correlation_id=consumption.correlation_id,
-                    batch_id=consumption.batch_id,
+                    correlation_id=correlation_id,
+                    batch_id=batch_id,
                     status="failed",
                 )
             except Exception:
                 logger.error("Failed to record error operation", exc_info=True)
 
-            return False
+            current_balance = await self.repository.get_credit_balance("user", user_id)
+            return CreditConsumptionResult(
+                success=False,
+                new_balance=current_balance,
+                consumed_from="error",
+            )
 
     async def get_balance(self, user_id: str, org_id: str | None = None) -> CreditBalanceInfo:
         """Get current credit balances for user/organization.
@@ -346,58 +378,61 @@ class CreditManagerImpl:
             )
 
     async def adjust_credits(self, adjustment: CreditAdjustment) -> bool:
-        """Manually adjust credit balance (admin operation).
+        """Backward-compatible method; delegates to adjust_balance and returns success."""
+        try:
+            await self.adjust_balance(
+                subject_type=adjustment.subject_type,
+                subject_id=adjustment.subject_id,
+                amount=adjustment.amount,
+                reason=adjustment.reason,
+                correlation_id=f"manual_adjustment_{adjustment.subject_id}_{adjustment.amount}",
+            )
+            return True
+        except Exception:
+            return False
 
-        Args:
-            adjustment: Credit adjustment details
+    async def adjust_balance(
+        self,
+        subject_type: str,
+        subject_id: str,
+        amount: int,
+        reason: str,
+        correlation_id: str,
+    ) -> int:
+        """Manually adjust credit balance (admin operation)."""
+        logger.info(f"Manual credit adjustment: {subject_type} {subject_id} by {amount} ({reason})")
 
-        Returns:
-            True if adjustment successful, False otherwise
-        """
-        logger.info(
-            f"Manual credit adjustment: {adjustment.subject_type} {adjustment.subject_id} "
-            f"by {adjustment.amount} ({adjustment.reason})"
+        # Apply adjustment via repository
+        new_balance = await self.repository.update_credit_balance(
+            subject_type=subject_type,
+            subject_id=subject_id,
+            delta=amount,
+            correlation_id=correlation_id,
         )
 
-        try:
-            # Generate correlation ID for tracking
-            correlation_id = f"manual_adjustment_{adjustment.subject_id}_{adjustment.amount}"
+        # Record adjustment operation
+        await self.repository.record_operation(
+            subject_type=subject_type,
+            subject_id=subject_id,
+            metric="manual_adjustment",
+            amount=abs(amount),
+            consumed_from=subject_type,
+            correlation_id=correlation_id,
+            status="completed",
+        )
 
-            # Apply adjustment
-            new_balance = await self.repository.update_credit_balance(
-                subject_type=adjustment.subject_type,
-                subject_id=adjustment.subject_id,
-                delta=adjustment.amount,
-                correlation_id=correlation_id,
-            )
+        logger.info(
+            f"Credit adjustment successful: new balance {new_balance}",
+            extra={
+                "subject_type": subject_type,
+                "subject_id": subject_id,
+                "adjustment": amount,
+                "new_balance": new_balance,
+                "reason": reason,
+            },
+        )
 
-            # Record adjustment operation
-            await self.repository.record_operation(
-                subject_type=adjustment.subject_type,
-                subject_id=adjustment.subject_id,
-                metric="manual_adjustment",
-                amount=abs(adjustment.amount),
-                consumed_from="admin",
-                correlation_id=correlation_id,
-                status="completed",
-            )
-
-            logger.info(
-                f"Credit adjustment successful: new balance {new_balance}",
-                extra={
-                    "subject_type": adjustment.subject_type,
-                    "subject_id": adjustment.subject_id,
-                    "adjustment": adjustment.amount,
-                    "new_balance": new_balance,
-                    "reason": adjustment.reason,
-                },
-            )
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error adjusting credits: {e}", exc_info=True)
-            return False
+        return new_balance
 
     async def _resolve_credit_source(
         self,
@@ -429,3 +464,7 @@ class CreditManagerImpl:
         # Fall back to user credits
         logger.debug(f"Insufficient org credits ({org_balance}), using user credits")
         return ("user", user_id)
+
+    async def reload_policies(self) -> None:
+        """Force reload of policies from file and update cache."""
+        await self.policy_loader.reload_policies()

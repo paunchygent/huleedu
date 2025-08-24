@@ -87,8 +87,10 @@ class SMTPEmailProvider(EmailProvider):
                 send_errors = await smtp.send_message(msg)
 
                 if send_errors:
-                    # aiosmtplib returns both errors AND success info in send_errors
-                    # Check if it's actually an error (non-empty dict) or success info (empty dict + success message)
+                    # aiosmtplib returns both errors AND success info
+                    # in send_errors. Check if it's actually an error
+                    # (non-empty dict) or success info (empty dict +
+                    # success message).
                     if isinstance(send_errors, tuple) and len(send_errors) == 2:
                         error_dict, message = send_errors
                         if error_dict:  # Non-empty dict means actual errors
@@ -102,7 +104,8 @@ class SMTPEmailProvider(EmailProvider):
                                 error_message=f"Partial send failure: {error_details}",
                             )
                         else:
-                            # Empty dict + message means success - this is normal SMTP server response
+                            # Empty dict + message means success - this is
+                            # normal SMTP server response
                             logger.info(f"SMTP server response: {message}")
                     else:
                         # Handle other send_errors formats

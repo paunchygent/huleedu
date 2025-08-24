@@ -37,7 +37,8 @@ async def health_check() -> tuple[dict[str, Any], int]:
     try:
         if "health_checker" in app.extensions:
             health_checker = app.extensions["health_checker"]
-            db_healthy = await health_checker.is_healthy()
+            summary = await health_checker.get_health_summary()
+            db_healthy = summary.get("status") in ["healthy", "warning"]
             db_message = (
                 "Database connection healthy" if db_healthy else "Database connection unhealthy"
             )

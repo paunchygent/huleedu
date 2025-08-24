@@ -47,7 +47,8 @@ class TestArgon2idPasswordHasher:
             # Argon2id hashes start with $argon2id$
             assert result.startswith("$argon2id$")
 
-            # Validate full Argon2id format: $argon2id$v=version$m=memory,t=time,p=parallelism$salt$hash
+            # Validate full Argon2id format:
+            # $argon2id$v=version$m=memory,t=time,p=parallelism$salt$hash
             argon2id_pattern = re.compile(
                 r"^\$argon2id\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$"
             )

@@ -472,7 +472,10 @@ class TestErrorResponseFormats:
         test_app: Quart,
         invalid_email: str,
     ) -> None:
-        """Test that invalid email addresses are processed (API doesn't validate emails directly)."""
+        """Test invalid emails are processed.
+
+        API doesn't validate emails directly.
+        """
         async with test_app.test_client() as client:
             request_data = {
                 "to": invalid_email,

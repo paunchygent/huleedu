@@ -78,7 +78,10 @@ class MockEntitlementsRepositoryImpl(EntitlementsRepositoryProtocol):
         self.balances[key] = new_balance
 
         logger.info(
-            f"Mock: Updated balance for {subject_type}:{subject_id}: {current_balance} -> {new_balance}",
+            (
+                f"Mock: Updated balance for {subject_type}:{subject_id}: "
+                f"{current_balance} -> {new_balance}"
+            ),
             extra={"correlation_id": correlation_id, "delta": delta},
         )
 

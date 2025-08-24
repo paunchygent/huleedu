@@ -45,7 +45,8 @@ class TestEmailWorkflowIntegration:
         # Create Swedish teacher notification template
         teacher_template = temp_dir / "teacher_notification.html.j2"
         teacher_template.write_text(
-            """<!-- subject: Meddelande från HuleEdu: {{ subject_prefix|default('Elevnotifiering') }} -->
+            """<!-- subject: Meddelande från HuleEdu:
+{{ subject_prefix|default('Elevnotifiering') }} -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -62,7 +63,8 @@ class TestEmailWorkflowIntegration:
             <div style="background: #f0f8ff; padding: 15px; border-left: 4px solid #007cba;">
                 <p><strong>Elev:</strong> {{ student_name|default('Okänd elev') }}</p>
                 <p><strong>Klass:</strong> {{ class_name|default('Ingen klass angiven') }}</p>
-                <p><strong>Meddelande:</strong> {{ notification_message|default('Ingen information tillgänglig') }}</p>
+                <p><strong>Meddelande:</strong>
+{{ notification_message|default('Ingen information tillgänglig') }}</p>
             </div>
             <p>För mer information, logga in på HuleEdu plattformen.</p>
             <p>Med vänliga hälsningar,<br>HuleEdu Teamet</p>
@@ -80,7 +82,8 @@ class TestEmailWorkflowIntegration:
         # Create student verification template with Swedish characters
         student_template = temp_dir / "student_verification.html.j2"
         student_template.write_text(
-            """<!-- subject: Bekräfta ditt HuleEdu konto, {{ student_first_name|default('Student') }}! -->
+            """<!-- subject: Bekräfta ditt HuleEdu konto,
+{{ student_first_name|default('Student') }}! -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -92,12 +95,20 @@ class TestEmailWorkflowIntegration:
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h1>Välkommen till HuleEdu!</h1>
         <div style="background: white; padding: 25px; border-radius: 5px;">
-            <h2>Hej {{ student_first_name|default('Student') }} {{ student_last_name|default('') }}!</h2>
-            <p>Tack för att du registrerat dig på HuleEdu. För att aktivera ditt konto och börja använda våra verktyg för språkutveckling, behöver du bekräfta din e-postadress.</p>
+            <h2>Hej {{ student_first_name|default('Student') }}
+{{ student_last_name|default('') }}!</h2>
+            <p>Tack för att du registrerat dig på HuleEdu. För att aktivera ditt konto och
+            börja använda våra verktyg för språkutveckling,
+            behöver du bekräfta din e-postadress.</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{{ verification_link }}" style="display: inline-block; background: #007cba; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="{{ verification_link }}" style="display: inline-block;">
+                <span style="background: #007cba; color: white;
+                padding: 15px 30px;
+                text-decoration: none;
+                border-radius: 5px; font-weight: bold;
+                display: inline-block;">
                     Bekräfta mitt konto
-                </a>
+                </span></a>
             </div>
             <p>Med HuleEdu kan du:</p>
             <ul>
@@ -208,7 +219,10 @@ class TestEmailWorkflowIntegration:
                     "teacher_name": "Anna Lindström",
                     "student_name": "Erik Björkman",
                     "class_name": "Svenska 1 - Språkutveckling",
-                    "notification_message": "Eleven har slutfört sin uppsats om 'Kärlek och kärlek' med utmärkt resultat.",
+                    "notification_message": (
+                        "Eleven har slutfört sin uppsats om 'Kärlek och kärlek' "
+                        "med utmärkt resultat."
+                    ),
                     "subject_prefix": "Elevbetyg klart",
                 },
                 "Elevbetyg klart",
@@ -246,10 +260,10 @@ class TestEmailWorkflowIntegration:
         expected_subject_contains: str,
         expected_content_contains: str,
     ) -> None:
-        """Test complete email processing pipeline with successful delivery.
+        """Test complete email pipeline with successful delivery.
 
-        Validates end-to-end workflow: request → template rendering → sending → persistence → event publishing.
-        Ensures Swedish character preservation throughout the entire pipeline.
+        Validates: request → render → send → persist → event publish.
+        Ensures Swedish characters are preserved end-to-end.
         """
         # Arrange: Configure successful email send
         correlation_id = str(uuid4())
@@ -539,7 +553,9 @@ class TestEmailWorkflowIntegration:
             ({"student_name": "Märta Äppelgren"}, ["Märta", "Äppelgren"]),
             (
                 {
-                    "notification_message": "Utmärkt arbete med språkförståelse och kärlek för litteratur"
+                    "notification_message": (
+                        "Utmärkt arbete med språkförståelse och kärlek för litteratur"
+                    )
                 },
                 ["Utmärkt", "språkförståelse", "kärlek"],
             ),
@@ -609,7 +625,8 @@ class TestEmailWorkflowIntegration:
         outbox_call = mock_outbox_repository.add_event.call_args
         event_data = outbox_call.kwargs["event_data"]
 
-        # Check if Swedish characters exist in the overall event (they should be in correlation with variables)
+        # Check if Swedish characters exist in the overall event
+        # (they should be in correlation with variables)
         str(event_data)
         for swedish_word in expected_swedish_chars:
             # Swedish characters should be preserved in the serialized data

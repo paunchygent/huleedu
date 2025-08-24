@@ -9,15 +9,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dishka import make_async_container
-from quart_dishka import QuartDishka
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.error_handling.quart import create_error_response
-from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
-from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
-from huleedu_service_libs.middleware.frameworks.quart_middleware import setup_tracing_middleware
+from huleedu_service_libs.logging_utils import (
+    configure_service_logging,
+    create_service_logger,
+)
+from huleedu_service_libs.metrics_middleware import (
+    setup_standard_service_metrics_middleware,
+)
+from huleedu_service_libs.middleware.frameworks.quart_middleware import (
+    setup_tracing_middleware,
+)
 from huleedu_service_libs.observability import init_tracing
+from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
 from pydantic import ValidationError
+from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from services.entitlements_service.config import Settings
@@ -76,6 +84,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
         ImplementationProvider(),
         ServiceProvider(),
         EntitlementsServiceProvider(engine=app.database_engine),
+        # Add OutboxProvider for transactional outbox pattern
+        OutboxProvider(),
     )
     app.extensions = {}
 

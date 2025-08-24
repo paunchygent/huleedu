@@ -91,7 +91,10 @@ class TestNotificationEmailRequestedV1Contracts:
     def test_notification_email_template_variables_swedish_contract(
         self, template_variables: dict[str, str], expected_variables: dict[str, str]
     ) -> None:
-        """Contract test: NotificationEmailRequestedV1 template variables with Swedish characters."""
+        """Contract: template variables with Swedish characters.
+
+        Ensures NotificationEmailRequestedV1 preserves åäö characters.
+        """
         correlation_id = str(uuid4())
 
         # Act

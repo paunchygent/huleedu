@@ -270,7 +270,10 @@ class TestEmailServiceDatabaseOperations:
             "variables": {
                 "student_name": "Björn Åkesson",
                 "school_name": "Språkskolan i Göteborg",
-                "message": "Hej Björn! Välkommen till vår svenska språkkurs. Läraren Åsa kommer att hjälpa dig.",
+                "message": (
+                    "Hej Björn! Välkommen till vår svenska språkkurs. "
+                    "Läraren Åsa kommer att hjälpa dig."
+                ),
                 "contact_info": "Kontakta oss på språk@skolan.se för frågor",
             },
         }

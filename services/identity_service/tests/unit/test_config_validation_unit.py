@@ -236,7 +236,10 @@ class TestIdentityServiceSettings:
             assert settings.database_url == override_url
 
     def test_database_url_generic_service_override(self) -> None:
-        """Test that generic SERVICE_DATABASE_URL environment variable overrides database URL generation."""
+        """Test generic SERVICE_DATABASE_URL env var overrides URL.
+
+        Ensures database URL generation respects generic override.
+        """
         override_url = "postgresql+asyncpg://generic_user:generic_pass@generic.host:5555/generic_db"
         env_vars = {
             "SERVICE_DATABASE_URL": override_url,

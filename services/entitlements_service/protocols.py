@@ -48,6 +48,14 @@ class CreditConsumption(BaseModel):
     correlation_id: str
 
 
+class CreditConsumptionResult(BaseModel):
+    """Result of a credit consumption operation."""
+
+    success: bool
+    new_balance: int
+    consumed_from: str  # "user", "org", or "none"/"error" for special cases
+
+
 class CreditBalanceInfo(BaseModel):
     """Credit balance information for a subject."""
 
@@ -109,14 +117,27 @@ class CreditManagerProtocol(Protocol):
         """
         ...
 
-    async def consume_credits(self, consumption: CreditConsumption) -> bool:
-        """Consume credits for completed operation.
+    async def consume_credits(
+        self,
+        user_id: str,
+        org_id: str | None,
+        metric: str,
+        amount: int,
+        batch_id: str | None,
+        correlation_id: str,
+    ) -> CreditConsumptionResult:
+        """Consume credits for completed operation and return details.
 
         Args:
-            consumption: Credit consumption details
+            user_id: User identifier
+            org_id: Organization identifier (optional)
+            metric: Operation metric name
+            amount: Number of operations requested
+            batch_id: Optional batch identifier
+            correlation_id: Operation correlation ID
 
         Returns:
-            True if consumption successful, False otherwise
+            CreditConsumptionResult with success flag, new balance, and source used
         """
         ...
 
@@ -132,37 +153,44 @@ class CreditManagerProtocol(Protocol):
         """
         ...
 
-    async def adjust_credits(self, adjustment: CreditAdjustment) -> bool:
+    async def adjust_balance(
+        self,
+        subject_type: str,
+        subject_id: str,
+        amount: int,
+        reason: str,
+        correlation_id: str,
+    ) -> int:
         """Manually adjust credit balance (admin operation).
 
         Args:
-            adjustment: Credit adjustment details
+            subject_type: "user" or "org"
+            subject_id: Subject identifier
+            amount: Adjustment amount (positive or negative)
+            reason: Reason for adjustment
+            correlation_id: Operation correlation ID
 
         Returns:
-            True if adjustment successful, False otherwise
+            New balance after adjustment
         """
+        ...
+
+    async def reload_policies(self) -> None:
+        """Force reload of policies from file and update cache."""
         ...
 
 
 class PolicyLoaderProtocol(Protocol):
-    """Protocol for policy configuration loading."""
-
-    async def load_policies(self) -> PolicyConfig:
-        """Load and cache policy configuration from file.
-
-        Returns:
-            PolicyConfig with current policy settings
-        """
-        ...
+    """Protocol for loading and managing entitlements policies."""
 
     async def get_cost(self, metric: str) -> int:
-        """Get credit cost for a specific metric.
+        """Get cost per unit for a metric.
 
         Args:
             metric: Operation metric name
 
         Returns:
-            Credit cost (0 for free operations)
+            Cost per unit (0 for free operations)
         """
         ...
 
@@ -174,6 +202,14 @@ class PolicyLoaderProtocol(Protocol):
 
         Returns:
             Tuple of (count, window_seconds), (0, 0) for unlimited
+        """
+        ...
+
+    async def load_policies(self) -> PolicyConfig:
+        """Load policies from configuration file.
+
+        Returns:
+            PolicyConfig with loaded settings
         """
         ...
 
@@ -308,5 +344,73 @@ class EntitlementsRepositoryProtocol(Protocol):
 
         Returns:
             List of operation records
+        """
+        ...
+
+
+class EventPublisherProtocol(Protocol):
+    """Protocol for publishing domain events from Entitlements Service."""
+
+    async def publish_credit_balance_changed(
+        self,
+        subject_type: str,
+        subject_id: str,
+        old_balance: int,
+        new_balance: int,
+        delta: int,
+        correlation_id: str,
+    ) -> None:
+        """
+        Publish credit balance changed event.
+
+        Args:
+            subject_type: Type of subject ("user" or "org")
+            subject_id: ID of the subject
+            old_balance: Previous credit balance
+            new_balance: New credit balance after change
+            delta: Amount of change (positive for credit, negative for debit)
+            correlation_id: Correlation ID for tracing
+        """
+        ...
+
+    async def publish_rate_limit_exceeded(
+        self,
+        subject_id: str,
+        metric: str,
+        limit: int,
+        current_count: int,
+        window_seconds: int,
+        correlation_id: str,
+    ) -> None:
+        """
+        Publish rate limit exceeded event.
+
+        Args:
+            subject_id: ID of the subject that exceeded the limit
+            metric: Metric that was rate limited
+            limit: The configured rate limit
+            current_count: Current usage count in the window
+            window_seconds: Rate limit window in seconds
+            correlation_id: Correlation ID for tracing
+        """
+        ...
+
+    async def publish_usage_recorded(
+        self,
+        subject_type: str,
+        subject_id: str,
+        metric: str,
+        amount: int,
+        correlation_id: str,
+    ) -> None:
+        """
+        Publish usage recorded event.
+
+        Args:
+            subject_type: Type of subject ("user" or "org")
+            subject_id: ID of the subject
+            metric: Operation metric name
+            amount: Amount of usage recorded
+            correlation_id: Correlation ID for tracing
         """
         ...

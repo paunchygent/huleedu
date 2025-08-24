@@ -207,7 +207,9 @@ class TestKafkaIntegration:
             return RenderedTemplate(
                 subject=subject_map.get(template_id, "Standard ämne"),
                 html_content=html_content,
-                text_content=f"Hej {variables.get('name', 'Användare')}! Detta är ett textmejl på svenska.",
+                text_content=(
+                    f"Hej {variables.get('name', 'Användare')}! Detta är ett textmejl på svenska."
+                ),
             )
 
         renderer.render.side_effect = mock_render

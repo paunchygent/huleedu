@@ -313,6 +313,11 @@ services:
       - LOG_LEVEL=DEBUG
       - ENTITLEMENTS_SERVICE_LOG_LEVEL=DEBUG
       - ENTITLEMENTS_USE_MOCK_REPOSITORY=false
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=entitlements_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
 
 # Development-specific volumes for faster file watching
 volumes:

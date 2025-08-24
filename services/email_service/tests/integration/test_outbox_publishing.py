@@ -140,9 +140,13 @@ class TestOutboxPublishingIntegration:
         mock.template_exists = AsyncMock(return_value=True)
         mock.render = AsyncMock(
             return_value=RenderedTemplate(
-                subject="Välkommen till HuleEdu - Ditt konto är verifierat!",  # Subject with Swedish chars
-                html_content="<p>Hej! Ditt konto för <strong>Göteborgs Högskola</strong> är nu aktivt.</p>",  # HTML
-                text_content="Hej! Ditt konto för Göteborgs Högskola är nu aktivt.",  # Text
+                subject=(
+                    "Välkommen till HuleEdu - Ditt konto är verifierat!"
+                ),  # Subject with Swedish chars
+                html_content=(
+                    "<p>Hej! Ditt konto för <strong>Göteborgs Högskola</strong> är nu aktivt.</p>"
+                ),  # HTML
+                text_content=("Hej! Ditt konto för Göteborgs Högskola är nu aktivt."),  # Text
             )
         )
         return mock
@@ -455,9 +459,12 @@ class TestOutboxPublishingIntegration:
         from services.email_service.protocols import RenderedTemplate
 
         mock_template_renderer.render.return_value = RenderedTemplate(
-            subject="Välkommen! Din ansökan till Göteborgs Högskola",  # Swedish subject
-            html_content="<p>Hej <strong>Åsa</strong>! Ditt konto för <em>Växjö Universitet</em> är klart.</p>",
-            text_content="Hej Åsa! Ditt konto för Växjö Universitet är klart.",
+            subject=("Välkommen! Din ansökan till Göteborgs Högskola"),  # Swedish subject
+            html_content=(
+                "<p>Hej <strong>Åsa</strong>! Ditt konto för <em>Växjö Universitet</em> "
+                "är klart.</p>"
+            ),
+            text_content=("Hej Åsa! Ditt konto för Växjö Universitet är klart."),
         )
 
         correlation_id = uuid4()

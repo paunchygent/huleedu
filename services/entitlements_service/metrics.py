@@ -51,7 +51,6 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["method", "endpoint"],
             registry=registry,
         ),
-        
         # Business Intelligence Metrics - Credit Operations
         "credit_checks_total": Counter(
             "entitlements_credit_checks_total",
@@ -71,7 +70,6 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["subject_type", "adjustment_type"],  # adjustment_type: addition/deduction
             registry=registry,
         ),
-        
         # Rate Limiting Metrics
         "rate_limit_checks_total": Counter(
             "entitlements_rate_limit_checks_total",
@@ -85,7 +83,6 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["metric"],
             registry=registry,
         ),
-        
         # Policy Management Metrics
         "policy_loads_total": Counter(
             "entitlements_policy_loads_total",
@@ -103,7 +100,6 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             "Total policy cache misses",
             registry=registry,
         ),
-        
         # Performance Metrics
         "credit_check_duration": Histogram(
             "entitlements_credit_check_duration_seconds",
@@ -122,7 +118,6 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["cache_hit"],  # cache_hit: true/false
             registry=registry,
         ),
-        
         # Balance Tracking Metrics
         "current_balances": Counter(
             "entitlements_current_balances_total",

@@ -106,7 +106,10 @@ class TestEmailDeliveryFailedV1Contracts:
         """Contract test: EmailDeliveryFailedV1 must maintain error context across boundaries."""
         # Arrange - Create failure event with complex reason
         correlation_id = str(uuid4())
-        complex_reason = "SMTP Error 550: User unknown in virtual mailbox table (error code: AUTH_FAILED_USER_LOOKUP)"
+        complex_reason = (
+            "SMTP Error 550: User unknown in virtual mailbox table "
+            "(error code: AUTH_FAILED_USER_LOOKUP)"
+        )
 
         original_event = EmailDeliveryFailedV1(
             message_id="context-test-001",

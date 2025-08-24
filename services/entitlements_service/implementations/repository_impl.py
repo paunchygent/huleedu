@@ -107,7 +107,10 @@ class EntitlementsRepositoryImpl(EntitlementsRepositoryProtocol):
                     # Create new balance record
                     if delta < 0:
                         raise ValueError(
-                            f"Cannot consume credits from non-existent balance for {subject_type}:{subject_id}"
+                            (
+                                "Cannot consume credits from non-existent balance for "
+                                f"{subject_type}:{subject_id}"
+                            )
                         )
 
                     balance_record = CreditBalance(
@@ -140,7 +143,10 @@ class EntitlementsRepositoryImpl(EntitlementsRepositoryProtocol):
                     await session.commit()
 
                     logger.info(
-                        f"Updated balance for {subject_type}:{subject_id}: {balance_record.balance} -> {new_balance}",
+                        (
+                            f"Updated balance for {subject_type}:{subject_id}: "
+                            f"{balance_record.balance} -> {new_balance}"
+                        ),
                         extra={"correlation_id": correlation_id, "delta": delta},
                     )
                     return new_balance
