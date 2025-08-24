@@ -284,7 +284,16 @@ services:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - EMAIL_SERVICE_LOG_LEVEL=DEBUG
-      - EMAIL_EMAIL_PROVIDER=mock  # Always use mock in development
+      - EMAIL_EMAIL_PROVIDER=${EMAIL_EMAIL_PROVIDER:-mock}  # Override with env var for SMTP testing
+      # SMTP configuration (only used if EMAIL_EMAIL_PROVIDER=smtp)
+      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST:-mail.privateemail.com}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
+      - EMAIL_SMTP_USERNAME=${EMAIL_SMTP_USERNAME}
+      - EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}
+      - EMAIL_SMTP_USE_TLS=${EMAIL_SMTP_USE_TLS:-true}
+      - EMAIL_SMTP_TIMEOUT=${EMAIL_SMTP_TIMEOUT:-30}
+      - EMAIL_DEFAULT_FROM_EMAIL=${EMAIL_DEFAULT_FROM_EMAIL:-noreply@hule.education}
+      - EMAIL_DEFAULT_FROM_NAME=${EMAIL_DEFAULT_FROM_NAME:-HuleEdu}
 
 # Development-specific volumes for faster file watching
 volumes:

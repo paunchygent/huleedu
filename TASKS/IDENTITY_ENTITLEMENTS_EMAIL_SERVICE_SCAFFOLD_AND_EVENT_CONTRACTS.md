@@ -17,11 +17,13 @@ Purpose-built scaffolding and contracts to complete the backend skeleton before 
 - Frameworks: Internal services (Identity, Entitlements, Email) use Quart; API Gateway is FastAPI
 - DI: `typing.Protocol` contracts in `protocols.py`, Dishka providers in `di.py`, with `APP`/`REQUEST` scopes
 - Services:
-  - HTTP services: `app.py` < 150 LoC; routes in `api/` per Rule 015
-  - Workers: `worker_main.py` (lifecycle/DI), `kafka_consumer.py` (consume loop), `event_processor.py` (business orchestration)
-  - Outbox: Use `huleedu_service_libs.outbox` for business‑critical events
+  - **Integrated Pattern**: `app.py` manages both HTTP and Kafka consumer lifecycle via `@app.before_serving/@app.after_serving`
+  - **HTTP-only Pattern**: HuleEduApp with `startup_setup.py` managing Kafka consumer lifecycle (Identity Service)
+  - **Worker-only Pattern**: `worker_main.py` entry point with no HTTP API (NLP Service)
+  - **Kafka Components**: `kafka_consumer.py` (consumer class), `event_processor.py` (business orchestration)
+  - **Outbox**: Use `huleedu_service_libs.outbox.EventRelayWorker` for reliable event publishing
+    - Started alongside Kafka consumers in service lifecycle
     - Do not inject/pass Kafka bus into business logic; publish only via outbox
-    - Include `topic` column + partial index on `(published_at, topic, created_at)` where `published_at IS NULL`
 - Events: `EventEnvelope[T]` (schema_version=int, default 1), publish via `topic_name(ProcessingEvent.X)`
 - Persistence: SQLAlchemy async, Alembic migrations (per service), repository‑managed sessions (Rule 042)
   - Follow Rule 085: `.env` autoload; no hardcoded DB URLs; share DB session with outbox for atomic writes
@@ -207,6 +209,7 @@ class ResourceAccessGrantedV1(BaseModel):
 Use `ProcessingEvent` + `topic_name()` from `common_core.event_enums`. Extend the enum and mapping with the following entries and always publish via `topic_name(ProcessingEvent.X)`:
 
 Identity events:
+
 - `IDENTITY_USER_REGISTERED` → `huleedu.identity.user.registered.v1`
 - `IDENTITY_EMAIL_VERIFICATION_REQUESTED` → `huleedu.identity.email.verification.requested.v1`
 - `IDENTITY_EMAIL_VERIFIED` → `huleedu.identity.email.verified.v1`
@@ -215,11 +218,13 @@ Identity events:
 - `IDENTITY_LOGIN_FAILED` → `huleedu.identity.login.failed.v1`
 
 Email events:
+
 - `EMAIL_NOTIFICATION_REQUESTED` → `huleedu.email.notification.requested.v1`
 - `EMAIL_SENT` → `huleedu.email.sent.v1`
 - `EMAIL_DELIVERY_FAILED` → `huleedu.email.delivery_failed.v1`
 
 Entitlements events:
+
 - `ENTITLEMENTS_SUBSCRIPTION_ACTIVATED` → `huleedu.entitlements.subscription.activated.v1`
 - `ENTITLEMENTS_SUBSCRIPTION_CHANGED` → `huleedu.entitlements.subscription.changed.v1`
 - `ENTITLEMENTS_SUBSCRIPTION_CANCELED` → `huleedu.entitlements.subscription.canceled.v1`
@@ -246,57 +251,78 @@ envelope = EventEnvelope[UserRegisteredV1](
 
 ---
 
-## Identity Service — HTTP Scaffold
+## Identity Service — HTTP + Kafka Consumer Scaffold
 
-Directory skeleton (Quart HTTP service):
+Directory skeleton (HuleEduApp with integrated Kafka consumer):
 
 ```
 services/identity_service/
-  app.py                      # <150 LoC; DI init, blueprint registration, middleware
-  startup_setup.py            # DB migration, metrics, tracing setup
+  app.py                      # HuleEduApp with blueprint registration
+  startup_setup.py            # DI init, Kafka consumer lifecycle, EventRelayWorker
   config.py                   # Pydantic settings
-  metrics.py                  # Prometheus counters/histograms
-  protocols.py                # PasswordHasher, TokenIssuer, UserRepo, SessionRepo
+  protocols.py                # UserRepo, TokenIssuer, PasswordHasher, SessionRepo
   di.py                       # Providers (APP/REQUEST scopes)
   models_db.py                # SQLAlchemy models
+  kafka_consumer.py           # IdentityKafkaConsumer for internal events
+  notification_orchestrator.py # Bridges Identity events to Email Service
   api/
     auth_routes.py            # register/login/refresh/logout/verify/reset/me
+    registration_routes.py    # User registration
+    verification_routes.py    # Email verification
+    password_routes.py        # Password reset/change
+    profile_routes.py         # User profile management
+    session_routes.py         # Session management
+    well_known_routes.py      # JWKS/OpenID endpoints
+    health_routes.py          # /healthz, /metrics
   implementations/
-    user_repository_postgres_impl.py
-    session_repository_postgres_impl.py
+    user_repository_impl.py
+    session_repository_impl.py
     password_hasher_impl.py   # Argon2id
     token_issuer_impl.py      # HS256 (dev), RS256 + JWKS (prod)
-    event_publisher_impl.py   # Outbox publisher
+    outbox_manager.py         # Outbox publisher
   alembic/
   README.md
   tests/
 ```
 
-Key protocols:
+Key patterns:
+
+**Integrated Kafka Consumer Lifecycle**:
 
 ```python
-# services/identity_service/protocols.py
-from __future__ import annotations
-from typing import Protocol, Optional
+# services/identity_service/startup_setup.py
+@app.before_serving
+async def startup() -> None:
+    # Start outbox relay worker
+    relay_worker = await request_container.get(EventRelayWorker)
+    await relay_worker.start()
+    
+    # Start IdentityKafkaConsumer for internal event processing
+    identity_kafka_consumer = await request_container.get(IdentityKafkaConsumer)
+    consumer_task = asyncio.create_task(identity_kafka_consumer.start_consumer())
+    
+@app.after_serving
+async def cleanup() -> None:
+    # Stop consumer and relay worker
+    await identity_kafka_consumer.stop_consumer()
+    await relay_worker.stop()
+```
 
-class PasswordHasher(Protocol):
-    def hash(self, password: str) -> str: ...
-    def verify(self, hash: str, password: str) -> bool: ...
+**NotificationOrchestrator Bridge Pattern**:
 
-class TokenIssuer(Protocol):
-    def issue_access_token(self, user_id: str, org_id: str | None, roles: list[str]) -> str: ...
-    def issue_refresh_token(self, user_id: str) -> tuple[str, str]: ...  # token, jti
-    def verify(self, token: str) -> dict: ...
-
-class UserRepo(Protocol):
-    async def create_user(self, email: str, org_id: str | None, password_hash: str) -> dict: ...
-    async def get_user_by_email(self, email: str) -> Optional[dict]: ...
-    async def set_email_verified(self, user_id: str) -> None: ...
-
-class SessionRepo(Protocol):
-    async def store_refresh(self, user_id: str, jti: str, exp_ts: int) -> None: ...
-    async def revoke_refresh(self, jti: str) -> None: ...
-    async def is_refresh_valid(self, jti: str) -> bool: ...
+```python
+# services/identity_service/notification_orchestrator.py
+class NotificationOrchestrator:
+    async def handle_user_registered(self, event: UserRegisteredV1) -> None:
+        # Transform to NotificationEmailRequestedV1
+        notification = NotificationEmailRequestedV1(
+            message_id=f"welcome-{event.user_id}-{uuid4().hex[:8]}",
+            template_id="welcome",
+            to=event.email,
+            variables={"user_name": event.email.split("@")[0].title()}
+        )
+        # Publish via outbox
+        await self.outbox_manager.publish_to_outbox(...)
 ```
 
 Pydantic request/response schemas:
@@ -381,32 +407,32 @@ JWKS endpoint (RS256 in prod):
 GET /.well-known/jwks.json → JwksResponseV1
 ```
 
- - Set `kid` on tokens and expose matching key in JWKS; gateway caches by `kid`
+- Set `kid` on tokens and expose matching key in JWKS; gateway caches by `kid`
+
 ---
 
-## Entitlements Service — HTTP + Worker Scaffold
+## Entitlements Service — HTTP + Kafka Consumer Scaffold
 
-Single service with Quart HTTP decision endpoints and Kafka worker for metering and ACL events.
+Integrated service with Quart HTTP decision endpoints and Kafka consumer for metering and ACL events.
 
 ```
 services/entitlements_service/
-  app.py                       # HTTP: decisions, effective entitlements, usage reads
-  startup_setup.py             # DB init, metrics, tracing
+  app.py                       # Integrated Quart + Kafka lifecycle (like Email Service)
+  startup_setup.py             # DI init, Kafka consumer lifecycle, EventRelayWorker
   config.py                    # Pydantic settings
-  metrics.py                   # Metrics
   protocols.py                 # repositories + cache + policy loader interfaces
   di.py                        # Providers
   models_db.py                 # plans, subscriptions, counters, credits, acl
+  kafka_consumer.py            # EntitlementsKafkaConsumer class
+  event_processor.py           # update counters/credits/acl; emit events
   api/
+    health_routes.py           # /healthz, /metrics
     decisions_routes.py        # /v1/entitlements/* endpoints
   implementations/
-    repositories_postgres_impl.py
-    cache_redis_impl.py
+    repositories_impl.py
+    cache_impl.py
     policy_loader_impl.py
-    event_publisher_impl.py
-  worker_main.py               # DI + lifecycle
-  kafka_consumer.py            # consume loop
-  event_processor.py           # update counters/credits/acl; emit events
+    outbox_manager.py
   policies/manifest.example.yaml
   alembic/
   README.md
@@ -467,11 +493,13 @@ class AclCheckResponse(BaseModel):
 ```
 
 Worker responsibilities:
+
 - Consume `ENTITLEMENTS_USAGE_AUTHORIZED` and `ENTITLEMENTS_USAGE_RECORDED` to update counters
 - Emit `ENTITLEMENTS_RATE_LIMIT_EXCEEDED`, `ENTITLEMENTS_CREDIT_BALANCE_CHANGED` as needed
 - Maintain ACL grants on `ENTITLEMENTS_RESOURCE_ACCESS_GRANTED`
 
 DB tables (Alembic):
+
 - `plans`, `plan_entitlements(plan_id, feature, limit, window_seconds, cost)`
 - `subscriptions(subject_type, subject_id, plan_id, status)`
 - `entitlement_overrides(subject_type, subject_id, feature, limit, window_seconds)`
@@ -482,33 +510,63 @@ DB tables (Alembic):
 
 ---
 
-## Email Service — Worker + Dev HTTP Scaffold
+## Email Service — Integrated HTTP + Kafka Consumer Scaffold
 
-Primary interaction via events; include a minimal dev/test Quart HTTP layer.
+**ALREADY IMPLEMENTED** - Primary interaction via Kafka events with dev HTTP endpoints.
 
 ```
 services/email_service/
-  app.py                       # optional dev/test endpoints only
-  config.py                    # Pydantic settings (provider, API keys)
-  metrics.py                   # Metrics
-  protocols.py                 # Provider, template renderer, repository
+  app.py                       # Integrated Quart + Kafka lifecycle (@app.before_serving)
+  startup_setup.py             # Service initialization
+  config.py                    # Pydantic settings (provider, SMTP config)
+  protocols.py                 # EmailProvider, TemplateRenderer, EmailRepository
   di.py                        # Providers
+  kafka_consumer.py            # EmailKafkaConsumer class
+  event_processor.py           # orchestrate send + emit events
   api/
+    health_routes.py           # /healthz, /metrics
     dev_routes.py              # /v1/emails/dev/send (dev only)
   implementations/
-    provider_sendgrid_impl.py | provider_ses_impl.py
-    template_renderer_jinja2.py
-    event_publisher_impl.py
-  worker_main.py               # DI + lifecycle
-  kafka_consumer.py            # consume loop
-  event_processor.py           # orchestrate send + emit events
+    provider_mock_impl.py      # Mock provider (testing)
+    provider_smtp_impl.py      # SMTP provider (Namecheap Private Email)
+    template_renderer_impl.py  # Jinja2 template engine
+    repository_impl.py         # PostgreSQL persistence
+    outbox_manager.py          # Transactional outbox
+  templates/
+    verification.html.j2       # Email verification template
+    welcome.html.j2            # User welcome template
+    password_reset.html.j2     # Password reset template
+  models_db.py                 # SQLAlchemy models
+  alembic/
   README.md
   tests/
 ```
 
+**Integrated Kafka Consumer Pattern**:
+
+```python
+# services/email_service/app.py
+@app.before_serving
+async def startup() -> None:
+    # Start EventRelayWorker for outbox pattern
+    app.relay_worker = await request_container.get(EventRelayWorker)
+    await app.relay_worker.start()
+    
+    # Start Kafka consumer as background task
+    app.kafka_consumer = await request_container.get(EmailKafkaConsumer)
+    app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
+
+@app.after_serving
+async def cleanup() -> None:
+    # Stop EventRelayWorker and Kafka consumer
+    await app.relay_worker.stop()
+    await app.kafka_consumer.stop_consumer()
+```
+
 Events:
+
 - Consume: `EMAIL_NOTIFICATION_REQUESTED`
-- Emit: `EMAIL_SENT`, `EMAIL_DELIVERY_FAILED`
+- Emit: `EMAIL_SENT`, `EMAIL_DELIVERY_FAILED` via outbox pattern
 
 Dev endpoint:
 
@@ -563,28 +621,36 @@ Store a manifest file (YAML/JSON) loaded by Entitlements Service to resolve poli
 
 ## Phased Implementation Plan
 
-1) Identity Minimal (Week 1)
-- Password hashing (Argon2id), HS256 in dev, RS256 + JWKS in prod
-- Endpoints: register, login, me, verify email (token exchange), request/reset password
-- Emit identity events via outbox; add Alembic migrations
-  - PDM: avoid version pinning; use Docker overrides for local libs
+1) **Identity Service** ✅ **COMPLETED**
 
-2) Entitlements Core (Week 2)
+- HuleEduApp with integrated Kafka consumer lifecycle via `startup_setup.py`
+- NotificationOrchestrator bridges Identity events to Email Service
+- All authentication endpoints, JWKS, event publishing via outbox
+- IdentityKafkaConsumer processes own events for email orchestration
+
+2) **Email Service** ✅ **COMPLETED**
+
+- Integrated `app.py` with Kafka consumer lifecycle via `@app.before_serving`
+- Provider abstraction: mock/SMTP with Namecheap Private Email
+- Jinja2 templates with subject extraction and variable fallbacks
+- Transactional delivery with outbox pattern
+
+3) Entitlements Service (Week 1)
+
+- Follow Email Service integrated pattern: `app.py` manages HTTP + Kafka lifecycle
 - Plans + subscriptions + decision engine + Redis cache
-- Endpoints: decision, authorize, effective, usage; worker: usage recording
-- Integrate simple policy manifest; basic rate limiting
-
-3) Email Core (Week 2)
-- Provider adapter (SES or SendGrid), Jinja2 templates, message status tracking
-- Worker consumes email requested events; dev HTTP endpoint
-- Webhook handlers (stretch): delivery, bounce, complaint → status updates
+- EntitlementsKafkaConsumer for usage/credit/ACL event processing
+- Endpoints: decision, authorize, effective, usage
+- EventRelayWorker for reliable event publishing
 
 4) Gateway Enforcement (Week 3)
+
 - JWT validation via JWKS; correlation IDs everywhere
 - Preflight entitlements checks on expensive routes; structured error responses
 - Basic UI impact: none (frontend keeps thin clients)
 
 5) Extensions (Week 4+)
+
 - Credits ledger + pay-as-you-go
 - ACL-backed student read access + email-based grants
 - MFA/SSO for Identity; more granular roles/scopes

@@ -18,7 +18,8 @@ Event-driven microservice platform for automated essay processing and assessment
 
 **Environment Configuration**: Pydantic `BaseSettings` classes, twelve-factor compliant.
 
-**Observability Stack**: 
+**Observability Stack**:
+
 - OpenTelemetry tracing, Prometheus metrics, structured logging
 - Grafana (3000), Prometheus (9091), Jaeger (16686), Loki (3100)
 
@@ -36,31 +37,40 @@ PDM-managed monorepo with unified dependency management:
 ## Microservices Overview
 
 ### Content Service
+
 HTTP service (port 8001) for binary content storage. REST API: `POST/GET /v1/content`.
 
 ### File Service  
+
 HTTP service (port 7001) for file uploads. Supports `.txt`, `.docx`, `.pdf` with Strategy Pattern extraction. Outbox pattern for event delivery.
 
 ### Essay Lifecycle Service (ELS)
+
 Hybrid HTTP (port 8000) + Kafka service for essay state management. Phase 1: stateless event routing. Phase 2+: stateful pipeline orchestration via EssayStateMachine.
 Events: Consumes BOS commands, publishes essay state transitions.
 
 ### Batch Orchestrator Service (BOS)
+
 HTTP service (port 5001) for batch-level coordination. Routes GUEST batches (no class_id) directly to pipeline. Routes REGULAR batches (has class_id) through Phase 1 student matching first.
 
 ### Batch Conductor Service (BCS)
+
 HTTP service (port 4002) for dynamic pipeline dependency resolution. Uses Redis to track batch completion state and determine next processing phase.
 
 ### Identity Service
+
 HTTP service (port 5003) for authentication and user management. JWT tokens (HS256/RS256), rate limiting, session control. API: `/v1/auth/*` endpoints. RFC 7009 token revocation.
 
 ### Spellchecker Service
+
 Kafka consumer for spell/grammar checking. Listens: `huleedu.commands.spellcheck.v1`. Emits: `EssaySpellcheckCompleted`. Metrics: port 8002.
 
 ### Comparative Judgment (CJ) Assessment Service
+
 Kafka consumer (port 9090) for AI-assisted essay comparison. Uses LLM Provider Service for pairwise judgments. PostgreSQL storage. Emits: `BatchComparativeJudgmentCompleted`.
 
 ### LLM Provider Service
+
 HTTP service (port 8090) for centralized AI API gateway. Redis queue with circuit breakers. Multi-provider (OpenAI, Anthropic). API: `POST /api/v1/comparison` with `callback_topic`. Emits: `LLMComparisonResultV1`.
 
 ### NLP Service
@@ -68,17 +78,20 @@ HTTP service (port 8090) for centralized AI API gateway. Redis queue with circui
 Kafka worker with Command Handler pattern for dual-phase processing. Uses PostgreSQL for outbox pattern, no HTTP endpoints.
 
 **Command Handler Architecture:**
+
 - **Phase 1**: `EssayStudentMatchingHandler` processes `BatchStudentMatchingRequestedV1`
 - **Phase 2**: `BatchNlpAnalysisHandler` processes `BatchNLPInitiateCommandV1`
 - Both handlers implement `CommandHandlerProtocol` for clean separation
 - Event routing via `command_handlers` dict in `NlpKafkaConsumer`
 
 **Phase 1: Student Matching (Pre-readiness)**
+
 - Extracts student identifiers using extraction pipeline (Exam.net, headers, email anchors)
 - Fuzzy matching against class rosters with confidence scoring
 - Emits: `BatchAuthorMatchesSuggestedV1` → Class Management Service
 
 **Phase 2: Text Analysis (Post-readiness)**  
+
 - Linguistic analysis: readability, complexity, NLP metrics
 - Language Tool integration for grammar analysis
 - Emits: `EssayNlpCompletedV1` (business data) + `BatchNlpAnalysisCompleted` (state management)
@@ -147,9 +160,14 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Real-Time Delivery**: Immediate teacher feedback via Kafka → WebSocket → Redis pipeline
 - **Clean Separation**: No business logic, trusts service-validated teacher_id in notification events
 
+### Email Service
+
+Kafka consumer + HTTP dev API (port 8082) for transactional email delivery. Consumes `NotificationEmailRequestedV1` events from Identity Service via NotificationOrchestrator. Provider pattern: mock/SMTP with Namecheap Private Email. Jinja2 templates with subject extraction. Outbox pattern for reliable event publishing.
+
 ## Critical Event Flows
 
 ### REGULAR Batch (with class_id)
+
 1. File upload → FileService → `FileUploadCompleted`
 2. BOS creates batch → `BatchCreated` → ELS Phase 1 routing
 3. ELS → `BatchStudentMatchingRequestedV1` → NLP Phase 1 Handler
@@ -158,6 +176,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 6. Standard pipeline: Spellcheck → CJ → NLP Phase 2 → RAS
 
 ### GUEST Batch (no class_id)  
+
 1. File upload → FileService → `FileUploadCompleted`
 2. BOS creates batch → `BatchCreated` → direct pipeline routing
 3. Skip Phase 1, immediate Phase 2 pipeline execution
@@ -166,6 +185,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 ## Service & Infrastructure Ports
 
 ### Microservices
+
 - **Content Service**: 8001
 - **File Service**: 7001  
 - **Essay Lifecycle (ELS)**: API:6001, Worker:internal
@@ -183,6 +203,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Email Service**: 8082 (API), 9098 (metrics)
 
 ### Databases (PostgreSQL)
+
 - **Essay Lifecycle DB**: 5433
 - **CJ Assessment DB**: 5434
 - **Class Management DB**: 5435
@@ -196,6 +217,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Email DB**: 5443
 
 ### Infrastructure
+
 - **Kafka**: 9092-9093
 - **Redis**: 6379
 - **Grafana**: 3000
@@ -205,6 +227,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Alertmanager**: 9094
 
 ### Observability Exporters
+
 - **Kafka Exporter**: 9308
 - **Postgres Exporter**: 9187
 - **Redis Exporter**: 9121
@@ -213,6 +236,7 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 ## Technology Stack
 
 ### Core
+
 - **Python 3.11+**: Async support, rich ecosystem
 - **Quart**: ASGI web framework for HTTP services  
 - **FastAPI**: API Gateway, automatic OpenAPI docs
@@ -220,17 +244,20 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 - **Kafka**: Event streaming via `aiokafka`
 
 ### Data
+
 - **PostgreSQL**: Production databases (per-service isolation)
 - **SQLAlchemy**: Async ORM, migrations
 - **Redis**: Caching, batch coordination, rate limiting, queuing
 - **Mock Repositories**: Development/testing (in-memory)
 
 ### Infrastructure
+
 - **Docker/Compose**: Service containerization
 - **Dishka**: Dependency injection with protocols
 - **PDM**: Python dependency management, task runner
 
 ### Development
+
 - **Ruff**: Linting, formatting (`pdm run format-all`)
 - **MyPy**: Static type checking
 - **PyTest**: Unit/integration/contract/e2e tests
@@ -238,15 +265,18 @@ A pure notification router (port 8080) that manages persistent WebSocket connect
 ## Development Setup
 
 ### Prerequisites
+
 - Python 3.11+, Docker/Compose, PDM
 
 ### Setup
+
 ```bash
 git clone <repository-url> && cd huledu-reboot
 ./scripts/setup_huledu_environment.sh
 ```
 
 ### Essential Commands
+
 ```bash
 # Docker workflow
 pdm run docker-build        # Build images
@@ -274,13 +304,15 @@ curl localhost:8000/healthz  # ELS health
 ## AI Agent Quick Reference
 
 ### Service Patterns
+
 - **Environment prefix**: `<SERVICE_NAME>_` (e.g., `IDENTITY_`, `CLASS_MANAGEMENT_`)
 - **Database URL pattern**: `postgresql+asyncpg://user:pass@host:port/huleedu_<service>`
 - **Health check pattern**: `http://localhost:<port>/healthz`
-- **Metrics pattern**: `http://localhost:<port>/metrics` 
+- **Metrics pattern**: `http://localhost:<port>/metrics`
 - **Event topics**: `huleedu.<domain>.<event>.<version>`
 
 ### Architecture Patterns
+
 - **Command Handler**: NLP service uses `CommandHandlerProtocol` for phase separation
 - **Outbox Pattern**: Transactional event publishing via PostgreSQL outbox tables
 - **Dual Events**: Thin state events + rich business events (ELS ↔ RAS pattern)
@@ -288,6 +320,7 @@ curl localhost:8000/healthz  # ELS health
 - **Request/Response**: Immediate HTTP + async Kafka completion events
 
 ### Database Access
+
 ```bash
 # Source environment first
 source .env

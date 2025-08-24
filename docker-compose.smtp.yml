@@ -1,0 +1,34 @@
+# Docker Compose override for enabling SMTP email delivery
+# 
+# Usage: 
+#   # Enable SMTP for all services
+#   docker-compose -f docker-compose.yml -f docker-compose.services.yml -f docker-compose.smtp.yml up -d
+#   
+#   # Enable SMTP for development with hot-reload  
+#   EMAIL_EMAIL_PROVIDER=smtp pdm run dev dev email_service
+#
+# This override enables real email delivery via Namecheap SMTP
+# while maintaining safety defaults in base configurations.
+
+version: '3.8'
+
+services:
+  email_service:
+    environment:
+      # Override email provider to use SMTP instead of mock
+      - EMAIL_EMAIL_PROVIDER=smtp
+      
+      # SMTP configuration loaded from .env file
+      - EMAIL_SMTP_HOST=${EMAIL_SMTP_HOST:-mail.privateemail.com}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
+      - EMAIL_SMTP_USERNAME=${EMAIL_SMTP_USERNAME}
+      - EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}
+      - EMAIL_SMTP_USE_TLS=${EMAIL_SMTP_USE_TLS:-true}
+      - EMAIL_SMTP_TIMEOUT=${EMAIL_SMTP_TIMEOUT:-30}
+      
+      # Email defaults
+      - EMAIL_DEFAULT_FROM_EMAIL=${EMAIL_DEFAULT_FROM_EMAIL:-noreply@hule.education}
+      - EMAIL_DEFAULT_FROM_NAME=${EMAIL_DEFAULT_FROM_NAME:-HuleEdu}
+      
+      # Enable debug logging for SMTP operations
+      - EMAIL_SERVICE_LOG_LEVEL=INFO

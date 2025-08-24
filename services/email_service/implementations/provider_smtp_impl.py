@@ -87,19 +87,43 @@ class SMTPEmailProvider(EmailProvider):
                 send_errors = await smtp.send_message(msg)
 
                 if send_errors:
-                    # Handle partial failures - send_errors is a dict of address -> error tuples
-                    if isinstance(send_errors, dict):
-                        error_details = "; ".join(
-                            f"{addr}: {error}" for addr, error in send_errors.items()
-                        )
+                    # aiosmtplib returns both errors AND success info in send_errors
+                    # Check if it's actually an error (non-empty dict) or success info (empty dict + success message)
+                    if isinstance(send_errors, tuple) and len(send_errors) == 2:
+                        error_dict, message = send_errors
+                        if error_dict:  # Non-empty dict means actual errors
+                            error_details = "; ".join(
+                                f"{addr}: {error}" for addr, error in error_dict.items()
+                            )
+                            logger.error(f"SMTP partial send failure to {to}: {error_details}")
+                            return EmailSendResult(
+                                success=False,
+                                provider_message_id=None,
+                                error_message=f"Partial send failure: {error_details}",
+                            )
+                        else:
+                            # Empty dict + message means success - this is normal SMTP server response
+                            logger.info(f"SMTP server response: {message}")
                     else:
-                        error_details = str(send_errors)
-                    logger.error(f"SMTP partial send failure to {to}: {error_details}")
-                    return EmailSendResult(
-                        success=False,
-                        provider_message_id=None,
-                        error_message=f"Partial send failure: {error_details}",
-                    )
+                        # Handle other send_errors formats
+                        if isinstance(send_errors, dict) and send_errors:
+                            error_details = "; ".join(
+                                f"{addr}: {error}" for addr, error in send_errors.items()
+                            )
+                            logger.error(f"SMTP partial send failure to {to}: {error_details}")
+                            return EmailSendResult(
+                                success=False,
+                                provider_message_id=None,
+                                error_message=f"Partial send failure: {error_details}",
+                            )
+                        else:
+                            # Unexpected format but non-empty, treat as error
+                            logger.error(f"SMTP unexpected send errors to {to}: {send_errors}")
+                            return EmailSendResult(
+                                success=False,
+                                provider_message_id=None,
+                                error_message=f"Unexpected send errors: {send_errors}",
+                            )
 
                 # Generate provider message ID for tracking
                 provider_message_id = f"smtp_{hash(f'{to}_{subject}_{from_email}')}"
