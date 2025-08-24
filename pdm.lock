@@ -654,7 +654,6 @@ summary = "Code coverage measurement for Python"
 groups = ["monorepo-tools"]
 dependencies = [
     "coverage==7.10.5",
-    "coverage==7.10.5",
     "tomli; python_full_version <= \"3.11.0a6\"",
 ]
 files = [
@@ -786,7 +785,6 @@ requires_python = ">=3.10"
 summary = "Cute DI framework with scopes and agreeable API"
 groups = ["dev"]
 dependencies = [
-    "dishka==1.6.0",
     "dishka==1.6.0",
 ]
 files = [
@@ -1093,7 +1091,6 @@ requires_python = ">=3.7"
 summary = "Google API client core library"
 groups = ["dev"]
 dependencies = [
-    "google-api-core==2.25.1",
     "google-api-core==2.25.1",
     "grpcio-status<2.0.0,>=1.33.2",
     "grpcio-status<2.0.0,>=1.49.1; python_version >= \"3.11\"",
@@ -2692,7 +2689,6 @@ groups = ["dev"]
 dependencies = [
     "bcrypt>=3.1.0",
     "passlib==1.7.4",
-    "passlib==1.7.4",
 ]
 files = [
     {file = "passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1"},
@@ -3059,7 +3055,6 @@ groups = ["dev"]
 dependencies = [
     "email-validator>=2.0.0",
     "pydantic==2.11.7",
-    "pydantic==2.11.7",
 ]
 files = [
     {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
@@ -3308,7 +3303,6 @@ groups = ["dev"]
 dependencies = [
     "cryptography>=3.4.0",
     "python-jose==3.5.0",
-    "python-jose==3.5.0",
 ]
 files = [
     {file = "python_jose-3.5.0-py2.py3-none-any.whl", hash = "sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771"},
@@ -3514,7 +3508,6 @@ summary = "Python client for Redis database and key-value store"
 groups = ["dev"]
 dependencies = [
     "hiredis>=3.2.0",
-    "redis==6.4.0",
     "redis==6.4.0",
 ]
 files = [
@@ -3878,7 +3871,6 @@ groups = ["dev"]
 dependencies = [
     "spacy-lookups-data<1.1.0,>=1.0.3",
     "spacy==3.8.7",
-    "spacy==3.8.7",
 ]
 files = [
     {file = "spacy-3.8.7-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:bdff8b9b556468a6dd527af17f0ddf9fb0b0bee92ee7703339ddf542361cff98"},
@@ -3940,7 +3932,6 @@ groups = ["dev"]
 dependencies = [
     "greenlet>=1",
     "sqlalchemy==2.0.43",
-    "sqlalchemy==2.0.43",
 ]
 files = [
     {file = "sqlalchemy-2.0.43-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:52d9b73b8fb3e9da34c2b31e6d99d60f5f99fd8c1225c9dad24aeb74a91e1d29"},
@@ -3992,7 +3983,7 @@ files = [
 
 [[package]]
 name = "starlette"
-version = "0.47.2"
+version = "0.47.3"
 requires_python = ">=3.9"
 summary = "The little ASGI library that shines."
 groups = ["dev"]
@@ -4001,8 +3992,8 @@ dependencies = [
     "typing-extensions>=4.10.0; python_version < \"3.13\"",
 ]
 files = [
-    {file = "starlette-0.47.2-py3-none-any.whl", hash = "sha256:c5847e96134e5c5371ee9fac6fdf1a67336d5815e09eb2a01fdb57a351ef915b"},
-    {file = "starlette-0.47.2.tar.gz", hash = "sha256:6ae9aa5db235e4846decc1e7b79c4f346adf41e9777aebeb49dfd09bbd7023d8"},
+    {file = "starlette-0.47.3-py3-none-any.whl", hash = "sha256:89c0778ca62a76b826101e7c709e70680a1699ca7da6b44d38eb0a7e61fe4b51"},
+    {file = "starlette-0.47.3.tar.gz", hash = "sha256:6bc94f839cc176c4858894f1f8908f0ab79dfec1a6b8402f6da9be26ebea52e9"},
 ]
 
 [[package]]
@@ -4067,7 +4058,6 @@ summary = "Python library for throwaway instances of anything that can run in a 
 groups = ["monorepo-tools"]
 dependencies = [
     "redis",
-    "testcontainers==4.12.0",
     "testcontainers==4.12.0",
 ]
 files = [
@@ -4295,7 +4285,6 @@ dependencies = [
     "httptools>=0.6.3",
     "python-dotenv>=0.13",
     "pyyaml>=5.1",
-    "uvicorn==0.35.0",
     "uvicorn==0.35.0",
     "uvloop>=0.15.1; (sys_platform != \"cygwin\" and sys_platform != \"win32\") and platform_python_implementation != \"PyPy\"",
     "watchfiles>=0.13",

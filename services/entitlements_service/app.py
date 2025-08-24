@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dishka.integrations.quart import QuartDishka, make_async_container
+from dishka import make_async_container
+from quart_dishka import QuartDishka
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.error_handling.quart import create_error_response
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger

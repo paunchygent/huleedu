@@ -19,6 +19,7 @@ volumes:
   nlp_db_data:
   identity_db_data:
   email_db_data:
+  entitlements_db_data:
 
 # Include the separate infrastructure and application service definitions.
 # Docker Compose will merge these files into a single project configuration.

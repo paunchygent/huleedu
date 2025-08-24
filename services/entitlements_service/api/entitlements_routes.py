@@ -14,7 +14,8 @@ from common_core.entitlements_models import (
     CreditCheckResponseV1,
     CreditConsumptionV1,
 )
-from dishka.integrations.quart import FromDishka
+from dishka import FromDishka
+from quart_dishka import inject
 from huleedu_service_libs.error_handling import raise_validation_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field

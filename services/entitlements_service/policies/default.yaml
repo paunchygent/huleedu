@@ -15,7 +15,6 @@ costs:
   # Paid LLM operations (per essay/operation)
   cj_assessment: 10      # Comparative Judgment assessment per essay
   ai_feedback: 5         # AI-generated feedback per essay
-  ai_grading: 8          # AI-assisted grading per essay
   content_analysis: 3    # Advanced content analysis per essay
 
 rate_limits:
@@ -29,7 +28,6 @@ rate_limits:
   # Assessment operations
   cj_assessment: 100/day        # Maximum 100 CJ assessments per day
   ai_feedback: 200/day          # Maximum 200 AI feedback requests per day
-  ai_grading: 150/day           # Maximum 150 AI grading requests per day
   
   # Content operations
   content_upload: 500/hour      # Maximum 500 file uploads per hour

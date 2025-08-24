@@ -13,7 +13,7 @@ from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.entitlements_service.metrics import (
-    EntitlementsMetrics,
+    get_metrics,
     setup_entitlements_service_database_monitoring,
 )
 from services.entitlements_service.protocols import PolicyLoaderProtocol
@@ -56,10 +56,11 @@ async def initialize_services(
         )
         logger.info("Health checker configured")
 
-        # Initialize business metrics
-        metrics = EntitlementsMetrics()
+        # Initialize metrics using singleton pattern with database metrics integration
+        database_metrics = app.extensions.get("db_metrics")
+        metrics = get_metrics(database_metrics)
         app.extensions["metrics"] = metrics
-        logger.info("Business metrics initialized")
+        logger.info("Metrics initialized with database integration")
 
         # Load policies on startup
         async with container() as request_container:

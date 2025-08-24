@@ -776,3 +776,47 @@ services:
       retries: 3
       start_period: 30s
 
+  entitlements_service:
+    build:
+      context: .
+      dockerfile: services/entitlements_service/Dockerfile
+    container_name: huleedu_entitlements_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      entitlements_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "8083:8083"
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENTITLEMENTS_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@entitlements_db:5432/huleedu_entitlements
+      - ENTITLEMENTS_SERVICE_DB_HOST=entitlements_db
+      - ENTITLEMENTS_SERVICE_DB_PORT=5432
+      - ENTITLEMENTS_SERVICE_DB_NAME=huleedu_entitlements
+      - ENTITLEMENTS_SERVICE_DB_USER=${HULEEDU_DB_USER}
+      - ENTITLEMENTS_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
+      - ENTITLEMENTS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ENTITLEMENTS_REDIS_URL=redis://redis:6379
+      - ENTITLEMENTS_LOG_LEVEL=INFO
+      - ENTITLEMENTS_SERVICE_HOST=0.0.0.0
+      - ENTITLEMENTS_METRICS_PORT=8083
+      - ENTITLEMENTS_POLICY_FILE=policies/default.yaml
+      - ENTITLEMENTS_POLICY_CACHE_TTL=300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+

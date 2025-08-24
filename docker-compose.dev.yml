@@ -295,6 +295,25 @@ services:
       - EMAIL_DEFAULT_FROM_EMAIL=${EMAIL_DEFAULT_FROM_EMAIL:-noreply@hule.education}
       - EMAIL_DEFAULT_FROM_NAME=${EMAIL_DEFAULT_FROM_NAME:-HuleEdu}
 
+  # Entitlements Service with development optimizations
+  entitlements_service:
+    build:
+      context: .
+      dockerfile: services/entitlements_service/Dockerfile.dev
+      target: development
+    volumes:
+      - ./services/entitlements_service:/app/services/entitlements_service:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - /app/services/entitlements_service/__pycache__
+      - /app/services/entitlements_service/__pypackages__
+    environment:
+      - ENV_TYPE=development
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - ENTITLEMENTS_SERVICE_LOG_LEVEL=DEBUG
+      - ENTITLEMENTS_USE_MOCK_REPOSITORY=false
+
 # Development-specific volumes for faster file watching
 volumes:
   # Use local driver with better performance for development
