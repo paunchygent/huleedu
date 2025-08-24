@@ -8,16 +8,12 @@ Focus on end-to-end workflow validation with minimal network-boundary mocking.
 from __future__ import annotations
 
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 from common_core.emailing_models import (
-    EmailDeliveryFailedV1,
-    EmailSentV1,
     NotificationEmailRequestedV1,
 )
 
@@ -137,11 +133,11 @@ class TestSMTPIntegrationWorkflow:
         mock_outbox_manager: AsyncMock,
     ) -> None:
         """Test complete workflow from NotificationEmailRequestedV1 to SMTP delivery."""
-        
+
         # Use real implementations for everything except network boundary
         template_renderer = JinjaTemplateRenderer(str(temp_template_dir))
         smtp_provider = SMTPEmailProvider(smtp_settings)
-        
+
         event_processor = EmailEventProcessor(
             repository=mock_repository,
             template_renderer=template_renderer,
@@ -186,14 +182,14 @@ class TestSMTPIntegrationWorkflow:
         # Verify status was updated to sent (may be called multiple times: processing -> sent)
         mock_repository.update_status.assert_called()
         status_calls = mock_repository.update_status.call_args_list
-        
+
         # Find the final 'sent' status call
         sent_call = None
         for call in status_calls:
             if call.kwargs.get("status") == "sent":
                 sent_call = call
                 break
-        
+
         assert sent_call is not None
         assert sent_call.kwargs["message_id"] == email_request.message_id
         assert sent_call.kwargs["status"] == "sent"
@@ -214,10 +210,10 @@ class TestSMTPIntegrationWorkflow:
         mock_outbox_manager: AsyncMock,
     ) -> None:
         """Test complete password reset email workflow with Swedish content."""
-        
+
         template_renderer = JinjaTemplateRenderer(str(temp_template_dir))
         smtp_provider = SMTPEmailProvider(smtp_settings)
-        
+
         event_processor = EmailEventProcessor(
             repository=mock_repository,
             template_renderer=template_renderer,
@@ -246,11 +242,11 @@ class TestSMTPIntegrationWorkflow:
         send_message_call = mock_smtp_server.send_message.call_args[0][0]
         assert send_message_call.get_charset() == "utf-8"
         # Swedish characters are checked in decoded content below
-        
+
         # Verify Swedish characters preserved in template rendering
         email_record_call = mock_repository.create_email_record.call_args[0][0]
         assert "Erik Ström" in email_record_call.variables["user_name"]
-        
+
         # Verify proper event correlation
         outbox_call = mock_outbox_manager.publish_to_outbox.call_args
         envelope_data = outbox_call[1]["event_data"]
@@ -266,23 +262,22 @@ class TestSMTPIntegrationWorkflow:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test complete workflow when SMTP authentication fails."""
-        
+
         # Mock SMTP to raise authentication error
         import aiosmtplib
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
         mock_smtp.connect.return_value = None
         mock_smtp.starttls.return_value = None
-        mock_smtp.login.side_effect = aiosmtplib.SMTPAuthenticationError(
-            535, "Invalid credentials"
-        )
+        mock_smtp.login.side_effect = aiosmtplib.SMTPAuthenticationError(535, "Invalid credentials")
 
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         template_renderer = JinjaTemplateRenderer(str(temp_template_dir))
         smtp_provider = SMTPEmailProvider(smtp_settings)
-        
+
         event_processor = EmailEventProcessor(
             repository=mock_repository,
             template_renderer=template_renderer,
@@ -309,10 +304,12 @@ class TestSMTPIntegrationWorkflow:
         failed_status_call = None
         for call in status_calls:
             # Check both positional and keyword arguments
-            if (len(call.args) >= 2 and call.args[1] == "failed") or call.kwargs.get("status") == "failed":
+            if (len(call.args) >= 2 and call.args[1] == "failed") or call.kwargs.get(
+                "status"
+            ) == "failed":
                 failed_status_call = call
                 break
-        
+
         assert failed_status_call is not None
         # Check for failure reason in kwargs
         failure_reason = failed_status_call.kwargs.get("failure_reason", "")
@@ -326,7 +323,7 @@ class TestSMTPIntegrationWorkflow:
             if "email.delivery_failed.v1" in call[1]["event_type"]:
                 failure_call = call
                 break
-        
+
         assert failure_call is not None
 
     @pytest.mark.asyncio
@@ -339,10 +336,10 @@ class TestSMTPIntegrationWorkflow:
         mock_outbox_manager: AsyncMock,
     ) -> None:
         """Test real Jinja2 template rendering integrated with SMTP delivery."""
-        
+
         template_renderer = JinjaTemplateRenderer(str(temp_template_dir))
         smtp_provider = SMTPEmailProvider(smtp_settings)
-        
+
         event_processor = EmailEventProcessor(
             repository=mock_repository,
             template_renderer=template_renderer,
@@ -369,10 +366,10 @@ class TestSMTPIntegrationWorkflow:
 
         # Verify SMTP message contains rendered Swedish content
         send_message_call = mock_smtp_server.send_message.call_args[0][0]
-        
+
         # Check subject was rendered correctly
         assert "Bekräfta ditt HuleEdu konto" in send_message_call["Subject"]
-        
+
         # Check Swedish characters preserved in body - decode content properly
         parts = list(send_message_call.walk())
         swedish_content_found = False
@@ -380,15 +377,19 @@ class TestSMTPIntegrationWorkflow:
             if part.get_content_type() in ("text/plain", "text/html"):
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
-                if "Maria Öberg" in payload and "Välkommen till HuleEdu" in payload and "åäö456" in payload:
+                    payload = payload.decode("utf-8")
+                if (
+                    "Maria Öberg" in payload
+                    and "Välkommen till HuleEdu" in payload
+                    and "åäö456" in payload
+                ):
                     swedish_content_found = True
                     break
         assert swedish_content_found
 
         # Verify multipart structure (HTML + text)
         assert send_message_call.is_multipart()
-        
+
         # Verify UTF-8 encoding
         assert send_message_call.get_charset() == "utf-8"
 
@@ -412,10 +413,10 @@ class TestSMTPIntegrationWorkflow:
         mock_outbox_manager: AsyncMock,
     ) -> None:
         """Test multiple Swedish template types with SMTP integration."""
-        
+
         template_renderer = JinjaTemplateRenderer(str(temp_template_dir))
         smtp_provider = SMTPEmailProvider(smtp_settings)
-        
+
         event_processor = EmailEventProcessor(
             repository=mock_repository,
             template_renderer=template_renderer,
@@ -443,7 +444,7 @@ class TestSMTPIntegrationWorkflow:
         # Verify template-specific content rendered correctly
         send_message_call = mock_smtp_server.send_message.call_args[0][0]
         assert subject_contains in send_message_call["Subject"]
-        
+
         # Check content in decoded payloads
         parts = list(send_message_call.walk())
         content_found = user_found = False
@@ -451,10 +452,10 @@ class TestSMTPIntegrationWorkflow:
             if part.get_content_type() in ("text/plain", "text/html"):
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
+                    payload = payload.decode("utf-8")
                 if content_contains in payload:
                     content_found = True
                 if "Test Användare" in payload:
                     user_found = True
-        
+
         assert content_found and user_found

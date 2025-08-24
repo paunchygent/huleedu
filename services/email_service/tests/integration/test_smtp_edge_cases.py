@@ -71,7 +71,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test comprehensive SMTP error scenarios with proper EmailSendResult handling."""
-        
+
         # Configure mock based on exception type for proper error simulation
         if isinstance(exception_type, (aiosmtplib.SMTPConnectError, ConnectionError, TimeoutError)):
             # Connection errors should be raised when context manager is entered
@@ -91,11 +91,11 @@ class TestSMTPEdgeCases:
             mock_smtp.__aexit__.return_value = None
             mock_smtp.login.return_value = None
             mock_smtp.send_message.side_effect = exception_type
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         result = await provider.send_email(
             to="test@example.com",
             subject="Test Error Handling",
@@ -115,7 +115,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test SMTP partial send failures with proper error reporting."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -123,14 +123,12 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         # Simulate partial send failure
-        mock_smtp.send_message.return_value = {
-            "test@example.com": (550, "Mailbox not found")
-        }
-        
+        mock_smtp.send_message.return_value = {"test@example.com": (550, "Mailbox not found")}
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         result = await provider.send_email(
             to="test@example.com",
             subject="Test Partial Failure",
@@ -139,7 +137,10 @@ class TestSMTPEdgeCases:
 
         assert result.success is False
         assert result.error_message and "Partial send failure" in result.error_message
-        assert result.error_message and "test@example.com: (550, 'Mailbox not found')" in result.error_message
+        assert (
+            result.error_message
+            and "test@example.com: (550, 'Mailbox not found')" in result.error_message
+        )
 
     @pytest.mark.parametrize(
         "invalid_config,expected_validation",
@@ -157,19 +158,19 @@ class TestSMTPEdgeCases:
         smtp_settings: Settings,
     ) -> None:
         """Test SMTP configuration validation with missing credentials."""
-        
+
         # Apply invalid configuration
         for key, value in invalid_config.items():
             setattr(smtp_settings, key, value)
 
         # Test that DI provider creation validates configuration
         from services.email_service.di import ImplementationProvider
-        
+
         provider_class = ImplementationProvider()
-        
+
         with pytest.raises(ValueError) as exc_info:
             provider_class.provide_email_provider(smtp_settings)
-        
+
         assert expected_validation in str(exc_info.value)
 
     @pytest.mark.parametrize(
@@ -191,7 +192,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test comprehensive Swedish character handling in edge cases."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -199,52 +200,52 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         mock_smtp.send_message.return_value = {}
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         # Test with comprehensive Swedish content
         result = await provider.send_email(
             to="åsa.öberg@skola.se",
             subject=swedish_subject,
             html_content="<p>Hej Åsa! Välkommen till vår svenska utbildningsplattform. "
-                        "Vi har åäöÅÄÖ tecken i vårt innehåll.</p>",
+            "Vi har åäöÅÄÖ tecken i vårt innehåll.</p>",
             text_content="Hej Åsa! Välkommen till vår svenska utbildningsplattform. "
-                        "Vi har åäöÅÄÖ tecken i vårt innehåll.",
+            "Vi har åäöÅÄÖ tecken i vårt innehåll.",
             from_name="Läraren Öberg",
         )
 
         assert result.success is True
-        
+
         # Verify message was created with proper encoding
         send_message_call = mock_smtp.send_message.call_args[0][0]
         assert send_message_call.get_charset() == expected_encoding
-        
+
         # Verify Swedish characters preserved in headers
         assert swedish_subject == send_message_call["Subject"]
         assert "Läraren Öberg" in send_message_call["From"]
-        
+
         # Verify multipart structure with Swedish content - check decoded payloads
         assert send_message_call.is_multipart()
         parts = list(send_message_call.walk())
-        
+
         # Find text and HTML parts and check decoded content
         for part in parts:
             if part.get_content_type() in ("text/plain", "text/html"):
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
+                    payload = payload.decode("utf-8")
                 assert "Åsa" in payload
                 assert "åäö" in payload or "ÅÄÖ" in payload
 
     @pytest.mark.parametrize(
         "content_length,expected_success",
         [
-            (100, True),          # Normal content
-            (10000, True),        # Large content
-            (100000, True),       # Very large content
-            (1000000, True),      # 1MB content
+            (100, True),  # Normal content
+            (10000, True),  # Large content
+            (100000, True),  # Very large content
+            (1000000, True),  # 1MB content
         ],
     )
     @pytest.mark.asyncio
@@ -256,7 +257,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test SMTP handling of various content sizes."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -264,14 +265,14 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         mock_smtp.send_message.return_value = {}
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         # Create content with Swedish characters
         swedish_content = "Detta är svenskt innehåll med åäöÅÄÖ tecken. " * (content_length // 50)
-        
+
         result = await provider.send_email(
             to="test@example.com",
             subject="Test Large Content",
@@ -283,7 +284,7 @@ class TestSMTPEdgeCases:
         if expected_success:
             # Verify message was sent
             mock_smtp.send_message.assert_called_once()
-            
+
             # Verify content integrity with proper decoding
             send_message_call = mock_smtp.send_message.call_args[0][0]
             parts = list(send_message_call.walk())
@@ -292,7 +293,7 @@ class TestSMTPEdgeCases:
                 if part.get_content_type() in ("text/plain", "text/html"):
                     payload = part.get_payload(decode=True)
                     if isinstance(payload, bytes):
-                        payload = payload.decode('utf-8')
+                        payload = payload.decode("utf-8")
                     if "åäöÅÄÖ" in payload:
                         found_swedish_chars = True
                         break
@@ -305,22 +306,22 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test SMTP connection timeout scenarios."""
-        
+
         async def slow_connect(*args: Any, **kwargs: Any) -> None:
             """Simulate slow connection that times out."""
             await asyncio.sleep(0.1)  # Longer than test timeout
             raise asyncio.TimeoutError("Connection timeout")
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.side_effect = slow_connect  # Raise timeout on context entry
         mock_smtp.__aexit__.return_value = None
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         # Set very short timeout for testing
         smtp_settings.SMTP_TIMEOUT = 1
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         result = await provider.send_email(
             to="test@example.com",
             subject="Test Timeout",
@@ -341,7 +342,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test HTML to text conversion with Swedish content edge cases."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -349,11 +350,11 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         mock_smtp.send_message.return_value = {}
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         # Complex HTML with Swedish characters and entities
         complex_html = """
         <html>
@@ -370,7 +371,7 @@ class TestSMTPEdgeCases:
         </body>
         </html>
         """
-        
+
         result = await provider.send_email(
             to="test@example.com",
             subject="Test HTML Conversion",
@@ -379,29 +380,29 @@ class TestSMTPEdgeCases:
         )
 
         assert result.success is True
-        
+
         # Verify multipart message created
         send_message_call = mock_smtp.send_message.call_args[0][0]
         assert send_message_call.is_multipart()
-        
+
         # Verify both HTML and text parts exist with Swedish characters - check decoded content
         parts = list(send_message_call.walk())
         html_found = text_found = False
-        
+
         for part in parts:
             if part.get_content_type() == "text/html":
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
+                    payload = payload.decode("utf-8")
                 if "Välkommen till HuleEdu" in payload and "åäö" in payload and "ÅÄÖ" in payload:
                     html_found = True
             elif part.get_content_type() == "text/plain":
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
+                    payload = payload.decode("utf-8")
                 if "Välkommen till HuleEdu" in payload and "åäö" in payload and "ÅÄÖ" in payload:
                     text_found = True
-        
+
         assert html_found and text_found
 
     @pytest.mark.asyncio
@@ -411,7 +412,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test mixed Swedish/English content handling."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -419,11 +420,11 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         mock_smtp.send_message.return_value = {}
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         mixed_content = """
         <h1>Welcome to HuleEdu / Välkommen till HuleEdu</h1>
         <p>Dear Åsa Öberg,</p>
@@ -432,7 +433,7 @@ class TestSMTPEdgeCases:
         <p>Best regards, / Med vänliga hälsningar,</p>
         <p>The HuleEdu Team / HuleEdu Teamet</p>
         """
-        
+
         result = await provider.send_email(
             to="åsa.öberg@international-school.se",
             subject="Welcome / Välkommen - Account Created / Konto Skapat",
@@ -441,32 +442,36 @@ class TestSMTPEdgeCases:
         )
 
         assert result.success is True
-        
+
         # Verify mixed language content preserved - check decoded content
         send_message_call = mock_smtp.send_message.call_args[0][0]
         parts = list(send_message_call.walk())
-        
+
         # Check content in decoded payloads
         english_found = swedish_found = False
         for part in parts:
             if part.get_content_type() in ("text/plain", "text/html"):
                 payload = part.get_payload(decode=True)
                 if isinstance(payload, bytes):
-                    payload = payload.decode('utf-8')
-                
+                    payload = payload.decode("utf-8")
+
                 # Check English content
                 if "Welcome to HuleEdu" in payload and "Best regards" in payload:
                     english_found = True
-                
+
                 # Check Swedish content with special characters
-                if "Välkommen till HuleEdu" in payload and "Med vänliga hälsningar" in payload and "Åsa Öberg" in payload:
+                if (
+                    "Välkommen till HuleEdu" in payload
+                    and "Med vänliga hälsningar" in payload
+                    and "Åsa Öberg" in payload
+                ):
                     swedish_found = True
-        
+
         assert english_found and swedish_found
-        
+
         # Check mixed subject line
         assert "Welcome / Välkommen" in send_message_call["Subject"]
-        
+
         # Check mixed sender name
         assert "HuleEdu International / HuleEdu Internationell" in send_message_call["From"]
 
@@ -477,7 +482,7 @@ class TestSMTPEdgeCases:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test handling of empty or minimal content."""
-        
+
         mock_smtp = AsyncMock()
         mock_smtp.__aenter__.return_value = mock_smtp
         mock_smtp.__aexit__.return_value = None
@@ -485,11 +490,11 @@ class TestSMTPEdgeCases:
         mock_smtp.starttls.return_value = None
         mock_smtp.login.return_value = None
         mock_smtp.send_message.return_value = {}
-        
+
         monkeypatch.setattr("aiosmtplib.SMTP", lambda *args, **kwargs: mock_smtp)
 
         provider = SMTPEmailProvider(smtp_settings)
-        
+
         # Test with minimal content
         result = await provider.send_email(
             to="test@example.com",
@@ -498,11 +503,11 @@ class TestSMTPEdgeCases:
         )
 
         assert result.success is True
-        
+
         # Verify message was created despite minimal content
         send_message_call = mock_smtp.send_message.call_args[0][0]
         assert send_message_call["Subject"] == ""
         assert send_message_call.is_multipart()
-        
+
         # Verify UTF-8 encoding still applied
         assert send_message_call.get_charset() == "utf-8"

@@ -1,0 +1,51 @@
+# Default Entitlements Policy Configuration
+#
+# This file defines the credit costs, rate limits, and signup bonuses
+# for the HuleEdu platform. Changes to this file require service restart
+# unless hot-reloading is enabled.
+
+costs:
+  # Free internal processing operations (no LLM API calls)
+  batch_create: 0
+  spellcheck: 0
+  nlp_analysis: 0
+  content_upload: 0
+  student_matching: 0
+  
+  # Paid LLM operations (per essay/operation)
+  cj_assessment: 10      # Comparative Judgment assessment per essay
+  ai_feedback: 5         # AI-generated feedback per essay
+  ai_grading: 8          # AI-assisted grading per essay
+  content_analysis: 3    # Advanced content analysis per essay
+
+rate_limits:
+  # Operations per time window (format: count/period)
+  # Periods: hour, day, week, month
+  
+  # Batch operations
+  batch_create: 60/hour         # Maximum 60 batch uploads per hour
+  batch_process: 10/day         # Maximum 10 batch processing requests per day
+  
+  # Assessment operations
+  cj_assessment: 100/day        # Maximum 100 CJ assessments per day
+  ai_feedback: 200/day          # Maximum 200 AI feedback requests per day
+  ai_grading: 150/day           # Maximum 150 AI grading requests per day
+  
+  # Content operations
+  content_upload: 500/hour      # Maximum 500 file uploads per hour
+  content_analysis: 300/day     # Maximum 300 content analyses per day
+  
+  # Administrative operations
+  credit_adjustment: 10/hour    # Maximum 10 manual adjustments per hour
+
+signup_bonuses:
+  # Initial credit allocation for new accounts
+  user: 50          # Credits for individual teacher accounts
+  org: 500          # Credits for institutional/organizational accounts
+
+# Policy cache configuration
+cache_ttl: 300      # Cache policies in Redis for 5 minutes (300 seconds)
+
+# System configuration
+version: "1.0"      # Policy schema version
+last_updated: "2025-01-24T12:00:00Z"

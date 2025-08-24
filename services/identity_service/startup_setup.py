@@ -73,7 +73,7 @@ async def shutdown_services(app: Quart | None = None) -> None:
             identity_kafka_consumer = app.extensions["identity_kafka_consumer"]
             await identity_kafka_consumer.stop_consumer()
             logger.info("IdentityKafkaConsumer stopped")
-            
+
         if "identity_kafka_consumer_task" in app.extensions:
             consumer_task = app.extensions["identity_kafka_consumer_task"]
             consumer_task.cancel()
@@ -82,7 +82,7 @@ async def shutdown_services(app: Quart | None = None) -> None:
             except asyncio.CancelledError:
                 pass
             logger.info("IdentityKafkaConsumer task cancelled")
-        
+
         # Stop relay worker
         if "relay_worker" in app.extensions:
             relay_worker = app.extensions["relay_worker"]

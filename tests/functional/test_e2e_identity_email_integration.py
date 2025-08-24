@@ -1,20 +1,20 @@
 """
 End-to-End Identity Service → Email Service Integration Tests
 
-This test module validates the complete event-driven integration between 
+This test module validates the complete event-driven integration between
 Identity Service and Email Service, ensuring that user actions in Identity Service
 trigger appropriate email notifications via the Email Service.
 
 ARCHITECTURAL FLOW:
 1. Identity Service API call → Identity event publication
-2. IdentityKafkaConsumer consumes own events  
+2. IdentityKafkaConsumer consumes own events
 3. NotificationOrchestrator transforms Identity events → Email notification events
 4. Email Service consumes notification events → Processes and sends emails
 5. Email Service publishes completion events (EmailSentV1/EmailDeliveryFailedV1)
 
 TEST SCENARIOS:
 1. User Registration → Welcome Email (UserRegisteredV1 → NotificationEmailRequestedV1)
-2. Email Verification Request → Verification Email (EmailVerificationRequestedV1 → NotificationEmailRequestedV1)  
+2. Email Verification Request → Verification Email (EmailVerificationRequestedV1 → NotificationEmailRequestedV1)
 3. Password Reset Request → Reset Email (PasswordResetRequestedV1 → NotificationEmailRequestedV1)
 
 DEBUGGING FEATURES:
@@ -27,7 +27,7 @@ DEBUGGING FEATURES:
 import asyncio
 import json
 import subprocess
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from uuid import uuid4
 
 import aiohttp
@@ -96,91 +96,103 @@ class TestIdentityEmailIntegrationE2E:
     async def _verify_docker_container_health(self) -> None:
         """Verify Identity and Email Service containers are running (Rule 046)."""
         print("🔍 Verifying Docker container health...")
-        
+
         # Check Identity Service container
         identity_check = subprocess.run(
-            ["docker", "ps", "--format", "table {{.Names}}", "--filter", "name=huleedu_identity_service"],
+            [
+                "docker",
+                "ps",
+                "--format",
+                "table {{.Names}}",
+                "--filter",
+                "name=huleedu_identity_service",
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
-        assert "huleedu_identity_service" in identity_check.stdout, "Identity Service container not running"
-        
-        # Check Email Service container  
+        assert "huleedu_identity_service" in identity_check.stdout, (
+            "Identity Service container not running"
+        )
+
+        # Check Email Service container
         email_check = subprocess.run(
-            ["docker", "ps", "--format", "table {{.Names}}", "--filter", "name=huleedu_email_service"],
+            [
+                "docker",
+                "ps",
+                "--format",
+                "table {{.Names}}",
+                "--filter",
+                "name=huleedu_email_service",
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
         assert "huleedu_email_service" in email_check.stdout, "Email Service container not running"
-        
+
         print("✅ Identity and Email Service containers verified running")
 
     async def _get_container_logs(self, service_name: str, correlation_id: str) -> str:
         """Get container logs for debugging (Rule 046)."""
         container_name = f"huleedu_{service_name}"
-        
+
         # Get logs filtered by correlation ID
         logs_result = subprocess.run(
-            ["docker", "logs", container_name, "--tail", "100"],
-            capture_output=True,
-            text=True
+            ["docker", "logs", container_name, "--tail", "100"], capture_output=True, text=True
         )
-        
+
         if logs_result.returncode != 0:
             print(f"⚠️ Failed to get logs from {container_name}: {logs_result.stderr}")
             return ""
-            
+
         # Filter logs containing correlation ID
         correlation_logs = []
-        for line in logs_result.stdout.split('\n'):
+        for line in logs_result.stdout.split("\n"):
             if correlation_id in line:
                 correlation_logs.append(line)
-                
-        return '\n'.join(correlation_logs)
+
+        return "\n".join(correlation_logs)
 
     async def _wait_for_event_sequence(
-        self, 
-        consumer: Any, 
-        expected_events: list[str], 
-        correlation_id: str, 
-        timeout: int = 30
+        self, consumer: Any, expected_events: list[str], correlation_id: str, timeout: int = 30
     ) -> Dict[str, Dict[str, Any]]:
         """
         Wait for a sequence of events to occur in order.
-        
+
         Args:
             consumer: Kafka consumer instance
             expected_events: List of topic names to wait for
             correlation_id: Correlation ID to match
             timeout: Timeout in seconds
-            
+
         Returns:
             Dictionary mapping topic names to event data
         """
         print(f"🔍 Waiting for event sequence: {expected_events}")
         print(f"🔗 Correlation ID: {correlation_id}")
-        
+
         found_events: Dict[str, Dict[str, Any]] = {}
         start_time = asyncio.get_event_loop().time()
-        
+
         async for message in consumer:
             try:
                 current_time = asyncio.get_event_loop().time()
                 if current_time - start_time > timeout:
-                    print(f"⏰ Timeout waiting for events. Found {len(found_events)}/{len(expected_events)}")
+                    print(
+                        f"⏰ Timeout waiting for events. Found {len(found_events)}/{len(expected_events)}"
+                    )
                     break
-                    
+
                 if not hasattr(message, "value") or not message.value:
                     continue
-                    
+
                 # Parse message
                 if isinstance(message.value, bytes):
                     raw_message = message.value.decode("utf-8")
                 else:
                     raw_message = message.value
-                    
+
                 envelope_data = json.loads(raw_message)
-                
+
                 # Check if this matches our correlation ID and is an expected event
                 if (
                     envelope_data.get("correlation_id") == correlation_id
@@ -189,16 +201,16 @@ class TestIdentityEmailIntegrationE2E:
                     event_data = envelope_data.get("data", {})
                     found_events[message.topic] = event_data
                     print(f"✅ Found event: {message.topic}")
-                    
+
                     # Check if we have all expected events
                     if len(found_events) >= len(expected_events):
                         print(f"🎉 All {len(expected_events)} events received!")
                         break
-                        
+
             except Exception as e:
                 print(f"⚠️ Error processing event: {e}")
                 continue
-                
+
         return found_events
 
     @pytest.mark.timeout(120)  # 2 minute timeout for complete integration test
@@ -210,28 +222,30 @@ class TestIdentityEmailIntegrationE2E:
     ):
         """
         Test complete User Registration → Welcome Email flow with Swedish character support.
-        
+
         FLOW:
         1. POST /v1/auth/register → UserRegisteredV1 event
         2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
         3. NotificationEmailRequestedV1 event published (template="welcome")
         4. Email Service processes → EmailSentV1 event
         """
-        
+
         # Verify Docker containers are healthy
         await self._verify_docker_container_health()
-        
+
         # Initialize unique correlation ID for this test
         event_factory = reset_test_event_factory()
         correlation_id = str(event_factory.create_unique_correlation_id())
-        
+
         print(f"🔍 Registration flow test correlation ID: {correlation_id}")
         print(f"📧 Testing Swedish email: {swedish_test_data['email']}")
-        
+
         # Set up Kafka consumer BEFORE triggering actions
-        async with kafka_manager.consumer("identity_email_registration", comprehensive_event_topics) as consumer:
+        async with kafka_manager.consumer(
+            "identity_email_registration", comprehensive_event_topics
+        ) as consumer:
             print("✅ Comprehensive event monitoring consumer ready")
-            
+
             async with aiohttp.ClientSession() as session:
                 # Step 1: User Registration
                 print("📝 Step 1: User registration with Swedish characters...")
@@ -241,13 +255,15 @@ class TestIdentityEmailIntegrationE2E:
                     "person_name": swedish_test_data["person_name"],
                     "organization_name": swedish_test_data["organization_name"],
                 }
-                
+
                 async with session.post(
                     f"{self.IDENTITY_SERVICE_BASE_URL}/register",
                     json=registration_payload,
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
-                    assert response.status == 201, f"Registration failed with status {response.status}"
+                    assert response.status == 201, (
+                        f"Registration failed with status {response.status}"
+                    )
                     registration_data = await response.json()
                     user_id = registration_data["user_id"]
                     print(f"✅ User registered successfully: {user_id}")
@@ -259,29 +275,33 @@ class TestIdentityEmailIntegrationE2E:
                     topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_SENT),
                 ]
-                
+
                 found_events = await self._wait_for_event_sequence(
                     consumer, expected_events, correlation_id, timeout=45
                 )
-                
+
                 # Step 3: Verify UserRegisteredV1 event
                 user_registered_topic = topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)
-                assert user_registered_topic in found_events, f"UserRegisteredV1 event not found"
-                
+                assert user_registered_topic in found_events, "UserRegisteredV1 event not found"
+
                 user_registered_event = found_events[user_registered_topic]
                 assert user_registered_event["user_id"] == user_id
                 assert user_registered_event["email"] == swedish_test_data["email"]
                 print("✅ UserRegisteredV1 event verified")
-                
+
                 # Step 4: Verify NotificationEmailRequestedV1 events (both welcome and verification)
                 notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
-                assert notification_topic in found_events, f"NotificationEmailRequestedV1 event not found"
-                
+                assert notification_topic in found_events, (
+                    "NotificationEmailRequestedV1 event not found"
+                )
+
                 # Registration triggers BOTH welcome and verification emails, verify we got at least one
                 notification_event = found_events[notification_topic]
                 assert notification_event["to"] == swedish_test_data["email"]
-                assert notification_event["template_id"] in ["welcome", "verification"], f"Expected welcome or verification template, got {notification_event['template_id']}"
-                
+                assert notification_event["template_id"] in ["welcome", "verification"], (
+                    f"Expected welcome or verification template, got {notification_event['template_id']}"
+                )
+
                 # Check template-specific variables
                 if notification_event["template_id"] == "welcome":
                     assert notification_event["category"] == "system"
@@ -294,32 +314,35 @@ class TestIdentityEmailIntegrationE2E:
                     assert "verification_link" in notification_event["variables"]
                     assert "expires_in" in notification_event["variables"]
                     print("✅ NotificationEmailRequestedV1 event verified (verification template)")
-                
+
                 # Step 5: Verify EmailSentV1 event
                 email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
-                assert email_sent_topic in found_events, f"EmailSentV1 event not found"
-                
+                assert email_sent_topic in found_events, "EmailSentV1 event not found"
+
                 email_sent_event = found_events[email_sent_topic]
                 assert "message_id" in email_sent_event
-                assert email_sent_event["provider"] in ["mock", "smtp"]  # Either provider is acceptable
+                assert email_sent_event["provider"] in [
+                    "mock",
+                    "smtp",
+                ]  # Either provider is acceptable
                 assert "sent_at" in email_sent_event
                 print("✅ EmailSentV1 event verified")
-                
+
                 # Step 6: Verify container logs show processing
                 print("🔍 Step 6: Verifying container logs...")
                 identity_logs = await self._get_container_logs("identity_service", correlation_id)
                 email_logs = await self._get_container_logs("email_service", correlation_id)
-                
+
                 # Log verification (informational)
                 if identity_logs:
-                    print(f"📋 Identity Service logs contain correlation ID: ✅")
+                    print("📋 Identity Service logs contain correlation ID: ✅")
                 else:
-                    print(f"⚠️ Identity Service logs missing correlation ID (check log levels)")
-                    
+                    print("⚠️ Identity Service logs missing correlation ID (check log levels)")
+
                 if email_logs:
-                    print(f"📋 Email Service logs contain correlation ID: ✅")
+                    print("📋 Email Service logs contain correlation ID: ✅")
                 else:
-                    print(f"⚠️ Email Service logs missing correlation ID (check log levels)")
+                    print("⚠️ Email Service logs missing correlation ID (check log levels)")
 
         print("🎉 REGISTRATION → WELCOME EMAIL flow COMPLETED successfully!")
         print("   → UserRegisteredV1 event published by Identity Service")
@@ -336,34 +359,34 @@ class TestIdentityEmailIntegrationE2E:
     ):
         """
         Test Email Verification Request → Verification Email flow.
-        
+
         FLOW:
         1. POST /v1/auth/request-email-verification → EmailVerificationRequestedV1 event
-        2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms  
+        2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
         3. NotificationEmailRequestedV1 event published (template="verification")
         4. Email Service processes → EmailSentV1 event
         """
-        
-        # Verify Docker containers are healthy  
+
+        # Verify Docker containers are healthy
         await self._verify_docker_container_health()
-        
+
         # Initialize unique correlation ID
         event_factory = reset_test_event_factory()
         correlation_id = str(event_factory.create_unique_correlation_id())
-        
+
         print(f"🔍 Email verification flow test correlation ID: {correlation_id}")
-        
+
         # Set up Kafka consumer BEFORE triggering actions
-        async with kafka_manager.consumer("identity_email_verification", comprehensive_event_topics) as consumer:
+        async with kafka_manager.consumer(
+            "identity_email_verification", comprehensive_event_topics
+        ) as consumer:
             print("✅ Comprehensive event monitoring consumer ready")
-            
+
             async with aiohttp.ClientSession() as session:
                 # Step 1: Email Verification Request (public endpoint)
                 print("📝 Step 1: Requesting email verification...")
-                verification_payload = {
-                    "email": swedish_test_data["email"]
-                }
-                
+                verification_payload = {"email": swedish_test_data["email"]}
+
                 async with session.post(
                     f"{self.IDENTITY_SERVICE_BASE_URL}/request-email-verification",
                     json=verification_payload,
@@ -371,37 +394,41 @@ class TestIdentityEmailIntegrationE2E:
                 ) as response:
                     # Note: This endpoint will return 400 if user doesn't exist, but event may still be published
                     print(f"📮 Verification request status: {response.status}")
-                    
+
                     # Even if API returns error, we should still monitor for events
                     # (this tests the integration robustness)
 
-                # Step 2: Wait for complete event sequence  
+                # Step 2: Wait for complete event sequence
                 print("🔄 Step 2: Waiting for verification event chain...")
                 expected_events = [
                     topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_SENT),
                 ]
-                
+
                 found_events = await self._wait_for_event_sequence(
                     consumer, expected_events, correlation_id, timeout=45
                 )
-                
+
                 # If no events found, this might be expected if user doesn't exist
                 if not found_events:
                     print("ℹ️ No events found - this may be expected if user doesn't exist")
-                    print("   Verification request flow requires existing user for event generation")
+                    print(
+                        "   Verification request flow requires existing user for event generation"
+                    )
                     return
-                    
+
                 # Step 3: Verify EmailVerificationRequestedV1 event (if published)
-                verification_topic = topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED)
+                verification_topic = topic_name(
+                    ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED
+                )
                 if verification_topic in found_events:
                     verification_event = found_events[verification_topic]
                     assert verification_event["email"] == swedish_test_data["email"]
                     assert "verification_token" in verification_event
                     assert "expires_at" in verification_event
                     print("✅ EmailVerificationRequestedV1 event verified")
-                    
+
                     # Step 4: Verify NotificationEmailRequestedV1 event
                     notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
                     if notification_topic in found_events:
@@ -411,9 +438,11 @@ class TestIdentityEmailIntegrationE2E:
                         assert notification_event["category"] == "verification"
                         assert "verification_link" in notification_event["variables"]
                         assert "expires_in" in notification_event["variables"]
-                        print("✅ NotificationEmailRequestedV1 event verified (verification template)")
-                        
-                        # Step 5: Verify EmailSentV1 event  
+                        print(
+                            "✅ NotificationEmailRequestedV1 event verified (verification template)"
+                        )
+
+                        # Step 5: Verify EmailSentV1 event
                         email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
                         if email_sent_topic in found_events:
                             email_sent_event = found_events[email_sent_topic]
@@ -434,41 +463,41 @@ class TestIdentityEmailIntegrationE2E:
     ):
         """
         Test Password Reset Request → Reset Email flow.
-        
+
         FLOW:
         1. POST /v1/auth/request-password-reset → PasswordResetRequestedV1 event
         2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
-        3. NotificationEmailRequestedV1 event published (template="password_reset")  
+        3. NotificationEmailRequestedV1 event published (template="password_reset")
         4. Email Service processes → EmailSentV1 event
         """
-        
+
         # Verify Docker containers are healthy
         await self._verify_docker_container_health()
-        
+
         # Initialize unique correlation ID
         event_factory = reset_test_event_factory()
         correlation_id = str(event_factory.create_unique_correlation_id())
-        
+
         print(f"🔍 Password reset flow test correlation ID: {correlation_id}")
-        
+
         # Set up Kafka consumer BEFORE triggering actions
-        async with kafka_manager.consumer("identity_email_password_reset", comprehensive_event_topics) as consumer:
+        async with kafka_manager.consumer(
+            "identity_email_password_reset", comprehensive_event_topics
+        ) as consumer:
             print("✅ Comprehensive event monitoring consumer ready")
-            
+
             async with aiohttp.ClientSession() as session:
                 # Step 1: Password Reset Request
                 print("📝 Step 1: Requesting password reset...")
-                reset_payload = {
-                    "email": swedish_test_data["email"]
-                }
-                
+                reset_payload = {"email": swedish_test_data["email"]}
+
                 async with session.post(
                     f"{self.IDENTITY_SERVICE_BASE_URL}/request-password-reset",
                     json=reset_payload,
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
                     print(f"🔐 Password reset request status: {response.status}")
-                    
+
                     # Note: Endpoint may return success even if user doesn't exist (security)
                     # Events may or may not be published depending on user existence
 
@@ -479,17 +508,17 @@ class TestIdentityEmailIntegrationE2E:
                     topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_SENT),
                 ]
-                
+
                 found_events = await self._wait_for_event_sequence(
                     consumer, expected_events, correlation_id, timeout=45
                 )
-                
+
                 # If no events found, this might be expected if user doesn't exist
                 if not found_events:
-                    print("ℹ️ No events found - this may be expected if user doesn't exist")  
+                    print("ℹ️ No events found - this may be expected if user doesn't exist")
                     print("   Password reset flow requires existing user for event generation")
                     return
-                    
+
                 # Step 3: Verify PasswordResetRequestedV1 event (if published)
                 reset_topic = topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED)
                 if reset_topic in found_events:
@@ -498,8 +527,8 @@ class TestIdentityEmailIntegrationE2E:
                     assert "token_id" in reset_event
                     assert "expires_at" in reset_event
                     print("✅ PasswordResetRequestedV1 event verified")
-                    
-                    # Step 4: Verify NotificationEmailRequestedV1 event  
+
+                    # Step 4: Verify NotificationEmailRequestedV1 event
                     notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
                     if notification_topic in found_events:
                         notification_event = found_events[notification_topic]
@@ -508,8 +537,10 @@ class TestIdentityEmailIntegrationE2E:
                         assert notification_event["category"] == "password_reset"
                         assert "reset_link" in notification_event["variables"]
                         assert "expires_in" in notification_event["variables"]
-                        print("✅ NotificationEmailRequestedV1 event verified (password_reset template)")
-                        
+                        print(
+                            "✅ NotificationEmailRequestedV1 event verified (password_reset template)"
+                        )
+
                         # Step 5: Verify EmailSentV1 event
                         email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
                         if email_sent_topic in found_events:
@@ -526,24 +557,33 @@ class TestIdentityEmailIntegrationE2E:
     async def _debug_kafka_consumer_groups(self) -> None:
         """Debug Kafka consumer group status (Rule 046)."""
         print("🔍 Debugging Kafka consumer groups...")
-        
+
         services = ["identity_service_internal_consumer", "email_service_consumer"]
-        
+
         for service in services:
             try:
-                result = subprocess.run([
-                    "docker", "exec", "huleedu_kafka", 
-                    "/opt/bitnami/kafka/bin/kafka-consumer-groups.sh",
-                    "--bootstrap-server", "localhost:9092",
-                    "--group", service,
-                    "--describe"
-                ], capture_output=True, text=True, timeout=10)
-                
+                result = subprocess.run(
+                    [
+                        "docker",
+                        "exec",
+                        "huleedu_kafka",
+                        "/opt/bitnami/kafka/bin/kafka-consumer-groups.sh",
+                        "--bootstrap-server",
+                        "localhost:9092",
+                        "--group",
+                        service,
+                        "--describe",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+
                 if result.returncode == 0:
                     print(f"📊 {service} consumer group status:")
                     print(result.stdout)
                 else:
                     print(f"❌ Failed to get {service} consumer group status")
-                    
+
             except Exception as e:
                 print(f"⚠️ Error checking {service} consumer group: {e}")

@@ -89,3 +89,27 @@ class ResourceAccessGrantedV1(BaseModel):
     rights: List[str] = ["read"]
     expires_at: Optional[datetime] = None
     correlation_id: str
+
+
+class CreditCheckRequestV1(BaseModel):
+    user_id: str
+    org_id: Optional[str] = None
+    metric: str
+    amount: int = 1
+
+
+class CreditCheckResponseV1(BaseModel):
+    allowed: bool
+    reason: Optional[str] = None
+    required_credits: int
+    available_credits: int
+    source: Optional[str] = None  # "user" or "org"
+
+
+class CreditConsumptionV1(BaseModel):
+    user_id: str
+    org_id: Optional[str] = None
+    metric: str
+    amount: int
+    batch_id: Optional[str] = None
+    correlation_id: str

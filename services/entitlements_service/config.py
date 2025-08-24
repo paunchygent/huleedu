@@ -1,12 +1,10 @@
-"""Configuration settings for Email Service.
+"""Configuration settings for Entitlements Service.
 
 This module provides configuration management following SecureServiceSettings pattern.
-Environment variables are prefixed with 'EMAIL_' for service isolation.
+Environment variables are prefixed with 'ENTITLEMENTS_' for service isolation.
 """
 
 from __future__ import annotations
-
-from typing import Literal
 
 from dotenv import find_dotenv, load_dotenv
 from huleedu_service_libs.config import SecureServiceSettings
@@ -17,37 +15,30 @@ load_dotenv(find_dotenv(".env"))
 
 
 class Settings(SecureServiceSettings):
-    """Configuration settings for Email Service."""
+    """Configuration settings for Entitlements Service."""
 
-    model_config = SettingsConfigDict(env_prefix="EMAIL_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="ENTITLEMENTS_", extra="ignore")
 
-    SERVICE_NAME: str = "email_service"
+    SERVICE_NAME: str = "entitlements_service"
 
-    # Email provider configuration
-    EMAIL_PROVIDER: Literal["mock", "smtp"] = "mock"
+    # Credit system configuration
+    USE_MOCK_REPOSITORY: bool = False  # Development/testing flag
 
-    # SMTP Configuration (Namecheap Private Email)
-    SMTP_HOST: str = "mail.privateemail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str | None = None
-    SMTP_PASSWORD: str | None = None
-    SMTP_USE_TLS: bool = True
-    SMTP_TIMEOUT: int = 30
+    # Policy configuration
+    POLICY_FILE: str = "policies/default.yaml"
+    POLICY_CACHE_TTL: int = 300  # 5 minutes
 
-    # Template configuration
-    TEMPLATE_PATH: str = "templates"
-    DEFAULT_FROM_EMAIL: str = "noreply@hule.education"
-    DEFAULT_FROM_NAME: str = "HuleEdu"
+    # Rate limiting configuration
+    RATE_LIMIT_WINDOW_SECONDS: int = 3600  # Default 1 hour window
+    RATE_LIMIT_ENABLED: bool = True
 
-    # Email processing settings
-    MAX_RETRY_ATTEMPTS: int = 3
-    RETRY_DELAY_SECONDS: int = 60
-
-    # Mock provider settings (for testing)
-    MOCK_PROVIDER_FAILURE_RATE: float = 0.0  # Default 0% for deterministic tests
+    # Credit system settings
+    DEFAULT_USER_CREDITS: int = 50
+    DEFAULT_ORG_CREDITS: int = 500
+    CREDIT_MINIMUM_BALANCE: int = 0  # Prevent negative balances
 
     # Metrics port (inherited from SecureServiceSettings but can override)
-    METRICS_PORT: int = 8080
+    METRICS_PORT: int = 8083
 
     # Database Connection Pool Settings (following established patterns)
     DATABASE_POOL_SIZE: int = 5
@@ -58,7 +49,7 @@ class Settings(SecureServiceSettings):
     # Infrastructure configuration
     REDIS_URL: str = "redis://redis:6379/0"  # Docker service name
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"  # Docker service name
-    PRODUCER_CLIENT_ID_EMAIL: str = "email-service-producer"
+    PRODUCER_CLIENT_ID: str = "entitlements-service-producer"
 
     # Circuit breaker configuration
     CIRCUIT_BREAKER_ENABLED: bool = True
@@ -80,7 +71,7 @@ class Settings(SecureServiceSettings):
         import os
 
         # Check for explicit override first (Docker environment, manual config)
-        env_url = os.getenv("EMAIL_SERVICE_DATABASE_URL")
+        env_url = os.getenv("ENTITLEMENTS_SERVICE_DATABASE_URL")
         if env_url:
             return env_url
 
@@ -99,10 +90,10 @@ class Settings(SecureServiceSettings):
 
             return (
                 f"postgresql+asyncpg://{self._db_user}:{prod_password}@"
-                f"{prod_host}:{prod_port}/huleedu_email"
+                f"{prod_host}:{prod_port}/huleedu_entitlements"
             )
         else:
-            # Development: Docker container (existing pattern)
+            # Development: Docker container (port 5444 for entitlements DB)
             db_user = os.getenv("HULEEDU_DB_USER")
             db_password = os.getenv("HULEEDU_DB_PASSWORD")
 
@@ -112,7 +103,9 @@ class Settings(SecureServiceSettings):
                     "HULEEDU_DB_PASSWORD are set in your .env file."
                 )
 
-            return f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5443/huleedu_email"
+            return (
+                f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5444/huleedu_entitlements"
+            )
 
     @property
     def _db_user(self) -> str:

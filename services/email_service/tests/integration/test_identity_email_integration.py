@@ -19,25 +19,24 @@ from common_core.identity_models import (
     PasswordResetRequestedV1,
     UserRegisteredV1,
 )
-from pydantic import EmailStr
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
 from services.email_service.implementations.provider_mock_impl import MockEmailProvider
+
 # from services.email_service.implementations.repository_impl import EmailRepository
 from services.email_service.implementations.template_renderer_impl import JinjaTemplateRenderer
 
 if TYPE_CHECKING:
-    from typing import Generator
+    pass
 
 
 class MockOutboxManager:
     """Mock outbox manager for testing."""
-    
+
     def __init__(self) -> None:
         self.published_events: list[dict[str, Any]] = []
-    
+
     async def publish_to_outbox(
         self,
         aggregate_type: str,
@@ -47,21 +46,23 @@ class MockOutboxManager:
         topic: str,
     ) -> None:
         """Mock publish to outbox."""
-        self.published_events.append({
-            "aggregate_type": aggregate_type,
-            "aggregate_id": aggregate_id,
-            "event_type": event_type,
-            "event_data": event_data,
-            "topic": topic,
-        })
+        self.published_events.append(
+            {
+                "aggregate_type": aggregate_type,
+                "aggregate_id": aggregate_id,
+                "event_type": event_type,
+                "event_data": event_data,
+                "topic": topic,
+            }
+        )
 
 
 class MockEmailRepository:
     """Mock email repository for testing."""
-    
+
     def __init__(self) -> None:
         self.emails: dict[str, dict[str, Any]] = {}
-    
+
     async def create_email_record(self, record: Any) -> None:
         """Create email record."""
         self.emails[record.message_id] = {
@@ -75,7 +76,7 @@ class MockEmailRepository:
             "correlation_id": record.correlation_id,
             "created_at": record.created_at,
         }
-    
+
     async def update_status(
         self,
         message_id: str,
@@ -159,13 +160,13 @@ async def test_email_verification_flow_integration(
     mock_repository: MockEmailRepository,
 ) -> None:
     """Test complete email verification flow: Identity event → Email sent."""
-    
+
     # Create email verification request event (simulating Identity Service)
     user_id = str(uuid4())
     verification_token = "test_verification_token_123"
     email = "test.user@example.com"
     correlation_id = str(uuid4())
-    
+
     verification_event = EmailVerificationRequestedV1(
         user_id=user_id,
         email=email,
@@ -173,7 +174,7 @@ async def test_email_verification_flow_integration(
         expires_at=datetime.now(timezone.utc).replace(microsecond=0),
         correlation_id=correlation_id,
     )
-    
+
     # Transform to email notification (simulating NotificationOrchestrator)
     notification = NotificationEmailRequestedV1(
         message_id=f"verification-{user_id}-{uuid4().hex[:8]}",
@@ -190,34 +191,34 @@ async def test_email_verification_flow_integration(
         category="verification",
         correlation_id=correlation_id,
     )
-    
+
     # Clear any previous emails
     mock_email_provider.clear_sent_emails()
-    
+
     # Process notification through processor
     await email_processor.process_email_request(notification)
-    
+
     # Verify email was sent
     sent_emails = mock_email_provider.get_sent_emails()
     assert len(sent_emails) == 1
     sent_email = sent_emails[0]
-    
+
     # Validate email content
     assert sent_email["to"] == str(email)
     assert "Verify your HuleEdu account" in sent_email["subject"]
     assert verification_token in sent_email["html_content"]
     assert "https://hule.education/verify" in sent_email["html_content"]
     assert email.split("@")[0].title() in sent_email["html_content"]
-    
+
     # Verify database record was created and updated
     assert notification.message_id in mock_repository.emails
     record = mock_repository.emails[notification.message_id]
     assert record["status"] == "sent"
     assert record["template_id"] == "verification"
     assert record["category"] == "verification"
-    
+
     # Verify Swedish character support in content
-    assert sent_email["html_content"].encode('utf-8')  # Should encode without error
+    assert sent_email["html_content"].encode("utf-8")  # Should encode without error
 
 
 @pytest.mark.integration
@@ -228,13 +229,13 @@ async def test_password_reset_flow_integration(
     mock_repository: MockEmailRepository,
 ) -> None:
     """Test complete password reset flow: Identity event → Email sent."""
-    
+
     # Create password reset request event (simulating Identity Service)
     user_id = str(uuid4())
     token_id = "test_reset_token_456"
     email = "test.user@example.com"
     correlation_id = str(uuid4())
-    
+
     reset_event = PasswordResetRequestedV1(
         user_id=user_id,
         email=email,
@@ -242,7 +243,7 @@ async def test_password_reset_flow_integration(
         expires_at=datetime.now(timezone.utc).replace(microsecond=0),
         correlation_id=correlation_id,
     )
-    
+
     # Transform to email notification (simulating NotificationOrchestrator)
     notification = NotificationEmailRequestedV1(
         message_id=f"password-reset-{user_id}-{uuid4().hex[:8]}",
@@ -259,25 +260,25 @@ async def test_password_reset_flow_integration(
         category="password_reset",
         correlation_id=correlation_id,
     )
-    
+
     # Clear any previous emails
     mock_email_provider.clear_sent_emails()
-    
+
     # Process notification through processor
     await email_processor.process_email_request(notification)
-    
+
     # Verify email was sent
     sent_emails = mock_email_provider.get_sent_emails()
     assert len(sent_emails) == 1
     sent_email = sent_emails[0]
-    
+
     # Validate email content
     assert sent_email["to"] == str(email)
     assert "Reset your HuleEdu password" in sent_email["subject"]
     assert token_id in sent_email["html_content"]
     assert "https://hule.education/reset-password" in sent_email["html_content"]
     assert email.split("@")[0].title() in sent_email["html_content"]
-    
+
     # Verify database record was created and updated
     assert notification.message_id in mock_repository.emails
     record = mock_repository.emails[notification.message_id]
@@ -294,19 +295,19 @@ async def test_welcome_email_flow_integration(
     mock_repository: MockEmailRepository,
 ) -> None:
     """Test complete welcome email flow: User registered → Email sent."""
-    
+
     # Create user registration event (simulating Identity Service)
     user_id = str(uuid4())
     email = "new.user@example.com"
     correlation_id = str(uuid4())
-    
+
     registration_event = UserRegisteredV1(
         user_id=user_id,
         email=email,
         registered_at=datetime.now(timezone.utc).replace(microsecond=0),
         correlation_id=correlation_id,
     )
-    
+
     # Transform to email notification (simulating NotificationOrchestrator)
     notification = NotificationEmailRequestedV1(
         message_id=f"welcome-{user_id}-{uuid4().hex[:8]}",
@@ -323,25 +324,25 @@ async def test_welcome_email_flow_integration(
         category="system",
         correlation_id=correlation_id,
     )
-    
+
     # Clear any previous emails
     mock_email_provider.clear_sent_emails()
-    
+
     # Process notification through processor
     await email_processor.process_email_request(notification)
-    
+
     # Verify email was sent
     sent_emails = mock_email_provider.get_sent_emails()
     assert len(sent_emails) == 1
     sent_email = sent_emails[0]
-    
+
     # Validate email content
     assert sent_email["to"] == str(email)
     assert "Welcome to HuleEdu!" in sent_email["subject"]
     assert "Welcome to HuleEdu!" in sent_email["html_content"]
     assert email.split("@")[0].title() in sent_email["html_content"]
     assert "https://app.hule.education/dashboard" in sent_email["html_content"]
-    
+
     # Verify database record was created and updated
     assert notification.message_id in mock_repository.emails
     record = mock_repository.emails[notification.message_id]
@@ -354,9 +355,9 @@ async def test_welcome_email_flow_integration(
 @pytest.mark.asyncio
 async def test_template_variable_compatibility() -> None:
     """Test that all Identity variables are compatible with email templates."""
-    
+
     template_renderer = JinjaTemplateRenderer("templates")
-    
+
     # Test verification template with Identity variables
     verification_variables = {
         "user_name": "TestUser",
@@ -366,16 +367,14 @@ async def test_template_variable_compatibility() -> None:
         "expires_at": "2025-01-01T12:00:00+00:00",
         "current_year": "2025",
     }
-    
-    verification_content = await template_renderer.render(
-        "verification", verification_variables
-    )
-    
+
+    verification_content = await template_renderer.render("verification", verification_variables)
+
     # Verify all variables are rendered
     assert "TestUser" in verification_content.html_content
     assert "https://hule.education/verify?token=abc123" in verification_content.html_content
     assert "24 hours" in verification_content.html_content
-    
+
     # Test password reset template with Identity variables
     reset_variables = {
         "user_name": "TestUser",
@@ -385,16 +384,14 @@ async def test_template_variable_compatibility() -> None:
         "expires_at": "2025-01-01T12:00:00+00:00",
         "current_year": "2025",
     }
-    
-    reset_content = await template_renderer.render(
-        "password_reset", reset_variables
-    )
-    
+
+    reset_content = await template_renderer.render("password_reset", reset_variables)
+
     # Verify all variables are rendered
     assert "TestUser" in reset_content.html_content
     assert "https://hule.education/reset-password?token=def456" in reset_content.html_content
     assert "1 hour" in reset_content.html_content
-    
+
     # Test welcome template with Identity variables
     welcome_variables = {
         "user_name": "NewUser",
@@ -404,11 +401,9 @@ async def test_template_variable_compatibility() -> None:
         "registered_at": "2025-01-01T12:00:00+00:00",
         "current_year": "2025",
     }
-    
-    welcome_content = await template_renderer.render(
-        "welcome", welcome_variables
-    )
-    
+
+    welcome_content = await template_renderer.render("welcome", welcome_variables)
+
     # Verify all variables are rendered
     assert "NewUser" in welcome_content.html_content
     assert "https://app.hule.education/dashboard" in welcome_content.html_content
@@ -422,10 +417,10 @@ async def test_swedish_characters_in_email_flow(
     mock_email_provider: MockEmailProvider,
 ) -> None:
     """Test Swedish character support in complete email flow."""
-    
+
     # Create notification with Swedish characters
     swedish_email = "björn.åström@example.com"
-    
+
     notification = NotificationEmailRequestedV1(
         message_id="swedish-test-123",
         template_id="verification",
@@ -441,26 +436,26 @@ async def test_swedish_characters_in_email_flow(
         category="verification",
         correlation_id=str(uuid4()),
     )
-    
+
     # Clear any previous emails
     mock_email_provider.clear_sent_emails()
-    
+
     # Process notification
     await email_processor.process_email_request(notification)
-    
+
     # Verify email was sent with Swedish characters
     sent_emails = mock_email_provider.get_sent_emails()
     assert len(sent_emails) == 1
     sent_email = sent_emails[0]
-    
+
     # Validate Swedish characters are preserved
     assert sent_email["to"] == str(swedish_email)
     assert "Björn Åström" in sent_email["html_content"]
     assert "åäö123" in sent_email["html_content"]
-    
+
     # Verify content can be encoded as UTF-8
-    encoded_content = sent_email["html_content"].encode('utf-8')
-    decoded_content = encoded_content.decode('utf-8')
+    encoded_content = sent_email["html_content"].encode("utf-8")
+    decoded_content = encoded_content.decode("utf-8")
     assert "Björn Åström" in decoded_content
     assert "åäö123" in decoded_content
 
@@ -473,10 +468,10 @@ async def test_correlation_id_preservation(
     mock_outbox: MockOutboxManager,
 ) -> None:
     """Test that correlation IDs are preserved through the complete flow."""
-    
+
     # Create notification with specific correlation ID (must be valid UUID)
     correlation_id = str(uuid4())
-    
+
     notification = NotificationEmailRequestedV1(
         message_id="correlation-test-456",
         template_id="welcome",
@@ -492,17 +487,17 @@ async def test_correlation_id_preservation(
         category="system",
         correlation_id=correlation_id,
     )
-    
+
     # Clear any previous emails and events
     mock_email_provider.clear_sent_emails()
-    
+
     # Process notification
     await email_processor.process_email_request(notification)
-    
+
     # Verify processing succeeded
     sent_emails = mock_email_provider.get_sent_emails()
     assert len(sent_emails) == 1
-    
+
     # Verify correlation ID is in published events
     assert len(mock_outbox.published_events) == 1
     published_event = mock_outbox.published_events[0]

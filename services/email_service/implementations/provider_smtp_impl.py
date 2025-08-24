@@ -77,7 +77,7 @@ class SMTPEmailProvider(EmailProvider):
                 # Authenticate with SMTP server
                 if self.settings.SMTP_USERNAME is None or self.settings.SMTP_PASSWORD is None:
                     raise ValueError("SMTP username and password are required for authentication")
-                
+
                 await smtp.login(
                     self.settings.SMTP_USERNAME,
                     self.settings.SMTP_PASSWORD,

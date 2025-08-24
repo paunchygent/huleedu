@@ -194,3 +194,351 @@ Note: Finalize all DTOs via a contract workshop before coding. Placeholders belo
 - Unit tests cover composition, error mapping, and partial failure cases
 - Optional: batch status diffs published to Redis and visible through `websocket_service`
 
+
+---
+
+# Junior Developer Guide: BFF in HuleEdu (Textbook Walkthrough)
+
+This section explains, step by step, what a Backend‑For‑Frontend (BFF) is, why we use it, and exactly how it looks in this repository—using only structures that exist here today. Code snippets are illustrative and follow the same libraries and patterns you can see under `services/api_gateway_service/` and other services.
+
+## BFF 101 (What and Why)
+- A BFF is a small backend tailored to a specific frontend (or role) that:
+  - Calls multiple domain services in parallel (composition).
+  - Returns a screen‑specific shape (DTO) that fits the UI perfectly.
+  - Enforces fine‑grained access policy for that UI.
+- What a BFF is NOT:
+  - It’s not the API Gateway. The gateway handles edge concerns (authN, coarse rate limits, CORS) and forwards to the right backend.
+  - It’s not a domain service (e.g., Class Management, Result Aggregator). Those own business logic and data. The BFF only composes their results.
+
+In HuleEdu terms:
+- Gateway: `services/api_gateway_service` (FastAPI) — entrypoint for the web app.
+- BFFs (to add): one per role, e.g. `bff-teacher`, later `bff-admin`. Gateway routes `/bff/v1/*` to them.
+- Services that the BFF composes:
+  - Class Management Service (CMS): `services/class_management_service` (Quart)
+  - Result Aggregator Service (RAS): `services/result_aggregator_service` (Quart)
+  - File & Content services (Quart)
+  - Identity service (Quart)
+  - WebSocket service (FastAPI) for push updates (existing pub/sub pipeline)
+
+## How BFF Shows Up in This Repo
+- New services under `services/` (e.g., `services/bff_teacher_service/`).
+- New gateway routers that forward `/bff/v1/teacher/*` to the teacher BFF (thin proxy only).
+- DTOs (Pydantic) defined inside the BFF for each screen, with versioned modules like `dto/teacher_v1.py`.
+- Clients that call existing services (using `httpx.AsyncClient`) and reuse shared libs from `libs/huleedu_service_libs` (metrics, error mapping, redis, etc.).
+
+## Step‑by‑Step: Build `bff-teacher` MVP
+
+We’ll implement four endpoints aligned with Teacher screens that already have upstream support:
+1) Dashboard summary (batch‑centric for MVP)
+2) Batch detail view
+3) Essay feedback view (subset from RAS batch payload)
+4) Student association review/confirm (CMS)
+
+### 1) Create the service skeleton
+Target structure:
+```
+services/bff_teacher_service/
+  app.py               # FastAPI app, middleware, DI hookup
+  di.py                # Provide httpx clients, redis, settings, metrics
+  dto/teacher_v1.py    # Screen‑specific Pydantic models (v1)
+  api/teacher_routes.py# Role endpoints under /v1/teacher/*
+  clients/
+    ras_client.py
+    cms_client.py
+    file_client.py
+    content_client.py
+    identity_client.py
+  tests/
+    test_teacher_routes.py
+```
+
+Why FastAPI? Evidence: the gateway and websocket services already use FastAPI + Dishka (`dishka.integrations.fastapi`) and HuleEdu libs have FastAPI error integration (`huleedu_service_libs.error_handling.fastapi`). Using the same stack reduces friction.
+
+Minimal `app.py` (follows gateway patterns):
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from huleedu_service_libs.error_handling.fastapi import register_error_handlers
+
+from .di import setup_dependency_injection
+from .api.teacher_routes import router as teacher_router
+
+app = FastAPI(title="bff-teacher", version="1.0.0")
+register_error_handlers(app)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+setup_dependency_injection(app)
+app.include_router(teacher_router, prefix="/v1/teacher", tags=["Teacher BFF"])
+```
+
+### 2) Define DTOs (screen contracts)
+Only include fields we can fetch from current services. Example DTOs referencing RAS structures in `services/result_aggregator_service/models_api.py`:
+```python
+# services/bff_teacher_service/dto/teacher_v1.py
+from datetime import datetime
+from pydantic import BaseModel
+from common_core.status_enums import BatchClientStatus
+from common_core.pipeline_models import PhaseName
+
+class EssayV1(BaseModel):
+    essay_id: str
+    filename: str | None = None
+    file_upload_id: str | None = None
+    spellcheck_status: str | None = None
+    spellcheck_correction_count: int | None = None
+    spellcheck_corrected_text_storage_id: str | None = None
+    cj_assessment_status: str | None = None
+    cj_rank: int | None = None
+    cj_score: float | None = None
+    last_updated: datetime
+
+class BatchDetailV1(BaseModel):
+    batch_id: str
+    overall_status: BatchClientStatus
+    requested_pipeline: str | None = None
+    current_phase: PhaseName | None = None
+    essays: list[EssayV1]
+    created_at: datetime
+    last_updated: datetime
+```
+
+### 3) Write thin service clients
+Clients call existing endpoints. Example RAS client using internal auth headers (compose file provides `${HULEEDU_INTERNAL_API_KEY}` to RAS):
+```python
+# services/bff_teacher_service/clients/ras_client.py
+from httpx import AsyncClient
+
+class RASClient:
+    def __init__(self, base_url: str, api_key: str, service_id: str = "bff-teacher"):
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.service_id = service_id
+
+    async def get_batch_status(self, batch_id: str) -> dict:
+        url = f"{self.base_url}/internal/v1/batches/{batch_id}/status"
+        async with AsyncClient(timeout=30) as client:
+            r = await client.get(url, headers={
+                "X-Internal-API-Key": self.api_key,
+                "X-Service-ID": self.service_id,
+            })
+            r.raise_for_status()
+            return r.json()
+
+    async def get_user_batches(self, user_id: str, limit: int = 20, offset: int = 0) -> dict:
+        url = f"{self.base_url}/internal/v1/batches/user/{user_id}?limit={limit}&offset={offset}"
+        async with AsyncClient(timeout=30) as client:
+            r = await client.get(url, headers={
+                "X-Internal-API-Key": self.api_key,
+                "X-Service-ID": self.service_id,
+            })
+            r.raise_for_status()
+            return r.json()
+```
+
+Example CMS client for owner class list (you can see the new `GET /v1/classes/` route in `services/class_management_service/api/class_routes.py`):
+```python
+# services/bff_teacher_service/clients/cms_client.py
+from httpx import AsyncClient
+
+class CMSClient:
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+
+    async def list_classes(self, user_id: str, limit: int = 20, offset: int = 0) -> dict:
+        url = f"{self.base_url}/v1/classes?limit={limit}&offset={offset}"
+        async with AsyncClient(timeout=30) as client:
+            r = await client.get(url, headers={"X-User-ID": user_id})
+            r.raise_for_status()
+            return r.json()
+```
+
+### 4) Implement the BFF routes
+Example: Batch detail screen composition (maps RAS response to `BatchDetailV1`).
+```python
+# services/bff_teacher_service/api/teacher_routes.py
+from dishka.integrations.fastapi import FromDishka, inject
+from fastapi import APIRouter
+from ..clients.ras_client import RASClient
+from ..dto.teacher_v1 import BatchDetailV1, EssayV1
+
+router = APIRouter()
+
+@router.get("/batches/{batch_id}", response_model=BatchDetailV1)
+@inject
+async def get_batch_detail(batch_id: str, ras: FromDishka[RASClient], user_id: FromDishka[str]):
+    # 1) Fetch from RAS (internal)
+    data = await ras.get_batch_status(batch_id)
+    # 2) Enforce ownership: data["user_id"] must equal user_id
+    if data.get("user_id") != user_id:
+        # Return 403 in real implementation
+        raise PermissionError("User not authorized for batch")
+    # 3) Map to DTO
+    essays = [EssayV1(**e) for e in data.get("essays", [])]
+    return BatchDetailV1(
+        batch_id=data["batch_id"],
+        overall_status=data["overall_status"],
+        requested_pipeline=data.get("requested_pipeline"),
+        current_phase=data.get("current_phase"),
+        essays=essays,
+        created_at=data["created_at"],
+        last_updated=data["last_updated"],
+    )
+```
+
+Note: In the real implementation, you will normalize errors via `huleedu_service_libs.error_handling.fastapi` and return proper 4xx/5xx responses, just like the gateway does.
+
+### 5) Dependency Injection (DI)
+Follow the gateway pattern: provide dependencies (settings, user_id, clients) with Dishka.
+```python
+# services/bff_teacher_service/di.py
+import os
+from dishka import make_container, Provider
+from dishka.integrations.fastapi import setup_dishka
+from fastapi import FastAPI
+
+from .clients.ras_client import RASClient
+from .clients.cms_client import CMSClient
+
+class BFFProvider(Provider):
+    def __init__(self):
+        self.ras = lambda: RASClient(os.environ["RESULT_AGGREGATOR_URL"], os.environ["HULEEDU_INTERNAL_API_KEY"])  # noqa: E501
+        self.cms = lambda: CMSClient(os.environ["CMS_API_URL"])  # provided by docker env
+
+    async def provide_user_id(self) -> str:
+        # In practice, read from request scope set by gateway middleware
+        return "mock-user-id"
+
+def setup_dependency_injection(app: FastAPI) -> None:
+    container = make_container(BFFProvider())
+    setup_dishka(container, app)
+```
+
+### 6) Expose BFF via the Gateway (minimal proxy)
+Add thin proxy routes in the gateway to forward `/bff/v1/teacher/*` to `bff-teacher`:
+```python
+# services/api_gateway_service/routers/bff_teacher_routes.py (pattern mirrors class_routes.py)
+from dishka.integrations.fastapi import DishkaRoute, FromDishka
+from fastapi import APIRouter, Request
+from httpx import AsyncClient
+from services.api_gateway_service.config import settings
+
+router = APIRouter(route_class=DishkaRoute)
+
+@router.api_route("/bff/v1/teacher/{path:path}", methods=["GET","POST","PUT","DELETE"])
+async def proxy_teacher_bff(path: str, request: Request) -> tuple[str, int, dict]:
+    url = f"{settings.BFF_TEACHER_URL}/v1/teacher/{path}"
+    async with AsyncClient(timeout=30) as client:
+        r = await client.request(
+            method=request.method,
+            url=url,
+            headers={
+                # Forward auth context and correlation ID
+                "Authorization": request.headers.get("Authorization", ""),
+                "X-User-ID": request.headers.get("X-User-ID", ""),
+                "X-Correlation-ID": request.headers.get("X-Correlation-ID", ""),
+            },
+            params=request.query_params,
+            content=await request.body(),
+        )
+    return r.text, r.status_code, dict(r.headers)
+```
+Register this router in `services/api_gateway_service/app/__init__.py` the same way other routers are included.
+
+### 7) Wire Docker Compose (service + envs)
+Add a service like (example, adjust ports/names as needed):
+```yaml
+# docker-compose.services.yml (illustrative snippet)
+  bff_teacher_service:
+    build:
+      context: .
+      dockerfile: services/bff_teacher_service/Dockerfile
+    container_name: huleedu_bff_teacher
+    networks: [huleedu_internal_network]
+    environment:
+      - RESULT_AGGREGATOR_URL=http://result_aggregator_service:4003
+      - CMS_API_URL=http://class_management_service:5002
+      - FILE_SERVICE_URL=http://file_service:7001
+      - CONTENT_SERVICE_URL=http://content_service:8000
+      - HULEEDU_INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+```
+Then add to gateway config:
+```python
+# services/api_gateway_service/config.py (add fields)
+BFF_TEACHER_URL: str = Field(default="http://bff_teacher_service:4101")
+```
+
+### 8) Test the BFF
+Unit test example using FastAPI’s test client and mocking the RAS client:
+```python
+import pytest
+from fastapi.testclient import TestClient
+from services.bff_teacher_service.app import app
+
+def test_get_batch_detail_happy_path(monkeypatch):
+    class FakeRAS:
+        async def get_batch_status(self, batch_id: str) -> dict:
+            return {
+                "batch_id": batch_id,
+                "user_id": "u1",
+                "overall_status": "processing",
+                "essays": [],
+                "created_at": "2024-01-01T00:00:00Z",
+                "last_updated": "2024-01-01T00:01:00Z",
+            }
+
+    # Monkeypatch DI to return FakeRAS and user_id "u1"
+    # (Implementation depends on DI setup; pattern mirrors gateway tests.)
+
+    client = TestClient(app)
+    r = client.get("/v1/teacher/batches/b123", headers={"X-User-ID":"u1"})
+    assert r.status_code == 200
+    assert r.json()["batch_id"] == "b123"
+```
+
+## End‑to‑End Example Calls
+
+1) CMS class list (now available):
+```
+GET /v1/classes?limit=10&offset=0
+Headers: X-User-ID: teacher_123
+
+Response 200
+{
+  "classes": [
+    {"id":"...","name":"Writing 101","course_code":"...","student_count":25,"created_at":"..."}
+  ],
+  "pagination": {"limit":10,"offset":0,"returned":1}
+}
+```
+
+2) Teacher BFF batch detail via gateway:
+```
+GET /bff/v1/teacher/batches/abcd-1234
+Headers: Authorization: Bearer <jwt>, X-User-ID: teacher_123
+
+Response 200 (BatchDetailV1)
+{
+  "batch_id":"abcd-1234",
+  "overall_status":"processing",
+  "essays": [ {"essay_id":"...","filename":"...","last_updated":"..."} ],
+  "created_at":"...",
+  "last_updated":"..."
+}
+```
+
+## Streaming Notes (Where BFF fits)
+- The WebSocket service already consumes teacher notification events from Kafka and publishes to Redis channels. See `services/websocket_service/implementations/notification_event_consumer.py`.
+- A BFF can optionally publish small diffs to Redis (e.g., batch status changes) using the same Redis client interfaces in `huleedu_service_libs.protocols` (evidence exists). This is an enhancement, not required for MVP because WS push is already implemented for notifications.
+
+## Responsibilities Recap
+- BFF (per role): composition, role‑specific DTOs, fine‑grained authZ, minimal policy, optional Redis diffs.
+- API Gateway: authN, CORS, coarse rate limit, correlation IDs, thin proxy to BFFs/services.
+- Domain Services (CMS, RAS, etc.): business logic, persistence, events; no UI‑specific response shaping.
+
+## Common Pitfalls (and Repo‑specific Tips)
+- Don’t put composition logic in the gateway; keep it in the BFF.
+- Only include DTO fields backed by actual upstream data (verify endpoints and model fields).
+- Propagate `X-User-ID` and `X-Correlation-ID` in all inter‑service calls (patterns exist across services).
+- Use `httpx.AsyncClient` with timeouts and per‑service circuit breakers (see resilience rules under `.cursor/rules/`).
+- Reuse error mapping utilities from `huleedu_service_libs.error_handling` for consistency.

@@ -1,25 +1,22 @@
 """Integration tests for SMTP email provider core functionality.
 
-Tests SMTPEmailProvider protocol compliance, configuration validation, Swedish character 
-support, message creation, authentication flow, and success scenarios following Rule 075 
+Tests SMTPEmailProvider protocol compliance, configuration validation, Swedish character
+support, message creation, authentication flow, and success scenarios following Rule 075
 methodology. Focus on behavioral testing without @patch usage.
 """
 
 from __future__ import annotations
 
-import asyncio
 from email.message import EmailMessage
 from typing import Any
 from unittest.mock import AsyncMock
-from uuid import uuid4
 
-import pytest
 import aiosmtplib  # type: ignore[import-not-found]
-from huleedu_service_libs.error_handling import HuleEduError
+import pytest
 
 from services.email_service.config import Settings
 from services.email_service.implementations.provider_smtp_impl import SMTPEmailProvider
-from services.email_service.protocols import EmailProvider, EmailSendResult
+from services.email_service.protocols import EmailSendResult
 
 
 class TestSMTPProviderCore:
@@ -65,9 +62,10 @@ class TestSMTPProviderCore:
         assert hasattr(provider, "get_provider_name")
         assert callable(provider.send_email)
         assert callable(provider.get_provider_name)
-        
+
         # Verify method signatures match protocol
         import inspect
+
         send_email_sig = inspect.signature(provider.send_email)
         assert "to" in send_email_sig.parameters
         assert "subject" in send_email_sig.parameters
@@ -90,8 +88,13 @@ class TestSMTPProviderCore:
         ],
     )
     def test_configuration_handling(
-        self, host: str, port: int, username: str | None, password: str | None, 
-        use_tls: bool, timeout: int
+        self,
+        host: str,
+        port: int,
+        username: str | None,
+        password: str | None,
+        use_tls: bool,
+        timeout: int,
     ) -> None:
         """Test SMTP settings configuration handling."""
         settings = Settings(
@@ -104,7 +107,7 @@ class TestSMTPProviderCore:
             DEFAULT_FROM_EMAIL="test@huleedu.se",
             DEFAULT_FROM_NAME="HuleEdu Test",
         )
-        
+
         # Act & Assert: Provider creation should succeed
         provider = SMTPEmailProvider(settings)
         assert provider.settings.SMTP_HOST == host
@@ -151,6 +154,7 @@ class TestSMTPProviderCore:
         expected_content_chars: list[str],
     ) -> None:
         """Test Swedish character support in email messages (ÅÄÖ mandatory for email domain)."""
+
         # Arrange: Mock SMTP connection
         def mock_smtp_class(*args: Any, **kwargs: Any) -> AsyncMock:
             return mock_smtp_server
@@ -194,7 +198,7 @@ class TestSMTPProviderCore:
         parts = list(sent_message.walk())
         html_part = None
         text_part = None
-        
+
         for part in parts:
             if part.get_content_type() == "text/html":
                 html_part = part
@@ -207,9 +211,17 @@ class TestSMTPProviderCore:
         # Verify Swedish characters preserved in content
         html_payload_raw = html_part.get_payload(decode=True)
         text_payload_raw = text_part.get_payload(decode=True)
-        
-        html_payload = html_payload_raw.decode('utf-8') if isinstance(html_payload_raw, bytes) else str(html_payload_raw)
-        text_payload = text_payload_raw.decode('utf-8') if isinstance(text_payload_raw, bytes) else str(text_payload_raw)
+
+        html_payload = (
+            html_payload_raw.decode("utf-8")
+            if isinstance(html_payload_raw, bytes)
+            else str(html_payload_raw)
+        )
+        text_payload = (
+            text_payload_raw.decode("utf-8")
+            if isinstance(text_payload_raw, bytes)
+            else str(text_payload_raw)
+        )
 
         for swedish_char in expected_content_chars:
             assert swedish_char in html_payload, f"Swedish char '{swedish_char}' missing from HTML"
@@ -219,6 +231,7 @@ class TestSMTPProviderCore:
         self, provider: SMTPEmailProvider, mock_smtp_server: AsyncMock, monkeypatch: Any
     ) -> None:
         """Test multipart HTML/text message generation."""
+
         # Arrange: Mock SMTP connection
         def mock_smtp_class(*args: Any, **kwargs: Any) -> AsyncMock:
             return mock_smtp_server
@@ -257,13 +270,17 @@ class TestSMTPProviderCore:
         # Get parts
         parts = list(sent_message.walk())
         content_parts = [p for p in parts if not p.is_multipart()]
-        
+
         assert len(content_parts) == 2, "Should have text and HTML parts"
 
         # Verify text part was generated from HTML
         text_part = next(p for p in content_parts if p.get_content_type() == "text/plain")
         text_payload_raw = text_part.get_payload(decode=True)
-        text_content = text_payload_raw.decode('utf-8') if isinstance(text_payload_raw, bytes) else str(text_payload_raw)
+        text_content = (
+            text_payload_raw.decode("utf-8")
+            if isinstance(text_payload_raw, bytes)
+            else str(text_payload_raw)
+        )
 
         # Text should contain Swedish characters without HTML tags
         assert "Välkommen Åsa!" in text_content
@@ -276,6 +293,7 @@ class TestSMTPProviderCore:
         self, provider: SMTPEmailProvider, mock_smtp_server: AsyncMock, monkeypatch: Any
     ) -> None:
         """Test custom text content is preserved when provided."""
+
         # Arrange: Mock SMTP connection
         def mock_smtp_class(*args: Any, **kwargs: Any) -> AsyncMock:
             return mock_smtp_server
@@ -300,9 +318,13 @@ class TestSMTPProviderCore:
         sent_message = mock_smtp_server.send_message.call_args.args[0]
         parts = list(sent_message.walk())
         text_part = next(p for p in parts if p.get_content_type() == "text/plain")
-        
+
         text_payload_raw = text_part.get_payload(decode=True)
-        text_payload = text_payload_raw.decode('utf-8') if isinstance(text_payload_raw, bytes) else str(text_payload_raw)
+        text_payload = (
+            text_payload_raw.decode("utf-8")
+            if isinstance(text_payload_raw, bytes)
+            else str(text_payload_raw)
+        )
         assert text_payload.strip() == custom_text.strip()
 
     @pytest.mark.parametrize(
@@ -311,9 +333,19 @@ class TestSMTPProviderCore:
             # Use default sender
             ("student@huleedu.se", None, None, "HuleEdu Test <noreply@huleedu.se>"),
             # Custom sender with Swedish name
-            ("lärare@svenskaskolan.se", "anna.lärare@huleedu.se", "Anna Lindström", "Anna Lindström <anna.lärare@huleedu.se>"),
+            (
+                "lärare@svenskaskolan.se",
+                "anna.lärare@huleedu.se",
+                "Anna Lindström",
+                "Anna Lindström <anna.lärare@huleedu.se>",
+            ),
             # Custom sender with special characters
-            ("test@example.com", "björn@huleedu.se", "Björn Andersson", "Björn Andersson <björn@huleedu.se>"),
+            (
+                "test@example.com",
+                "björn@huleedu.se",
+                "Björn Andersson",
+                "Björn Andersson <björn@huleedu.se>",
+            ),
         ],
     )
     async def test_sender_information_handling(
@@ -327,6 +359,7 @@ class TestSMTPProviderCore:
         expected_from_header: str,
     ) -> None:
         """Test sender information handling with Swedish characters."""
+
         # Arrange: Mock SMTP connection
         def mock_smtp_class(*args: Any, **kwargs: Any) -> AsyncMock:
             return mock_smtp_server
@@ -387,7 +420,9 @@ class TestSMTPProviderCore:
         # Assert: Message was sent
         mock_smtp.send_message.assert_called_once()
 
-    async def test_authentication_failure(self, provider: SMTPEmailProvider, monkeypatch: Any) -> None:
+    async def test_authentication_failure(
+        self, provider: SMTPEmailProvider, monkeypatch: Any
+    ) -> None:
         """Test authentication failure handling."""
         # Arrange: Mock SMTP authentication failure
         mock_smtp = AsyncMock()
@@ -423,6 +458,7 @@ class TestSMTPProviderCore:
 
     async def test_connection_failure(self, provider: SMTPEmailProvider, monkeypatch: Any) -> None:
         """Test SMTP connection failure handling."""
+
         # Arrange: Mock SMTP connection failure
         def mock_smtp_class(*args: Any, **kwargs: Any) -> None:
             raise aiosmtplib.SMTPConnectError("Connection refused")
@@ -447,6 +483,7 @@ class TestSMTPProviderCore:
         self, provider: SMTPEmailProvider, mock_smtp_server: AsyncMock, monkeypatch: Any
     ) -> None:
         """Test successful email sending with proper EmailSendResult."""
+
         # Arrange: Mock successful SMTP operation
         def mock_smtp_class(*args: Any, **kwargs: Any) -> AsyncMock:
             return mock_smtp_server
@@ -469,7 +506,7 @@ class TestSMTPProviderCore:
         assert result.error_message is None
 
         # Assert: Provider message ID is deterministic for same inputs
-        expected_hash = hash(f"recipient@example.com_Success Test_noreply@huleedu.se")
+        expected_hash = hash("recipient@example.com_Success Test_noreply@huleedu.se")
         expected_provider_id = f"smtp_{expected_hash}"
         assert result.provider_message_id == expected_provider_id
 
