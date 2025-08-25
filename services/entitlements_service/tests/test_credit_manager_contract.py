@@ -11,7 +11,11 @@ from services.entitlements_service.implementations.mock_policy_loader_impl impor
 from services.entitlements_service.implementations.mock_repository_impl import (
     MockEntitlementsRepositoryImpl,
 )
-from services.entitlements_service.protocols import RateLimitCheck, RateLimiterProtocol
+from services.entitlements_service.protocols import (
+    EventPublisherProtocol,
+    RateLimitCheck,
+    RateLimiterProtocol,
+)
 
 
 class _AllowAllRateLimiter(RateLimiterProtocol):
@@ -31,12 +35,80 @@ class _AllowAllRateLimiter(RateLimiterProtocol):
         return None
 
 
+class _MockEventPublisher(EventPublisherProtocol):
+    """Mock event publisher for testing that tracks published events."""
+
+    def __init__(self) -> None:
+        self.published_events: list[dict] = []
+
+    async def publish_credit_balance_changed(
+        self,
+        subject_type: str,
+        subject_id: str,
+        old_balance: int,
+        new_balance: int,
+        delta: int,
+        correlation_id: str,
+    ) -> None:
+        self.published_events.append({
+            "type": "credit_balance_changed",
+            "subject_type": subject_type,
+            "subject_id": subject_id,
+            "old_balance": old_balance,
+            "new_balance": new_balance,
+            "delta": delta,
+            "correlation_id": correlation_id,
+        })
+
+    async def publish_rate_limit_exceeded(
+        self,
+        subject_id: str,
+        metric: str,
+        limit: int,
+        current_count: int,
+        window_seconds: int,
+        correlation_id: str,
+    ) -> None:
+        self.published_events.append({
+            "type": "rate_limit_exceeded",
+            "subject_id": subject_id,
+            "metric": metric,
+            "limit": limit,
+            "current_count": current_count,
+            "window_seconds": window_seconds,
+            "correlation_id": correlation_id,
+        })
+
+    async def publish_usage_recorded(
+        self,
+        subject_type: str,
+        subject_id: str,
+        metric: str,
+        amount: int,
+        correlation_id: str,
+    ) -> None:
+        self.published_events.append({
+            "type": "usage_recorded",
+            "subject_type": subject_type,
+            "subject_id": subject_id,
+            "metric": metric,
+            "amount": amount,
+            "correlation_id": correlation_id,
+        })
+
+
 @pytest.mark.asyncio
 async def test_consume_credits_returns_structured_result() -> None:
     repo = MockEntitlementsRepositoryImpl()
     policy = MockPolicyLoaderImpl()
     limiter = _AllowAllRateLimiter()
-    mgr = CreditManagerImpl(repository=repo, policy_loader=policy, rate_limiter=limiter)
+    event_publisher = _MockEventPublisher()
+    mgr = CreditManagerImpl(
+        repository=repo,
+        policy_loader=policy,
+        rate_limiter=limiter,
+        event_publisher=event_publisher,
+    )
 
     # Seed user balance
     user_id = "user-123"
@@ -62,7 +134,13 @@ async def test_consume_credits_free_operation_records_none_source() -> None:
     repo = MockEntitlementsRepositoryImpl()
     policy = MockPolicyLoaderImpl()
     limiter = _AllowAllRateLimiter()
-    mgr = CreditManagerImpl(repository=repo, policy_loader=policy, rate_limiter=limiter)
+    event_publisher = _MockEventPublisher()
+    mgr = CreditManagerImpl(
+        repository=repo,
+        policy_loader=policy,
+        rate_limiter=limiter,
+        event_publisher=event_publisher,
+    )
 
     user_id = "user-456"
     # Default balance is 0; free metric should not change it
@@ -85,7 +163,13 @@ async def test_adjust_balance_returns_new_balance() -> None:
     repo = MockEntitlementsRepositoryImpl()
     policy = MockPolicyLoaderImpl()
     limiter = _AllowAllRateLimiter()
-    mgr = CreditManagerImpl(repository=repo, policy_loader=policy, rate_limiter=limiter)
+    event_publisher = _MockEventPublisher()
+    mgr = CreditManagerImpl(
+        repository=repo,
+        policy_loader=policy,
+        rate_limiter=limiter,
+        event_publisher=event_publisher,
+    )
 
     new_balance = await mgr.adjust_balance(
         subject_type="user",

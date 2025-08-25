@@ -4,52 +4,86 @@
 
 **Purpose**: Rate limiting and credit management for LLM-powered features to protect platform from API cost overruns while enabling B2B/B2C revenue models.
 
-**Core Economics**: Differentiate between free operations (internal processing) and paid operations (external LLM API calls) with credit-based consumption tracking.
+**Core Economics**: Resource-based pricing where credits map to actual LLM API calls, not arbitrary units like batches or essays.
 
-**Integration**: Gateway-facing synchronous API with asynchronous event publishing for usage analytics and cross-service coordination.
+**Integration**: BOS-centric architecture where pipeline cost calculations occur in Batch Orchestrator Service, with optimistic consumption on phase completion events.
+
+## Implementation Status
+
+### ✅ **Phase 1: COMPLETE** - Core Infrastructure
+
+- Database models and migrations
+- Credit Manager with dual system (org/user precedence)
+- Policy Loader with YAML + Redis caching
+- Rate Limiter with Redis sliding window
+- Core API endpoints (check-credits, consume-credits, balance)
+- Admin endpoints for manual credit adjustments
+- **Outbox Pattern**: OutboxManager, EventPublisher, EventRelayWorker
+- **Event Publishing**: Proper ProcessingEvent enum usage (no magic strings)
+- **Type Safety**: All type annotation issues resolved
+
+### 🔄 **Phase 2: IN PROGRESS** - Event Publishing Integration
+
+- ✅ EventPublisher injected into CreditManager via DI
+- ⏳ Publish CreditBalanceChangedV1 after credit operations  
+- ⏳ Publish RateLimitExceededV1 when limits hit
+- ⏳ Publish UsageRecordedV1 for tracking
+
+### 📋 **Phases 3-5: PLANNED** - Full Platform Integration
 
 ## Architecture Alignment
 
-### Service Pattern
+### BOS-Centric Credit Calculation Architecture
 
-- **Integrated Pattern**: Follow Email Service model with `app.py` managing HTTP + Kafka lifecycle
-- **Event Publishing**: EventRelayWorker for outbox pattern with reliable event delivery
-- **Configuration**: Policy manifest in YAML with Redis caching for zero-downtime updates
-- **DI**: Dishka with Protocol interfaces following established patterns
+**Critical Decision**: Credit calculations belong in **Batch Orchestrator Service (BOS)** as a domain service, not in Entitlements Service or processing services.
 
-### Core Principle
+**Rationale**:
 
-**Optimistic Credit Flow**: Check credits → Process operation → Record consumption (with failure logging for admin resolution)
+- BOS owns pipeline orchestration and resource planning
+- BOS has complete context (pipeline steps + essay count)
+- BOS is the single decision point for pipeline execution
+- Keeps processing services focused on their domain
+- Maintains clean DDD boundaries
 
-## Service Structure
+### Resource-Based Pricing Model
+
+**Credits map to actual resource consumption (LLM API calls)**:
+
+- CJ Assessment: n*(n-1)/2 comparisons for n essays (full pairwise)
+- AI Feedback: n API calls for n essays (linear)
+- Free Operations: spellcheck, NLP analysis, batch operations
+
+### Optimistic Consumption Pattern
+
+**Flow**: Check credits → Start pipeline → Consume credits on phase completion
+**Benefits**: Fair billing (pay for success), graceful failure handling, educational trust model
+
+## Current Service Structure
 
 ```
 services/entitlements_service/
-  app.py                    # Integrated Quart + Kafka lifecycle (@app.before_serving)
-  startup_setup.py          # DI init, policy loader, EventRelayWorker startup
-  config.py                 # Settings with ENTITLEMENTS_ prefix
-  protocols.py              # CreditManager, PolicyLoader, RateLimiter protocols
-  di.py                     # Providers (APP/REQUEST scopes)
-  models_db.py              # SQLAlchemy models
-  kafka_consumer.py         # EntitlementsKafkaConsumer class
-  event_processor.py        # Usage recording, credit balance events
+  app.py                        # ✅ Integrated Quart + Kafka lifecycle
+  startup_setup.py              # ✅ DI init, policy loader, EventRelayWorker
+  config.py                     # ✅ Settings with ENTITLEMENTS_ prefix
+  protocols.py                  # ✅ All protocols including EventPublisher
+  di.py                         # ✅ Providers with EventPublisher integration
+  models_db.py                  # ✅ SQLAlchemy models
+  kafka_consumer.py             # ⏳ TO BE CREATED (Phase 3)
   api/
-    health_routes.py        # /healthz, /metrics
-    entitlements_routes.py  # /v1/entitlements/* endpoints
-    admin_routes.py         # /v1/admin/credits/* (dev/admin only)
+    health_routes.py            # ✅ /healthz, /metrics
+    entitlements_routes.py      # ✅ /v1/entitlements/* endpoints
+    admin_routes.py             # ✅ /v1/admin/credits/* (dev only)
   implementations/
-    credit_manager_impl.py  # Core credit logic with dual system
-    policy_loader_impl.py   # YAML loading with Redis cache
-    rate_limiter_impl.py    # Redis-based sliding window
-    outbox_manager.py       # Transactional outbox
+    credit_manager_impl.py      # ✅ Core credit logic, EventPublisher injected
+    policy_loader_impl.py       # ✅ YAML loading with Redis cache
+    rate_limiter_impl.py        # ✅ Redis-based sliding window
+    outbox_manager.py           # ✅ Transactional outbox
+    event_publisher_impl.py     # ✅ Event publishing with proper enums
   policies/
-    default.yaml            # Default costs, limits, signup bonuses
-  alembic/
-  README.md
-  tests/
+    default.yaml                # ⏳ TO BE UPDATED (Phase 5)
 ```
 
-## Database Schema
+## Database Schema ✅ **IMPLEMENTED**
 
 ```sql
 -- Credit balances per subject (user or org)
@@ -67,22 +101,13 @@ CREATE TABLE credit_operations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_type VARCHAR(10) NOT NULL,
     subject_id VARCHAR(255) NOT NULL,
-    metric VARCHAR(100) NOT NULL,        -- 'cj_assessment', 'ai_feedback'
+    metric VARCHAR(100) NOT NULL,        -- 'cj_comparison', 'ai_feedback_generation'
     amount INTEGER NOT NULL,             -- Credits consumed
     batch_id VARCHAR(255),               -- For correlation with processing
     consumed_from VARCHAR(10) NOT NULL,  -- 'user' or 'org' (which balance used)
     correlation_id VARCHAR(255) NOT NULL,
     operation_status VARCHAR(20) DEFAULT 'completed', -- 'completed', 'failed', 'pending'
     created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Rate limiting sliding windows
-CREATE TABLE rate_limit_buckets (
-    subject_id VARCHAR(255) NOT NULL,
-    metric VARCHAR(100) NOT NULL,
-    window_start TIMESTAMP NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (subject_id, metric, window_start)
 );
 
 -- Outbox for reliable event publishing
@@ -96,528 +121,444 @@ CREATE TABLE event_outbox (
     created_at TIMESTAMP DEFAULT NOW(),
     published_at TIMESTAMP NULL
 );
-
--- Indexes
-CREATE INDEX idx_credit_operations_subject ON credit_operations(subject_type, subject_id);
-CREATE INDEX idx_credit_operations_correlation ON credit_operations(correlation_id);
-CREATE INDEX idx_rate_limit_window ON rate_limit_buckets(window_start);
-CREATE INDEX idx_outbox_unpublished ON event_outbox(published_at, topic, created_at) WHERE published_at IS NULL;
 ```
 
-## Core Models (Pydantic)
-
-```python
-# libs/common_core/src/common_core/entitlements_models.py
-
-from __future__ import annotations
-from pydantic import BaseModel
-from typing import Literal, Optional
-from datetime import datetime
-
-SubjectType = Literal["org", "user"]
-
-class SubjectRefV1(BaseModel):
-    type: SubjectType
-    id: str  # uuid
-
-class CreditCheckRequestV1(BaseModel):
-    user_id: str
-    org_id: Optional[str] = None
-    metric: str
-    amount: int = 1
-
-class CreditCheckResponseV1(BaseModel):
-    allowed: bool
-    reason: Optional[str] = None
-    required_credits: int
-    available_credits: int
-    source: Optional[str] = None  # "user" or "org"
-
-class CreditConsumptionV1(BaseModel):
-    user_id: str
-    org_id: Optional[str] = None
-    metric: str
-    amount: int
-    batch_id: Optional[str] = None
-    correlation_id: str
-
-class CreditBalanceChangedV1(BaseModel):
-    subject: SubjectRefV1
-    delta: int  # negative for consumption, positive for addition
-    new_balance: int
-    reason: str
-    correlation_id: str
-
-class RateLimitExceededV1(BaseModel):
-    subject: SubjectRefV1
-    metric: str
-    limit: int
-    window_seconds: int
-    correlation_id: str
-
-class UsageRecordedV1(BaseModel):
-    subject: SubjectRefV1
-    metric: str
-    amount: int = 1
-    timestamp: datetime
-    correlation_id: str
-```
-
-## Policy Manifest System
-
-### Configuration File
+## Updated Policy Configuration (Phase 5)
 
 ```yaml
 # services/entitlements_service/policies/default.yaml
 
 costs:
-  # Free internal processing
-  batch_create: 0
-  spellcheck: 0
-  nlp_analysis: 0
+  # Resource-based costs (per LLM API call)
+  cj_comparison: 1              # Per pairwise comparison in CJ Assessment
+  ai_feedback_generation: 5     # Per essay feedback generation
+  ai_editor_revision: 3         # Per AI editor revision (future)
   
-  # Paid LLM operations (per essay)
-  cj_assessment: 10
-  ai_feedback: 5
+  # Free internal operations (no external API costs)
+  spellcheck: 0                 # Internal processing via LanguageTool
+  nlp_analysis: 0               # Internal NLP processing
+  batch_create: 0               # Batch orchestration
+  student_matching: 0           # NLP-based student matching
+  content_upload: 0             # File uploads
 
 rate_limits:
-  # Operations per time window
-  batch_create: 60/hour
-  cj_assessment: 100/day
-  ai_feedback: 200/day
+  # Resource-based limits (prevent API abuse)
+  cj_comparison: 10000/day      # Max CJ comparisons per day
+  ai_feedback_generation: 500/day   # Max AI feedback generations per day
+  
+  # Operation-based limits (prevent platform abuse)
+  batch_create: 60/hour         # Maximum batch uploads per hour
+  pipeline_request: 100/hour    # Maximum pipeline requests per hour
+  credit_adjustment: 10/hour    # Administrative adjustments
 
 signup_bonuses:
-  user: 50    # Credits for new individual users
-  org: 500    # Credits for new organizations
+  # Initial credit allocation for new accounts
+  user: 50          # Credits for individual teacher accounts
+  org: 500          # Credits for institutional/organizational accounts
 
-cache_ttl: 300  # Policy cache TTL in Redis (5 minutes)
+# Policy cache configuration
+cache_ttl: 300      # Cache policies in Redis for 5 minutes
 ```
 
-### Policy Loader Implementation
+## Integration Flow Architecture
 
-```python
-# services/entitlements_service/implementations/policy_loader_impl.py
+### Complete Pipeline Flow with Credit Management
 
-class PolicyLoaderImpl:
-    def __init__(self, redis_client, config_path: str = "policies/default.yaml"):
-        self.redis = redis_client
-        self.config_path = config_path
-        self.cache_key = "entitlements:policies:v1"
-    
-    async def load_policies(self) -> dict:
-        """Load policies from file and cache in Redis."""
-        with open(self.config_path) as f:
-            policies = yaml.safe_load(f)
-        await self.redis.set(self.cache_key, json.dumps(policies))
-        return policies
-    
-    async def get_cost(self, metric: str) -> int:
-        """Get credit cost for a metric."""
-        policies = await self._get_cached_policies()
-        return policies.get("costs", {}).get(metric, 0)
-    
-    async def get_rate_limit(self, metric: str) -> tuple[int, int]:
-        """Get rate limit as (count, window_seconds)."""
-        policies = await self._get_cached_policies()
-        limit_str = policies.get("rate_limits", {}).get(metric, "unlimited")
-        if limit_str == "unlimited":
-            return 0, 0
-        # Parse "60/hour" or "100/day"
-        count, period = limit_str.split("/")
-        window_seconds = {"hour": 3600, "day": 86400}[period]
-        return int(count), window_seconds
+```
+1. Teacher clicks "Start Processing" → API Gateway → BOS
+2. BOS → BCS (resolve pipeline) → ["spellcheck", "cj_assessment", "nlp"]
+3. BOS calculates resource requirements:
+   - CJ: essays*(essays-1)/2 comparisons
+   - AI: essays API calls  
+   - Spellcheck/NLP: 0 (free)
+4. BOS → Entitlements (check_credits for each resource)
+5. Entitlements validates credits + rate limits
+6. If sufficient: BOS starts pipeline → ELS → Services
+7. Services complete phases → Publish completion events
+8. Entitlements consumes credits on phase completion events
+9. If insufficient: BOS publishes PipelineDeniedV1 → API Gateway → 402 Payment Required
 ```
 
-## API Endpoints
+## Implementation Phases
 
-### Core Entitlements API
+### ✅ **Phase 1: COMPLETE** - Core Infrastructure (January 2025)
 
-**POST /v1/entitlements/check-credits**
+- Database models, migrations, and indexing
+- Credit Manager with dual system (org → user precedence)
+- Policy Loader with YAML configuration and Redis caching
+- Rate Limiter with Redis sliding window implementation
+- Core API endpoints with proper validation
+- Admin endpoints for manual operations
+- Outbox pattern for reliable event publishing
+- Type-safe event publishing with ProcessingEvent enums
+
+### ✅ **Phase 2: COMPLETE** - Event Publishing Integration
+
+**Timeline**: Completed January 2025
+**Status**: All event publishing integrated into CreditManager
+
+**Completed Tasks**:
+
+1. ✅ Inject EventPublisher into CreditManager via DI
+2. ✅ Publish CreditBalanceChangedV1 after successful credit operations
+3. ✅ Publish RateLimitExceededV1 when rate limits are hit
+4. ✅ Publish UsageRecordedV1 for usage analytics
+5. ✅ Updated tests with MockEventPublisher
+
+### 🔄 **Phase 3: IN PROGRESS** - Resource Consumption Events & Kafka Consumer
+
+**Timeline**: Current sprint (January 2025)
+**Purpose**: Consume credits based on actual resource consumption events
+
+**Architectural Decision**: Create dedicated `ResourceConsumptionV1` event
+
+- Clean DDD boundaries between services
+- Explicit resource consumption tracking
+- Consistent pattern for all billable services
+
+**Implementation Details**:
+
+#### Part A: Create ResourceConsumptionV1 Event (common_core)
 
 ```python
-{
-    "user_id": "uuid",
-    "org_id": "uuid",  # optional
-    "metric": "cj_assessment", 
-    "amount": 15       # essays in batch
-}
-
-Response:
-{
-    "allowed": true,
-    "required_credits": 150,
-    "available_credits": 500,
-    "source": "org"
-}
+# libs/common_core/src/common_core/events/resource_consumption_events.py
+class ResourceConsumptionV1(BaseEventData):
+    """Event for tracking billable resource consumption."""
+    event_name: ProcessingEvent = Field(default=ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED)
+    user_id: str
+    org_id: Optional[str]
+    resource_type: str  # "cj_comparison", "ai_feedback_generation"
+    quantity: int
+    service_name: str
+    processing_id: str
+    consumed_at: datetime
 ```
 
-**POST /v1/entitlements/consume-credits**
+#### Part B: Update CJ Assessment Service
 
 ```python
-{
-    "user_id": "uuid",
-    "org_id": "uuid",
-    "metric": "cj_assessment",
-    "amount": 150,
-    "batch_id": "batch_uuid",
-    "correlation_id": "correlation_uuid"
-}
-
-Response: 
-{
-    "success": true,
-    "new_balance": 350,
-    "consumed_from": "org"
-}
-```
-
-**GET /v1/entitlements/balance/{user_id}**
-
-```python
-Response:
-{
-    "user_balance": 100,
-    "org_balance": 350,  # if user belongs to org
-    "org_id": "uuid"     # if applicable
-}
-```
-
-### Admin API (Development/Admin Only)
-
-**POST /v1/admin/credits/adjust**
-
-```python
-{
-    "subject_type": "user",  # or "org"
-    "subject_id": "uuid",
-    "amount": 500,           # positive to add, negative to deduct
-    "reason": "manual_adjustment"
-}
-```
-
-**GET /v1/admin/credits/operations?subject_id=uuid&limit=100**
-
-```python
-Response:
-{
-    "operations": [
-        {
-            "metric": "cj_assessment",
-            "amount": 150,
-            "batch_id": "uuid",
-            "consumed_from": "org",
-            "created_at": "2025-01-01T12:00:00Z"
-        }
-    ]
-}
-```
-
-## Core Business Logic
-
-### Credit Resolution (Dual System)
-
-```python
-class CreditManagerImpl:
-    async def check_credits(self, user_id: str, org_id: str | None, 
-                          metric: str, amount: int) -> CreditCheckResponseV1:
-        # Get cost from policy
-        cost_per_unit = await self.policy_loader.get_cost(metric)
-        total_cost = cost_per_unit * amount
-        
-        if total_cost == 0:  # Free operation
-            return CreditCheckResponseV1(
-                allowed=True, 
-                required_credits=0, 
-                available_credits=0
-            )
-        
-        # Check rate limits first
-        if not await self._check_rate_limit(user_id, metric, amount):
-            return CreditCheckResponseV1(
-                allowed=False,
-                reason="rate_limit_exceeded",
-                required_credits=total_cost,
-                available_credits=0
-            )
-        
-        # Check credits: org first, then user
-        if org_id:
-            org_balance = await self._get_balance("org", org_id)
-            if org_balance >= total_cost:
-                return CreditCheckResponseV1(
-                    allowed=True,
-                    required_credits=total_cost,
-                    available_credits=org_balance,
-                    source="org"
-                )
-        
-        # Fallback to user credits
-        user_balance = await self._get_balance("user", user_id)
-        if user_balance >= total_cost:
-            return CreditCheckResponseV1(
-                allowed=True,
-                required_credits=total_cost,
-                available_credits=user_balance,
-                source="user"
-            )
-        
-        return CreditCheckResponseV1(
-            allowed=False,
-            reason="insufficient_credits",
-            required_credits=total_cost,
-            available_credits=user_balance
-        )
-    
-    async def consume_credits(self, consumption: CreditConsumptionV1) -> bool:
-        # Determine source (same logic as check_credits)
-        source, subject_id = await self._resolve_credit_source(
-            consumption.user_id, consumption.org_id, consumption.metric, consumption.amount
-        )
-        
-        try:
-            # Deduct credits
-            await self._deduct_balance(source, subject_id, total_cost)
-            
-            # Record detailed operation
-            await self._record_operation(
-                subject_type=source,
-                subject_id=subject_id,
-                metric=consumption.metric,
-                amount=total_cost,
-                batch_id=consumption.batch_id,
-                consumed_from=source,
-                correlation_id=consumption.correlation_id,
-                status="completed"
-            )
-            
-            # Publish balance changed event
-            await self._publish_balance_changed(source, subject_id, -total_cost, consumption.correlation_id)
-            
-            return True
-            
-        except Exception as e:
-            # Log credit debt for admin resolution (optimistic approach)
-            await self._record_operation(
-                subject_type=source,
-                subject_id=subject_id,
-                metric=consumption.metric,
-                amount=total_cost,
-                batch_id=consumption.batch_id,
-                consumed_from=source,
-                correlation_id=consumption.correlation_id,
-                status="failed"
-            )
-            logger.error(f"Credit consumption failed: {e}, correlation_id: {consumption.correlation_id}")
-            return False
-```
-
-## Integration Patterns
-
-### Gateway Integration
-
-```python
-# API Gateway before expensive operations
-
-# 1. Check entitlements
-check_response = await entitlements_client.check_credits(
-    user_id=token.user_id,
-    org_id=token.org_id,
-    metric="cj_assessment",
-    amount=essay_count
-)
-
-if not check_response.allowed:
-    return JSONResponse({
-        "error": "insufficient_credits",
-        "required": check_response.required_credits,
-        "available": check_response.available_credits
-    }, status_code=402)
-
-# 2. Process batch (may take minutes)
-batch_result = await batch_orchestrator.process_batch(batch_id)
-
-# 3. Record consumption
-await entitlements_client.consume_credits(
-    user_id=token.user_id,
-    org_id=token.org_id,
-    metric="cj_assessment", 
-    amount=essay_count,
-    batch_id=batch_id,
+# In dual_event_publisher.py, add third event:
+resource_event = ResourceConsumptionV1(
+    entity_id=bos_batch_id,
+    entity_type="batch",
+    user_id=batch.user_id,  # Need to pass this through
+    org_id=batch.org_id,
+    resource_type="cj_comparison",
+    quantity=len(comparison_results),  # Actual comparisons
+    service_name="cj_assessment_service",
+    processing_id=cj_assessment_job_id,
+    consumed_at=datetime.now(UTC),
     correlation_id=correlation_id
 )
+await event_publisher.publish(topic="huleedu.resource.consumption.v1", event=resource_event)
 ```
 
-### Event Publishing
+#### Part C: Entitlements Kafka Consumer
 
 ```python
-# Published events for cross-service coordination
+# services/entitlements_service/kafka_consumer.py
+async def handle_resource_consumption(event: ResourceConsumptionV1):
+    """Consume credits based on actual resource usage."""
+    await credit_manager.consume_credits(
+        user_id=event.user_id,
+        org_id=event.org_id,
+        metric=event.resource_type,
+        amount=event.quantity,
+        batch_id=event.entity_id,
+        correlation_id=event.correlation_id
+    )
+```
 
-# When credits are consumed
-CreditBalanceChangedV1(
-    subject=SubjectRefV1(type="org", id="org_uuid"),
-    delta=-150,
-    new_balance=350,
-    reason="cj_assessment",
-    correlation_id="correlation_uuid"
-)
+**Tasks**:
 
-# When rate limit exceeded
-RateLimitExceededV1(
-    subject=SubjectRefV1(type="user", id="user_uuid"),
-    metric="batch_create",
-    limit=60,
-    window_seconds=3600,
-    correlation_id="correlation_uuid"
-)
+1. ⏳ Create `ResourceConsumptionV1` event model in common_core
+2. ⏳ Add RESOURCE_CONSUMPTION_REPORTED to ProcessingEvent enum
+3. ⏳ Update CJ Assessment Service dual_event_publisher.py
+4. ⏳ Pass user_id/org_id through CJ Assessment workflow
+5. ⏳ Create EntitlementsKafkaConsumer class
+6. ⏳ Subscribe to topic: `huleedu.resource.consumption.v1`
+7. ⏳ Implement credit consumption handler
+8. ⏳ Add consumer health checks and monitoring
+9. ⏳ Integration tests with testcontainers
+
+### 📋 **Phase 4: PLANNED** - BOS Integration
+
+**Timeline**: Following sprint  
+**Purpose**: BOS-centric credit checking before pipeline execution
+
+**Tasks**:
+
+1. Create PipelineCostStrategy domain service in BOS:
+
+   ```python
+   def calculate_cj_comparisons(n: int) -> int:
+       return n * (n - 1) // 2  # Simple full pairwise
+   ```
+
+2. Add credit checking to BOS pipeline request handler
+3. Create PipelineDeniedV1 event model in common_core
+4. Publish denial events when insufficient credits
+
+### 📋 **Phase 5: PLANNED** - Policy Configuration Update
+
+**Timeline**: Same sprint as Phase 4
+**Purpose**: Align policy with resource-based pricing
+
+**Tasks**:
+
+1. Update services/entitlements_service/policies/default.yaml
+2. Migrate from batch/essay-based to resource-based costs
+3. Update rate limits to reflect actual resource constraints
+4. Test policy loading and caching
+
+### 📋 **Phase 6: PLANNED** - API Gateway Integration
+
+**Timeline**: Final integration sprint
+**Purpose**: Complete end-to-end credit enforcement
+
+**Tasks**:
+
+1. Handle PipelineDeniedV1 events in API Gateway
+2. Return 402 Payment Required with credit details
+3. Update client-facing error messages
+4. Add credit purchase flow hooks (future payment integration)
+
+## BOS PipelineCostStrategy Implementation
+
+```python
+# services/batch_orchestrator_service/domain/pipeline_cost_strategy.py
+
+from dataclasses import dataclass
+from typing import List, Tuple
+
+@dataclass
+class ResourceRequirements:
+    """Resource requirements for pipeline execution"""
+    cj_comparisons: int = 0
+    ai_feedback_calls: int = 0
+    
+    def to_entitlement_checks(self) -> List[Tuple[str, int]]:
+        """Convert to entitlement check requests"""
+        checks = []
+        if self.cj_comparisons > 0:
+            checks.append(("cj_comparison", self.cj_comparisons))
+        if self.ai_feedback_calls > 0:
+            checks.append(("ai_feedback_generation", self.ai_feedback_calls))
+        return checks
+
+class PipelineCostStrategy:
+    """Domain Service for calculating pipeline resource requirements"""
+    
+    def calculate_requirements(
+        self,
+        pipeline_steps: List[str],  # From BCS resolution
+        essay_count: int            # From batch data
+    ) -> ResourceRequirements:
+        """Calculate resource requirements for pipeline execution"""
+        
+        reqs = ResourceRequirements()
+        
+        for step in pipeline_steps:
+            if step == "cj_assessment":
+                # Full pairwise comparisons - what CJ actually does
+                reqs.cj_comparisons = essay_count * (essay_count - 1) // 2
+                
+            elif step == "ai_feedback":
+                # Linear: one API call per essay
+                reqs.ai_feedback_calls = essay_count
+                
+            # spellcheck, nlp = free internal processing
+        
+        return reqs
+```
+
+## Event Models
+
+### Consumed by Entitlements Service (Phase 3)
+
+```python
+ResourceConsumptionV1:
+    """Event published when billable resources have been consumed.
+    Published by processing services (CJ Assessment, AI Feedback, etc.)
+    Consumed by Entitlements Service for credit tracking."""
+    
+    event_name: ProcessingEvent    # RESOURCE_CONSUMPTION_REPORTED
+    entity_id: str                 # Batch ID
+    entity_type: str               # "batch"
+    
+    # Identity (critical for credit attribution)
+    user_id: str                   # User who owns the batch
+    org_id: Optional[str]          # Organization if applicable
+    
+    # Resource details
+    resource_type: str             # "cj_comparison", "ai_feedback_generation"
+    quantity: int                  # Actual amount consumed
+    
+    # Service metadata
+    service_name: str              # "cj_assessment_service"
+    processing_id: str             # Internal job ID for tracing
+    consumed_at: datetime          # When resources were consumed
+    correlation_id: str            # For distributed tracing
+```
+
+### Published by Entitlements Service
+
+```python
+CreditBalanceChangedV1:
+    subject: SubjectRefV1          # {type: "org"|"user", id: "uuid"}
+    delta: int                     # Negative for consumption, positive for addition
+    new_balance: int
+    reason: str                    # "credit_operation", "manual_adjustment"
+    correlation_id: str
+
+RateLimitExceededV1:
+    subject: SubjectRefV1
+    metric: str                    # "cj_comparison", "ai_feedback_generation"
+    limit: int
+    window_seconds: int
+    correlation_id: str
+
+UsageRecordedV1:
+    subject: SubjectRefV1
+    metric: str
+    amount: int
+    period_start: datetime
+    period_end: datetime
+    correlation_id: str
+```
+
+### Published by BOS (Phase 4)
+
+```python
+PipelineDeniedV1:
+    batch_id: str
+    user_id: str
+    org_id: Optional[str]
+    requested_pipeline: str
+    denial_reason: str             # "insufficient_credits" | "rate_limit_exceeded"
+    required_credits: int
+    available_credits: int
+    # NO suggested_alternatives - client handles this (YAGNI)
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
 
-- Credit resolution precedence logic
-- Policy loading and caching
-- Rate limiting calculations
-- Balance arithmetic
+- ✅ Credit resolution logic (dual system precedence)
+- ✅ Policy loading and caching mechanisms
+- ✅ Rate limiting calculations with Redis
+- ✅ Balance arithmetic operations
+- ⏳ Event publishing integration
+- ⏳ PipelineCostStrategy calculations (10, 30, 60 essay batches)
 
-### Integration Tests  
+### Integration Tests
 
-- Redis rate limiting with concurrent requests
-- Database credit operations with transactions
-- Policy loading from YAML files
-- Event publishing via outbox
-
-### Contract Tests
-
-- API request/response schemas
-- Event schema validation
-- Common core model compatibility
+- ✅ Redis rate limiting with concurrent requests
+- ✅ Database credit operations with transactions
+- ✅ Policy loading from YAML files
+- ✅ Event publishing via outbox pattern
+- ⏳ BOS ↔ Entitlements communication flow
+- ⏳ Phase completion event consumption
 
 ### End-to-End Tests
 
-- Gateway → Entitlements → Service flow
-- Credit depletion scenarios
-- Rate limit enforcement
-- Org membership changes
+- ⏳ Complete pipeline flow with credit checking
+- ⏳ Credit consumption on successful completion
+- ⏳ Failed operations don't consume credits
+- ⏳ Rate limit enforcement across services
+- ⏳ Organization membership changes
 
-## Deployment Configuration
+### Performance Tests
 
-### Environment Variables
-
-```bash
-# Service configuration
-ENTITLEMENTS_SERVICE_NAME=entitlements_service
-ENTITLEMENTS_LOG_LEVEL=INFO
-ENTITLEMENTS_METRICS_PORT=8083
-
-# Database
-ENTITLEMENTS_SERVICE_DATABASE_URL=postgresql+asyncpg://...
-
-# Redis for caching and rate limiting
-ENTITLEMENTS_REDIS_URL=redis://redis:6379/0
-
-# Kafka
-ENTITLEMENTS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-ENTITLEMENTS_PRODUCER_CLIENT_ID=entitlements-service-producer
-
-# Policy configuration
-ENTITLEMENTS_POLICY_FILE=policies/default.yaml
-ENTITLEMENTS_POLICY_CACHE_TTL=300
-```
-
-### Docker Configuration
-
-```yaml
-# docker-compose.services.yml
-entitlements_service:
-  build:
-    context: .
-    dockerfile: services/entitlements_service/Dockerfile
-  ports:
-    - "8083:8083"  # HTTP API + metrics
-  environment:
-    - ENTITLEMENTS_REDIS_URL=redis://redis:6379/0
-    - ENTITLEMENTS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-  depends_on:
-    - entitlements_db
-    - redis
-    - kafka
-
-entitlements_db:
-  image: postgres:15
-  ports:
-    - "5444:5432"  # Unique port for entitlements DB
-  environment:
-    - POSTGRES_DB=huleedu_entitlements
-    - POSTGRES_USER=huleedu_user
-    - POSTGRES_PASSWORD=huleedu_password
-```
-
-## Event Integration
-
-### Consumed Events
-
-```python
-# From other services reporting usage
-UsageRecordedV1  # Real-time usage tracking for analytics
-```
-
-### Published Events
-
-```python
-# To Result Aggregator Service for analytics
-CreditBalanceChangedV1   # Balance changes for reporting
-RateLimitExceededV1      # Rate limit violations for monitoring
-
-# Event topics
-ENTITLEMENTS_CREDIT_BALANCE_CHANGED → huleedu.entitlements.credit.balance.changed.v1
-ENTITLEMENTS_RATE_LIMIT_EXCEEDED → huleedu.entitlements.rate_limit.exceeded.v1
-```
-
-## MVP Implementation Order
-
-### Phase 1: Core Credit System (Week 1)
-
-1. Database models and migrations
-2. Basic credit manager with dual system (org/user precedence)
-3. Policy loader with YAML + Redis caching
-4. Core API endpoints (check-credits, consume-credits, balance)
-5. Admin endpoints for manual credit adjustments
-
-### Phase 2: Rate Limiting (Week 1)
-
-1. Redis-based rate limiting implementation
-2. Integration with check-credits endpoint
-3. Rate limit violation events
-
-### Phase 3: Integration & Testing (Week 1)
-
-1. Gateway integration points
-2. Event publishing via outbox
-3. End-to-end testing with real services
-4. Performance testing and optimization
-
-## Future Expansion Hooks
-
-### Payment Integration Ready
-
-- Webhook endpoints structured for easy addition
-- Credit adjustment events ready for payment service consumption
-- Purchase history tracking prepared in database schema
-
-### Advanced Features
-
-- Two-phase commit reservation pattern (if credit disputes become frequent)
-- Credit expiration and automatic cleanup
-- Usage analytics and reporting dashboards
-- Complex approval workflows for organizational purchases
+- API endpoint response times (<100ms for checks, <500ms for consumption)
+- Event publishing throughput
+- Redis rate limiting under load
+- Policy cache hit rates
 
 ## Success Criteria
 
-1. **Cost Protection**: No unauthorized LLM API consumption possible
-2. **Business Model**: Teachers can purchase and use individual credits
-3. **B2B Ready**: Organizations can purchase credits for teacher pools
-4. **Operational**: Policy updates without service restart
-5. **Reliable**: Credit operations never lost or double-charged
-6. **Performant**: <100ms for credit checks, <500ms for consumption
-7. **Observable**: Full audit trail for credit operations and failures
+### ✅ **Completed**
+
+1. **Service Foundation**: Core infrastructure operational
+2. **Credit Management**: Dual system with audit trails
+3. **Rate Limiting**: Redis-based sliding window protection
+4. **Event Infrastructure**: Outbox pattern with reliable delivery
+5. **Type Safety**: Proper enum usage, no magic strings
+
+### 🔄 **In Progress**
+
+6. **Event Publishing**: Domain events for all credit operations
+
+### 📋 **Planned**
+
+7. **Cost Protection**: No unauthorized LLM API consumption possible
+8. **BOS Integration**: Pipeline cost calculation and credit checking
+9. **Optimistic Consumption**: Credits consumed only on success
+10. **Platform Integration**: End-to-end credit enforcement
+
+### 🚀 **Future Expansion**
+
+11. **Business Model**: Teacher credit purchases and organizational pools
+12. **Payment Integration**: Webhook endpoints for credit top-ups
+13. **Analytics**: Usage reporting and cost optimization insights
+
+## Architectural Principles Maintained
+
+- **Domain-Driven Design**: Clean bounded contexts with proper service responsibilities
+- **Event-Driven Architecture**: Reliable async communication via Kafka
+- **Service Autonomy**: Independent deployment and data ownership
+- **Observability**: Full tracing, metrics, and structured logging
+- **YAGNI Compliance**: Simple implementations without unnecessary complexity
+- **EdTech Trust Model**: Optimistic patterns suitable for educational environments
+
+## Phase 3 Implementation Checklist
+
+### Common Core Changes
+
+- [ ] Create `libs/common_core/src/common_core/events/resource_consumption_events.py`
+- [ ] Add `ResourceConsumptionV1` event model with all required fields
+- [ ] Add `RESOURCE_CONSUMPTION_REPORTED` to `ProcessingEvent` enum
+- [ ] Add topic mapping: `"huleedu.resource.consumption.v1"`
+- [ ] Run tests to ensure event model serialization works
+
+### CJ Assessment Service Changes
+
+- [ ] Update `cj_core_logic/dual_event_publisher.py` to publish third event
+- [ ] Pass `user_id` and `org_id` through the workflow (from batch context)
+- [ ] Calculate actual comparison count from completed comparisons
+- [ ] Publish `ResourceConsumptionV1` after successful assessment
+- [ ] Add unit tests for resource consumption event publishing
+- [ ] Integration test with Kafka to verify event publishing
+
+### Entitlements Service Changes
+
+- [ ] Create `services/entitlements_service/kafka_consumer.py`
+- [ ] Implement `EntitlementsKafkaConsumer` class
+- [ ] Add handler for `ResourceConsumptionV1` events
+- [ ] Subscribe to topic: `huleedu.resource.consumption.v1`
+- [ ] Call `credit_manager.consume_credits()` with event data
+- [ ] Add consumer to `app.py` lifecycle (startup/shutdown)
+- [ ] Update `di.py` to provide consumer dependencies
+- [ ] Add health check endpoint for consumer status
+- [ ] Create integration tests with testcontainers
+- [ ] Test credit consumption with various event scenarios
+
+### Testing & Validation
+
+- [ ] Unit test: 10 essays = 45 comparisons consumed
+- [ ] Unit test: 5 essays = 10 comparisons consumed
+- [ ] Integration test: End-to-end flow from CJ to credits
+- [ ] Test org vs user credit precedence
+- [ ] Test handling of missing user_id/org_id
+- [ ] Load test: Verify consumer can handle event volume
+- [ ] Monitor: Outbox pattern ensures reliable delivery
+
+### Documentation Updates
+
+- [ ] Update this document when Phase 3 is complete
+- [ ] Document the new event in common_core README
+- [ ] Add architecture diagram showing event flow
+- [ ] Update service READMEs with new capabilities
+
+This implementation plan ensures robust credit management while maintaining the platform's architectural integrity and educational domain requirements.

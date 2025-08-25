@@ -237,6 +237,7 @@ class ServiceProvider(Provider):
         repository: EntitlementsRepositoryProtocol,
         policy_loader: PolicyLoaderProtocol,
         rate_limiter: RateLimiterProtocol,
+        event_publisher: EventPublisherProtocol,
     ) -> CreditManagerProtocol:
         """Provide credit manager implementation."""
         # Import here to avoid circular dependencies
@@ -248,6 +249,7 @@ class ServiceProvider(Provider):
             repository=repository,
             policy_loader=policy_loader,
             rate_limiter=rate_limiter,
+            event_publisher=event_publisher,
         )
 
 

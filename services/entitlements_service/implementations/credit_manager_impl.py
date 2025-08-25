@@ -14,6 +14,7 @@ from services.entitlements_service.protocols import (
     CreditCheckResponse,
     CreditConsumptionResult,
     EntitlementsRepositoryProtocol,
+    EventPublisherProtocol,
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
@@ -29,6 +30,7 @@ class CreditManagerImpl:
         repository: EntitlementsRepositoryProtocol,
         policy_loader: PolicyLoaderProtocol,
         rate_limiter: RateLimiterProtocol,
+        event_publisher: EventPublisherProtocol,
     ) -> None:
         """Initialize credit manager with dependencies.
 
@@ -36,10 +38,12 @@ class CreditManagerImpl:
             repository: Repository for credit data persistence
             policy_loader: Policy loader for costs and limits
             rate_limiter: Rate limiter for operation throttling
+            event_publisher: Event publisher for domain events
         """
         self.repository = repository
         self.policy_loader = policy_loader
         self.rate_limiter = rate_limiter
+        self.event_publisher = event_publisher
 
     async def check_credits(
         self,
@@ -86,6 +90,28 @@ class CreditManagerImpl:
             # Check rate limits first
             rate_check = await self.rate_limiter.check_rate_limit(user_id, metric, amount)
             if not rate_check.allowed:
+                # Publish rate limit exceeded event
+                try:
+                    # Generate correlation ID for rate limit event if not provided
+                    rate_limit_correlation_id = f"rate_limit_{user_id}_{metric}_{rate_check.current_count}"
+                    
+                    await self.event_publisher.publish_rate_limit_exceeded(
+                        subject_id=user_id,
+                        metric=metric,
+                        limit=rate_check.limit,
+                        current_count=rate_check.current_count,
+                        window_seconds=rate_check.window_seconds,
+                        correlation_id=rate_limit_correlation_id,
+                    )
+                    logger.debug(f"Rate limit exceeded event published: {rate_limit_correlation_id}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to publish rate limit exceeded event: {e}",
+                        exc_info=True,
+                        extra={"user_id": user_id, "metric": metric},
+                    )
+                    # Continue - don't fail the check due to event publishing issues
+
                 logger.info(
                     (
                         f"Rate limit exceeded for {metric}: "
@@ -234,6 +260,9 @@ class CreditManagerImpl:
 
             logger.debug(f"Consuming {total_cost} credits from {source} account: {subject_id}")
 
+            # Capture old balance before consumption for event publishing
+            old_balance = await self.repository.get_credit_balance(source, subject_id)
+
             try:
                 # Optimistically consume credits
                 new_balance = await self.repository.update_credit_balance(
@@ -257,6 +286,36 @@ class CreditManagerImpl:
 
                 # Record rate limiting usage
                 await self.rate_limiter.record_usage(user_id, metric, amount)
+
+                # Publish domain events for successful consumption
+                try:
+                    # Publish credit balance changed event
+                    await self.event_publisher.publish_credit_balance_changed(
+                        subject_type=source,
+                        subject_id=subject_id,
+                        old_balance=old_balance,
+                        new_balance=new_balance,
+                        delta=-total_cost,
+                        correlation_id=correlation_id,
+                    )
+                    
+                    # Publish usage recorded event for analytics
+                    await self.event_publisher.publish_usage_recorded(
+                        subject_type=source,
+                        subject_id=subject_id,
+                        metric=metric,
+                        amount=amount,  # Use original amount, not total_cost
+                        correlation_id=correlation_id,
+                    )
+                    
+                    logger.debug(f"Events published for credit consumption: {correlation_id}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to publish events for credit consumption: {e}",
+                        exc_info=True,
+                        extra={"correlation_id": correlation_id},
+                    )
+                    # Continue - don't fail the operation due to event publishing issues
 
                 logger.info(
                     (
@@ -402,6 +461,9 @@ class CreditManagerImpl:
         """Manually adjust credit balance (admin operation)."""
         logger.info(f"Manual credit adjustment: {subject_type} {subject_id} by {amount} ({reason})")
 
+        # Capture old balance before adjustment for event publishing
+        old_balance = await self.repository.get_credit_balance(subject_type, subject_id)
+
         # Apply adjustment via repository
         new_balance = await self.repository.update_credit_balance(
             subject_type=subject_type,
@@ -420,6 +482,25 @@ class CreditManagerImpl:
             correlation_id=correlation_id,
             status="completed",
         )
+
+        # Publish domain event for manual adjustment
+        try:
+            await self.event_publisher.publish_credit_balance_changed(
+                subject_type=subject_type,
+                subject_id=subject_id,
+                old_balance=old_balance,
+                new_balance=new_balance,
+                delta=amount,
+                correlation_id=correlation_id,
+            )
+            logger.debug(f"Credit balance changed event published for adjustment: {correlation_id}")
+        except Exception as e:
+            logger.warning(
+                f"Failed to publish event for credit adjustment: {e}",
+                exc_info=True,
+                extra={"correlation_id": correlation_id},
+            )
+            # Continue - don't fail the operation due to event publishing issues
 
         logger.info(
             f"Credit adjustment successful: new balance {new_balance}",
