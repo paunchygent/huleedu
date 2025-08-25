@@ -20,10 +20,11 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.events.spellcheck_models import SpellcheckResultV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox import EventOutbox, EventRelayWorker
 from testcontainers.kafka import KafkaContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
@@ -215,7 +216,7 @@ class TestSpellcheckerServiceTestcontainers:
         """Create Kafka consumer for results."""
         bootstrap_servers = kafka_container.get_bootstrap_server()
         consumer = AIOKafkaConsumer(
-            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             bootstrap_servers=bootstrap_servers,
             group_id=f"test-{uuid4()}",
             auto_offset_reset="earliest",
@@ -276,16 +277,22 @@ class TestSpellcheckerServiceTestcontainers:
         # Create database engine
         engine = create_async_engine(postgres_url, echo=False)
 
+        # Create outbox tables (required for EventRelayWorker)
+        async with engine.begin() as conn:
+            await conn.run_sync(EventOutbox.metadata.create_all)
+
         # Create DI container with test settings and engine
         container = make_async_container(
             SpellCheckerServiceProvider(engine), context={Settings: settings}
         )
 
-        # Initialize the Kafka consumer
+        # Initialize the Kafka consumer and outbox relay worker
         kafka_consumer = await container.get(SpellCheckerKafkaConsumer)
+        relay_worker = await container.get(EventRelayWorker)
 
-        # Start the consumer in the background
+        # Start both consumer and relay worker in the background
         consumer_task = asyncio.create_task(kafka_consumer.start_consumer())
+        relay_task = asyncio.create_task(relay_worker.start())
 
         try:
             # Wait a moment for the consumer to be ready
@@ -298,14 +305,20 @@ class TestSpellcheckerServiceTestcontainers:
                 "bootstrap_servers": bootstrap_servers,
                 "container": container,
                 "kafka_consumer": kafka_consumer,
+                "relay_worker": relay_worker,
                 "engine": engine,
             }
 
         finally:
-            # Stop the consumer
+            # Stop the consumer and relay worker
             consumer_task.cancel()
+            relay_task.cancel()
             try:
                 await consumer_task
+            except asyncio.CancelledError:
+                pass
+            try:
+                await relay_task
             except asyncio.CancelledError:
                 pass
             await container.close()
@@ -313,25 +326,25 @@ class TestSpellcheckerServiceTestcontainers:
 
     async def wait_for_result(
         self, consumer: AIOKafkaConsumer, correlation_id: UUID, timeout: float = 10.0
-    ) -> Tuple[SpellcheckResultDataV1, float]:
+    ) -> Tuple[SpellcheckResultV1, float]:
         """Wait for spellcheck result."""
         start_time = time.time()
         print(f"🔍 Waiting for result with correlation_id: {correlation_id}")
 
-        async def get_result() -> Tuple[SpellcheckResultDataV1, float]:
+        async def get_result() -> Tuple[SpellcheckResultV1, float]:
             msg_count = 0
             async for msg in consumer:
                 msg_count += 1
                 print(f"📨 Received message #{msg_count} on topic {msg.topic}")
                 try:
-                    envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(
+                    envelope = EventEnvelope[SpellcheckResultV1].model_validate_json(
                         msg.value.decode()
                     )
                     print(f"   Parsed envelope with correlation_id: {envelope.correlation_id}")
                     if envelope.correlation_id == correlation_id:
                         processing_time = time.time() - start_time
                         print(f"✅ Found matching result in {processing_time:.3f}s")
-                        typed_data = SpellcheckResultDataV1.model_validate(envelope.data)
+                        typed_data = SpellcheckResultV1.model_validate(envelope.data)
                         return typed_data, processing_time
                     else:
                         print("   ⚠ Wrong correlation_id, continuing...")
@@ -388,20 +401,19 @@ class TestSpellcheckerServiceTestcontainers:
                     timestamp=datetime.now(UTC),
                     started_at=datetime.now(UTC),
                     processing_stage="processing",
-                    event=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value,
+                    event=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED),
                 ),
                 language="en",
             )
 
+            topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
             envelope: EventEnvelope[EssayLifecycleSpellcheckRequestV1] = EventEnvelope(
-                event_type=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED.value,
+                event_type=topic,
                 source_service="test",
                 correlation_id=correlation_id,
                 data=request,
                 event_timestamp=datetime.now(UTC),
             )
-
-            topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
             print(f"\n🚀 Sending message to topic: {topic}")
             print(f"   Storage ID: {storage_id}")
             print(f"   Correlation ID: {correlation_id}")
@@ -419,7 +431,7 @@ class TestSpellcheckerServiceTestcontainers:
                 result, processing_time = await self.wait_for_result(
                     kafka_consumer,
                     correlation_id,
-                    timeout=5.0,  # Should be fast now
+                    timeout=10.0,  # Allow time for outbox relay processing
                 )
 
                 status = result.status.value if result.status else "Unknown"

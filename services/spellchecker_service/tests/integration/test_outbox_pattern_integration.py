@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.event_enums import ProcessingEvent
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import SpellcheckResultDataV1
 from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
@@ -318,24 +318,44 @@ class TestSpellcheckerOutboxPatternIntegration:
                 # Publish event
                 await event_publisher.publish_spellcheck_result(event_data, correlation_id)
 
-                # Verify event is stored in outbox
+                # Verify TWO events are stored in outbox (thin + rich dual pattern)
                 stmt = select(EventOutbox).where(
                     EventOutbox.aggregate_id == essay_id,
                     EventOutbox.aggregate_type == "spellcheck_job",
-                    EventOutbox.event_type == "huleedu.essay.spellcheck.completed.v1",
                 )
 
                 result = await session.execute(stmt)
-                outbox_event = result.scalar_one()
+                outbox_events = result.scalars().all()
 
-                assert outbox_event is not None
-                assert outbox_event.aggregate_id == essay_id
-                assert outbox_event.aggregate_type == "spellcheck_job"
-                assert outbox_event.event_type == "huleedu.essay.spellcheck.completed.v1"
-                assert outbox_event.topic == "huleedu.essay.spellcheck.completed.v1"
-                assert outbox_event.event_key == essay_id
-                assert outbox_event.published_at is None  # Not yet published
-                assert outbox_event.event_data is not None  # Should contain the event envelope
+                # Should have exactly 2 events: thin and rich
+                assert len(outbox_events) == 2
+                
+                # Sort events by topic to ensure consistent ordering
+                thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+                rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+                
+                thin_event = next((e for e in outbox_events if e.event_type == thin_topic), None)
+                rich_event = next((e for e in outbox_events if e.event_type == rich_topic), None)
+
+                # Verify thin event (for ELS/BCS state management)
+                assert thin_event is not None
+                assert thin_event.aggregate_id == essay_id
+                assert thin_event.aggregate_type == "spellcheck_job"
+                assert thin_event.event_type == thin_topic
+                assert thin_event.topic == thin_topic
+                assert thin_event.event_key == essay_id
+                assert thin_event.published_at is None
+                assert thin_event.event_data is not None
+
+                # Verify rich event (for RAS business data)
+                assert rich_event is not None
+                assert rich_event.aggregate_id == essay_id
+                assert rich_event.aggregate_type == "spellcheck_job"
+                assert rich_event.event_type == rich_topic
+                assert rich_event.topic == rich_topic
+                assert rich_event.event_key == essay_id
+                assert rich_event.published_at is None
+                assert rich_event.event_data is not None
 
                 # Verify Redis notification was sent
                 mock_redis_client.lpush.assert_called_with("outbox:wake:spell-checker-service", "1")
@@ -383,31 +403,41 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                 await event_publisher.publish_spellcheck_result(event_data, correlation_id)
 
-                # Verify event stored in outbox before processing
+                # Verify TWO events stored in outbox before processing (dual pattern)
                 stmt = select(EventOutbox).where(EventOutbox.published_at.is_(None))
                 result = await session.execute(stmt)
                 unpublished_events = result.scalars().all()
-                assert len(unpublished_events) == 1
+                assert len(unpublished_events) == 2
 
                 # Start relay worker and process events
                 await relay_worker.start()
 
                 try:
-                    # Wait for relay worker to process the event
+                    # Wait for relay worker to process both events
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_bus.published_events) > 0,
+                        lambda: len(mock_kafka_bus.published_events) >= 2,
                         timeout=3.0,
                     )
 
-                    # Verify Kafka publication
-                    assert len(mock_kafka_bus.published_events) == 1
-                    published_event = mock_kafka_bus.published_events[0]
-                    assert published_event["topic"] == "huleedu.essay.spellcheck.completed.v1"
-                    assert published_event["key"] == essay_id
+                    # Verify Kafka publication of both events
+                    assert len(mock_kafka_bus.published_events) == 2
+                    
+                    # Get expected topics using enums
+                    thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+                    rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+                    
+                    published_topics = [event["topic"] for event in mock_kafka_bus.published_events]
+                    assert thin_topic in published_topics
+                    assert rich_topic in published_topics
+                    
+                    # Verify event keys are correct for both events
+                    for published_event in mock_kafka_bus.published_events:
+                        assert published_event["key"] == essay_id
 
-                    # Verify event marked as published in outbox
-                    await session.refresh(unpublished_events[0])
-                    assert unpublished_events[0].published_at is not None
+                    # Verify both events marked as published in outbox
+                    for event in unpublished_events:
+                        await session.refresh(event)
+                        assert event.published_at is not None
 
                 finally:
                     await relay_worker.stop()
@@ -459,13 +489,25 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                     # Transaction commits here
 
-                # Verify event was committed
+                # Verify BOTH events were committed (dual pattern)
                 stmt = select(EventOutbox).where(EventOutbox.aggregate_id == essay_id)
                 result = await session.execute(stmt)
-                outbox_event = result.scalar_one_or_none()
+                outbox_events = result.scalars().all()
 
-                assert outbox_event is not None
-                assert outbox_event.aggregate_type == "spellcheck_job"
+                assert len(outbox_events) == 2
+                
+                # Verify both events have correct aggregate type
+                for event in outbox_events:
+                    assert event.aggregate_type == "spellcheck_job"
+                    assert event.aggregate_id == essay_id
+                
+                # Verify we have both thin and rich event types using enums
+                thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+                rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+                
+                event_types = [event.event_type for event in outbox_events]
+                assert thin_topic in event_types
+                assert rich_topic in event_types
 
     async def test_multiple_events_batch_processing(
         self,
@@ -512,11 +554,11 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                     await event_publisher.publish_spellcheck_result(event_data, correlation_id)
 
-                # Verify all events stored
+                # Verify all events stored (3 essays × 2 events each = 6 total)
                 stmt = select(EventOutbox).where(EventOutbox.published_at.is_(None))
                 result = await session.execute(stmt)
                 unpublished_events = result.scalars().all()
-                assert len(unpublished_events) == 3
+                assert len(unpublished_events) == 6  # 3 essays with dual events each
 
                 # Start relay worker and process events
                 await relay_worker.start()
@@ -524,12 +566,12 @@ class TestSpellcheckerOutboxPatternIntegration:
                 try:
                     # Wait for relay worker to process all events
                     await self.wait_for_condition(
-                        lambda: len(mock_kafka_bus.published_events) >= 3,
+                        lambda: len(mock_kafka_bus.published_events) >= 6,
                         timeout=5.0,
                     )
 
-                    # Verify all processed
-                    assert len(mock_kafka_bus.published_events) == 3
+                    # Verify all processed (3 essays × 2 events each = 6 total)
+                    assert len(mock_kafka_bus.published_events) == 6
 
                     # Verify all marked as published
                     for event in unpublished_events:

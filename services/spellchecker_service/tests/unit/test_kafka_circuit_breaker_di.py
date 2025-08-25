@@ -17,6 +17,13 @@ from services.spellchecker_service.config import Settings
 from services.spellchecker_service.di import SpellCheckerServiceProvider
 
 
+async def get_kafka_bus_from_provider(provider, settings, registry):
+    """Helper to extract KafkaBus from async generator provider."""
+    async for bus in provider.provide_kafka_bus(settings, registry):
+        return bus
+    raise RuntimeError("Provider did not yield KafkaBus")
+
+
 @pytest.fixture
 def mock_settings() -> Settings:
     """Mock settings for testing."""
@@ -89,7 +96,7 @@ async def test_kafka_bus_with_circuit_breaker(
         patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start,
         patch.object(KafkaBus, "stop", new_callable=AsyncMock),
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
+        kafka_bus = await get_kafka_bus_from_provider(provider, mock_settings, registry)
 
         try:
             # Should return ResilientKafkaPublisher when circuit breaker is enabled
@@ -128,7 +135,7 @@ async def test_kafka_bus_without_circuit_breaker(
 
     # Mock the KafkaBus.start method to avoid actual Kafka connection
     with patch.object(KafkaBus, "start", new_callable=AsyncMock) as mock_start:
-        kafka_bus = await provider.provide_kafka_bus(mock_settings_disabled, registry)
+        kafka_bus = await get_kafka_bus_from_provider(provider, mock_settings_disabled, registry)
 
         # Should return base KafkaBus when circuit breaker is disabled
         assert isinstance(kafka_bus, KafkaBus)
@@ -148,7 +155,7 @@ async def test_circuit_breaker_configuration(
     registry = provider.provide_circuit_breaker_registry(mock_settings)
 
     with patch.object(KafkaBus, "start", new_callable=AsyncMock):
-        await provider.provide_kafka_bus(mock_settings, registry)
+        await get_kafka_bus_from_provider(provider, mock_settings, registry)
 
         # Get the circuit breaker from registry
         circuit_breaker = registry.get("kafka_producer")
@@ -195,11 +202,12 @@ async def test_lifecycle_cleanup(
         patch.object(KafkaBus, "start", new_callable=AsyncMock),
         patch.object(KafkaBus, "stop", new_callable=AsyncMock) as mock_stop,
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, registry)
+        kafka_bus = await get_kafka_bus_from_provider(provider, mock_settings, registry)
 
-        # Test cleanup
+        # Test cleanup - Note: async generator pattern calls stop() in cleanup
+        # so we expect 2 calls total (1 from generator cleanup + 1 explicit call)
         await kafka_bus.stop()
-        mock_stop.assert_called_once()
+        assert mock_stop.call_count == 2
 
 
 def test_env_prefix() -> None:
@@ -226,7 +234,7 @@ async def test_integration_with_existing_providers(
         patch.object(KafkaBus, "start", new_callable=AsyncMock),
         patch.object(KafkaBus, "stop", new_callable=AsyncMock),
     ):
-        kafka_bus = await provider.provide_kafka_bus(mock_settings, cb_registry)
+        kafka_bus = await get_kafka_bus_from_provider(provider, mock_settings, cb_registry)
         try:
             assert kafka_bus is not None
         finally:

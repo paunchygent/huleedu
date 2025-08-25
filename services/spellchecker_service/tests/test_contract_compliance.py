@@ -254,11 +254,12 @@ class TestEventContractCompliance:
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
 
         # Verify thin event (SPELLCHECK_PHASE_COMPLETED)
-        assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
-        assert thin_call.kwargs["topic"] == topic_name(SPELLCHECK_PHASE_COMPLETED)
+        thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+        assert thin_call.kwargs["event_type"] == thin_topic
+        assert thin_call.kwargs["topic"] == thin_topic
 
         thin_envelope = thin_call.kwargs["event_data"]
-        assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
+        assert thin_envelope.event_type == thin_topic
         assert thin_envelope.source_service == "test-spellchecker-service"
 
         # Verify thin event data structure compliance
@@ -273,11 +274,12 @@ class TestEventContractCompliance:
         assert thin_data.correlation_id is not None
 
         # Verify rich event (SPELLCHECK_RESULTS)
-        assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
-        assert rich_call.kwargs["topic"] == topic_name(SPELLCHECK_RESULTS)
+        rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+        assert rich_call.kwargs["event_type"] == rich_topic
+        assert rich_call.kwargs["topic"] == rich_topic
 
         rich_envelope = rich_call.kwargs["event_data"]
-        assert rich_envelope.event_type == "SpellcheckResultV1"
+        assert rich_envelope.event_type == rich_topic
         assert rich_envelope.source_service == "test-spellchecker-service"
 
         # Verify rich event data structure compliance

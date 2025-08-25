@@ -108,12 +108,13 @@ class TestDefaultSpellcheckEventPublisher:
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         assert thin_call.kwargs["aggregate_type"] == "spellcheck_job"
         assert thin_call.kwargs["aggregate_id"] == sample_entity_id
-        assert thin_call.kwargs["event_type"] == "SpellcheckPhaseCompletedV1"
-        assert thin_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+        thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+        assert thin_call.kwargs["event_type"] == thin_topic
+        assert thin_call.kwargs["topic"] == thin_topic
 
         thin_envelope = thin_call.kwargs["event_data"]
         assert isinstance(thin_envelope, EventEnvelope)
-        assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
+        assert thin_envelope.event_type == thin_topic
         assert thin_envelope.source_service == "spell-checker-service"
         assert thin_envelope.correlation_id == sample_correlation_id
         assert isinstance(thin_envelope.data, SpellcheckPhaseCompletedV1)
@@ -126,12 +127,13 @@ class TestDefaultSpellcheckEventPublisher:
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         assert rich_call.kwargs["aggregate_type"] == "spellcheck_job"
         assert rich_call.kwargs["aggregate_id"] == sample_entity_id
-        assert rich_call.kwargs["event_type"] == "SpellcheckResultV1"
-        assert rich_call.kwargs["topic"] == topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+        rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+        assert rich_call.kwargs["event_type"] == rich_topic
+        assert rich_call.kwargs["topic"] == rich_topic
 
         rich_envelope = rich_call.kwargs["event_data"]
         assert isinstance(rich_envelope, EventEnvelope)
-        assert rich_envelope.event_type == "SpellcheckResultV1"
+        assert rich_envelope.event_type == rich_topic
         assert rich_envelope.source_service == "spell-checker-service"
         assert rich_envelope.correlation_id == sample_correlation_id
         assert isinstance(rich_envelope.data, SpellcheckResultV1)
@@ -220,7 +222,8 @@ class TestDefaultSpellcheckEventPublisher:
         thin_call = mock_outbox_manager.publish_to_outbox.call_args_list[0]
         thin_envelope = thin_call.kwargs["event_data"]
         assert isinstance(thin_envelope, EventEnvelope)
-        assert thin_envelope.event_type == "SpellcheckPhaseCompletedV1"
+        thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
+        assert thin_envelope.event_type == thin_topic
         assert thin_envelope.source_service == "spell-checker-service"
         assert thin_envelope.correlation_id == sample_correlation_id
         assert isinstance(thin_envelope.data, SpellcheckPhaseCompletedV1)
@@ -231,7 +234,8 @@ class TestDefaultSpellcheckEventPublisher:
         rich_call = mock_outbox_manager.publish_to_outbox.call_args_list[1]
         rich_envelope = rich_call.kwargs["event_data"]
         assert isinstance(rich_envelope, EventEnvelope)
-        assert rich_envelope.event_type == "SpellcheckResultV1"
+        rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
+        assert rich_envelope.event_type == rich_topic
         assert rich_envelope.source_service == "spell-checker-service"
         assert rich_envelope.correlation_id == sample_correlation_id
         assert isinstance(rich_envelope.data, SpellcheckResultV1)
