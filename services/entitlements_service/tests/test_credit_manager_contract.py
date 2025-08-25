@@ -50,15 +50,17 @@ class _MockEventPublisher(EventPublisherProtocol):
         delta: int,
         correlation_id: str,
     ) -> None:
-        self.published_events.append({
-            "type": "credit_balance_changed",
-            "subject_type": subject_type,
-            "subject_id": subject_id,
-            "old_balance": old_balance,
-            "new_balance": new_balance,
-            "delta": delta,
-            "correlation_id": correlation_id,
-        })
+        self.published_events.append(
+            {
+                "type": "credit_balance_changed",
+                "subject_type": subject_type,
+                "subject_id": subject_id,
+                "old_balance": old_balance,
+                "new_balance": new_balance,
+                "delta": delta,
+                "correlation_id": correlation_id,
+            }
+        )
 
     async def publish_rate_limit_exceeded(
         self,
@@ -69,15 +71,17 @@ class _MockEventPublisher(EventPublisherProtocol):
         window_seconds: int,
         correlation_id: str,
     ) -> None:
-        self.published_events.append({
-            "type": "rate_limit_exceeded",
-            "subject_id": subject_id,
-            "metric": metric,
-            "limit": limit,
-            "current_count": current_count,
-            "window_seconds": window_seconds,
-            "correlation_id": correlation_id,
-        })
+        self.published_events.append(
+            {
+                "type": "rate_limit_exceeded",
+                "subject_id": subject_id,
+                "metric": metric,
+                "limit": limit,
+                "current_count": current_count,
+                "window_seconds": window_seconds,
+                "correlation_id": correlation_id,
+            }
+        )
 
     async def publish_usage_recorded(
         self,
@@ -87,14 +91,16 @@ class _MockEventPublisher(EventPublisherProtocol):
         amount: int,
         correlation_id: str,
     ) -> None:
-        self.published_events.append({
-            "type": "usage_recorded",
-            "subject_type": subject_type,
-            "subject_id": subject_id,
-            "metric": metric,
-            "amount": amount,
-            "correlation_id": correlation_id,
-        })
+        self.published_events.append(
+            {
+                "type": "usage_recorded",
+                "subject_type": subject_type,
+                "subject_id": subject_id,
+                "metric": metric,
+                "amount": amount,
+                "correlation_id": correlation_id,
+            }
+        )
 
 
 @pytest.mark.asyncio

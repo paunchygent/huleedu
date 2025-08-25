@@ -15,8 +15,7 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 from common_core.event_enums import ProcessingEvent
-from common_core.events.assessment_result_events import AssessmentResultV1
-from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
+from common_core.events.cj_assessment_events import AssessmentResultV1, CJAssessmentCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage

@@ -93,8 +93,10 @@ class CreditManagerImpl:
                 # Publish rate limit exceeded event
                 try:
                     # Generate correlation ID for rate limit event if not provided
-                    rate_limit_correlation_id = f"rate_limit_{user_id}_{metric}_{rate_check.current_count}"
-                    
+                    rate_limit_correlation_id = (
+                        f"rate_limit_{user_id}_{metric}_{rate_check.current_count}"
+                    )
+
                     await self.event_publisher.publish_rate_limit_exceeded(
                         subject_id=user_id,
                         metric=metric,
@@ -103,7 +105,9 @@ class CreditManagerImpl:
                         window_seconds=rate_check.window_seconds,
                         correlation_id=rate_limit_correlation_id,
                     )
-                    logger.debug(f"Rate limit exceeded event published: {rate_limit_correlation_id}")
+                    logger.debug(
+                        f"Rate limit exceeded event published: {rate_limit_correlation_id}"
+                    )
                 except Exception as e:
                     logger.warning(
                         f"Failed to publish rate limit exceeded event: {e}",
@@ -298,7 +302,7 @@ class CreditManagerImpl:
                         delta=-total_cost,
                         correlation_id=correlation_id,
                     )
-                    
+
                     # Publish usage recorded event for analytics
                     await self.event_publisher.publish_usage_recorded(
                         subject_type=source,
@@ -307,7 +311,7 @@ class CreditManagerImpl:
                         amount=amount,  # Use original amount, not total_cost
                         correlation_id=correlation_id,
                     )
-                    
+
                     logger.debug(f"Events published for credit consumption: {correlation_id}")
                 except Exception as e:
                     logger.warning(

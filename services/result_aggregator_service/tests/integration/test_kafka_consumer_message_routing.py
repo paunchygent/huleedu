@@ -8,18 +8,17 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import ContentType, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckResultDataV1,
 )
+from common_core.events.spellcheck_models import SpellcheckResultV1, SpellcheckMetricsV1
 from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
-    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.pipeline_models import PhaseName
@@ -102,35 +101,38 @@ class TestKafkaConsumerRouting:
         kafka_consumer: ResultAggregatorKafkaConsumer,
         mock_event_processor: AsyncMock,
     ) -> None:
-        """Test routing of SpellcheckResultDataV1 event."""
+        """Test routing of SpellcheckResultV1 event."""
         # Arrange
         essay_id: str = str(uuid4())
         batch_id: str = str(uuid4())
+        correlation_id: str = str(uuid4())
 
-        # Use primitive parameters directly
-        entity_id = essay_id
-        entity_type = "essay"
-        parent_id = batch_id
-
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_id=entity_id,
-            entity_type=entity_type,
-            parent_id=parent_id,
+        data = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
+            entity_id=essay_id,
+            entity_type="essay",
+            parent_id=batch_id,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=SystemProcessingMetadata(
-                entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
+                entity_id=essay_id, entity_type="essay", parent_id=batch_id
+            ),
+            correlation_id=correlation_id,
+            corrections_made=5,
+            correction_metrics=SpellcheckMetricsV1(
+                total_corrections=5,
+                l2_dictionary_corrections=3,
+                spellchecker_corrections=2,
+                word_count=100,
+                correction_density=5.0,
             ),
             original_text_storage_id="original-123",
-            corrections_made=5,
-            storage_metadata=StorageReferenceMetadata(
-                references={ContentType.CORRECTED_TEXT: {"corrected": "storage-456"}}
-            ),
+            corrected_text_storage_id="corrected-456",
+            processing_duration_ms=1500,
         )
 
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type="SpellcheckResultV1",
             event_timestamp=datetime.now(UTC),
             source_service="spell_checker",
             correlation_id=uuid4(),
@@ -138,7 +140,7 @@ class TestKafkaConsumerRouting:
         )
 
         record = create_kafka_record(
-            topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_envelope=envelope,
         )
 
@@ -147,8 +149,8 @@ class TestKafkaConsumerRouting:
 
         # Assert
         assert result is True
-        mock_event_processor.process_spellcheck_completed.assert_called_once()
-        call_args = mock_event_processor.process_spellcheck_completed.call_args
+        mock_event_processor.process_spellcheck_result.assert_called_once()
+        call_args = mock_event_processor.process_spellcheck_result.call_args
         assert call_args[0][1].entity_id == essay_id
 
     async def test_route_assessment_result_event(
@@ -158,7 +160,7 @@ class TestKafkaConsumerRouting:
     ) -> None:
         """Test routing of AssessmentResultV1 event."""
         # Arrange
-        from common_core.events.assessment_result_events import AssessmentResultV1
+        from common_core.events.cj_assessment_events import AssessmentResultV1
 
         batch_id: str = str(uuid4())
         cj_job_id: str = str(uuid4())

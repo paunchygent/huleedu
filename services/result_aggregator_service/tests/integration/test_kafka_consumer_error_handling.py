@@ -8,17 +8,13 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import ContentType, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
     EventEnvelope,
-    SpellcheckResultDataV1,
 )
-from common_core.metadata_models import (
-    StorageReferenceMetadata,
-    SystemProcessingMetadata,
-)
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
@@ -183,12 +179,14 @@ class TestKafkaConsumerErrorHandling:
             headers=[],
         )
 
-        # Valid spellcheck completed event
-        # EntityReference removed - using primitive parameters
+        # Valid spellcheck result event (using the rich event that consumer actually handles)
+        # Import the rich event model
+        from common_core.events.spellcheck_models import SpellcheckMetricsV1, SpellcheckResultV1
+
         essay_id = str(uuid4())
 
-        valid_data2 = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+        valid_data2 = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id2,
@@ -198,16 +196,24 @@ class TestKafkaConsumerErrorHandling:
                 entity_type="essay",
                 parent_id=batch_id2,
             ),
+            correlation_id=str(uuid4()),
             original_text_storage_id="original-123",
+            corrected_text_storage_id="corrected-456",
             corrections_made=3,
-            storage_metadata=StorageReferenceMetadata(
-                references={ContentType.CORRECTED_TEXT: {"corrected": "storage-456"}}
+            correction_metrics=SpellcheckMetricsV1(
+                total_corrections=3,
+                l2_dictionary_corrections=2,
+                spellchecker_corrections=1,
+                word_count=100,
+                correction_density=3.0,
             ),
+            processing_duration_ms=1500,
+            processor_version="pyspellchecker_1.0_L2_swedish",
         )
 
-        valid_envelope2: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        valid_envelope2: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type="SpellcheckResultV1",
             event_timestamp=datetime.now(UTC),
             source_service="spell_checker",
             correlation_id=uuid4(),
@@ -215,7 +221,7 @@ class TestKafkaConsumerErrorHandling:
         )
 
         valid_record2 = create_kafka_record(
-            topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_envelope=valid_envelope2,
             offset=3,
         )
@@ -233,6 +239,6 @@ class TestKafkaConsumerErrorHandling:
 
         # Both valid messages should have been processed
         assert mock_event_processor.process_batch_registered.call_count == 1
-        assert mock_event_processor.process_spellcheck_completed.call_count == 1
+        assert mock_event_processor.process_spellcheck_result.call_count == 1
 
         # The poison pill was handled gracefully without affecting other messages

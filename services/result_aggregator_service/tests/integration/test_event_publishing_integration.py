@@ -229,7 +229,7 @@ async def test_batch_assessment_completed_published_on_assessment_result(
     mock_batch_repository.update_essay_cj_assessment_result = AsyncMock()
 
     # Create assessment result event (new pattern)
-    from common_core.events.assessment_result_events import AssessmentResultV1
+    from common_core.events.cj_assessment_events import AssessmentResultV1
 
     essay_results = [
         {
@@ -420,7 +420,7 @@ async def test_correlation_id_propagation(
     mock_batch_repository.update_essay_cj_assessment_result = AsyncMock()
 
     # Create assessment result event with specific correlation_id (new pattern)
-    from common_core.events.assessment_result_events import AssessmentResultV1
+    from common_core.events.cj_assessment_events import AssessmentResultV1
 
     envelope: EventEnvelope[AssessmentResultV1] = EventEnvelope(
         event_type="huleedu.assessment.results.v1",

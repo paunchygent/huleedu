@@ -16,7 +16,7 @@ from common_core.events import (
     EventEnvelope,
     SpellcheckResultDataV1,
 )
-from common_core.events.assessment_result_events import AssessmentResultV1
+from common_core.events.cj_assessment_events import AssessmentResultV1
 from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 from common_core.metadata_models import (
     StorageReferenceMetadata,

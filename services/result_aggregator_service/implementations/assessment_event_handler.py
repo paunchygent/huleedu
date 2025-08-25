@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from common_core.events.assessment_result_events import AssessmentResultV1
+from common_core.events.cj_assessment_events import AssessmentResultV1
 from common_core.events.result_events import BatchAssessmentCompletedV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage

@@ -14,8 +14,8 @@ from common_core.events import (
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
 )
-from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+from common_core.events.cj_assessment_events import AssessmentResultV1
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol

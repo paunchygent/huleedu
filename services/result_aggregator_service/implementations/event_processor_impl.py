@@ -28,8 +28,8 @@ if TYPE_CHECKING:
         SpellcheckResultDataV1,
         SpellcheckResultV1,
     )
-    from common_core.events.assessment_result_events import AssessmentResultV1
     from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+    from common_core.events.cj_assessment_events import AssessmentResultV1
     from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 
     from services.result_aggregator_service.protocols import (

@@ -12,8 +12,8 @@ from common_core.events import (
     SpellcheckResultDataV1,
     SpellcheckResultV1,
 )
-from common_core.events.assessment_result_events import AssessmentResultV1
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
+from common_core.events.cj_assessment_events import AssessmentResultV1
 from common_core.events.result_events import BatchAssessmentCompletedV1, BatchResultsReadyV1
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage

@@ -6,6 +6,7 @@ regarding Comparative Judgment (CJ) assessment processing.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadat
 from .base_event_models import BaseEventData, ProcessingUpdate
 
 __all__ = [
+    "AssessmentResultV1",
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
     "ELS_CJAssessmentRequestV1",
@@ -155,3 +157,57 @@ class CJAssessmentFailedV1(ProcessingUpdate):
     # system_metadata (from ProcessingUpdate) should contain detailed error_info
 
     cj_assessment_job_id: str  # Internal CJ Job ID for traceability
+
+
+# === RICH RESULT EVENT (CJ → RAS) ===
+
+
+class AssessmentResultV1(BaseEventData):
+    """Rich assessment result event sent directly to Result Aggregator Service.
+
+    This event contains the full business data from CJ Assessment, including
+    scores, grades, and rankings. Published alongside the thin CJAssessmentCompletedV1
+    event that goes to ELS for state tracking.
+    """
+
+    event_name: ProcessingEvent = Field(default=ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED)
+
+    # Batch identification
+    batch_id: str = Field(description="BOS batch ID")
+    cj_assessment_job_id: str = Field(description="Internal CJ batch ID")
+
+    # Assessment method tracking
+    assessment_method: str = Field(description="Method used: cj_assessment, nlp_random_forest, etc")
+    model_used: str = Field(description="Specific model: claude-3-opus, gpt-4, etc")
+    model_provider: str = Field(description="Provider: anthropic, openai, internal")
+    model_version: str | None = Field(default=None, description="Model version if applicable")
+
+    # Essay results (excludes anchor essays)
+    essay_results: list[dict[str, Any]] = Field(
+        description="List of student essay assessment results",
+        # Each dict contains:
+        # - essay_id: str
+        # - normalized_score: float (0.0-1.0)
+        # - letter_grade: str (A, B, C, etc)
+        # - confidence_score: float (0.0-1.0)
+        # - confidence_label: str (HIGH, MID, LOW)
+        # - bt_score: float (Bradley-Terry score)
+        # - rank: int
+        # - is_anchor: bool (always False for student essays)
+    )
+
+    # Assessment metadata
+    assessment_metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional assessment context",
+        # Contains:
+        # - anchor_essays_used: int
+        # - calibration_method: str (anchor, default)
+        # - comparison_count: int
+        # - processing_duration_seconds: float
+        # - llm_temperature: float
+        # - assignment_id: str | None
+    )
+
+    # Timestamp
+    assessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
