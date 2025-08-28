@@ -42,7 +42,7 @@ from services.class_management_service.implementations.class_repository_postgres
 from services.class_management_service.implementations.event_publisher_impl import (
     DefaultClassEventPublisherImpl,
 )
-from services.class_management_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
 from services.class_management_service.metrics import (
     CmsMetrics,
@@ -187,8 +187,12 @@ class ServiceProvider(Provider):
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for TRUE OUTBOX PATTERN."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        """Provide shared outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

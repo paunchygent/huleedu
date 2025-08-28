@@ -385,7 +385,7 @@ duplicate_event_detection_total = Counter(
 - [x] Unit tests pass for all components
 
 ### Phase 2 Complete  
-- [ ] All 12 service OutboxManager implementations removed (0/12 migrated)
+- [ ] All 11 service OutboxManager implementations removed (5/11 migrated)
 - [ ] Deterministic partition keys implemented (infrastructure ready, logic pending)
 - [x] Topic naming consistency fixed
 - [ ] Integration tests pass (infrastructure tests pass, service migration pending)
@@ -411,11 +411,13 @@ duplicate_event_detection_total = Counter(
 - EventRelayWorker extracts and propagates headers from outbox storage
 - All infrastructure tests passing
 
-### Phase 2: Service Integration ⚠️ 10% COMPLETE
+### Phase 2: Service Integration ⚠️ 45% COMPLETE
 
 - **Completed**: Topic naming consistency using `topic_name()` function
+- **Completed**: class_management_service migrated with PDM composite pattern
+- **Completed**: Automatic migration pattern established for development
 - **Ready**: Partition key infrastructure in place
-- **Pending**: Migrate 12 services to shared OutboxManager (0/12 done)
+- **In Progress**: Migrate remaining services to shared OutboxManager (5/11 done)
 - **Pending**: Implement service-specific partition key strategies
 
 ### Phase 3: Schema & Type Safety ⚠️ 30% COMPLETE
@@ -425,7 +427,7 @@ duplicate_event_detection_total = Counter(
 - **Pending**: Performance benchmarking
 - **Pending**: Monitoring dashboard setup
 
-### Overall Progress: ~40% Complete
+### Overall Progress: ~50% Complete
 
 ### Phase 3.5: Business Logic Alignment (UNPLANNED BUT CRITICAL) ✅ COMPLETE
 
@@ -503,6 +505,48 @@ These fixes were essential for production readiness and revealed important archi
 - [HuleEdu Event-Driven Architecture Standards](.cursor/rules/030-event-driven-architecture-eda-standards.mdc)
 - [Outbox Pattern Best Practices](https://microservices.io/patterns/data/transactional-outbox.html)
 - [Schema Evolution Strategies](https://docs.confluent.io/platform/current/schema-registry/avro.html)
+
+## Phase 2 Migration Success (August 28, 2025)
+
+### Class Management Service Migration ✅ COMPLETED
+
+**Achievement**: Successfully migrated class_management_service to shared OutboxManager with automatic migration pattern.
+
+**Key Changes**:
+1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
+2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter
+3. **PDM Composite Pattern**: Added `start-dev = {composite = ["migrate", "start"]}` for automatic migrations
+4. **Docker Environment Awareness**: Dockerfile uses development vs production startup commands
+5. **Migration State Fixed**: Resolved broken alembic tracking with proper `alembic upgrade heads`
+
+**Pattern Established**:
+```toml
+[tool.pdm.scripts]
+migrate = "alembic upgrade heads"
+start = "python app.py"
+start-dev = {composite = ["migrate", "start"]}
+```
+
+**Validation**: 
+- ✅ Functional test passes (class creation with course "ENG5")
+- ✅ Event publishing through shared OutboxManager works
+- ✅ Automatic migrations apply on container startup
+- ✅ Development workflow preserved (`pdm run dev build dev` → `pdm run dev dev`)
+
+**Services Migrated (5/11)**:
+- batch_orchestrator_service (already using shared)
+- nlp_service (already using shared)
+- result_aggregator_service (already using shared) 
+- spellchecker_service (already using shared)
+- **class_management_service** (✅ newly migrated)
+
+**Remaining Services (6/11)**:
+- cj_assessment_service
+- email_service
+- entitlements_service
+- essay_lifecycle_service
+- file_service
+- identity_service
 
 ## Next Session Goals
 
