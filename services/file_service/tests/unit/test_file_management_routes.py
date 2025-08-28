@@ -25,6 +25,7 @@ from services.file_service.protocols import (
     ContentServiceClientProtocol,
     ContentValidatorProtocol,
     EventPublisherProtocol,
+    FileRepositoryProtocol,
     TextExtractorProtocol,
 )
 
@@ -45,7 +46,10 @@ class TestFileManagementRoutes:
     @pytest.fixture
     def mock_text_extractor(self) -> AsyncMock:
         """Create mock text extractor."""
-        return AsyncMock(spec=TextExtractorProtocol)
+        mock = AsyncMock(spec=TextExtractorProtocol)
+        # Configure mock to return extracted text as string
+        mock.extract_text.return_value = "This is the extracted text content"
+        return mock
 
     @pytest.fixture
     def mock_content_validator(self) -> AsyncMock:
@@ -55,7 +59,15 @@ class TestFileManagementRoutes:
     @pytest.fixture
     def mock_content_client(self) -> AsyncMock:
         """Create mock content service client."""
-        return AsyncMock(spec=ContentServiceClientProtocol)
+        mock = AsyncMock(spec=ContentServiceClientProtocol)
+        # Configure mock to return proper string storage IDs
+        mock.store_content.return_value = "storage-id-12345"
+        return mock
+
+    @pytest.fixture
+    def mock_file_repository(self) -> AsyncMock:
+        """Create mock file repository."""
+        return AsyncMock(spec=FileRepositoryProtocol)
 
     @pytest.fixture
     async def app_client(
@@ -65,6 +77,7 @@ class TestFileManagementRoutes:
         mock_text_extractor: AsyncMock,
         mock_content_validator: AsyncMock,
         mock_content_client: AsyncMock,
+        mock_file_repository: AsyncMock,
     ) -> AsyncGenerator[QuartTestClient, None]:
         """
         Return a Quart test client configured with mocked dependencies using Dishka.
@@ -92,6 +105,10 @@ class TestFileManagementRoutes:
             @provide(scope=Scope.APP)
             def provide_content_client(self) -> ContentServiceClientProtocol:
                 return mock_content_client
+
+            @provide(scope=Scope.REQUEST)
+            def provide_file_repository(self) -> FileRepositoryProtocol:
+                return mock_file_repository
 
             @provide(scope=Scope.APP)
             def provide_metrics(self) -> dict[str, Any]:

@@ -13,7 +13,7 @@ from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 if TYPE_CHECKING:
-    from services.batch_orchestrator_service.implementations.outbox_manager import OutboxManager
+    from huleedu_service_libs.outbox.manager import OutboxManager
 
 logger = create_service_logger("bos.event_publisher")
 

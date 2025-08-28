@@ -17,10 +17,12 @@ from services.spellchecker_service.config import Settings
 from services.spellchecker_service.di import SpellCheckerServiceProvider
 
 
-async def get_kafka_bus_from_provider(provider, settings, registry):
+async def get_kafka_bus_from_provider(
+    provider: SpellCheckerServiceProvider, settings: Settings, registry: CircuitBreakerRegistry
+) -> KafkaBus:
     """Helper to extract KafkaBus from async generator provider."""
     async for bus in provider.provide_kafka_bus(settings, registry):
-        return bus
+        return bus  # type: ignore[no-any-return,return-value]
     raise RuntimeError("Provider did not yield KafkaBus")
 
 

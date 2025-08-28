@@ -298,10 +298,6 @@ class OutboxManagerProtocol(Protocol):
         """
         ...
 
-    async def notify_relay_worker(self) -> None:
-        """Notify relay worker of new events in outbox."""
-        ...
-
 
 class EventPublisherProtocol(Protocol):
     """Protocol for publishing domain events from Result Aggregator Service."""

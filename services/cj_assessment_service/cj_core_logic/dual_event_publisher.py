@@ -15,7 +15,11 @@ if TYPE_CHECKING:
     from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 from common_core.event_enums import ProcessingEvent
-from common_core.events.cj_assessment_events import AssessmentResultV1, CJAssessmentCompletedV1
+from common_core.events.cj_assessment_events import (
+    AssessmentResultV1,
+    CJAssessmentCompletedV1,
+    EssayResultV1,
+)
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -161,20 +165,20 @@ async def publish_dual_assessment_events(
         grade = grade_projections.primary_grades.get(essay_id, "U")
 
         essay_results.append(
-            {
-                "essay_id": essay_id,
-                "normalized_score": _grade_to_normalized(grade),
-                "letter_grade": grade,
-                "confidence_score": grade_projections.confidence_scores.get(essay_id, 0.0),
-                "confidence_label": grade_projections.confidence_labels.get(essay_id, "LOW"),
-                "bt_score": ranking.get(
+            EssayResultV1(
+                essay_id=essay_id,
+                normalized_score=_grade_to_normalized(grade),
+                letter_grade=grade,
+                confidence_score=grade_projections.confidence_scores.get(essay_id, 0.0),
+                confidence_label=grade_projections.confidence_labels.get(essay_id, "LOW"),
+                bt_score=ranking.get(
                     "bradley_terry_score", 0.0
                 ),  # bradley_terry_score field contains BT score
-                "rank": ranking.get("rank", 999),
-                "is_anchor": is_anchor,
+                rank=ranking.get("rank", 999),
+                is_anchor=is_anchor,
                 # Display name for anchors to help with score band visualization
-                "display_name": f"ANCHOR GRADE {grade}" if is_anchor else None,
-            }
+                display_name=f"ANCHOR GRADE {grade}" if is_anchor else None,
+            )
         )
 
     # Calculate anchor grade distribution (CRITICAL - was missing in some locations)

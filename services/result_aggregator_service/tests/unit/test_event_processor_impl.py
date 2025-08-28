@@ -890,7 +890,7 @@ class TestProcessAssessmentResult:
                     "confidence_score": 1.0,
                     "confidence_label": "HIGH",
                     "bt_score": 2.0,
-                    "rank": 0,
+                    "rank": 2,
                     "is_anchor": True,  # Anchor essay - should be excluded
                 },
             ],

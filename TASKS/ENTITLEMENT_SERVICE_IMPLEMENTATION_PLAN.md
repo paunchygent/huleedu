@@ -176,7 +176,9 @@ cache_ttl: 300      # Cache policies in Redis for 5 minutes
 6. If sufficient: BOS starts pipeline → ELS → Services
 7. Services complete phases → Publish completion events
 8. Entitlements consumes credits on phase completion events
-9. If insufficient: BOS publishes PipelineDeniedV1 → API Gateway → 402 Payment Required
+9. If insufficient: 
+   - BOS publishes PipelineDeniedV1 → API Gateway → 402 Payment Required
+   - BOS projects TeacherNotificationRequestedV1 → WebSocket → Real-time teacher notification
 ```
 
 ## Implementation Phases
@@ -298,6 +300,13 @@ async def handle_resource_consumption(event: ResourceConsumptionV1):
 2. Add credit checking to BOS pipeline request handler
 3. Create PipelineDeniedV1 event model in common_core
 4. Publish denial events when insufficient credits
+5. Project credit denial notifications to WebSocket:
+   - Use existing NotificationProjector (services/batch_orchestrator_service/notification_projector.py)
+   - Create TeacherNotificationRequestedV1 for real-time teacher feedback
+   - Include denial reason, required credits, and available credits in payload
+6. Handle credit denial in ClientPipelineRequestHandler:
+   - After credit check failure, call notification_projector.handle_pipeline_denied_credits()
+   - Ensure teacher gets immediate visual feedback about credit insufficiency
 
 ### 📋 **Phase 5: PLANNED** - Policy Configuration Update
 
@@ -440,6 +449,14 @@ PipelineDeniedV1:
     available_credits: int
     # NO suggested_alternatives - client handles this (YAGNI)
 ```
+
+### WebSocket Notification for Credit Denials
+
+BOS's NotificationProjector will handle credit denial notifications:
+- notification_type: "pipeline_denied_insufficient_credits" or "pipeline_denied_rate_limit"
+- category: WebSocketEventCategory.BATCH_PROGRESS
+- priority: NotificationPriority.IMMEDIATE
+- action_required: true (teacher needs to purchase credits or wait)
 
 ## Testing Strategy
 

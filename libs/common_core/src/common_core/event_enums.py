@@ -154,7 +154,7 @@ _TOPIC_MAPPING = {
     # Result aggregator events
     ProcessingEvent.BATCH_RESULTS_READY: "huleedu.ras.batch.results.ready.v1",
     ProcessingEvent.BATCH_ASSESSMENT_COMPLETED: "huleedu.ras.batch.assessment.completed.v1",
-    ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED: "huleedu.assessment.results.v1",
+    ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED: "huleedu.assessment.result.published.v1",
     # LLM Provider events
     ProcessingEvent.LLM_REQUEST_STARTED: "huleedu.llm_provider.request_started.v1",
     ProcessingEvent.LLM_REQUEST_COMPLETED: "huleedu.llm_provider.request_completed.v1",

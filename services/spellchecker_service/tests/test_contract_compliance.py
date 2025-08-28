@@ -207,10 +207,11 @@ class TestEventContractCompliance:
         mock_result_store.store_content.return_value = mock_corrected_storage_id
 
         # Use REAL event publisher implementation to test dual event creation
+        from huleedu_service_libs.outbox.manager import OutboxManager
+
         from services.spellchecker_service.implementations.event_publisher_impl import (
             DefaultSpellcheckEventPublisher,
         )
-        from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 
         # Mock the outbox manager
         mock_outbox_manager = AsyncMock(spec=OutboxManager)

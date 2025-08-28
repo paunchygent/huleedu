@@ -8,7 +8,7 @@ during Kafka outages.
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Callable, Optional, TypeVar, cast
+from typing import Optional, TypeVar
 
 from aiokafka.errors import KafkaError
 from common_core import CircuitBreakerState
@@ -103,6 +103,7 @@ class ResilientKafkaPublisher:
         topic: str,
         envelope: EventEnvelope[T_EventPayload],
         key: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """
         Publish message with circuit breaker protection.
@@ -111,6 +112,7 @@ class ResilientKafkaPublisher:
             topic: Kafka topic to publish to
             envelope: Event envelope to publish
             key: Optional message key
+            headers: Optional Kafka message headers for idempotency/tracing
 
         Raises:
             CircuitBreakerError: If circuit is open and no fallback is available
@@ -118,13 +120,11 @@ class ResilientKafkaPublisher:
         """
         if not self.circuit_breaker:
             # No circuit breaker, delegate directly to wrapped KafkaBus
-            return await self.delegate.publish(topic, envelope, key)
+            return await self.delegate.publish(topic, envelope, key, headers)
 
         try:
             # Attempt to publish through circuit breaker
-            # Cast the publish method to the expected type for circuit breaker compatibility
-            publish_func = cast(Callable[..., None], self.delegate.publish)
-            await self.circuit_breaker.call(publish_func, topic, envelope, key)
+            await self.circuit_breaker.call(self.delegate.publish, topic, envelope, key, headers)
             logger.debug(f"Published message to topic '{topic}' via circuit breaker")
             return  # Successfully published
 
@@ -134,14 +134,14 @@ class ResilientKafkaPublisher:
                 f"Circuit breaker is open for Kafka publisher '{self.delegate.client_id}', "
                 f"queuing message for topic '{topic}'"
             )
-            await self._queue_message_for_retry(topic, envelope, key)
+            await self._queue_message_for_retry(topic, envelope, key, headers)
 
         except (KafkaError, Exception) as e:
             # Kafka error occurred, let circuit breaker handle it
             logger.error(
                 f"Kafka publish failed for topic '{topic}': {e}. Queuing message for retry."
             )
-            await self._queue_message_for_retry(topic, envelope, key)
+            await self._queue_message_for_retry(topic, envelope, key, headers)
             raise
 
     async def _queue_message_for_retry(
@@ -149,6 +149,7 @@ class ResilientKafkaPublisher:
         topic: str,
         envelope: EventEnvelope[T_EventPayload],
         key: str | None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Queue a failed message for later retry."""
         queued_message = QueuedMessage(
@@ -157,6 +158,7 @@ class ResilientKafkaPublisher:
             key=key,
             queued_at=datetime.now(timezone.utc),
             retry_count=0,
+            headers=headers,
         )
 
         try:
@@ -212,7 +214,9 @@ class ResilientKafkaPublisher:
                     break
 
                 # Attempt to publish the queued message using delegate
-                await self.delegate.publish(message.topic, message.envelope, message.key)
+                await self.delegate.publish(
+                    message.topic, message.envelope, message.key, message.headers
+                )
 
                 processed_count += 1
                 logger.debug(

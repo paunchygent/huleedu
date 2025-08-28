@@ -39,7 +39,6 @@ class TestResultEventPublisher:
         """Create mock outbox manager."""
         mock = create_autospec(OutboxManagerProtocol, spec_set=True)
         mock.publish_to_outbox = AsyncMock()
-        mock.notify_relay_worker = AsyncMock()
         return mock
 
     @pytest.fixture

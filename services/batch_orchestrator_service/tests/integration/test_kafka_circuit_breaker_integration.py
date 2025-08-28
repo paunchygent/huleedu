@@ -76,7 +76,7 @@ async def test_resilient_kafka_publisher_normal_operation(
     await resilient_publisher.publish("test-topic", test_envelope, "test-key")
 
     # Verify delegate was called through circuit breaker
-    mock_kafka_bus.publish.assert_called_once_with("test-topic", test_envelope, "test-key")
+    mock_kafka_bus.publish.assert_called_once_with("test-topic", test_envelope, "test-key", None)
 
     # Test stop
     await resilient_publisher.stop()
@@ -106,7 +106,7 @@ async def test_resilient_kafka_publisher_without_circuit_breaker(
     await resilient_publisher.publish("test-topic", test_envelope, "test-key")
 
     # Should call delegate publish directly
-    mock_kafka_bus.publish.assert_called_once_with("test-topic", test_envelope, "test-key")
+    mock_kafka_bus.publish.assert_called_once_with("test-topic", test_envelope, "test-key", None)
 
     await resilient_publisher.stop()
 

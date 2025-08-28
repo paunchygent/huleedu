@@ -22,6 +22,7 @@ from common_core.events.essay_lifecycle_events import BatchStudentMatchingReques
 from common_core.events.nlp_events import StudentMatchSuggestion
 from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
@@ -33,7 +34,6 @@ from services.nlp_service.config import Settings
 from services.nlp_service.implementations.event_publisher_impl import (
     DefaultNlpEventPublisher,
 )
-from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.protocols import (
     NlpEventPublisherProtocol,
 )
@@ -230,7 +230,7 @@ class TestCommandHandlerOutboxIntegration:
         return OutboxManager(
             outbox_repository=outbox_repository,
             redis_client=redis_client,
-            settings=test_settings,
+            service_name="nlp-service",
         )
 
     @pytest.fixture

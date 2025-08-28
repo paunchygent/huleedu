@@ -192,6 +192,11 @@ class TestOutboxPatternIntegration:
     @pytest.fixture
     def test_settings(self) -> Settings:
         """Test settings."""
+        import os
+
+        # Set testing environment for fast OutboxProvider polling (0.1s)
+        os.environ["ENVIRONMENT"] = "testing"
+
         settings = Mock(spec=Settings)
         settings.SERVICE_NAME = "cj_assessment_service"
         settings.CJ_ASSESSMENT_COMPLETED_TOPIC = "processing.cj.assessment.completed.v1"
@@ -206,12 +211,15 @@ class TestOutboxPatternIntegration:
         mock = AsyncMock()
         mock.published_events = []
 
-        async def track_publish(topic: str, envelope: Any, key: str | None = None) -> None:
+        async def track_publish(
+            topic: str, envelope: Any, key: str | None = None, headers: dict[str, str] | None = None
+        ) -> None:
             mock.published_events.append(
                 {
                     "topic": topic,
                     "envelope": envelope,
                     "key": key,
+                    "headers": headers,
                 }
             )
 

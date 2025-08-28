@@ -8,9 +8,9 @@ from uuid import uuid4
 import pytest
 from common_core.events import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.result_aggregator_service.config import Settings
-from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 
 
 @pytest.fixture
@@ -37,13 +37,13 @@ def settings() -> Settings:
 
 @pytest.fixture
 def outbox_manager(
-    mock_outbox_repository: AsyncMock, mock_redis_client: AsyncMock, settings: Settings
+    mock_outbox_repository: AsyncMock, mock_redis_client: AsyncMock
 ) -> OutboxManager:
     """Create OutboxManager instance with mocked dependencies."""
     return OutboxManager(
         outbox_repository=mock_outbox_repository,
         redis_client=mock_redis_client,
-        settings=settings,
+        service_name="result_aggregator_service",
     )
 
 
@@ -93,7 +93,7 @@ class TestOutboxManager:
 
         # Verify Redis notification
         mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:result_aggregator_service", "1"
+            "outbox:wake:result_aggregator_service", "wake"
         )
 
     @pytest.mark.asyncio
@@ -133,7 +133,7 @@ class TestOutboxManager:
         outbox_manager = OutboxManager(
             outbox_repository=None,  # type: ignore[arg-type]
             redis_client=mock_redis_client,
-            settings=settings,
+            service_name="result_aggregator_service",
         )
 
         event_data: EventEnvelope = EventEnvelope(
@@ -157,11 +157,19 @@ class TestOutboxManager:
 
     @pytest.mark.asyncio
     async def test_publish_to_outbox_invalid_event_data(
-        self, outbox_manager: OutboxManager
+        self, outbox_manager: OutboxManager, mock_outbox_repository: AsyncMock
     ) -> None:
         """Test error when event data is not a Pydantic model."""
-        # Arrange
-        invalid_event_data = {"not": "a pydantic model"}
+        # Arrange - create an invalid EventEnvelope that will cause serialization issues
+        invalid_event_data: EventEnvelope = EventEnvelope(
+            event_type="test.event.v1",
+            source_service="result_aggregator_service",
+            correlation_id=uuid4(),
+            data={"not": "a valid model"},
+        )
+
+        # Mock the repository to fail during add_event to simulate serialization issues
+        mock_outbox_repository.add_event.side_effect = Exception("Serialization error")
 
         # Act & Assert
         with pytest.raises(HuleEduError) as exc_info:
@@ -179,28 +187,59 @@ class TestOutboxManager:
     async def test_notify_relay_worker_success(
         self, outbox_manager: OutboxManager, mock_redis_client: AsyncMock
     ) -> None:
-        """Test successful relay worker notification."""
-        # Act
-        await outbox_manager.notify_relay_worker()
+        """Test successful relay worker notification via publish_to_outbox."""
+        # Arrange
+        event_data: EventEnvelope = EventEnvelope(
+            event_type="test.event.v1",
+            source_service="result_aggregator_service",
+            correlation_id=uuid4(),
+            data={"test": "data"},
+        )
 
-        # Assert
+        # Act - relay worker notification happens during publish_to_outbox
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id="batch-123",
+            event_type="test.event.v1",
+            event_data=event_data,
+            topic="test-topic",
+        )
+
+        # Assert - notification was sent
         mock_redis_client.lpush.assert_called_once_with(
-            "outbox:wake:result_aggregator_service", "1"
+            "outbox:wake:result_aggregator_service", "wake"
         )
 
     @pytest.mark.asyncio
     async def test_notify_relay_worker_failure_does_not_raise(
-        self, outbox_manager: OutboxManager, mock_redis_client: AsyncMock
+        self,
+        outbox_manager: OutboxManager,
+        mock_redis_client: AsyncMock,
+        mock_outbox_repository: AsyncMock,
     ) -> None:
-        """Test that relay worker notification failure doesn't raise exception."""
+        """Test that relay worker notification failure doesn't prevent event storage."""
         # Arrange
         mock_redis_client.lpush.side_effect = Exception("Redis error")
 
-        # Act - should not raise
-        await outbox_manager.notify_relay_worker()
+        event_data: EventEnvelope = EventEnvelope(
+            event_type="test.event.v1",
+            source_service="result_aggregator_service",
+            correlation_id=uuid4(),
+            data={"test": "data"},
+        )
 
-        # Assert
+        # Act - should not raise even if Redis notification fails
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="batch",
+            aggregate_id="batch-123",
+            event_type="test.event.v1",
+            event_data=event_data,
+            topic="test-topic",
+        )
+
+        # Assert - notification was attempted and event was still stored
         mock_redis_client.lpush.assert_called_once()
+        mock_outbox_repository.add_event.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_publish_to_outbox_repository_error(

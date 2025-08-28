@@ -43,13 +43,13 @@ class MockDIProvider(Provider):
     @provide
     def settings(self) -> Settings:
         """Provide test settings."""
-        from pydantic import SecretStr
-        
+
         # Create settings with properly typed INTERNAL_API_KEY
         # Use the validation_alias to override the environment variable
         import os
+
         os.environ["HULEEDU_INTERNAL_API_KEY"] = "test-api-key-123"
-        
+
         return Settings(
             SERVICE_NAME="result_aggregator_service",
             SERVICE_VERSION="1.0.0",
@@ -64,17 +64,15 @@ class MockDIProvider(Provider):
     @provide
     def security_service(self, settings: Settings) -> SecurityServiceProtocol:
         """Provide mock security service."""
+
         # Configure the mock to return True for valid credentials
         # Use return_value for async methods instead of side_effect
         async def validate_credentials(api_key: str, service_id: str) -> bool:
             expected_key = settings.get_internal_api_key()
             allowed_services = settings.ALLOWED_SERVICE_IDS
-            result = (
-                api_key == expected_key
-                and service_id in allowed_services
-            )
+            result = api_key == expected_key and service_id in allowed_services
             return result
-        
+
         self._security_service.validate_service_credentials = validate_credentials
         return self._security_service
 
@@ -151,7 +149,7 @@ async def app(test_provider: MockDIProvider) -> HuleEduApp:
 
     # Setup DI integration
     dishka_ext = QuartDishka(app=app, container=container)
-    
+
     # Ensure extensions dictionary is properly set up for test environment
     # QuartDishka should register itself, but we'll ensure it's accessible
     if "QUART_DISHKA" not in app.extensions:

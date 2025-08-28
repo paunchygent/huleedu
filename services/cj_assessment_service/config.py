@@ -44,7 +44,7 @@ class Settings(SecureServiceSettings):
     CJ_ASSESSMENT_COMPLETED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
     CJ_ASSESSMENT_FAILED_TOPIC: str = topic_name(ProcessingEvent.CJ_ASSESSMENT_FAILED)
     ASSESSMENT_RESULT_TOPIC: str = Field(
-        default="huleedu.assessment.results.v1",
+        default="huleedu.assessment.result.published.v1",
         description="Topic for publishing assessment results to RAS",
     )
 

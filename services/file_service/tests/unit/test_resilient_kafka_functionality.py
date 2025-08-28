@@ -113,7 +113,7 @@ async def test_successful_publish(
 
     # Verify delegate was called (note: includes key parameter)
     cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
-        topic, sample_file_event, None
+        topic, sample_file_event, None, None
     )
 
     # Circuit breaker should remain closed
@@ -353,5 +353,5 @@ async def test_file_batch_management_events(resilient_publisher: ResilientKafkaP
 
     # Verify correct topic and event (with key parameter)
     cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
-        topic, batch_file_event, None
+        topic, batch_file_event, None, None
     )

@@ -170,7 +170,13 @@ class FakeKafkaPublisher:
         self.should_fail = False
         self.failure_message = "Kafka unavailable"
 
-    async def publish(self, topic: str, envelope: Any, key: str | None = None) -> None:
+    async def publish(
+        self,
+        topic: str,
+        envelope: Any,
+        key: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         """Simulate publishing to Kafka."""
         if self.should_fail:
             raise Exception(self.failure_message)

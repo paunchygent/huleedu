@@ -10,7 +10,6 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "20250706_0001"
@@ -20,30 +19,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create initial schema for Result Aggregator Service."""
-    # Create BatchStatus enum
-    batch_status_enum = postgresql.ENUM(
-        "AWAITING_CONTENT_VALIDATION",
-        "CONTENT_VALIDATION_FAILED",
-        "CONTENT_VALIDATED",
-        "PROCESSING",
-        "COMPLETED",
-        "FAILED",
-        "CANCELLED",
-        name="batchstatus",
-    )
-    batch_status_enum.create(op.get_bind())
+    """Create initial schema for Result Aggregator Service.
 
-    # Create ProcessingStage enum
-    processing_stage_enum = postgresql.ENUM(
-        "PENDING",
-        "IN_PROGRESS",
-        "COMPLETED",
-        "FAILED",
-        "SKIPPED",
-        name="processingstage",
-    )
-    processing_stage_enum.create(op.get_bind())
+    Note: Enums are created implicitly when referenced in table definitions.
+    """
 
     # Create batch_results table
     op.create_table(
@@ -53,13 +32,18 @@ def upgrade() -> None:
         sa.Column(
             "overall_status",
             sa.Enum(
-                "AWAITING_CONTENT_VALIDATION",
-                "CONTENT_VALIDATION_FAILED",
-                "CONTENT_VALIDATED",
-                "PROCESSING",
-                "COMPLETED",
-                "FAILED",
-                "CANCELLED",
+                "awaiting_content_validation",
+                "content_ingestion_failed",
+                "awaiting_pipeline_configuration",
+                "ready_for_pipeline_execution",
+                "processing_pipelines",
+                "awaiting_student_validation",
+                "student_validation_completed",
+                "validation_timeout_processed",
+                "completed_successfully",
+                "completed_with_failures",
+                "failed_critically",
+                "cancelled",
                 name="batchstatus",
             ),
             nullable=False,
@@ -94,11 +78,12 @@ def upgrade() -> None:
         sa.Column(
             "spellcheck_status",
             sa.Enum(
-                "PENDING",
-                "IN_PROGRESS",
-                "COMPLETED",
-                "FAILED",
-                "SKIPPED",
+                "pending",
+                "initialized",
+                "processing",
+                "completed",
+                "failed",
+                "cancelled",
                 name="processingstage",
             ),
             nullable=True,
@@ -110,11 +95,12 @@ def upgrade() -> None:
         sa.Column(
             "cj_assessment_status",
             sa.Enum(
-                "PENDING",
-                "IN_PROGRESS",
-                "COMPLETED",
-                "FAILED",
-                "SKIPPED",
+                "pending",
+                "initialized",
+                "processing",
+                "completed",
+                "failed",
+                "cancelled",
                 name="processingstage",
             ),
             nullable=True,
@@ -142,29 +128,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Drop all tables and enums."""
-    # Drop tables in reverse order
+    # Drop tables in reverse order (enums will be dropped automatically if not referenced)
     op.drop_table("essay_results")
     op.drop_table("batch_results")
 
-    # Drop enums
-    processing_stage_enum = postgresql.ENUM(
-        "PENDING",
-        "IN_PROGRESS",
-        "COMPLETED",
-        "FAILED",
-        "SKIPPED",
-        name="processingstage",
-    )
-    processing_stage_enum.drop(op.get_bind())
-
-    batch_status_enum = postgresql.ENUM(
-        "AWAITING_CONTENT_VALIDATION",
-        "CONTENT_VALIDATION_FAILED",
-        "CONTENT_VALIDATED",
-        "PROCESSING",
-        "COMPLETED",
-        "FAILED",
-        "CANCELLED",
-        name="batchstatus",
-    )
-    batch_status_enum.drop(op.get_bind())
+    # Drop enums explicitly since they might still exist
+    op.execute("DROP TYPE IF EXISTS processingstage")
+    op.execute("DROP TYPE IF EXISTS batchstatus")

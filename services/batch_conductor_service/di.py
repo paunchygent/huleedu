@@ -166,8 +166,16 @@ class EventDrivenServicesProvider(Provider):
                 async def stop(self) -> None:
                     pass
 
-                async def publish(self, topic: str, envelope, key: str | None = None) -> None:
-                    logger.debug(f"NoOp: Would publish to {topic} with key {key}")
+                async def publish(
+                    self,
+                    topic: str,
+                    envelope,
+                    key: str | None = None,
+                    headers: dict[str, str] | None = None,
+                ) -> None:
+                    logger.debug(
+                        f"NoOp: Would publish to {topic} with key {key}, headers: {headers}"
+                    )
 
             return _NoOpEventPublisher()
 

@@ -24,6 +24,7 @@ from common_core.metadata_models import StorageReferenceMetadata, SystemProcessi
 from common_core.status_enums import EssayStatus, ProcessingStage
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.relay import OutboxSettings
@@ -41,7 +42,6 @@ from services.spellchecker_service.config import Settings
 from services.spellchecker_service.implementations.event_publisher_impl import (
     DefaultSpellcheckEventPublisher,
 )
-from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 from services.spellchecker_service.protocols import SpellcheckEventPublisherProtocol
 
 
@@ -131,7 +131,7 @@ class OutboxIntegrationTestProvider(Provider):
         settings: Settings,
     ) -> OutboxManager:
         """Provide outbox manager for transactional event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(outbox_repository, redis_client, settings.SERVICE_NAME)
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(
@@ -219,12 +219,15 @@ class TestSpellcheckerOutboxPatternIntegration:
         mock = AsyncMock()
         mock.published_events = []
 
-        async def track_publish(topic: str, envelope: Any, key: str | None = None) -> None:
+        async def track_publish(
+            topic: str, envelope: Any, key: str | None = None, headers: dict[str, str] | None = None
+        ) -> None:
             mock.published_events.append(
                 {
                     "topic": topic,
                     "envelope": envelope,
                     "key": key,
+                    "headers": headers,
                 }
             )
 
@@ -329,11 +332,11 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                 # Should have exactly 2 events: thin and rich
                 assert len(outbox_events) == 2
-                
+
                 # Sort events by topic to ensure consistent ordering
                 thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
                 rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
-                
+
                 thin_event = next((e for e in outbox_events if e.event_type == thin_topic), None)
                 rich_event = next((e for e in outbox_events if e.event_type == rich_topic), None)
 
@@ -358,7 +361,9 @@ class TestSpellcheckerOutboxPatternIntegration:
                 assert rich_event.event_data is not None
 
                 # Verify Redis notification was sent
-                mock_redis_client.lpush.assert_called_with("outbox:wake:spell-checker-service", "1")
+                mock_redis_client.lpush.assert_called_with(
+                    "outbox:wake:spell-checker-service", "wake"
+                )
 
     async def test_relay_worker_processes_outbox_events(
         self,
@@ -421,15 +426,15 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                     # Verify Kafka publication of both events
                     assert len(mock_kafka_bus.published_events) == 2
-                    
+
                     # Get expected topics using enums
                     thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
                     rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
-                    
+
                     published_topics = [event["topic"] for event in mock_kafka_bus.published_events]
                     assert thin_topic in published_topics
                     assert rich_topic in published_topics
-                    
+
                     # Verify event keys are correct for both events
                     for published_event in mock_kafka_bus.published_events:
                         assert published_event["key"] == essay_id
@@ -495,16 +500,16 @@ class TestSpellcheckerOutboxPatternIntegration:
                 outbox_events = result.scalars().all()
 
                 assert len(outbox_events) == 2
-                
+
                 # Verify both events have correct aggregate type
                 for event in outbox_events:
                     assert event.aggregate_type == "spellcheck_job"
                     assert event.aggregate_id == essay_id
-                
+
                 # Verify we have both thin and rich event types using enums
                 thin_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
                 rich_topic = topic_name(ProcessingEvent.SPELLCHECK_RESULTS)
-                
+
                 event_types = [event.event_type for event in outbox_events]
                 assert thin_topic in event_types
                 assert rich_topic in event_types

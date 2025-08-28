@@ -65,6 +65,7 @@ class KafkaBus:
         topic: str,
         envelope: EventEnvelope[T_EventPayload],
         key: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         if not self._started:
             logger.warning(f"KafkaProducer '{self.client_id}' not started. Attempting to start.")
@@ -77,10 +78,17 @@ class KafkaBus:
                 raise RuntimeError(f"KafkaProducer '{self.client_id}' is not running.")
         try:
             key_bytes = key.encode("utf-8") if key else None
+
+            # Convert headers to bytes format for aiokafka
+            header_bytes = None
+            if headers:
+                header_bytes = [(k.encode("utf-8"), v.encode("utf-8")) for k, v in headers.items()]
+
             future = await self.producer.send_and_wait(
                 topic,
                 value=envelope.model_dump(mode="json"),
                 key=key_bytes,
+                headers=header_bytes,
             )
             record_metadata = future
             logger.debug(

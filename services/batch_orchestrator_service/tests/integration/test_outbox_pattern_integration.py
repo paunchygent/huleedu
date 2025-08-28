@@ -29,8 +29,10 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
-from huleedu_service_libs.outbox import EventRelayWorker, OutboxRepositoryProtocol
+from huleedu_service_libs.outbox import EventRelayWorker
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.models import EventOutbox
+from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.relay import OutboxSettings
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
@@ -47,7 +49,6 @@ from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.event_publisher_impl import (
     DefaultBatchEventPublisherImpl,
 )
-from services.batch_orchestrator_service.implementations.outbox_manager import OutboxManager
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
 
 
@@ -109,7 +110,7 @@ class OutboxTestProvider(Provider):
         settings: Any,
     ) -> OutboxManager:
         """Provide outbox manager for TRUE OUTBOX PATTERN."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(outbox_repository, redis_client, settings.SERVICE_NAME)
 
     @provide(scope=Scope.REQUEST)
     def provide_event_publisher(

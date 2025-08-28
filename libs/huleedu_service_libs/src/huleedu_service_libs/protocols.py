@@ -493,6 +493,7 @@ class KafkaPublisherProtocol(Protocol):
         topic: str,
         envelope: "EventEnvelope[T_EventPayload]",
         key: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """
         Publish an event envelope to a Kafka topic.
@@ -501,6 +502,7 @@ class KafkaPublisherProtocol(Protocol):
             topic: Kafka topic to publish to
             envelope: Event envelope containing the event data
             key: Optional message key for partitioning
+            headers: Optional Kafka message headers for idempotency/tracing
 
         Raises:
             KafkaError: If publishing fails

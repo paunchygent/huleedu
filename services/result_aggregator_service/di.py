@@ -12,6 +12,7 @@ from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublish
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import (
     AtomicRedisClientProtocol,
     KafkaPublisherProtocol,
@@ -45,7 +46,6 @@ from services.result_aggregator_service.implementations.event_processor_impl imp
 from services.result_aggregator_service.implementations.event_publisher_impl import (
     ResultEventPublisher,
 )
-from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 from services.result_aggregator_service.implementations.security_impl import SecurityServiceImpl
 from services.result_aggregator_service.implementations.state_store_redis_impl import (
     StateStoreRedisImpl,
@@ -300,12 +300,15 @@ class ServiceProvider(Provider):
         self,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: RedisClientProtocol,
-        settings: Settings,
     ) -> OutboxManagerProtocol:
-        """Provide outbox manager for reliable event publishing."""
+        """Provide shared outbox manager for reliable event publishing."""
         # Cast RedisClientProtocol to AtomicRedisClientProtocol as they are compatible
         atomic_redis = cast(AtomicRedisClientProtocol, redis_client)
-        return OutboxManager(outbox_repository, atomic_redis, settings)
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=atomic_redis,
+            service_name="result_aggregator_service",
+        )
 
     @provide
     def provide_notification_projector(

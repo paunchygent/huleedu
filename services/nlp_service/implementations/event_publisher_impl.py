@@ -23,9 +23,9 @@ from common_core.status_enums import BatchStatus
 # EntityReference removed - using primitive parameters
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 
-from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.protocols import NlpEventPublisherProtocol
 
 logger = create_service_logger("nlp_service.event_publisher_impl")

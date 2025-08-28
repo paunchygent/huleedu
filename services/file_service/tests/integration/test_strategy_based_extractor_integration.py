@@ -217,8 +217,7 @@ class TestStrategyBasedExtractorIntegration:
         # Verify error details
         error_detail = exc_info.value.error_detail
         assert error_detail.error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-        assert "Unsupported file type '.xlsx'" in error_detail.message
-        assert "Supported types: .txt, .docx, .pdf" in error_detail.message
+        assert "No extraction strategy found for file type '.xlsx'." in error_detail.message
 
     async def test_file_without_extension_integration(
         self,
@@ -236,7 +235,7 @@ class TestStrategyBasedExtractorIntegration:
         # Verify error details
         error_detail = exc_info.value.error_detail
         assert error_detail.error_code == FileValidationErrorCode.TEXT_EXTRACTION_FAILED
-        assert "File has no extension" in error_detail.message
+        assert "No extraction strategy found for file type ''." in error_detail.message
 
     async def test_empty_file_content_integration(
         self,

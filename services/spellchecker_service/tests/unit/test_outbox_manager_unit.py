@@ -23,9 +23,9 @@ from common_core.events.spellcheck_models import (
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage, ProcessingStatus
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.spellchecker_service.config import Settings
-from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=None,  # type: ignore
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         # When/Then
@@ -108,7 +108,7 @@ class TestOutboxManagerErrorHandling:
 
         # Verify error details
         error_detail: Any = exc_info.value.error_detail
-        assert error_detail.service == "spellchecker_service"
+        assert error_detail.service == "spell-checker-service"
         assert error_detail.operation == "publish_to_outbox"
         assert "Outbox repository not configured" in error_detail.message
         assert error_detail.correlation_id == sample_event_envelope.correlation_id
@@ -127,7 +127,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         # When/Then
@@ -142,7 +142,7 @@ class TestOutboxManagerErrorHandling:
 
         # Verify wrapped error details
         error_detail: Any = exc_info.value.error_detail
-        assert error_detail.service == "spellchecker_service"
+        assert error_detail.service == "spell-checker-service"
         assert error_detail.operation == "publish_to_outbox"
         assert "Failed to store event in outbox" in error_detail.message
         assert error_detail.correlation_id == sample_event_envelope.correlation_id
@@ -160,7 +160,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         test_correlation_id: UUID = uuid4()
@@ -175,7 +175,7 @@ class TestOutboxManagerErrorHandling:
                 aggregate_type="spellcheck_job",
                 aggregate_id="essay-test-789",
                 event_type="huleedu.essay.spellcheck.completed.v1",
-                event_data=dict_event_data,
+                event_data=dict_event_data,  # type: ignore[arg-type]
                 topic="huleedu.essay.spellcheck.completed.v1",
             )
 
@@ -196,7 +196,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         invalid_event_data: dict[str, str] = {"correlation_id": "invalid-uuid-format"}
@@ -207,7 +207,7 @@ class TestOutboxManagerErrorHandling:
                 aggregate_type="spellcheck_job",
                 aggregate_id="essay-test-999",
                 event_type="huleedu.essay.spellcheck.completed.v1",
-                event_data=invalid_event_data,
+                event_data=invalid_event_data,  # type: ignore[arg-type]
                 topic="huleedu.essay.spellcheck.completed.v1",
             )
 
@@ -232,7 +232,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         # When - Should complete successfully despite Redis failure
@@ -263,7 +263,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         # When
@@ -291,7 +291,7 @@ class TestOutboxManagerErrorHandling:
         assert event_data["source_service"] == "spell-checker-service"
 
         # Verify Redis notification was sent
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:spell-checker-service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:spell-checker-service", "wake")
 
     async def test_custom_partition_key_handling(
         self,
@@ -306,7 +306,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         correlation_id = uuid4()
@@ -371,7 +371,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         # When
@@ -414,7 +414,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         invalid_event_data = "not-a-pydantic-model"
@@ -425,13 +425,13 @@ class TestOutboxManagerErrorHandling:
                 aggregate_type="spellcheck_job",
                 aggregate_id="essay-test-invalid",
                 event_type="huleedu.essay.spellcheck.completed.v1",
-                event_data=invalid_event_data,
+                event_data=invalid_event_data,  # type: ignore[arg-type]
                 topic="huleedu.essay.spellcheck.completed.v1",
             )
 
         # Verify error details indicate invalid event data
         error_detail: Any = exc_info.value.error_detail
-        assert error_detail.service == "spellchecker_service"
+        assert error_detail.service == "spell-checker-service"
         assert error_detail.operation == "publish_to_outbox"
         assert "Failed to store event in outbox" in error_detail.message
 
@@ -448,7 +448,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="spell-checker-service",
         )
 
         correlation_id = uuid4()

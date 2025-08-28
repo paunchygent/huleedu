@@ -58,7 +58,13 @@ class MockKafkaProducer(KafkaPublisherProtocol):
         """Record sent messages for assertions."""
         self.sent_messages.append((topic, value))
 
-    async def publish(self, topic: str, envelope: Any, key: str | None = None) -> None:
+    async def publish(
+        self,
+        topic: str,
+        envelope: Any,
+        key: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         """Publish an event envelope to a Kafka topic."""
         # Convert envelope to bytes for storage
         self.sent_messages.append((topic, str(envelope).encode()))

@@ -41,7 +41,11 @@ class BatchResult(Base):
 
     # Status tracking
     overall_status: Mapped[BatchStatus] = mapped_column(
-        SQLAlchemyEnum(BatchStatus),
+        SQLAlchemyEnum(
+            BatchStatus,
+            name="batchstatus",
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
         default=BatchStatus.AWAITING_CONTENT_VALIDATION,
     )
@@ -114,7 +118,11 @@ class EssayResult(Base):
 
     # Spellcheck Phase Results
     spellcheck_status: Mapped[Optional[ProcessingStage]] = mapped_column(
-        SQLAlchemyEnum(ProcessingStage)
+        SQLAlchemyEnum(
+            ProcessingStage,
+            name="processingstage",
+            values_callable=lambda obj: [e.value for e in obj],
+        )
     )
     spellcheck_correction_count: Mapped[Optional[int]] = mapped_column(Integer)
     spellcheck_corrected_text_storage_id: Mapped[Optional[str]] = mapped_column(String(255))
@@ -123,7 +131,11 @@ class EssayResult(Base):
 
     # CJ Assessment Phase Results
     cj_assessment_status: Mapped[Optional[ProcessingStage]] = mapped_column(
-        SQLAlchemyEnum(ProcessingStage)
+        SQLAlchemyEnum(
+            ProcessingStage,
+            name="processingstage",
+            values_callable=lambda obj: [e.value for e in obj],
+        )
     )
     cj_rank: Mapped[Optional[int]] = mapped_column(Integer)
     cj_score: Mapped[Optional[float]] = mapped_column(Float)

@@ -433,10 +433,10 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Mock the handler to verify it's called
-        with patch.object(kafka_consumer, "_handle_spellcheck_completed") as mock_handler:
+        with patch.object(kafka_consumer, "_handle_spellcheck_phase_completed") as mock_handler:
             # Act
             await kafka_consumer._handle_message(mock_msg)
 
@@ -492,11 +492,13 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Mock handler to raise exception
         with patch.object(
-            kafka_consumer, "_handle_spellcheck_completed", side_effect=Exception("Handler error")
+            kafka_consumer,
+            "_handle_spellcheck_phase_completed",
+            side_effect=Exception("Handler error"),
         ):
             # Act & Assert
             with pytest.raises(Exception, match="Handler error"):

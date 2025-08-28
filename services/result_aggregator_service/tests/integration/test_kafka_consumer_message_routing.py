@@ -15,8 +15,8 @@ from common_core.events import (
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
 )
-from common_core.events.spellcheck_models import SpellcheckResultV1, SpellcheckMetricsV1
 from common_core.events.cj_assessment_events import GradeProjectionSummary
+from common_core.events.spellcheck_models import SpellcheckMetricsV1, SpellcheckResultV1
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     SystemProcessingMetadata,

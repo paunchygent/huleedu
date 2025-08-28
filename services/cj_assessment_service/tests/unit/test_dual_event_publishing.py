@@ -139,19 +139,19 @@ class TestDualEventPublishing:
         assert len(ras_envelope.data.essay_results) == 4
 
         # Check anchor flags
-        student_results = [r for r in ras_envelope.data.essay_results if not r["is_anchor"]]
-        anchor_results = [r for r in ras_envelope.data.essay_results if r["is_anchor"]]
+        student_results = [r for r in ras_envelope.data.essay_results if not r.is_anchor]
+        anchor_results = [r for r in ras_envelope.data.essay_results if r.is_anchor]
         assert len(student_results) == 2
         assert len(anchor_results) == 2
 
         # Check display names for anchors
         for anchor in anchor_results:
-            assert anchor["display_name"] is not None
-            assert anchor["display_name"].startswith("ANCHOR GRADE")
+            assert anchor.display_name is not None
+            assert anchor.display_name.startswith("ANCHOR GRADE")
 
         # Check no display names for students
         for student in student_results:
-            assert student["display_name"] is None
+            assert student.display_name is None
 
     @pytest.mark.asyncio
     async def test_anchor_grade_distribution_calculation(
@@ -301,27 +301,25 @@ class TestDualEventPublishing:
         ras_envelope = ras_call.kwargs["result_data"]
 
         student_result = next(
-            r for r in ras_envelope.data.essay_results if r["essay_id"] == "student_1"
+            r for r in ras_envelope.data.essay_results if r.essay_id == "student_1"
         )
-        anchor_result = next(
-            r for r in ras_envelope.data.essay_results if r["essay_id"] == "ANCHOR_A"
-        )
+        anchor_result = next(r for r in ras_envelope.data.essay_results if r.essay_id == "ANCHOR_A")
 
         # Check student fields
-        assert student_result["bt_score"] == 0.85  # score → bt_score
-        assert student_result["rank"] == 1
-        assert student_result["letter_grade"] == "B"
-        assert student_result["confidence_score"] == 0.88
-        assert student_result["confidence_label"] == "HIGH"
-        assert student_result["is_anchor"] is False
-        assert student_result["display_name"] is None
-        assert 0.0 <= student_result["normalized_score"] <= 1.0
+        assert student_result.bt_score == 0.85  # score → bt_score
+        assert student_result.rank == 1
+        assert student_result.letter_grade == "B"
+        assert student_result.confidence_score == 0.88
+        assert student_result.confidence_label == "HIGH"
+        assert student_result.is_anchor is False
+        assert student_result.display_name is None
+        assert 0.0 <= student_result.normalized_score <= 1.0
 
         # Check anchor fields
-        assert anchor_result["bt_score"] == 0.95
-        assert anchor_result["is_anchor"] is True
-        assert anchor_result["display_name"] == "ANCHOR GRADE A"
-        assert anchor_result["letter_grade"] == "A"
+        assert anchor_result.bt_score == 0.95
+        assert anchor_result.is_anchor is True
+        assert anchor_result.display_name == "ANCHOR GRADE A"
+        assert anchor_result.letter_grade == "A"
 
     @pytest.mark.asyncio
     async def test_course_code_enum_handling(
@@ -633,30 +631,30 @@ class TestDualEventPublishing:
         assert len(ras_envelope.data.essay_results) == 7
 
         # Separate RAS results by anchor flag
-        student_results = [r for r in ras_envelope.data.essay_results if not r["is_anchor"]]
-        anchor_results = [r for r in ras_envelope.data.essay_results if r["is_anchor"]]
+        student_results = [r for r in ras_envelope.data.essay_results if not r.is_anchor]
+        anchor_results = [r for r in ras_envelope.data.essay_results if r.is_anchor]
 
         # Verify the separation produced the expected counts
         assert len(student_results) == 4
         assert len(anchor_results) == 3
 
         # Verify all student essays appear in ELS event
-        student_ids_in_ras = {r["essay_id"] for r in student_results}
+        student_ids_in_ras = {r.essay_id for r in student_results}
         # Note: ELS event contains essay IDs, RAS contains essay IDs - should match for students
         assert els_essay_ids == student_ids_in_ras
 
         # Verify anchor-specific attributes are set correctly
         for anchor in anchor_results:
-            assert anchor["is_anchor"] is True
-            assert anchor["display_name"] is not None
+            assert anchor.is_anchor is True
+            assert anchor.display_name is not None
 
         # Verify student-specific attributes are set correctly
         for student in student_results:
-            assert student["is_anchor"] is False
-            assert student["display_name"] is None
+            assert student.is_anchor is False
+            assert student.display_name is None
 
         # Verify all original essays are accounted for in RAS
-        all_ras_ids = {r["essay_id"] for r in ras_envelope.data.essay_results}
+        all_ras_ids = {r.essay_id for r in ras_envelope.data.essay_results}
         all_original_ids = {r["els_essay_id"] for r in rankings}
         assert all_ras_ids == all_original_ids
 

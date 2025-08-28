@@ -123,30 +123,30 @@ class TestDualEventPublishingValidation:
         # Verify all essay results have correct field types
         for result in ras_envelope.data.essay_results:
             # String fields
-            assert isinstance(result["essay_id"], str)
-            assert isinstance(result["letter_grade"], str)
-            assert isinstance(result["confidence_label"], str)
+            assert isinstance(result.essay_id, str)
+            assert isinstance(result.letter_grade, str)
+            assert isinstance(result.confidence_label, str)
 
             # Float fields
-            assert isinstance(result["bt_score"], (int, float))
-            assert isinstance(result["confidence_score"], (int, float))
-            assert isinstance(result["normalized_score"], (int, float))
+            assert isinstance(result.bt_score, (int, float))
+            assert isinstance(result.confidence_score, (int, float))
+            assert isinstance(result.normalized_score, (int, float))
 
             # Integer field
-            assert isinstance(result["rank"], int)
+            assert isinstance(result.rank, int)
 
             # Boolean field
-            assert isinstance(result["is_anchor"], bool)
+            assert isinstance(result.is_anchor, bool)
 
             # Nullable string field (only anchors have display names)
-            if result["is_anchor"]:
-                assert isinstance(result["display_name"], str)
+            if result.is_anchor:
+                assert isinstance(result.display_name, str)
             else:
-                assert result["display_name"] is None
+                assert result.display_name is None
 
         # Verify normalized_score is always in valid range
         for result in ras_envelope.data.essay_results:
-            normalized_score = result["normalized_score"]
+            normalized_score = result.normalized_score
             assert 0.0 <= normalized_score <= 1.0
 
         # Verify assessment_metadata field types
@@ -211,12 +211,12 @@ class TestDualEventPublishingValidation:
         ras_envelope = ras_call.kwargs["result_data"]
 
         # Separate results by type
-        student_results = [r for r in ras_envelope.data.essay_results if not r["is_anchor"]]
-        anchor_results = [r for r in ras_envelope.data.essay_results if r["is_anchor"]]
+        student_results = [r for r in ras_envelope.data.essay_results if not r.is_anchor]
+        anchor_results = [r for r in ras_envelope.data.essay_results if r.is_anchor]
 
         # Verify student has no display name
         assert len(student_results) == 1
-        assert student_results[0]["display_name"] is None
+        assert student_results[0].display_name is None
 
         # Verify each anchor has correct display name format
         assert len(anchor_results) == 7
@@ -289,14 +289,14 @@ class TestDualEventPublishingValidation:
 
         # Find the essay with partial confidence data
         partial_result = next(
-            r for r in ras_envelope.data.essay_results if r["essay_id"] == "student_partial"
+            r for r in ras_envelope.data.essay_results if r.essay_id == "student_partial"
         )
 
         # Verify system provides default values for missing confidence data
         # (The exact default values depend on implementation, but should be reasonable)
-        assert partial_result["confidence_label"] is not None
-        assert isinstance(partial_result["confidence_score"], (int, float))
-        assert 0.0 <= partial_result["confidence_score"] <= 1.0
+        assert partial_result.confidence_label is not None
+        assert isinstance(partial_result.confidence_score, (int, float))
+        assert 0.0 <= partial_result.confidence_score <= 1.0
 
     @pytest.mark.asyncio
     async def test_data_resilience_with_null_scores(
@@ -358,11 +358,11 @@ class TestDualEventPublishingValidation:
         assert len(ras_envelope.data.essay_results) == 3
 
         null_score_result = next(
-            r for r in ras_envelope.data.essay_results if r["essay_id"] == "student_null"
+            r for r in ras_envelope.data.essay_results if r.essay_id == "student_null"
         )
 
         # Verify null score is preserved (correct behavior for failed essays)
-        assert null_score_result["bt_score"] is None  # Null scores remain null
+        assert null_score_result.bt_score is None  # Null scores remain null
         # normalized_score should still be calculated (likely 0.0 for failed essays)
-        assert isinstance(null_score_result["normalized_score"], (int, float))
-        assert 0.0 <= null_score_result["normalized_score"] <= 1.0
+        assert isinstance(null_score_result.normalized_score, (int, float))
+        assert 0.0 <= null_score_result.normalized_score <= 1.0

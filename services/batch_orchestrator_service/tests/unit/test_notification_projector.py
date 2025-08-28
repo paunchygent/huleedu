@@ -258,7 +258,7 @@ async def test_handle_batch_pipeline_completed_successful_completion(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["spellcheck", "cj_assessment"],
-        final_status="COMPLETED_SUCCESSFULLY",
+        final_status="completed_successfully",
         processing_duration_seconds=45.2,
         successful_essay_count=25,
         failed_essay_count=0,
@@ -294,7 +294,7 @@ async def test_handle_batch_pipeline_completed_successful_completion(
     # Verify payload content
     payload = notification.payload
     assert payload["batch_id"] == batch_id
-    assert payload["final_status"] == "COMPLETED_SUCCESSFULLY"
+    assert payload["final_status"] == "completed_successfully"
     assert payload["completed_phases"] == ["spellcheck", "cj_assessment"]
     assert payload["successful_essays"] == 25
     assert payload["failed_essays"] == 0
@@ -323,7 +323,7 @@ async def test_handle_batch_pipeline_completed_with_failures(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["spellcheck", "cj_assessment"],
-        final_status="COMPLETED_WITH_FAILURES",
+        final_status="completed_with_failures",
         processing_duration_seconds=62.8,
         successful_essay_count=22,
         failed_essay_count=3,
@@ -353,7 +353,7 @@ async def test_handle_batch_pipeline_completed_with_failures(
 
     # Verify payload content shows failures
     payload = notification.payload
-    assert payload["final_status"] == "COMPLETED_WITH_FAILURES"
+    assert payload["final_status"] == "completed_with_failures"
     assert payload["successful_essays"] == 22
     assert payload["failed_essays"] == 3
     assert "Pipeline completed with 3 failures" in payload["message"]
@@ -376,7 +376,7 @@ async def test_handle_batch_pipeline_completed_missing_batch(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["spellcheck"],
-        final_status="COMPLETED_SUCCESSFULLY",
+        final_status="completed_successfully",
         processing_duration_seconds=30.0,
         successful_essay_count=10,
         failed_essay_count=0,
@@ -416,7 +416,7 @@ async def test_handle_batch_pipeline_completed_missing_user_id(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["spellcheck"],
-        final_status="COMPLETED_SUCCESSFULLY",
+        final_status="completed_successfully",
         processing_duration_seconds=25.0,
         successful_essay_count=15,
         failed_essay_count=0,
@@ -460,7 +460,7 @@ async def test_handle_batch_pipeline_completed_publish_failure_does_not_raise(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["spellcheck"],
-        final_status="COMPLETED_SUCCESSFULLY",
+        final_status="completed_successfully",
         processing_duration_seconds=40.0,
         successful_essay_count=20,
         failed_essay_count=0,
@@ -498,7 +498,7 @@ async def test_handle_batch_pipeline_completed_correct_envelope_structure(
     event = BatchPipelineCompletedV1(
         batch_id=batch_id,
         completed_phases=["cj_assessment"],
-        final_status="COMPLETED_SUCCESSFULLY",
+        final_status="completed_successfully",
         processing_duration_seconds=55.0,
         successful_essay_count=18,
         failed_essay_count=0,

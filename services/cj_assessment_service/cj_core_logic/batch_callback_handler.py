@@ -206,10 +206,21 @@ async def check_workflow_continuation(
         completed_pairs = result.scalars().all()
         completed_count = len(completed_pairs)
 
-        # Check if ALL expected comparisons are completed
-        should_continue: bool = (
-            batch_state.total_comparisons > 0 and completed_count >= batch_state.total_comparisons
-        )
+        # Support both periodic continuation (every 5) and threshold-based
+        should_continue: bool = False
+        if batch_state.total_comparisons > 0:
+            # Periodic continuation every 5 completions
+            if completed_count > 0 and completed_count % 5 == 0:
+                should_continue = True
+            # Also check completion threshold if configured
+            if (
+                not should_continue
+                and batch_state.completion_threshold_pct
+                and batch_state.completion_threshold_pct > 0
+            ):
+                completion_percentage = (completed_count / batch_state.total_comparisons) * 100
+                if completion_percentage >= batch_state.completion_threshold_pct:
+                    should_continue = True
 
         logger.info(
             f"Batch {batch_id} has {completed_count}/{batch_state.total_comparisons} completed "

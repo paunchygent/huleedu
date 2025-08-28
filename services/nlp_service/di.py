@@ -8,6 +8,7 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from opentelemetry.trace import Tracer
@@ -44,7 +45,6 @@ from services.nlp_service.features.student_matching.matching.simple_name_parser 
 from services.nlp_service.implementations.content_client_impl import DefaultContentClient
 from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
 from services.nlp_service.implementations.language_tool_client_impl import LanguageToolServiceClient
-from services.nlp_service.implementations.outbox_manager import OutboxManager
 from services.nlp_service.implementations.roster_cache_impl import RedisRosterCache
 from services.nlp_service.implementations.roster_client_impl import DefaultClassManagementClient
 from services.nlp_service.implementations.student_matcher_impl import DefaultStudentMatcher
@@ -148,10 +148,13 @@ class NlpServiceProvider(Provider):
         self,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
-        settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for reliable event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        """Provide shared outbox manager for reliable event publishing."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name="nlp_service",
+        )
 
     @provide(scope=Scope.REQUEST)
     def provide_nlp_repository(self, engine: AsyncEngine) -> NlpRepository:

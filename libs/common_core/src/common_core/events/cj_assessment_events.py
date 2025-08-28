@@ -7,7 +7,7 @@ regarding Comparative Judgment (CJ) assessment processing.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ __all__ = [
     "CJAssessmentCompletedV1",
     "CJAssessmentFailedV1",
     "ELS_CJAssessmentRequestV1",
+    "EssayResultV1",
     "GradeProjectionSummary",
     "LLMConfigOverrides",
 ]
@@ -162,6 +163,49 @@ class CJAssessmentFailedV1(ProcessingUpdate):
 # === RICH RESULT EVENT (CJ → RAS) ===
 
 
+class EssayResultV1(BaseModel):
+    """Typed assessment result for individual essay.
+
+    ARCHITECTURAL FOUNDATION: This model establishes the pattern for all assessment
+    results across HuleEdu services. Future services (NLP, Spellcheck, AI Feedback)
+    will adopt this same structure or extend it, enabling consistent typed models
+    throughout the assessment pipeline and Result Aggregator Service.
+
+    This replaces the untyped dict[str, Any] approach with proper validation,
+    better IDE support, and schema evolution capabilities.
+    """
+
+    essay_id: str = Field(description="Unique identifier for the essay")
+    normalized_score: float = Field(
+        ge=0.0, le=1.0, description="Normalized score between 0 and 1 for cross-service consistency"
+    )
+    letter_grade: str = Field(
+        pattern=r"^([A-F][+-]?|U)$",
+        description="Letter grade (A+, A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F, U)",
+    )
+    confidence_score: float = Field(
+        ge=0.0, le=1.0, description="Confidence in the assessment accuracy"
+    )
+    confidence_label: Literal["HIGH", "MID", "LOW"] = Field(
+        description="Human-readable confidence category"
+    )
+    bt_score: float = Field(description="Bradley-Terry score for comparative ranking")
+    rank: int = Field(gt=0, description="Rank position within the assessment batch (1-based)")
+    is_anchor: bool = Field(
+        default=False, description="Whether this essay serves as an anchor for grade calibration"
+    )
+    feedback_uri: str | None = Field(
+        default=None, description="URI to detailed feedback content (if available and >50KB)"
+    )
+    metrics_uri: str | None = Field(
+        default=None, description="URI to detailed assessment metrics (if available and >50KB)"
+    )
+    display_name: str | None = Field(
+        default=None,
+        description="Human-readable display name for UI purposes (e.g., 'ANCHOR GRADE A' for anchors)",
+    )
+
+
 class AssessmentResultV1(BaseEventData):
     """Rich assessment result event sent directly to Result Aggregator Service.
 
@@ -182,18 +226,15 @@ class AssessmentResultV1(BaseEventData):
     model_provider: str = Field(description="Provider: anthropic, openai, internal")
     model_version: str | None = Field(default=None, description="Model version if applicable")
 
-    # Essay results (excludes anchor essays)
-    essay_results: list[dict[str, Any]] = Field(
-        description="List of student essay assessment results",
-        # Each dict contains:
-        # - essay_id: str
-        # - normalized_score: float (0.0-1.0)
-        # - letter_grade: str (A, B, C, etc)
-        # - confidence_score: float (0.0-1.0)
-        # - confidence_label: str (HIGH, MID, LOW)
-        # - bt_score: float (Bradley-Terry score)
-        # - rank: int
-        # - is_anchor: bool (always False for student essays)
+    # Essay results (excludes anchor essays) - NOW TYPED!
+    essay_results: list[EssayResultV1] = Field(
+        description="List of student essay assessment results using typed validation",
+        # Replaced dict[str, Any] with EssayResultV1 for:
+        # - Proper type safety and IDE support
+        # - Runtime validation of all fields
+        # - Clear schema documentation
+        # - Consistent structure across assessment services
+        # - Foundation for future service migrations
     )
 
     # Assessment metadata

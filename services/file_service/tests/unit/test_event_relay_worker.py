@@ -169,7 +169,13 @@ class FakeKafkaPublisher:
         self.should_fail = False
         self.failure_message = "Kafka unavailable"
 
-    async def publish(self, topic: str, envelope: Any, key: str | None = None) -> None:
+    async def publish(
+        self,
+        topic: str,
+        envelope: Any,
+        key: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         """Simulate publishing to Kafka."""
         if self.should_fail:
             raise Exception(self.failure_message)
@@ -223,6 +229,7 @@ def sample_event(
             "correlation_id": str(uuid4()),
             "source_service": "test-service",
             "metadata": {"user_id": "user-123"},
+            "topic": "test.events.v1",
         },
         event_key="test-aggregate-123",
         topic="test.events.v1",
@@ -332,27 +339,20 @@ class TestEventRelayWorker:
         assert sample_event.id in fake_repository.failed_events
         assert "Exceeded max retries" in fake_repository.failed_events[sample_event.id]
 
-    async def test_uses_event_mapper_for_topic_resolution(
+    async def test_uses_explicit_topic_from_event(
         self,
         fake_repository: FakeOutboxRepository,
         fake_kafka: FakeKafkaPublisher,
         test_settings: OutboxSettings,
         sample_event: FakeOutboxEvent,
     ) -> None:
-        """Verify event mapper is used when topic not in event data."""
-        # Given
-        sample_event.event_data.pop("topic")
-
-        class TestEventMapper:
-            def get_topic_for_event(self, event_type: str) -> str:
-                return f"mapped.{event_type}"
-
+        """Verify event uses explicit topic from event property."""
+        # Given - sample_event already has topic set in fixture
         worker = EventRelayWorker(
             outbox_repository=fake_repository,
             kafka_bus=fake_kafka,
             settings=test_settings,
             service_name="test-service",
-            event_mapper=TestEventMapper(),
         )
 
         # When
@@ -363,7 +363,7 @@ class TestEventRelayWorker:
         # Then
         assert len(fake_kafka.published_messages) == 1
         topic, _, _ = fake_kafka.published_messages[0]
-        assert topic == "mapped.test.event.created.v1"
+        assert topic == "test.events.v1"  # Uses the explicit topic from event property
 
     async def test_processes_multiple_events_in_batch(
         self,

@@ -16,8 +16,8 @@ from common_core.events.spellcheck_models import (
 from common_core.status_enums import ProcessingStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
+from huleedu_service_libs.outbox.manager import OutboxManager
 
-from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 from services.spellchecker_service.protocols import SpellcheckEventPublisherProtocol
 
 logger = create_service_logger("spellchecker_service.event_publisher_impl")

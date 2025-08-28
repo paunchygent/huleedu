@@ -102,12 +102,12 @@ class AssessmentEventHandler:
             )
 
             # Process each essay result (excluding anchors for student results)
-            student_results = [r for r in data.essay_results if not r.get("is_anchor", False)]
+            student_results = [r for r in data.essay_results if not r.is_anchor]
 
             for essay_result in student_results:
-                essay_id = essay_result["essay_id"]
-                rank = essay_result.get("rank")
-                bt_score = essay_result.get("bt_score")
+                essay_id = essay_result.essay_id
+                rank = essay_result.rank
+                bt_score = essay_result.bt_score
 
                 await self.batch_repository.update_essay_cj_assessment_result(
                     essay_id=essay_id,
@@ -129,12 +129,12 @@ class AssessmentEventHandler:
                 # Create enriched rankings summary with business data
                 rankings_summary = [
                     {
-                        "essay_id": r["essay_id"],
-                        "rank": r.get("rank"),
-                        "score": r.get("bt_score"),
-                        "letter_grade": r.get("letter_grade"),
-                        "confidence_score": r.get("confidence_score"),
-                        "confidence_label": r.get("confidence_label"),
+                        "essay_id": r.essay_id,
+                        "rank": r.rank,
+                        "score": r.bt_score,
+                        "letter_grade": r.letter_grade,
+                        "confidence_score": r.confidence_score,
+                        "confidence_label": r.confidence_label,
                     }
                     for r in student_results
                 ]

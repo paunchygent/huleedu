@@ -277,6 +277,9 @@ class EventRelayWorker:
             # Prepare the event envelope for publishing
             envelope_data = event.event_data.copy()
 
+            # Extract headers from event data if available
+            headers = envelope_data.pop("headers", None)
+
             logger.info(
                 "Publishing event from outbox to Kafka",
                 extra={
@@ -285,6 +288,7 @@ class EventRelayWorker:
                     "topic": topic,
                     "aggregate_id": event.aggregate_id,
                     "retry_count": event.retry_count,
+                    "headers_present": headers is not None,
                     "service": self.service_name,
                 },
             )
@@ -298,11 +302,12 @@ class EventRelayWorker:
                 metadata=envelope_data.get("metadata", {}),
             )
 
-            # Publish to Kafka
+            # Publish to Kafka with headers support
             await self.kafka_bus.publish(
                 topic=topic,
                 envelope=envelope,
                 key=event.event_key,
+                headers=headers,
             )
 
             # Mark event as published

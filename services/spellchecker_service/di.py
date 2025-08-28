@@ -17,6 +17,7 @@ from huleedu_service_libs.outbox import (
     OutboxSettings,
     PostgreSQLOutboxRepository,
 )
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import (
     AtomicRedisClientProtocol,
     KafkaPublisherProtocol,
@@ -35,7 +36,6 @@ from services.spellchecker_service.implementations.content_client_impl import (
 from services.spellchecker_service.implementations.event_publisher_impl import (
     DefaultSpellcheckEventPublisher,
 )
-from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
 )
@@ -255,10 +255,13 @@ class SpellCheckerServiceProvider(Provider):
         self,
         outbox_repo: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
-        settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for transactional event publishing."""
-        return OutboxManager(outbox_repo, redis_client, settings)
+        """Provide shared outbox manager for transactional event publishing."""
+        return OutboxManager(
+            outbox_repository=outbox_repo,
+            redis_client=redis_client,
+            service_name="spellchecker_service",
+        )
 
     @provide(scope=Scope.APP)
     def provide_spellcheck_event_publisher(

@@ -24,10 +24,10 @@ from common_core.status_enums import BatchStatus
 from common_core.websocket_enums import NotificationPriority, WebSocketEventCategory
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 
 from services.result_aggregator_service.config import Settings
-from services.result_aggregator_service.implementations.outbox_manager import OutboxManager
 from services.result_aggregator_service.notification_projector import ResultNotificationProjector
 
 
@@ -117,7 +117,7 @@ def outbox_manager(
     return OutboxManager(
         outbox_repository=cast(OutboxRepositoryProtocol, mock_outbox_repository),
         redis_client=cast(AtomicRedisClientProtocol, mock_redis_client),
-        settings=settings,
+        service_name="result_aggregator_service",
     )
 
 
@@ -258,7 +258,9 @@ async def test_batch_results_ready_end_to_end_flow(
 
     # Verify Redis notification was sent for relay worker wake-up
     assert len(mock_redis_client.notifications_sent) == 1
-    assert mock_redis_client.notifications_sent[0] == "1"  # OutboxManager sends "1" as wake signal
+    assert (
+        mock_redis_client.notifications_sent[0] == "wake"
+    )  # OutboxManager sends "wake" as wake signal
 
 
 @pytest.mark.asyncio
@@ -311,7 +313,9 @@ async def test_batch_assessment_completed_end_to_end_flow(
 
     # Verify Redis notification was sent for relay worker wake-up
     assert len(mock_redis_client.notifications_sent) == 1
-    assert mock_redis_client.notifications_sent[0] == "1"  # OutboxManager sends "1" as wake signal
+    assert (
+        mock_redis_client.notifications_sent[0] == "wake"
+    )  # OutboxManager sends "wake" as wake signal
 
 
 @pytest.mark.asyncio
@@ -362,7 +366,7 @@ async def test_outbox_manager_failure_propagation(
     outbox_manager = OutboxManager(
         outbox_repository=failing_repo,
         redis_client=cast(AtomicRedisClientProtocol, mock_redis_client),
-        settings=settings,
+        service_name="result_aggregator_service",
     )
 
     notification_projector = ResultNotificationProjector(

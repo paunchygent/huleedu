@@ -22,11 +22,11 @@ from common_core.events.spellcheck_models import (
 )
 from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage, ProcessingStatus
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.spellchecker_service.implementations.event_publisher_impl import (
     DefaultSpellcheckEventPublisher,
 )
-from services.spellchecker_service.implementations.outbox_manager import OutboxManager
 
 
 @pytest.fixture

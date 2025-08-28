@@ -29,6 +29,7 @@ class QueuedMessage(Generic[T_EventPayload]):
     key: Optional[str]
     queued_at: datetime
     retry_count: int = 0
+    headers: Optional[dict[str, str]] = None
 
 
 class FallbackMessageHandler:

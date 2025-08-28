@@ -20,10 +20,10 @@ from common_core.events.nlp_events import (
     EssayMatchResult,
     StudentMatchSuggestion,
 )
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.nlp_service.config import Settings
 from services.nlp_service.implementations.event_publisher_impl import DefaultNlpEventPublisher
-from services.nlp_service.implementations.outbox_manager import OutboxManager
 
 
 @pytest.fixture

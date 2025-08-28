@@ -98,7 +98,7 @@ async def test_normal_publishing_flow(
 
         # Verify delegate was called
         mock_kafka_bus.publish.assert_called_once_with(
-            "huleedu.essay.spellcheck.completed", test_event, "essay_123"
+            "huleedu.essay.spellcheck.completed", test_event, "essay_123", None
         )
     finally:
         # Cleanup
@@ -270,7 +270,7 @@ async def test_without_circuit_breaker(
         # Should delegate directly
         await resilient_publisher.publish("test.topic", test_event, "test_key")
 
-        mock_kafka_bus.publish.assert_called_once_with("test.topic", test_event, "test_key")
+        mock_kafka_bus.publish.assert_called_once_with("test.topic", test_event, "test_key", None)
 
         # Circuit breaker state should show disabled
         state = resilient_publisher.get_circuit_breaker_state()

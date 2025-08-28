@@ -86,7 +86,7 @@ services:
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_URL=redis://redis:6379
-      - INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
+      - HULEEDU_INTERNAL_API_KEY=${HULEEDU_INTERNAL_API_KEY}
       - LOG_LEVEL=INFO
       - SERVICE_NAME=result_aggregator_service
       - HOST=0.0.0.0

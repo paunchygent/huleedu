@@ -12,6 +12,7 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -69,9 +70,6 @@ from services.batch_orchestrator_service.implementations.event_publisher_impl im
 from services.batch_orchestrator_service.implementations.nlp_initiator_impl import NLPInitiatorImpl
 from services.batch_orchestrator_service.implementations.notification_service import (
     NotificationService,
-)
-from services.batch_orchestrator_service.implementations.outbox_manager import (
-    OutboxManager,
 )
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
@@ -267,10 +265,13 @@ class RepositoryAndPublishingProvider(Provider):
         self,
         outbox_repository: OutboxRepositoryProtocol,
         redis_client: AtomicRedisClientProtocol,
-        settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for TRUE OUTBOX PATTERN."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        """Provide shared outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name="batch_orchestrator_service",
+        )
 
     @provide(scope=Scope.APP)
     def provide_batch_event_publisher(
