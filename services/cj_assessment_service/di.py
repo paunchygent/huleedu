@@ -35,7 +35,7 @@ from services.cj_assessment_service.implementations.llm_interaction_impl import 
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
-from services.cj_assessment_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring
@@ -228,8 +228,12 @@ class CJAssessmentServiceProvider(Provider):
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for transactional event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        """Provide shared outbox manager for TRUE OUTBOX PATTERN."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

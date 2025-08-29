@@ -21,7 +21,7 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.entitlements_service.config import Settings
-from services.entitlements_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.entitlements_service.protocols import (
     CreditManagerProtocol,
     EntitlementsRepositoryProtocol,
@@ -205,7 +205,7 @@ class ImplementationProvider(Provider):
         return OutboxManager(
             outbox_repository=outbox_repository,
             redis_client=redis_client,
-            settings=settings,
+            service_name=settings.SERVICE_NAME,
         )
 
     @provide

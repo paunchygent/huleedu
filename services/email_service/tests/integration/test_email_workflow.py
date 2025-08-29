@@ -22,7 +22,7 @@ from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,
 )
@@ -188,7 +188,7 @@ class TestEmailWorkflowIntegration:
         return OutboxManager(
             outbox_repository=mock_outbox_repository,
             redis_client=mock_redis_client,
-            settings=settings,
+            service_name="email_service",
         )
 
     @pytest.fixture

@@ -37,9 +37,22 @@ distribution = false
 huleedu-common-core = "file:///app/libs/common_core"
 huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
 
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock",
+    "faker",
+]
+
 [tool.pdm.scripts]
 start = "hypercorn app:app --bind 0.0.0.0:8083"
 dev = "quart --app app:app --debug run -p 8083"
+migrate = "alembic upgrade head"
+start-dev = {composite = ["migrate", "start"]}
 
 # Alembic database migration commands (ergonomics; see Rule 085 for actual usage)
 migrate-upgrade = "alembic upgrade head"

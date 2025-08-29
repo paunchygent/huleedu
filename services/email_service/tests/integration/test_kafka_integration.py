@@ -53,7 +53,7 @@ from sqlalchemy.ext.asyncio import (
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.implementations.repository_impl import PostgreSQLEmailRepository
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,
@@ -228,11 +228,14 @@ class TestKafkaIntegration:
         self,
         mock_outbox_repository: AsyncMock,
         mock_redis_client: AtomicRedisClientProtocol,
-        settings: Settings,
     ) -> OutboxManager:
         """Create outbox manager for event publishing."""
         # Create manager with proper dependencies
-        return OutboxManager(mock_outbox_repository, mock_redis_client, settings)
+        return OutboxManager(
+            outbox_repository=mock_outbox_repository,
+            redis_client=mock_redis_client,
+            service_name="email_service",
+        )
 
     @pytest.fixture
     async def event_processor(

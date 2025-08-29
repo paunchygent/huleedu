@@ -42,6 +42,8 @@ huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
 [tool.pdm.scripts]
 start = "hypercorn app:app --bind 0.0.0.0:8080"
 dev = "quart --app app:app --debug run -p 8080"
+migrate = "alembic upgrade heads"
+start-dev = {composite = ["migrate", "start"]}
 
 # Alembic database migration commands (ergonomics; see Rule 085 for actual usage)
 migrate-upgrade = "alembic upgrade head"

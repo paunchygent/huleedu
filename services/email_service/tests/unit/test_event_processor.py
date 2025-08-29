@@ -18,7 +18,7 @@ from huleedu_service_libs.error_handling import HuleEduError, create_test_huleed
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,

@@ -19,7 +19,7 @@ from common_core.emailing_models import (
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.implementations.provider_smtp_impl import SMTPEmailProvider
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,

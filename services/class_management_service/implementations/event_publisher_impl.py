@@ -18,7 +18,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
     from services.class_management_service.config import Settings
-    from services.class_management_service.implementations.outbox_manager import OutboxManager
+    from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.class_management_service.protocols import ClassEventPublisherProtocol
 

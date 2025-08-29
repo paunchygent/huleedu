@@ -18,7 +18,7 @@ from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
 
 from services.email_service.config import Settings
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 @pytest.fixture
@@ -57,14 +57,13 @@ def settings() -> Settings:
 
 @pytest.fixture
 def outbox_manager(
-    mock_outbox_repository: AsyncMock, mock_redis_client: AsyncMock, settings: Settings
+    mock_outbox_repository: AsyncMock, mock_redis_client: AsyncMock
 ) -> OutboxManager:
     """Create OutboxManager instance with mocked dependencies.
 
     Args:
         mock_outbox_repository: Mocked outbox repository.
         mock_redis_client: Mocked Redis client.
-        settings: Service settings.
 
     Returns:
         OutboxManager instance for testing.
@@ -72,7 +71,7 @@ def outbox_manager(
     return OutboxManager(
         outbox_repository=mock_outbox_repository,
         redis_client=mock_redis_client,
-        settings=settings,
+        service_name="email_service",
     )
 
 
@@ -136,7 +135,7 @@ class TestOutboxManager:
         assert event_data_arg["data"]["provider"] == "sendgrid"
 
         # Verify Redis notification was sent
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:email_service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:email_service", "wake")
 
     @pytest.mark.asyncio
     async def test_publish_email_delivery_failed_event_success(
@@ -375,7 +374,7 @@ class TestOutboxManager:
         outbox_manager = OutboxManager(
             outbox_repository=None,  # type: ignore[arg-type]
             redis_client=mock_redis_client,
-            settings=settings,
+            service_name="email_service",
         )
 
         correlation_id = uuid4()
@@ -477,40 +476,82 @@ class TestOutboxManager:
         assert error.error_detail.correlation_id == correlation_id
 
     @pytest.mark.asyncio
-    async def test_notify_relay_worker_success(
+    async def test_redis_notification_integration_success(
         self,
         outbox_manager: OutboxManager,
+        mock_outbox_repository: AsyncMock,
         mock_redis_client: AsyncMock,
     ) -> None:
-        """Test successful relay worker notification via Redis.
+        """Test relay worker notification is sent during event publishing.
 
-        Verifies that relay worker wake-up notifications are sent
-        correctly to enable immediate event processing.
+        Verifies that Redis wake-up notifications are sent automatically
+        when events are published to enable immediate event processing.
         """
+        # Arrange
+        correlation_id = uuid4()
+        event_envelope: EventEnvelope = EventEnvelope(
+            event_type="huleedu.email.sent.v1",
+            source_service="email_service",
+            correlation_id=correlation_id,
+            data=EmailSentV1(
+                message_id="msg-redis-test",
+                provider="sendgrid",
+                sent_at=datetime(2024, 1, 15, 10, 30, 45),
+                correlation_id=str(correlation_id),
+            ),
+        )
+
         # Act
-        await outbox_manager.notify_relay_worker()
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="email_message",
+            aggregate_id="msg-redis-test",
+            event_type="huleedu.email.sent.v1",
+            event_data=event_envelope,
+            topic="huleedu-email-events",
+        )
 
         # Assert
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:email_service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:email_service", "wake")
 
     @pytest.mark.asyncio
-    async def test_notify_relay_worker_redis_failure_graceful(
+    async def test_redis_notification_failure_graceful(
         self,
         outbox_manager: OutboxManager,
+        mock_outbox_repository: AsyncMock,
         mock_redis_client: AsyncMock,
     ) -> None:
-        """Test graceful handling of Redis notification failures.
+        """Test graceful handling of Redis notification failures during publishing.
 
         Verifies that Redis notification failures do not raise exceptions
         and allow the outbox pattern to continue functioning via polling.
         """
         # Arrange
         mock_redis_client.lpush.side_effect = Exception("Redis connection timeout")
+        
+        correlation_id = uuid4()
+        event_envelope: EventEnvelope = EventEnvelope(
+            event_type="huleedu.email.sent.v1",
+            source_service="email_service",
+            correlation_id=correlation_id,
+            data=EmailSentV1(
+                message_id="msg-redis-error-test",
+                provider="sendgrid",
+                sent_at=datetime(2024, 1, 15, 10, 30, 45),
+                correlation_id=str(correlation_id),
+            ),
+        )
 
-        # Act - Should not raise exception
-        await outbox_manager.notify_relay_worker()
+        # Act - Should not raise exception even if Redis fails
+        await outbox_manager.publish_to_outbox(
+            aggregate_type="email_message",
+            aggregate_id="msg-redis-error-test",
+            event_type="huleedu.email.sent.v1",
+            event_data=event_envelope,
+            topic="huleedu-email-events",
+        )
 
-        # Assert
+        # Assert - Event should still be stored in outbox despite Redis failure
+        mock_outbox_repository.add_event.assert_called_once()
         mock_redis_client.lpush.assert_called_once()
 
     @pytest.mark.asyncio

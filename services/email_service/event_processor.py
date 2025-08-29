@@ -23,7 +23,7 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.email_service.config import Settings
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.kafka_consumer import EmailKafkaConsumer
 from services.email_service.metrics import setup_email_service_database_monitoring
 from services.email_service.protocols import EmailProvider, EmailRepository, TemplateRenderer
@@ -191,7 +191,11 @@ class ServiceProvider(Provider):
         settings: Settings,
     ) -> OutboxManager:
         """Provide outbox manager for transactional event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_processor(

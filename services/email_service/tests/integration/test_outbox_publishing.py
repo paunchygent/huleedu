@@ -37,7 +37,7 @@ from testcontainers.postgres import PostgresContainer
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from services.email_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.models_db import Base, EmailStatus
 from services.email_service.models_db import EmailRecord as DbEmailRecord
 from services.email_service.protocols import EmailProvider, EmailRepository, TemplateRenderer
@@ -205,7 +205,7 @@ class TestOutboxPublishingIntegration:
         return OutboxManager(
             outbox_repository=mock_outbox_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name="email_service",
         )
 
     @pytest.fixture
