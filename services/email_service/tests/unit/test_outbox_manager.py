@@ -527,7 +527,7 @@ class TestOutboxManager:
         """
         # Arrange
         mock_redis_client.lpush.side_effect = Exception("Redis connection timeout")
-        
+
         correlation_id = uuid4()
         event_envelope: EventEnvelope = EventEnvelope(
             event_type="huleedu.email.sent.v1",

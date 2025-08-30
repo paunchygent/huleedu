@@ -15,11 +15,11 @@ import pytest
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from pydantic import BaseModel
 
 from services.identity_service.config import Settings
-from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 class MockEventData(BaseModel):
@@ -406,7 +406,6 @@ class TestOutboxManager:
 
         # Assert - Repository operation completed successfully
         mock_outbox_repository.add_event.assert_called_once()
-
 
     async def test_publish_to_outbox_serialization_preserves_swedish_characters(
         self,

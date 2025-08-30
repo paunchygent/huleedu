@@ -220,15 +220,15 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
             "timestamp": datetime.now(UTC).isoformat(),
             "correlation_id": str(correlation_id),
         }
-        
-        # Create event envelope  
+
+        # Create event envelope
         envelope = EventEnvelope[Any](
             event_type="TokenRevokedV1",
             source_service=self.source_service_name,
             correlation_id=correlation_id,
             data=event_data,
         )
-        
+
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="User",
             aggregate_id=user_id,

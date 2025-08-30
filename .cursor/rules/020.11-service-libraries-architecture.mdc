@@ -52,12 +52,15 @@ libs/huleedu_service_libs/
 │       │   └── factories.py        # Error context with tracing
 │       ├── outbox/                 # Transactional outbox pattern
 │       │   ├── __init__.py         # Main exports
+│       │   ├── manager.py          # Shared OutboxManager implementation
 │       │   ├── models.py           # EventOutbox SQLAlchemy model
 │       │   ├── protocols.py        # OutboxRepositoryProtocol interface
 │       │   ├── repository.py       # PostgreSQLOutboxRepository implementation
 │       │   ├── relay.py            # EventRelayWorker background processor
 │       │   ├── monitoring.py       # Prometheus metrics for outbox operations
-│       │   └── di.py               # OutboxProvider for Dishka DI
+│       │   ├── di.py               # OutboxProvider for Dishka DI
+│       │   └── templates/          # Migration templates
+│       │       └── create_outbox_table.py.template
 │       └── py.typed                # Type stub marker
 └── tests/                          # Test suite
     ├── test_idempotency.py
@@ -70,6 +73,7 @@ libs/huleedu_service_libs/
 - **Purpose**: Simplified async Kafka producer wrapper
 - **Key Methods**: `start()`, `stop()`, `publish_event()`
 - **Features**: Connection pooling, graceful shutdown, automatic serialization
+- **Integration**: Optional circuit breaker protection via `ResilientKafkaPublisher`
 
 ### 3.2. RedisClient
 - **Purpose**: Key-value operations and atomic transactions
@@ -156,25 +160,50 @@ libs/huleedu_service_libs/
 
 ## 5. Integration Patterns
 
-### 5.1. Dependency Injection
+### 5.1. Redis Client Integration
 ```python
 @provide(scope=Scope.APP)
-async def provide_redis_client(settings: Settings) -> AtomicRedisClientProtocol:
-    client = RedisClient(
+async def provide_redis_client(
+    self, settings: Settings
+) -> AsyncGenerator[AtomicRedisClientProtocol, None]:
+    redis_client = RedisClient(
         client_id=f"{settings.SERVICE_NAME}-redis",
         redis_url=settings.REDIS_URL,
     )
-    await client.start()
-    return cast(AtomicRedisClientProtocol, client)
+    await redis_client.start()
+    try:
+        yield redis_client
+    finally:
+        await redis_client.stop()
 ```
 
-### 5.2. Event Publishing
+### 5.2. Kafka Client Integration
+
+**Base Configuration**
 ```python
-async def publish_event(kafka_bus: KafkaBus, envelope: EventEnvelope):
-    await kafka_bus.publish_event(
-        topic=topic_name(envelope.event_type),
-        event_envelope=envelope
+@provide(scope=Scope.APP)
+async def provide_kafka_bus(self, settings: Settings) -> AsyncGenerator[KafkaPublisherProtocol, None]:
+    base_kafka_bus = KafkaBus(
+        client_id=settings.PRODUCER_CLIENT_ID,  # or f"{SERVICE_NAME}-producer"
+        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
     )
+    await base_kafka_bus.start()
+    try:
+        yield base_kafka_bus
+    finally:
+        await base_kafka_bus.stop()
+```
+
+**Circuit Breaker Protection (Optional)**
+```python
+if settings.CIRCUIT_BREAKER_ENABLED:
+    kafka_publisher = ResilientKafkaPublisher(
+        delegate=base_kafka_bus,
+        circuit_breaker=kafka_circuit_breaker,
+        retry_interval=30,
+    )
+else:
+    kafka_publisher = base_kafka_bus
 ```
 
 ### 5.3. Redis Pub/Sub
@@ -266,11 +295,44 @@ from huleedu_service_libs.middleware.frameworks.fastapi_middleware import setup_
 - **Pattern**: Middleware applied in app factory function
 
 ### 6.10. Transactional Outbox Pattern
-- **MUST** use outbox for all business-critical inter-service events
-- **MUST** include EventOutbox table in service database migrations
+- **MUST** use shared `huleedu_service_libs.outbox.manager.OutboxManager` (all 11 services)
+- **MUST** include EventOutbox table with required schema (id, aggregate_id, aggregate_type, event_type, event_data, event_key, topic, created_at, published_at, retry_count, last_error)
 - **MUST** start EventRelayWorker in application lifecycle
 - **MUST** share database session between business logic and outbox operations
 - **Pattern**: Store events in outbox within same transaction as business operations
+
+### 6.11. OutboxManager Integration Patterns
+
+**Pattern A: Direct Provider Integration (Recommended)**
+```python
+from huleedu_service_libs.outbox.manager import OutboxManager
+
+@provide(scope=Scope.APP)
+def provide_outbox_manager(
+    self,
+    outbox_repository: OutboxRepositoryProtocol,
+    redis_client: AtomicRedisClientProtocol,
+    settings: Settings,
+) -> OutboxManager:
+    return OutboxManager(
+        outbox_repository=outbox_repository,
+        redis_client=redis_client,
+        service_name=settings.SERVICE_NAME,
+    )
+```
+
+**Pattern B: OutboxProvider Integration**
+```python
+from huleedu_service_libs.outbox import OutboxProvider
+
+return make_async_container(
+    CoreProvider(),
+    ServiceProvider(),
+    OutboxProvider(),  # Provides complete outbox infrastructure
+)
+```
+
+**Features**: Headers support, deterministic partition keys, Redis-based relay worker notifications
 
 ## 7. Testing Considerations
 

@@ -145,7 +145,7 @@ class TestOutboxManagerErrorHandling:
         )
 
         test_correlation_id: UUID = uuid4()
-        
+
         # Create properly typed event data
         event_data = EssayContentProvisionedV1(
             entity_id="test-batch-extraction",
@@ -178,7 +178,6 @@ class TestOutboxManagerErrorHandling:
         # Verify correlation ID extracted from envelope
         error_detail: Any = exc_info.value.error_detail
         assert error_detail.correlation_id == test_correlation_id
-
 
     async def test_redis_notification_failure_graceful_degradation(
         self,
@@ -268,7 +267,6 @@ class TestOutboxManagerErrorHandling:
         mock_repository.add_event.assert_called_once()
         call_args: Any = mock_repository.add_event.call_args
         assert call_args.kwargs["event_key"] == "custom-partition-key"
-
 
     async def test_successful_outbox_storage_with_topic_injection(
         self,
