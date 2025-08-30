@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
-    from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
+    from huleedu_service_libs.outbox.manager import OutboxManager
     from services.essay_lifecycle_service.protocols import TopicNamingProtocol
 
 logger = create_service_logger("essay_lifecycle_service.batch_lifecycle_publisher")

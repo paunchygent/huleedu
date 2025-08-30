@@ -33,7 +33,7 @@ from testcontainers.postgres import PostgresContainer
 
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
-from services.file_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.file_service.protocols import EventPublisherProtocol
 
 
@@ -120,7 +120,11 @@ class MinimalOutboxTestProvider(Provider):
         settings: Settings,
     ) -> OutboxManager:
         """Provide OutboxManager with real database and mocked Redis."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

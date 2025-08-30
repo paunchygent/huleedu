@@ -75,4 +75,4 @@ EXPOSE ${HTTP_PORT} ${PROMETHEUS_PORT}
 
 # Command to run the HTTP application from service directory
 # Note: Worker mode (worker_main.py) can be started separately if needed
-CMD ["pdm", "run", "start"]
+CMD ["sh", "-c", "if [ \"$HULEEDU_ENVIRONMENT\" = 'production' ]; then pdm run start; else pdm run start-dev; fi"]

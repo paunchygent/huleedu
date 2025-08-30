@@ -73,4 +73,4 @@ EXPOSE ${FILE_SERVICE_HTTP_PORT}
 EXPOSE ${FILE_SERVICE_PROMETHEUS_PORT}
 
 # Command to run the application
-CMD ["pdm", "run", "start"]
+CMD ["sh", "-c", "if [ \"$HULEEDU_ENVIRONMENT\" = 'production' ]; then pdm run start; else pdm run start-dev; fi"]

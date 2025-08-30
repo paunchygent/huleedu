@@ -34,6 +34,17 @@ dev = [
     "huleedu-service-libs[dev]",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock",
+    "faker",
+]
+
 # Local development dependencies (editable installs)
 [tool.pdm.dev-dependencies]
 dev = [
@@ -44,6 +55,8 @@ dev = [
 [tool.pdm.scripts]
 start = "hypercorn app:app --config python:hypercorn_config"
 dev = "quart --app app:app --debug run -p 7001"
+migrate = "alembic upgrade head"
+start-dev = {composite = ["migrate", "start"]}
 
 # Docker build overrides for containerized deployment
 [tool.pdm.resolution.overrides]

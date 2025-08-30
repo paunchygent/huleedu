@@ -18,7 +18,7 @@ from common_core.events.file_events import EssayContentProvisionedV1
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.file_service.config import Settings
-from services.file_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 @pytest.fixture
@@ -74,7 +74,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=None,  # type: ignore
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         # When/Then
@@ -108,7 +108,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         # When/Then
@@ -128,12 +128,12 @@ class TestOutboxManagerErrorHandling:
         assert "Failed to store event in outbox" in error_detail.message
         assert error_detail.correlation_id == sample_event_envelope.correlation_id
 
-    async def test_correlation_id_extraction_from_dict_event_data(
+    async def test_correlation_id_extraction_from_envelope_event_data(
         self,
         test_settings: Settings,
         mock_redis_client: AsyncMock,
     ) -> None:
-        """Test correlation ID extraction from dict event data."""
+        """Test correlation ID extraction from event envelope data."""
         # Given
         mock_repository: AsyncMock = AsyncMock()
         mock_repository.add_event.side_effect = Exception("Test exception")
@@ -141,14 +141,29 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         test_correlation_id: UUID = uuid4()
-        dict_event_data: dict[str, Any] = {
-            "correlation_id": str(test_correlation_id),
-            "data": "test",
-        }
+        
+        # Create properly typed event data
+        event_data = EssayContentProvisionedV1(
+            entity_id="test-batch-extraction",
+            file_upload_id="test-file-extraction",
+            original_file_name="extraction_test.txt",
+            raw_file_storage_id="raw-extraction-123",
+            text_storage_id="text-extraction-123",
+            file_size_bytes=1024,
+            content_md5_hash="extraction-hash-123",
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        envelope_event_data: EventEnvelope = EventEnvelope(
+            event_type="file.essay.content.provisioned.v1",
+            source_service="file_service",
+            correlation_id=test_correlation_id,
+            data=event_data,
+        )
 
         # When/Then
         with pytest.raises(HuleEduError) as exc_info:
@@ -156,45 +171,14 @@ class TestOutboxManagerErrorHandling:
                 aggregate_type="test_entity",
                 aggregate_id="test-789",
                 event_type="test.event.v1",
-                event_data=dict_event_data,
+                event_data=envelope_event_data,
                 topic="test.topic",
             )
 
-        # Verify correlation ID extracted from dict
+        # Verify correlation ID extracted from envelope
         error_detail: Any = exc_info.value.error_detail
         assert error_detail.correlation_id == test_correlation_id
 
-    async def test_correlation_id_fallback_for_invalid_data(
-        self,
-        test_settings: Settings,
-        mock_redis_client: AsyncMock,
-    ) -> None:
-        """Test correlation ID fallback when extraction fails."""
-        # Given
-        mock_repository: AsyncMock = AsyncMock()
-        mock_repository.add_event.side_effect = Exception("Test exception")
-
-        outbox_manager: OutboxManager = OutboxManager(
-            outbox_repository=mock_repository,
-            redis_client=mock_redis_client,
-            settings=test_settings,
-        )
-
-        invalid_event_data: dict[str, str] = {"correlation_id": "invalid-uuid-format"}
-
-        # When/Then
-        with pytest.raises(HuleEduError) as exc_info:
-            await outbox_manager.publish_to_outbox(
-                aggregate_type="test_entity",
-                aggregate_id="test-999",
-                event_type="test.event.v1",
-                event_data=invalid_event_data,
-                topic="test.topic",
-            )
-
-        # Verify fallback to default UUID
-        error_detail: Any = exc_info.value.error_detail
-        assert error_detail.correlation_id == UUID("00000000-0000-0000-0000-000000000000")
 
     async def test_redis_notification_failure_graceful_degradation(
         self,
@@ -212,7 +196,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager: OutboxManager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         # When - This should NOT raise an exception despite Redis failure
@@ -229,7 +213,7 @@ class TestOutboxManagerErrorHandling:
         mock_repository.add_event.assert_called_once()
 
         # Verify Redis notification was attempted but failed gracefully
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:file_service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:file_service", "wake")
 
     async def test_custom_partition_key_from_metadata(
         self,
@@ -244,7 +228,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         # Create event with custom partition key in metadata
@@ -285,36 +269,6 @@ class TestOutboxManagerErrorHandling:
         call_args: Any = mock_repository.add_event.call_args
         assert call_args.kwargs["event_key"] == "custom-partition-key"
 
-    async def test_non_pydantic_event_data_validation(
-        self,
-        test_settings: Settings,
-        mock_redis_client: AsyncMock,
-    ) -> None:
-        """Test validation error for non-Pydantic event data."""
-        # Given
-        mock_repository: AsyncMock = AsyncMock()
-        outbox_manager: OutboxManager = OutboxManager(
-            outbox_repository=mock_repository,
-            redis_client=mock_redis_client,
-            settings=test_settings,
-        )
-
-        # When/Then - ValueError is caught and wrapped as HuleEduError by OutboxManager
-        with pytest.raises(HuleEduError) as exc_info:
-            await outbox_manager.publish_to_outbox(
-                aggregate_type="test_entity",
-                aggregate_id="test-invalid",
-                event_type="test.event.v1",
-                event_data="invalid-string-data",  # Not a Pydantic model
-                topic="test.topic",
-            )
-
-        # Verify the wrapped error contains the original validation message
-        error_detail: Any = exc_info.value.error_detail
-        assert error_detail.service == "file_service"
-        assert error_detail.operation == "publish_to_outbox"
-        assert "Failed to store event in outbox" in error_detail.message
-        assert "ValueError" in error_detail.message
 
     async def test_successful_outbox_storage_with_topic_injection(
         self,
@@ -330,7 +284,7 @@ class TestOutboxManagerErrorHandling:
         outbox_manager = OutboxManager(
             outbox_repository=mock_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         # When

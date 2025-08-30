@@ -25,7 +25,7 @@ from services.file_service.implementations.content_service_client_impl import (
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 from services.file_service.implementations.file_repository_impl import FileRepository
-from services.file_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.notification_projector import FileServiceNotificationProjector
@@ -177,7 +177,11 @@ class ServiceImplementationsProvider(Provider):
         settings: Settings,
     ) -> OutboxManager:
         """Provide outbox manager for reliable event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

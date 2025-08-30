@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
-from services.file_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 class FakeOutboxRepository:

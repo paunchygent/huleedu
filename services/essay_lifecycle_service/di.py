@@ -65,7 +65,7 @@ from services.essay_lifecycle_service.implementations.mock_essay_repository impo
 from services.essay_lifecycle_service.implementations.nlp_command_handler import (
     NlpCommandHandler,
 )
-from services.essay_lifecycle_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
@@ -294,7 +294,11 @@ class ServiceClientsProvider(Provider):
         settings: Settings,
     ) -> OutboxManager:
         """Provide outbox manager for reliable event publishing."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_topic_naming(self) -> TopicNamingProtocol:

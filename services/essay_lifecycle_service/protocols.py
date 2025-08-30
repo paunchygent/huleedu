@@ -642,12 +642,14 @@ class OutboxManagerProtocol(Protocol):
 
     async def publish_to_outbox(
         self,
-        aggregate_id: str,
         aggregate_type: str,
+        aggregate_id: str,
         event_type: str,
         event_data: Any,
         topic: str,
-        session: AsyncSession | None = None,
+        message_key: str | None = None,
+        headers: dict[str, str] | None = None,
+        session: Any | None = None,
     ) -> None:
         """Store event in outbox for reliable delivery."""
         ...
