@@ -7,7 +7,7 @@ protection to any protocol implementation without modifying the original code.
 
 import asyncio
 import functools
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
@@ -86,7 +86,7 @@ class ResilientClientWrapper:
         return f"ResilientClientWrapper({type(self._delegate).__name__})"
 
 
-def make_resilient(implementation: T, circuit_breaker: CircuitBreaker) -> T:
+def make_resilient(implementation: T, circuit_breaker: CircuitBreaker) -> Any:
     """
     Factory function to create a resilient version of any implementation.
 
@@ -101,5 +101,5 @@ def make_resilient(implementation: T, circuit_breaker: CircuitBreaker) -> T:
         A wrapped version that appears to be the same type but with protection
     """
     wrapper = ResilientClientWrapper(implementation, circuit_breaker)
-    # Cast to make type checker happy - the wrapper implements the same interface
-    return cast(T, wrapper)
+    # Return the wrapper; it transparently proxies the interface at runtime
+    return wrapper

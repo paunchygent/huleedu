@@ -5,7 +5,7 @@ the base HTTP client, with proper error handling and response parsing
 for Content Service API endpoints.
 """
 
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
@@ -147,8 +147,8 @@ class ContentServiceClient(ContentServiceClientProtocol):
         )
 
         # Extract storage_id from response
-        storage_id = result.get("storage_id")
-        if not storage_id or not isinstance(storage_id, str):
+        storage_id_obj: Any = result.get("storage_id")
+        if not storage_id_obj or not isinstance(storage_id_obj, str):
             logger.error(
                 f"{log_prefix}Content Service response missing or invalid 'storage_id' field",
                 extra={
@@ -169,6 +169,7 @@ class ContentServiceClient(ContentServiceClientProtocol):
                 **context,
             )
 
+        storage_id: str = storage_id_obj
         logger.info(
             f"{log_prefix}Successfully stored content, new storage_id: {storage_id}",
             extra={
@@ -178,4 +179,4 @@ class ContentServiceClient(ContentServiceClientProtocol):
             },
         )
 
-        return cast(str, storage_id)
+        return storage_id

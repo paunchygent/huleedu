@@ -20,6 +20,14 @@ import sys
 from typing import Any
 
 import structlog
+try:
+    # structlog >= 23
+    from structlog.typing import Processor
+except Exception:  # Fallback for environments without structlog.typing
+    from typing import Protocol
+
+    class Processor(Protocol):
+        def __call__(self, logger: Any, name: str, event_dict: Any) -> Any: ...
 from common_core.events.envelope import EventEnvelope
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
 
@@ -50,7 +58,7 @@ def configure_service_logging(
     # Choose processors based on environment
     if environment == "production":
         # Production: JSON output for log aggregation
-        processors = [
+        processors: list[Processor] = [
             merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.add_log_level,
@@ -91,7 +99,7 @@ def configure_service_logging(
 
     # Configure structlog
     structlog.configure(
-        processors=processors,  # type: ignore[arg-type]
+        processors=processors,
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,

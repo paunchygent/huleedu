@@ -9,7 +9,18 @@ import asyncio
 from datetime import datetime, timedelta
 
 # Import TYPE_CHECKING to avoid circular imports
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Dict,
+    Optional,
+    Type,
+    TypeVar,
+    overload,
+)
 
 from common_core import CircuitBreakerState
 from opentelemetry import trace
@@ -105,9 +116,13 @@ class CircuitBreaker:
 
         return self._lazy_tracer
 
-    async def call(
-        self, func: Callable[..., T] | Callable[..., Coroutine[Any, Any, T]], *args, **kwargs
-    ) -> T:
+    @overload
+    async def call(self, func: Callable[..., Awaitable[T]], *args, **kwargs) -> T: ...
+
+    @overload
+    async def call(self, func: Callable[..., T], *args, **kwargs) -> T: ...
+
+    async def call(self, func: Callable[..., Any], *args, **kwargs) -> Any:
         """
         Execute function with circuit breaker protection.
 
