@@ -30,8 +30,13 @@ The service implements a dual event pattern optimized for different consumer nee
 - **Separation of Concerns**: State management vs business analytics
 - **Network Efficiency**: Reduces data transfer for state-only consumers
 
-### Performance Optimizations
-**Header-First Message Processing**: Events published via OutboxManager include complete headers (`event_id`, `event_type`, `trace_id`), enabling consuming services to skip JSON parsing during idempotency processing - significant performance improvement for high-volume pipelines.
+### Header Processing
+
+Events from OutboxManager-enabled services include Kafka headers:
+
+- `event_id`, `event_type`, `trace_id`, `source_service` headers  
+- Header-complete messages skip JSON parsing during idempotency processing
+- `headers_used` field logged for utilization tracking
 
 ## Runtime Flow
 

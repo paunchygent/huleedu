@@ -57,12 +57,18 @@ For services requiring both state management and business data:
 - **MUST** implement error handling, retries, DLQ strategy
 - **SHOULD** validate schema on deserialization
 
-### 4.1. Header-First Optimization
-**Zero-Parse Performance**: When Kafka headers contain complete event metadata (`event_id`, `event_type`), idempotency processing skips JSON parsing entirely for improved performance.
+### 4.1. Header-First Processing
+**Processing Path**: Idempotency decorator prioritizes header extraction over JSON parsing.
 
-**Behavior**:
-- Headers with `event_id` + `event_type` → Zero JSON parsing
-- Incomplete headers → Automatic fallback to JSON parsing
+**Header Decoding**:
+- Handles bytes/string key formats via utf-8 decode
+- Extracts `event_id`, `event_type`, `trace_id`, `source_service`
+- `headers_used` field tracks header utilization in logs
+
+**Fallback Logic**:
+- Complete headers (`event_id` + `event_type`) → Skip JSON parsing
+- Incomplete headers → Parse JSON for missing fields
+- Missing headers → Full JSON parsing
 
 ## 5. Schema Evolution
 - Additive, optional changes are safe

@@ -46,7 +46,8 @@ libs/huleedu_service_libs/
 │       │   ├── __init__.py
 │       │   ├── circuit_breaker.py  # Circuit breaker implementation
 │       │   ├── registry.py         # Circuit breaker registry
-│       │   └── resilient_client.py # Generic resilient wrapper
+│       │   ├── http_client.py      # Typed HttpClient wrapper
+│       │   └── content_service.py  # Typed ContentService wrapper
 │       ├── error_handling/         # Enhanced error context
 │       │   ├── __init__.py
 │       │   └── factories.py        # Error context with tracing

@@ -5,7 +5,7 @@ the base HTTP client, with proper error handling and response parsing
 for Content Service API endpoints.
 """
 
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 from common_core.domain_enums import ContentType

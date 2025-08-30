@@ -131,6 +131,13 @@ Consumed from Kafka for batch coordination:
   * **Data**: `ELSBatchPhaseOutcomeV1` detailing the results of a completed phase from ELS.
   * **Handler**: `ELSBatchPhaseOutcomeHandler` processes the outcome and triggers the next pipeline phase.
 
+### Header-First Processing
+
+Events from OutboxManager-enabled services include Kafka headers:
+- `event_id`, `event_type`, `trace_id`, `source_service` headers
+- Header-complete messages skip JSON parsing during idempotency processing
+- `headers_used` field logged for utilization tracking
+
 ## Dependency Injection and Repository Architecture
 
 ### Dishka Configuration

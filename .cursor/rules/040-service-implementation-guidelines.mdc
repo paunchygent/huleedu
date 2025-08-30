@@ -102,6 +102,14 @@ def provide_circuit_breaker_registry(settings: Settings) -> CircuitBreakerRegist
         registry.register("kafka_producer", CircuitBreaker(...))
     return registry
 
+@provide(scope=Scope.APP)
+def provide_idempotency_config(settings: Settings) -> IdempotencyConfig:
+    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig
+    return IdempotencyConfig(
+        service_name=settings.SERVICE_NAME,
+        enable_debug_logging=settings.ENVIRONMENT == "development"
+    )
+
 @provide(scope=Scope.REQUEST)  # Per-operation instances  
 def provide_repository(session: AsyncSession, settings: Settings) -> Repository:
     if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
@@ -119,17 +127,25 @@ def provide_repository(session: AsyncSession, settings: Settings) -> Repository:
 
 ### 4.3. Circuit Breaker Standards
 ```python
-# MUST wrap external dependencies with circuit breakers
+# Shared protocols: Use service library wrappers
 @provide(scope=Scope.APP)
-def provide_external_client(
-    settings: Settings,
+def provide_http_client(
+    base_client: HttpClientProtocol,
     circuit_breaker_registry: CircuitBreakerRegistry,
-) -> ExternalClientProtocol:
-    base_client = ExternalClientImpl(settings)
-    if settings.CIRCUIT_BREAKER_ENABLED:
-        breaker = circuit_breaker_registry.get("external_client")
-        return CircuitBreakerExternalClient(base_client, breaker)
-    return base_client
+) -> HttpClientProtocol:
+    from huleedu_service_libs.resilience import CircuitBreakerHttpClient
+    breaker = circuit_breaker_registry.get("http_client")
+    return CircuitBreakerHttpClient(base_client, breaker)
+
+# Service-specific protocols: Create service-specific wrappers
+@provide(scope=Scope.APP)
+def provide_service_client(
+    base_client: ServiceSpecificProtocol,
+    circuit_breaker_registry: CircuitBreakerRegistry,
+) -> ServiceSpecificProtocol:
+    from .implementations.circuit_breaker_service_client import CircuitBreakerServiceClient
+    breaker = circuit_breaker_registry.get("service_client")
+    return CircuitBreakerServiceClient(base_client, breaker)
 ```
 
 ### 4.4. Repository Selection Standards
@@ -152,6 +168,7 @@ app.database_engine = database_engine  # REQUIRED HuleEduApp attribute
 @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
 async def handle_message(msg: ConsumerRecord):
     # Automatically prevents duplicate processing
+    # Header-first processing: Complete headers skip JSON parsing
     pass
 
 # Background task startup (startup_setup.py)
@@ -179,6 +196,8 @@ app.extensions["relay_worker"] = relay_worker
 # Transactional outbox for reliable event publishing
 # Shared DB session ensures atomicity with domain operations
 ```
+
+**Header Automation**: OutboxManager automatically adds Kafka headers (`event_id`, `event_type`, `trace_id`, `source_service`) enabling consuming services to skip JSON parsing during idempotency processing.
 
 ### 4.9. Observability Middleware Setup
 ```python  
