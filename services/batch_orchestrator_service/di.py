@@ -17,7 +17,9 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPubli
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
-from huleedu_service_libs.resilience.resilient_client import make_resilient
+from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (
+    CircuitBreakerBatchConductorClient,
+)
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -310,7 +312,7 @@ class ExternalClientsProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("batch_conductor")
             if circuit_breaker:
-                return make_resilient(base_client, circuit_breaker)
+                return CircuitBreakerBatchConductorClient(base_client, circuit_breaker)
 
         return base_client
 

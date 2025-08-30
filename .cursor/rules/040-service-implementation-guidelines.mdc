@@ -128,7 +128,7 @@ def provide_external_client(
     base_client = ExternalClientImpl(settings)
     if settings.CIRCUIT_BREAKER_ENABLED:
         breaker = circuit_breaker_registry.get("external_client")
-        return make_resilient(base_client, breaker)
+        return CircuitBreakerExternalClient(base_client, breaker)
     return base_client
 ```
 

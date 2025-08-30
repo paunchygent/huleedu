@@ -13,7 +13,7 @@ import pytest
 from aiohttp import ClientError, ClientSession
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerError
-from huleedu_service_libs.resilience.resilient_client import make_resilient
+from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import CircuitBreakerBatchConductorClient
 
 from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
@@ -59,7 +59,7 @@ async def test_circuit_breaker_opens_after_failures(
 
     # Create client and wrap with circuit breaker
     base_client = BatchConductorClientImpl(mock_session, mock_settings)
-    resilient_client = make_resilient(base_client, circuit_breaker)
+    resilient_client = CircuitBreakerBatchConductorClient(base_client, circuit_breaker)
 
     # First two calls should fail with ValueError (from the client)
     for i in range(2):
@@ -115,7 +115,7 @@ async def test_circuit_breaker_recovers_after_timeout(
 
     # Create resilient client
     base_client = BatchConductorClientImpl(mock_session, mock_settings)
-    resilient_client = make_resilient(base_client, circuit_breaker)
+    resilient_client = CircuitBreakerBatchConductorClient(base_client, circuit_breaker)
 
     # Fail twice to open circuit
     for _ in range(2):
@@ -175,7 +175,7 @@ async def test_circuit_breaker_transparent_when_service_healthy(mock_settings: S
 
     # Create resilient client
     base_client = BatchConductorClientImpl(mock_session, mock_settings)
-    resilient_client = make_resilient(base_client, circuit_breaker)
+    resilient_client = CircuitBreakerBatchConductorClient(base_client, circuit_breaker)
 
     # Make multiple successful calls
     for i in range(10):
@@ -211,7 +211,7 @@ async def test_circuit_breaker_handles_different_error_types(mock_settings: Sett
     mock_session.post.return_value.__aenter__.return_value = mock_response
 
     base_client = BatchConductorClientImpl(mock_session, mock_settings)
-    resilient_client = make_resilient(base_client, circuit_breaker)
+    resilient_client = CircuitBreakerBatchConductorClient(base_client, circuit_breaker)
 
     # These failures won't open the circuit (wrong exception type)
     for i in range(3):

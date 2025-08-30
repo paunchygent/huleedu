@@ -23,7 +23,9 @@ class TestIdempotentConsumerDuplicateDetection:
         msg: ConsumerRecord = create_mock_kafka_message(sample_event_data)
         tracker = HandlerCallTracker()
 
-        config = IdempotencyConfig(service_name="test-service", default_ttl=3600, enable_debug_logging=True)
+        config = IdempotencyConfig(
+            service_name="test-service", default_ttl=3600, enable_debug_logging=True
+        )
 
         @idempotent_consumer(redis_client=mock_redis_client, config=config)
         async def handler(msg: ConsumerRecord, *, confirm_idempotency, **kwargs) -> str:
@@ -56,8 +58,12 @@ class TestIdempotentConsumerDuplicateDetection:
         from huleedu_service_libs.event_utils import generate_deterministic_event_id
 
         deterministic_id = generate_deterministic_event_id(msg.value)
-        redis_key = config.generate_redis_key(sample_event_data["event_type"], sample_event_data["event_id"], deterministic_id)
-        mock_redis_client.keys[redis_key] = json.dumps({"status": "completed", "processed_at": datetime.now(UTC).timestamp()})
+        redis_key = config.generate_redis_key(
+            sample_event_data["event_type"], sample_event_data["event_id"], deterministic_id
+        )
+        mock_redis_client.keys[redis_key] = json.dumps(
+            {"status": "completed", "processed_at": datetime.now(UTC).timestamp()}
+        )
 
         tracker = HandlerCallTracker()
 
@@ -73,7 +79,9 @@ class TestIdempotentConsumerDuplicateDetection:
         assert len(mock_redis_client.set_calls) == 0
 
     @pytest.mark.asyncio
-    async def test_idempotent_consumer_deterministic_key_same_event_same_key(self, mock_redis_client) -> None:
+    async def test_idempotent_consumer_deterministic_key_same_event_same_key(
+        self, mock_redis_client
+    ) -> None:
         """Identical event_id+data yields the same Redis key; second is skipped as duplicate."""
         fixed_event_id = str(uuid.uuid4())
         event_data = {
@@ -106,7 +114,9 @@ class TestIdempotentConsumerDuplicateDetection:
         assert tracker.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_idempotent_consumer_different_data_different_keys(self, mock_redis_client) -> None:
+    async def test_idempotent_consumer_different_data_different_keys(
+        self, mock_redis_client
+    ) -> None:
         """Different events produce different keys and both are processed."""
         event_data_1 = {
             "event_id": str(uuid.uuid4()),
@@ -166,4 +176,3 @@ class TestIdempotentConsumerDuplicateDetection:
 
         assert res1 == f"tracked_result_{msg1.offset}"
         assert res2 is None  # Duplicate by event_id+data; locale chars should not matter
-

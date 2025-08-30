@@ -11,7 +11,10 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
-from huleedu_service_libs.resilience.resilient_client import make_resilient
+from services.api_gateway_service.implementations.circuit_breaker_http_client import (
+    ApiGatewayCircuitBreakerHttpClient,
+)
+from services.api_gateway_service.implementations.http_client import ApiGatewayHttpClient
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
 from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
@@ -32,12 +35,16 @@ class ApiGatewayProvider(Provider):
     async def get_http_client(
         self, config: Settings, registry: CircuitBreakerRegistry
     ) -> AsyncIterator[HttpClientProtocol]:
+        # Create httpx AsyncClient with proper timeouts
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(
                 config.HTTP_CLIENT_TIMEOUT_SECONDS,
                 connect=config.HTTP_CLIENT_CONNECT_TIMEOUT_SECONDS,
             )
-        ) as client:
+        ) as httpx_client:
+            # Create API Gateway's HTTP client implementation
+            base_client = ApiGatewayHttpClient(httpx_client)
+
             if config.CIRCUIT_BREAKER_ENABLED:
                 # Create circuit breaker for HTTP client
                 circuit_breaker = CircuitBreaker(
@@ -50,9 +57,9 @@ class ApiGatewayProvider(Provider):
                     expected_exception=httpx.HTTPError,
                 )
                 registry.register("http_client", circuit_breaker)
-                yield make_resilient(client, circuit_breaker)
+                yield ApiGatewayCircuitBreakerHttpClient(base_client, circuit_breaker)
             else:
-                yield client
+                yield base_client
 
     @provide
     async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:

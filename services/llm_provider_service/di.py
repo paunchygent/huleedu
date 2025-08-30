@@ -17,7 +17,9 @@ from huleedu_service_libs.queue_redis_client import QueueRedisClient
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
-from huleedu_service_libs.resilience.resilient_client import make_resilient
+from services.llm_provider_service.implementations.circuit_breaker_llm_provider import (
+    CircuitBreakerLLMProvider,
+)
 
 from services.llm_provider_service.config import Settings, settings
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
@@ -258,7 +260,7 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("llm_anthropic")
             if circuit_breaker:
-                return make_resilient(base_provider, circuit_breaker)
+                return CircuitBreakerLLMProvider(base_provider, circuit_breaker)
 
         return base_provider
 
@@ -285,7 +287,7 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("llm_openai")
             if circuit_breaker:
-                return make_resilient(base_provider, circuit_breaker)
+                return CircuitBreakerLLMProvider(base_provider, circuit_breaker)
 
         return base_provider
 
@@ -312,7 +314,7 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("llm_google")
             if circuit_breaker:
-                return make_resilient(base_provider, circuit_breaker)
+                return CircuitBreakerLLMProvider(base_provider, circuit_breaker)
 
         return base_provider
 
@@ -339,7 +341,7 @@ class LLMProviderServiceProvider(Provider):
         if settings.CIRCUIT_BREAKER_ENABLED:
             circuit_breaker = circuit_breaker_registry.get("llm_openrouter")
             if circuit_breaker:
-                return make_resilient(base_provider, circuit_breaker)
+                return CircuitBreakerLLMProvider(base_provider, circuit_breaker)
 
         return base_provider
 

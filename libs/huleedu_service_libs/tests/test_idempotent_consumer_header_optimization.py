@@ -25,7 +25,7 @@ class TestIdempotentConsumerHeaderOptimization:
             "source_service": sample_event_data["source_service"],
         }
         msg = create_mock_kafka_message(sample_event_data, headers=headers)
-        
+
         tracker = HandlerCallTracker()
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
@@ -38,7 +38,7 @@ class TestIdempotentConsumerHeaderOptimization:
         result = await handler(msg)
         assert result == f"tracked_result_{msg.offset}"
         assert tracker.call_count == 1
-        
+
         # Verify Redis key was created (processing state)
         assert len(mock_redis_client.set_calls) == 1
         # Verify completion state was set
@@ -55,7 +55,7 @@ class TestIdempotentConsumerHeaderOptimization:
             "source_service": sample_event_data["source_service"],
         }
         msg = create_mock_kafka_message(sample_event_data, headers=headers)
-        
+
         tracker = HandlerCallTracker()
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
@@ -76,16 +76,16 @@ class TestIdempotentConsumerHeaderOptimization:
         """Header-based and JSON-based paths generate different deterministic keys (by design)."""
         event_id = str(uuid.uuid4())
         event_type = "test.deterministic.v1"
-        
+
         # First message: JSON-only (no headers) - includes data in hash
         json_data = {
             "event_id": event_id,
             "event_type": event_type,
             "source_service": "test-service",
-            "data": {"field": "value"}
+            "data": {"field": "value"},
         }
         msg1 = create_mock_kafka_message(json_data, headers=None, offset=401)
-        
+
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
         tracker = HandlerCallTracker()
 
@@ -99,7 +99,7 @@ class TestIdempotentConsumerHeaderOptimization:
         res1 = await handler(msg1)
         assert res1 == f"tracked_result_{msg1.offset}"
         assert tracker.call_count == 1
-        
+
         # Reset tracker and create second message with headers
         tracker.reset()
         headers = {
@@ -108,7 +108,7 @@ class TestIdempotentConsumerHeaderOptimization:
             "source_service": "test-service",
         }
         msg2 = create_mock_kafka_message(json_data, headers=headers, offset=402)
-        
+
         # Process second message - should NOT be duplicate because header path uses different hash
         res2 = await handler(msg2)
         assert res2 == f"tracked_result_{msg2.offset}"  # Should process as different message
@@ -124,10 +124,10 @@ class TestIdempotentConsumerHeaderOptimization:
             "event_type": sample_event_data["event_type"],
             "source_service": sample_event_data["source_service"],
         }
-        
+
         msg1 = create_mock_kafka_message(sample_event_data, headers=headers, offset=501)
         msg2 = create_mock_kafka_message(sample_event_data, headers=headers, offset=502)
-        
+
         tracker = HandlerCallTracker()
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
 
@@ -140,45 +140,44 @@ class TestIdempotentConsumerHeaderOptimization:
         # Process first message
         res1 = await handler(msg1)
         assert res1 == f"tracked_result_{msg1.offset}"
-        
+
         # Process second message (should be duplicate)
         res2 = await handler(msg2)
         assert res2 is None
         assert tracker.call_count == 1  # Only first message processed
 
     @pytest.mark.asyncio
-    async def test_idempotent_consumer_mixed_header_scenarios(
-        self, mock_redis_client
-    ) -> None:
+    async def test_idempotent_consumer_mixed_header_scenarios(self, mock_redis_client) -> None:
         """Test various header completeness scenarios."""
         base_data = {
             "event_id": str(uuid.uuid4()),
             "event_type": "test.mixed.v1",
             "source_service": "test-service",
-            "data": {"test": "value"}
+            "data": {"test": "value"},
         }
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
-        
+
         test_cases = [
             # (description, headers, should_process)
             ("No headers", None, True),
             ("Empty headers", {}, True),
             ("Only event_id", {"event_id": base_data["event_id"]}, True),
             ("Only event_type", {"event_type": base_data["event_type"]}, True),
-            ("Complete headers", {
-                "event_id": base_data["event_id"],
-                "event_type": base_data["event_type"]
-            }, True),
+            (
+                "Complete headers",
+                {"event_id": base_data["event_id"], "event_type": base_data["event_type"]},
+                True,
+            ),
         ]
-        
+
         for i, (desc, headers, should_process) in enumerate(test_cases):
             # Use unique event_id for each test case to avoid duplicates
             test_data = base_data.copy()
             test_data["event_id"] = str(uuid.uuid4())
-            
+
             if headers and "event_id" in headers:
                 headers["event_id"] = test_data["event_id"]
-                
+
             msg = create_mock_kafka_message(test_data, headers=headers, offset=600 + i)
             tracker = HandlerCallTracker()
 
@@ -189,7 +188,7 @@ class TestIdempotentConsumerHeaderOptimization:
                 return result
 
             result = await handler(msg)
-            
+
             if should_process:
                 assert result == f"tracked_result_{msg.offset}", f"Failed for: {desc}"
                 assert tracker.call_count == 1, f"Handler not called for: {desc}"
@@ -206,7 +205,7 @@ class TestIdempotentConsumerHeaderOptimization:
             "event_type": sample_event_data["event_type"],
             "source_service": swedish_source_service,  # Contains åäöÅÄÖ
         }
-        
+
         msg = create_mock_kafka_message(sample_event_data, headers=headers)
         tracker = HandlerCallTracker()
         config = IdempotencyConfig(service_name="test-service", default_ttl=3600)
@@ -220,7 +219,7 @@ class TestIdempotentConsumerHeaderOptimization:
         result = await handler(msg)
         assert result == f"tracked_result_{msg.offset}"
         assert tracker.call_count == 1
-        
+
         # Should process successfully despite Swedish characters
         assert len(mock_redis_client.set_calls) == 1
         assert len(mock_redis_client.setex_calls) == 1

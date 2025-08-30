@@ -70,9 +70,7 @@ class TestIdempotentConsumerErrorHandling:
         assert len(mock_redis_client.delete_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_idempotent_consumer_invalid_json_fails_open(
-        self, mock_redis_client
-    ) -> None:
+    async def test_idempotent_consumer_invalid_json_fails_open(self, mock_redis_client) -> None:
         """Invalid JSON causes fail-open: handler executes with noop confirm."""
         # Create a ConsumerRecord with invalid JSON body
         bad_value = b"{not-json}"
@@ -102,4 +100,3 @@ class TestIdempotentConsumerErrorHandling:
         # No Redis operations should occur on invalid JSON path
         assert len(mock_redis_client.set_calls) == 0
         assert len(mock_redis_client.delete_calls) == 0
-

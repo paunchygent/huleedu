@@ -130,4 +130,3 @@ def create_mock_kafka_message(
         serialized_key_size=len(key.encode("utf-8")),
         serialized_value_size=len(message_json),
     )
-

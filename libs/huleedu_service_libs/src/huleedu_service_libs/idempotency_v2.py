@@ -154,18 +154,18 @@ def idempotent_consumer(
                 source_service = None
                 headers_used = False
 
-                if hasattr(msg, 'headers') and msg.headers:
+                if hasattr(msg, "headers") and msg.headers:
                     # Robust decoding for both str and bytes keys
                     headers_dict = {}
                     for k, v in msg.headers:
-                        key = k.decode('utf-8') if isinstance(k, bytes) else k
-                        value = v.decode('utf-8') if v else None
+                        key = k.decode("utf-8") if isinstance(k, bytes) else k
+                        value = v.decode("utf-8") if v else None
                         headers_dict[key] = value
 
-                    event_id = headers_dict.get('event_id')
-                    event_type = headers_dict.get('event_type')
-                    correlation_id = headers_dict.get('trace_id')  # trace_id is correlation_id
-                    source_service = headers_dict.get('source_service')
+                    event_id = headers_dict.get("event_id")
+                    event_type = headers_dict.get("event_type")
+                    correlation_id = headers_dict.get("trace_id")  # trace_id is correlation_id
+                    source_service = headers_dict.get("source_service")
 
                     headers_used = bool(event_id and event_type)  # Track full header usage
 
@@ -194,8 +194,8 @@ def idempotent_consumer(
                     # but avoid JSON parsing by using header values directly
                     hash_input = {"event_id": event_id}
                     # For headers, we don't have easy access to data, so use event_id only
-                    hash_data = json.dumps(hash_input, sort_keys=True, separators=(',', ':'))
-                    deterministic_hash = hashlib.sha256(hash_data.encode('utf-8')).hexdigest()
+                    hash_data = json.dumps(hash_input, sort_keys=True, separators=(",", ":"))
+                    deterministic_hash = hashlib.sha256(hash_data.encode("utf-8")).hexdigest()
                 else:
                     # Fallback: use existing proven logic for backward compatibility
                     deterministic_hash = generate_deterministic_event_id(msg.value)

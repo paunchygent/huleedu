@@ -12,7 +12,9 @@ class TestIdempotentConsumerTTLBehavior:
     """Tests TTL selection for processing and completion states."""
 
     @pytest.mark.asyncio
-    async def test_idempotent_consumer_processing_state_uses_short_ttl(self, mock_redis_client, sample_event_data) -> None:
+    async def test_idempotent_consumer_processing_state_uses_short_ttl(
+        self, mock_redis_client, sample_event_data
+    ) -> None:
         """Initial processing state must use 300s TTL to allow recovery from crashes."""
         msg: ConsumerRecord = create_mock_kafka_message(sample_event_data)
         config = IdempotencyConfig(service_name="test-service")
@@ -56,4 +58,3 @@ class TestIdempotentConsumerTTLBehavior:
         assert len(mock_redis_client.setex_calls) == 1
         key, ttl, _ = mock_redis_client.setex_calls[0]
         assert ttl == expected_ttl
-

@@ -4,13 +4,8 @@ This module provides dependency injection providers for the shared HTTP
 client utilities, following HuleEdu's established DI patterns with Dishka.
 """
 
-from typing import Optional
-
 from aiohttp import ClientSession
 from dishka import Provider, Scope, provide
-
-from huleedu_service_libs.resilience import CircuitBreakerRegistry
-from huleedu_service_libs.resilience.resilient_client import make_resilient
 
 from .base_client import BaseHttpClient
 from .config import ContentServiceConfig, HttpClientConfig
@@ -70,27 +65,21 @@ class ContentServiceClientProvider(Provider):
         self,
         http_client: HttpClientProtocol,
         content_service_config: ContentServiceConfig,
-        circuit_breaker_registry: Optional[CircuitBreakerRegistry] = None,
     ) -> ContentServiceClientProtocol:
-        """Provide Content Service client with optional circuit breaker.
+        """Provide base Content Service client.
 
         Args:
             http_client: Base HTTP client for making requests
             content_service_config: Configuration for Content Service operations
-            circuit_breaker_registry: Optional circuit breaker registry for resilience
 
         Returns:
             Content Service client protocol implementation
+            
+        Note:
+            Services should wrap this with CircuitBreakerContentServiceClient
+            in their own DI if circuit breaker protection is needed.
         """
-        client = ContentServiceClient(http_client=http_client, config=content_service_config)
-
-        # Wrap with circuit breaker if available and configured
-        if circuit_breaker_registry:
-            breaker = circuit_breaker_registry.get("content_service")
-            if breaker:
-                return make_resilient(client, breaker)
-
-        return client
+        return ContentServiceClient(http_client=http_client, config=content_service_config)
 
 
 class ContentServiceConfigProvider(Provider):

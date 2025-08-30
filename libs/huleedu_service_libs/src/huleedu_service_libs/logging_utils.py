@@ -20,14 +20,7 @@ import sys
 from typing import Any
 
 import structlog
-try:
-    # structlog >= 23
-    from structlog.typing import Processor
-except Exception:  # Fallback for environments without structlog.typing
-    from typing import Protocol
-
-    class Processor(Protocol):
-        def __call__(self, logger: Any, name: str, event_dict: Any) -> Any: ...
+from structlog.typing import Processor
 from common_core.events.envelope import EventEnvelope
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
 

@@ -32,4 +32,3 @@ def sample_event_data() -> Dict[str, str]:
 def swedish_source_service() -> str:
     """Swedish characters to validate locale handling where applicable."""
     return "fil_tjänst_ÅÄÖ"
-
