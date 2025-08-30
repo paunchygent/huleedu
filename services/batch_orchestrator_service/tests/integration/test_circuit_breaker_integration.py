@@ -18,7 +18,7 @@ from services.batch_orchestrator_service.config import Settings
 from services.batch_orchestrator_service.implementations.batch_conductor_client_impl import (
     BatchConductorClientImpl,
 )
-from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (
+from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (  # noqa: E501
     CircuitBreakerBatchConductorClient,
 )
 

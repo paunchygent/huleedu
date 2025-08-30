@@ -93,10 +93,10 @@ class EventPublisherImpl(EventPublisherProtocol):
 
         # Determine topic and deterministic event_id
         event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED)
-        deterministic_id = uuid5(
-            NAMESPACE_OID,
-            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        payload_json = json.dumps(
+            event_data.model_dump(mode="json", exclude_none=True), sort_keys=True
         )
+        deterministic_id = uuid5(NAMESPACE_OID, f"{event_topic}:{payload_json}")
 
         # Safe correlation UUID propagation (derive stable UUID if not a valid UUID)
         try:
@@ -180,10 +180,10 @@ class EventPublisherImpl(EventPublisherProtocol):
 
         # Determine topic and deterministic event_id
         event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED)
-        deterministic_id = uuid5(
-            NAMESPACE_OID,
-            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        payload_json = json.dumps(
+            event_data.model_dump(mode="json", exclude_none=True), sort_keys=True
         )
+        deterministic_id = uuid5(NAMESPACE_OID, f"{event_topic}:{payload_json}")
 
         # Safe correlation UUID propagation
         try:
@@ -272,10 +272,10 @@ class EventPublisherImpl(EventPublisherProtocol):
 
         # Determine topic and deterministic event_id
         event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED)
-        deterministic_id = uuid5(
-            NAMESPACE_OID,
-            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        payload_json = json.dumps(
+            event_data.model_dump(mode="json", exclude_none=True), sort_keys=True
         )
+        deterministic_id = uuid5(NAMESPACE_OID, f"{event_topic}:{payload_json}")
 
         # Safe correlation UUID propagation
         try:

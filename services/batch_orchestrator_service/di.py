@@ -51,7 +51,7 @@ from services.batch_orchestrator_service.implementations.batch_repository_postgr
 from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
     BatchValidationErrorsHandler,
 )
-from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (
+from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (  # noqa: E501
     CircuitBreakerBatchConductorClient,
 )
 from services.batch_orchestrator_service.implementations.cj_assessment_initiator_impl import (
