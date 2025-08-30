@@ -237,8 +237,7 @@ class TestContentOperationsWithCircuitBreaker:
 
 
 class TestProtocolCompliance:
-    """Test CircuitBreakerContentServiceClient properly implements ContentServiceClientProtocol.
-    """
+    """Test CircuitBreakerContentServiceClient properly implements ContentServiceClientProtocol."""
 
     def test_implements_protocol(
         self, circuit_breaker_client: CircuitBreakerContentServiceClient

@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.envelope import EventEnvelope
+from common_core.events.resource_consumption_events import ResourceConsumptionV1
 from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
@@ -146,5 +149,39 @@ class CJEventPublisherImpl(CJEventPublisherProtocol):
                 "correlation_id": str(correlation_id),
                 "aggregate_id": aggregate_id,
                 "topic": self.settings.ASSESSMENT_RESULT_TOPIC,
+            },
+        )
+
+    async def publish_resource_consumption(
+        self,
+        resource_event: Any,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish ResourceConsumptionV1 using TRUE OUTBOX PATTERN."""
+        aggregate_id = str(correlation_id)
+        try:
+            # resource_event is EventEnvelope[ResourceConsumptionV1]
+            if isinstance(resource_event, EventEnvelope) and hasattr(resource_event, "data"):
+                data = resource_event.data
+                if isinstance(data, ResourceConsumptionV1) and data.entity_id:
+                    aggregate_id = str(data.entity_id)
+        except Exception:
+            pass
+
+        topic = topic_name(ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED)
+        await self.outbox_manager.publish_to_outbox(
+            aggregate_type="resource_consumption",
+            aggregate_id=aggregate_id,
+            event_type=topic,
+            event_data=resource_event,
+            topic=topic,
+        )
+
+        logger.info(
+            "ResourceConsumptionV1 stored in outbox",
+            extra={
+                "correlation_id": str(correlation_id),
+                "aggregate_id": aggregate_id,
+                "topic": topic,
             },
         )

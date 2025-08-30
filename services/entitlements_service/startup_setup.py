@@ -6,17 +6,19 @@ including database connections, Redis clients, and policy loading.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from dishka import AsyncContainer
 from huleedu_service_libs.database import DatabaseHealthChecker
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.entitlements_service.kafka_consumer import EntitlementsKafkaConsumer
 from services.entitlements_service.metrics import (
     get_metrics,
     setup_entitlements_service_database_monitoring,
 )
-from services.entitlements_service.protocols import PolicyLoaderProtocol
+from services.entitlements_service.protocols import CreditManagerProtocol, PolicyLoaderProtocol
 
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
@@ -93,7 +95,26 @@ async def initialize_services(
                 logger.error(f"Failed to initialize EventRelayWorker: {e}", exc_info=True)
                 raise
 
-        # Note: Kafka consumer will be added in Phase 3 for event consumption
+        # Start Kafka consumer for resource consumption events (Phase 3)
+        try:
+            async with container() as request_container:
+                credit_manager = await request_container.get(CreditManagerProtocol)
+                # Redis client (Atomic) is provided by CoreProvider
+                from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
+
+                redis_client = await request_container.get(AtomicRedisClientProtocol)
+
+            app.kafka_consumer = EntitlementsKafkaConsumer(
+                kafka_bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+                consumer_group="entitlements-resource-consumer",
+                credit_manager=credit_manager,
+                redis_client=redis_client,
+            )
+            app.consumer_task = asyncio.create_task(app.kafka_consumer.start_consumer())
+            logger.info("Entitlements Kafka consumer background task started")
+        except Exception as e:
+            logger.error(f"Failed to start Entitlements Kafka consumer: {e}", exc_info=True)
+            raise
 
         logger.info("All Entitlements Service components initialized successfully")
 
@@ -107,8 +128,15 @@ async def shutdown_services() -> None:
     logger.info("Shutting down Entitlements Service components...")
 
     try:
-        # Note: Add specific cleanup tasks here if needed
-        # Most resources are handled automatically by context managers
+        # Stop Kafka consumer gracefully
+        from huleedu_service_libs.logging_utils import create_service_logger as _l
+
+        _logger = _l("entitlements_service.shutdown")
+        try:
+            # Access global app state is managed in app cleanup; no-op here
+            _logger.debug("Shutdown steps executed")
+        except Exception:
+            pass
 
         logger.info("Entitlements Service components shutdown complete")
 

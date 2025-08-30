@@ -261,6 +261,19 @@ class CJEventPublisherProtocol(Protocol):
         """
         ...
 
+    async def publish_resource_consumption(
+        self,
+        resource_event: Any,
+        correlation_id: UUID,
+    ) -> None:
+        """Publish ResourceConsumptionV1 event using TRUE OUTBOX PATTERN.
+
+        Args:
+            resource_event: EventEnvelope[ResourceConsumptionV1]
+            correlation_id: Correlation ID for tracing
+        """
+        ...
+
 
 class LLMInteractionProtocol(Protocol):
     """Protocol for performing LLM-based essay comparisons."""

@@ -207,9 +207,9 @@ cache_ttl: 300      # Cache policies in Redis for 5 minutes
 4. ✅ Publish UsageRecordedV1 for usage analytics
 5. ✅ Updated tests with MockEventPublisher
 
-### 📋 **Phase 3: NOT STARTED** - Resource Consumption Events & Kafka Consumer
+### 🔄 **Phase 3: IN PROGRESS** - Resource Consumption Events & Kafka Consumer
 
-**Timeline**: Upcoming sprint
+**Timeline**: Current sprint
 **Purpose**: Consume credits based on actual resource consumption events
 
 **Architectural Decision**: Create dedicated `ResourceConsumptionV1` event
@@ -273,13 +273,13 @@ async def handle_resource_consumption(event: ResourceConsumptionV1):
 
 **Tasks**:
 
-1. ⏳ Create `ResourceConsumptionV1` event model in common_core
-2. ⏳ Add RESOURCE_CONSUMPTION_REPORTED to ProcessingEvent enum
-3. ⏳ Update CJ Assessment Service dual_event_publisher.py
-4. ⏳ Pass user_id/org_id through CJ Assessment workflow
-5. ⏳ Create EntitlementsKafkaConsumer class
-6. ⏳ Subscribe to topic: `huleedu.resource.consumption.v1`
-7. ⏳ Implement credit consumption handler
+1. ✅ Create `ResourceConsumptionV1` event model in common_core
+2. ✅ Add RESOURCE_CONSUMPTION_REPORTED to ProcessingEvent enum + topic mapping
+3. ⏳ Update CJ Assessment Service `dual_event_publisher.py` to publish resource events (est. quantity)
+4. ⏳ Pass user_id/org_id through CJ Assessment workflow (to publish precise identities)
+5. ✅ Create `EntitlementsKafkaConsumer` class
+6. ✅ Subscribe to topic: `huleedu.resource.consumption.v1`
+7. ✅ Implement credit consumption handler and start background task
 8. ⏳ Add consumer health checks and monitoring
 9. ⏳ Integration tests with testcontainers
 

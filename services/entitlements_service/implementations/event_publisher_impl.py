@@ -8,7 +8,7 @@ from credit operations using the transactional outbox pattern.
 import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from uuid import NAMESPACE_OID, UUID, uuid4, uuid5
+from uuid import NAMESPACE_OID, UUID, uuid5
 
 from common_core import (
     CreditBalanceChangedV1,
@@ -20,8 +20,8 @@ from common_core import (
     topic_name,
 )
 from common_core.entitlements_models import SubjectType
-from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.entitlements_service.protocols import EventPublisherProtocol
 

@@ -34,6 +34,7 @@ from .llm_provider_events import LLMComparisonResultV1, TokenUsage
 from .nlp_events import (
     StudentMatchSuggestion,
 )
+from .resource_consumption_events import ResourceConsumptionV1
 from .spellcheck_models import (
     SpellcheckMetricsV1,
     SpellcheckPhaseCompletedV1,
@@ -79,6 +80,7 @@ __all__ = [
     "SpellcheckRequestedDataV1",
     "SpellcheckResultDataV1",
     "SpellcheckResultV1",
+    "ResourceConsumptionV1",
     "StudentAssociation",
     "StudentAssociationConfirmation",
     "StudentAssociationsConfirmedV1",

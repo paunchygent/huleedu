@@ -18,8 +18,7 @@ class TestIdempotentConsumerDuplicateDetection:
     async def test_idempotent_consumer_first_time_processing_sets_processing_state(
         self, mock_redis_client, sample_event_data
     ) -> None:
-        """Processes first-time event, sets processing state key with TTL=300, and returns result.
-        """
+        """Processes first-time event, sets processing state key with TTL=300, and returns result."""
         msg: ConsumerRecord = create_mock_kafka_message(sample_event_data)
         tracker = HandlerCallTracker()
 

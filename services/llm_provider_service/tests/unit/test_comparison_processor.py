@@ -1,5 +1,4 @@
-"""Unit tests for ComparisonProcessorImpl - domain logic testing without infrastructure.
-"""
+"""Unit tests for ComparisonProcessorImpl - domain logic testing without infrastructure."""
 
 from __future__ import annotations
 
@@ -310,8 +309,7 @@ class TestSwedishCharacterHandling:
         # Arrange
         correlation_id = uuid4()
         justification = (
-            "Essä B visar bättre förståelse av ämnet och "
-            "använder mer precisa svenska uttryck."
+            "Essä B visar bättre förståelse av ämnet och använder mer precisa svenska uttryck."
         )
         swedish_response = LLMProviderResponse(
             winner=EssayComparisonWinner.ESSAY_B,

@@ -128,8 +128,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             # Setup metrics middleware
             setup_standard_service_metrics_middleware(app, "entitlements")
 
-            # Note: Kafka consumer will be added in Phase 2
-            # For now, we're API-only
+            # Kafka consumer is started in startup_setup.initialize_services
 
             logger.info("Entitlements Service started successfully")
             logger.info("Health endpoint: /healthz")
@@ -152,7 +151,17 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
                 await app.relay_worker.stop()
                 logger.info("EventRelayWorker stopped")
 
-            # Note: Kafka consumer cleanup will be added in Phase 2
+            # Stop Kafka consumer if configured
+            if app.kafka_consumer:
+                logger.info("Stopping Kafka consumer...")
+                await app.kafka_consumer.stop_consumer()
+            if app.consumer_task and not app.consumer_task.done():
+                logger.info("Cancelling Kafka consumer task...")
+                app.consumer_task.cancel()
+                try:
+                    await app.consumer_task
+                except Exception:
+                    pass
 
             # Additional cleanup
             await shutdown_services()

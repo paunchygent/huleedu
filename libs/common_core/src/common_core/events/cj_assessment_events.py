@@ -203,8 +203,7 @@ class EssayResultV1(BaseModel):
     display_name: str | None = Field(
         default=None,
         description=(
-            "Human-readable display name for UI purposes "
-            "(e.g., 'ANCHOR GRADE A' for anchors)"
+            "Human-readable display name for UI purposes (e.g., 'ANCHOR GRADE A' for anchors)"
         ),
     )
 

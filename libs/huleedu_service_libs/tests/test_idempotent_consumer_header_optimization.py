@@ -16,8 +16,7 @@ class TestIdempotentConsumerHeaderOptimization:
     async def test_idempotent_consumer_header_only_skips_json_parsing(
         self, mock_redis_client, sample_event_data
     ) -> None:
-        """When headers contain event_id + event_type, JSON parsing is skipped (headers_used=True).
-        """
+        """When headers contain event_id + event_type, JSON parsing is skipped (headers_used=True)."""
         # Create message with complete headers
         headers = {
             "event_id": sample_event_data["event_id"],
