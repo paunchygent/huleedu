@@ -253,52 +253,51 @@ async def publish_dual_assessment_events(
         # Compute estimated comparisons (includes student-only to avoid anchors inflating counts)
         comparisons_estimated = len(student_rankings) * (len(student_rankings) - 1) // 2
 
-        # Attempt to resolve identities from batch_upload when available
+        # Extract identities from batch_upload (now threaded through workflow)
         user_id = getattr(batch_upload, "user_id", None)
         org_id = getattr(batch_upload, "org_id", None)
 
-        if user_id:
-            resource_event = ResourceConsumptionV1(
-                entity_id=bos_batch_id,
-                entity_type="batch",
-                user_id=str(user_id),
-                org_id=str(org_id) if org_id else None,
-                resource_type="cj_comparison",
-                quantity=comparisons_estimated,
-                service_name=settings.SERVICE_NAME,
-                processing_id=cj_batch_id,
-                consumed_at=datetime.now(UTC),
-            )
+        if not user_id:
+            raise ValueError(f"user_id not available for batch {cj_batch_id} - identity threading failed")
 
-            resource_envelope = EventEnvelope[ResourceConsumptionV1](
-                event_type=topic_name(ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED),
-                event_timestamp=datetime.now(UTC),
-                source_service=settings.SERVICE_NAME,
-                correlation_id=correlation_id,
-                data=resource_event,
-                metadata={},
-            )
+        resource_event = ResourceConsumptionV1(
+            entity_id=bos_batch_id,
+            entity_type="batch",
+            user_id=str(user_id),
+            org_id=str(org_id) if org_id else None,
+            resource_type="cj_comparison",
+            quantity=comparisons_estimated,
+            service_name=settings.SERVICE_NAME,
+            processing_id=cj_batch_id,
+            consumed_at=datetime.now(UTC),
+        )
 
-            if resource_envelope.metadata is not None:
-                inject_trace_context(resource_envelope.metadata)
+        resource_envelope = EventEnvelope[ResourceConsumptionV1](
+            event_type=topic_name(ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED),
+            event_timestamp=datetime.now(UTC),
+            source_service=settings.SERVICE_NAME,
+            correlation_id=correlation_id,
+            data=resource_event,
+            metadata={},
+        )
 
-            await event_publisher.publish_resource_consumption(
-                resource_event=resource_envelope, correlation_id=correlation_id
-            )
+        if resource_envelope.metadata is not None:
+            inject_trace_context(resource_envelope.metadata)
 
-            logger.info(
-                "Published resource consumption event for CJ comparisons",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "batch_id": cj_batch_id,
-                    "quantity": comparisons_estimated,
-                },
-            )
-        else:
-            logger.info(
-                "Skipping ResourceConsumptionV1: user_id not available on batch_upload",
-                extra={"batch_id": cj_batch_id},
-            )
+        await event_publisher.publish_resource_consumption(
+            resource_event=resource_envelope, correlation_id=correlation_id
+        )
+
+        logger.info(
+            "Published resource consumption event for CJ comparisons",
+            extra={
+                "correlation_id": str(correlation_id),
+                "batch_id": cj_batch_id,
+                "quantity": comparisons_estimated,
+                "user_id": user_id,
+                "org_id": org_id,
+            },
+        )
     except Exception as e:
         logger.warning(
             f"Failed to publish ResourceConsumptionV1: {e}",

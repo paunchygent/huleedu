@@ -250,6 +250,9 @@ async def _process_cj_assessment_impl(
             "course_code": request_event_data.course_code,
             "essay_instructions": request_event_data.essay_instructions,
             "llm_config_overrides": request_event_data.llm_config_overrides,
+            # Identity fields for credit attribution (Phase 3: Entitlements integration)
+            "user_id": request_event_data.user_id,
+            "org_id": request_event_data.org_id,
         }
 
         logger.info(

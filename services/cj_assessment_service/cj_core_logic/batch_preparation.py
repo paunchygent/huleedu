@@ -51,6 +51,9 @@ async def create_cj_batch(
         essay_instructions = request_data.get("essay_instructions", "")
         essays_to_process = request_data.get("essays_to_process", [])
         assignment_id = request_data.get("assignment_id")  # For anchor essay lookup
+        # Identity fields for credit attribution (Phase 3: Entitlements integration)
+        user_id = request_data.get("user_id")
+        org_id = request_data.get("org_id")
 
         if not bos_batch_id or not essays_to_process:
             raise ValueError("Missing required fields: bos_batch_id or essays_to_process")
@@ -65,6 +68,8 @@ async def create_cj_batch(
             essay_instructions=essay_instructions,
             initial_status=CJBatchStatusEnum.PENDING,
             expected_essay_count=len(essays_to_process),
+            user_id=user_id,
+            org_id=org_id,
         )
 
         # Store assignment_id if provided

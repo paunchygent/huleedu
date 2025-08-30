@@ -117,6 +117,11 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
         max_length=100,
         description="Assignment context for grade projection",
     )
+    
+    # Identity fields for credit attribution (Phase 3: Entitlements integration)
+    user_id: str = Field(description="User who owns the assessment request")
+    org_id: str | None = Field(default=None, description="Organization, if applicable")
+    
     # class_designation: str  # Deferred (YAGNI)
 
 

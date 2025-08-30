@@ -156,6 +156,8 @@ class CJRepositoryProtocol(Protocol):
         essay_instructions: str,
         initial_status: Any,  # CJBatchStatusEnum
         expected_essay_count: int,
+        user_id: str | None = None,
+        org_id: str | None = None,
     ) -> Any:  # CJBatchUpload
         """Create a new CJ batch record."""
         ...

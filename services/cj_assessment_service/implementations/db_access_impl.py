@@ -99,6 +99,8 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         essay_instructions: str,
         initial_status: CJBatchStatusEnum,
         expected_essay_count: int,
+        user_id: str | None = None,
+        org_id: str | None = None,
     ) -> CJBatchUpload:
         """Create a new CJ assessment batch with its required state tracking."""
         from datetime import UTC, datetime
@@ -117,6 +119,8 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             status=initial_status,
             expected_essay_count=expected_essay_count,
             processing_metadata={},
+            user_id=user_id,
+            org_id=org_id,
         )
         session.add(cj_batch)
         await session.flush()  # Get the batch ID
