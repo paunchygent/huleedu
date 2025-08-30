@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -17,7 +18,7 @@ from common_core.identity_models import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.identity_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.identity_service.protocols import IdentityEventPublisherProtocol
 
 logger = create_service_logger("identity_service.event_publisher")
@@ -211,18 +212,28 @@ class DefaultIdentityEventPublisher(IdentityEventPublisherProtocol):
         self, user_id: str, jti: str, reason: str, correlation_id: UUID
     ) -> None:
         """Publish token revoked event."""
+        # Create event data
+        event_data = {
+            "user_id": user_id,
+            "jti": jti,
+            "reason": reason,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "correlation_id": str(correlation_id),
+        }
+        
+        # Create event envelope  
+        envelope = EventEnvelope[Any](
+            event_type="TokenRevokedV1",
+            source_service=self.source_service_name,
+            correlation_id=correlation_id,
+            data=event_data,
+        )
+        
         await self.outbox_manager.publish_to_outbox(
             aggregate_type="User",
             aggregate_id=user_id,
-            event_type="TokenRevokedV1",
-            event_data={
-                "user_id": user_id,
-                "jti": jti,
-                "reason": reason,
-                "timestamp": datetime.now(UTC).isoformat(),
-                "correlation_id": str(correlation_id),
-                "source_service": self.source_service_name,
-            },
+            event_type=envelope.event_type,
+            event_data=envelope,
             # Direct topic name until ProcessingEvent is updated
             topic="huleedu.identity.token.revoked.v1",
         )

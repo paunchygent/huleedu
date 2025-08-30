@@ -25,6 +25,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.identity_models import EmailVerifiedV1, LoginSucceededV1, UserRegisteredV1
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.outbox import EventOutbox, PostgreSQLOutboxRepository
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from sqlalchemy import func, select, text
@@ -37,7 +38,6 @@ from sqlalchemy.ext.asyncio import (
 from testcontainers.postgres import PostgresContainer
 
 from services.identity_service.config import Settings
-from services.identity_service.implementations.outbox_manager import OutboxManager
 from services.identity_service.models_db import Base, User
 
 
@@ -140,7 +140,7 @@ class TestEventPublishingIntegration:
         return OutboxManager(
             outbox_repository=outbox_repository,
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
     @pytest.mark.parametrize(
@@ -476,7 +476,7 @@ class TestEventPublishingIntegration:
         outbox_manager = OutboxManager(
             outbox_repository=None,  # type: ignore[arg-type]  # Testing misconfiguration scenario
             redis_client=mock_redis_client,
-            settings=test_settings,
+            service_name=test_settings.SERVICE_NAME,
         )
 
         correlation_id = uuid4()
@@ -542,4 +542,4 @@ class TestEventPublishingIntegration:
         )
 
         # Assert - Redis wake notification was sent
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "wake")

@@ -34,7 +34,7 @@ from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
 from services.identity_service.implementations.jwks_store import JwksStore
-from services.identity_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 from services.identity_service.implementations.password_hasher_impl import (
     Argon2idPasswordHasher,
 )
@@ -164,8 +164,12 @@ class IdentityImplementationsProvider(Provider):
         redis_client: AtomicRedisClientProtocol,
         settings: Settings,
     ) -> OutboxManager:
-        """Provide outbox manager for TRUE OUTBOX PATTERN."""
-        return OutboxManager(outbox_repository, redis_client, settings)
+        """Provide outbox manager for reliable event publishing."""
+        return OutboxManager(
+            outbox_repository=outbox_repository,
+            redis_client=redis_client,
+            service_name=settings.SERVICE_NAME,
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

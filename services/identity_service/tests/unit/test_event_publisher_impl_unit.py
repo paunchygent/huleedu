@@ -26,11 +26,11 @@ from common_core.identity_models import (
     UserRegisteredV1,
 )
 from huleedu_service_libs.error_handling import HuleEduError, create_test_huleedu_error
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
-from services.identity_service.implementations.outbox_manager import OutboxManager
 
 
 class TestDefaultIdentityEventPublisher:

@@ -12,12 +12,12 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
+from huleedu_service_libs.outbox.manager import OutboxManager
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 
 from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
-from services.identity_service.implementations.outbox_manager import OutboxManager
 from services.identity_service.metrics import (
     ACCOUNT_LOCKOUTS,
     ACTIVE_SESSIONS,
@@ -299,12 +299,12 @@ class TestTokenRevokedEventPublishing:
         assert call_kwargs["event_type"] == "TokenRevokedV1"
 
         # Verify event data
-        event_data = call_kwargs["event_data"]
-        assert event_data["correlation_id"] == str(correlation_id)
-        assert event_data["user_id"] == sample_token_data["user_id"]
-        assert event_data["jti"] == sample_token_data["jti"]
-        assert event_data["reason"] == sample_token_data["reason"]
-        assert "timestamp" in event_data
+        event_envelope = call_kwargs["event_data"]
+        assert event_envelope.correlation_id == correlation_id
+        assert event_envelope.data["user_id"] == sample_token_data["user_id"]
+        assert event_envelope.data["jti"] == sample_token_data["jti"]
+        assert event_envelope.data["reason"] == sample_token_data["reason"]
+        assert "timestamp" in event_envelope.data
 
     @pytest.mark.parametrize(
         "user_id, jti, reason",
@@ -335,11 +335,11 @@ class TestTokenRevokedEventPublishing:
 
         # Assert
         mock_outbox_manager.publish_to_outbox.assert_called_once()
-        event_data = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
+        event_envelope = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
 
-        assert event_data["user_id"] == user_id
-        assert event_data["jti"] == jti
-        assert event_data["reason"] == reason
+        assert event_envelope.data["user_id"] == user_id
+        assert event_envelope.data["jti"] == jti
+        assert event_envelope.data["reason"] == reason
 
     async def test_publish_token_revoked_includes_timestamp(
         self,
@@ -362,11 +362,11 @@ class TestTokenRevokedEventPublishing:
 
         # Assert
         after_time = datetime.now(UTC)
-        event_data = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
+        event_envelope = mock_outbox_manager.publish_to_outbox.call_args.kwargs["event_data"]
 
         # Verify timestamp is present and properly formatted
-        assert "timestamp" in event_data
-        timestamp_str = event_data["timestamp"]
+        assert "timestamp" in event_envelope.data
+        timestamp_str = event_envelope.data["timestamp"]
         assert isinstance(timestamp_str, str)
 
         # Verify timestamp is in ISO format and within expected range

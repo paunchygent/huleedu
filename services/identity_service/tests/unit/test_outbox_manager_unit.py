@@ -19,7 +19,7 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from pydantic import BaseModel
 
 from services.identity_service.config import Settings
-from services.identity_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 class MockEventData(BaseModel):
@@ -53,13 +53,12 @@ class TestOutboxManager:
         self,
         mock_outbox_repository: AsyncMock,
         mock_redis_client: AsyncMock,
-        mock_settings: AsyncMock,
     ) -> OutboxManager:
         """Create OutboxManager instance with mocked dependencies."""
         return OutboxManager(
             outbox_repository=mock_outbox_repository,
             redis_client=mock_redis_client,
-            settings=mock_settings,
+            service_name="identity_service",
         )
 
     @pytest.fixture
@@ -130,7 +129,7 @@ class TestOutboxManager:
         assert "åäö" in event_data["data"]["message"]
 
         # Assert - Redis notification sent
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
+        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "wake")
 
     async def test_publish_to_outbox_success_without_session(
         self,
@@ -228,15 +227,14 @@ class TestOutboxManager:
     async def test_publish_to_outbox_repository_not_configured(
         self,
         mock_redis_client: AsyncMock,
-        mock_settings: AsyncMock,
         sample_event_envelope: EventEnvelope[MockEventData],
     ) -> None:
         """Test HuleEduError raised when outbox repository is not configured."""
         # Arrange
         outbox_manager = OutboxManager(
-            outbox_repository=None,  # type: ignore  # Testing None scenario
+            outbox_repository=None,  # type: ignore[arg-type]  # Testing None scenario
             redis_client=mock_redis_client,
-            settings=mock_settings,
+            service_name="identity_service",
         )
 
         # Act & Assert
@@ -274,7 +272,7 @@ class TestOutboxManager:
                 aggregate_type="user",
                 aggregate_id="user_123",
                 event_type="huleedu.identity.test.v1",
-                event_data=invalid_event_data,
+                event_data=invalid_event_data,  # type: ignore[arg-type]  # Testing invalid event data
                 topic="identity_events",
             )
 
@@ -375,7 +373,7 @@ class TestOutboxManager:
                 aggregate_type="user",
                 aggregate_id="user_123",
                 event_type="huleedu.identity.test.v1",
-                event_data=invalid_event_data,
+                event_data=invalid_event_data,  # type: ignore[arg-type]  # Testing invalid object
                 topic="identity_events",
             )
 
@@ -409,35 +407,6 @@ class TestOutboxManager:
         # Assert - Repository operation completed successfully
         mock_outbox_repository.add_event.assert_called_once()
 
-    async def test_notify_relay_worker_success(
-        self,
-        outbox_manager: OutboxManager,
-        mock_redis_client: AsyncMock,
-    ) -> None:
-        """Test successful relay worker notification via Redis LPUSH."""
-        # Arrange
-        mock_redis_client.lpush.return_value = 1
-
-        # Act
-        await outbox_manager.notify_relay_worker()
-
-        # Assert
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
-
-    async def test_notify_relay_worker_redis_failure_logs_warning(
-        self,
-        outbox_manager: OutboxManager,
-        mock_redis_client: AsyncMock,
-    ) -> None:
-        """Test Redis failure in notify_relay_worker logs warning but does not raise."""
-        # Arrange
-        mock_redis_client.lpush.side_effect = Exception("Redis timeout")
-
-        # Act - Should not raise exception
-        await outbox_manager.notify_relay_worker()
-
-        # Assert
-        mock_redis_client.lpush.assert_called_once_with("outbox:wake:identity_service", "1")
 
     async def test_publish_to_outbox_serialization_preserves_swedish_characters(
         self,

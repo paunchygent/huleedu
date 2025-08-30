@@ -19,7 +19,7 @@ from common_core.identity_models import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.identity_service.implementations.outbox_manager import OutboxManager
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 logger = create_service_logger("identity_service.notification_orchestrator")
 
