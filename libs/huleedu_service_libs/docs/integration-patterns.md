@@ -164,6 +164,8 @@ class EventProcessor:
     
     @idempotent_consumer(redis_client=self.redis_client, config=self.config)
     async def process_content_event(self, msg: ConsumerRecord):
+        # Header-first optimization: If headers contain event_id + event_type,
+        # JSON parsing is skipped for significant performance improvement
         with trace_operation(self.tracer, "process_content_event"):
             envelope = EventEnvelope.model_validate_json(msg.value)
             

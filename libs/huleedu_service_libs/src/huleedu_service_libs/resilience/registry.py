@@ -16,7 +16,7 @@ logger = create_service_logger("circuit_breaker_registry")
 class CircuitBreakerRegistry:
     """Registry for managing multiple circuit breakers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._breakers: Dict[str, CircuitBreaker] = {}
         logger.info("CircuitBreakerRegistry initialized")
 

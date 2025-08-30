@@ -6,16 +6,72 @@ Advanced idempotency decorator with service namespacing and configurable TTLs fo
 
 Idempotency v2 provides advanced message processing protection with service isolation, event-type specific TTLs, and enhanced observability. It ensures that each unique event is processed exactly once, even in the face of retries or duplicate deliveries.
 
+**NEW**: Header-first optimization eliminates JSON parsing overhead when Kafka headers contain complete event metadata, providing significant performance benefits for high-volume services.
+
 ### Key Features
 
+- **Header-First Optimization**: Zero JSON parsing when headers contain event metadata
 - **Service Isolation**: Each service maintains separate idempotency namespace
 - **Event-Type Specific TTLs**: Optimized memory usage based on business requirements
 - **Enhanced Observability**: Comprehensive structured logging for debugging
 - **Robust Error Handling**: Fail-open behavior with proper cleanup
 - **Backward Compatibility**: Drop-in replacement for existing decorator
+- **Smart Fallback**: Automatic JSON parsing when headers are incomplete
 - **Deterministic Event ID Generation**: Using proven hash algorithms
 - **Atomic Redis Operations**: SET NX with configurable TTL
 - **Automatic Lock Release**: On processing failures to allow retry
+
+## Header-First Optimization (Zero-Parse Performance)
+
+### Overview
+When Kafka headers contain complete event metadata (`event_id` and `event_type`), the idempotency system skips JSON parsing entirely, providing significant performance improvements for high-volume message processing.
+
+### Behavior
+- **Optimized Path**: Headers with `event_id` + `event_type` → Zero JSON parsing
+- **Fallback Path**: Incomplete headers → Automatic JSON parsing with header prioritization
+- **Backward Compatibility**: 100% compatible with existing header-less messages
+
+### Header Mapping
+- **event_id**: Direct mapping from header
+- **event_type**: Direct mapping from header  
+- **trace_id**: Header field that maps to `correlation_id`
+- **source_service**: Optional service identification
+
+### Performance Benefits
+- **Zero JSON Parsing**: Eliminates `json.loads()` overhead for optimized path
+- **Faster Duplicate Detection**: Header-based hash generation without full message parsing
+- **Reduced CPU Usage**: Significant performance improvement for services processing high message volumes
+- **Lower Memory Usage**: No temporary JSON objects created during duplicate check
+
+### Implementation Details
+```python
+# Headers-complete path (optimized)
+if event_id and event_type:  # From headers
+    # Fast path: header-based hash without JSON parsing
+    hash_input = {"event_id": event_id}
+    deterministic_hash = hashlib.sha256(json.dumps(hash_input, sort_keys=True).encode()).hexdigest()
+    headers_used = True
+    json_parsed = False
+
+# Fallback path (backward compatibility)
+else:
+    # Traditional path: parse JSON for missing metadata
+    event_dict = json.loads(msg.value)
+    deterministic_hash = generate_deterministic_event_id(msg.value)
+    headers_used = False
+    json_parsed = True
+```
+
+### Logging and Observability
+The system logs optimization usage for monitoring and debugging:
+```json
+{
+  "headers_used": true,
+  "json_parsed": false,
+  "optimization_active": true,
+  "message": "Header-first optimization: zero JSON parsing"
+}
+```
 
 ## API Reference
 

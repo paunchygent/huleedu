@@ -9,7 +9,7 @@ import asyncio
 from datetime import datetime, timedelta
 
 # Import TYPE_CHECKING to avoid circular imports
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, Optional, Type, TypeVar
 
 from common_core import CircuitBreakerState
 from opentelemetry import trace
@@ -160,7 +160,7 @@ class CircuitBreaker:
                 if self.metrics:
                     self.metrics.increment_calls(self.name, "success", self.service_name)
 
-                return cast(T, result)
+                return result
 
             except self.expected_exception as e:
                 # Record failure

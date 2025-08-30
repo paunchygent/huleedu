@@ -53,10 +53,12 @@ async def publish_event(self, event_data, correlation_id, session=None):
         event_type="domain.event.v1",
         event_data=envelope,  # Pass original Pydantic envelope
         topic=topic,
+        # Headers automatically added for idempotency optimization
+        # (event_id, event_type, trace_id, source_service, etc.)
     )
     
-    # 3. Relay worker publishes from outbox asynchronously
-    # No direct Kafka calls - that defeats the purpose!
+    # 3. Relay worker publishes from outbox asynchronously with headers
+    # Headers enable zero-parse idempotency optimization for consumers
 ```
 
 ### 3.3. Unit of Work Pattern (Atomic Business + Events)
@@ -118,7 +120,18 @@ class EventPublisher:
 - **Wake-up**: Redis BLPOP on `outbox:wake:{service_name}` for instant processing
 - **Polling**: Adaptive intervals (0.1s → 5s) based on ENVIRONMENT  
 - **Batch**: Up to 100 events per batch with exponential backoff retry
+- **Headers**: Automatically adds headers (`event_id`, `event_type`, `trace_id`) for consumer optimization
 - **Idempotency**: Handle duplicate events gracefully
+
+### 4.1. Header Optimization for Consumer Performance
+The relay worker automatically adds standard headers to all published events:
+- `event_id`: Enables header-based duplicate detection
+- `event_type`: Enables header-based routing without JSON parsing
+- `trace_id`: Maps to `correlation_id` for distributed tracing
+- `source_service`: Origin service for debugging
+- `schema_version`, `occurred_at`, `content_type`: Standard metadata
+
+**Consumer Benefits**: Zero JSON parsing when headers are complete, significant performance improvement for high-volume services.
 
 ## 5. Required Patterns
 

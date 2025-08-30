@@ -152,7 +152,7 @@ class ResilientKafkaPublisher:
         headers: dict[str, str] | None = None,
     ) -> None:
         """Queue a failed message for later retry."""
-        queued_message = QueuedMessage(
+        queued_message: QueuedMessage = QueuedMessage(
             topic=topic,
             envelope=envelope,
             key=key,

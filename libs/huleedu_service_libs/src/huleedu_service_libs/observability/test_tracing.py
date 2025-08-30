@@ -52,7 +52,7 @@ async def test_trace_operation_context_manager():
 
 
 @pytest.mark.asyncio
-async def test_trace_context_propagation():
+async def test_trace_context_propagation() -> None:
     """Test trace context injection and extraction."""
     from huleedu_service_libs.observability.tracing import (
         extract_trace_context,

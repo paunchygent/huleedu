@@ -30,6 +30,12 @@ The NLP Service is a dual-phase Kafka worker service responsible for natural lan
 - Advanced NLP features - Future implementation
 - Language analysis - Future implementation
 
+### Performance Optimizations
+- **Header-First Message Processing**: Benefits from zero-parse idempotency when processing events with complete Kafka headers (event_id, event_type, trace_id)
+- **Batch Parallel Processing**: Multiple essays processed concurrently within each batch
+- **Redis Caching**: Class rosters cached for 5 minutes to reduce HTTP calls
+- **Early Exit**: Extraction strategies stop on high-confidence matches
+
 ## Service Structure
 
 ```

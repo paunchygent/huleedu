@@ -71,6 +71,13 @@ ELS consumes **thin events** from the spellchecker service optimized for state m
 
 This thin event pattern ensures ELS receives only the minimal data needed for state management, improving performance and reducing network overhead.
 
+### Performance Optimizations
+
+**Header-First Processing**: ELS benefits from zero-parse idempotency when processing events with complete Kafka headers:
+- Events from OutboxManager-enabled services include `event_id`, `event_type`, `trace_id` headers
+- Header-complete messages skip JSON parsing during idempotency checking
+- Performance benefit: Reduced CPU usage and faster duplicate detection for high-volume processing
+
 - **HTTP API**:
   - **Query-Only**: Provides read-only access to essay and batch state information.
   - **No Control Operations**: Does not accept processing commands via HTTP.

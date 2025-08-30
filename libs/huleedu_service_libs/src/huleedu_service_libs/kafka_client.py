@@ -79,10 +79,10 @@ class KafkaBus:
         try:
             key_bytes = key.encode("utf-8") if key else None
 
-            # Convert headers to bytes format for aiokafka
+            # Convert headers to aiokafka format (str keys, bytes values)
             header_bytes = None
             if headers:
-                header_bytes = [(k.encode("utf-8"), v.encode("utf-8")) for k, v in headers.items()]
+                header_bytes = [(k, v.encode("utf-8")) for k, v in headers.items()]
 
             future = await self.producer.send_and_wait(
                 topic,

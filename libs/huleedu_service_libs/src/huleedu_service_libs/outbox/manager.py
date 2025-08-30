@@ -226,6 +226,9 @@ class OutboxManager:
         if "source_service" not in headers:
             headers["source_service"] = getattr(event_data, "source_service", self.service_name)
 
+        if "event_type" not in headers:
+            headers["event_type"] = getattr(event_data, "event_type", "unknown")
+
         return headers
 
     async def _notify_relay_worker(self) -> None:

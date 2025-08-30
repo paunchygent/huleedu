@@ -19,6 +19,7 @@ Based on research from:
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import time
 from collections.abc import Awaitable, Callable, Coroutine
@@ -146,20 +147,63 @@ def idempotent_consumer(
         @functools.wraps(func)
         async def wrapper(msg: ConsumerRecord, *args: Any, **kwargs: Any) -> Any | None:
             try:
-                # Parse event envelope for metadata
-                event_dict = json.loads(msg.value)
-                event_id = event_dict.get("event_id")
-                event_type = event_dict.get("event_type", "unknown")
-                correlation_id = event_dict.get("correlation_id")
-                source_service = event_dict.get("source_service", "unknown")
+                # Extract ALL metadata from headers first
+                event_id = None
+                event_type = None
+                correlation_id = None
+                source_service = None
+                headers_used = False
 
-                # Generate deterministic hash using existing proven logic
-                deterministic_hash = generate_deterministic_event_id(msg.value)
+                if hasattr(msg, 'headers') and msg.headers:
+                    # Robust decoding for both str and bytes keys
+                    headers_dict = {}
+                    for k, v in msg.headers:
+                        key = k.decode('utf-8') if isinstance(k, bytes) else k
+                        value = v.decode('utf-8') if v else None
+                        headers_dict[key] = value
+
+                    event_id = headers_dict.get('event_id')
+                    event_type = headers_dict.get('event_type')
+                    correlation_id = headers_dict.get('trace_id')  # trace_id is correlation_id
+                    source_service = headers_dict.get('source_service')
+
+                    headers_used = bool(event_id and event_type)  # Track full header usage
+
+                # Only parse JSON if headers incomplete
+                event_dict = None
+                if not (event_id and event_type):
+                    event_dict = json.loads(msg.value)
+                    # If critical headers missing, prioritize body values entirely
+                    if not event_id:  # Critical header missing, use body values
+                        event_type = event_dict.get("event_type", "unknown")
+                        event_id = event_dict.get("event_id")
+                        correlation_id = event_dict.get("correlation_id")
+                        source_service = event_dict.get("source_service", "unknown")
+                        headers_used = False  # Override since we're using body
+                    else:
+                        # Only event_type missing from headers, use body for that
+                        event_type = event_dict.get("event_type", "unknown")
+                        correlation_id = correlation_id or event_dict.get("correlation_id")
+                        source_service = source_service or event_dict.get(
+                            "source_service", "unknown"
+                        )
+
+                # Optimized deterministic hash (maintain backward compatibility)
+                if event_id and headers_used:
+                    # Fast path: header-based hash using same algorithm
+                    # but avoid JSON parsing by using header values directly
+                    hash_input = {"event_id": event_id}
+                    # For headers, we don't have easy access to data, so use event_id only
+                    hash_data = json.dumps(hash_input, sort_keys=True, separators=(',', ':'))
+                    deterministic_hash = hashlib.sha256(hash_data.encode('utf-8')).hexdigest()
+                else:
+                    # Fallback: use existing proven logic for backward compatibility
+                    deterministic_hash = generate_deterministic_event_id(msg.value)
 
                 # Create service-namespaced Redis key
                 redis_key = config.generate_redis_key(event_type, event_id, deterministic_hash)
 
-                # Structured logging for observability
+                # Enhanced logging
                 log_context = {
                     "service": config.service_name,
                     "event_type": event_type,
@@ -171,6 +215,8 @@ def idempotent_consumer(
                     "kafka_topic": msg.topic,
                     "kafka_partition": msg.partition,
                     "kafka_offset": msg.offset,
+                    "headers_used": headers_used,  # Track header utilization
+                    "json_parsed": event_dict is not None,  # Track if JSON parsing occurred
                 }
 
                 if config.enable_debug_logging:

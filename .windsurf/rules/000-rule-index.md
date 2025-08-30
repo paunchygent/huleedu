@@ -27,7 +27,7 @@ alwaysApply: false
   - [020.13-llm-provider-service-architecture.mdc](mdc:020.13-llm-provider-service-architecture.mdc): LLM Provider Service (Centralized provider abstraction with queue resilience)
   - [020.14-websocket-service.mdc](mdc:020.14-websocket-service.mdc): WebSocket Service
   - [020.15-nlp-service-architecture.mdc](mdc:020.15-nlp-service-architecture.mdc): NLP Service (Phase 1 student matching, Phase 2 text analysis)
-- [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards
+- [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards with header-first optimization
 
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
