@@ -16,10 +16,10 @@ import pytest
 from common_core.emailing_models import (
     NotificationEmailRequestedV1,
 )
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.implementations.provider_smtp_impl import SMTPEmailProvider
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,

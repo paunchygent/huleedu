@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 from aiokafka import ConsumerRecord
-
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
 from ._helpers_idempotency import create_mock_kafka_message

@@ -24,6 +24,7 @@ from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
 )
+from services.llm_provider_service.internal_models import LLMQueuedResult
 from services.llm_provider_service.protocols import (
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
@@ -160,17 +161,19 @@ class TestConcurrentPerformance:
             start_time = time.perf_counter()
 
             try:
-                await orchestrator.perform_comparison(
+                result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                     user_prompt="Compare these essays",
                     essay_a=f"Sample essay A content {request_id}",
                     essay_b=f"Sample essay B content {request_id}",
                     correlation_id=uuid4(),
+                    callback_topic=f"test.concurrent.perf.req_{request_id}",
                     model="mock-model",
                 )
 
                 response_time = time.perf_counter() - start_time
-                return response_time, True
+                success = isinstance(result, LLMQueuedResult) and result.status == "queued"
+                return response_time, success
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -217,16 +220,18 @@ class TestConcurrentPerformance:
         async def make_request(request_id: int) -> Tuple[float, bool]:
             start_time = time.perf_counter()
             try:
-                await orchestrator.perform_comparison(
+                result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
                     user_prompt="Stress test comparison",
                     essay_a=f"Stress essay A {request_id}",
                     essay_b=f"Stress essay B {request_id}",
                     correlation_id=uuid4(),
+                    callback_topic=f"test.concurrent.stress.req_{request_id}",
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, True
+                success = isinstance(result, LLMQueuedResult) and result.status == "queued"
+                return response_time, success
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -276,16 +281,18 @@ class TestConcurrentPerformance:
         async def make_burst_request(burst_id: int, request_id: int) -> Tuple[float, bool]:
             start_time = time.perf_counter()
             try:
-                await orchestrator.perform_comparison(
+                result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
                     user_prompt="Burst test comparison",
                     essay_a=f"Burst {burst_id} essay A {request_id}",
                     essay_b=f"Burst {burst_id} essay B {request_id}",
                     correlation_id=uuid4(),
+                    callback_topic=f"test.concurrent.burst.b{burst_id}_r{request_id}",
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, True
+                success = isinstance(result, LLMQueuedResult) and result.status == "queued"
+                return response_time, success
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False
@@ -358,16 +365,18 @@ class TestConcurrentPerformance:
         ) -> Tuple[float, bool, str]:
             start_time = time.perf_counter()
             try:
-                await orchestrator.perform_comparison(
+                result = await orchestrator.perform_comparison(
                     provider=provider,
                     user_prompt="Mixed provider test",
                     essay_a=f"Essay A for {provider.value} {request_id}",
                     essay_b=f"Essay B for {provider.value} {request_id}",
                     correlation_id=uuid4(),
+                    callback_topic=f"test.concurrent.mixed.{provider.value}_{request_id}",
                     model="mock-model",
                 )
                 response_time = time.perf_counter() - start_time
-                return response_time, True, provider.value
+                success = isinstance(result, LLMQueuedResult) and result.status == "queued"
+                return response_time, success, provider.value
             except Exception:
                 response_time = time.perf_counter() - start_time
                 return response_time, False, provider.value

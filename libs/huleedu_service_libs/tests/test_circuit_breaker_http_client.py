@@ -7,9 +7,9 @@ Follows HuleEdu testing excellence patterns with proper type safety.
 
 from __future__ import annotations
 
-import pytest
 from uuid import uuid4
 
+import pytest
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker, CircuitBreakerError
 from huleedu_service_libs.resilience.http_client import CircuitBreakerHttpClient
 
@@ -30,7 +30,9 @@ class MockHttpClient:
         **context,
     ) -> str:
         """Mock GET method."""
-        self.call_history.append(("get", (url, correlation_id, timeout_seconds), {"headers": headers, **context}))
+        self.call_history.append(
+            ("get", (url, correlation_id, timeout_seconds), {"headers": headers, **context})
+        )
         if self.should_fail:
             raise ValueError(f"HTTP GET failed for {url}")
         return f"response_from_{url}"
@@ -45,10 +47,15 @@ class MockHttpClient:
         **context,
     ) -> dict[str, str]:
         """Mock POST method."""
-        self.call_history.append(("post", (url, data, correlation_id, timeout_seconds), {"headers": headers, **context}))
+        self.call_history.append(
+            ("post", (url, data, correlation_id, timeout_seconds), {"headers": headers, **context})
+        )
         if self.should_fail:
             raise ValueError(f"HTTP POST failed for {url}")
-        return {"result": f"post_response_{url}", "data_length": len(data) if isinstance(data, (str, bytes)) else 0}
+        return {
+            "result": f"post_response_{url}",
+            "data_length": len(data) if isinstance(data, (str, bytes)) else 0,
+        }
 
     def reset(self) -> None:
         """Reset mock state."""
@@ -101,7 +108,9 @@ class TestHttpOperationsWithCircuitBreaker:
     """Test HTTP operations through circuit breaker."""
 
     @pytest.mark.asyncio
-    async def test_get_success(self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient) -> None:
+    async def test_get_success(
+        self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient
+    ) -> None:
         """Test successful GET request through circuit breaker."""
         correlation_id = uuid4()
         url = "https://example.com/api/test"
@@ -115,15 +124,22 @@ class TestHttpOperationsWithCircuitBreaker:
         assert call[1] == (url, correlation_id, 30)
 
     @pytest.mark.asyncio
-    async def test_post_success(self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient) -> None:
+    async def test_post_success(
+        self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient
+    ) -> None:
         """Test successful POST request through circuit breaker."""
         correlation_id = uuid4()
         url = "https://example.com/api/submit"
         data = "test payload"
 
-        result = await circuit_breaker_client.post(url, data, correlation_id, timeout_seconds=45, headers={"Content-Type": "text/plain"})
+        result = await circuit_breaker_client.post(
+            url, data, correlation_id, timeout_seconds=45, headers={"Content-Type": "text/plain"}
+        )
 
-        expected_response = {"result": "post_response_https://example.com/api/submit", "data_length": 12}
+        expected_response = {
+            "result": "post_response_https://example.com/api/submit",
+            "data_length": 12,
+        }
         assert result == expected_response
         assert len(mock_http_client.call_history) == 1
         call = mock_http_client.call_history[0]
@@ -132,18 +148,20 @@ class TestHttpOperationsWithCircuitBreaker:
         assert call[2]["headers"] == {"Content-Type": "text/plain"}
 
     @pytest.mark.asyncio
-    async def test_get_with_context(self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient) -> None:
+    async def test_get_with_context(
+        self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient
+    ) -> None:
         """Test GET request with additional context parameters."""
         correlation_id = uuid4()
         url = "https://example.com/api/context-test"
 
         result = await circuit_breaker_client.get(
-            url, 
-            correlation_id, 
-            timeout_seconds=20, 
-            headers={"Authorization": "Bearer token"}, 
+            url,
+            correlation_id,
+            timeout_seconds=20,
+            headers={"Authorization": "Bearer token"},
             service_context="test_service",
-            operation_id="op_123"
+            operation_id="op_123",
         )
 
         assert result == "response_from_https://example.com/api/context-test"
@@ -232,7 +250,9 @@ class TestErrorHandlingEdgeCases:
         assert len(mock_http_client.call_history) == 3
 
     @pytest.mark.asyncio
-    async def test_bytes_data_post(self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient) -> None:
+    async def test_bytes_data_post(
+        self, circuit_breaker_client: CircuitBreakerHttpClient, mock_http_client: MockHttpClient
+    ) -> None:
         """Test POST request with bytes data."""
         correlation_id = uuid4()
         url = "https://example.com/api/binary"
@@ -240,7 +260,10 @@ class TestErrorHandlingEdgeCases:
 
         result = await circuit_breaker_client.post(url, data, correlation_id)
 
-        expected_response = {"result": "post_response_https://example.com/api/binary", "data_length": 14}
+        expected_response = {
+            "result": "post_response_https://example.com/api/binary",
+            "data_length": 14,
+        }
         assert result == expected_response
         assert len(mock_http_client.call_history) == 1
         call = mock_http_client.call_history[0]

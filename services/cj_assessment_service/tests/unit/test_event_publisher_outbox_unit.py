@@ -23,10 +23,10 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import BatchStatus, ProcessingStage
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
-from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:

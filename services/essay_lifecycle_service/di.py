@@ -17,6 +17,7 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -65,7 +66,6 @@ from services.essay_lifecycle_service.implementations.mock_essay_repository impo
 from services.essay_lifecycle_service.implementations.nlp_command_handler import (
     NlpCommandHandler,
 )
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
 from services.essay_lifecycle_service.implementations.redis_failure_tracker import (

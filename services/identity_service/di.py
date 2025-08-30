@@ -10,6 +10,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
@@ -34,7 +35,6 @@ from services.identity_service.implementations.event_publisher_impl import (
     DefaultIdentityEventPublisher,
 )
 from services.identity_service.implementations.jwks_store import JwksStore
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.identity_service.implementations.password_hasher_impl import (
     Argon2idPasswordHasher,
 )

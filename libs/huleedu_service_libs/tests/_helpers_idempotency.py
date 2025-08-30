@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord

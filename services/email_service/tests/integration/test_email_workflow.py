@@ -18,11 +18,11 @@ from common_core.emailing_models import (
 )
 from common_core.event_enums import ProcessingEvent, topic_name
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.implementations.template_renderer_impl import (
     JinjaTemplateRenderer,
 )

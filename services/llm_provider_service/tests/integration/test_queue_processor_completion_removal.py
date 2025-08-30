@@ -23,6 +23,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
 
 
@@ -38,9 +39,9 @@ class TestQueueProcessorCompletionRemoval:
         return settings
 
     @pytest.fixture
-    def mock_orchestrator(self) -> AsyncMock:
-        """Mock LLM orchestrator."""
-        return AsyncMock()
+    def mock_comparison_processor(self) -> AsyncMock:
+        """Mock comparison processor."""
+        return AsyncMock(spec=ComparisonProcessorProtocol)
 
     @pytest.fixture
     def mock_queue_manager(self) -> AsyncMock:
@@ -70,7 +71,7 @@ class TestQueueProcessorCompletionRemoval:
     @pytest.fixture
     def queue_processor(
         self,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         mock_event_publisher: AsyncMock,
         trace_context_manager: TraceContextManagerImpl,
@@ -78,7 +79,7 @@ class TestQueueProcessorCompletionRemoval:
     ) -> QueueProcessorImpl:
         """Queue processor with mocked dependencies."""
         return QueueProcessorImpl(
-            orchestrator=mock_orchestrator,
+            comparison_processor=mock_comparison_processor,
             queue_manager=mock_queue_manager,
             event_publisher=mock_event_publisher,
             trace_context_manager=trace_context_manager,
@@ -112,7 +113,7 @@ class TestQueueProcessorCompletionRemoval:
     async def test_successful_request_is_removed_from_queue(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         sample_request: QueuedRequest,
     ) -> None:
@@ -130,7 +131,7 @@ class TestQueueProcessorCompletionRemoval:
             cost_estimate=0.001,
             trace_id="test-trace",
         )
-        mock_orchestrator.process_queued_request.return_value = mock_result
+        mock_comparison_processor.process_comparison.return_value = mock_result
 
         # Process the request
         await queue_processor._process_request(sample_request)
@@ -149,7 +150,7 @@ class TestQueueProcessorCompletionRemoval:
     async def test_permanently_failed_request_is_removed_from_queue(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         sample_request: QueuedRequest,
     ) -> None:
@@ -166,7 +167,7 @@ class TestQueueProcessorCompletionRemoval:
             correlation_id=sample_request.request_data.correlation_id,
             details={"provider": "mock"},
         )
-        mock_orchestrator.process_queued_request.side_effect = HuleEduError(error_detail)
+        mock_comparison_processor.process_comparison.side_effect = HuleEduError(error_detail)
 
         # Process the request
         await queue_processor._process_request(sample_request)
@@ -185,7 +186,7 @@ class TestQueueProcessorCompletionRemoval:
     async def test_retryable_request_is_removed_then_requeued(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         sample_request: QueuedRequest,
     ) -> None:
@@ -202,7 +203,7 @@ class TestQueueProcessorCompletionRemoval:
             correlation_id=sample_request.request_data.correlation_id,
             details={"provider": "mock"},
         )
-        mock_orchestrator.process_queued_request.side_effect = HuleEduError(error_detail)
+        mock_comparison_processor.process_comparison.side_effect = HuleEduError(error_detail)
 
         # Process the request
         await queue_processor._process_request(sample_request)
@@ -221,7 +222,7 @@ class TestQueueProcessorCompletionRemoval:
     async def test_multiple_completions_dont_clog_queue(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
     ) -> None:
         """Test that multiple completed requests are all removed from queue."""
@@ -249,7 +250,7 @@ class TestQueueProcessorCompletionRemoval:
             )
             requests.append(request)
 
-        # Configure orchestrator to succeed for all requests
+        # Configure comparison processor to succeed for all requests
         mock_result = LLMOrchestratorResponse(
             winner=EssayComparisonWinner.ESSAY_A,
             justification="Test justification",
@@ -262,7 +263,7 @@ class TestQueueProcessorCompletionRemoval:
             cost_estimate=0.001,
             trace_id="test-trace",
         )
-        mock_orchestrator.process_queued_request.return_value = mock_result
+        mock_comparison_processor.process_comparison.return_value = mock_result
 
         # Process all requests
         for request in requests:

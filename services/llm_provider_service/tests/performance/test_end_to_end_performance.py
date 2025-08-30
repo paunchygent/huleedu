@@ -25,7 +25,6 @@ from services.llm_provider_service.implementations.connection_pool_manager_impl 
     ConnectionPoolManagerImpl,
 )
 from services.llm_provider_service.internal_models import (
-    LLMOrchestratorResponse,
     LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
@@ -152,7 +151,9 @@ class TestEndToEndPerformance:
     """Tests for complete end-to-end pipeline performance with real infrastructure."""
 
     @pytest.mark.asyncio
-    async def test_end_to_end_load_scenario(self, infrastructure_di_container: Any) -> None:
+    async def test_end_to_end_load_scenario(
+        self, infrastructure_di_container: Any, performance_callback_topic: str
+    ) -> None:
         """Test complete end-to-end load scenario with real infrastructure."""
         metrics = PerformanceMetrics()
 
@@ -184,18 +185,17 @@ class TestEndToEndPerformance:
                             essay_a=f"Load test essay A {request_id}",
                             essay_b=f"Load test essay B {request_id}",
                             correlation_id=uuid4(),
+                            callback_topic=performance_callback_topic,
                             model="mock-model",
                         )
 
                         response_time = time.perf_counter() - start_time
 
-                        # Granular status codes based on response type
-                        if isinstance(result, LLMQueuedResult):
+                        # Success = request accepted and queued (async-only architecture)
+                        if isinstance(result, LLMQueuedResult) and result.status == "queued":
                             status_code = 202  # Accepted (queued)
-                        elif isinstance(result, LLMOrchestratorResponse):
-                            status_code = 200  # Success (immediate response)
                         else:
-                            status_code = 500  # Unexpected response type
+                            status_code = 500  # Unexpected response type (should always queue)
 
                         metrics.add_measurement(response_time, status_code)
 
@@ -238,13 +238,17 @@ class TestEndToEndPerformance:
         print("  Infrastructure: Real Kafka + Redis (testcontainers)")
         print("  LLM Provider: Mock (no API costs)")
 
-        # Realistic performance targets for real infrastructure
-        assert stats["response_times"]["p95"] < 5.0  # P95 under 5s
-        assert stats["successful_requests"] / stats["total_requests"] >= 0.90  # 90% success rate
+        # Performance targets for queue acceptance with real infrastructure
+        assert stats["response_times"]["p95"] < 5.0  # P95 queue acceptance under 5s
+        assert (
+            stats["successful_requests"] / stats["total_requests"] >= 0.90
+        )  # 90% queue acceptance rate
         assert stats["error_rate"] < 10  # Less than 10% error rate
 
     @pytest.mark.asyncio
-    async def test_mixed_workload_performance(self, infrastructure_di_container: Any) -> None:
+    async def test_mixed_workload_performance(
+        self, infrastructure_di_container: Any, performance_callback_topic: str
+    ) -> None:
         """Test performance under mixed workload with real infrastructure."""
         metrics = PerformanceMetrics()
 
@@ -274,17 +278,16 @@ class TestEndToEndPerformance:
                         essay_a=f"{workload_name} essay A {request_id}",
                         essay_b=f"{workload_name} essay B {request_id}",
                         correlation_id=uuid4(),
+                        callback_topic=f"{performance_callback_topic}_{workload_name}",
                         model="mock-model",
                     )
                     response_time = time.perf_counter() - start_time
 
-                    # Granular status codes based on response type
-                    if isinstance(result, LLMQueuedResult):
+                    # Success = request accepted and queued (async-only architecture)
+                    if isinstance(result, LLMQueuedResult) and result.status == "queued":
                         status_code = 202  # Accepted (queued)
-                    elif isinstance(result, LLMOrchestratorResponse):
-                        status_code = 200  # Success (immediate response)
                     else:
-                        status_code = 500  # Unexpected response type
+                        status_code = 500  # Unexpected response type (should always queue)
 
                     workload_metrics.add_measurement(response_time, status_code)
                     metrics.add_measurement(response_time, status_code)
@@ -341,16 +344,18 @@ class TestEndToEndPerformance:
                 print(f"    Success rate: {workload_success_rate:.1f}%")
                 print(f"    Mean time: {stats['response_times']['mean']:.4f}s")
 
-        # Realistic mixed workload performance targets
-        assert overall_stats["response_times"]["p95"] < 6.0  # P95 under 6s for mixed load
+        # Performance targets for mixed workload queue acceptance
+        assert overall_stats["response_times"]["p95"] < 6.0  # P95 queue acceptance under 6s
         assert (
             overall_stats["successful_requests"] / overall_stats["total_requests"] >= 0.85
-        )  # 85% success rate
+        )  # 85% queue acceptance rate
 
     @pytest.mark.slow
     @pytest.mark.performance
     @pytest.mark.asyncio
-    async def test_sustained_load_performance(self, infrastructure_di_container: Any) -> None:
+    async def test_sustained_load_performance(
+        self, infrastructure_di_container: Any, performance_callback_topic: str
+    ) -> None:
         """Test performance under sustained load with real infrastructure."""
         duration_seconds = 15  # Reduced for real infrastructure
         requests_per_second = 2  # Reduced rate for real infrastructure
@@ -376,17 +381,16 @@ class TestEndToEndPerformance:
                             essay_a=f"Sustained essay A {req_id}",
                             essay_b=f"Sustained essay B {req_id}",
                             correlation_id=uuid4(),
+                            callback_topic=f"{performance_callback_topic}_sustained_{req_id}",
                             model="mock-model",
                         )
                         response_time = time.perf_counter() - req_start
 
-                        # Granular status codes based on response type
-                        if isinstance(result, LLMQueuedResult):
+                        # Success = request accepted and queued (async-only architecture)
+                        if isinstance(result, LLMQueuedResult) and result.status == "queued":
                             status_code = 202  # Accepted (queued)
-                        elif isinstance(result, LLMOrchestratorResponse):
-                            status_code = 200  # Success (immediate response)
                         else:
-                            status_code = 500  # Unexpected response type
+                            status_code = 500  # Unexpected response type (should always queue)
 
                         metrics.add_measurement(response_time, status_code)
                     except HuleEduError as e:
@@ -429,8 +433,10 @@ class TestEndToEndPerformance:
         print(f"    P99: {stats['response_times']['p99']:.4f}s")
         print("  Infrastructure: Real Kafka + Redis (testcontainers)")
 
-        # Realistic sustained performance targets
+        # Performance targets for sustained queue acceptance
         actual_rate = stats["total_requests"] / duration_seconds
         assert actual_rate >= requests_per_second * 0.80  # At least 80% of target rate
-        assert stats["response_times"]["p95"] < 8.0  # P95 under 8 seconds
-        assert stats["successful_requests"] / stats["total_requests"] >= 0.85  # 85% success rate
+        assert stats["response_times"]["p95"] < 8.0  # P95 queue acceptance under 8 seconds
+        assert (
+            stats["successful_requests"] / stats["total_requests"] >= 0.85
+        )  # 85% queue acceptance rate

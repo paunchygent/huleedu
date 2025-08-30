@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 import pytest
 from aiokafka import ConsumerRecord
-
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 
 from ._helpers_idempotency import HandlerCallTracker, create_mock_kafka_message, tracked_handler
@@ -19,7 +18,8 @@ class TestIdempotentConsumerDuplicateDetection:
     async def test_idempotent_consumer_first_time_processing_sets_processing_state(
         self, mock_redis_client, sample_event_data
     ) -> None:
-        """Processes first-time event, sets processing state key with TTL=300, and returns result."""
+        """Processes first-time event, sets processing state key with TTL=300, and returns result.
+        """
         msg: ConsumerRecord = create_mock_kafka_message(sample_event_data)
         tracker = HandlerCallTracker()
 

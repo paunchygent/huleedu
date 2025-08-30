@@ -11,12 +11,12 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
+from services.api_gateway_service.app.metrics import GatewayMetrics
+from services.api_gateway_service.config import Settings, settings
 from services.api_gateway_service.implementations.circuit_breaker_http_client import (
     ApiGatewayCircuitBreakerHttpClient,
 )
 from services.api_gateway_service.implementations.http_client import ApiGatewayHttpClient
-from services.api_gateway_service.app.metrics import GatewayMetrics
-from services.api_gateway_service.config import Settings, settings
 from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
 

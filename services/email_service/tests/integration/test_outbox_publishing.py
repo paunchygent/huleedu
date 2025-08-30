@@ -22,6 +22,7 @@ from common_core.emailing_models import (
 )
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
@@ -37,7 +38,6 @@ from testcontainers.postgres import PostgresContainer
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.models_db import Base, EmailStatus
 from services.email_service.models_db import EmailRecord as DbEmailRecord
 from services.email_service.protocols import EmailProvider, EmailRepository, TemplateRenderer

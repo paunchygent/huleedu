@@ -14,6 +14,7 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol, RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -22,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.kafka_consumer import EmailKafkaConsumer
 from services.email_service.metrics import setup_email_service_database_monitoring
 from services.email_service.protocols import EmailProvider, EmailRepository, TemplateRenderer

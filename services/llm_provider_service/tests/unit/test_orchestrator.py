@@ -1,6 +1,6 @@
 """Unit tests for LLM orchestrator."""
 
-from typing import Any
+from typing import Any, Callable
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -12,7 +12,19 @@ from common_core.error_enums import ErrorCode
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.llm_orchestrator_impl import LLMOrchestratorImpl
-from services.llm_provider_service.internal_models import LLMProviderResponse
+from services.llm_provider_service.internal_models import LLMProviderResponse, LLMQueuedResult
+
+
+@pytest.fixture
+def callback_topic_factory() -> Callable[[str], str]:
+    """Generate callback topics for tests."""
+
+    def _factory(test_name: str) -> str:
+        # Simple callback topic for tests
+        clean_name = test_name.replace("test_", "").replace("_", "")
+        return f"huleedu.test.{clean_name}.callback.v1"
+
+    return _factory
 
 
 @pytest.fixture
@@ -98,11 +110,15 @@ def orchestrator(
 
 @pytest.mark.asyncio
 async def test_orchestrator_successful_comparison(
-    orchestrator: LLMOrchestratorImpl, mock_provider: AsyncMock, mock_event_publisher: AsyncMock
+    orchestrator: LLMOrchestratorImpl,
+    mock_provider: AsyncMock,
+    mock_event_publisher: AsyncMock,
+    callback_topic_factory: Callable[[str], str],
 ) -> None:
-    """Test orchestrator handles successful comparison."""
+    """Test orchestrator queues comparison requests and returns queued result."""
     # Arrange
     correlation_id = uuid4()
+    callback_topic = callback_topic_factory("successful_comparison")
     mock_response = LLMProviderResponse(
         winner=EssayComparisonWinner.ESSAY_B,
         justification="Essay B is better structured",
@@ -122,24 +138,19 @@ async def test_orchestrator_successful_comparison(
         essay_a="Essay A content",
         essay_b="Essay B content",
         correlation_id=correlation_id,
+        callback_topic=callback_topic,
     )
 
-    # Assert
+    # Assert - ALL requests return LLMQueuedResult in async-only architecture
     assert result is not None
-    # Result should be an LLMOrchestratorResponse for successful case
-    from services.llm_provider_service.internal_models import LLMOrchestratorResponse
-
-    assert isinstance(result, LLMOrchestratorResponse)
-    assert result.winner == "Essay B"
-    assert result.justification == "Essay B is better structured"
-    assert result.confidence == 0.85
+    assert isinstance(result, LLMQueuedResult)
     assert result.provider == LLMProviderType.MOCK
-    assert result.model == "mock-model-v1"
+    assert result.status == "queued"
     assert result.correlation_id == correlation_id
 
-    # Verify events were published
+    # Verify events were published - only started event, not completed (queued != completed)
     mock_event_publisher.publish_llm_request_started.assert_called_once()
-    mock_event_publisher.publish_llm_request_completed.assert_called_once()
+    # Note: publish_llm_request_completed is called by queue processor, not orchestrator
 
 
 @pytest.mark.asyncio
@@ -212,9 +223,6 @@ async def test_orchestrator_queues_when_provider_unavailable(
 
     # Assert
     assert result is not None
-    # Result should be an LLMQueuedResult for queued case
-    from services.llm_provider_service.internal_models import LLMQueuedResult
-
     assert isinstance(result, LLMQueuedResult)
     assert result.provider == LLMProviderType.MOCK
     assert result.status == "queued"
@@ -224,22 +232,26 @@ async def test_orchestrator_queues_when_provider_unavailable(
     # Verify queue was called
     mock_queue_manager.enqueue.assert_called_once()
 
-    # Verify events were published
+    # Verify events were published - only started event when queuing
     mock_event_publisher.publish_llm_request_started.assert_called_once()
-    mock_event_publisher.publish_llm_request_completed.assert_called_once()
+    # Note: Completion events published by queue processor during async processing
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_provider_error(
-    orchestrator: LLMOrchestratorImpl, mock_provider: AsyncMock, mock_event_publisher: AsyncMock
+    orchestrator: LLMOrchestratorImpl,
+    mock_provider: AsyncMock,
+    mock_event_publisher: AsyncMock,
+    callback_topic_factory: Callable[[str], str],
 ) -> None:
-    """Test orchestrator handles provider errors."""
+    """Test orchestrator returns queued result even when provider would error during processing."""
     # Arrange
     correlation_id = uuid4()
+    callback_topic = callback_topic_factory("provider_error")
     from services.llm_provider_service.exceptions import raise_rate_limit_error
 
     # Mock provider to raise rate limit error
-    def mock_rate_limit_error(*args: Any, **kwargs: Any) -> None:
+    def mock_rate_limit_error(*_args: Any, **_kwargs: Any) -> None:
         raise_rate_limit_error(
             service="llm_provider_service",
             operation="generate_comparison",
@@ -253,33 +265,26 @@ async def test_orchestrator_provider_error(
 
     mock_provider.generate_comparison.side_effect = mock_rate_limit_error
 
-    # Act & Assert
-    with pytest.raises(HuleEduError) as exc_info:
-        await orchestrator.perform_comparison(
-            provider=LLMProviderType.MOCK,
-            user_prompt="Compare",
-            essay_a="A",
-            essay_b="B",
-            correlation_id=correlation_id,
-        )
-
-    # Verify error details
-    assert exc_info.value.error_detail.error_code == ErrorCode.RATE_LIMIT
-    assert "Rate limit exceeded" in str(exc_info.value)
-
-    # Verify failure events were published
-    mock_event_publisher.publish_llm_provider_failure.assert_called_once()
-    mock_event_publisher.publish_llm_request_completed.assert_called_once_with(
-        provider="mock",  # Event publisher uses string value
+    # Act - With callback_topic provided, request gets queued regardless of provider issues
+    result = await orchestrator.perform_comparison(
+        provider=LLMProviderType.MOCK,
+        user_prompt="Compare",
+        essay_a="A",
+        essay_b="B",
         correlation_id=correlation_id,
-        success=False,
-        response_time_ms=pytest.approx(0, abs=100),  # Allow some variance in timing
-        metadata={
-            "request_type": "comparison",
-            "error_message": "Provider error occurred",
-            "failure_type": "unknown",
-        },
+        callback_topic=callback_topic,
     )
+
+    # Assert - Request is queued, errors will be handled during async processing
+    assert result is not None
+    assert isinstance(result, LLMQueuedResult)
+    assert result.provider == LLMProviderType.MOCK
+    assert result.status == "queued"
+    assert result.correlation_id == correlation_id
+
+    # Verify events were published - only started event when queuing
+    mock_event_publisher.publish_llm_request_started.assert_called_once()
+    # Note: Completion events published by queue processor during async processing
 
 
 @pytest.mark.asyncio
@@ -324,11 +329,14 @@ async def test_orchestrator_test_provider_failure(
 
 @pytest.mark.asyncio
 async def test_orchestrator_with_overrides(
-    orchestrator: LLMOrchestratorImpl, mock_provider: AsyncMock
+    orchestrator: LLMOrchestratorImpl,
+    mock_provider: AsyncMock,
+    callback_topic_factory: Callable[[str], str],
 ) -> None:
-    """Test orchestrator passes overrides to provider."""
+    """Test orchestrator queues requests with parameter overrides."""
     # Arrange
     correlation_id = uuid4()
+    callback_topic = callback_topic_factory("with_overrides")
     mock_response = LLMProviderResponse(
         winner=EssayComparisonWinner.ESSAY_A,
         justification="Response",
@@ -348,20 +356,17 @@ async def test_orchestrator_with_overrides(
         essay_a="A",
         essay_b="B",
         correlation_id=correlation_id,
+        callback_topic=callback_topic,
         model_override="overridden-model",
         temperature_override=0.5,
         system_prompt_override="Custom prompt",
     )
 
-    # Assert
+    # Assert - Request is queued with overrides preserved for async processing
     assert result is not None
-    mock_provider.generate_comparison.assert_called_once_with(
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
-        correlation_id=correlation_id,
-        system_prompt_override="Custom prompt",
-        model_override="overridden-model",
-        temperature_override=0.5,
-        max_tokens_override=None,
-    )
+    assert isinstance(result, LLMQueuedResult)
+    assert result.provider == LLMProviderType.MOCK
+    assert result.status == "queued"
+    assert result.correlation_id == correlation_id
+
+    # Note: Provider is not called immediately - overrides will be applied during async processing

@@ -19,6 +19,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
 
 
@@ -26,9 +27,9 @@ class TestQueueProcessorErrorHandling:
     """Tests for queue processor error handling."""
 
     @pytest.fixture
-    def mock_orchestrator(self) -> AsyncMock:
-        """Create mock orchestrator."""
-        return AsyncMock()
+    def mock_comparison_processor(self) -> AsyncMock:
+        """Create mock comparison processor."""
+        return AsyncMock(spec=ComparisonProcessorProtocol)
 
     @pytest.fixture
     def mock_queue_manager(self) -> AsyncMock:
@@ -63,7 +64,7 @@ class TestQueueProcessorErrorHandling:
     @pytest.fixture
     def queue_processor(
         self,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         mock_event_publisher: AsyncMock,
         mock_trace_context_manager: Mock,
@@ -71,7 +72,7 @@ class TestQueueProcessorErrorHandling:
     ) -> QueueProcessorImpl:
         """Create queue processor with mocked dependencies."""
         return QueueProcessorImpl(
-            orchestrator=mock_orchestrator,
+            comparison_processor=mock_comparison_processor,
             queue_manager=mock_queue_manager,
             event_publisher=mock_event_publisher,
             trace_context_manager=mock_trace_context_manager,
@@ -82,7 +83,7 @@ class TestQueueProcessorErrorHandling:
     async def test_process_request_handles_huleedu_error(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         mock_event_publisher: AsyncMock,
     ) -> None:
@@ -123,7 +124,7 @@ class TestQueueProcessorErrorHandling:
             details={"provider": "mock", "error_simulation": True},
         )
 
-        mock_orchestrator.process_queued_request.side_effect = HuleEduError(error_detail)
+        mock_comparison_processor.process_comparison.side_effect = HuleEduError(error_detail)
 
         # Set retry count to max so next error causes immediate failure
         queued_request.retry_count = 3
@@ -149,7 +150,7 @@ class TestQueueProcessorErrorHandling:
     async def test_process_request_handles_unexpected_exception(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         mock_event_publisher: AsyncMock,
     ) -> None:
@@ -177,7 +178,7 @@ class TestQueueProcessorErrorHandling:
         )
 
         # Configure orchestrator to raise unexpected exception
-        mock_orchestrator.process_queued_request.side_effect = RuntimeError("Unexpected error")
+        mock_comparison_processor.process_comparison.side_effect = RuntimeError("Unexpected error")
 
         # Set retry count to max so next error causes immediate failure
         queued_request.retry_count = 3
@@ -203,7 +204,7 @@ class TestQueueProcessorErrorHandling:
     async def test_process_request_successful_processing(
         self,
         queue_processor: QueueProcessorImpl,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
         mock_event_publisher: AsyncMock,
     ) -> None:
@@ -230,8 +231,8 @@ class TestQueueProcessorErrorHandling:
             trace_context={},
         )
 
-        # Configure orchestrator to return successful response
-        mock_orchestrator.process_queued_request.return_value = LLMOrchestratorResponse(
+        # Configure comparison processor to return successful response
+        mock_comparison_processor.process_comparison.return_value = LLMOrchestratorResponse(
             winner="Essay A",
             justification="Essay A is better",
             confidence=0.85,

@@ -23,6 +23,8 @@ from services.llm_provider_service.implementations.redis_queue_repository_impl i
     RedisQueueRepositoryImpl,
 )
 
+# Import callback fixtures for performance tests
+
 
 @pytest.fixture(scope="session")
 def kafka_container() -> Generator[KafkaContainer, None, None]:

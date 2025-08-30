@@ -15,10 +15,10 @@ from common_core.emailing_models import (
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError, create_test_huleedu_error
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.email_service.config import Settings
 from services.email_service.event_processor import EmailEventProcessor
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,

@@ -17,9 +17,6 @@ from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPubli
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
-from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (
-    CircuitBreakerBatchConductorClient,
-)
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -53,6 +50,9 @@ from services.batch_orchestrator_service.implementations.batch_repository_postgr
 )
 from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
     BatchValidationErrorsHandler,
+)
+from services.batch_orchestrator_service.implementations.circuit_breaker_batch_conductor_client import (
+    CircuitBreakerBatchConductorClient,
 )
 from services.batch_orchestrator_service.implementations.cj_assessment_initiator_impl import (
     DefaultCJAssessmentInitiator,

@@ -7,12 +7,12 @@ architectural boundaries.
 """
 
 from typing import Any
-from uuid import UUID
 
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
+
 from services.batch_orchestrator_service.protocols import BatchConductorClientProtocol
-from common_core.pipeline_models import PhaseName
 
 logger = create_service_logger("circuit_breaker_batch_conductor_client")
 

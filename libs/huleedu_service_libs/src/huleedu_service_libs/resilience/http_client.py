@@ -8,8 +8,8 @@ from typing import Any
 from uuid import UUID
 
 from huleedu_service_libs.http_client.protocols import HttpClientProtocol
-from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 
 logger = create_service_logger("circuit_breaker_http_client")
 

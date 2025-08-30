@@ -21,9 +21,9 @@ from huleedu_service_libs.error_handling import (
     raise_validation_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.email_service.config import Settings
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.email_service.protocols import (
     EmailProvider,
     EmailRecord,

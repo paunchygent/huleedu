@@ -14,10 +14,10 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import inject_trace_context
 
 if TYPE_CHECKING:
+    from huleedu_service_libs.outbox.manager import OutboxManager
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
-    from huleedu_service_libs.outbox.manager import OutboxManager
     from services.essay_lifecycle_service.protocols import TopicNamingProtocol
 
 logger = create_service_logger("essay_lifecycle_service.batch_lifecycle_publisher")

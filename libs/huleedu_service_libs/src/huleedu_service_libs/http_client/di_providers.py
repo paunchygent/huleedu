@@ -74,7 +74,7 @@ class ContentServiceClientProvider(Provider):
 
         Returns:
             Content Service client protocol implementation
-            
+
         Note:
             Services should wrap this with CircuitBreakerContentServiceClient
             in their own DI if circuit breaker protection is needed.

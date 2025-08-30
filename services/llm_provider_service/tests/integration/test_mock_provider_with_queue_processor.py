@@ -17,12 +17,16 @@ from dishka import AsyncContainer, Provider, Scope, make_async_container, provid
 
 from services.llm_provider_service.api_models import LLMComparisonRequest, LLMConfigOverrides
 from services.llm_provider_service.config import Settings
+from services.llm_provider_service.implementations.comparison_processor_impl import (
+    ComparisonProcessorImpl,
+)
 from services.llm_provider_service.implementations.llm_orchestrator_impl import LLMOrchestratorImpl
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.implementations.trace_context_manager_impl import (
     TraceContextManagerImpl,
 )
 from services.llm_provider_service.protocols import (
+    ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
@@ -162,9 +166,16 @@ class MockEventPublisher:
 class ErrorTriggeringMockProvider:
     """Mock provider that guarantees errors for testing."""
 
+    # Class-level counter to ensure error triggering works across DI instances
+    _request_count = 0
+
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.request_count = 0
+
+    @classmethod
+    def reset_counter(cls) -> None:
+        """Reset the request counter for test isolation."""
+        cls._request_count = 0
 
     async def generate_comparison(
         self,
@@ -178,15 +189,15 @@ class ErrorTriggeringMockProvider:
         max_tokens_override: Optional[int] = None,
     ) -> Any:
         """Generate comparison with guaranteed errors every 10th request."""
-        self.request_count += 1
+        # Use class-level counter to ensure shared state across DI instances
+        ErrorTriggeringMockProvider._request_count += 1
+        current_count = ErrorTriggeringMockProvider._request_count
 
-        print(f"🔥 ErrorTriggeringMockProvider: Processing request #{self.request_count}")
+        print(f"🔥 ErrorTriggeringMockProvider: Processing request #{current_count}")
 
         # Fail every 10th request to guarantee errors
-        if self.request_count % 10 == 0:
-            print(
-                f"💥 ErrorTriggeringMockProvider: Triggering error on request #{self.request_count}"
-            )
+        if current_count % 10 == 0:
+            print(f"💥 ErrorTriggeringMockProvider: Triggering error on request #{current_count}")
             from huleedu_service_libs.error_handling import raise_external_service_error
 
             raise_external_service_error(
@@ -195,7 +206,7 @@ class ErrorTriggeringMockProvider:
                 external_service="error_triggering_mock",
                 message="Guaranteed error for testing",
                 correlation_id=correlation_id,
-                details={"provider": "mock", "request_count": self.request_count},
+                details={"provider": "mock", "request_count": current_count},
             )
 
         # Otherwise return a mock response
@@ -205,7 +216,7 @@ class ErrorTriggeringMockProvider:
 
         print(
             f"✅ ErrorTriggeringMockProvider: Returning success response for "
-            f"request #{self.request_count}"
+            f"request #{current_count}"
         )
         return LLMProviderResponse(
             winner=EssayComparisonWinner.ESSAY_A,  # Fixed: use enum, not .value
@@ -231,6 +242,7 @@ class TestProvider(Provider):
         settings = Settings()
         settings.USE_MOCK_LLM = True
         settings.QUEUE_POLL_INTERVAL_SECONDS = 0.1
+        settings.QUEUE_MAX_RETRIES = 0  # Disable retries to test error handling directly
         return settings
 
     @provide(scope=Scope.APP)
@@ -243,6 +255,20 @@ class TestProvider(Provider):
             LLMProviderType.OPENAI: mock_provider,
             LLMProviderType.ANTHROPIC: mock_provider,
         }
+
+    @provide(scope=Scope.APP)
+    def provide_comparison_processor(
+        self,
+        providers: Dict[LLMProviderType, LLMProviderProtocol],
+        event_publisher: LLMEventPublisherProtocol,
+        settings: Settings,
+    ) -> ComparisonProcessorProtocol:
+        """Provide comparison processor for domain logic."""
+        return ComparisonProcessorImpl(
+            providers=providers,
+            event_publisher=event_publisher,
+            settings=settings,
+        )
 
     @provide(scope=Scope.APP)
     def provide_orchestrator(
@@ -289,8 +315,11 @@ async def di_container() -> AsyncGenerator[AsyncContainer, None]:
 @pytest.mark.asyncio
 async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncContainer) -> None:
     """Test that queue processor handles mock provider errors correctly."""
+    # Reset error triggering provider counter for test isolation
+    ErrorTriggeringMockProvider.reset_counter()
+
     # Get dependencies from container
-    orchestrator = await di_container.get(LLMOrchestratorProtocol)
+    comparison_processor = await di_container.get(ComparisonProcessorProtocol)
     queue_manager = await di_container.get(QueueManagerProtocol)
     event_publisher = await di_container.get(LLMEventPublisherProtocol)
     trace_context_manager = await di_container.get(TraceContextManagerImpl)
@@ -298,7 +327,7 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
 
     # Create queue processor
     queue_processor = QueueProcessorImpl(
-        orchestrator=orchestrator,
+        comparison_processor=comparison_processor,
         queue_manager=queue_manager,
         event_publisher=event_publisher,
         trace_context_manager=trace_context_manager,
@@ -400,8 +429,11 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
 @pytest.mark.asyncio
 async def test_queue_processor_error_within_context_manager(di_container: AsyncContainer) -> None:
     """Test that errors within trace context manager are handled correctly."""
+    # Reset error triggering provider counter for test isolation
+    ErrorTriggeringMockProvider.reset_counter()
+
     # Get dependencies
-    orchestrator = await di_container.get(LLMOrchestratorProtocol)
+    comparison_processor = await di_container.get(ComparisonProcessorProtocol)
     queue_manager = await di_container.get(QueueManagerProtocol)
     event_publisher = await di_container.get(LLMEventPublisherProtocol)
     trace_context_manager = await di_container.get(TraceContextManagerImpl)
@@ -409,7 +441,7 @@ async def test_queue_processor_error_within_context_manager(di_container: AsyncC
 
     # Create queue processor
     queue_processor = QueueProcessorImpl(
-        orchestrator=orchestrator,
+        comparison_processor=comparison_processor,
         queue_manager=queue_manager,
         event_publisher=event_publisher,
         trace_context_manager=trace_context_manager,

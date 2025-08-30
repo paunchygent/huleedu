@@ -4,7 +4,12 @@ Infrastructure performance tests using testcontainers.
 Tests realistic performance with controlled Redis and Kafka infrastructure while keeping
 LLM providers mocked to avoid API costs. Uses testcontainers for deterministic,
 isolated infrastructure testing.
+
+Focuses on infrastructure capacity metrics: queue acceptance rates, Redis/Kafka throughput,
+and concurrent request handling capacity rather than end-to-end processing completion.
 """
+
+from __future__ import annotations
 
 import asyncio
 import statistics
@@ -13,13 +18,22 @@ from typing import Any, AsyncGenerator, Dict, Generator, Tuple
 from uuid import UUID, uuid4
 
 import pytest
-from common_core import Environment, EssayComparisonWinner, LLMProviderType
+from common_core import Environment, LLMProviderType
 from dishka import Scope, make_async_container, provide
+from huleedu_service_libs.resilience import CircuitBreakerRegistry
 from testcontainers.kafka import KafkaContainer
 from testcontainers.redis import RedisContainer
 
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.di import LLMProviderServiceProvider
+from services.llm_provider_service.implementations.connection_pool_manager_impl import (
+    ConnectionPoolManagerImpl,
+)
+from services.llm_provider_service.internal_models import LLMQueuedResult
+from services.llm_provider_service.protocols import (
+    LLMProviderProtocol,
+    LLMRetryManagerProtocol,
+)
 
 
 class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
@@ -32,6 +46,29 @@ class LLMProviderServiceTestProvider(LLMProviderServiceProvider):
     @provide(scope=Scope.APP)
     def provide_settings(self) -> Settings:
         return self._test_settings
+
+    @provide(scope=Scope.APP)
+    async def provide_llm_provider_map(
+        self,
+        settings: Settings,
+        pool_manager: ConnectionPoolManagerImpl,
+        retry_manager: LLMRetryManagerProtocol,
+        circuit_breaker_registry: CircuitBreakerRegistry,
+    ) -> Dict[LLMProviderType, LLMProviderProtocol]:
+        """Provide dictionary of performance-optimized mock providers."""
+        # Always use performance-optimized mock providers for infrastructure performance tests
+        from services.llm_provider_service.implementations.mock_provider_impl import (
+            MockProviderImpl,
+        )
+
+        mock_provider = MockProviderImpl(settings=settings, seed=42, performance_mode=True)
+        return {
+            LLMProviderType.MOCK: mock_provider,
+            LLMProviderType.ANTHROPIC: mock_provider,
+            LLMProviderType.OPENAI: mock_provider,
+            LLMProviderType.GOOGLE: mock_provider,
+            LLMProviderType.OPENROUTER: mock_provider,
+        }
 
 
 @pytest.fixture(scope="class")
@@ -142,16 +179,17 @@ class TestInfrastructurePerformance:
     async def test_realistic_single_request_performance(
         self, infrastructure_di_container: Any
     ) -> None:
-        """Test single request performance with real Redis and Kafka infrastructure.
+        """Test single request queue acceptance performance with real Redis and Kafka.
 
-        Measures actual infrastructure overhead using controlled testcontainers.
+        Measures infrastructure overhead for queue acceptance using controlled testcontainers.
+        Success criteria: request is accepted and queued with proper LLMQueuedResult response.
         """
         async with infrastructure_di_container() as request_container:
             from services.llm_provider_service.protocols import LLMOrchestratorProtocol
 
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            # Measure single request performance with real infrastructure
+            # Measure queue acceptance performance with real infrastructure
             start_time = time.perf_counter()
 
             result = await orchestrator.perform_comparison(
@@ -160,29 +198,37 @@ class TestInfrastructurePerformance:
                 essay_a="Sample essay A content for infrastructure testing",
                 essay_b="Sample essay B content for infrastructure testing",
                 correlation_id=uuid4(),
+                callback_topic="test.callback.topic",
                 model="mock-model",
             )
 
             response_time = time.perf_counter() - start_time
 
-            # Assertions for infrastructure performance
-            assert result is not None
-            assert result.winner in [EssayComparisonWinner.ESSAY_A, EssayComparisonWinner.ESSAY_B]
+            # Assert successful queueing (async-only architecture)
+            assert isinstance(result, LLMQueuedResult)
+            assert result.status == "queued"
+            assert result.queue_id is not None
+            assert result.correlation_id is not None
+            assert result.provider == LLMProviderType.MOCK
 
-            # Performance targets for real infrastructure
-            assert response_time < 2.0  # Should be under 2 seconds with real infrastructure
+            # Performance targets for real infrastructure queue acceptance
+            assert response_time < 2.0  # Queue acceptance should be under 2 seconds
 
-            print(f"Realistic single request performance: {response_time:.4f}s")
+            print(f"Infrastructure queue acceptance performance: {response_time:.4f}s")
+            print(f"Queued with ID: {result.queue_id}")
             print("  Infrastructure: Real Kafka + Redis (testcontainers)")
             print("  Provider: Mock (no API costs)")
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.performance
     async def test_realistic_concurrent_requests_performance(
         self, infrastructure_di_container: Any
     ) -> None:
-        """Test concurrent request performance with real Redis and Kafka infrastructure.
+        """Test concurrent queue acceptance performance with real Redis and Kafka infrastructure.
 
-        Tests realistic concurrent load with controlled testcontainers.
+        Tests realistic concurrent load on infrastructure capacity with controlled testcontainers.
+        Success criteria: measures infrastructure queue acceptance rates under concurrent load.
         """
         concurrent_requests = 20  # Appropriate load for real infrastructure
 
@@ -191,25 +237,27 @@ class TestInfrastructurePerformance:
 
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            async def make_request(request_id: int) -> Tuple[float, bool]:
-                """Make a single request and return response time and success."""
+            async def make_request(request_id: int) -> Tuple[float, bool, LLMQueuedResult | None]:
+                """Make a single request and return response time, success, and queue result."""
                 start_time = time.perf_counter()
 
                 try:
-                    await orchestrator.perform_comparison(
+                    result = await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,  # Mock to avoid API costs
                         user_prompt=f"Compare these essays for infrastructure test {request_id}",
                         essay_a=f"Infrastructure test essay A {request_id}",
                         essay_b=f"Infrastructure test essay B {request_id}",
                         correlation_id=uuid4(),
+                        callback_topic=f"test.callback.topic.{request_id}",
                         model="mock-model",
                     )
 
                     response_time = time.perf_counter() - start_time
-                    return response_time, True
+                    is_success = isinstance(result, LLMQueuedResult) and result.status == "queued"
+                    return response_time, is_success, result if is_success else None
                 except Exception:
                     response_time = time.perf_counter() - start_time
-                    return response_time, False
+                    return response_time, False, None
 
             # Run concurrent requests
             start_time = time.perf_counter()
@@ -219,26 +267,30 @@ class TestInfrastructurePerformance:
 
             total_time = time.perf_counter() - start_time
 
-            # Analyze results
+            # Analyze queue acceptance results
             response_times = [r[0] for r in results]
             successes = [r[1] for r in results]
+            queued_results = [r[2] for r in results if r[2] is not None]
 
             p95_time = sorted(response_times)[int(len(response_times) * 0.95)]
             success_rate = sum(successes) / len(successes) * 100
+            queue_acceptance_rate = len(queued_results) / concurrent_requests * 100
 
-            print("Realistic concurrent requests performance:")
+            print("Infrastructure concurrent queue acceptance performance:")
             print(f"  Total requests: {concurrent_requests}")
+            print(f"  Queued requests: {len(queued_results)}")
+            print(f"  Queue acceptance rate: {queue_acceptance_rate:.1f}%")
             print(f"  Total time: {total_time:.4f}s")
-            print(f"  Requests per second: {concurrent_requests / total_time:.2f}")
+            print(f"  Queue throughput: {concurrent_requests / total_time:.2f} requests/sec")
             print(f"  Success rate: {success_rate:.1f}%")
-            print(f"  P95 response time: {p95_time:.4f}s")
-            print(f"  Mean response time: {statistics.mean(response_times):.4f}s")
+            print(f"  P95 queue acceptance time: {p95_time:.4f}s")
+            print(f"  Mean queue acceptance time: {statistics.mean(response_times):.4f}s")
             print("  Infrastructure: Real Kafka + Redis")
 
-            # Assertions for real infrastructure performance
-            assert success_rate >= 90  # At least 90% success rate
-            assert p95_time < 5.0  # P95 should be under 5 seconds with real infrastructure
-            assert statistics.mean(response_times) < 2.0  # Mean should be under 2 seconds
+            # Assertions for infrastructure queue acceptance performance
+            assert queue_acceptance_rate >= 90  # At least 90% queue acceptance rate
+            assert p95_time < 5.0  # P95 queue acceptance should be under 5 seconds
+            assert statistics.mean(response_times) < 2.0  # Mean queue acceptance under 2 seconds
 
     @pytest.mark.asyncio
     async def test_queue_resilience_with_real_redis(self, infrastructure_di_container: Any) -> None:
@@ -363,45 +415,50 @@ class TestInfrastructurePerformance:
             assert event_count / publishing_time > 1  # At least 1 event per second
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.performance
     async def test_end_to_end_infrastructure_load(self, infrastructure_di_container: Any) -> None:
-        """Test complete end-to-end load with real infrastructure.
+        """Test complete infrastructure load capacity with real Redis and Kafka.
 
-        This is the most realistic performance test - measures the full stack
-        with real Kafka and Redis but mock LLM providers.
+        Tests infrastructure queue acceptance capacity under concurrent load.
+        Success criteria: measures queue acceptance rates and infrastructure throughput limits.
         """
-        request_count = 15  # Moderate load for end-to-end test
+        request_count = 15  # Moderate load for infrastructure capacity test
 
         async with infrastructure_di_container() as request_container:
             from services.llm_provider_service.protocols import LLMOrchestratorProtocol
 
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-            # Run end-to-end load test
+            # Run infrastructure load test
             start_time = time.perf_counter()
 
             tasks = []
             for i in range(request_count):
 
-                async def make_e2e_request(request_id: int) -> Tuple[float, bool, Dict[str, Any]]:
+                async def make_e2e_request(
+                    request_id: int,
+                ) -> Tuple[float, bool, LLMQueuedResult | None]:
                     start = time.perf_counter()
                     try:
+                        prompt = f"Compare these essays for infrastructure load test {request_id}"
                         result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,
-                            user_prompt=f"Compare these essays for e2e test {request_id}",
-                            essay_a=f"End-to-end test essay A {request_id}",
-                            essay_b=f"End-to-end test essay B {request_id}",
+                            user_prompt=prompt,
+                            essay_a=f"Infrastructure load test essay A {request_id}",
+                            essay_b=f"Infrastructure load test essay B {request_id}",
                             correlation_id=uuid4(),
+                            callback_topic=f"test.e2e.callback.topic.{request_id}",
                             model="mock-model",
                         )
                         duration = time.perf_counter() - start
-                        return (
-                            duration,
-                            True,
-                            result.__dict__ if hasattr(result, "__dict__") else {},
+                        is_success = (
+                            isinstance(result, LLMQueuedResult) and result.status == "queued"
                         )
-                    except Exception as e:
+                        return duration, is_success, result if is_success else None
+                    except Exception:
                         duration = time.perf_counter() - start
-                        return duration, False, {"error": str(e)}
+                        return duration, False, None
 
                 tasks.append(make_e2e_request(i))
 
@@ -410,26 +467,29 @@ class TestInfrastructurePerformance:
 
             total_time = time.perf_counter() - start_time
 
-            # Analyze results
+            # Analyze infrastructure load results
             response_times = [r[0] for r in results]
             successes = [r[1] for r in results]
+            queued_results = [r[2] for r in results if r[2] is not None]
 
             success_count = sum(successes)
             success_rate = success_count / len(successes) * 100
+            queue_acceptance_rate = len(queued_results) / request_count * 100
             p95_time = sorted(response_times)[int(len(response_times) * 0.95)]
 
-            print("End-to-end infrastructure load test (testcontainers):")
+            print("Infrastructure load capacity test (testcontainers):")
             print(f"  Total requests: {request_count}")
-            print(f"  Successful requests: {success_count}")
+            print(f"  Queued requests: {len(queued_results)}")
+            print(f"  Queue acceptance rate: {queue_acceptance_rate:.1f}%")
             print(f"  Success rate: {success_rate:.1f}%")
             print(f"  Total time: {total_time:.4f}s")
-            print(f"  Throughput: {request_count / total_time:.2f} requests/sec")
-            print(f"  P95 response time: {p95_time:.4f}s")
-            print(f"  Mean response time: {statistics.mean(response_times):.4f}s")
+            print(f"  Infrastructure throughput: {request_count / total_time:.2f} requests/sec")
+            print(f"  P95 queue acceptance time: {p95_time:.4f}s")
+            print(f"  Mean queue acceptance time: {statistics.mean(response_times):.4f}s")
             print("  Infrastructure: Real Kafka + Redis (testcontainers)")
             print("  LLM Provider: Mock (no API costs)")
 
-            # Performance targets for real infrastructure
-            assert success_rate >= 85  # At least 85% success rate
-            assert p95_time < 10.0  # P95 under 10 seconds for full stack
-            assert statistics.mean(response_times) < 3.0  # Mean under 3 seconds
+            # Infrastructure capacity performance targets
+            assert queue_acceptance_rate >= 85  # At least 85% queue acceptance rate
+            assert p95_time < 10.0  # P95 queue acceptance under 10 seconds
+            assert statistics.mean(response_times) < 3.0  # Mean queue acceptance under 3 seconds

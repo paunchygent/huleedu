@@ -9,8 +9,8 @@ from uuid import UUID
 from common_core.domain_enums import ContentType
 
 from huleedu_service_libs.http_client.protocols import ContentServiceClientProtocol
-from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 
 logger = create_service_logger("circuit_breaker_content_service")
 

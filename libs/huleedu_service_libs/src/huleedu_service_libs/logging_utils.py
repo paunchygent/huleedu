@@ -20,9 +20,9 @@ import sys
 from typing import Any
 
 import structlog
-from structlog.typing import Processor
 from common_core.events.envelope import EventEnvelope
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
+from structlog.typing import Processor
 
 
 def configure_service_logging(

@@ -17,6 +17,7 @@ from uuid import UUID, uuid4
 import pytest
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.relay import OutboxSettings
@@ -33,7 +34,6 @@ from testcontainers.postgres import PostgresContainer
 
 from services.file_service.config import Settings
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.file_service.protocols import EventPublisherProtocol
 
 

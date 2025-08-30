@@ -13,8 +13,9 @@ from uuid import UUID
 from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
-    from services.cj_assessment_service.config import Settings
     from huleedu_service_libs.outbox.manager import OutboxManager
+
+    from services.cj_assessment_service.config import Settings
 
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 

@@ -14,11 +14,11 @@ import pytest
 from common_core.emailing_models import EmailDeliveryFailedV1, EmailSentV1
 from common_core.events.envelope import EventEnvelope
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
 
 from services.email_service.config import Settings
-from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 @pytest.fixture

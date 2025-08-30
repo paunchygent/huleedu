@@ -5,6 +5,8 @@ Tests individual request performance with real Redis and Kafka infrastructure
 to establish meaningful baseline metrics. Uses mock LLM providers to avoid API costs.
 """
 
+from __future__ import annotations
+
 import time
 from typing import Any, AsyncGenerator, Dict, Generator
 from uuid import uuid4
@@ -21,6 +23,7 @@ from services.llm_provider_service.di import LLMProviderServiceProvider
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
 )
+from services.llm_provider_service.internal_models import LLMQueuedResult
 from services.llm_provider_service.protocols import (
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
@@ -146,11 +149,15 @@ class TestSingleRequestPerformance:
     @pytest.mark.slow
     @pytest.mark.performance
     async def test_single_request_performance(self, infrastructure_di_container: Any) -> None:
-        """Test single request performance baseline with real infrastructure."""
+        """Test single request queue acceptance performance baseline with real infrastructure.
+
+        Measures the performance of successfully queuing a request, not end-to-end processing.
+        Success criteria: request is accepted and queued with proper LLMQueuedResult response.
+        """
         async with infrastructure_di_container() as request_container:
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-        # Measure single request performance
+        # Measure queue acceptance performance
         start_time = time.perf_counter()
 
         result = await orchestrator.perform_comparison(
@@ -159,29 +166,41 @@ class TestSingleRequestPerformance:
             essay_a="Sample essay A content",
             essay_b="Sample essay B content",
             correlation_id=uuid4(),
+            callback_topic="test_callback_topic",
             model="mock-model",
         )
 
         response_time = time.perf_counter() - start_time
 
-        # Realistic assertions for single request with real infrastructure
-        assert result is not None
-        assert response_time < 2.0  # Should be under 2s for real infrastructure
+        # Assert successful queueing (async-only architecture)
+        assert isinstance(result, LLMQueuedResult)
+        assert result.status == "queued"
+        assert result.queue_id is not None
+        assert result.correlation_id is not None
+        assert result.provider == LLMProviderType.MOCK
 
-        print(f"Single request performance (real infrastructure): {response_time:.4f}s")
+        # Performance assertions for queue acceptance
+        assert response_time < 2.0  # Queue acceptance should be under 2s
+
+        print(f"Queue acceptance performance (real infrastructure): {response_time:.4f}s")
+        print(f"Queued with ID: {result.queue_id}")
         print("Infrastructure: Real Kafka + Redis (testcontainers)")
 
     @pytest.mark.asyncio
     async def test_multiple_sequential_requests(self, infrastructure_di_container: Any) -> None:
-        """Test performance consistency across multiple sequential requests
-        with real infrastructure."""
+        """Test queue acceptance consistency across multiple sequential requests.
+
+        Measures the performance of successfully queuing multiple requests sequentially.
+        Success criteria: all requests are accepted and queued with consistent timing.
+        """
         request_count = 5  # Reduced for real infrastructure
         response_times = []
+        queued_results = []
 
         async with infrastructure_di_container() as request_container:
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
-        # Make sequential requests
+        # Make sequential requests and measure queue acceptance
         for i in range(request_count):
             start_time = time.perf_counter()
 
@@ -191,51 +210,69 @@ class TestSingleRequestPerformance:
                 essay_a=f"Sample essay A content {i}",
                 essay_b=f"Sample essay B content {i}",
                 correlation_id=uuid4(),
+                callback_topic=f"test_callback_topic_{i}",
                 model="mock-model",
             )
 
             response_time = time.perf_counter() - start_time
             response_times.append(response_time)
+            queued_results.append(result)
 
-            # Verify each request succeeds
-            assert result is not None
+            # Verify each request is successfully queued
+            assert isinstance(result, LLMQueuedResult)
+            assert result.status == "queued"
+            assert result.queue_id is not None
+            assert result.provider == LLMProviderType.MOCK
 
-        # Analyze performance consistency
+        # Analyze queue acceptance performance consistency
         avg_time = sum(response_times) / len(response_times)
         max_time = max(response_times)
         min_time = min(response_times)
+        success_rate = len([r for r in queued_results if r.status == "queued"]) / request_count
 
-        print("Sequential requests performance (real infrastructure):")
+        print("Sequential queue acceptance performance (real infrastructure):")
         print(f"  Requests: {request_count}")
+        print(f"  Success rate: {success_rate:.2%}")
         print(f"  Average: {avg_time:.4f}s")
         print(f"  Min: {min_time:.4f}s")
         print(f"  Max: {max_time:.4f}s")
         print(f"  Variance: {max_time - min_time:.4f}s")
         print("  Infrastructure: Real Kafka + Redis (testcontainers)")
 
-        # Realistic assertions for consistency with real infrastructure
-        assert avg_time < 2.5  # Average should be under 2.5s
-        assert max_time < 5.0  # No request should take more than 5s
+        # Performance assertions for queue acceptance consistency
+        assert success_rate == 1.0  # All requests should be successfully queued
+        assert avg_time < 2.5  # Average queue acceptance should be under 2.5s
+        assert max_time < 5.0  # No queue acceptance should take more than 5s
         assert (max_time - min_time) < 3.0  # Variance should be reasonable
 
     @pytest.mark.asyncio
     async def test_infrastructure_overhead_analysis(self, infrastructure_di_container: Any) -> None:
-        """Analyze infrastructure overhead with real Redis and Kafka."""
+        """Analyze infrastructure overhead for queue acceptance with real Redis and Kafka.
+
+        Measures the minimal overhead of queue acceptance operations after warmup.
+        Success criteria: consistent queue acceptance with minimal infrastructure overhead.
+        """
         async with infrastructure_di_container() as request_container:
             orchestrator = await request_container.get(LLMOrchestratorProtocol)
 
             # Warm up (eliminate cold start effects)
-            await orchestrator.perform_comparison(
+            warmup_result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
                 user_prompt="Warmup",
                 essay_a="Warmup A",
                 essay_b="Warmup B",
                 correlation_id=uuid4(),
+                callback_topic="warmup_topic",
                 model="mock-model",
             )
+            # Verify warmup succeeded
+            assert isinstance(warmup_result, LLMQueuedResult)
+            assert warmup_result.status == "queued"
 
-        # Measure minimal overhead
+        # Measure minimal queue acceptance overhead
         overhead_measurements = []
+        queued_results = []
+
         for _ in range(5):
             start_time = time.perf_counter()
 
@@ -245,22 +282,32 @@ class TestSingleRequestPerformance:
                 essay_a="A",
                 essay_b="B",
                 correlation_id=uuid4(),
+                callback_topic="overhead_test_topic",
                 model="mock-model",
             )
 
             overhead_time = time.perf_counter() - start_time
             overhead_measurements.append(overhead_time)
-            assert result is not None
+            queued_results.append(result)
+
+            # Verify successful queueing
+            assert isinstance(result, LLMQueuedResult)
+            assert result.status == "queued"
 
         avg_overhead = sum(overhead_measurements) / len(overhead_measurements)
         min_overhead = min(overhead_measurements)
+        success_rate = len([r for r in queued_results if r.status == "queued"]) / len(
+            queued_results
+        )
 
-        print("Infrastructure overhead analysis (real infrastructure):")
+        print("Infrastructure overhead analysis for queue acceptance (real infrastructure):")
+        print(f"  Success rate: {success_rate:.2%}")
         print(f"  Average overhead: {avg_overhead:.6f}s")
         print(f"  Minimum overhead: {min_overhead:.6f}s")
         print(f"  Overhead measurements: {[f'{t:.6f}' for t in overhead_measurements]}")
         print("  Infrastructure: Real Kafka + Redis (testcontainers)")
 
-        # Realistic assertions for infrastructure overhead
-        assert avg_overhead < 3.0  # Average overhead should be under 3s for real infrastructure
-        assert min_overhead < 1.0  # Minimum should be under 1s
+        # Performance assertions for queue acceptance overhead
+        assert success_rate == 1.0  # All requests should be successfully queued
+        assert avg_overhead < 3.0  # Average queue acceptance overhead should be under 3s
+        assert min_overhead < 1.0  # Minimum queue acceptance should be under 1s

@@ -11,6 +11,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
@@ -25,7 +26,6 @@ from services.file_service.implementations.content_service_client_impl import (
 )
 from services.file_service.implementations.event_publisher_impl import DefaultEventPublisher
 from services.file_service.implementations.file_repository_impl import FileRepository
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.file_service.implementations.text_extractor_impl import StrategyBasedTextExtractor
 from services.file_service.metrics import METRICS
 from services.file_service.notification_projector import FileServiceNotificationProjector

@@ -17,13 +17,16 @@ from huleedu_service_libs.queue_redis_client import QueueRedisClient
 from huleedu_service_libs.redis_client import RedisClient
 from huleedu_service_libs.resilience import CircuitBreaker, CircuitBreakerRegistry
 from huleedu_service_libs.resilience.metrics_bridge import create_metrics_bridge
-from services.llm_provider_service.implementations.circuit_breaker_llm_provider import (
-    CircuitBreakerLLMProvider,
-)
 
 from services.llm_provider_service.config import Settings, settings
 from services.llm_provider_service.implementations.anthropic_provider_impl import (
     AnthropicProviderImpl,
+)
+from services.llm_provider_service.implementations.circuit_breaker_llm_provider import (
+    CircuitBreakerLLMProvider,
+)
+from services.llm_provider_service.implementations.comparison_processor_impl import (
+    ComparisonProcessorImpl,
 )
 from services.llm_provider_service.implementations.connection_pool_manager_impl import (
     ConnectionPoolManagerImpl,
@@ -63,6 +66,7 @@ from services.llm_provider_service.implementations.trace_context_manager_impl im
 )
 from services.llm_provider_service.metrics import get_circuit_breaker_metrics
 from services.llm_provider_service.protocols import (
+    ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     LLMOrchestratorProtocol,
     LLMProviderProtocol,
@@ -387,6 +391,20 @@ class LLMProviderServiceProvider(Provider):
         }
 
     @provide(scope=Scope.APP)
+    def provide_comparison_processor(
+        self,
+        providers: Dict[LLMProviderType, LLMProviderProtocol],
+        event_publisher: LLMEventPublisherProtocol,
+        settings: Settings,
+    ) -> ComparisonProcessorProtocol:
+        """Provide comparison processor for domain logic."""
+        return ComparisonProcessorImpl(
+            providers=providers,
+            event_publisher=event_publisher,
+            settings=settings,
+        )
+
+    @provide(scope=Scope.APP)
     def provide_llm_orchestrator(
         self,
         settings: Settings,
@@ -407,7 +425,7 @@ class LLMProviderServiceProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_queue_processor(
         self,
-        orchestrator: LLMOrchestratorProtocol,
+        comparison_processor: ComparisonProcessorProtocol,
         queue_manager: QueueManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
         trace_context_manager: TraceContextManagerImpl,
@@ -415,7 +433,7 @@ class LLMProviderServiceProvider(Provider):
     ) -> QueueProcessorImpl:
         """Provide queue processor for background request processing."""
         return QueueProcessorImpl(
-            orchestrator=orchestrator,
+            comparison_processor=comparison_processor,
             queue_manager=queue_manager,
             event_publisher=event_publisher,
             trace_context_manager=trace_context_manager,

@@ -11,6 +11,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
@@ -35,7 +36,6 @@ from services.cj_assessment_service.implementations.llm_interaction_impl import 
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 from services.cj_assessment_service.kafka_consumer import CJAssessmentKafkaConsumer
 from services.cj_assessment_service.metrics import setup_cj_assessment_database_monitoring

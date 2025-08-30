@@ -17,8 +17,8 @@ from common_core.identity_models import (
     UserRegisteredV1,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
-
 from huleedu_service_libs.outbox.manager import OutboxManager
+
 from services.identity_service.protocols import IdentityEventPublisherProtocol
 
 logger = create_service_logger("identity_service.event_publisher")

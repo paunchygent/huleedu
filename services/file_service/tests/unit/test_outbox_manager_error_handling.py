@@ -16,9 +16,9 @@ import pytest
 from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1
 from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.file_service.config import Settings
-from huleedu_service_libs.outbox.manager import OutboxManager
 
 
 @pytest.fixture

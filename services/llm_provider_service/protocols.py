@@ -375,3 +375,37 @@ class ConnectionPoolManagerProtocol(Protocol):
     async def cleanup(self) -> None:
         """Clean up all sessions and connection pools."""
         ...
+
+
+class ComparisonProcessorProtocol(Protocol):
+    """Protocol for processing LLM comparisons - domain logic only."""
+
+    async def process_comparison(
+        self,
+        provider: LLMProviderType,
+        user_prompt: str,
+        essay_a: str,
+        essay_b: str,
+        correlation_id: UUID,
+        **overrides: Any,
+    ) -> "LLMOrchestratorResponse":
+        """Process LLM comparison without infrastructure concerns.
+
+        This is pure domain logic - no queuing, no callbacks.
+        Used by QueueProcessor for actual LLM invocation.
+
+        Args:
+            provider: LLM provider to use
+            user_prompt: The comparison prompt
+            essay_a: First essay to compare
+            essay_b: Second essay to compare
+            correlation_id: Request correlation ID
+            **overrides: Additional parameter overrides
+
+        Returns:
+            LLMOrchestratorResponse with immediate result
+
+        Raises:
+            HuleEduError: On any failure to process comparison
+        """
+        ...

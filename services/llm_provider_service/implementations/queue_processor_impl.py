@@ -28,8 +28,8 @@ from services.llm_provider_service.internal_models import (
     LLMQueuedResult,
 )
 from services.llm_provider_service.protocols import (
+    ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
-    LLMOrchestratorProtocol,
     QueueManagerProtocol,
 )
 from services.llm_provider_service.queue_models import QueuedRequest
@@ -42,7 +42,7 @@ class QueueProcessorImpl:
 
     def __init__(
         self,
-        orchestrator: LLMOrchestratorProtocol,
+        comparison_processor: ComparisonProcessorProtocol,
         queue_manager: QueueManagerProtocol,
         event_publisher: LLMEventPublisherProtocol,
         trace_context_manager: TraceContextManagerImpl,
@@ -51,13 +51,13 @@ class QueueProcessorImpl:
         """Initialize queue processor.
 
         Args:
-            orchestrator: LLM orchestrator for making requests
+            comparison_processor: Processor for domain logic (comparison processing)
             queue_manager: Queue manager for request handling
             event_publisher: Event publisher for notifications
             trace_context_manager: Trace context manager for distributed tracing
             settings: Service settings
         """
-        self.orchestrator = orchestrator
+        self.comparison_processor = comparison_processor
         self.queue_manager = queue_manager
         self.event_publisher = event_publisher
         self.trace_context_manager = trace_context_manager
@@ -182,8 +182,8 @@ class QueueProcessorImpl:
                     },
                 )
 
-                # Direct processing for queued requests (bypasses API queueing)
-                result = await self.orchestrator.process_queued_request(
+                # Use comparison processor for domain logic only
+                result = await self.comparison_processor.process_comparison(
                     provider=provider,
                     user_prompt=req_data.user_prompt,
                     essay_a=req_data.essay_a,

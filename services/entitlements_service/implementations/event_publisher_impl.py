@@ -5,10 +5,10 @@ This module implements the EventPublisherProtocol for publishing domain events
 from credit operations using the transactional outbox pattern.
 """
 
-import logging
+import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from uuid import uuid4
+from uuid import NAMESPACE_OID, UUID, uuid4, uuid5
 
 from common_core import (
     CreditBalanceChangedV1,
@@ -20,14 +20,15 @@ from common_core import (
     topic_name,
 )
 from common_core.entitlements_models import SubjectType
-
 from huleedu_service_libs.outbox.manager import OutboxManager
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.entitlements_service.protocols import EventPublisherProtocol
 
 if TYPE_CHECKING:
     from services.entitlements_service.config import Settings
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("entitlements_service.event_publisher")
 
 
 class EventPublisherImpl(EventPublisherProtocol):
@@ -90,13 +91,26 @@ class EventPublisherImpl(EventPublisherProtocol):
             correlation_id=correlation_id,
         )
 
+        # Determine topic and deterministic event_id
+        event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED)
+        deterministic_id = uuid5(
+            NAMESPACE_OID,
+            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        )
+
+        # Safe correlation UUID propagation (derive stable UUID if not a valid UUID)
+        try:
+            corr_uuid = UUID(correlation_id)
+        except Exception:
+            corr_uuid = uuid5(NAMESPACE_OID, correlation_id)
+
         # Create event envelope
         event_envelope = EventEnvelope[CreditBalanceChangedV1](
-            event_id=uuid4(),
-            event_type=topic_name(ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED),
+            event_id=deterministic_id,
+            event_type=event_topic,
             event_timestamp=datetime.now(timezone.utc),
             source_service=self.settings.SERVICE_NAME,
-            correlation_id=uuid4(),
+            correlation_id=corr_uuid,
             data=event_data,
             metadata={
                 "partition_key": subject_id,
@@ -106,7 +120,7 @@ class EventPublisherImpl(EventPublisherProtocol):
         )
 
         # Determine topic
-        topic = topic_name(ProcessingEvent.ENTITLEMENTS_CREDIT_BALANCE_CHANGED)
+        topic = event_topic
 
         # Publish via outbox
         await self.outbox_manager.publish_to_outbox(
@@ -164,13 +178,26 @@ class EventPublisherImpl(EventPublisherProtocol):
             correlation_id=correlation_id,
         )
 
+        # Determine topic and deterministic event_id
+        event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED)
+        deterministic_id = uuid5(
+            NAMESPACE_OID,
+            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        )
+
+        # Safe correlation UUID propagation
+        try:
+            corr_uuid = UUID(correlation_id)
+        except Exception:
+            corr_uuid = uuid5(NAMESPACE_OID, correlation_id)
+
         # Create event envelope
         event_envelope = EventEnvelope[RateLimitExceededV1](
-            event_id=uuid4(),
-            event_type=topic_name(ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED),
+            event_id=deterministic_id,
+            event_type=event_topic,
             event_timestamp=datetime.now(timezone.utc),
             source_service=self.settings.SERVICE_NAME,
-            correlation_id=uuid4(),
+            correlation_id=corr_uuid,
             data=event_data,
             metadata={
                 "partition_key": subject_id,
@@ -181,7 +208,7 @@ class EventPublisherImpl(EventPublisherProtocol):
         )
 
         # Determine topic
-        topic = topic_name(ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED)
+        topic = event_topic
 
         # Publish via outbox
         await self.outbox_manager.publish_to_outbox(
@@ -243,13 +270,26 @@ class EventPublisherImpl(EventPublisherProtocol):
             correlation_id=correlation_id,
         )
 
+        # Determine topic and deterministic event_id
+        event_topic = topic_name(ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED)
+        deterministic_id = uuid5(
+            NAMESPACE_OID,
+            f"{event_topic}:{json.dumps(event_data.model_dump(mode='json', exclude_none=True), sort_keys=True)}",
+        )
+
+        # Safe correlation UUID propagation
+        try:
+            corr_uuid = UUID(correlation_id)
+        except Exception:
+            corr_uuid = uuid5(NAMESPACE_OID, correlation_id)
+
         # Create event envelope
         event_envelope = EventEnvelope[UsageRecordedV1](
-            event_id=uuid4(),
-            event_type=topic_name(ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED),
+            event_id=deterministic_id,
+            event_type=event_topic,
             event_timestamp=now,
             source_service=self.settings.SERVICE_NAME,
-            correlation_id=uuid4(),
+            correlation_id=corr_uuid,
             data=event_data,
             metadata={
                 "partition_key": subject_id,
@@ -260,7 +300,7 @@ class EventPublisherImpl(EventPublisherProtocol):
         )
 
         # Determine topic
-        topic = topic_name(ProcessingEvent.ENTITLEMENTS_USAGE_RECORDED)
+        topic = event_topic
 
         # Publish via outbox
         await self.outbox_manager.publish_to_outbox(

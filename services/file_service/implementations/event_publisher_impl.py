@@ -9,9 +9,9 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.file_events import EssayContentProvisionedV1, EssayValidationFailedV1
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.outbox.manager import OutboxManager
 
 from services.file_service.config import Settings
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.file_service.protocols import EventPublisherProtocol, FileRepositoryProtocol
 
 if TYPE_CHECKING:

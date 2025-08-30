@@ -23,6 +23,7 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import EventRelayWorker, OutboxProvider
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.models import EventOutbox
 from huleedu_service_libs.outbox.protocols import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.relay import OutboxSettings
@@ -33,7 +34,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.event_publisher_impl import CJEventPublisherImpl
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 

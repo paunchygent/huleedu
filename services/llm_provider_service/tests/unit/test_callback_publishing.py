@@ -23,6 +23,7 @@ from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
 
 
@@ -36,10 +37,9 @@ def mock_settings() -> Mock:
 
 
 @pytest.fixture
-def mock_orchestrator() -> AsyncMock:
-    """Mock LLM orchestrator."""
-    orchestrator = AsyncMock()
-    return orchestrator
+def mock_comparison_processor() -> AsyncMock:
+    """Mock comparison processor."""
+    return AsyncMock(spec=ComparisonProcessorProtocol)
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def mock_trace_context_manager() -> Mock:
 
 @pytest.fixture
 def queue_processor(
-    mock_orchestrator: AsyncMock,
+    mock_comparison_processor: AsyncMock,
     mock_queue_manager: AsyncMock,
     mock_event_publisher: AsyncMock,
     mock_trace_context_manager: Mock,
@@ -85,7 +85,7 @@ def queue_processor(
 ) -> QueueProcessorImpl:
     """Create queue processor with mocked dependencies."""
     return QueueProcessorImpl(
-        orchestrator=mock_orchestrator,
+        comparison_processor=mock_comparison_processor,
         queue_manager=mock_queue_manager,
         event_publisher=mock_event_publisher,
         trace_context_manager=mock_trace_context_manager,
@@ -624,12 +624,12 @@ class TestPublishFailureHandling:
         sample_request: QueuedRequest,
         successful_llm_response: LLMOrchestratorResponse,
         mock_event_publisher: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_comparison_processor: AsyncMock,
         mock_queue_manager: AsyncMock,
     ) -> None:
         """Test that queue processing continues even if callback publish fails."""
         # Arrange
-        mock_orchestrator.perform_comparison.return_value = successful_llm_response
+        mock_comparison_processor.process_comparison.return_value = successful_llm_response
         mock_event_publisher.publish_to_topic.side_effect = Exception("Kafka publish failed")
 
         # Act - process the request

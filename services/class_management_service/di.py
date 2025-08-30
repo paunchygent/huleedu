@@ -8,6 +8,7 @@ from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
@@ -42,7 +43,6 @@ from services.class_management_service.implementations.class_repository_postgres
 from services.class_management_service.implementations.event_publisher_impl import (
     DefaultClassEventPublisherImpl,
 )
-from huleedu_service_libs.outbox.manager import OutboxManager
 from services.class_management_service.kafka_consumer import ClassManagementKafkaConsumer
 from services.class_management_service.metrics import (
     CmsMetrics,
