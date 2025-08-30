@@ -172,9 +172,7 @@ async def publish_dual_assessment_events(
                 letter_grade=grade,
                 confidence_score=grade_projections.confidence_scores.get(essay_id, 0.0),
                 confidence_label=grade_projections.confidence_labels.get(essay_id, "LOW"),
-                bt_score=ranking.get(
-                    "bradley_terry_score", 0.0
-                ),  # bradley_terry_score field contains BT score
+                bt_score=ranking.get("bradley_terry_score") or 0.0,  # Handle None values
                 rank=ranking.get("rank", 999),
                 is_anchor=is_anchor,
                 # Display name for anchors to help with score band visualization

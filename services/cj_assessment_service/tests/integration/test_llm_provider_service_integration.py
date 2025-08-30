@@ -152,6 +152,9 @@ class TestLLMProviderServiceIntegration:
                 provider_override=LLMProviderType.ANTHROPIC,
                 temperature_override=0.1,
             ),
+            # Identity fields for credit attribution
+            user_id="integration-test-user",
+            org_id="integration-test-org",
         )
 
         # Create event envelope

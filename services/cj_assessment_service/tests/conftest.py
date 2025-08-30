@@ -147,6 +147,9 @@ def cj_assessment_request_data_with_overrides(
         course_code=CourseCode.ENG5,
         essay_instructions="Compare the quality of these essays.",
         llm_config_overrides=llm_config_overrides,
+        # Identity fields for credit attribution (Phase 3)
+        user_id="test-user-123",
+        org_id="test-org-456",
     )
 
 
@@ -174,6 +177,9 @@ def cj_assessment_request_data_no_overrides(
         course_code=CourseCode.SV1,
         essay_instructions="Compare the quality of these essays.",
         llm_config_overrides=None,
+        # Identity fields for credit attribution (Phase 3)
+        user_id="test-user-456",
+        org_id=None,  # Test both with and without org
     )
 
 

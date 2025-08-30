@@ -83,6 +83,9 @@ class TestRealDatabaseIntegration:
             course_code=CourseCode.ENG5,
             essay_instructions="Compare the quality of these essays.",
             llm_config_overrides=None,
+            # Identity fields for credit attribution (Phase 3)
+            user_id="db-integration-test-user",
+            org_id=None,  # Test scenario without org
         )
 
         return EventEnvelope[ELS_CJAssessmentRequestV1](

@@ -82,6 +82,9 @@ class TestDualEventPublishing:
             assignment_id="assignment_789",
             course_code=CourseCode.ENG5,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+            # Identity fields for ResourceConsumptionV1 publishing
+            user_id="test-user-123",
+            org_id="test-org-456",
         )
 
     @pytest.mark.asyncio

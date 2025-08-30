@@ -244,6 +244,9 @@ class MockDatabase(CJRepositoryProtocol):
         essay_instructions: str,
         initial_status: Any,
         expected_essay_count: int,
+        # Identity fields for credit attribution (Phase 3)
+        user_id: str | None = None,
+        org_id: str | None = None,
     ) -> Any:
         """Create a new CJ batch record."""
         if self.should_fail_create_batch:
@@ -258,13 +261,19 @@ class MockDatabase(CJRepositoryProtocol):
             "essay_instructions": essay_instructions,
             "initial_status": initial_status,
             "expected_essay_count": expected_essay_count,
+            # Identity fields for credit attribution (Phase 3)
+            "user_id": user_id,
+            "org_id": org_id,
         }
 
         class Batch:
-            def __init__(self, batch_id_val: int) -> None:
+            def __init__(self, batch_id_val: int, batch_data: dict) -> None:
                 self.id = batch_id_val
+                # Add identity fields from stored data
+                self.user_id = batch_data.get("user_id")
+                self.org_id = batch_data.get("org_id")
 
-        return Batch(batch_id)
+        return Batch(batch_id, self.batches[batch_id])
 
     async def create_or_update_cj_processed_essay(
         self,

@@ -55,6 +55,9 @@ class TestDualEventPublishingValidation:
             assignment_id="assignment_789",
             course_code=CourseCode.ENG5,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+            # Identity fields for ResourceConsumptionV1 publishing
+            user_id="test-user-789",
+            org_id=None,  # Test scenario without org
         )
 
     @pytest.mark.asyncio
@@ -231,9 +234,9 @@ class TestDualEventPublishingValidation:
         }
 
         for result in anchor_results:
-            essay_id = result["essay_id"]
+            essay_id = result.essay_id
             expected_name = expected_display_names[essay_id]
-            assert result["display_name"] == expected_name
+            assert result.display_name == expected_name
 
     @pytest.mark.asyncio
     async def test_data_resilience_with_missing_confidence_data(
@@ -361,8 +364,8 @@ class TestDualEventPublishingValidation:
             r for r in ras_envelope.data.essay_results if r.essay_id == "student_null"
         )
 
-        # Verify null score is preserved (correct behavior for failed essays)
-        assert null_score_result.bt_score is None  # Null scores remain null
+        # Verify null score is converted to 0.0 (correct behavior for failed essays)
+        assert null_score_result.bt_score == 0.0  # Null scores become 0.0 for Pydantic validation
         # normalized_score should still be calculated (likely 0.0 for failed essays)
         assert isinstance(null_score_result.normalized_score, (int, float))
         assert 0.0 <= null_score_result.normalized_score <= 1.0
