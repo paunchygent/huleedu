@@ -111,7 +111,7 @@ async def register_comprehensive_batch(
     selected_course = CourseCode.ENG5
 
     # Use ServiceTestManager's create_batch method for authentication
-    batch_id, actual_correlation_id = await service_manager.create_batch(
+    batch_id, actual_correlation_id = await service_manager.create_batch_via_agw(
         expected_essay_count=expected_essay_count,
         course_code=selected_course,
         user=user,

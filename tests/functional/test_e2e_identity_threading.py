@@ -17,6 +17,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
 from tests.utils.kafka_test_manager import KafkaTestManager
+from tests.utils.identity_validation import IdentityValidator
 from tests.utils.service_test_manager import ServiceTestManager
 
 logger = create_service_logger("test.e2e_identity_threading")
@@ -65,8 +66,8 @@ class TestE2EIdentityThreading:
         try:
             # Start monitoring ResourceConsumptionV1 events
             async with kafka_mgr.consumer("identity_threading", ["huleedu.resource.consumption.reported.v1"]) as consumer:
-                # Execute CJ pipeline
-                batch_id, corr = await harness.setup_guest_batch(essay_files)
+                # Execute CJ pipeline (pass test user to ensure identity propagation)
+                batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_user)
                 logger.info(f"Starting identity threading for batch {batch_id}, user: {test_user.user_id}")
                 
                 result = await harness.execute_pipeline(
@@ -97,9 +98,11 @@ class TestE2EIdentityThreading:
                 logger.info(f"📊 ResourceConsumptionV1 event received: {resource_event.get('event_type')}")
                 
                 # Validate identity threading in event
+                # Using validator for payload identity
+                id_check = IdentityValidator.validate_event_identity(resource_event)
                 event_data = resource_event["data"]
-                assert event_data["user_id"] == test_user.user_id
-                assert event_data["org_id"] == test_user.organization_id
+                assert id_check["has_user"] and event_data["user_id"] == test_user.user_id
+                assert id_check["has_org"] and event_data["org_id"] == test_user.organization_id
                 assert event_data["resource_type"] == "cj_comparison"
                 assert event_data["entity_id"] == batch_id
                 
@@ -140,7 +143,7 @@ class TestE2EIdentityThreading:
         ]
 
         try:
-            batch_id, corr = await harness.setup_guest_batch(essay_files)
+            batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_teacher)
             
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
@@ -220,17 +223,14 @@ class TestE2EIdentityThreading:
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
         # Individual user (no org_id)
-        individual_user = auth_manager.create_test_user(
-            user_id="individual_user_123",
-            organization_id=None
-        )
+        individual_user = auth_manager.create_individual_user(user_id="individual_user_123")
 
         essay_files = [
             Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
         try:
-            batch_id, corr = await harness.setup_guest_batch(essay_files)
+            batch_id, corr = await harness.setup_guest_batch(essay_files, user=individual_user)
 
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
@@ -264,9 +264,8 @@ class TestE2EIdentityThreading:
         harness = PipelineTestHarness(service_manager, kafka_mgr, auth_manager)
 
         # Swedish teacher
-        swedish_user = auth_manager.create_test_user(
-            user_id="lärare_åsa_123", 
-            organization_id="skolan_västerås"
+        swedish_user = auth_manager.create_org_user(
+            user_id="lärare_åsa_123", org_id="skolan_västerås"
         )
 
         essay_files = [
@@ -274,7 +273,7 @@ class TestE2EIdentityThreading:
         ]
 
         try:
-            batch_id, corr = await harness.setup_guest_batch(essay_files)
+            batch_id, corr = await harness.setup_guest_batch(essay_files, user=swedish_user)
 
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
@@ -293,4 +292,3 @@ class TestE2EIdentityThreading:
 
         finally:
             await harness.cleanup()
-

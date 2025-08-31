@@ -44,9 +44,9 @@ COPY libs/huleedu_service_libs/src/ /app/libs/huleedu_service_libs/src/
 # Install dependencies (this layer caches well if pyproject.toml doesn't change)
 # Use lockfile if it exists, otherwise install normally
 RUN if [ -f "pdm.lock.docker" ]; then \
-        pdm install --prod --lockfile pdm.lock.docker; \
+        pdm install --dev --lockfile pdm.lock.docker; \
     else \
-        pdm install --prod; \
+        pdm install --dev; \
     fi
 
 # ========================================

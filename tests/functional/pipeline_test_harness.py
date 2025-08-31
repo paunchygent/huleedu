@@ -212,7 +212,7 @@ class PipelineTestHarness:
 
         # Register batch WITH class_id (triggers REGULAR flow)
         logger.info(f"📝 Registering REGULAR batch with class_id: {self.class_id}")
-        self.batch_id, actual_correlation_id = await self.service_manager.create_batch(
+        self.batch_id, actual_correlation_id = await self.service_manager.create_batch_via_agw(
             expected_essay_count=len(essay_files),
             course_code=CourseCode.ENG5,
             user=self.teacher_user,
@@ -300,7 +300,7 @@ class PipelineTestHarness:
         logger.info("📝 Registering GUEST batch (no class_id)")
         from common_core.domain_enums import CourseCode
 
-        self.batch_id, actual_correlation_id = await self.service_manager.create_batch(
+        self.batch_id, actual_correlation_id = await self.service_manager.create_batch_via_agw(
             expected_essay_count=len(essay_files),
             course_code=CourseCode.ENG5,
             user=user,

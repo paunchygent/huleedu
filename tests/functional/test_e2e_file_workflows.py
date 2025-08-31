@@ -51,7 +51,7 @@ class TestE2EFileWorkflows:
 
         # Create batch first with authenticated user
         try:
-            batch_id, correlation_id = await service_manager.create_batch(
+            batch_id, correlation_id = await service_manager.create_batch_via_agw(
                 expected_essay_count=1, user=test_teacher
             )
         except RuntimeError as e:
@@ -116,7 +116,7 @@ class TestE2EFileWorkflows:
 
         # Create batch first with authenticated user
         try:
-            batch_id, correlation_id = await service_manager.create_batch(
+            batch_id, correlation_id = await service_manager.create_batch_via_agw(
                 expected_essay_count=len(test_file_paths), user=test_teacher
             )
         except RuntimeError as e:
@@ -170,7 +170,7 @@ class TestE2EFileWorkflows:
 
         # Create a valid batch first
         try:
-            batch_id, _ = await service_manager.create_batch(expected_essay_count=1)
+            batch_id, _ = await service_manager.create_batch_via_agw(expected_essay_count=1)
         except RuntimeError as e:
             pytest.skip(f"Batch creation failed: {e}")
 

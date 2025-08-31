@@ -44,6 +44,7 @@ class ServiceTestManager:
 
     # Service configuration - single source of truth
     SERVICE_ENDPOINTS = [
+        ServiceEndpoint("api_gateway_service", 8080, has_http_api=True, has_metrics=True),
         ServiceEndpoint("content_service", 8001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("batch_orchestrator_service", 5001, has_http_api=True, has_metrics=True),
         ServiceEndpoint("batch_conductor_service", 4002, has_http_api=True, has_metrics=True),
@@ -147,6 +148,107 @@ class ServiceTestManager:
                         logger.warning(f"⚠️  {service.name} metrics not accessible: {e}")
 
         return validated_endpoints
+
+    async def create_batch_via_agw(
+        self,
+        expected_essay_count: int,
+        course_code: CourseCode | str = CourseCode.ENG5,
+        user: Optional[AuthTestUser] = None,
+        correlation_id: str | None = None,
+        enable_cj_assessment: bool = False,
+        class_id: str | None = None,
+        essay_ids: list[str] | None = None,
+        cj_default_llm_model: str | None = None,
+        cj_default_temperature: float | None = None,
+    ) -> tuple[str, str]:
+        """
+        Create a test batch via API Gateway (AGW).
+
+        Identity is injected at the edge by AGW; do not include user_id/org_id in the body.
+
+        Returns:
+            tuple[str, str]: (batch_id, correlation_id)
+        """
+        endpoints = await self.get_validated_endpoints()
+
+        if "api_gateway_service" not in endpoints:
+            raise RuntimeError("API Gateway Service not available for batch creation")
+
+        import uuid
+        import datetime
+
+        if correlation_id is None:
+            correlation_id = str(uuid.uuid4())
+
+        if user is None:
+            user = self.auth_manager.get_default_user()
+
+        agw_base_url = endpoints["api_gateway_service"]["base_url"]
+
+        # Convert string course codes to CourseCode enum if possible, fallback to ENG5
+        if isinstance(course_code, str):
+            try:
+                course_code_enum = CourseCode(course_code)
+            except ValueError:
+                course_code_enum = CourseCode.ENG5
+                logger.warning(
+                    f"Invalid course code '{course_code}', using default {CourseCode.ENG5.value}"
+                )
+        else:
+            course_code_enum = course_code
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        unique_instructions = (
+            f"Test batch via AGW at {timestamp} (corr: {correlation_id[:8]})"
+        )
+
+        payload = {
+            "expected_essay_count": expected_essay_count,
+            "course_code": course_code_enum.value,
+            "essay_instructions": unique_instructions,
+            "enable_cj_assessment": enable_cj_assessment,
+        }
+
+        if class_id is not None:
+            payload["class_id"] = class_id
+        if essay_ids is not None:
+            payload["essay_ids"] = essay_ids
+        if cj_default_llm_model is not None:
+            payload["cj_default_llm_model"] = cj_default_llm_model
+        if cj_default_temperature is not None:
+            payload["cj_default_temperature"] = cj_default_temperature
+
+        # Build minimal headers for AGW: Authorization + Correlation
+        bearer = self.auth_manager.generate_jwt_token(user)
+        headers = {
+            "Authorization": f"Bearer {bearer}",
+            "X-Correlation-ID": correlation_id,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{agw_base_url}/v1/batches/register",
+                json=payload,
+                headers=headers,
+            ) as response:
+                if response.status not in (200, 202):
+                    error_text = await response.text()
+                    raise RuntimeError(
+                        f"AGW batch creation failed: {response.status} - {error_text}"
+                    )
+
+                result = await response.json()
+                batch_id = result.get("batch_id")
+                returned_correlation_id = result.get("correlation_id", correlation_id)
+                if not batch_id:
+                    raise RuntimeError(
+                        f"AGW response missing batch_id: {result}"
+                    )
+
+                logger.info(
+                    f"Created batch via AGW {batch_id} with correlation {returned_correlation_id}"
+                )
+                return batch_id, returned_correlation_id
 
     async def create_batch(
         self,

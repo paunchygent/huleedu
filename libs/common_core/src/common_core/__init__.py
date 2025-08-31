@@ -6,6 +6,7 @@ HuleEdu Common Core Package.
 # in base_event_models.py and must be available when model_rebuild() is called
 from typing import Union
 
+from .api_models import BatchRegistrationRequestV1
 from .batch_service_models import (
     BatchServiceAIFeedbackInitiateCommandDataV1,
     BatchServiceCJAssessmentInitiateCommandDataV1,
@@ -240,6 +241,8 @@ __all__ = [
     "EssayLifecycleSpellcheckRequestV1",
     "EssayLifecycleNLPRequestV1",
     "EssayLifecycleAIFeedbackRequestV1",
+    # API Models
+    "BatchRegistrationRequestV1",
 ]
 
 # Rebuild models to resolve forward references after all imports
@@ -257,6 +260,7 @@ BatchServiceStudentMatchingInitiateCommandDataV1.model_rebuild(raise_errors=True
 EssayLifecycleSpellcheckRequestV1.model_rebuild(raise_errors=True)
 EssayLifecycleNLPRequestV1.model_rebuild(raise_errors=True)
 EssayLifecycleAIFeedbackRequestV1.model_rebuild(raise_errors=True)
+BatchRegistrationRequestV1.model_rebuild(raise_errors=True)
 BatchEssaysRegistered.model_rebuild(raise_errors=True)
 BatchEssaysReady.model_rebuild(raise_errors=True)
 BatchReadinessTimeout.model_rebuild(raise_errors=True)

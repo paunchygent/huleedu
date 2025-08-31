@@ -43,12 +43,11 @@ class AuthTestUser:
 
     def to_jwt_payload(self) -> Dict[str, Any]:
         """Convert user to JWT payload format."""
-        return {
+        payload: Dict[str, Any] = {
             "sub": self.user_id,  # Standard JWT subject claim
             "email": self.email,
             "name": self.name,
             "role": self.role,
-            "org_id": self.organization_id,
             "iat": int(time.time()),  # Issued at
             "exp": int(
                 (datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()
@@ -56,6 +55,10 @@ class AuthTestUser:
             "iss": "huledu-test-auth",  # Issuer
             "aud": "huledu-services",  # Audience
         }
+        # Include org_id claim only when non-empty/non-null to allow individual users
+        if self.organization_id:
+            payload["org_id"] = self.organization_id
+        return payload
 
 
 class AuthTestManager:
@@ -122,7 +125,11 @@ class AuthTestManager:
             name = f"Test User {user_id[-8:]}"
 
         user = AuthTestUser(
-            user_id=user_id, email=email, name=name, role=role, organization_id=organization_id
+            user_id=user_id,
+            email=email,
+            name=name,
+            role=role,
+            organization_id=organization_id,
         )
 
         self._test_users[user_id] = user
@@ -178,6 +185,51 @@ class AuthTestManager:
             "Authorization": f"Bearer {token}",
             "X-Test-Auth": "true",  # Marker for test authentication
         }
+
+    # New helpers for org-identity variations
+    def create_org_user(self, org_id: str, **kwargs) -> AuthTestUser:
+        """Create a test user associated with a specific organization."""
+        return self.create_test_user(organization_id=org_id, **kwargs)
+
+    def create_individual_user(self, **kwargs) -> AuthTestUser:
+        """Create a test user without any organization identity (individual flow)."""
+        # Pass empty string so to_jwt_payload omits org_id claim
+        return self.create_test_user(organization_id="", **kwargs)
+
+    def generate_jwt_with_org_claim(
+        self, user: Optional[AuthTestUser] = None, org_claim_name: str = "org_id"
+    ) -> str:
+        """
+        Generate a JWT token using a specific claim name for organization identity.
+
+        Args:
+            user: Test user (uses default if None)
+            org_claim_name: Which claim to use for organization identity
+                             (e.g., 'org_id', 'org', 'organization_id').
+
+        Returns:
+            str: Encoded JWT token
+        """
+        if user is None:
+            user = self.get_default_user()
+
+        # Base payload without org_id
+        payload = user.to_jwt_payload()
+        org_value = None
+        # If user has an organization (via instance), prefer that
+        if user.organization_id:
+            org_value = user.organization_id
+        # If org_id exists in payload (from to_jwt_payload), move it to requested claim
+        if "org_id" in payload:
+            org_value = payload.pop("org_id")
+        if org_value:
+            payload[org_claim_name] = org_value
+
+        token = jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
+        logger.debug(
+            f"Generated JWT token for user {user.user_id} with org claim '{org_claim_name}'"
+        )
+        return token
 
     def validate_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
         """

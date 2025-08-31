@@ -256,3 +256,82 @@ Full quality gates
   - .cursor/rules/090-documentation-standards.mdc
   - .cursor/rules/071-observability-index.mdc
   - .cursor/rules/071.1-prometheus-metrics-patterns.mdc
+
+## Current Implementation Status (in repo)
+
+Date: 2025-08-31
+
+Implemented (Phase 1 core + initial Phase 2 migrations):
+- Rules/index
+  - Updated: `.cursor/rules/000-rule-index.mdc` now includes `020.17-entitlements-service-architecture.mdc` (and `020.16-email-service-architecture.mdc`).
+
+- Utilities
+  - Added AGW endpoint + batch registration via AGW:
+    - `tests/utils/service_test_manager.py`
+      - Added `ServiceEndpoint("api_gateway_service", 8080, ...)`.
+      - Added `create_batch_via_agw(...)` posting to `http://localhost:8080/v1/batches/register` using `Authorization` and `X-Correlation-ID`.
+  - Authentication helpers for org claims and individual users:
+    - `tests/utils/auth_manager.py`
+      - `to_jwt_payload()` now omits `org_id` when empty (supports individual flows).
+      - Added `create_org_user(org_id=...)`, `create_individual_user()`.
+      - Added `generate_jwt_with_org_claim(user, org_claim_name)` to test claim precedence.
+  - Identity validation utilities (new):
+    - `tests/utils/identity_validation.py` with `IdentityValidator` providing:
+      - `validate_proxy_headers`, `validate_event_metadata`, `validate_event_identity`,
+        `validate_batch_registration_identity`, `validate_agw_registration_identity`,
+        and advanced `validate_identity_consistency` (service-scoped only).
+  - Metrics validation utilities (non-identity) (new):
+    - `tests/utils/metrics_validation.py` with helpers to parse Prometheus text and assert counter/timer increments.
+
+- Functional harness/tests switched to AGW registration (Phase 2 partial):
+  - `tests/functional/pipeline_test_harness.py`: REGULAR and GUEST registration now call `create_batch_via_agw(...)`.
+  - `tests/functional/comprehensive_pipeline_utils.py`: `register_comprehensive_batch(...)` uses `create_batch_via_agw(...)`.
+  - `tests/functional/test_e2e_file_workflows.py`: all batch creations via AGW.
+  - `tests/functional/test_e2e_identity_threading.py`:
+    - Pass the created user to `setup_guest_batch(...)` for correct identity propagation.
+    - Use `IdentityValidator.validate_event_identity(...)` to assert identity presence; keep exact value assertions.
+
+- AGW service-level proxy identity tests (pre-existing and aligned):
+  - `services/api_gateway_service/tests/test_class_routes.py` already asserts forwarding of `X-User-ID`, `X-Org-ID`, and `X-Correlation-ID` using DI + `respx`.
+
+Not yet implemented (planned):
+- Integrate metrics validation helpers into specific proxy tests at root level (without identity labels).
+- Additional optional functional test for AGW `/v1/classes/*` end-to-end (header verification stays at service-level test).
+- Broader migration of remaining functional/E2E tests to AGW where they register batches.
+- Default flip: make `ServiceTestManager.create_batch()` call AGW by default; deprecate BOS-direct path after stability.
+
+Checkpoint status vs plan:
+- CP1.1 (AGW utilities): Implemented.
+- CP1.2 (Identity validation utils): Implemented.
+- CP1.3 (New functional tests pass locally): Implemented changes, pending local run confirmation.
+- CP1.4 (AGW class proxy header test): Covered by existing service tests; pending run confirmation.
+- CP1.5 (Metrics helper validations): Helpers implemented; test usage pending.
+- CP2.x (Migration): Initiated; several functional paths now use AGW.
+
+## Suggested Next Steps
+
+Immediate (verify and stabilize):
+- Run targeted tests locally:
+  - `pdm run pytest tests/utils -q`
+  - `pdm run pytest tests/functional/test_e2e_identity_threading.py -q`
+  - `pdm run pytest tests/functional/test_e2e_file_workflows.py -q`
+  - `pdm run pytest tests/functional/pipeline_test_harness.py -q`
+  - From AGW service dir: `pdm run pytest services/api_gateway_service/tests -q`
+- Address any failures; ensure identity assertions and correlation preservation hold across flows.
+
+Short-term (complete Phase 2):
+- Migrate remaining functional/E2E batch-creating tests to use `create_batch_via_agw(...)` (e.g., sequential pipelines, pipeline resolution workflows).
+- Use `IdentityValidator` consistently in functional tests where identity should be asserted.
+- Add optional lightweight functional test that exercises AGW `/v1/classes/*` end-to-end for happy-path behavior (leave header assertions at service tests).
+- Add targeted metrics assertions using `tests/utils/metrics_validation.py` around key proxy calls (e.g., AGW registration/file upload), validating increments in `http_requests_total` and `downstream_service_calls_total` (no identity labels).
+- Run `pdm run typecheck-all` and `pdm run test-unit`/`test-integration` to gate changes.
+
+Medium-term (Phase 3 – default flip and cleanup):
+- After 2 consecutive green CI runs post-migration, flip default of `ServiceTestManager.create_batch()` to use AGW under the hood and deprecate/remove the BOS-direct method in functional code paths.
+- Update `tests/README.md` to codify AGW as the entry point for client flows.
+- Remove any deprecated patterns and ensure documentation reflects final state.
+
+Stretch (quality and coverage):
+- Parametric tests for AGW org claim extraction order using `generate_jwt_with_org_claim()`.
+- Extend identity envelope assertions across more events where relevant (e.g., client pipeline requests, if applicable).
+- Add more metrics assertions around downstream latency histograms/timers (without identity labels) to ensure observability signals are exercised.
