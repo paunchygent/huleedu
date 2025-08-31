@@ -40,6 +40,10 @@ class BatchRegistrationRequestV1(BaseModel):
         ...,
         description="The ID of the user who owns this batch (from API Gateway JWT).",
     )
+    org_id: str | None = Field(
+        default=None,
+        description="Organization ID for credit attribution, None for individual users (from API Gateway JWT).",
+    )
     class_id: str | None = Field(
         default=None,
         description=(

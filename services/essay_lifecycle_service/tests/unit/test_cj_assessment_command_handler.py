@@ -67,16 +67,23 @@ class TestCJAssessmentCommandHandler:
     # Using shared mock_session_factory fixture from test_utils
 
     @pytest.fixture
+    def mock_batch_tracker(self) -> AsyncMock:
+        """Create mock BatchEssayTracker."""
+        return AsyncMock()
+
+    @pytest.fixture
     def cj_assessment_handler(
         self,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         mock_session_factory: AsyncMock,
     ) -> CJAssessmentCommandHandler:
         """Create CJAssessmentCommandHandler with mocked dependencies."""
         return CJAssessmentCommandHandler(
             repository=mock_repository,
             request_dispatcher=mock_request_dispatcher,
+            batch_tracker=mock_batch_tracker,
             session_factory=mock_session_factory,
         )
 
@@ -122,6 +129,7 @@ class TestCJAssessmentCommandHandler:
         cj_assessment_handler: CJAssessmentCommandHandler,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         cj_assessment_command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
         correlation_id: UUID,
         essay_id: str,
@@ -133,6 +141,12 @@ class TestCJAssessmentCommandHandler:
         mock_repository.get_essay_state.return_value = essay_state
         mock_repository.update_essay_status_via_machine.return_value = None
         mock_request_dispatcher.dispatch_cj_assessment_requests.return_value = None
+        
+        # Setup batch tracker to return identity information
+        mock_batch_tracker.get_batch_status.return_value = {
+            "user_id": "test-user-123",
+            "org_id": "test-org-456"
+        }
 
         with patch(
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
@@ -186,6 +200,8 @@ class TestCJAssessmentCommandHandler:
                 course_code=cj_assessment_command_data.course_code,
                 essay_instructions=cj_assessment_command_data.essay_instructions,
                 batch_id=cj_assessment_command_data.entity_id,
+                user_id="test-user-123",
+                org_id="test-org-456",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
             )
@@ -260,6 +276,7 @@ class TestCJAssessmentCommandHandler:
         cj_assessment_handler: CJAssessmentCommandHandler,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         batch_id: str,
         correlation_id: UUID,
     ) -> None:
@@ -283,6 +300,12 @@ class TestCJAssessmentCommandHandler:
         # Setup essay states - all found and can transition
         essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in essay_refs]
         mock_repository.get_essay_state.side_effect = essay_states
+        
+        # Setup batch tracker to return identity information
+        mock_batch_tracker.get_batch_status.return_value = {
+            "user_id": "multi-essay-user-123",
+            "org_id": "multi-essay-org-456"
+        }
 
         with patch(
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler."
@@ -319,6 +342,8 @@ class TestCJAssessmentCommandHandler:
             assert len(kwargs["essays_to_process"]) == 2
             assert kwargs["essays_to_process"][0].essay_id == "essay-a"
             assert kwargs["essays_to_process"][1].essay_id == "essay-b"
+            assert kwargs["user_id"] == "multi-essay-user-123"
+            assert kwargs["org_id"] == "multi-essay-org-456"
             assert "session" in kwargs  # Verify session parameter is passed
 
     # Test: Custom Command Data Propagation
@@ -328,6 +353,7 @@ class TestCJAssessmentCommandHandler:
         cj_assessment_handler: CJAssessmentCommandHandler,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         correlation_id: UUID,
         essay_id: str,
         batch_id: str,
@@ -349,6 +375,12 @@ class TestCJAssessmentCommandHandler:
         # Setup essay state
         essay_state = self.create_essay_state_mock(essay_id, batch_id)
         mock_repository.get_essay_state.return_value = essay_state
+        
+        # Setup batch tracker to return identity information
+        mock_batch_tracker.get_batch_status.return_value = {
+            "user_id": "swedish-user-789",
+            "org_id": "stockholm-school"
+        }
 
         with patch(
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
@@ -370,6 +402,8 @@ class TestCJAssessmentCommandHandler:
                 course_code=CourseCode.SV3,
                 essay_instructions="Skriv om din semester",
                 batch_id=batch_id,
+                user_id="swedish-user-789",
+                org_id="stockholm-school",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
             )
@@ -381,6 +415,7 @@ class TestCJAssessmentCommandHandler:
         cj_assessment_handler: CJAssessmentCommandHandler,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         batch_id: str,
         correlation_id: UUID,
     ) -> None:
@@ -405,6 +440,12 @@ class TestCJAssessmentCommandHandler:
             for ref in command_data.essays_to_process
         ]
         mock_repository.get_essay_state.side_effect = essay_states
+        
+        # Setup batch tracker to return identity information
+        mock_batch_tracker.get_batch_status.return_value = {
+            "user_id": "course-code-user-789",
+            "org_id": "course-code-org-123"
+        }
 
         with patch(
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler."
@@ -441,6 +482,8 @@ class TestCJAssessmentCommandHandler:
             assert len(kwargs["essays_to_process"]) == 2
             assert kwargs["essays_to_process"][0].essay_id == "essay1"
             assert kwargs["essays_to_process"][1].essay_id == "essay2"
+            assert kwargs["user_id"] == "course-code-user-789"
+            assert kwargs["org_id"] == "course-code-org-123"
             assert "session" in kwargs  # Verify session parameter is passed
 
     # Test: Create command with minimal data
@@ -450,6 +493,7 @@ class TestCJAssessmentCommandHandler:
         cj_assessment_handler: CJAssessmentCommandHandler,
         mock_repository: AsyncMock,
         mock_request_dispatcher: AsyncMock,
+        mock_batch_tracker: AsyncMock,
         batch_id: str,
         correlation_id: UUID,
     ) -> None:
@@ -472,6 +516,12 @@ class TestCJAssessmentCommandHandler:
             command_data.essays_to_process[0].essay_id, batch_id
         )
         mock_repository.get_essay_state.return_value = essay_state
+        
+        # Setup batch tracker to return identity information
+        mock_batch_tracker.get_batch_status.return_value = {
+            "user_id": "minimal-user-456",
+            "org_id": "minimal-org-789"
+        }
 
         with patch(
             "services.essay_lifecycle_service.implementations.cj_assessment_command_handler.EssayStateMachine"
@@ -493,6 +543,8 @@ class TestCJAssessmentCommandHandler:
                 course_code=command_data.course_code,
                 essay_instructions=command_data.essay_instructions,
                 batch_id=batch_id,
+                user_id="minimal-user-456",
+                org_id="minimal-org-789",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
             )

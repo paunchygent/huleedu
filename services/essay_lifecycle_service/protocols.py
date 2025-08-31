@@ -459,6 +459,8 @@ class SpecializedServiceRequestDispatcher(Protocol):
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
+        user_id: str,
+        org_id: str | None,
         correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:

@@ -59,6 +59,10 @@ class BatchEssaysRegistered(BaseModel):
     course_code: CourseCode = Field(description="Course code from batch registration")
     essay_instructions: str = Field(description="Essay instructions from batch registration")
     user_id: str = Field(description="User who owns this batch")
+    org_id: str | None = Field(
+        default=None,
+        description="Organization ID for credit attribution, None for individual users"
+    )
 
     # Class context for GUEST vs REGULAR batch determination
     class_id: str | None = Field(

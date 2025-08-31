@@ -573,6 +573,8 @@ class TestServiceRequestDispatchBusinessImpact:
                 course_code=CourseCode.ENG5,  # Use valid enum value
                 essay_instructions="Write about the topic",
                 batch_id=business_context.batch_id,
+                user_id="test-user",
+                org_id=None,
                 correlation_id=correlation_id,
             )
 

@@ -125,6 +125,7 @@ class BatchEssayTracker(Base):
     course_code: Mapped[str] = mapped_column(String(50), nullable=False)
     essay_instructions: Mapped[str] = mapped_column(Text, nullable=False)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    org_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Event correlation
     correlation_id: Mapped[str] = mapped_column(String(255), nullable=False)

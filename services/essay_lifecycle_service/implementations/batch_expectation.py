@@ -31,6 +31,7 @@ class BatchExpectation:
     course_code: CourseCode
     essay_instructions: str
     user_id: str
+    org_id: str | None
     correlation_id: UUID  # Original correlation ID from registration
     created_at: datetime
     timeout_seconds: int = 86400  # 24 hours for complex processing including overnight LLM batches

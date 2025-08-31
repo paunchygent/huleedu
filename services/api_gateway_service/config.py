@@ -68,6 +68,13 @@ class Settings(SecureServiceSettings):
         description="JWT secret key for token signing and validation",
     )
     JWT_ALGORITHM: str = "HS256"
+    JWT_ORG_ID_CLAIM_NAMES: list[str] = Field(
+        default_factory=lambda: ["org_id", "org", "organization_id"],
+        description=(
+            "Ordered list of JWT claim names to check for organization identity. "
+            "First matching non-empty string value is used as org_id."
+        ),
+    )
 
     # HTTP Client Timeouts
     HTTP_CLIENT_TIMEOUT_SECONDS: int = 30

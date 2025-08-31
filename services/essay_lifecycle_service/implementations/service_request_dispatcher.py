@@ -274,6 +274,8 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         course_code: CourseCode,
         essay_instructions: str,
         batch_id: str,
+        user_id: str,
+        org_id: str | None,
         correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:
@@ -317,9 +319,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 processing_stage=ProcessingStage.PENDING,
             )
 
-            # Create CJ assessment request event data with primitive parameters
-            # TODO: Phase 3 - Add proper identity threading from batch processing context
-            # Currently using placeholder values - need to thread user_id/org_id from batch context
+            # Create CJ assessment request event data with identity threading
             cj_request = ELS_CJAssessmentRequestV1(
                 entity_id=batch_id,
                 entity_type="batch",
@@ -330,10 +330,9 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 course_code=course_code,
                 essay_instructions=essay_instructions,
                 llm_config_overrides=None,  # Use service defaults
-                # Phase 3: Identity fields for credit attribution
-                # TODO: Extract from batch/user context instead of placeholder
-                user_id="placeholder-user-id",  # TODO: Get from batch processing context
-                org_id=None,  # TODO: Get from batch processing context if available
+                # Identity fields for credit attribution - real values from batch context
+                user_id=user_id,
+                org_id=org_id,
             )
 
             # Create event envelope

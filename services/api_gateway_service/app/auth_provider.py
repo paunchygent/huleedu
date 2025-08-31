@@ -145,3 +145,90 @@ class AuthProvider(Provider):
                 correlation_id=correlation_id,
                 reason="unexpected_error",
             )
+
+    @provide(scope=Scope.REQUEST)
+    def provide_org_id(
+        self, token: BearerToken, settings: Settings, request: Request
+    ) -> str | None:
+        """
+        Extract organization ID from JWT claims using configured claim names.
+
+        Returns None when the token represents an individual user without org context.
+        Performs the same JWT validation (signature, algorithm, exp) as provide_user_id.
+        """
+        correlation_id: UUID = getattr(request.state, "correlation_id", uuid4())
+
+        try:
+            payload = jwt.decode(
+                token,
+                settings.JWT_SECRET_KEY.get_secret_value(),
+                algorithms=[settings.JWT_ALGORITHM],
+            )
+
+            exp_timestamp = payload.get("exp")
+            if exp_timestamp is None:
+                raise_authentication_error(
+                    service="api_gateway_service",
+                    operation="validate_jwt",
+                    message="Token missing expiration claim",
+                    correlation_id=correlation_id,
+                    reason="missing_exp",
+                )
+
+            current_time = datetime.now(UTC).timestamp()
+            if current_time >= exp_timestamp:
+                raise_authentication_error(
+                    service="api_gateway_service",
+                    operation="validate_jwt",
+                    message="Token has expired",
+                    correlation_id=correlation_id,
+                    reason="token_expired",
+                )
+
+            # Try configured org_id claim names in order
+            for claim_name in settings.JWT_ORG_ID_CLAIM_NAMES:
+                value = payload.get(claim_name)
+                if isinstance(value, str):
+                    cleaned = value.strip()
+                    if cleaned:
+                        logger.debug(
+                            f"Resolved org_id from claim '{claim_name}' for token subject"
+                        )
+                        return cleaned
+                elif value is not None:
+                    # Non-string claim present; skip but log for diagnostics
+                    logger.debug(
+                        f"Ignoring non-string org_id claim '{claim_name}' of type {type(value).__name__}"
+                    )
+
+            # No org_id found; treat as individual user context
+            logger.debug("No org_id claim present; proceeding without organizational context")
+            return None
+
+        except jwt.ExpiredSignatureError:
+            raise_authentication_error(
+                service="api_gateway_service",
+                operation="validate_jwt",
+                message="Token has expired",
+                correlation_id=correlation_id,
+                reason="jwt_expired",
+            )
+        except jwt.InvalidTokenError as e:
+            raise_authentication_error(
+                service="api_gateway_service",
+                operation="validate_jwt",
+                message=f"Could not validate credentials: {str(e)}",
+                correlation_id=correlation_id,
+                reason="jwt_invalid",
+            )
+        except HuleEduError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in JWT validation: {e}", exc_info=True)
+            raise_authentication_error(
+                service="api_gateway_service",
+                operation="validate_jwt",
+                message="Authentication failed",
+                correlation_id=correlation_id,
+                reason="unexpected_error",
+            )

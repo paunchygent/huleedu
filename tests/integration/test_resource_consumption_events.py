@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import CourseCode
+from common_core.config_enums import LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
@@ -23,6 +24,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     publish_dual_assessment_events,
 )
+from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 
 logger = create_service_logger("test.resource_consumption_events")
@@ -39,14 +41,18 @@ class MockBatchUpload:
         self.created_at = datetime.now(UTC)
 
 
-class MockSettings:
-    SERVICE_NAME = "cj_assessment_service"
-    CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
-    DEFAULT_LLM_MODEL = "gpt-4"
-    DEFAULT_LLM_PROVIDER = type('Provider', (), {'value': 'openai'})()
-    DEFAULT_LLM_MODEL_VERSION = "20240101"
-    DEFAULT_LLM_TEMPERATURE = 0.0
-    ASSESSMENT_RESULT_TOPIC = "huleedu.assessment.results.v1"
+@pytest.fixture
+def mock_settings():
+    """Create a properly typed mock settings object."""
+    settings = Mock(spec=Settings)
+    settings.SERVICE_NAME = "cj_assessment_service"
+    settings.CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
+    settings.DEFAULT_LLM_MODEL = "gpt-4"
+    settings.DEFAULT_LLM_PROVIDER = LLMProviderType.OPENAI
+    settings.DEFAULT_LLM_MODEL_VERSION = "20240101"
+    settings.DEFAULT_LLM_TEMPERATURE = 0.0
+    settings.ASSESSMENT_RESULT_TOPIC = "huleedu.assessment.results.v1"
+    return settings
 
 
 class TestResourceConsumptionEventPublishing:
@@ -78,7 +84,7 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_resource_consumption_event_structure(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test ResourceConsumptionV1 event structure and fields."""
         batch_upload = MockBatchUpload("batch_123", "user_456", "org_789")
@@ -89,7 +95,7 @@ class TestResourceConsumptionEventPublishing:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=mock_settings,
             correlation_id=correlation_id
         )
 
@@ -113,7 +119,7 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_identity_threading_preservation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test user_id/org_id preservation in ResourceConsumptionV1."""
         batch_upload = MockBatchUpload("identity_test", "teacher_123", "school_456")
@@ -124,7 +130,7 @@ class TestResourceConsumptionEventPublishing:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=mock_settings,
             correlation_id=correlation_id
         )
 
@@ -138,7 +144,7 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_comparison_calculation_accuracy(
-        self, mock_event_publisher: AsyncMock, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test comparison quantity calculation for different essay counts."""
         test_cases = [
@@ -159,7 +165,7 @@ class TestResourceConsumptionEventPublishing:
                 grade_projections=mock_grade_projections,
                 batch_upload=batch_upload,
                 event_publisher=mock_event_publisher,
-                settings=MockSettings(),
+                settings=mock_settings,
                 correlation_id=uuid4()
             )
             
@@ -169,24 +175,61 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration 
     async def test_missing_user_id_validation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
-        """Test validation when user_id is missing."""
+        """Test graceful handling when user_id is missing - should skip resource consumption but continue with other events."""
         batch_upload = MockBatchUpload("batch_no_user", user_id=None, org_id="org_test")
         
-        with pytest.raises(ValueError, match="user_id not available"):
-            await publish_dual_assessment_events(
-                rankings=sample_rankings,
-                grade_projections=mock_grade_projections,
-                batch_upload=batch_upload,
-                event_publisher=mock_event_publisher,
-                settings=MockSettings(),
-                correlation_id=uuid4()
-            )
+        # Should complete without raising exception (resilient behavior)
+        await publish_dual_assessment_events(
+            rankings=sample_rankings,
+            grade_projections=mock_grade_projections,
+            batch_upload=batch_upload,
+            event_publisher=mock_event_publisher,
+            settings=mock_settings,
+            correlation_id=uuid4()
+        )
+        
+        # Critical events should still be published successfully (resilient behavior)
+        mock_event_publisher.publish_assessment_completed.assert_called_once()
+        mock_event_publisher.publish_assessment_result.assert_called_once()
+        
+        # Resource consumption event should be skipped due to missing user_id
+        mock_event_publisher.publish_resource_consumption.assert_not_called()
+
+    @pytest.mark.integration
+    async def test_missing_org_id_fallback_behavior(
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+    ) -> None:
+        """Test org-first, user-fallback behavior - resource consumption should work with user_id only."""
+        batch_upload = MockBatchUpload("batch_user_fallback", user_id="individual_user_123", org_id=None)
+        correlation_id = uuid4()
+        
+        await publish_dual_assessment_events(
+            rankings=sample_rankings,
+            grade_projections=mock_grade_projections,
+            batch_upload=batch_upload,
+            event_publisher=mock_event_publisher,
+            settings=mock_settings,
+            correlation_id=correlation_id
+        )
+        
+        # All events should be published successfully
+        mock_event_publisher.publish_assessment_completed.assert_called_once()
+        mock_event_publisher.publish_assessment_result.assert_called_once()
+        mock_event_publisher.publish_resource_consumption.assert_called_once()
+        
+        # Verify resource consumption event has user_id but no org_id (fallback behavior)
+        call_args = mock_event_publisher.publish_resource_consumption.call_args
+        resource_envelope = call_args[1]["resource_event"]
+        resource_data = resource_envelope.data
+        
+        assert resource_data.user_id == "individual_user_123"
+        assert resource_data.org_id is None  # Fallback to individual user
 
     @pytest.mark.integration
     async def test_swedish_character_preservation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test Swedish character preservation in identity fields."""
         batch_upload = MockBatchUpload("batch_åäö", "lärare_åsa", "skola_västerås")
@@ -196,7 +239,7 @@ class TestResourceConsumptionEventPublishing:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=mock_settings,
             correlation_id=uuid4()
         )
         
@@ -210,7 +253,7 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_event_serialization_compatibility(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
+        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test event can be properly serialized for Kafka."""
         batch_upload = MockBatchUpload("serialization_test", "user_123", "org_456")
@@ -220,7 +263,7 @@ class TestResourceConsumptionEventPublishing:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=mock_settings,
             correlation_id=uuid4()
         )
         

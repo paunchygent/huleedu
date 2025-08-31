@@ -123,6 +123,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             "course_code": batch_essays_registered.course_code.value,
             "essay_instructions": batch_essays_registered.essay_instructions,
             "user_id": batch_essays_registered.user_id,
+            "org_id": batch_essays_registered.org_id,
             "correlation_id": str(correlation_id),  # Convert UUID to string for Redis storage
             "expected_count": len(batch_essays_registered.essay_ids),
             "class_type": "REGULAR" if batch_essays_registered.class_id else "GUEST",
@@ -145,6 +146,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             course_code=batch_essays_registered.course_code,
             essay_instructions=batch_essays_registered.essay_instructions,
             user_id=batch_essays_registered.user_id,
+            org_id=batch_essays_registered.org_id,
             correlation_id=correlation_id,
             created_at=datetime.now(UTC),
             timeout_seconds=86400,  # 24 hours for complex processing
@@ -265,6 +267,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                     "is_timeout_due": not redis_status["has_timeout"],
                     "created_at": redis_status.get("metadata", {}).get("created_at"),
                     "user_id": redis_status.get("metadata", {}).get("user_id"),
+                    "org_id": redis_status.get("metadata", {}).get("org_id"),
                 }
 
             return None

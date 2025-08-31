@@ -24,6 +24,7 @@ from services.essay_lifecycle_service.essay_state_machine import (
     EssayStateMachine,
 )
 from services.essay_lifecycle_service.protocols import (
+    BatchEssayTracker,
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
@@ -38,10 +39,12 @@ class CJAssessmentCommandHandler:
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
+        batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
     ) -> None:
         self.repository = repository
         self.request_dispatcher = request_dispatcher
+        self.batch_tracker = batch_tracker
         self.session_factory = session_factory
 
     async def process_initiate_cj_assessment_command(
@@ -169,12 +172,31 @@ class CJAssessmentCommandHandler:
                         # Convert string language to Language enum at boundary
                         language_enum = Language(command_data.language)
 
+                        # Get identity from batch tracker for proper identity threading
+                        batch_status = await self.batch_tracker.get_batch_status(command_data.entity_id)
+                        if batch_status:
+                            user_id = batch_status.get("user_id", "unknown-user")
+                            org_id = batch_status.get("org_id")
+                        else:
+                            # Fallback if batch status not found
+                            logger.warning(
+                                f"Could not retrieve batch status for identity threading, using fallback",
+                                extra={
+                                    "batch_id": command_data.entity_id,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            user_id = "unknown-user"
+                            org_id = None
+
                         await self.request_dispatcher.dispatch_cj_assessment_requests(
                             essays_to_process=successfully_transitioned_essays,
                             language=language_enum,
                             course_code=command_data.course_code,
                             essay_instructions=command_data.essay_instructions,
                             batch_id=command_data.entity_id,
+                            user_id=user_id,
+                            org_id=org_id,
                             correlation_id=correlation_id,
                             session=session,
                         )
