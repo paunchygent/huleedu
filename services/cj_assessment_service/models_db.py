@@ -71,7 +71,7 @@ class CJBatchUpload(Base):
 
     # Assignment context for grade projection
     assignment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    
+
     # Identity fields for credit attribution (Phase 3: Entitlements integration)
     user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     org_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)

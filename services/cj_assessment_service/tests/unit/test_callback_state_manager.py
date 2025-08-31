@@ -124,6 +124,8 @@ class MockRepository(CJRepositoryProtocol):
         essay_instructions: str,
         initial_status: Any,
         expected_essay_count: int,
+        user_id: str | None = None,
+        org_id: str | None = None,
     ) -> Any:
         return None
 

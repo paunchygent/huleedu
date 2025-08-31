@@ -422,7 +422,9 @@ class TestOutboxPatternIntegration:
                 assert outbox_event.published_at is None
 
                 # Verify Redis notification was sent
-                mock_redis_client.lpush.assert_called_with("outbox:wake:cj_assessment_service", "wake")
+                mock_redis_client.lpush.assert_called_with(
+                    "outbox:wake:cj_assessment_service", "wake"
+                )
 
     async def test_relay_worker_processes_outbox_events(
         self,

@@ -256,7 +256,9 @@ async def publish_dual_assessment_events(
         org_id = getattr(batch_upload, "org_id", None)
 
         if not user_id:
-            raise ValueError(f"user_id not available for batch {cj_batch_id} - identity threading failed")
+            raise ValueError(
+                f"user_id not available for batch {cj_batch_id} - identity threading failed"
+            )
 
         resource_event = ResourceConsumptionV1(
             entity_id=bos_batch_id,

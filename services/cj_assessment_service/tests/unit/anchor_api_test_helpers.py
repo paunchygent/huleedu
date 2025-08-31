@@ -143,6 +143,8 @@ class MockCJRepository(CJRepositoryProtocol):
         essay_instructions: str,
         initial_status: Any,
         expected_essay_count: int,
+        user_id: str | None = None,
+        org_id: str | None = None,
     ) -> Any:
         """Mock implementation - not used in anchor management tests."""
         return None

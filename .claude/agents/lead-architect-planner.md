@@ -50,6 +50,11 @@ You are an expert lead architect specializing in complex microservice architectu
    - Ensure proper error handling using the structured approach
    - Validate adherence to coding standards
 
+4.1 **Test Implementation Review** In addition to 4., when reviewing tests, you must
+   - Check all tests against our architectural rules and ensure NO PATCHING or BRITTLE assertions: .cursor/rules/075-test-creation-methodology.mdc
+   - Run tests (pdm run pytest <test file> -m "") and identify root causes to any failures or errors
+   - Run typecheck-all from root and identify any issues 
+
 5. **Deliverables Structure**: Your outputs should be:
    - Structured and hierarchical, using clear sections and subsections
    - Backed by specific references to rule documents

@@ -148,7 +148,7 @@ class EntitlementsKafkaConsumer:
                 org_id=event.org_id,
                 metric=event.resource_type,
                 amount=event.quantity,
-                batch_id=envelope.data.entity_id or None,
+                batch_id=event.entity_id if event.entity_type == "batch" else None,
                 correlation_id=str(envelope.correlation_id),
             )
 

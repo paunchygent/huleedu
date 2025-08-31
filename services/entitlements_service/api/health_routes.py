@@ -51,10 +51,10 @@ async def health_check() -> tuple[dict[str, Any], int]:
     # Check Kafka consumer health
     kafka_healthy = False
     kafka_message = "Unknown"
-    
+
     try:
-        if hasattr(app, 'kafka_consumer') and app.kafka_consumer:
-            if hasattr(app, 'consumer_task') and app.consumer_task and not app.consumer_task.done():
+        if hasattr(app, "kafka_consumer") and app.kafka_consumer:
+            if hasattr(app, "consumer_task") and app.consumer_task and not app.consumer_task.done():
                 kafka_healthy = True
                 kafka_message = "Kafka consumer running"
             else:
