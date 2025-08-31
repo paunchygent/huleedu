@@ -23,6 +23,7 @@ from services.api_gateway_service.tests.test_provider import (
 )
 
 USER_ID = "test_user_123"
+ORG_ID = "test_org_456"
 
 
 @pytest.fixture(autouse=True)
@@ -264,3 +265,58 @@ async def test_correlation_id_generation(client_with_mocks, mock_kafka_bus):
     envelope = call_args.kwargs["envelope"]
     assert str(envelope.correlation_id) == correlation_id
     assert str(envelope.data.client_correlation_id) == correlation_id
+
+
+@pytest.fixture
+async def container_with_org():
+    """Create a DI container with org_id provided."""
+    container = make_async_container(
+        InfrastructureTestProvider(),
+        AuthTestProvider(user_id=USER_ID, org_id=ORG_ID),
+        FastapiProvider(),
+    )
+    yield container
+    await container.close()
+
+
+@pytest.fixture
+async def client_with_org_mocks(container_with_org):
+    """Create a test client using the container that provides org_id."""
+    app = create_app()
+    setup_dishka(container_with_org, app)
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+async def mock_kafka_bus_with_org(container_with_org):
+    """Expose the KafkaBus mock from the same container used by the app."""
+    async with container_with_org() as request_container:
+        kafka_bus = await request_container.get(KafkaBus)
+        yield kafka_bus
+
+
+@pytest.mark.asyncio
+async def test_pipeline_request_includes_org_id_in_envelope_metadata(
+    client_with_org_mocks, mock_kafka_bus_with_org
+):
+    """org_id in DI should be recorded in envelope.metadata for downstream attribution."""
+    batch_id = "test_batch_with_org"
+    request_data = {
+        "batch_id": batch_id,
+        "requested_pipeline": PhaseName.AI_FEEDBACK.value,
+        "is_retry": False,
+    }
+
+    response = client_with_org_mocks.post(
+        f"/v1/batches/{batch_id}/pipelines", json=request_data
+    )
+
+    assert response.status_code == 202
+
+    # Inspect the kafka_bus mock from our shared container
+    assert mock_kafka_bus_with_org.publish.called
+    envelope = mock_kafka_bus_with_org.publish.call_args.kwargs["envelope"]
+    assert isinstance(envelope, EventEnvelope)
+    assert envelope.metadata is not None
+    assert envelope.metadata.get("org_id") == ORG_ID

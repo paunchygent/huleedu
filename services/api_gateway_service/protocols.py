@@ -24,6 +24,7 @@ class HttpClientProtocol(Protocol):
         *,
         data: dict | None = None,
         files: list | None = None,
+        json: dict | None = None,
         headers: dict[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
     ) -> httpx.Response:

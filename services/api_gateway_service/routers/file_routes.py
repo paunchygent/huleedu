@@ -195,6 +195,7 @@ async def upload_batch_files(
     http_client: FromDishka[HttpClientProtocol],
     metrics: FromDishka[MetricsProtocol],
     user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
+    org_id: FromDishka[str | None],  # Provided by AuthProvider.provide_org_id (optional)
     correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id
 ):
     """
@@ -205,6 +206,9 @@ async def upload_batch_files(
     supports multipart/form-data with multiple files and comprehensive error handling.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
+    - Identity Injection: `user_id` (required) and `org_id` (optional) via DI.
+    - Forwarded Identity: Adds `X-User-ID` and, when present, `X-Org-ID` headers to the
+      File Service request for downstream authorization and attribution.
 
     **Rate Limiting**: 5 uploads per minute per user (lower limit due to resource intensity)
 
@@ -307,7 +311,7 @@ async def upload_batch_files(
 
     logger.info(
         f"File upload request: batch_id='{batch_id}', "
-        f"files_count={len(files)}, user_id='{user_id}', correlation_id='{correlation_id}'"
+        f"files_count={len(files)}, user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
     )
 
     with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
@@ -339,6 +343,8 @@ async def upload_batch_files(
                 "X-User-ID": user_id,
                 "X-Correlation-ID": str(correlation_id),
             }
+            if org_id:
+                headers["X-Org-ID"] = org_id
 
             # Forward request to file service
             file_service_url = f"{settings.FILE_SERVICE_URL}/v1/files/batch"
@@ -368,7 +374,7 @@ async def upload_batch_files(
                 response_data = response.json()
                 logger.info(
                     f"File upload successful: batch_id='{batch_id}', "
-                    f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                    f"user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
                 )
                 metrics.http_requests_total.labels(
                     method="POST", endpoint=endpoint, http_status="201"

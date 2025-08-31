@@ -129,13 +129,46 @@ async def proxy_specific_endpoint(
             metrics.http_requests_total.labels(method="POST", endpoint=endpoint, http_status="500").inc()
             metrics.api_errors_total.labels(endpoint=endpoint, error_type="proxy_error").inc()
             raise HTTPException(status_code=500, detail="Proxy service error") from e
+
+### 2.3. Identity-Enriched Proxy (API Gateway)
+For client-facing proxies that must inject identity from JWT:
+
+```python
+@router.post("/v1/batches/register")
+async def register_batch(
+    registration_request: ClientRegistrationModel,  # no identity fields
+    http_client: FromDishka[HttpClientProtocol],
+    user_id: FromDishka[str],
+    org_id: FromDishka[str | None],
+    correlation_id: FromDishka[UUID],
+):
+    # Build shared HTTP contract from common_core
+    internal = BatchRegistrationRequestV1(
+        **registration_request.model_dump(), user_id=user_id, org_id=org_id
+    )
+
+    # Proxy to downstream with correlation header
+    response = await http_client.post(
+        f"{settings.BOS_URL}/v1/batches/register",
+        json=internal.model_dump(mode="json"),
+        headers={"X-Correlation-ID": str(correlation_id)},
+    )
+    # Preserve downstream status and body
+    return JSONResponse(status_code=response.status_code, content=response.json())
+```
+
+Key points:
+- Extract identity once at the edge via DI providers (`user_id`, optional `org_id`).
+- Use shared HTTP contracts from `common_core.api_models` for inter-service requests.
+- Forward `X-Correlation-ID` and, where relevant, identity headers like `X-User-ID` and `X-Org-ID` (optional).
+- Preserve downstream response semantics using framework response objects.
 ```
 
 ## 3. Header Management
 
 ### 3.1. Header Forwarding Rules
 - **MUST** remove `host` header to avoid conflicts
-- **SHOULD** forward authentication headers (`Authorization`, `X-User-ID`)
+- **SHOULD** forward identity headers (`X-User-ID`) and, when present, `X-Org-ID`
 - **SHOULD** forward correlation headers (`X-Correlation-ID`, `X-Request-ID`)
 - **MAY** add proxy-specific headers for downstream service identification
 
@@ -217,6 +250,7 @@ async def test_proxy_endpoint(client: AsyncClient, respx_mock: MockRouter):
 - **MUST** test network error scenarios
 - **SHOULD** test header forwarding behavior
 - **SHOULD** test request/response transformation if applicable
+- **MUST** test identity injection behavior when proxying client-facing endpoints (user_id and org_id flows)
 
 ## 6. Observability Requirements
 
@@ -248,9 +282,9 @@ async def test_proxy_endpoint(client: AsyncClient, respx_mock: MockRouter):
 ## 8. Security Considerations
 
 ### 8.1. Authorization
-- **MUST** validate authorization before proxying requests
-- **SHOULD** add service-to-service authentication headers
-- **FORBIDDEN** Exposing internal service authentication tokens
+- **MUST** validate authorization at the gateway boundary (JWT validation in AGW)
+- **SHOULD** add service-to-service authentication headers where required by downstreams
+- **FORBIDDEN** Exposing internal service authentication tokens to clients
 
 ### 8.2. Input Validation
 - **MUST** validate proxy path parameters to prevent SSRF

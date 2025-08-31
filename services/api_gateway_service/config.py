@@ -93,6 +93,10 @@ class Settings(SecureServiceSettings):
         default="http://result_aggregator_service:8000",
         description="Result Aggregator Service base URL",
     )
+    BOS_URL: str = Field(
+        default="http://batch_orchestrator_service:5000",
+        description="Batch Orchestrator Service internal base URL",
+    )
 
     # Redis configuration
     REDIS_URL: str = Field(

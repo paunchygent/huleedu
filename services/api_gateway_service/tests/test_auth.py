@@ -29,6 +29,16 @@ class TestJWTAuthentication:
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
 
+    def create_token_with_claims(
+        self, user_id: str, extra_claims: dict, exp_delta: timedelta | None = None
+    ) -> str:
+        """Helper to create JWT with additional claims for org_id testing."""
+        payload = {"sub": user_id, "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
+        payload.update(extra_claims)
+        return jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
+
     def create_token_without_exp(self, user_id: str) -> str:
         """Helper method to create JWT token without expiration claim."""
         payload = {"sub": user_id}
@@ -119,6 +129,11 @@ class TestJWTAuthentication:
             await self._test_auth_through_container(mock_request)
 
         assert "missing subject" in exc_info.value.error_detail.message.lower()
+
+
+
+
+## Org ID extraction tests are defined in a separate class at the end of this file.
 
     @pytest.mark.asyncio
     async def test_invalid_token_signature(self):

@@ -5,6 +5,18 @@
 - Scope: Update event contracts, BOS registration models/publishers, ELS persistence + Redis metadata + dispatcher, CJ verification, and tests. No production/legacy concerns; we change code and tests together.
 - Out of scope (for now): BOS `org_id` DB column and any production compatibility bridges. This is a clean, development-only plan.
 
+## Current Status Update (2025-08-31)
+- ✅ Phase 0: Event contracts updated to include optional `org_id` where applicable.
+- ✅ Phase 1: BOS registration model/publishers updated; `org_id` stored in processing metadata and propagated in events.
+- ✅ Phase 2: ELS persistence, Redis metadata, dispatcher/command handler pass real `user_id`/`org_id`; CJ identity threading complete.
+- ✅ Phase 3: API Gateway integration completed:
+  - JWT-based `org_id` extraction with configurable claim names
+  - Identity injection via DI for authenticated routes
+  - Registration proxy `POST /v1/batches/register` (AGW → BOS) with `user_id`/`org_id` injection
+  - `org_id` added to pipeline request `EventEnvelope.metadata` (no contract change)
+- ✅ Contract centralization: `BatchRegistrationRequestV1` moved to `common_core.api_models` with BOS re-export.
+- 📋 Follow-up: Align cross-cutting integration + functional harness (see `TASKS/TEST_INFRA_ALIGNMENT_BATCH_REGISTRATION.md`).
+
 
 ## Prerequisites (Rebuild Operational Context)
 1. Read rules to align with HuleEdu standards (in order):
@@ -63,10 +75,10 @@
 - Phase 0: Event contracts (common_core)
 - Phase 1: BOS source capture + event publishing
 - Phase 2: ELS persistence (DB + Redis) and CJ dispatch with real identity
-- Phase 3: AGW org_id extraction (optional if AGW is upstream of BOS registration)
+- Phase 3: AGW org_id extraction + AGW registration proxy (identity injection)
 - Phase 4: CJ verification (ResourceConsumptionV1 already identity-aware)
 - Phase 5: Entitlements verification (consumer already identity-aware)
-- Phase 6: Tests, linters, typecheck
+- Phase 6: Tests, linters, typecheck (includes test infra alignment)
 
 
 ## Testing Strategy
@@ -140,12 +152,22 @@
   - Add tests for Redis metadata containing `org_id` and for dispatcher populating real identity into `ELS_CJAssessmentRequestV1`.
 
 
-### Phase 3 — API Gateway (Optional if AGW builds registration requests)
-- File: `services/api_gateway_service/app/auth_provider.py`
-  - Add provider `provide_org_id(...) -> str | None` that reads a configurable JWT claim (e.g., `org_id`, `org`, `organization_id`).
-  - If AGW composes registration requests, include `org_id` in the payload to BOS.
+### Phase 3 — API Gateway Integration — COMPLETE
+- Files:
+  - `services/api_gateway_service/app/auth_provider.py`
+    - Implemented `provide_org_id(...) -> str | None` reading configurable JWT claims.
+  - `services/api_gateway_service/routers/batch_routes.py`
+    - Added registration proxy `POST /v1/batches/register` (AGW → BOS) injecting `user_id`/`org_id` using shared `BatchRegistrationRequestV1`.
+    - Added `org_id` to `EventEnvelope.metadata` for pipeline requests.
+  - `services/api_gateway_service/config.py`
+    - Added `BOS_URL` for internal BOS proxying.
+  - `libs/common_core/src/common_core/api_models/batch_registration.py`
+    - Centralized `BatchRegistrationRequestV1` in common_core; BOS re-exports.
 - Tests:
-  - Simple unit tests asserting extraction when claim present.
+  - `services/api_gateway_service/tests/test_auth_org.py`: org_id claim extraction
+  - `services/api_gateway_service/tests/test_batch_registration_proxy.py`: proxy injection + passthrough tests
+  - `services/api_gateway_service/tests/test_batch_routes.py`: envelope metadata `org_id`
+  - `services/api_gateway_service/tests/test_file_routes.py`: `X-Org-ID` forwarding
 
 
 ### Phase 4 — CJ Service (Verification Only)
@@ -231,8 +253,8 @@
 
 ## ULTRATHINK: Current Implementation Status (2025-08-31)
 
-### ✅ PHASES 0-2: COMPLETE AND FUNCTIONAL
-**Core org_id identity threading implementation is COMPLETE and operational.**
+### ✅ PHASES 0-3: COMPLETE AND FUNCTIONAL
+**Complete org_id identity threading implementation including AGW proxies is COMPLETE and operational.**
 
 #### Phase 0: Common Core Event Updates ✅ COMPLETE
 - **File**: `libs/common_core/src/common_core/events/batch_coordination_events.py`
@@ -278,8 +300,27 @@
 - **Implementation**: Command handler retrieves identity from batch tracker, passes to dispatcher
 - **Status**: ✅ Implemented, DI configured, working
 
-### 🔧 CURRENT PHASE: Test Fixes and Verification
-**Status**: IN PROGRESS - Fixing tests after signature changes
+#### Phase 3: API Gateway Identity Header Forwarding ✅ COMPLETE
+**Phase 3a: Class Management Proxy Identity Headers** ✅ COMPLETE
+- **File**: `services/api_gateway_service/routers/class_routes.py`
+- **Implementation**: Added identity header injection to ensure architectural consistency
+- **Identity Headers**: Forwards `X-User-ID`, `X-Correlation-ID`, and optional `X-Org-ID` to Class Management Service
+- **Pattern**: Follows established pattern from File Service proxy for consistent identity propagation
+- **Status**: ✅ Implemented, tested, working
+
+**Phase 3b: Registration Proxy Identity Injection** ✅ COMPLETE (Previously implemented)
+- **File**: `services/api_gateway_service/routers/batch_routes.py`
+- **Implementation**: POST /v1/batches/register enriches client requests with identity
+- **Pattern**: Clean separation between client (ClientBatchRegistrationRequest) and internal (BatchRegistrationRequestV1) contracts
+- **Status**: ✅ Implemented, tested, working
+
+**Phase 3c: File Upload Identity Headers** ✅ COMPLETE (Previously implemented)
+- **File**: `services/api_gateway_service/routers/file_routes.py`
+- **Implementation**: POST /v1/files/batch forwards identity headers to File Service
+- **Status**: ✅ Implemented, tested, working
+
+### ✅ ARCHITECTURAL CONSISTENCY ACHIEVED
+**Status**: COMPLETE - All API Gateway proxies now follow consistent identity propagation patterns
 
 #### Current Issue: Test Failures Due to Implementation Updates
 After successful identity threading implementation, tests need updates for new method signatures:
@@ -314,7 +355,7 @@ After successful identity threading implementation, tests need updates for new m
 - [x] Phase 0: common_core updated and tests adjusted
 - [x] Phase 1: BOS registration + event publishing updated and tested
 - [x] Phase 2: ELS DB migration, Redis metadata, dispatcher, and CJ handler updated; tests adjusted
-- [ ] Phase 3: (Optional) AGW org_id extraction implemented and tested - DEFERRED
+- [x] Phase 3: AGW org_id extraction and identity header forwarding COMPLETE (Class Management proxy added for consistency)
 - [x] Phase 4: CJ identity verification complete (CJ already supports identity)
 - [x] Phase 5: Entitlements verification complete (Entitlements already consumes identity)  
 - [ ] Phase 6: All tests, lint, and typecheck pass - IN PROGRESS (test fixes)

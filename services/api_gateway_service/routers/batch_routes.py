@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.domain_enums import CourseCode
+from common_core.api_models.batch_registration import BatchRegistrationRequestV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise_validation_error
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -22,6 +24,9 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
+from ..protocols import HttpClientProtocol, MetricsProtocol
+from ..config import settings
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 logger = create_service_logger("api_gateway.batch_routes")
@@ -53,6 +58,84 @@ class BatchPipelineRequest(BaseModel):
         description="Optional user-provided reason for the retry.",
         max_length=500,
     )
+
+
+class ClientBatchRegistrationRequest(BaseModel):
+    """Client-facing registration model (no identity fields).
+
+    API Gateway enriches this with `user_id` and optional `org_id` from JWT
+    and forwards it to BOS using the shared inter-service contract.
+    """
+
+    expected_essay_count: int = Field(..., gt=0)
+    essay_ids: list[str] | None = Field(default=None, min_length=1)
+    course_code: CourseCode
+    essay_instructions: str
+    class_id: str | None = None
+    enable_cj_assessment: bool = False
+    cj_default_llm_model: str | None = None
+    cj_default_temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+
+@router.post(
+    "/batches/register",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Register a new batch",
+    description=(
+        "Client-facing endpoint for batch registration. API Gateway injects identity "
+        "(user_id/org_id) and proxies to the Batch Orchestrator Service."
+    ),
+)
+@inject
+async def register_batch(
+    registration_request: ClientBatchRegistrationRequest,
+    request: Request,
+    http_client: FromDishka[HttpClientProtocol],
+    metrics: FromDishka[MetricsProtocol],
+    user_id: FromDishka[str],
+    org_id: FromDishka[str | None],
+    correlation_id: FromDishka[UUID],
+):
+    endpoint = "/batches/register"
+    with metrics.http_request_duration_seconds.labels(method="POST", endpoint=endpoint).time():
+        # Build inter-service contract with identity enrichment
+        internal_model = BatchRegistrationRequestV1(
+            expected_essay_count=registration_request.expected_essay_count,
+            essay_ids=registration_request.essay_ids,
+            course_code=registration_request.course_code,
+            essay_instructions=registration_request.essay_instructions,
+            user_id=user_id,
+            org_id=org_id,
+            class_id=registration_request.class_id,
+            enable_cj_assessment=registration_request.enable_cj_assessment,
+            cj_default_llm_model=registration_request.cj_default_llm_model,
+            cj_default_temperature=registration_request.cj_default_temperature,
+        )
+
+        # Proxy to BOS with correlation header
+        bos_url = f"{settings.BOS_URL}/v1/batches/register"
+        response = await http_client.post(
+            bos_url,
+            json=internal_model.model_dump(mode="json"),
+            headers={"X-Correlation-ID": str(correlation_id)},
+            timeout=30.0,
+        )
+
+        # Pass through status and response body
+        try:
+            body = response.json()
+        except Exception:
+            body = {"detail": "Invalid response from BOS"}
+
+        if response.status_code in (200, 202):
+            logger.info(
+                f"Batch registration proxied: user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
+            )
+        else:
+            logger.warning(
+                f"BOS registration failed: status={response.status_code}, body={body}, correlation_id='{correlation_id}'"
+            )
+        return JSONResponse(status_code=response.status_code, content=body)
 
 
 @router.post(
@@ -173,6 +256,7 @@ async def request_pipeline_execution(
     kafka_bus: FromDishka[KafkaBus],
     metrics: FromDishka[GatewayMetrics],
     user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
+    org_id: FromDishka[str | None],  # Provided by AuthProvider.provide_org_id
     correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id
 ):
     """
@@ -183,6 +267,9 @@ async def request_pipeline_execution(
     to the appropriate Kafka topic for asynchronous processing.
 
     **Authentication**: Requires valid JWT token in Authorization header (Bearer format)
+    - Identity Injection: `user_id` (required) and `org_id` (optional) are injected via DI.
+    - Org Identity Handling: `org_id` is recorded in the event envelope metadata when present
+      to support org-first attribution without changing the client command contract.
 
     **Rate Limiting**: 10 requests per minute per user
 
@@ -257,6 +344,9 @@ async def request_pipeline_execution(
             # Inject current trace context into the envelope metadata
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
+                # Include org identity in metadata for downstream attribution (optional)
+                if org_id:
+                    envelope.metadata["org_id"] = org_id
 
             # Publish using KafkaBus.publish method with EventEnvelope
             await kafka_bus.publish(
@@ -275,7 +365,7 @@ async def request_pipeline_execution(
             logger.info(
                 f"Pipeline request published: batch_id='{batch_id}', "
                 f"pipeline='{client_request.requested_pipeline}', "
-                f"user_id='{user_id}', correlation_id='{correlation_id}'"
+                f"user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
             )
 
             # Record successful HTTP response
@@ -298,7 +388,7 @@ async def request_pipeline_execution(
                 raise
             logger.error(
                 f"Failed to publish pipeline request: batch_id='{batch_id}', "
-                f"user_id='{user_id}', correlation_id='{correlation_id}', error='{e}'",
+                f"user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}', error='{e}'",
                 exc_info=True,
             )
             metrics.http_requests_total.labels(

@@ -34,6 +34,13 @@ Upload multiple files for batch processing.
 
 **Response:** `202 Accepted` with a confirmation message and `correlation_id`.
 
+**Upstream Identity (via API Gateway):**
+
+- Headers forwarded by API Gateway include:
+  - `X-User-ID` (always)
+  - `X-Correlation-ID` (always)
+  - `X-Org-ID` (optional, present when client JWT contains an organization identity)
+
 ### Health and Monitoring
 
 #### `GET /healthz`
@@ -156,6 +163,7 @@ class PdfExtractionStrategy(ExtractionStrategy):
 ```
 
 **Strategy Registration:**
+
 ```python
 # Dependency injection setup
 strategies = {
@@ -218,16 +226,19 @@ class StrategyBasedTextExtractor:
 ```
 
 **Supported File Types:**
+
 - **`.txt`**: UTF-8 decoding with error handling
 - **`.docx`**: Microsoft Word document parsing using python-docx
 - **`.pdf`**: PDF text extraction using pypdf with encrypted file detection
 
 **Error Handling:**
+
 - Encrypted PDFs raise `ENCRYPTED_FILE_UNSUPPORTED` structured error
 - Corrupted files handled gracefully with specific error codes
 - Each strategy implements async extraction with correlation ID tracking
 
 **Validation constraints:**
+
 - `MIN_CONTENT_LENGTH`: 50 characters (configurable)
 - `MAX_CONTENT_LENGTH`: 50,000 characters (configurable)
 - Empty/whitespace-only content rejected with `EMPTY_CONTENT` error code
@@ -382,7 +393,8 @@ CREATE INDEX ix_event_outbox_unpublished ON event_outbox (published_at, created_
 WHERE published_at IS NULL;
 ```
 
-**Event Relay Worker (Redis-Driven)**: 
+**Event Relay Worker (Redis-Driven)**:
+
 - **Primary Mode**: Waits on Redis BLPOP for instant wake-up when events enter outbox
 - **Adaptive Polling**: 0.1s → 1s → 5s intervals when idle (configured by ENVIRONMENT)
 - **Zero-Delay**: Processes events immediately upon Redis notification
@@ -446,6 +458,7 @@ METRICS = {
 ```
 
 **Async I/O patterns:**
+
 - All file operations use async/await
 - HTTP client session reused via DI (`Scope.APP`)
 - No blocking I/O in request handlers

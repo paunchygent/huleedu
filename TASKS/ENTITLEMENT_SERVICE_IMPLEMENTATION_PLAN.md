@@ -8,6 +8,23 @@
 
 **Integration**: BOS-centric architecture where pipeline cost calculations occur in Batch Orchestrator Service, with optimistic consumption on phase completion events.
 
+## Session Progress Update (2025-08-31)
+
+Recent cross-service identity and gateway work completed to support org-first credit attribution:
+
+- API Gateway
+  - ✅ JWT-based org_id extraction with configurable claim names.
+  - ✅ Identity injection via DI for authenticated routes.
+  - ✅ Registration proxy: `POST /v1/batches/register` now proxies to BOS and injects `user_id`/`org_id`.
+  - ✅ Pipeline request: `org_id` added to `EventEnvelope.metadata` (no contract change).
+- Contracts
+  - ✅ Centralized BatchRegistrationRequestV1 in `common_core.api_models` (BOS re-exports).
+- Downstream services
+  - ✅ ELS and CJ identity threading already complete (org-first, user-fallback).
+  - ✅ ResourceConsumptionV1 path remains identity-aware.
+
+Implication for Entitlements: Identity is now captured at the AGW boundary and consistently threaded through BOS→ELS→CJ→ResourceConsumptionV1, enabling org-first debit logic as designed.
+
 ## Implementation Status
 
 ### ✅ **Phase 1: COMPLETE** - Core Infrastructure
@@ -30,6 +47,8 @@
 - ✅ Publish UsageRecordedV1 for tracking
 
 ### 📋 **Phases 3-6: PLANNED** - Full Platform Integration
+
+Note: With AGW registration and identity extraction completed, integration work focuses on verification and cross-cutting test alignment (see new Test Infrastructure Alignment task).
 
 ## Architecture Alignment
 
@@ -391,6 +410,23 @@ async def handle_resource_consumption(event: ResourceConsumptionV1):
 **Tasks**:
 
 1. Handle PipelineDeniedV1 events in API Gateway
+2. Validate registration proxy behavior under load and edge cases
+3. Confirm identity propagation in envelope metadata for pipeline requests
+
+### 📋 New Cross-Cutting Task (Test Infrastructure Alignment)
+
+Scope: Align integration and functional test harnesses with the new AGW registration flow and identity threading.
+
+- Update functional harness to use AGW `POST /v1/batches/register` instead of direct BOS calls
+  - File: `tests/functional/pipeline_test_harness.py`
+  - Ensure `user_id`/`org_id` are injected via JWT in AGW tests
+- Update utility helpers impacted by registration flow
+  - Directory: `tests/utils`
+  - Adjust any BOS direct registration helpers to route via AGW
+- Review cross-cutting integration tests for assumptions
+  - Replace direct BOS registration calls with AGW proxy usage
+  - Update assertions for `X-Org-ID` forwarding and envelope metadata `org_id`
+- Run `typecheck-all` and targeted suites; fix fixtures to include optional `org_id`
 2. Return 402 Payment Required with credit details
 3. Update client-facing error messages
 4. Add credit purchase flow hooks (future payment integration)

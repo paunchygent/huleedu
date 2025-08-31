@@ -24,16 +24,32 @@ For asynchronous operations, the gateway publishes commands to Kafka and returns
     1. Validates `batch_id` consistency between URL path and request body.
     2. Constructs a formal `ClientBatchPipelineRequestV1` event from `common_core`.
     3. Wraps the event in a standard `EventEnvelope`.
-    4. Publishes to the `huleedu.commands.batch.pipeline.v1` Kafka topic via the injected `KafkaBus`.
+    4. Injects tracing context into `envelope.metadata`.
+    5. If `org_id` is present in the JWT (see 3.1), records it in `envelope.metadata["org_id"]` to support org-first attribution without changing the client command contract.
+    6. Publishes to the `huleedu.commands.batch.pipeline.v1` Kafka topic via the injected `KafkaBus`.
 
 ### 2.2. Request Proxying
 For synchronous CRUD operations, the gateway proxies requests to the appropriate internal service.
 - **File Proxy (`routers/file_routes.py`)**:
     - **Endpoint**: `POST /v1/files/batch`
-    - **Logic**: Handles `multipart/form-data`. Injects the authenticated `X-User-ID` header and forwards the request to the `file_service`.
+    - **Logic**: Handles `multipart/form-data`. Injects identity headers and forwards the request to the `file_service`.
+      - Always forwards: `X-User-ID`, `X-Correlation-ID`
+      - Conditionally forwards: `X-Org-ID` when JWT contains `org_id`
+
+- **Batch Registration Proxy (`routers/batch_routes.py`)**:
+    - **Endpoint**: `POST /v1/batches/register`
+    - **Logic**:
+      1. Accepts client-facing registration model (no identity fields).
+      2. Injects `user_id` and optional `org_id` from JWT via DI.
+      3. Constructs shared `BatchRegistrationRequestV1` (from `common_core.api_models`).
+      4. Proxies to BOS `POST {BOS_URL}/v1/batches/register` with `X-Correlation-ID`.
+      5. Returns BOS status and body verbatim (JSON), preserving error details.
+    - **Configuration**: `BOS_URL` defines the internal BOS base URL.
 - **Class Management Proxy (`routers/class_routes.py`)**:
     - **Endpoint**: `ANY /v1/classes/{path:path}`
     - **Logic**: A generic, streaming proxy. Captures all methods and paths under `/v1/classes/` and streams the request and response to/from the `class_management_service`.
+      - Always forwards: `X-User-ID`, `X-Correlation-ID`
+      - Conditionally forwards: `X-Org-ID` when JWT contains `org_id`
 
 ### 2.3. Query with Status Mapping
 For data retrieval, the gateway queries internal services and maps internal status representations to client-facing statuses.
@@ -49,13 +65,24 @@ For data retrieval, the gateway queries internal services and maps internal stat
 ## 3. Security Implementation
 
 ### 3.1. JWT Authentication
-- **File**: `auth.py`
-- **Mechanism**: The `get_current_user_id` dependency uses `OAuth2PasswordBearer` to extract the token.
-- **Validation**:
-    1.  Decodes the token using `settings.JWT_SECRET_KEY`.
-    2.  Validates the signature and algorithm (`HS256`).
-    3.  **Critically**, it validates the `exp` (expiration) claim against the current time.
-    4.  Extracts the user ID from the `sub` claim.
+- **File**: `app/auth_provider.py`
+- **Mechanism**: Request-scope providers extract and validate JWT once per request.
+- **Providers**:
+    - `provide_user_id(token) -> str`: Validates signature/alg, enforces `exp`, returns `sub`.
+    - `provide_org_id(token) -> str | None`: Same validation as above; extracts org identity from configurable claim names.
+- **Configuration**:
+    - `JWT_ORG_ID_CLAIM_NAMES` (default: `["org_id", "org", "organization_id"]`): Ordered claim names to resolve `org_id`.
+    - `JWT_SECRET_KEY`, `JWT_ALGORITHM`: Standard signature validation settings.
+
+## 4. Configuration
+
+- `BOS_URL`: Internal base URL for Batch Orchestrator Service (default `http://batch_orchestrator_service:5000`).
+
+## 5. Architectural Mandates
+
+- API Gateway is the single client-facing entry point for batch registration.
+- BOS does not perform JWT validation; identity is injected at the edge by AGW.
+- Inter-service registration contract is centralized in `common_core` to avoid drift.
 
 ### 3.2. Rate Limiting
 - **File**: `app/rate_limiter.py`

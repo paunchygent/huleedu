@@ -183,6 +183,9 @@ async def proxy_class_requests(
     request: Request,
     http_client: FromDishka[AsyncClient],
     metrics: FromDishka[GatewayMetrics],
+    user_id: FromDishka[str],
+    org_id: FromDishka[str | None],
+    correlation_id: FromDishka[UUID],
 ):
     """
     Proxy all class management operations to the Class Management Service.
@@ -283,8 +286,14 @@ async def proxy_class_requests(
         method=request.method, endpoint=endpoint
     ).time():
         try:
-            # Prepare the request to be forwarded
-            headers = dict(request.headers)
+            # Prepare the request to be forwarded with identity headers
+            headers = {
+                **request.headers,
+                "X-User-ID": user_id,
+                "X-Correlation-ID": str(correlation_id),
+            }
+            if org_id:
+                headers["X-Org-ID"] = org_id
             headers.pop("host", None)  # Let httpx set the host
 
             # Time the downstream service call

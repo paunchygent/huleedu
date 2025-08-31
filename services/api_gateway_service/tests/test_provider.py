@@ -28,10 +28,16 @@ class AuthTestProvider(Provider):
     consistent authentication dependencies without requiring real JWT tokens.
     """
 
-    def __init__(self, user_id: str = "test-user-123", correlation_id: UUID | None = None):
+    def __init__(
+        self,
+        user_id: str = "test-user-123",
+        correlation_id: UUID | None = None,
+        org_id: str | None = None,
+    ):
         super().__init__()
         self.user_id = user_id
         self.correlation_id = correlation_id or uuid4()
+        self._org_id = org_id
 
     @provide(scope=Scope.REQUEST)
     def provide_mock_request(self) -> Request:
@@ -55,6 +61,11 @@ class AuthTestProvider(Provider):
     def extract_bearer_token(self) -> BearerToken:
         """Provide mock bearer token for testing."""
         return BearerToken(f"test-token-{self.user_id}")
+
+    @provide(scope=Scope.REQUEST)
+    def provide_org_id(self) -> str | None:
+        """Provide mock org ID (None by default) for testing optional DI injection."""
+        return self._org_id
 
 
 class InfrastructureTestProvider(Provider):

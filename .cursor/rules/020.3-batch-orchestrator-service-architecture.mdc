@@ -33,10 +33,16 @@ services/batch_orchestrator_service/
 
 ## API Design Patterns
 
-### External APIs
-- **POST /v1/batches/register**: Lean registration with deferred context resolution
-- **GET /v1/batches/{batch_id}/status**: Pipeline state queries
-- **POST /v1/batches/{batch_id}/retry**: Phase retry with user validation
+### Service APIs (proxied via API Gateway)
+- Client access is always through the API Gateway; BOS endpoints are internal-only in production.
+- **POST /v1/batches/register**: Lean registration with deferred context resolution (AGW injects identity)
+- **GET /v1/batches/{batch_id}/status**: Pipeline state queries (queried by AGW/Result Aggregator)
+- **POST /v1/batches/{batch_id}/retry**: Phase retry with user validation (initiated via AGW)
+
+### Identity Threading (Org-First)
+- **Registration**: `BatchRegistrationRequestV1` includes `user_id` and optional `org_id` sourced from API Gateway JWT.
+- **Processing Metadata**: `org_id` is stored as part of registration metadata and propagated in published events where applicable.
+- **Client Pipeline Requests**: When initiated via API Gateway, `org_id` may be provided in the `EventEnvelope.metadata["org_id"]` to aid downstream attribution.
 
 ### Internal APIs
 - **GET /internal/v1/batches/{batch_id}/pipeline-state**: Authoritative state for other services
@@ -152,3 +158,4 @@ phase_initiators_map: dict[PhaseName, PipelinePhaseInitiatorProtocol] = {
 - **Centralized State**: BOS maintains authoritative pipeline state
 - **Service Coordination**: Other services query BOS for state information
 - **UI Updates**: Real-time Redis notifications for frontend synchronization
+  - Includes identity context; `org_id` is optional and present when provided at registration.

@@ -90,8 +90,9 @@ services/batch_orchestrator_service/
 
 ### Current Endpoints
 
-* **`POST /v1/batches/register`**:
-  * Accepts batch registration requests with essay details.
+* **`POST /v1/batches/register`** (internal only; proxied by API Gateway):
+  * API Gateway is the single client-facing entrypoint for registration and injects identity (user_id/org_id) from JWT.
+  * Accepts `BatchRegistrationRequestV1` from `common_core.api_models`.
   * Delegates to `BatchProcessingServiceProtocol.register_new_batch()` service layer.
   * Publishes `BatchEssaysRegistered` event to ELS for readiness tracking.
   * Returns `202 Accepted` with `batch_id` and `correlation_id`.

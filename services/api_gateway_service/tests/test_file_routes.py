@@ -22,6 +22,7 @@ from services.api_gateway_service.tests.test_provider import (
 )
 
 USER_ID = "test_user_123"
+ORG_ID = "test_org_999"
 
 
 def create_test_file(filename: str, content: str) -> tuple[str, BytesIO, str]:
@@ -65,6 +66,29 @@ async def client_with_mocks(mock_http_client, monkeypatch):
     await container.close()
 
 
+@pytest.fixture
+async def client_with_org_mocks(mock_http_client, monkeypatch):
+    """Create test client with container providing an org_id for DI."""
+    from prometheus_client import CollectorRegistry
+
+    test_registry = CollectorRegistry()
+
+    container = make_async_container(
+        HttpClientTestProvider(mock_http_client),
+        AuthTestProvider(user_id=USER_ID, org_id=ORG_ID),
+        FastapiProvider(),
+    )
+
+    app = create_test_app_with_isolated_registry(test_registry)
+    setup_dishka(container, app)
+
+    monkeypatch.setattr("services.api_gateway_service.app.rate_limiter.limiter.enabled", False)
+
+    with TestClient(app) as client:
+        yield client
+    await container.close()
+
+
 @pytest.mark.asyncio
 async def test_successful_file_upload(client_with_mocks, mock_http_client):
     """Test successful file upload proxy to file service."""
@@ -102,6 +126,25 @@ async def test_successful_file_upload(client_with_mocks, mock_http_client):
     headers = call_args.kwargs["headers"]
     assert headers["X-User-ID"] == "test_user_123"
     assert "X-Correlation-ID" in headers
+
+
+@pytest.mark.asyncio
+async def test_file_upload_forwards_org_id_header(client_with_org_mocks, mock_http_client):
+    """When org_id is present in DI, X-Org-ID header should be forwarded to file service."""
+    mock_response = Mock()
+    mock_response.status_code = 201
+    mock_response.json.return_value = {"message": "Files uploaded successfully"}
+    mock_http_client.post.return_value = mock_response
+
+    test_file = create_test_file("essay.txt", "content")
+    response = client_with_org_mocks.post(
+        "/v1/files/batch", files={"files": test_file}, data={"batch_id": "batch_with_org"}
+    )
+
+    assert response.status_code == 201
+    call_args = mock_http_client.post.call_args
+    headers = call_args.kwargs["headers"]
+    assert headers.get("X-Org-ID") == ORG_ID
 
 
 @pytest.mark.asyncio

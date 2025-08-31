@@ -30,8 +30,9 @@ libs/common_core/src/common_core/
 ├── observability_enums.py      # Enums for metrics and tracing
 ├── metadata_models.py          # Metadata and reference data models
 ├── pipeline_models.py          # Models for pipeline state and configuration
-├── essay_service_models.py     # Request/response models for essay-related services
-├── batch_service_models.py     # Command and data models for batch processing services
+├── api_models/                 # HTTP inter-service contracts (request/response)
+│   ├── __init__.py
+│   └── batch_registration.py   # BatchRegistrationRequestV1 HTTP contract
 └── events/
     ├── __init__.py
     ├── envelope.py             # Canonical EventEnvelope schema
@@ -49,7 +50,20 @@ libs/common_core/src/common_core/
     └── validation_events.py    # Events related to data validation
 ```
 
-## 3. Core Enums
+## 3. Contract Types
+
+### 3.1. HTTP Contracts (api_models)
+- Purpose: Request/response bodies for service-to-service HTTP calls
+- Versioning: Versioned by model suffix (e.g., V1, V2) independent of events
+- Transport: REST/HTTP only (NOT Kafka)
+- Example: `BatchRegistrationRequestV1`
+
+### 3.2. Event Contracts (events)
+- Purpose: Kafka event payloads, thin by design (Thin Events)
+- Transport: Always wrapped in `EventEnvelope` and published to Kafka topics
+- Versioning: Encoded in event name (e.g., `.v1`)
+
+## 4. Core Enums
 
 ### 3.1. ProcessingStage
 
@@ -104,7 +118,7 @@ def topic_name(event: ProcessingEvent) -> str:
 - `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
 - `BATCH_SPELLCHECK_INITIATE_COMMAND` → `"huleedu.els.spellcheck.initiate.command.v1"`
 
-## 4. Models
+## 5. Models
 
 ### 4.1. SystemProcessingMetadata
 
@@ -138,7 +152,7 @@ text_storage_id: str
 student_name: str | None = None
 ```
 
-## 5. Event System
+## 6. Event System
 
 ### 5.1. EventEnvelope
 
@@ -171,7 +185,7 @@ data: T_EventData
 **essay_service_models.py**: Request models from ELS to Specialized Services
 **batch_service_models.py**: Command models from BOS to ELS
 
-## 6. Implementation
+## 7. Implementation
 
 ### 6.1. Pydantic
 
@@ -192,7 +206,7 @@ data: T_EventData
 - Core: `pydantic[email]>=2.0`
 - Dev: MyPy, Pytest, Ruff
 
-## 7. Versioning
+## 8. Versioning
 
 - Semantic versioning (0.1.0)
 - Breaking changes = major version
@@ -200,12 +214,12 @@ data: T_EventData
 - EventEnvelope includes schema_version field
 - Backward compatibility within major versions
 
-## 8. Error Handling
+## 9. Error Handling
 
 ### 8.1. ErrorCode Enum
 
 `UNKNOWN_ERROR`, `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `CONFIGURATION_ERROR`, `EXTERNAL_SERVICE_ERROR`, `KAFKA_PUBLISH_ERROR`, service-specific errors
 
-## 9. Extension Points
+## 10. Extension Points
 
 Additional specialized service event models can be added to `common_core/events/` as new services are developed, following the established patterns for event definitions, versioning, and service boundaries.

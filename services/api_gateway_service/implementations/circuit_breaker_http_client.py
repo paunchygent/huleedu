@@ -36,6 +36,7 @@ class ApiGatewayCircuitBreakerHttpClient(HttpClientProtocol):
         *,
         data: dict | None = None,
         files: list | None = None,
+        json: dict | None = None,
         headers: dict[str, str] | None = None,
         timeout: float | httpx.Timeout | None = None,
     ) -> httpx.Response:
@@ -45,6 +46,7 @@ class ApiGatewayCircuitBreakerHttpClient(HttpClientProtocol):
             url: Target URL for the POST request
             data: Form data dictionary (optional)
             files: List of files to upload (optional)
+            json: JSON data dictionary (optional)
             headers: Additional HTTP headers (optional)
             timeout: Request timeout (optional)
 
@@ -60,6 +62,7 @@ class ApiGatewayCircuitBreakerHttpClient(HttpClientProtocol):
             url,
             data=data,
             files=files,
+            json=json,
             headers=headers,
             timeout=timeout,
         )
