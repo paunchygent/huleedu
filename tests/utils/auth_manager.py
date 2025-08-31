@@ -70,7 +70,7 @@ class AuthTestManager:
     real authentication when available.
     """
 
-    def __init__(self, jwt_secret: str = "test-secret-key-not-for-production"):
+    def __init__(self, jwt_secret: str = "test-secret-key"):
         self.jwt_secret = jwt_secret
         self.jwt_algorithm = "HS256"
         self._test_users: Dict[str, AuthTestUser] = {}

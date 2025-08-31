@@ -78,6 +78,7 @@ class AuthProvider(Provider):
                 token,
                 settings.JWT_SECRET_KEY.get_secret_value(),
                 algorithms=[settings.JWT_ALGORITHM],
+                audience="huledu-services",  # Expected audience for HuleEdu services
             )
 
             # CRITICAL: Validate token expiry (Architect Feedback #2)
@@ -163,6 +164,7 @@ class AuthProvider(Provider):
                 token,
                 settings.JWT_SECRET_KEY.get_secret_value(),
                 algorithms=[settings.JWT_ALGORITHM],
+                audience="huledu-services",  # Expected audience for HuleEdu services
             )
 
             exp_timestamp = payload.get("exp")

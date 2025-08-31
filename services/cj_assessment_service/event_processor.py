@@ -33,6 +33,7 @@ from huleedu_service_libs.observability import (
 )
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
@@ -65,26 +66,22 @@ async def publish_assessment_completion(
     centralized dual event publisher for consistency.
     """
 
-    # Create a batch_upload-like object from request_event_data
-    class BatchUploadAdapter:
-        """Adapter to make request_event_data compatible with centralized publisher."""
-
-        def __init__(self, request_data: ELS_CJAssessmentRequestV1) -> None:
-            self.bos_batch_id = request_data.entity_id
-            self.entity_id = request_data.entity_id
-            self.id = workflow_result.batch_id  # CJ batch ID
-            self.batch_id = workflow_result.batch_id
-            self.assignment_id = request_data.assignment_id
-            self.course_code = request_data.course_code
-            self.created_at = processing_started_at
-
-    batch_upload_adapter = BatchUploadAdapter(request_event_data)
+    # Create publishing data from request event
+    publishing_data = DualEventPublishingData(
+        bos_batch_id=str(request_event_data.entity_id),
+        cj_batch_id=str(workflow_result.batch_id),
+        assignment_id=request_event_data.assignment_id,
+        course_code=request_event_data.course_code,
+        user_id=request_event_data.user_id,  # Identity from event
+        org_id=request_event_data.org_id,    # Identity from event
+        created_at=processing_started_at,
+    )
 
     # Use centralized dual event publishing function
     await publish_dual_assessment_events(
         rankings=workflow_result.rankings,
         grade_projections=grade_projections,
-        batch_upload=batch_upload_adapter,
+        publishing_data=publishing_data,  # Pass DTO instead of adapter
         event_publisher=event_publisher,
         settings=settings,
         correlation_id=correlation_id,

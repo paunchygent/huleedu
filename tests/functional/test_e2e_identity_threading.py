@@ -65,7 +65,7 @@ class TestE2EIdentityThreading:
 
         try:
             # Start monitoring ResourceConsumptionV1 events
-            async with kafka_mgr.consumer("identity_threading", ["huleedu.resource.consumption.reported.v1"]) as consumer:
+            async with kafka_mgr.consumer("identity_threading", ["huleedu.resource.consumption.v1"]) as consumer:
                 # Execute CJ pipeline (pass test user to ensure identity propagation)
                 batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_user)
                 logger.info(f"Starting identity threading for batch {batch_id}, user: {test_user.user_id}")

@@ -19,6 +19,7 @@ from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.status_enums import BatchStatus, ProcessingStage
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
@@ -74,13 +75,13 @@ class TestDualEventPublishing:
         )
 
     @pytest.fixture
-    def sample_batch_upload(self) -> Mock:
-        """Create sample batch upload with metadata."""
-        return Mock(
+    def sample_publishing_data(self) -> DualEventPublishingData:
+        """Create sample publishing data with metadata."""
+        return DualEventPublishingData(
             bos_batch_id="bos_123",
-            id="cj_456",
+            cj_batch_id="cj_456",
             assignment_id="assignment_789",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             # Identity fields for ResourceConsumptionV1 publishing
             user_id="test-user-123",
@@ -93,7 +94,7 @@ class TestDualEventPublishing:
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
         sample_grade_projections: GradeProjectionSummary,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test that ELS gets filtered rankings and RAS gets all rankings."""
         # Arrange
@@ -109,7 +110,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=correlation_id,
@@ -161,7 +162,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Verify anchor_grade_distribution is correctly calculated."""
         # Arrange
@@ -188,7 +189,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -240,7 +241,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
         rankings: list[dict[str, Any]],
         expected_status: BatchStatus,
     ) -> None:
@@ -257,7 +258,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -273,7 +274,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Verify all fields are mapped correctly between events."""
         # Arrange
@@ -293,7 +294,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -332,12 +333,14 @@ class TestDualEventPublishing:
     ) -> None:
         """Test CourseCode enum is converted to string value."""
         # Arrange
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_123",
-            id="cj_456",
+            cj_batch_id="cj_456",
             assignment_id="assignment_789",
-            course_code=CourseCode.SV2,  # Enum value
+            course_code=CourseCode.SV2.value,  # Enum value converted to string
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+            user_id="test-user",
+            org_id="test-org",
         )
 
         # Act
@@ -349,7 +352,7 @@ class TestDualEventPublishing:
                 confidence_labels={},
                 confidence_scores={},
             ),
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -367,7 +370,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Verify processing_duration_seconds is calculated correctly."""
         # Arrange
@@ -382,7 +385,7 @@ class TestDualEventPublishing:
                 confidence_labels={},
                 confidence_scores={},
             ),
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -402,7 +405,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Ensure same correlation_id used for both events."""
         # Arrange
@@ -417,7 +420,7 @@ class TestDualEventPublishing:
                 confidence_labels={},
                 confidence_scores={},
             ),
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=correlation_id,
@@ -442,7 +445,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test handling when there are no anchor essays."""
         # Arrange
@@ -462,7 +465,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -482,7 +485,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test that all required metadata fields are present in both events."""
         # Arrange
@@ -498,7 +501,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -546,7 +549,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test that essays are correctly separated between ELS and RAS events
         with proper flagging."""
@@ -613,7 +616,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -666,7 +669,7 @@ class TestDualEventPublishing:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test comprehensive anchor grade distribution calculation across all grade levels."""
         # Arrange - Design data to comprehensively test grade distribution
@@ -712,7 +715,7 @@ class TestDualEventPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),

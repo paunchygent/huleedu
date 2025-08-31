@@ -202,7 +202,7 @@ class ServiceTestManager:
             f"Test batch via AGW at {timestamp} (corr: {correlation_id[:8]})"
         )
 
-        payload = {
+        payload: dict[str, Any] = {
             "expected_essay_count": expected_essay_count,
             "course_code": course_code_enum.value,
             "essay_instructions": unique_instructions,

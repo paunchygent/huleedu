@@ -146,6 +146,7 @@ services:
       - ENV_TYPE=development
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - API_GATEWAY_JWT_SECRET_KEY=test-secret-key
 
   # Result Aggregator Service
   result_aggregator_service:

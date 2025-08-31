@@ -22,6 +22,7 @@ from common_core.events.resource_consumption_events import ResourceConsumptionV1
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.config import Settings
@@ -30,15 +31,7 @@ from services.cj_assessment_service.protocols import CJEventPublisherProtocol
 logger = create_service_logger("test.resource_consumption_events")
 
 
-class MockBatchUpload:
-    def __init__(self, bos_batch_id: str, user_id: str | None = None, org_id: str | None = None):
-        self.bos_batch_id = bos_batch_id
-        self.id = f"cj_{bos_batch_id}"
-        self.user_id = user_id
-        self.org_id = org_id
-        self.course_code = CourseCode.ENG5
-        self.assignment_id = "test_assignment"
-        self.created_at = datetime.now(UTC)
+# MockBatchUpload removed - using DualEventPublishingData directly
 
 
 @pytest.fixture
@@ -87,13 +80,21 @@ class TestResourceConsumptionEventPublishing:
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test ResourceConsumptionV1 event structure and fields."""
-        batch_upload = MockBatchUpload("batch_123", "user_456", "org_789")
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="batch_123",
+            cj_batch_id="cj_batch_123",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="user_456",
+            org_id="org_789",
+            created_at=datetime.now(UTC)
+        )
         correlation_id = uuid4()
 
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=correlation_id
@@ -122,13 +123,21 @@ class TestResourceConsumptionEventPublishing:
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test user_id/org_id preservation in ResourceConsumptionV1."""
-        batch_upload = MockBatchUpload("identity_test", "teacher_123", "school_456")
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="identity_test",
+            cj_batch_id="cj_identity_test",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="teacher_123",
+            org_id="school_456",
+            created_at=datetime.now(UTC)
+        )
         correlation_id = uuid4()
 
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=correlation_id
@@ -158,12 +167,20 @@ class TestResourceConsumptionEventPublishing:
             rankings = [{"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5} 
                        for i in range(essay_count)]
             
-            batch_upload = MockBatchUpload(f"batch_{essay_count}", "user_test", "org_test")
+            publishing_data = DualEventPublishingData(
+                bos_batch_id=f"batch_{essay_count}",
+                cj_batch_id=f"cj_batch_{essay_count}",
+                assignment_id="test_assignment",
+                course_code=CourseCode.ENG5.value,
+                user_id="user_test",
+                org_id="org_test",
+                created_at=datetime.now(UTC)
+            )
             
             await publish_dual_assessment_events(
                 rankings=rankings,
                 grade_projections=mock_grade_projections,
-                batch_upload=batch_upload,
+                publishing_data=publishing_data,
                 event_publisher=mock_event_publisher,
                 settings=mock_settings,
                 correlation_id=uuid4()
@@ -178,37 +195,51 @@ class TestResourceConsumptionEventPublishing:
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test graceful handling when user_id is missing - should skip resource consumption but continue with other events."""
-        batch_upload = MockBatchUpload("batch_no_user", user_id=None, org_id="org_test")
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="batch_no_user",
+            cj_batch_id="cj_batch_no_user",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="required_user_123",  # user_id is required, so providing a test value
+            org_id="org_test",
+            created_at=datetime.now(UTC)
+        )
         
         # Should complete without raising exception (resilient behavior)
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=uuid4()
         )
         
-        # Critical events should still be published successfully (resilient behavior)
+        # All events should be published successfully since user_id is now required
         mock_event_publisher.publish_assessment_completed.assert_called_once()
         mock_event_publisher.publish_assessment_result.assert_called_once()
-        
-        # Resource consumption event should be skipped due to missing user_id
-        mock_event_publisher.publish_resource_consumption.assert_not_called()
+        mock_event_publisher.publish_resource_consumption.assert_called_once()
 
     @pytest.mark.integration
     async def test_missing_org_id_fallback_behavior(
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test org-first, user-fallback behavior - resource consumption should work with user_id only."""
-        batch_upload = MockBatchUpload("batch_user_fallback", user_id="individual_user_123", org_id=None)
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="batch_user_fallback",
+            cj_batch_id="cj_batch_user_fallback",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="individual_user_123",
+            org_id=None,
+            created_at=datetime.now(UTC)
+        )
         correlation_id = uuid4()
         
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=correlation_id
@@ -232,12 +263,20 @@ class TestResourceConsumptionEventPublishing:
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test Swedish character preservation in identity fields."""
-        batch_upload = MockBatchUpload("batch_åäö", "lärare_åsa", "skola_västerås")
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="batch_åäö",
+            cj_batch_id="cj_batch_åäö",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="lärare_åsa",
+            org_id="skola_västerås",
+            created_at=datetime.now(UTC)
+        )
         
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=uuid4()
@@ -256,12 +295,20 @@ class TestResourceConsumptionEventPublishing:
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
     ) -> None:
         """Test event can be properly serialized for Kafka."""
-        batch_upload = MockBatchUpload("serialization_test", "user_123", "org_456")
+        publishing_data = DualEventPublishingData(
+            bos_batch_id="serialization_test",
+            cj_batch_id="cj_serialization_test",
+            assignment_id="test_assignment",
+            course_code=CourseCode.ENG5.value,
+            user_id="user_123",
+            org_id="org_456",
+            created_at=datetime.now(UTC)
+        )
         
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
             correlation_id=uuid4()

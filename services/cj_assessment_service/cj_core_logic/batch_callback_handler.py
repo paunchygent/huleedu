@@ -23,6 +23,7 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
     update_comparison_result,
 )
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.config import Settings
@@ -498,10 +499,28 @@ async def _trigger_batch_scoring_completion(
             },
         )
 
+        # Extract data from batch_upload for publishing
+        # user_id MUST be present for resource consumption tracking
+        if not batch_upload.user_id:
+            raise ValueError(
+                f"user_id is None for batch {batch_upload.id} - identity threading failed. "
+                f"This is a critical error that should never happen in production."
+            )
+            
+        publishing_data = DualEventPublishingData(
+            bos_batch_id=batch_upload.bos_batch_id,
+            cj_batch_id=str(batch_upload.id),
+            assignment_id=batch_upload.assignment_id,
+            course_code=batch_upload.course_code,
+            user_id=batch_upload.user_id,  # Will raise if None due to check above
+            org_id=batch_upload.org_id,
+            created_at=batch_upload.created_at,
+        )
+
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,  # Pass DTO
             event_publisher=event_publisher,
             settings=settings,
             correlation_id=original_correlation_id,

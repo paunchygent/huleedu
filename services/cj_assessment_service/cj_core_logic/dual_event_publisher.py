@@ -6,8 +6,9 @@ multiple locations to follow DRY principle and ensure consistency.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -32,10 +33,27 @@ from services.cj_assessment_service.cj_core_logic.grade_utils import _grade_to_n
 logger = create_service_logger("dual_event_publisher")
 
 
+@dataclass
+class DualEventPublishingData:
+    """Data contract for dual event publishing.
+    
+    This DTO provides all necessary data for publishing both thin (ELS) 
+    and rich (RAS) assessment events, decoupling the publishing logic 
+    from database models.
+    """
+    bos_batch_id: str  # Original BOS batch identifier
+    cj_batch_id: str   # Internal CJ batch identifier
+    assignment_id: Optional[str]
+    course_code: str
+    user_id: str       # Required for resource consumption tracking
+    org_id: Optional[str]
+    created_at: datetime
+
+
 async def publish_dual_assessment_events(
     rankings: list[dict[str, Any]],
     grade_projections: Any,  # GradeProjectionSummary
-    batch_upload: Any,  # CJBatchUpload
+    publishing_data: DualEventPublishingData,
     event_publisher: CJEventPublisherProtocol,
     settings: Settings,
     correlation_id: UUID,
@@ -51,18 +69,14 @@ async def publish_dual_assessment_events(
     Args:
         rankings: Complete rankings including both students and anchors
         grade_projections: Grade projection summary with confidence scores
-        batch_upload: Batch upload record with BOS batch ID and metadata
+        publishing_data: Data contract containing all required publishing information
         event_publisher: Event publisher protocol implementation
         settings: Application settings
         correlation_id: Correlation ID for event tracing
         processing_started_at: When processing started (for duration calculation)
     """
     if processing_started_at is None:
-        processing_started_at = (
-            batch_upload.created_at.replace(tzinfo=UTC)
-            if hasattr(batch_upload, "created_at")
-            else datetime.now(UTC)
-        )
+        processing_started_at = publishing_data.created_at.replace(tzinfo=UTC)
 
     # Separate student essays from anchors using the correct field name
     student_rankings = [r for r in rankings if not r["els_essay_id"].startswith("ANCHOR_")]
@@ -76,17 +90,11 @@ async def publish_dual_assessment_events(
         r["els_essay_id"] for r in student_rankings if r.get("bradley_terry_score") is None
     ]
 
-    # Extract batch metadata
-    bos_batch_id = (
-        batch_upload.bos_batch_id
-        if hasattr(batch_upload, "bos_batch_id")
-        else str(batch_upload.entity_id)
-    )
-    cj_batch_id = (
-        str(batch_upload.id) if hasattr(batch_upload, "id") else str(batch_upload.batch_id)
-    )
-    assignment_id = batch_upload.assignment_id if hasattr(batch_upload, "assignment_id") else None
-    course_code = batch_upload.course_code if hasattr(batch_upload, "course_code") else ""
+    # Extract batch metadata from publishing data
+    bos_batch_id = publishing_data.bos_batch_id
+    cj_batch_id = publishing_data.cj_batch_id
+    assignment_id = publishing_data.assignment_id
+    course_code = publishing_data.course_code
 
     # Convert course_code enum to string if needed
     if hasattr(course_code, "value"):
@@ -251,9 +259,9 @@ async def publish_dual_assessment_events(
         # Compute estimated comparisons (includes student-only to avoid anchors inflating counts)
         comparisons_estimated = len(student_rankings) * (len(student_rankings) - 1) // 2
 
-        # Extract identities from batch_upload (now threaded through workflow)
-        user_id = getattr(batch_upload, "user_id", None)
-        org_id = getattr(batch_upload, "org_id", None)
+        # Extract identities from publishing data
+        user_id = publishing_data.user_id
+        org_id = publishing_data.org_id
 
         if not user_id:
             raise ValueError(

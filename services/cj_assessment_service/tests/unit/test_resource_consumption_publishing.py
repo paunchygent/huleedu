@@ -20,6 +20,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.resource_consumption_events import ResourceConsumptionV1
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
@@ -94,13 +95,13 @@ class TestResourceConsumptionPublishing:
         expected_user_str: str,
         expected_org_str: str | None,
     ) -> None:
-        """Test identity field extraction from batch_upload and proper string conversion."""
+        """Test identity field extraction from publishing_data and proper string conversion."""
         # Arrange
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_test_123",
-            id="cj_456",
+            cj_batch_id="cj_456",
             assignment_id="assignment_789",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             user_id=user_id,
             org_id=org_id,
@@ -114,7 +115,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -138,25 +139,40 @@ class TestResourceConsumptionPublishing:
         sample_grade_projections: GradeProjectionSummary,
         user_id_scenario: str,
     ) -> None:
-        """Test ValueError handling when user_id is None or missing from batch_upload."""
-        batch_upload = Mock(
-            bos_batch_id="bos_no_user",
-            id="cj_789",
-            assignment_id="assignment_123",
-            course_code=CourseCode.SV2,
-            created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
-            org_id="test-org",
-            user_id=None if user_id_scenario == "none" else "dummy",
-        )
-        if user_id_scenario == "missing" and hasattr(batch_upload, "user_id"):
-            delattr(batch_upload, "user_id")
+        """Test ValueError handling when user_id is None or missing from publishing_data."""
+        # DualEventPublishingData enforces user_id as required, so we test by using a Mock 
+        # to simulate the old batch_upload interface that could have None/missing user_id
+        if user_id_scenario == "none":
+            # Create mock publishing data with None user_id to test the validation
+            publishing_data = Mock(
+                bos_batch_id="bos_no_user",
+                cj_batch_id="cj_789",
+                assignment_id="assignment_123",
+                course_code="SV2",
+                created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+                org_id="test-org",
+                user_id=None,  # Simulating None user_id
+            )
+        else:  # missing scenario
+            # Create mock without user_id attribute
+            publishing_data = Mock(
+                bos_batch_id="bos_no_user",
+                cj_batch_id="cj_789",
+                assignment_id="assignment_123",
+                course_code="SV2",
+                created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+                org_id="test-org",
+                # user_id is missing - will trigger AttributeError
+            )
+            if hasattr(publishing_data, "user_id"):
+                delattr(publishing_data, "user_id")
 
         rankings = [{"els_essay_id": "student_1", "bradley_terry_score": 0.8, "rank": 1}]
 
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -191,11 +207,11 @@ class TestResourceConsumptionPublishing:
     ) -> None:
         """Test quantity calculation uses student-only essays to avoid anchor inflation."""
         # Arrange
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_quantity_test",
-            id="cj_calc",
+            cj_batch_id="cj_calc",
             assignment_id="assignment_calc",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             user_id="calc-user-123",
             org_id="calc-org-456",
@@ -223,7 +239,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -248,11 +264,11 @@ class TestResourceConsumptionPublishing:
     ) -> None:
         """Test that anchor essays are excluded from comparison quantity calculation."""
         # Arrange
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_anchor_exclusion",
-            id="cj_exclusion",
+            cj_batch_id="cj_exclusion",
             assignment_id="assignment_exclusion",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             user_id="exclusion-user-123",
             org_id="exclusion-org-456",
@@ -296,7 +312,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -318,11 +334,11 @@ class TestResourceConsumptionPublishing:
         sample_grade_projections: GradeProjectionSummary,
     ) -> None:
         """Test ResourceConsumptionV1 event creation, structure, and trace context."""
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_event_creation",
-            id="cj_creation",
+            cj_batch_id="cj_creation",
             assignment_id="assignment_creation",
-            course_code=CourseCode.SV2,
+            course_code=CourseCode.SV2.value,
             created_at=datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC),
             user_id="creation-user-456",
             org_id="creation-org-789",
@@ -336,7 +352,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=correlation_id,
@@ -385,21 +401,21 @@ class TestResourceConsumptionPublishing:
         expected_org_string: str | None,
     ) -> None:
         """Test org_id optional behavior and proper None/string conversion."""
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_org_test",
-            id="cj_org",
+            cj_batch_id="cj_org",
             assignment_id="assignment_org",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             user_id="org-test-user",
-            org_id=org_id_input,
+            org_id=str(org_id_input) if org_id_input not in (None, "") else None,
         )
         rankings = [{"els_essay_id": "student_1", "bradley_terry_score": 0.8, "rank": 1}]
 
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -418,11 +434,11 @@ class TestResourceConsumptionPublishing:
         sample_grade_projections: GradeProjectionSummary,
     ) -> None:
         """Test publish_resource_consumption call parameters and failure handling."""
-        batch_upload = Mock(
+        publishing_data = DualEventPublishingData(
             bos_batch_id="bos_method_test",
-            id="cj_method",
+            cj_batch_id="cj_method",
             assignment_id="assignment_method",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             user_id="method-user-123",
             org_id="method-org-456",
@@ -433,7 +449,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=correlation_id,
@@ -453,7 +469,7 @@ class TestResourceConsumptionPublishing:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=sample_grade_projections,
-            batch_upload=batch_upload,
+            publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),

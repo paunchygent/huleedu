@@ -17,6 +17,7 @@ from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.status_enums import BatchStatus
 
 from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
+    DualEventPublishingData,
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
@@ -47,13 +48,13 @@ class TestDualEventPublishingValidation:
         )
 
     @pytest.fixture
-    def sample_batch_upload(self) -> Mock:
-        """Create sample batch upload with metadata."""
-        return Mock(
+    def sample_publishing_data(self) -> DualEventPublishingData:
+        """Create sample publishing data with metadata."""
+        return DualEventPublishingData(
             bos_batch_id="bos_123",
-            id="cj_456",
+            cj_batch_id="cj_456",
             assignment_id="assignment_789",
-            course_code=CourseCode.ENG5,
+            course_code=CourseCode.ENG5.value,
             created_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
             # Identity fields for ResourceConsumptionV1 publishing
             user_id="test-user-789",
@@ -65,7 +66,7 @@ class TestDualEventPublishingValidation:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Verify all RAS event fields have correct types and normalized scores
         are calculated properly."""
@@ -113,7 +114,7 @@ class TestDualEventPublishingValidation:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -166,7 +167,7 @@ class TestDualEventPublishingValidation:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Verify anchor display names follow correct format for all grade levels."""
         # Arrange - Create anchors with each possible grade
@@ -203,7 +204,7 @@ class TestDualEventPublishingValidation:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -243,7 +244,7 @@ class TestDualEventPublishingValidation:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test system handles missing or incomplete confidence data gracefully."""
         # Arrange - Mix of complete and incomplete confidence data
@@ -277,7 +278,7 @@ class TestDualEventPublishingValidation:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
@@ -306,7 +307,7 @@ class TestDualEventPublishingValidation:
         self,
         mock_event_publisher: AsyncMock,
         test_settings: Mock,
-        sample_batch_upload: Mock,
+        sample_publishing_data: DualEventPublishingData,
     ) -> None:
         """Test system handles null/None scores in rankings gracefully."""
         # Arrange - Mix of valid and null scores
@@ -339,7 +340,7 @@ class TestDualEventPublishingValidation:
         await publish_dual_assessment_events(
             rankings=rankings,
             grade_projections=grade_projections,
-            batch_upload=sample_batch_upload,
+            publishing_data=sample_publishing_data,
             event_publisher=mock_event_publisher,
             settings=test_settings,
             correlation_id=uuid4(),
