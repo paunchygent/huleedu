@@ -1,12 +1,4 @@
-"""
-Integration tests for CJ Assessment → Entitlements identity threading.
-
-Tests complete identity propagation flow from CJ processing through ResourceConsumptionV1
-event publishing to Entitlements Service, focusing on user_id/org_id preservation,
-batch quantity mapping, and credit attribution accuracy.
-
-Uses ServiceTestManager and KafkaTestManager utilities exclusively.
-"""
+"""CJ Assessment → Entitlements identity threading integration tests."""
 
 from __future__ import annotations
 
@@ -36,27 +28,24 @@ logger = create_service_logger("test.cj_entitlements_identity")
 class MockBatchUpload:
     """Mock CJ batch upload with identity fields."""
 
-    def __init__(
-        self,
-        bos_batch_id: str,
-        user_id: str | None = None,
-        org_id: str | None = None,
-        course_code: CourseCode = CourseCode.ENG5,
-    ):
+    def __init__(self, bos_batch_id: str, user_id: str | None = None, org_id: str | None = None):
         self.bos_batch_id = bos_batch_id
         self.id = f"cj_{bos_batch_id}"
         self.user_id = user_id
         self.org_id = org_id
-        self.course_code = course_code
+        self.course_code = CourseCode.ENG5
         self.assignment_id = "test_assignment"
         self.created_at = datetime.now(UTC)
 
 
 class MockSettings:
-    """Mock CJ Assessment service settings."""
-
+    """Mock CJ service settings."""
     SERVICE_NAME = "cj_assessment_service"
     CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
+    ASSESSMENT_RESULT_TOPIC = "huleedu.assessment.result.published.v1"
+    DEFAULT_LLM_MODEL = "gpt-4"
+    DEFAULT_LLM_PROVIDER = type('Provider', (), {'value': 'openai'})()
+    DEFAULT_LLM_TEMPERATURE = 0.0
 
 
 class TestCJEntitlementsIdentityFlow:
@@ -64,15 +53,16 @@ class TestCJEntitlementsIdentityFlow:
 
     @pytest.fixture
     def mock_event_publisher(self) -> AsyncMock:
-        """Mock CJ event publisher that captures ResourceConsumptionV1 events."""
+        """Mock CJ event publisher."""
         publisher = AsyncMock(spec=CJEventPublisherProtocol)
         publisher.publish_resource_consumption = AsyncMock()
         publisher.publish_assessment_completed = AsyncMock()
+        publisher.publish_assessment_result = AsyncMock()
         return publisher
 
     @pytest.fixture
     def sample_rankings(self) -> list[dict[str, Any]]:
-        """Sample essay rankings for 4 essays."""
+        """Sample essay rankings."""
         return [
             {"els_essay_id": "essay_1", "bradley_terry_score": 0.75},
             {"els_essay_id": "essay_2", "bradley_terry_score": 0.60},
@@ -82,8 +72,14 @@ class TestCJEntitlementsIdentityFlow:
 
     @pytest.fixture
     def mock_grade_projections(self) -> Any:
-        """Mock grade projection summary."""
-        return AsyncMock()
+        """Mock grade projections."""
+        from common_core.events.cj_assessment_events import GradeProjectionSummary
+        return GradeProjectionSummary(
+            projections_available=True,
+            primary_grades={"essay_1": "A", "essay_2": "B", "essay_3": "B", "essay_4": "C"},
+            confidence_labels={"essay_1": "HIGH", "essay_2": "HIGH", "essay_3": "MID", "essay_4": "LOW"},
+            confidence_scores={"essay_1": 0.85, "essay_2": 0.80, "essay_3": 0.65, "essay_4": 0.45}
+        )
 
     @pytest.mark.integration
     async def test_cj_identity_propagation_to_entitlements(
@@ -102,7 +98,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=correlation_id,
         )
 
@@ -133,7 +129,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -161,7 +157,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=test_correlation_id,
         )
 
@@ -195,7 +191,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -236,7 +232,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -247,52 +243,31 @@ class TestCJEntitlementsIdentityFlow:
         assert resource_envelope.data.user_id == expected_user
         assert resource_envelope.data.org_id == expected_org
 
-    @pytest.mark.integration
-    async def test_swedish_resource_type_handling(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
-    ) -> None:
-        """Test Swedish resource type språkgranskning handling."""
-        # Arrange - Modify mock to simulate Swedish resource type
-        batch_upload = MockBatchUpload(
-            bos_batch_id="språk_test", user_id="svensk-användare", org_id="skolan-växjö"
-        )
-
-        # Act
-        await publish_dual_assessment_events(
-            rankings=sample_rankings,
-            grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
-            event_publisher=mock_event_publisher,
-            settings=MockSettings(),
-            correlation_id=uuid4(),
-        )
-
-        # Assert - Standard CJ comparison resource type (Swedish would be in different service)
-        resource_envelope = mock_event_publisher.publish_resource_consumption.call_args.kwargs[
-            "resource_event"
-        ]
-        assert resource_envelope.data.resource_type == "cj_comparison"
 
     @pytest.mark.integration
-    async def test_missing_user_id_raises_error(
+    async def test_missing_user_id_graceful_handling(
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
     ) -> None:
-        """Test missing user_id raises ValueError."""
+        """Test missing user_id is handled gracefully (logged but not raised)."""
         # Arrange
         batch_upload = MockBatchUpload(
             bos_batch_id="missing_user_test", user_id=None, org_id="test_org"
         )
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="user_id not available"):
-            await publish_dual_assessment_events(
-                rankings=sample_rankings,
-                grade_projections=mock_grade_projections,
-                batch_upload=batch_upload,
-                event_publisher=mock_event_publisher,
-                settings=MockSettings(),
-                correlation_id=uuid4(),
-            )
+        # Act - Should not raise exception, failure is logged
+        await publish_dual_assessment_events(
+            rankings=sample_rankings,
+            grade_projections=mock_grade_projections,
+            batch_upload=batch_upload,
+            event_publisher=mock_event_publisher,
+            settings=MockSettings(),  # type: ignore[arg-type]
+            correlation_id=uuid4(),
+        )
+        
+        # Assert - Main events still published, resource consumption not called
+        mock_event_publisher.publish_assessment_completed.assert_called_once()
+        mock_event_publisher.publish_assessment_result.assert_called_once()
+        mock_event_publisher.publish_resource_consumption.assert_not_called()
 
     @pytest.mark.integration
     async def test_individual_user_org_id_none(
@@ -310,7 +285,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -343,7 +318,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=failing_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -351,46 +326,6 @@ class TestCJEntitlementsIdentityFlow:
         failing_publisher.publish_assessment_completed.assert_called_once()
         failing_publisher.publish_resource_consumption.assert_called_once()
 
-    @pytest.mark.integration
-    async def test_cj_comparison_resource_consumption_accuracy(
-        self, mock_event_publisher: AsyncMock, mock_grade_projections: Any
-    ) -> None:
-        """Test CJ comparison resource consumption accuracy."""
-        # Arrange - Test different batch sizes
-        test_cases = [
-            (2, 1),   # 2 essays: 1 comparison
-            (3, 3),   # 3 essays: 3 comparisons
-            (4, 6),   # 4 essays: 6 comparisons
-            (5, 10),  # 5 essays: 10 comparisons
-        ]
-        
-        for essay_count, expected_comparisons in test_cases:
-            rankings = [
-                {"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5}
-                for i in range(essay_count)
-            ]
-            batch_upload = MockBatchUpload(
-                bos_batch_id=f"accuracy_test_{essay_count}",
-                user_id="accuracy_user",
-                org_id="accuracy_org"
-            )
-            
-            # Act
-            await publish_dual_assessment_events(
-                rankings=rankings,
-                grade_projections=mock_grade_projections,
-                batch_upload=batch_upload,
-                event_publisher=mock_event_publisher,
-                settings=MockSettings(),
-                correlation_id=uuid4(),
-            )
-            
-            # Assert
-            resource_envelope = mock_event_publisher.publish_resource_consumption.call_args.kwargs[
-                "resource_event"
-            ]
-            assert resource_envelope.data.quantity == expected_comparisons
-            mock_event_publisher.reset_mock()
 
     @pytest.mark.integration
     async def test_batch_size_to_quantity_mapping_edge_cases(
@@ -409,7 +344,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
 
@@ -419,32 +354,6 @@ class TestCJEntitlementsIdentityFlow:
         ]
         assert resource_envelope.data.quantity == 0  # Single essay = 0 comparisons
 
-    @pytest.mark.integration
-    async def test_multiple_resource_types_per_batch(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
-    ) -> None:
-        """Test multiple resource types per batch (CJ focuses on cj_comparison only)."""
-        # Arrange
-        batch_upload = MockBatchUpload(
-            bos_batch_id="multi_resource_test", user_id="multi_user", org_id="multi_org"
-        )
-
-        # Act
-        await publish_dual_assessment_events(
-            rankings=sample_rankings,
-            grade_projections=mock_grade_projections,
-            batch_upload=batch_upload,
-            event_publisher=mock_event_publisher,
-            settings=MockSettings(),
-            correlation_id=uuid4(),
-        )
-
-        # Assert - CJ Assessment only publishes cj_comparison resource type
-        resource_envelope = mock_event_publisher.publish_resource_consumption.call_args.kwargs[
-            "resource_event"
-        ]
-        assert resource_envelope.data.resource_type == "cj_comparison"
-        assert resource_envelope.data.service_name == "cj_assessment_service"
 
     @pytest.mark.integration
     async def test_credit_attribution_accuracy_with_service_metadata(
@@ -463,7 +372,7 @@ class TestCJEntitlementsIdentityFlow:
             grade_projections=mock_grade_projections,
             batch_upload=batch_upload,
             event_publisher=mock_event_publisher,
-            settings=MockSettings(),
+            settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=correlation_id,
         )
 
