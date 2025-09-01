@@ -13,7 +13,7 @@ Architecture Option
 References
 - Gateway: `services/api_gateway_service/*` (if embedding)
 - Result data: `services/result_aggregator_service/*`
-- Rules: `020`, `040-service-implementation-guidelines`, `041-fastapi-integration-patterns`, `070`
+- Rules: `020`, `040-service-implementation-guidelines`, `041.1-fastapi-integration-patterns`, `070`
 
 Deliverables
 1. LTI Security Profile: JWKs, OIDC login/initiate login, launch endpoint handling nonce/state.

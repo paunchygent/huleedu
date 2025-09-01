@@ -56,7 +56,8 @@ Repository rules referenced
 - .cursor/rules/020.10-api-gateway-service.mdc
 - .cursor/rules/020.17-entitlements-service-architecture.mdc (ensure listed in 000 index)
 - .cursor/rules/030-event-driven-architecture-eda-standards.mdc
-- .cursor/rules/042-http-proxy-service-patterns.mdc
+- .cursor/rules/042.2-http-proxy-service-patterns.mdc
+- .cursor/rules/046-docker-container-debugging.mdc
 - .cursor/rules/050-python-coding-standards.mdc
 - .cursor/rules/070-testing-and-quality-assurance.mdc
 - .cursor/rules/075-test-creation-methodology.mdc
@@ -248,7 +249,7 @@ Full quality gates
   - .cursor/rules/020.10-api-gateway-service.mdc
   - .cursor/rules/020.17-entitlements-service-architecture.mdc
   - .cursor/rules/030-event-driven-architecture-eda-standards.mdc
-  - .cursor/rules/042-http-proxy-service-patterns.mdc
+  - .cursor/rules/042.2-http-proxy-service-patterns.mdc
   - .cursor/rules/050-python-coding-standards.mdc
   - .cursor/rules/070-testing-and-quality-assurance.mdc
   - .cursor/rules/075-test-creation-methodology.mdc
@@ -268,7 +269,7 @@ Overarching issue:
 - E2E tests time out when BOS does not transition batches to `READY_FOR_PIPELINE_EXECUTION`. This typically happens when upstream events (file → ELS completion) are not observed.
 
 Prerequisites (rules to review):
-- `.cursor/rules/042-http-proxy-service-patterns.mdc` (edge identity injection and forwarding)
+- `.cursor/rules/042.2-http-proxy-service-patterns.mdc` (edge identity injection and forwarding)
 - `.cursor/rules/030-event-driven-architecture-eda-standards.mdc` (envelopes, topics)
 - `.cursor/rules/043-service-configuration-and-logging.mdc` (backend URL config, logging)
 - `.cursor/rules/048-structured-error-handling-standards.mdc` (mapped error responses)

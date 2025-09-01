@@ -91,6 +91,36 @@ async def run_cj_assessment_workflow(
             log_extra,
         )
 
+        # Short-circuit for single-essay batches (no comparisons possible)
+        student_count = sum(1 for e in essays_for_api_model if not e.id.startswith("ANCHOR_"))
+        if student_count < 2:
+            logger.info(
+                "Detected <2 student essays; finalizing batch without comparisons",
+                extra={**log_extra, "cj_batch_id": cj_batch_id, "student_count": student_count},
+            )
+
+            # Use centralized finalizer in single_essay mode
+            from services.cj_assessment_service.cj_core_logic.batch_finalizer import (
+                BatchFinalizer,
+            )
+
+            async with database.session() as session:
+                finalizer = BatchFinalizer(
+                    database=database,
+                    event_publisher=event_publisher,
+                    content_client=content_client,
+                    settings=settings,
+                )
+                await finalizer.finalize_single_essay(
+                    batch_id=cj_batch_id,
+                    correlation_id=correlation_id,
+                    session=session,
+                    log_extra=log_extra,
+                )
+
+            # Return empty result; events published via outbox
+            return CJAssessmentWorkflowResult(rankings=[], batch_id=str(cj_batch_id))
+
         # Phase 3: Submit Comparisons for Async Processing
         # ALL LLM calls are async - workflow ALWAYS pauses here
         # Results arrive via Kafka callbacks which trigger completion

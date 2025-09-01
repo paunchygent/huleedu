@@ -247,8 +247,9 @@ async def test_file_upload_accepts_202(client_with_mocks, mock_http_client):
 @pytest.mark.asyncio
 async def test_swedish_user_id_is_url_encoded_in_forwarded_headers(monkeypatch):
     """Swedish user/org IDs are URL-encoded with encoding marker when forwarded."""
-    from prometheus_client import CollectorRegistry
     from urllib.parse import quote
+
+    from prometheus_client import CollectorRegistry
 
     mock_http_client = AsyncMock()
     mock_response = Mock()

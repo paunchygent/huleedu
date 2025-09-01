@@ -32,6 +32,7 @@ from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
 from services.cj_assessment_service.cj_core_logic.grade_projector import (
     GradeProjector,
 )
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.metrics import get_business_metrics
 from services.cj_assessment_service.models_api import EssayForComparison
 from services.cj_assessment_service.models_db import CJBatchState, CJBatchUpload
@@ -192,6 +193,25 @@ class BatchMonitor:
 
             batch_id = batch_state.batch_id
             current_state = batch_state.state
+
+            # Early exit: batch completed via insufficient essays fast-path
+            try:
+                if batch_state.batch_upload and (
+                    batch_state.batch_upload.status
+                    == CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS
+                ):
+                    logger.info(
+                        "Skipping stuck handling: batch completed with insufficient essays",
+                        extra={
+                            "batch_id": batch_id,
+                            "current_state": current_state.value,
+                            "status": CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS.value,
+                        },
+                    )
+                    return
+            except Exception:
+                # If relationship not loaded for any reason, continue with normal flow
+                pass
 
             logger.info(
                 "Handling stuck batch",

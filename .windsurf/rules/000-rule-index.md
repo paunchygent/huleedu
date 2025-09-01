@@ -31,24 +31,33 @@ alwaysApply: false
   - [020.17-entitlements-service-architecture.mdc](mdc:020.17-entitlements-service-architecture.mdc): Entitlements Service
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards with header-first optimization
 
+## Processing Flows
+- [035-complete-processing-flow-overview.mdc](mdc:035-complete-processing-flow-overview.mdc): Complete processing flow overview
+- [036-phase1-processing-flow.mdc](mdc:036-phase1-processing-flow.mdc): Phase 1 processing flow documentation
+- [037-phase2-processing-flow.mdc](mdc:037-phase2-processing-flow.mdc): Phase 2 processing flow documentation
+
 ## Implementation & Coding Standards
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
-- [041-fastapi-integration-patterns.mdc](mdc:041-fastapi-integration-patterns.mdc): FastAPI integration patterns with comprehensive observability and testing
+- [041.1-fastapi-integration-patterns.mdc](mdc:041.1-fastapi-integration-patterns.mdc): FastAPI integration patterns with comprehensive observability and testing
 - [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
 - [042.1-transactional-outbox-pattern.mdc](mdc:042.1-transactional-outbox-pattern.mdc): Transactional outbox pattern as fallback for Kafka failures
-- [042-http-proxy-service-patterns.mdc](mdc:042-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
+- [042.2-http-proxy-service-patterns.mdc](mdc:042.2-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
+- [043.1-kafka-redis-configuration-standards.mdc](mdc:043.1-kafka-redis-configuration-standards.mdc): Kafka and Redis configuration standards
 - [044-service-debugging-and-troubleshooting.mdc](mdc:044-service-debugging-and-troubleshooting.mdc): CRITICAL debugging priority: service configuration over import patterns
 - [044.1-circuit-breaker-observability.mdc](mdc:044.1-circuit-breaker-observability.mdc): Circuit breaker observability patterns and metrics integration standards
+- [044.2-redis-kafka-state-debugging.mdc](mdc:044.2-redis-kafka-state-debugging.mdc): Redis and Kafka state debugging patterns for distributed system failures
 - [045-retry-logic.mdc](mdc:045-retry-logic.mdc): Natural retry via idempotency and user-initiated retry patterns
 - [046-docker-container-debugging.mdc](mdc:046-docker-container-debugging.mdc): Systematic Docker container discovery and debugging protocol
 - [047-security-configuration-standards.mdc](mdc:047-security-configuration-standards.mdc): Security configuration patterns for JWT, secrets management, and environment-aware security controls
 - [048-structured-error-handling-standards.mdc](mdc:048-structured-error-handling-standards.mdc): Structured error handling patterns and observability integration standards
+- [049-smtp-email-provider-patterns.mdc](mdc:049-smtp-email-provider-patterns.mdc): SMTP email provider configuration patterns
 - [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc): Pydantic v2 usage patterns, serialization, and configuration standards
 - [052-event-contract-standards.mdc](mdc:052-event-contract-standards.mdc): Event contract standards and best practices
 - [053-sqlalchemy-standards.mdc](mdc:053-sqlalchemy-standards.mdc): Database models and SQLAlchemy patterns
+- [054-utility-markdown-mermaid-conversion.mdc](mdc:054-utility-markdown-mermaid-conversion.mdc): Markdown/Mermaid to HTML conversion patterns
 - [055-import-resolution-patterns.mdc](mdc:055-import-resolution-patterns.mdc): Import patterns to avoid module conflicts in monorepo
 
 ## Quality, Workflow & Documentation
@@ -59,25 +68,28 @@ alwaysApply: false
 - [075.1-parallel-test-creation-methodology.mdc](mdc:075.1-parallel-test-creation-methodology.mdc): Parallel test creation with mandatory architect validation
 - **Observability (071.x)**
   - [071-observability-index.mdc](mdc:071-observability-index.mdc): Observability patterns index
-  - [071-observability-core-patterns.mdc](mdc:071-observability-core-patterns.mdc): Core observability patterns
-  - [071.1-prometheus-metrics-patterns.mdc](mdc:071.1-prometheus-metrics-patterns.mdc): Prometheus metrics patterns
-  - [071.2-jaeger-tracing-patterns.mdc](mdc:071.2-jaeger-tracing-patterns.mdc): Distributed tracing with Jaeger
-  - [071.3-grafana-loki-patterns.mdc](mdc:071.3-grafana-loki-patterns.mdc): Grafana dashboards and Loki logs
+  - [071.1-observability-core-patterns.mdc](mdc:071.1-observability-core-patterns.mdc): Core observability patterns
+  - [071.2-prometheus-metrics-patterns.mdc](mdc:071.2-prometheus-metrics-patterns.mdc): Prometheus metrics patterns
+  - [071.3-jaeger-tracing-patterns.mdc](mdc:071.3-jaeger-tracing-patterns.mdc): Distributed tracing with Jaeger
+  - [071.4-grafana-loki-patterns.mdc](mdc:071.4-grafana-loki-patterns.mdc): Grafana dashboards and Loki logs
 - [072-grafana-playbook-rules.mdc](mdc:072-grafana-playbook-rules.mdc): Grafana dashboard and alerting playbook
 - [073-health-endpoint-implementation.mdc](mdc:073-health-endpoint-implementation.mdc): Health endpoint implementation patterns for HuleEdu services
 - [077-service-anti-patterns.mdc](mdc:077-service-anti-patterns.mdc): Common anti-patterns to avoid and their corrections
 - [080-repository-workflow-and-tooling.mdc](mdc:080-repository-workflow-and-tooling.mdc): PDM monorepo usage, version control, CI/CD
 - [081-pdm-dependency-management.mdc](mdc:081-pdm-dependency-management.mdc): PDM configuration and dependency management standards
+- [081.1-docker-development-workflow.mdc](mdc:081.1-docker-development-workflow.mdc): Comprehensive Docker development workflow for optimized builds and hot-reload
 - [082-ruff-linting-standards.mdc](mdc:082-ruff-linting-standards.mdc): Ruff linting and formatting configuration
 - [083-pdm-standards-2025.mdc](mdc:083-pdm-standards-2025.mdc): Correct modern PDM syntax that must never be questioned
 - [084-docker-containerization-standards.mdc](mdc:084-docker-containerization-standards.mdc): Docker containerization patterns, import requirements, and troubleshooting
-- [085-docker-compose-v2-command-reference.mdc](mdc:085-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
+- [084.1-docker-compose-v2-command-reference.mdc](mdc:084.1-docker-compose-v2-command-reference.mdc): Docker Compose v2 command reference
+- [085-database-migration-standards.mdc](mdc:085-database-migration-standards.mdc): Database migration standards for HuleEdu microservices
 - [086-mypy-configuration-standards.mdc](mdc:086-mypy-configuration-standards.mdc): MyPy configuration and monorepo type checking standards with module conflict resolution
 - [087-docker-development-container-patterns.mdc](mdc:087-docker-development-container-patterns.mdc): Docker development container patterns and optimization standards for layer caching and hot-reload
 - [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
 
 ## Frontend Development Standards
 - [200-frontend-core-rules.mdc](mdc:200-frontend-core-rules.mdc): Core frontend architecture patterns (Svelte 5 + Vite, TypeScript, modular design)
+- [201-frontend-development-utilities.mdc](mdc:201-frontend-development-utilities.mdc): Frontend development utilities
 - [210-frontend-dashboard-rules.mdc](mdc:210-frontend-dashboard-rules.mdc): Teacher dashboard patterns and real-time UI components
 
 ## Terminology & Your Interaction Modes

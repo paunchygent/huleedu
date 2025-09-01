@@ -134,6 +134,7 @@ async def publish_dual_assessment_events(
             "successful_essay_ids": successful_essay_ids,
             "failed_essay_ids": failed_essay_ids,
             "processing_time_seconds": round(processing_time, 2),
+            "single_essay_batch": len(student_rankings) == 1,
         },
     )
 

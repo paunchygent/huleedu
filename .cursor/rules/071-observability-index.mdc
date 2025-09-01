@@ -11,7 +11,7 @@ Observability patterns for monitoring, tracing, and debugging HuleEdu services.
 ## Sub-Rules
 
 ### 071: Core Patterns
-- Location: `071-observability-core-patterns.mdc`
+- Location: `071.1-observability-core-patterns.mdc`
 - Covers: Philosophy, correlation patterns, naming conventions
 - When: Setting up any observability component
 

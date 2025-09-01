@@ -7,7 +7,7 @@ The dual event publishing pattern has been implemented across three locations in
 
 ### 1. Implementation Locations Validated ✅
 - `event_processor.py:55-201` - `publish_assessment_completion()` function
-- `batch_callback_handler.py:352-577` - `_trigger_batch_scoring_completion()` function  
+- `batch_finalizer.py` - `BatchFinalizer.finalize_scoring()` method  
 - `batch_monitor.py:350-573` - `_trigger_scoring()` function
 
 ### 2. Dual Event Publishing Pattern ✅
