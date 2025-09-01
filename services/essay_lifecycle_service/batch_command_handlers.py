@@ -283,15 +283,15 @@ async def _route_event(
             if envelope.metadata:
                 with use_trace_context(envelope.metadata):
                     await batch_command_handler.process_initiate_cj_assessment_command(
-                        command_data=cj_command_data, 
+                        command_data=cj_command_data,
                         correlation_id=correlation_id,
-                        envelope_metadata=envelope.metadata
+                        envelope_metadata=envelope.metadata,
                     )
             else:
                 await batch_command_handler.process_initiate_cj_assessment_command(
-                    command_data=cj_command_data, 
+                    command_data=cj_command_data,
                     correlation_id=correlation_id,
-                    envelope_metadata=None
+                    envelope_metadata=None,
                 )
             return True
 

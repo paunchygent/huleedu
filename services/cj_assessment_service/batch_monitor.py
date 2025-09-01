@@ -462,7 +462,7 @@ class BatchMonitor:
                     f"user_id is None for batch {batch_upload.id} - identity threading failed. "
                     f"This is a critical error that should never happen in production."
                 )
-                
+
             publishing_data = DualEventPublishingData(
                 bos_batch_id=batch_upload.bos_batch_id,
                 cj_batch_id=str(batch_upload.id),

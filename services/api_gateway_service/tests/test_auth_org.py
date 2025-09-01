@@ -6,7 +6,7 @@ Keeps scope limited to AuthProvider.provide_org_id behavior.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -102,7 +102,9 @@ class TestJWTOrgIdExtraction:
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
         auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"org_id": "org-1"}, exp_delta=timedelta(hours=-1))
+        token = auth.create_token_with_claims(
+            "user-1", {"org_id": "org-1"}, exp_delta=timedelta(hours=-1)
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         provider = AuthProvider()
@@ -125,4 +127,3 @@ class TestJWTOrgIdExtraction:
         bearer_token = provider.extract_bearer_token(mock_request)
         with pytest.raises(HuleEduError):
             provider.provide_org_id(bearer_token, settings, mock_request)
-

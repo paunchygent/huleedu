@@ -7,21 +7,18 @@ Uses ServiceTestManager + KafkaTestManager patterns.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
-from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.identity_validation import IdentityValidator
+from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 
 logger = create_service_logger("test.e2e_identity_threading")
-
 
 
 class TestE2EIdentityThreading:
@@ -34,7 +31,7 @@ class TestE2EIdentityThreading:
         """Validate service health."""
         service_manager = ServiceTestManager()
         endpoints = await service_manager.get_validated_endpoints()
-        
+
         required_services = ["essay_lifecycle_api", "cj_assessment_service", "entitlements_service"]
         for service_name in required_services:
             if service_name not in endpoints:
@@ -54,8 +51,7 @@ class TestE2EIdentityThreading:
 
         # Create test user for identity tracking
         test_user = auth_manager.create_test_user(
-            user_id="test_identity_user",
-            organization_id="test_org_123"
+            user_id="test_identity_user", organization_id="test_org_123"
         )
 
         essay_files = [
@@ -66,14 +62,16 @@ class TestE2EIdentityThreading:
         try:
             # Start monitoring ResourceConsumptionV1 events with earliest offset to catch all events
             async with kafka_mgr.consumer(
-                "identity_threading", 
+                "identity_threading",
                 ["huleedu.resource.consumption.v1"],
-                auto_offset_reset="earliest"
+                auto_offset_reset="earliest",
             ) as consumer:
                 # Execute CJ pipeline (pass test user to ensure identity propagation)
                 batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_user)
-                logger.info(f"Starting identity threading for batch {batch_id}, user: {test_user.user_id}")
-                
+                logger.info(
+                    f"Starting identity threading for batch {batch_id}, user: {test_user.user_id}"
+                )
+
                 result = await harness.execute_pipeline(
                     pipeline_name="cj_assessment",
                     expected_steps=["spellcheck", "cj_assessment"],
@@ -89,18 +87,22 @@ class TestE2EIdentityThreading:
                 # Collect ResourceConsumptionV1 events
                 logger.info(f"🔍 Collecting ResourceConsumptionV1 events for correlation: {corr}")
                 resource_events = await kafka_mgr.collect_events(
-                    consumer, 
-                    expected_count=1, 
+                    consumer,
+                    expected_count=1,
                     timeout_seconds=10,
-                    event_filter=lambda event: event.get("correlation_id") == str(corr)
+                    event_filter=lambda event: event.get("correlation_id") == str(corr),
                 )
-                
+
                 # Validate ResourceConsumptionV1 event was published
-                assert len(resource_events) > 0, f"No ResourceConsumptionV1 events for correlation {corr}"
-                
+                assert len(resource_events) > 0, (
+                    f"No ResourceConsumptionV1 events for correlation {corr}"
+                )
+
                 resource_event = resource_events[0]["data"]
-                logger.info(f"📊 ResourceConsumptionV1 event received: {resource_event.get('event_type')}")
-                
+                logger.info(
+                    f"📊 ResourceConsumptionV1 event received: {resource_event.get('event_type')}"
+                )
+
                 # Validate identity threading in event
                 # Using validator for payload identity
                 id_check = IdentityValidator.validate_event_identity(resource_event)
@@ -109,16 +111,16 @@ class TestE2EIdentityThreading:
                 assert id_check["has_org"] and event_data["org_id"] == test_user.organization_id
                 assert event_data["resource_type"] == "cj_comparison"
                 assert event_data["entity_id"] == batch_id
-                
-                logger.info(f"✅ Identity threading verified in ResourceConsumptionV1:")
+
+                logger.info("✅ Identity threading verified in ResourceConsumptionV1:")
                 logger.info(f"   user_id: {event_data['user_id']}")
                 logger.info(f"   org_id: {event_data['org_id']}")
                 logger.info(f"   quantity: {event_data['quantity']}")
                 logger.info(f"   resource_type: {event_data['resource_type']}")
-                
+
                 logger.info("🎉 IDENTITY THREADING TEST SUCCESS!")
                 logger.info("   ✅ ELS → CJ pipeline completed")
-                logger.info("   ✅ ResourceConsumptionV1 event published") 
+                logger.info("   ✅ ResourceConsumptionV1 event published")
                 logger.info("   ✅ user_id/org_id properly threaded through event")
 
         finally:
@@ -137,8 +139,7 @@ class TestE2EIdentityThreading:
 
         # Teacher scenario with organization
         test_teacher = auth_manager.create_test_user(
-            user_id="teacher_sv_123",
-            organization_id="gymnasium_stockholm"
+            user_id="teacher_sv_123", organization_id="gymnasium_stockholm"
         )
 
         essay_files = [
@@ -148,7 +149,7 @@ class TestE2EIdentityThreading:
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files, user=test_teacher)
-            
+
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
                 expected_steps=["spellcheck", "cj_assessment"],
@@ -189,7 +190,7 @@ class TestE2EIdentityThreading:
 
         try:
             batch_id, corr = await harness.setup_guest_batch(essay_files)
-            
+
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
                 expected_steps=["spellcheck", "cj_assessment"],
@@ -199,7 +200,7 @@ class TestE2EIdentityThreading:
             )
 
             assert result.all_steps_completed
-            
+
             # Validate correlation preserved across all phases
             assert result.ras_result_event is not None
             ras_data = result.ras_result_event["data"]
@@ -231,6 +232,7 @@ class TestE2EIdentityThreading:
 
         essay_files = [
             Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
         try:
@@ -239,22 +241,24 @@ class TestE2EIdentityThreading:
             result = await harness.execute_pipeline(
                 pipeline_name="cj_assessment",
                 expected_steps=["spellcheck", "cj_assessment"],
-                expected_completion_event="cj_assessment.completed", 
+                expected_completion_event="cj_assessment.completed",
                 validate_phase_pruning=False,
                 timeout_seconds=45,
             )
 
             assert result.all_steps_completed
             assert result.ras_result_event is not None
-            
+
             # Individual user should still get results
             ras_data = result.ras_result_event["data"]
             assert ras_data["batch_id"] == batch_id
-            assert ras_data["overall_status"] in ["completed_successfully", "completed_with_failures"]
+            assert ras_data["overall_status"] in [
+                "completed_successfully",
+                "completed_with_failures",
+            ]
 
         finally:
             await harness.cleanup()
-
 
     @pytest.mark.e2e
     @pytest.mark.docker
@@ -274,6 +278,7 @@ class TestE2EIdentityThreading:
 
         essay_files = [
             Path("test_uploads/real_test_batch/MHHXGMXL 50 (SA24D ENG 5 WRITING 2025).txt"),
+            Path("test_uploads/real_test_batch/MHHXGMXE 50 (SA24D ENG 5 WRITING 2025).txt"),
         ]
 
         try:
@@ -289,7 +294,7 @@ class TestE2EIdentityThreading:
 
             assert result.all_steps_completed
             assert result.ras_result_event is not None
-            
+
             # Swedish characters should be preserved
             ras_data = result.ras_result_event["data"]
             assert ras_data["batch_id"] == batch_id

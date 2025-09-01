@@ -109,4 +109,3 @@ class IdentityValidator:
                 raise AssertionError("Event org_id does not match DB record")
 
         return result
-

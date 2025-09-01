@@ -141,11 +141,11 @@ class TestCJAssessmentCommandHandler:
         mock_repository.get_essay_state.return_value = essay_state
         mock_repository.update_essay_status_via_machine.return_value = None
         mock_request_dispatcher.dispatch_cj_assessment_requests.return_value = None
-        
+
         # Setup batch tracker to return identity information
         mock_batch_tracker.get_batch_status.return_value = {
             "user_id": "test-user-123",
-            "org_id": "test-org-456"
+            "org_id": "test-org-456",
         }
 
         with patch(
@@ -300,11 +300,11 @@ class TestCJAssessmentCommandHandler:
         # Setup essay states - all found and can transition
         essay_states = [self.create_essay_state_mock(ref.essay_id, batch_id) for ref in essay_refs]
         mock_repository.get_essay_state.side_effect = essay_states
-        
+
         # Setup batch tracker to return identity information
         mock_batch_tracker.get_batch_status.return_value = {
             "user_id": "multi-essay-user-123",
-            "org_id": "multi-essay-org-456"
+            "org_id": "multi-essay-org-456",
         }
 
         with patch(
@@ -375,11 +375,11 @@ class TestCJAssessmentCommandHandler:
         # Setup essay state
         essay_state = self.create_essay_state_mock(essay_id, batch_id)
         mock_repository.get_essay_state.return_value = essay_state
-        
+
         # Setup batch tracker to return identity information
         mock_batch_tracker.get_batch_status.return_value = {
             "user_id": "swedish-user-789",
-            "org_id": "stockholm-school"
+            "org_id": "stockholm-school",
         }
 
         with patch(
@@ -440,11 +440,11 @@ class TestCJAssessmentCommandHandler:
             for ref in command_data.essays_to_process
         ]
         mock_repository.get_essay_state.side_effect = essay_states
-        
+
         # Setup batch tracker to return identity information
         mock_batch_tracker.get_batch_status.return_value = {
             "user_id": "course-code-user-789",
-            "org_id": "course-code-org-123"
+            "org_id": "course-code-org-123",
         }
 
         with patch(
@@ -516,11 +516,11 @@ class TestCJAssessmentCommandHandler:
             command_data.essays_to_process[0].essay_id, batch_id
         )
         mock_repository.get_essay_state.return_value = essay_state
-        
+
         # Setup batch tracker to return identity information
         mock_batch_tracker.get_batch_status.return_value = {
             "user_id": "minimal-user-456",
-            "org_id": "minimal-org-789"
+            "org_id": "minimal-org-789",
         }
 
         with patch(

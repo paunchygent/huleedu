@@ -10,10 +10,11 @@ Identity values MUST NOT be used as metric labels.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
-
-SAMPLE_RE = re.compile(r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\{(?P<labels>[^}]*)\}\s+(?P<value>[-+]?[0-9]*\.?[0-9]+(e[-+]?\d+)?)$")
+SAMPLE_RE = re.compile(
+    r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\{(?P<labels>[^}]*)\}\s+(?P<value>[-+]?[0-9]*\.?[0-9]+(e[-+]?\d+)?)$"
+)
 
 
 def parse_labels(labels_str: str) -> Dict[str, str]:
@@ -65,16 +66,21 @@ def assert_metric_incremented(
     before_vals = find_metric_values(before_text, metric_name, labels_subset)
     after_vals = find_metric_values(after_text, metric_name, labels_subset)
     if not after_vals:
-        raise AssertionError(f"Metric '{metric_name}' with labels {labels_subset} not found in 'after' snapshot")
+        raise AssertionError(
+            f"Metric '{metric_name}' with labels {labels_subset} not found in 'after' snapshot"
+        )
     if not before_vals:
         # If not present before, require non-zero after
         if max(after_vals) <= 0:
             raise AssertionError(
-                f"Metric '{metric_name}' did not increase; 'before' missing, 'after' max={max(after_vals)}"
+                (
+                    "Metric '{}' did not increase; 'before' missing, 'after' max={}"
+                ).format(metric_name, max(after_vals))
             )
         return
     if max(after_vals) <= max(before_vals):
         raise AssertionError(
-            f"Metric '{metric_name}' did not increase: before={max(before_vals)} after={max(after_vals)}"
+            (
+                "Metric '{}' did not increase: before={} after={}"
+            ).format(metric_name, max(before_vals), max(after_vals))
         )
-

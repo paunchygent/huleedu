@@ -96,7 +96,10 @@ class TestCreditConsumptionLogic:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "user_id, org_id, user_balance, org_balance, expected_source, expected_new_balance, description",
+        (
+            "user_id, org_id, user_balance, org_balance, expected_source, "
+            "expected_new_balance, description"
+        ),
         [
             # Org credits used first when both available and sufficient
             (

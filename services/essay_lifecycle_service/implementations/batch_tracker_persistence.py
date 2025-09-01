@@ -172,7 +172,7 @@ class BatchTrackerPersistence:
             course_code=CourseCode(tracker_db.course_code),
             essay_instructions=tracker_db.essay_instructions,
             user_id=tracker_db.user_id,
-            org_id=tracker_db.org_id if hasattr(tracker_db, 'org_id') else None,
+            org_id=tracker_db.org_id if hasattr(tracker_db, "org_id") else None,
             correlation_id=UUID(tracker_db.correlation_id),
             created_at=tracker_db.created_at,  # Fixed: Added missing required field
             timeout_seconds=tracker_db.timeout_seconds,

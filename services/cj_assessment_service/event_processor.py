@@ -73,7 +73,7 @@ async def publish_assessment_completion(
         assignment_id=request_event_data.assignment_id,
         course_code=request_event_data.course_code,
         user_id=request_event_data.user_id,  # Identity from event
-        org_id=request_event_data.org_id,    # Identity from event
+        org_id=request_event_data.org_id,  # Identity from event
         created_at=processing_started_at,
     )
 

@@ -308,9 +308,7 @@ async def test_pipeline_request_includes_org_id_in_envelope_metadata(
         "is_retry": False,
     }
 
-    response = client_with_org_mocks.post(
-        f"/v1/batches/{batch_id}/pipelines", json=request_data
-    )
+    response = client_with_org_mocks.post(f"/v1/batches/{batch_id}/pipelines", json=request_data)
 
     assert response.status_code == 202
 

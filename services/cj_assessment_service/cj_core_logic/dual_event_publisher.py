@@ -36,16 +36,17 @@ logger = create_service_logger("dual_event_publisher")
 @dataclass
 class DualEventPublishingData:
     """Data contract for dual event publishing.
-    
-    This DTO provides all necessary data for publishing both thin (ELS) 
-    and rich (RAS) assessment events, decoupling the publishing logic 
+
+    This DTO provides all necessary data for publishing both thin (ELS)
+    and rich (RAS) assessment events, decoupling the publishing logic
     from database models.
     """
+
     bos_batch_id: str  # Original BOS batch identifier
-    cj_batch_id: str   # Internal CJ batch identifier
+    cj_batch_id: str  # Internal CJ batch identifier
     assignment_id: Optional[str]
     course_code: str
-    user_id: str       # Required for resource consumption tracking
+    user_id: str  # Required for resource consumption tracking
     org_id: Optional[str]
     created_at: datetime
 

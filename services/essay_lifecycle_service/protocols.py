@@ -292,6 +292,7 @@ class BatchCommandHandler(Protocol):
         self,
         command_data: Any,  # BatchServiceCJAssessmentInitiateCommandDataV1
         correlation_id: UUID,
+        envelope_metadata: dict | None = None,
     ) -> None:
         """Process CJ assessment phase initiation command from Batch Service."""
         ...

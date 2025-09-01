@@ -38,7 +38,10 @@ class AuthTestUser:
         self.email = email
         self.name = name
         self.role = role
-        self.organization_id = organization_id or f"test_org_{user_id}"
+        # Explicit None check to allow empty-string cases without fallback
+        self.organization_id: Optional[str] = (
+            organization_id if organization_id is not None else f"test_org_{user_id}"
+        )
         self.created_at = datetime.now(timezone.utc)
 
     def to_jwt_payload(self) -> Dict[str, Any]:
@@ -193,8 +196,11 @@ class AuthTestManager:
 
     def create_individual_user(self, **kwargs) -> AuthTestUser:
         """Create a test user without any organization identity (individual flow)."""
-        # Pass empty string so to_jwt_payload omits org_id claim
-        return self.create_test_user(organization_id="", **kwargs)
+        # Create user and explicitly clear organization identity
+        user = self.create_test_user(organization_id=None, **kwargs)
+        user.organization_id = None
+        self._test_users[user.user_id] = user
+        return user
 
     def generate_jwt_with_org_claim(
         self, user: Optional[AuthTestUser] = None, org_claim_name: str = "org_id"
@@ -243,7 +249,13 @@ class AuthTestManager:
         """
         try:
             payload = cast(
-                Dict[str, Any], jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+                Dict[str, Any],
+                jwt.decode(
+                    token,
+                    self.jwt_secret,
+                    algorithms=[self.jwt_algorithm],
+                    audience="huledu-services",
+                ),
             )
             return payload
         except jwt.InvalidTokenError as e:

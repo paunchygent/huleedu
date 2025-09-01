@@ -193,9 +193,7 @@ class AuthProvider(Provider):
                 if isinstance(value, str):
                     cleaned = value.strip()
                     if cleaned:
-                        logger.debug(
-                            f"Resolved org_id from claim '{claim_name}' for token subject"
-                        )
+                        logger.debug(f"Resolved org_id from claim '{claim_name}' for token subject")
                         return cleaned
                 elif value is not None:
                     # Non-string claim present; skip but log for diagnostics

@@ -123,7 +123,7 @@ class StudentMatchingInitiatorImpl(PipelinePhaseInitiatorProtocol):
                 data=command_data,
                 metadata={
                     "user_id": batch_context.user_id,  # Identity from batch context
-                    "org_id": batch_context.org_id,    # Org from batch context
+                    "org_id": batch_context.org_id,  # Org from batch context
                 },
             )
 

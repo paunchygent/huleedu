@@ -429,7 +429,7 @@ class TestEntitlementsKafkaConsumer:
         consumer_instance: EntitlementsKafkaConsumer,
         mock_credit_manager: AsyncMock,
     ) -> None:
-        """Test that correlation_id is correctly extracted from EventEnvelope and passed to credit manager."""
+        """Verify correlation_id extraction from envelope and pass-through to manager."""
         # Arrange - Create event with specific correlation ID
         test_correlation_id = uuid4()
         event = ResourceConsumptionV1(

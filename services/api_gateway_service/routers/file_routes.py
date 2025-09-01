@@ -6,6 +6,7 @@ Implements secure file upload proxy to the File Service with proper authenticati
 
 from __future__ import annotations
 
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -339,12 +340,34 @@ async def upload_batch_files(
             }
 
             # Add authentication header for file service
-            headers = {
-                "X-User-ID": user_id,
-                "X-Correlation-ID": str(correlation_id),
-            }
+            # Ensure headers are ASCII-safe per HTTP/1.1 requirements
+            def _needs_encoding(value: str | None) -> bool:
+                if value is None:
+                    return False
+                try:
+                    value.encode("ascii")
+                    return False
+                except UnicodeEncodeError:
+                    return True
+
+            headers = {"X-Correlation-ID": str(correlation_id)}
+            identity_encoded = False
+
+            if _needs_encoding(user_id):
+                headers["X-User-ID"] = quote(user_id, safe="")
+                identity_encoded = True
+            else:
+                headers["X-User-ID"] = user_id
+
             if org_id:
-                headers["X-Org-ID"] = org_id
+                if _needs_encoding(org_id):
+                    headers["X-Org-ID"] = quote(org_id, safe="")
+                    identity_encoded = True
+                else:
+                    headers["X-Org-ID"] = org_id
+
+            if identity_encoded:
+                headers["X-Identity-Encoding"] = "url"
 
             # Forward request to file service
             file_service_url = f"{settings.FILE_SERVICE_URL}/v1/files/batch"
@@ -370,16 +393,17 @@ async def upload_batch_files(
             ).inc()
 
             # Handle different response status codes
-            if response.status_code == 201:
+            if response.status_code in (201, 202):
                 response_data = response.json()
                 logger.info(
                     f"File upload successful: batch_id='{batch_id}', "
-                    f"user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}'"
+                    f"user_id='{user_id}', org_id='{org_id}', correlation_id='{correlation_id}', "
+                    f"status={response.status_code}"
                 )
                 metrics.http_requests_total.labels(
-                    method="POST", endpoint=endpoint, http_status="201"
+                    method="POST", endpoint=endpoint, http_status=str(response.status_code)
                 ).inc()
-                return JSONResponse(status_code=201, content=response_data)
+                return JSONResponse(status_code=response.status_code, content=response_data)
             elif response.status_code == 400:
                 error_data = response.json()
                 logger.warning(

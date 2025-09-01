@@ -641,7 +641,6 @@ class PipelineTestHarness:
                             # Special-case: CJ completion events may be published with the original
                             # batch registration correlation_id instead of the pipeline request ID.
                             if event_correlation_id != request_correlation_id:
-                                
                                 is_cj_completion = (
                                     expected_completion_event in event_type
                                     and "cj_assessment.completed" in event_type

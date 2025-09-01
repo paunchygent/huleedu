@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
 from common_core.config_enums import LLMProviderType
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
@@ -72,12 +72,16 @@ class TestResourceConsumptionEventPublishing:
             projections_available=True,
             primary_grades={"essay_1": "A", "essay_2": "B", "essay_3": "B"},
             confidence_labels={"essay_1": "HIGH", "essay_2": "HIGH", "essay_3": "MID"},
-            confidence_scores={"essay_1": 0.85, "essay_2": 0.80, "essay_3": 0.65}
+            confidence_scores={"essay_1": 0.85, "essay_2": 0.80, "essay_3": 0.65},
         )
 
     @pytest.mark.integration
     async def test_resource_consumption_event_structure(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
         """Test ResourceConsumptionV1 event structure and fields."""
         publishing_data = DualEventPublishingData(
@@ -87,7 +91,7 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="user_456",
             org_id="org_789",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         correlation_id = uuid4()
 
@@ -97,18 +101,20 @@ class TestResourceConsumptionEventPublishing:
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         mock_event_publisher.publish_resource_consumption.assert_called_once()
         call_args = mock_event_publisher.publish_resource_consumption.call_args
         resource_envelope = call_args[1]["resource_event"]
-        
+
         # Validate event structure
         assert isinstance(resource_envelope, EventEnvelope)
-        assert resource_envelope.event_type == topic_name(ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED)
+        assert resource_envelope.event_type == topic_name(
+            ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED
+        )
         assert resource_envelope.correlation_id == correlation_id
-        
+
         # Validate event data
         resource_data = resource_envelope.data
         assert isinstance(resource_data, ResourceConsumptionV1)
@@ -120,7 +126,11 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_identity_threading_preservation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
         """Test user_id/org_id preservation in ResourceConsumptionV1."""
         publishing_data = DualEventPublishingData(
@@ -130,7 +140,7 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="teacher_123",
             org_id="school_456",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         correlation_id = uuid4()
 
@@ -140,13 +150,13 @@ class TestResourceConsumptionEventPublishing:
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
 
         call_args = mock_event_publisher.publish_resource_consumption.call_args
         resource_envelope = call_args[1]["resource_event"]
         resource_data = resource_envelope.data
-        
+
         # Validate identity threading
         assert resource_data.user_id == "teacher_123"
         assert resource_data.org_id == "school_456"
@@ -157,16 +167,18 @@ class TestResourceConsumptionEventPublishing:
     ) -> None:
         """Test comparison quantity calculation for different essay counts."""
         test_cases = [
-            (2, 1),    # 2 essays = 1 comparison
-            (3, 3),    # 3 essays = 3 comparisons
-            (4, 6),    # 4 essays = 6 comparisons
-            (5, 10),   # 5 essays = 10 comparisons
+            (2, 1),  # 2 essays = 1 comparison
+            (3, 3),  # 3 essays = 3 comparisons
+            (4, 6),  # 4 essays = 6 comparisons
+            (5, 10),  # 5 essays = 10 comparisons
         ]
-        
+
         for essay_count, expected_comparisons in test_cases:
-            rankings = [{"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5} 
-                       for i in range(essay_count)]
-            
+            rankings = [
+                {"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5}
+                for i in range(essay_count)
+            ]
+
             publishing_data = DualEventPublishingData(
                 bos_batch_id=f"batch_{essay_count}",
                 cj_batch_id=f"cj_batch_{essay_count}",
@@ -174,27 +186,31 @@ class TestResourceConsumptionEventPublishing:
                 course_code=CourseCode.ENG5.value,
                 user_id="user_test",
                 org_id="org_test",
-                created_at=datetime.now(UTC)
+                created_at=datetime.now(UTC),
             )
-            
+
             await publish_dual_assessment_events(
                 rankings=rankings,
                 grade_projections=mock_grade_projections,
                 publishing_data=publishing_data,
                 event_publisher=mock_event_publisher,
                 settings=mock_settings,
-                correlation_id=uuid4()
+                correlation_id=uuid4(),
             )
-            
+
             call_args = mock_event_publisher.publish_resource_consumption.call_args
             resource_data = call_args[1]["resource_event"].data
             assert resource_data.quantity == expected_comparisons
 
-    @pytest.mark.integration 
+    @pytest.mark.integration
     async def test_missing_user_id_validation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
-        """Test graceful handling when user_id is missing - should skip resource consumption but continue with other events."""
+        """Graceful handling when user_id is missing; events continue."""
         publishing_data = DualEventPublishingData(
             bos_batch_id="batch_no_user",
             cj_batch_id="cj_batch_no_user",
@@ -202,9 +218,9 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="required_user_123",  # user_id is required, so providing a test value
             org_id="org_test",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
-        
+
         # Should complete without raising exception (resilient behavior)
         await publish_dual_assessment_events(
             rankings=sample_rankings,
@@ -212,9 +228,9 @@ class TestResourceConsumptionEventPublishing:
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
-        
+
         # All events should be published successfully since user_id is now required
         mock_event_publisher.publish_assessment_completed.assert_called_once()
         mock_event_publisher.publish_assessment_result.assert_called_once()
@@ -222,9 +238,13 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_missing_org_id_fallback_behavior(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
-        """Test org-first, user-fallback behavior - resource consumption should work with user_id only."""
+        """Org-first, user-fallback; consumption works with user_id only."""
         publishing_data = DualEventPublishingData(
             bos_batch_id="batch_user_fallback",
             cj_batch_id="cj_batch_user_fallback",
@@ -232,35 +252,39 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="individual_user_123",
             org_id=None,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         correlation_id = uuid4()
-        
+
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
         )
-        
+
         # All events should be published successfully
         mock_event_publisher.publish_assessment_completed.assert_called_once()
         mock_event_publisher.publish_assessment_result.assert_called_once()
         mock_event_publisher.publish_resource_consumption.assert_called_once()
-        
+
         # Verify resource consumption event has user_id but no org_id (fallback behavior)
         call_args = mock_event_publisher.publish_resource_consumption.call_args
         resource_envelope = call_args[1]["resource_event"]
         resource_data = resource_envelope.data
-        
+
         assert resource_data.user_id == "individual_user_123"
         assert resource_data.org_id is None  # Fallback to individual user
 
     @pytest.mark.integration
     async def test_swedish_character_preservation(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
         """Test Swedish character preservation in identity fields."""
         publishing_data = DualEventPublishingData(
@@ -270,21 +294,21 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="lärare_åsa",
             org_id="skola_västerås",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
-        
+
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
-        
+
         call_args = mock_event_publisher.publish_resource_consumption.call_args
         resource_data = call_args[1]["resource_event"].data
-        
+
         # Validate Swedish characters preserved
         assert resource_data.user_id == "lärare_åsa"
         assert resource_data.org_id == "skola_västerås"
@@ -292,7 +316,11 @@ class TestResourceConsumptionEventPublishing:
 
     @pytest.mark.integration
     async def test_event_serialization_compatibility(
-        self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any, mock_settings: Mock
+        self,
+        mock_event_publisher: AsyncMock,
+        sample_rankings: list,
+        mock_grade_projections: Any,
+        mock_settings: Mock,
     ) -> None:
         """Test event can be properly serialized for Kafka."""
         publishing_data = DualEventPublishingData(
@@ -302,26 +330,26 @@ class TestResourceConsumptionEventPublishing:
             course_code=CourseCode.ENG5.value,
             user_id="user_123",
             org_id="org_456",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
-        
+
         await publish_dual_assessment_events(
             rankings=sample_rankings,
             grade_projections=mock_grade_projections,
             publishing_data=publishing_data,
             event_publisher=mock_event_publisher,
             settings=mock_settings,
-            correlation_id=uuid4()
+            correlation_id=uuid4(),
         )
-        
+
         call_args = mock_event_publisher.publish_resource_consumption.call_args
         resource_envelope = call_args[1]["resource_event"]
-        
+
         # Test serialization/deserialization
         serialized = resource_envelope.model_dump(mode="json")
         json_str = json.dumps(serialized)
         deserialized = json.loads(json_str)
-        
+
         # Validate key fields survive serialization
         assert deserialized["event_type"] == "huleedu.resource.consumption.v1"
         assert deserialized["data"]["resource_type"] == "cj_comparison"

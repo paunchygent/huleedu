@@ -392,7 +392,9 @@ class CommandHandlerProvider(Provider):
         session_factory: async_sessionmaker,
     ) -> CJAssessmentCommandHandler:
         """Provide CJ assessment command handler implementation."""
-        return CJAssessmentCommandHandler(repository, request_dispatcher, batch_tracker, session_factory)
+        return CJAssessmentCommandHandler(
+            repository, request_dispatcher, batch_tracker, session_factory
+        )
 
     @provide(scope=Scope.APP)
     def provide_nlp_command_handler(

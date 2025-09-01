@@ -146,12 +146,12 @@ async def test_proxy_forwards_identity_headers(client: AsyncClient, respx_mock: 
 
 
 @pytest.mark.asyncio
-async def test_proxy_forwards_org_id_when_present(client_with_org: AsyncClient, respx_mock: MockRouter):
+async def test_proxy_forwards_org_id_when_present(
+    client_with_org: AsyncClient, respx_mock: MockRouter
+):
     """Test that X-Org-ID header is forwarded when org_id is present in DI."""
     downstream_url = f"{settings.CMS_API_URL}/v1/classes/org/path"
-    mock_route = respx_mock.post(downstream_url).mock(
-        return_value=Response(201, json={"id": 456})
-    )
+    mock_route = respx_mock.post(downstream_url).mock(return_value=Response(201, json={"id": 456}))
 
     response = await client_with_org.post("/v1/classes/org/path", json={"data": "test"})
 

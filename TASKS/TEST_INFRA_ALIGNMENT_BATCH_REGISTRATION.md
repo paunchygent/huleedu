@@ -257,6 +257,56 @@ Full quality gates
   - .cursor/rules/071-observability-index.mdc
   - .cursor/rules/071.1-prometheus-metrics-patterns.mdc
 
+## Recent Revisions Synopsis (2025-09-01)
+- Functional/E2E file uploads must be made via API Gateway `POST /v1/files/batch` to validate proxy behavior. Direct posts to File Service are reserved for service-scoped tests only.
+- API Gateway now percent‑encodes non‑ASCII identity headers and adds `X-Identity-Encoding: url`; File Service decodes when this marker is present. A service-level unit test covers this path.
+- API Gateway configuration accepts backend URLs from either prefixed or service env vars (e.g., `FILE_SERVICE_URL`). Ensure compose sets `FILE_SERVICE_URL=http://file_service:7001` so AGW reaches the correct File Service port.
+
+## Debugging Playbook: E2E Identity Threading Timeouts
+
+Overarching issue:
+- E2E tests time out when BOS does not transition batches to `READY_FOR_PIPELINE_EXECUTION`. This typically happens when upstream events (file → ELS completion) are not observed.
+
+Prerequisites (rules to review):
+- `.cursor/rules/042-http-proxy-service-patterns.mdc` (edge identity injection and forwarding)
+- `.cursor/rules/030-event-driven-architecture-eda-standards.mdc` (envelopes, topics)
+- `.cursor/rules/043-service-configuration-and-logging.mdc` (backend URL config, logging)
+- `.cursor/rules/048-structured-error-handling-standards.mdc` (mapped error responses)
+- `.cursor/rules/070-testing-and-quality-assurance.mdc` and `.cursor/rules/075-test-creation-methodology.mdc` (abstraction boundaries)
+
+Affected components/files:
+- API Gateway: `services/api_gateway_service/routers/file_routes.py`, `services/api_gateway_service/config.py`
+- File Service: `services/file_service/api/file_routes.py`, `services/file_service/startup_setup.py`, `services/file_service/implementations/event_publisher_impl.py`
+- BOS: `services/batch_orchestrator_service/implementations/batch_content_provisioning_completed_handler.py`, `client_pipeline_request_handler.py`
+- ELS: handlers that emit `BatchContentProvisioningCompletedV1` (GUEST) or `BatchEssaysReady`
+- Tests/harness: `tests/functional/pipeline_test_harness.py`, `tests/utils/service_test_manager.py`
+
+Step-by-step (per correlation_id):
+1) API Gateway
+- `pdm run logs api_gateway_service | grep -F "correlation_id='<corr>'"`
+- Expect: “Batch registration proxied …”, “File upload successful … status=201|202”. If 500/503, verify AGW FILE_SERVICE_URL mapping (Rule 043) and consult 042 for proxy semantics.
+
+2) File Service
+- `pdm run logs file_service | grep -F '<corr>'`
+- Expect: “Received N files for batch …”, “Stored raw file blob …”, then “event stored in outbox” or “Published EssayContentProvisionedV1 …”. Confirm “EventRelayWorker started for outbox pattern” exists in logs. Optional: `curl -s http://localhost:7001/metrics | egrep 'file_service_outbox_(queue_depth|events_published)_total'` — a stuck queue implies relay issues.
+
+3) Essay Lifecycle (ELS)
+- `pdm run logs essay_lifecycle_api | egrep -i "provision|BatchContentProvisioningCompleted|essays ready|correlation_id.*(<corr>)"`
+- GUEST flow expects completion after expected_essay_count files (often 1). Absence indicates ELS consumption issues.
+
+4) Batch Orchestrator (BOS)
+- `pdm run logs batch_orchestrator_service | egrep -i "READY_FOR_PIPELINE_EXECUTION|content provisioning completed|Stored .* essays|correlation_id.*(<corr>)"`
+- If logs show “not ready for pipeline execution”, upstream readiness gating failed.
+
+Common fixes:
+- AGW backend URL mismatch → ensure `FILE_SERVICE_URL=http://file_service:7001` is visible to AGW and accepted by config aliases.
+- Non‑ASCII identity header failures → confirmed fixed by AGW encoding and File Service decoding; validate via the AGW unit test.
+- Outbox relay not running/publishing → restart File Service; ensure outbox queue drains.
+- ELS not consuming file events → restart `essay_lifecycle_api`; re-run a single failing test.
+
+Optional hardening:
+- Align `ClientBatchPipelineRequestV1.user_id` in functional helpers with the batch owner to keep event identity consistent.
+
 ## Current Implementation Status (in repo)
 
 Date: 2025-09-01

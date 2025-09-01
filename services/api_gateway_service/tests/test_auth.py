@@ -130,10 +130,7 @@ class TestJWTAuthentication:
 
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
-
-
-
-## Org ID extraction tests are defined in a separate class at the end of this file.
+    ## Org ID extraction tests are defined in a separate class at the end of this file.
 
     @pytest.mark.asyncio
     async def test_invalid_token_signature(self):

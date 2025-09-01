@@ -140,9 +140,7 @@ class TestCreditAttribution:
     ) -> None:
         """Test ResourceConsumptionV1 event processing."""
         # Arrange
-        message = self.create_kafka_message(
-            "user-123", "org-456", resource_type, quantity
-        )
+        message = self.create_kafka_message("user-123", "org-456", resource_type, quantity)
 
         # Act
         await kafka_consumer._handle_message(message)
@@ -238,9 +236,7 @@ class TestCreditAttribution:
     ) -> None:
         """Test organizational billing with Swedish org_id."""
         # Arrange
-        message = self.create_kafka_message(
-            "teacher-swe", "skola-malmö-åäö", "ai_feedback", 4
-        )
+        message = self.create_kafka_message("teacher-swe", "skola-malmö-åäö", "ai_feedback", 4)
 
         # Act
         await kafka_consumer._handle_message(message)
@@ -278,9 +274,7 @@ class TestCreditAttribution:
     ) -> None:
         """Test credit calculation from quantity mapping."""
         # Arrange
-        message = self.create_kafka_message(
-            "user-calc", "org-calc", "essay_scoring", 25
-        )
+        message = self.create_kafka_message("user-calc", "org-calc", "essay_scoring", 25)
 
         # Act
         await kafka_consumer._handle_message(message)
@@ -338,7 +332,7 @@ class TestCreditAttribution:
         }
         envelope = {
             "event_type": "huleedu.resource.consumption.v1",
-            "source_service": "test_service", 
+            "source_service": "test_service",
             "correlation_id": str(uuid4()),
             "data": invalid_event_data,
         }

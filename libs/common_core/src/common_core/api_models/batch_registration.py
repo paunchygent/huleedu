@@ -51,7 +51,8 @@ class BatchRegistrationRequestV1(BaseModel):
     org_id: str | None = Field(
         default=None,
         description=(
-            "Organization ID for credit attribution, None for individual users (from API Gateway JWT)."
+            "Organization ID for credit attribution, None for individual users "
+            "(from API Gateway JWT)."
         ),
     )
     class_id: str | None = Field(

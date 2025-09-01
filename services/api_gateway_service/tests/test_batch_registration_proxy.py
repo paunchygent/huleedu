@@ -94,7 +94,9 @@ async def test_registration_proxy_injects_identity_and_calls_bos(client_with_org
 @pytest.mark.asyncio
 async def test_registration_proxy_handles_bos_error_passthrough(client_with_org):
     client, container, mock_http_client = client_with_org
-    mock_http_client.post.return_value = _ok_response({"error": "Validation Error"}, status_code=400)
+    mock_http_client.post.return_value = _ok_response(
+        {"error": "Validation Error"}, status_code=400
+    )
 
     payload = {
         "expected_essay_count": 1,

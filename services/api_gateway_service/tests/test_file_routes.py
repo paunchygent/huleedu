@@ -23,6 +23,8 @@ from services.api_gateway_service.tests.test_provider import (
 
 USER_ID = "test_user_123"
 ORG_ID = "test_org_999"
+SWEDISH_USER_ID = "lärare_åsa_123"
+SWEDISH_ORG_ID = "skolan_västerås"
 
 
 def create_test_file(filename: str, content: str) -> tuple[str, BytesIO, str]:
@@ -218,6 +220,71 @@ async def test_file_upload_access_denied(client_with_mocks, mock_http_client):
     error = response_json["error"]
     assert error["code"] == "AUTHENTICATION_ERROR"
     assert "Access denied" in error["message"]
+
+
+@pytest.mark.asyncio
+async def test_file_upload_accepts_202(client_with_mocks, mock_http_client):
+    """API Gateway should pass through 202 Accepted from File Service as success."""
+    mock_response = Mock()
+    mock_response.status_code = 202
+    mock_response.json.return_value = {
+        "message": "Files accepted for processing",
+        "batch_id": "batch_202",
+        "correlation_id": "00000000-0000-0000-0000-000000000000",
+    }
+    mock_http_client.post.return_value = mock_response
+
+    test_file = create_test_file("essay.txt", "content")
+    response = client_with_mocks.post(
+        "/v1/files/batch", files={"files": test_file}, data={"batch_id": "batch_202"}
+    )
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body.get("batch_id") == "batch_202"
+
+
+@pytest.mark.asyncio
+async def test_swedish_user_id_is_url_encoded_in_forwarded_headers(monkeypatch):
+    """Swedish user/org IDs are URL-encoded with encoding marker when forwarded."""
+    from prometheus_client import CollectorRegistry
+    from urllib.parse import quote
+
+    mock_http_client = AsyncMock()
+    mock_response = Mock()
+    mock_response.status_code = 201
+    mock_response.json.return_value = {"message": "Files uploaded successfully"}
+    mock_http_client.post.return_value = mock_response
+
+    test_registry = CollectorRegistry()
+    container = make_async_container(
+        HttpClientTestProvider(mock_http_client),
+        AuthTestProvider(user_id=SWEDISH_USER_ID, org_id=SWEDISH_ORG_ID),
+        FastapiProvider(),
+    )
+
+    app = create_test_app_with_isolated_registry(test_registry)
+    setup_dishka(container, app)
+
+    # Disable rate limiting
+    monkeypatch.setattr("services.api_gateway_service.app.rate_limiter.limiter.enabled", False)
+
+    try:
+        with TestClient(app) as client:
+            test_file = create_test_file("essay.txt", "content")
+            resp = client.post(
+                "/v1/files/batch", files={"files": test_file}, data={"batch_id": "batch_sv"}
+            )
+            assert resp.status_code == 201
+
+        # Verify forwarded headers
+        call_args = mock_http_client.post.call_args
+        headers = call_args.kwargs["headers"]
+        assert headers.get("X-Identity-Encoding") == "url"
+        assert headers.get("X-User-ID") == quote(SWEDISH_USER_ID, safe="")
+        assert headers.get("X-Org-ID") == quote(SWEDISH_ORG_ID, safe="")
+    finally:
+        await container.close()
 
 
 @pytest.mark.asyncio

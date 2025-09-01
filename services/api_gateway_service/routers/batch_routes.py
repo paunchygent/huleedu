@@ -10,13 +10,14 @@ from uuid import UUID
 
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from common_core.api_models.batch_registration import BatchRegistrationRequestV1
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
-from common_core.domain_enums import CourseCode
-from common_core.api_models.batch_registration import BatchRegistrationRequestV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise_validation_error
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -24,9 +25,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
-from ..protocols import HttpClientProtocol, MetricsProtocol
 from ..config import settings
-from fastapi.responses import JSONResponse
+from ..protocols import HttpClientProtocol, MetricsProtocol
 
 router = APIRouter()
 logger = create_service_logger("api_gateway.batch_routes")

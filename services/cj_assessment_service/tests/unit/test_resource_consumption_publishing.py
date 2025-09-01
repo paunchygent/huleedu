@@ -140,7 +140,7 @@ class TestResourceConsumptionPublishing:
         user_id_scenario: str,
     ) -> None:
         """Test ValueError handling when user_id is None or missing from publishing_data."""
-        # DualEventPublishingData enforces user_id as required, so we test by using a Mock 
+        # DualEventPublishingData enforces user_id as required, so we test by using a Mock
         # to simulate the old batch_upload interface that could have None/missing user_id
         if user_id_scenario == "none":
             # Create mock publishing data with None user_id to test the validation

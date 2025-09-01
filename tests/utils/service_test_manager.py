@@ -174,8 +174,8 @@ class ServiceTestManager:
         if "api_gateway_service" not in endpoints:
             raise RuntimeError("API Gateway Service not available for batch creation")
 
-        import uuid
         import datetime
+        import uuid
 
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
@@ -198,9 +198,7 @@ class ServiceTestManager:
             course_code_enum = course_code
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_instructions = (
-            f"Test batch via AGW at {timestamp} (corr: {correlation_id[:8]})"
-        )
+        unique_instructions = f"Test batch via AGW at {timestamp} (corr: {correlation_id[:8]})"
 
         payload: dict[str, Any] = {
             "expected_essay_count": expected_essay_count,
@@ -241,9 +239,7 @@ class ServiceTestManager:
                 batch_id = result.get("batch_id")
                 returned_correlation_id = result.get("correlation_id", correlation_id)
                 if not batch_id:
-                    raise RuntimeError(
-                        f"AGW response missing batch_id: {result}"
-                    )
+                    raise RuntimeError(f"AGW response missing batch_id: {result}")
 
                 logger.info(
                     f"Created batch via AGW {batch_id} with correlation {returned_correlation_id}"
@@ -365,13 +361,14 @@ class ServiceTestManager:
         """
         endpoints = await self.get_validated_endpoints()
 
-        if "file_service" not in endpoints:
-            raise RuntimeError("File Service not available for file upload")
+        # Prefer uploading via API Gateway to exercise edge identity injection
+        if "api_gateway_service" not in endpoints:
+            raise RuntimeError("API Gateway Service not available for file upload")
 
         if user is None:
             user = self.auth_manager.get_default_user()
 
-        file_service_base = endpoints["file_service"]["base_url"]
+        agw_base_url = endpoints["api_gateway_service"]["base_url"]
 
         async with aiohttp.ClientSession() as session:
             data = aiohttp.FormData()
@@ -393,12 +390,12 @@ class ServiceTestManager:
                 headers["X-Correlation-ID"] = correlation_id
 
             async with session.post(
-                f"{file_service_base}/v1/files/batch",
+                f"{agw_base_url}/v1/files/batch",
                 data=data,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as response:
-                if response.status == 202:
+                if response.status in (201, 202):
                     result: dict[str, Any] = await response.json()
                     logger.info(f"File upload successful: {len(files)} files")
                     return result

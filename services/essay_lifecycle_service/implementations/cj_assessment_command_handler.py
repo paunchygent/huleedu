@@ -176,11 +176,11 @@ class CJAssessmentCommandHandler:
                         # Prefer identity from envelope metadata (canonical source)
                         user_id = None
                         org_id = None
-                        
+
                         if envelope_metadata:
                             user_id = envelope_metadata.get("user_id")
                             org_id = envelope_metadata.get("org_id")
-                            
+
                         if user_id:
                             logger.info(
                                 f"Using identity from envelope metadata: user_id={user_id}, org_id={org_id}",
@@ -198,7 +198,9 @@ class CJAssessmentCommandHandler:
                                     "correlation_id": str(correlation_id),
                                 },
                             )
-                            batch_status = await self.batch_tracker.get_batch_status(command_data.entity_id)
+                            batch_status = await self.batch_tracker.get_batch_status(
+                                command_data.entity_id
+                            )
                             if batch_status:
                                 user_id = batch_status.get("user_id", "unknown-user")
                                 org_id = batch_status.get("org_id")
@@ -206,7 +208,7 @@ class CJAssessmentCommandHandler:
                                 user_id = "unknown-user"
                                 org_id = None
                                 logger.error(
-                                    f"Could not retrieve identity from Redis either, using fallback",
+                                    "Could not retrieve identity from Redis either, using fallback",
                                     extra={
                                         "batch_id": command_data.entity_id,
                                         "correlation_id": str(correlation_id),

@@ -7,7 +7,7 @@ FastAPI-specific settings and Svelte 5 + Vite frontend integration.
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import SettingsConfigDict
 
 from common_core.config_enums import Environment
@@ -84,18 +84,24 @@ class Settings(SecureServiceSettings):
     CMS_API_URL: str = Field(
         default="http://class_management_service:8000",
         description="Class Management Service base URL",
+        validation_alias=AliasChoices("API_GATEWAY_CMS_API_URL", "CLASS_MANAGEMENT_SERVICE_URL"),
     )
     FILE_SERVICE_URL: str = Field(
         default="http://file_service:8000",
         description="File Service base URL for file upload proxy",
+        validation_alias=AliasChoices("API_GATEWAY_FILE_SERVICE_URL", "FILE_SERVICE_URL"),
     )
     RESULT_AGGREGATOR_URL: str = Field(
         default="http://result_aggregator_service:8000",
         description="Result Aggregator Service base URL",
+        validation_alias=AliasChoices(
+            "API_GATEWAY_RESULT_AGGREGATOR_URL", "RESULT_AGGREGATOR_SERVICE_URL"
+        ),
     )
     BOS_URL: str = Field(
         default="http://batch_orchestrator_service:5000",
         description="Batch Orchestrator Service internal base URL",
+        validation_alias=AliasChoices("API_GATEWAY_BOS_URL", "BATCH_ORCHESTRATOR_SERVICE_URL"),
     )
 
     # Redis configuration

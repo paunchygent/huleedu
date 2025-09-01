@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from typing import Any
+from urllib.parse import unquote
 
 from common_core.events.file_management_events import BatchFileAddedV1, BatchFileRemovedV1
 from dishka import FromDishka
@@ -56,6 +57,9 @@ async def upload_batch_files(
 
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
+        identity_encoding = request.headers.get("X-Identity-Encoding")
+        if identity_encoding == "url" and user_id:
+            user_id = unquote(user_id)
         if not user_id:
             logger.warning(f"Batch upload attempt for {batch_id} without user authentication.")
             return jsonify({"error": "User authentication required"}), 401
@@ -171,6 +175,9 @@ async def get_batch_state(
     try:
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
+        identity_encoding = request.headers.get("X-Identity-Encoding")
+        if identity_encoding == "url" and user_id:
+            user_id = unquote(user_id)
         if not user_id:
             logger.warning(f"Batch state query for {batch_id} without user authentication.")
             return jsonify({"error": "User authentication required"}), 401
@@ -220,6 +227,9 @@ async def add_files_to_batch(
 
         # Get user_id from authenticated request (provided by API Gateway)
         user_id = request.headers.get("X-User-ID")
+        identity_encoding = request.headers.get("X-Identity-Encoding")
+        if identity_encoding == "url" and user_id:
+            user_id = unquote(user_id)
         if not user_id:
             logger.warning(
                 f"File addition attempt for batch {batch_id} without user authentication."

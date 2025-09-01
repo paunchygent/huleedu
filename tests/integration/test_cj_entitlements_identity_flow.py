@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.event_enums import ProcessingEvent
-from common_core.events.envelope import EventEnvelope
 from common_core.events.resource_consumption_events import ResourceConsumptionV1
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -19,8 +16,6 @@ from services.cj_assessment_service.cj_core_logic.dual_event_publisher import (
     publish_dual_assessment_events,
 )
 from services.cj_assessment_service.protocols import CJEventPublisherProtocol
-from tests.utils.kafka_test_manager import KafkaTestManager
-from tests.utils.service_test_manager import ServiceTestManager
 
 logger = create_service_logger("test.cj_entitlements_identity")
 
@@ -30,11 +25,12 @@ logger = create_service_logger("test.cj_entitlements_identity")
 
 class MockSettings:
     """Mock CJ service settings."""
+
     SERVICE_NAME = "cj_assessment_service"
     CJ_ASSESSMENT_COMPLETED_TOPIC = "huleedu.cj_assessment.completed.v1"
     ASSESSMENT_RESULT_TOPIC = "huleedu.assessment.result.published.v1"
     DEFAULT_LLM_MODEL = "gpt-4"
-    DEFAULT_LLM_PROVIDER = type('Provider', (), {'value': 'openai'})()
+    DEFAULT_LLM_PROVIDER = type("Provider", (), {"value": "openai"})()
     DEFAULT_LLM_TEMPERATURE = 0.0
 
 
@@ -64,11 +60,17 @@ class TestCJEntitlementsIdentityFlow:
     def mock_grade_projections(self) -> Any:
         """Mock grade projections."""
         from common_core.events.cj_assessment_events import GradeProjectionSummary
+
         return GradeProjectionSummary(
             projections_available=True,
             primary_grades={"essay_1": "A", "essay_2": "B", "essay_3": "B", "essay_4": "C"},
-            confidence_labels={"essay_1": "HIGH", "essay_2": "HIGH", "essay_3": "MID", "essay_4": "LOW"},
-            confidence_scores={"essay_1": 0.85, "essay_2": 0.80, "essay_3": 0.65, "essay_4": 0.45}
+            confidence_labels={
+                "essay_1": "HIGH",
+                "essay_2": "HIGH",
+                "essay_3": "MID",
+                "essay_4": "LOW",
+            },
+            confidence_scores={"essay_1": 0.85, "essay_2": 0.80, "essay_3": 0.65, "essay_4": 0.45},
         )
 
     @pytest.mark.integration
@@ -84,7 +86,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="teacher_123",
             org_id="school_456",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         correlation_id = uuid4()
 
@@ -102,7 +104,7 @@ class TestCJEntitlementsIdentityFlow:
         mock_event_publisher.publish_resource_consumption.assert_called_once()
         resource_call = mock_event_publisher.publish_resource_consumption.call_args
         resource_envelope = resource_call.kwargs["resource_event"]
-        
+
         assert isinstance(resource_envelope.data, ResourceConsumptionV1)
         assert resource_envelope.data.user_id == "teacher_123"
         assert resource_envelope.data.org_id == "school_456"
@@ -122,7 +124,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="user_mapping",
             org_id="org_mapping",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -155,7 +157,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="corr_user",
             org_id="corr_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         test_correlation_id = uuid4()
 
@@ -186,9 +188,7 @@ class TestCJEntitlementsIdentityFlow:
     ) -> None:
         """Test quantity mapping from processed essays to credit consumption."""
         # Arrange - 6 essays = 15 comparisons: 6*(6-1)/2 = 15
-        rankings = [
-            {"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5} for i in range(1, 7)
-        ]
+        rankings = [{"els_essay_id": f"essay_{i}", "bradley_terry_score": 0.5} for i in range(1, 7)]
         publishing_data = DualEventPublishingData(
             bos_batch_id="quantity_test",
             cj_batch_id="cj_quantity_test",
@@ -196,7 +196,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="quantity_user",
             org_id="quantity_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -243,7 +243,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id=user_id,
             org_id=org_id,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -263,7 +263,6 @@ class TestCJEntitlementsIdentityFlow:
         assert resource_envelope.data.user_id == expected_user
         assert resource_envelope.data.org_id == expected_org
 
-
     @pytest.mark.integration
     async def test_missing_user_id_graceful_handling(
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
@@ -272,12 +271,12 @@ class TestCJEntitlementsIdentityFlow:
         # NOTE: Since DualEventPublishingData requires user_id to be str (not Optional[str]),
         # this test now validates that the dataclass enforces the requirement.
         # We can't create DualEventPublishingData with user_id=None
-        
+
         # This test is no longer valid with the new interface since user_id is required
         # The dataclass will not allow None values for user_id
         # If we need to test missing user_id scenarios, it would need to be at a higher level
         # where the data is validated before creating DualEventPublishingData
-        
+
         # For now, we'll test that the function works correctly with a valid user_id
         publishing_data = DualEventPublishingData(
             bos_batch_id="user_id_test",
@@ -286,7 +285,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="valid_user",  # Required field
             org_id="test_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -298,7 +297,7 @@ class TestCJEntitlementsIdentityFlow:
             settings=MockSettings(),  # type: ignore[arg-type]
             correlation_id=uuid4(),
         )
-        
+
         # Assert - All events published successfully
         mock_event_publisher.publish_assessment_completed.assert_called_once()
         mock_event_publisher.publish_assessment_result.assert_called_once()
@@ -317,7 +316,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="individual_teacher",
             org_id=None,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -350,9 +349,9 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="failure_user",
             org_id="failure_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
-        
+
         failing_publisher = AsyncMock(spec=CJEventPublisherProtocol)
         failing_publisher.publish_assessment_completed = AsyncMock()
         failing_publisher.publish_resource_consumption = AsyncMock(
@@ -373,7 +372,6 @@ class TestCJEntitlementsIdentityFlow:
         failing_publisher.publish_assessment_completed.assert_called_once()
         failing_publisher.publish_resource_consumption.assert_called_once()
 
-
     @pytest.mark.integration
     async def test_batch_size_to_quantity_mapping_edge_cases(
         self, mock_event_publisher: AsyncMock, mock_grade_projections: Any
@@ -388,7 +386,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="edge_user",
             org_id="edge_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
 
         # Act
@@ -407,7 +405,6 @@ class TestCJEntitlementsIdentityFlow:
         ]
         assert resource_envelope.data.quantity == 0  # Single essay = 0 comparisons
 
-
     @pytest.mark.integration
     async def test_credit_attribution_accuracy_with_service_metadata(
         self, mock_event_publisher: AsyncMock, sample_rankings: list, mock_grade_projections: Any
@@ -421,7 +418,7 @@ class TestCJEntitlementsIdentityFlow:
             course_code="ENG5",
             user_id="attribution_user",
             org_id="attribution_org",
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         correlation_id = uuid4()
 
@@ -440,9 +437,9 @@ class TestCJEntitlementsIdentityFlow:
             "resource_event"
         ]
         resource_data = resource_envelope.data
-        
+
         assert resource_data.service_name == "cj_assessment_service"
-        assert resource_data.processing_id == f"cj_attribution_test"
+        assert resource_data.processing_id == "cj_attribution_test"
         assert resource_data.consumed_at is not None
         assert resource_data.entity_id == "attribution_test"
         assert resource_data.user_id == "attribution_user"
