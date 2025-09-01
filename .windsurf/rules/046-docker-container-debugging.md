@@ -25,6 +25,10 @@ docker ps | grep <service_pattern>
 docker logs huleedu_<container_name> --tail 50
 docker logs huleedu_<container_name> 2>&1 | grep -E "error|failed|exception"
 docker logs huleedu_<container_name> 2>&1 | grep "<correlation_id>"
+
+# CRITICAL: NEVER use --since arguments when searching for correlation IDs
+# System time and container UTC time confusion causes search failures
+# Always use --tail instead
 ```
 
 ## Database Access Pattern

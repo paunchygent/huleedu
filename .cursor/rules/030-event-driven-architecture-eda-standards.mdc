@@ -17,11 +17,28 @@ alwaysApply: true
 - `source_service: str`, `correlation_id: Optional[UUID]`
 - `data: T_EventData` (typed, versioned Pydantic model)
 
-### 2.2. Event Naming Convention
+### 2.2. Identity Propagation Pattern
+**MUST** propagate identity context in EventEnvelope metadata for all internal commands:
+- **Required Fields**: `user_id` and `org_id` from batch context
+- **Implementation**: Phase initiators in BOS must include identity in metadata
+- **Example**:
+```python
+EventEnvelope(
+    # ... other fields
+    metadata={
+        "user_id": batch_context.user_id,
+        "org_id": batch_context.org_id,
+    }
+)
+```
+- **Consumer Pattern**: Prefer metadata over external lookups (Redis/DB)
+- **Benefits**: Eliminates race conditions, improves performance, ensures reliable identity threading
+
+### 2.3. Event Naming Convention
 **MUST** follow: `<project>.<domain>.<entity>.<action_past_tense>.v<version>`
 Example: `huleedu.essay.spellcheck.requested.v1`
 
-### 2.3. Event Size Optimization
+### 2.4. Event Size Optimization
 
 #### Thin Events Principle
 - Events signal occurrences with identifiers/references

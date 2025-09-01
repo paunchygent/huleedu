@@ -121,6 +121,10 @@ class StudentMatchingInitiatorImpl(PipelinePhaseInitiatorProtocol):
                 source_service="batch_orchestrator_service",
                 correlation_id=correlation_id,
                 data=command_data,
+                metadata={
+                    "user_id": batch_context.user_id,  # Identity from batch context
+                    "org_id": batch_context.org_id,    # Org from batch context
+                },
             )
 
             # Determine target topic for ELS

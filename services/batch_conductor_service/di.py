@@ -101,8 +101,9 @@ class EventDrivenServicesProvider(Provider):
     @provide(scope=Scope.APP)
     def provide_dlq_producer(self, settings: Settings) -> DlqProducerProtocol:
         """Provide Kafka DLQ producer implementation."""
-        # Use in-memory no-op producer for development/testing to avoid Kafka requirement
-        if settings.is_development() or settings.is_testing():
+        # Use in-memory no-op producer only for unit testing to avoid Kafka requirement
+        # Docker integration tests need real Kafka publishing
+        if settings.is_testing():
 
             class _NoOpDlqProducer:
                 async def publish_to_dlq(
@@ -152,8 +153,9 @@ class EventDrivenServicesProvider(Provider):
     @provide(scope=Scope.APP)
     async def provide_event_publisher(self, settings: Settings) -> KafkaPublisherProtocol:
         """Provide Kafka event publisher for BCS phase events."""
-        # Use no-op publisher for development/testing to avoid Kafka requirement
-        if settings.is_development() or settings.is_testing():
+        # Use no-op publisher only for unit testing to avoid Kafka requirement
+        # Docker integration tests need real Kafka publishing
+        if settings.is_testing():
             from huleedu_service_libs.logging_utils import create_service_logger
 
             logger = create_service_logger("bcs.di.event_publisher")

@@ -115,6 +115,10 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
                 source_service="batch-orchestrator-service",
                 correlation_id=correlation_id,
                 data=ai_feedback_command,
+                metadata={
+                    "user_id": batch_context.user_id,  # Identity from batch context
+                    "org_id": batch_context.org_id,    # Org from batch context
+                },
             )
 
             # Publish AI feedback command

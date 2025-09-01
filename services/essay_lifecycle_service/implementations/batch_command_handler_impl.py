@@ -93,10 +93,11 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         self,
         command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
         correlation_id: UUID,
+        envelope_metadata: dict | None = None,
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
         await self.cj_assessment_handler.process_initiate_cj_assessment_command(
-            command_data, correlation_id
+            command_data, correlation_id, envelope_metadata
         )
 
     async def process_student_matching_command(

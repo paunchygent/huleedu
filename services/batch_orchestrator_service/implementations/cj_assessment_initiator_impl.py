@@ -109,7 +109,10 @@ class DefaultCJAssessmentInitiator(CJAssessmentInitiatorProtocol):
                 source_service="batch-orchestrator-service",
                 correlation_id=correlation_id,
                 data=cj_command,
-                metadata={},
+                metadata={
+                    "user_id": batch_context.user_id,  # Identity from batch context
+                    "org_id": batch_context.org_id,    # Org from batch context
+                },
             )
 
             # Inject current trace context into the envelope metadata

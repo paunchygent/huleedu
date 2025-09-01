@@ -122,7 +122,8 @@ class PipelineTestHarness:
         # Create consumer context
         self.consumer_context = self.kafka_manager.consumer("pipeline_test_harness", all_topics)
         self.consumer = await self.consumer_context.__aenter__()
-        await self.consumer.seek_to_end()  # Start from latest
+        # Consumer uses default auto_offset_reset="latest" which seeks to end
+        # This is correct since we want to see events published AFTER consumer creation
         logger.info("📡 Kafka consumer started for pipeline monitoring")
 
     async def setup_test_class_with_roster(self) -> str:
@@ -622,7 +623,7 @@ class PipelineTestHarness:
                     raise RuntimeError("Consumer not initialized")
                 msg_batch = await self.consumer.getmany(timeout_ms=1000, max_records=10)
 
-                for _topic_partition, messages in msg_batch.items():
+                for topic_partition, messages in msg_batch.items():
                     for message in messages:
                         try:
                             # Parse message
@@ -640,6 +641,7 @@ class PipelineTestHarness:
                             # Special-case: CJ completion events may be published with the original
                             # batch registration correlation_id instead of the pipeline request ID.
                             if event_correlation_id != request_correlation_id:
+                                
                                 is_cj_completion = (
                                     expected_completion_event in event_type
                                     and "cj_assessment.completed" in event_type

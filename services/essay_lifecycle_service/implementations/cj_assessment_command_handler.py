@@ -51,6 +51,7 @@ class CJAssessmentCommandHandler:
         self,
         command_data: BatchServiceCJAssessmentInitiateCommandDataV1,
         correlation_id: UUID,
+        envelope_metadata: dict | None = None,
     ) -> None:
         """Process CJ assessment initiation command from Batch Orchestrator Service."""
         logger.info(
@@ -172,22 +173,45 @@ class CJAssessmentCommandHandler:
                         # Convert string language to Language enum at boundary
                         language_enum = Language(command_data.language)
 
-                        # Get identity from batch tracker for proper identity threading
-                        batch_status = await self.batch_tracker.get_batch_status(command_data.entity_id)
-                        if batch_status:
-                            user_id = batch_status.get("user_id", "unknown-user")
-                            org_id = batch_status.get("org_id")
-                        else:
-                            # Fallback if batch status not found
-                            logger.warning(
-                                f"Could not retrieve batch status for identity threading, using fallback",
+                        # Prefer identity from envelope metadata (canonical source)
+                        user_id = None
+                        org_id = None
+                        
+                        if envelope_metadata:
+                            user_id = envelope_metadata.get("user_id")
+                            org_id = envelope_metadata.get("org_id")
+                            
+                        if user_id:
+                            logger.info(
+                                f"Using identity from envelope metadata: user_id={user_id}, org_id={org_id}",
                                 extra={
                                     "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
                             )
-                            user_id = "unknown-user"
-                            org_id = None
+                        else:
+                            # Fallback to Redis if metadata missing (backward compatibility)
+                            logger.warning(
+                                "Identity not found in envelope metadata, falling back to Redis lookup",
+                                extra={
+                                    "batch_id": command_data.entity_id,
+                                    "correlation_id": str(correlation_id),
+                                },
+                            )
+                            batch_status = await self.batch_tracker.get_batch_status(command_data.entity_id)
+                            if batch_status:
+                                user_id = batch_status.get("user_id", "unknown-user")
+                                org_id = batch_status.get("org_id")
+                            else:
+                                user_id = "unknown-user"
+                                org_id = None
+                                logger.error(
+                                    f"Could not retrieve identity from Redis either, using fallback",
+                                    extra={
+                                        "batch_id": command_data.entity_id,
+                                        "correlation_id": str(correlation_id),
+                                    },
+                                )
 
                         await self.request_dispatcher.dispatch_cj_assessment_requests(
                             essays_to_process=successfully_transitioned_essays,

@@ -259,7 +259,88 @@ Full quality gates
 
 ## Current Implementation Status (in repo)
 
-Date: 2025-08-31
+Date: 2025-09-01
+
+### Identity Threading Fix Implementation (COMPLETED)
+
+#### Root Cause Identified
+- BOS phase initiators were sending empty `metadata={}` in EventEnvelope when initiating downstream phases
+- ELS attempted to retrieve identity from Redis batch tracker, causing race conditions and failures
+- This violated the header-first/event-metadata-first architectural principle
+
+#### Solution Implemented
+Following the architecturally aligned fix proposed by the dev team:
+
+1. **BOS Phase Initiator Updates** - All phase initiators now include identity in EventEnvelope metadata:
+   - ✅ `cj_assessment_initiator_impl.py` - Includes `user_id` and `org_id` from batch context
+   - ✅ `spellcheck_initiator_impl.py` - Includes identity metadata
+   - ✅ `nlp_initiator_impl.py` - Includes identity metadata  
+   - ✅ `ai_feedback_initiator_impl.py` - Includes identity metadata
+   - ✅ `student_matching_initiator_impl.py` - Includes identity metadata
+
+2. **ELS Handler Updates** - CJ Assessment command handler now prefers envelope metadata:
+   - ✅ `cj_assessment_command_handler.py` - Checks envelope metadata first, falls back to Redis
+   - ✅ `batch_command_handlers.py` - Passes envelope metadata to handler
+   - ✅ `batch_command_handler_impl.py` - Forwards metadata through chain
+
+3. **Test Infrastructure Fix**:
+   - ✅ `test_e2e_identity_threading.py` - Fixed consumer to use `auto_offset_reset="earliest"`
+   - Test now passes with correct identity threading verified in ResourceConsumptionV1 events
+
+4. **Architecture Documentation Updated**:
+   - ✅ `.cursor/rules/030-event-driven-architecture-eda-standards.mdc` - Added section 2.2 Identity Propagation Pattern
+   - ✅ `.cursor/rules/046-docker-container-debugging.mdc` - Added warning about --since arguments with correlation IDs
+
+#### Test Results
+✅ Identity threading test PASSING:
+- ResourceConsumptionV1 events contain correct `user_id: test_identity_user` and `org_id: test_org_123`
+- Identity properly flows: AGW → BOS → ELS → CJ Assessment → ResourceConsumptionV1
+- No "unknown-user" fallbacks occurring
+
+#### Benefits Achieved
+- Eliminates Redis race conditions
+- Improves performance (no external lookups needed)
+- Follows event-driven best practices (self-contained events)
+- Ensures reliable identity threading throughout the pipeline
+
+### Phase Pruning and BCS Event Publishing Fix (COMPLETED - 2025-09-01)
+
+#### Issue Identified
+- Test `test_e2e_cj_after_nlp_with_pruning.py` was not detecting phase pruning
+- BCS logs showed "Published phase skipped event" but test harness never received BatchPhaseSkipped events
+- Investigation revealed NO BCS events were reaching the test consumer
+
+#### Root Cause
+- BCS was using `NoOpEventPublisher` in development environment (Docker)
+- In `services/batch_conductor_service/di.py`, the condition `if settings.is_development() or settings.is_testing()` was preventing real Kafka publishing
+- This meant BCS logged events but never actually published them to Kafka
+
+#### Solution Implemented
+1. **BCS DI Configuration Fix**:
+   - ✅ Updated `provide_event_publisher()` to only use NoOp for unit tests: `if settings.is_testing()`
+   - ✅ Updated `provide_dlq_producer()` similarly for consistency
+   - Now Docker development environment uses real KafkaBus for event publishing
+
+2. **BCS Database Migration**:
+   - ✅ Applied missing migration for `phase_completions` table
+   - BCS can now properly track completed phases in PostgreSQL
+
+#### Test Results
+✅ Phase pruning test PASSING:
+- BatchPhaseSkipped events are now published and received
+- Test correctly shows `Pruned: ['spellcheck']` when CJ Assessment runs after NLP
+- Correlation IDs properly preserved throughout pipeline
+- BCS correctly tracks completed phases and publishes pruning events
+
+#### Benefits Achieved
+- BCS now publishes all events correctly in Docker environment
+- Phase pruning optimization working as designed
+- Tests can properly validate phase skipping behavior
+- Improved observability of BCS behavior in development
+
+## Current Implementation Status (in repo)
+
+Date: 2025-09-01
 
 Implemented (Phase 1 core + initial Phase 2 migrations):
 - Rules/index
