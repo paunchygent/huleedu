@@ -64,6 +64,12 @@ class Settings(SecureServiceSettings):
         default=SecretStr("your-secret-key-here"), description="Secret key for JWT validation"
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
+    JWT_AUDIENCE: str = Field(
+        default="huleedu-platform", description="Expected JWT audience for WebSocket auth"
+    )
+    JWT_ISSUER: str = Field(
+        default="huleedu-identity-service", description="Expected JWT issuer for WebSocket auth"
+    )
 
     # CORS Configuration for WebSocket upgrade
     CORS_ORIGINS: list[str] = Field(

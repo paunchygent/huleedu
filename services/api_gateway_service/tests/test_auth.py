@@ -24,7 +24,12 @@ class TestJWTAuthentication:
 
     def create_test_token(self, user_id: str, exp_delta: timedelta | None = None) -> str:
         """Helper method to create test JWT tokens."""
-        payload = {"sub": user_id, "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1)),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         return jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
@@ -33,7 +38,12 @@ class TestJWTAuthentication:
         self, user_id: str, extra_claims: dict, exp_delta: timedelta | None = None
     ) -> str:
         """Helper to create JWT with additional claims for org_id testing."""
-        payload = {"sub": user_id, "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1)),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         payload.update(extra_claims)
         return jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
@@ -41,14 +51,18 @@ class TestJWTAuthentication:
 
     def create_token_without_exp(self, user_id: str) -> str:
         """Helper method to create JWT token without expiration claim."""
-        payload = {"sub": user_id}
+        payload = {"sub": user_id, "aud": settings.JWT_AUDIENCE, "iss": settings.JWT_ISSUER}
         return jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
 
     def create_token_without_sub(self, exp_delta: timedelta | None = None) -> str:
         """Helper method to create JWT token without subject claim."""
-        payload = {"exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1))}
+        payload = {
+            "exp": datetime.now(UTC) + (exp_delta or timedelta(hours=1)),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         return jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
@@ -139,7 +153,12 @@ class TestJWTAuthentication:
 
         user_id = "test_user_123"
         # Create token with wrong secret key
-        payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(hours=1)}
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         invalid_token = jwt.encode(payload, "wrong_secret_key", algorithm=settings.JWT_ALGORITHM)
         mock_request = self._create_mock_request(f"Bearer {invalid_token}")
 
@@ -191,7 +210,12 @@ class TestJWTAuthentication:
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
         user_id = "test_user_123"
-        payload = {"sub": user_id, "exp": datetime.now(UTC) + timedelta(hours=1)}
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         # Create token with different algorithm
         wrong_algorithm_token = jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm="HS512"
@@ -231,6 +255,8 @@ class TestJWTAuthentication:
             "iat": datetime.now(UTC),
             "role": "admin",
             "permissions": ["read", "write"],
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
         }
         token = jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
@@ -245,7 +271,12 @@ class TestJWTAuthentication:
         """Test handling of null subject claim in JWT payload."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
-        payload = {"sub": None, "exp": datetime.now(UTC) + timedelta(hours=1)}
+        payload = {
+            "sub": None,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         token = jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
@@ -261,7 +292,12 @@ class TestJWTAuthentication:
         """Test handling of empty string subject claim in JWT payload."""
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
-        payload = {"sub": "", "exp": datetime.now(UTC) + timedelta(hours=1)}
+        payload = {
+            "sub": "",
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
+        }
         token = jwt.encode(
             payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
         )
@@ -271,3 +307,48 @@ class TestJWTAuthentication:
             await self._test_auth_through_container(mock_request)
 
         assert "missing subject" in exc_info.value.error_detail.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_audience_rejection(self):
+        """Token with wrong audience should be rejected by audience validation."""
+        from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+
+        user_id = "test_user_123"
+        # Create token with wrong audience
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": "wrong-audience",
+            "iss": settings.JWT_ISSUER,
+        }
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
+        mock_request = self._create_mock_request(f"Bearer {token}")
+
+        with pytest.raises(HuleEduError) as exc_info:
+            await self._test_auth_through_container(mock_request)
+
+        assert "aud" in exc_info.value.error_detail.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_issuer_rejection(self):
+        """Token with wrong issuer should be rejected by issuer validation."""
+        from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+
+        user_id = "test_user_123"
+        payload = {
+            "sub": user_id,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+            "aud": settings.JWT_AUDIENCE,
+            "iss": "wrong-issuer",
+        }
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
+        mock_request = self._create_mock_request(f"Bearer {token}")
+
+        with pytest.raises(HuleEduError) as exc_info:
+            await self._test_auth_through_container(mock_request)
+
+        assert "iss" in exc_info.value.error_detail.message.lower()

@@ -21,7 +21,8 @@ class DevTokenIssuer(TokenIssuer):
             "org": org_id,
             "roles": roles,
             "exp": int(time.time()) + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS,
-            "iss": settings.SERVICE_NAME,
+            "iss": settings.JWT_ISSUER,
+            "aud": settings.JWT_AUDIENCE,
         }
         return self._encode(payload)
 
@@ -32,6 +33,7 @@ class DevTokenIssuer(TokenIssuer):
             "typ": "refresh",
             "jti": jti,
             "exp": int(time.time()) + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS * 24,
+            "iss": settings.JWT_ISSUER,
         }
         return self._encode(payload), jti
 

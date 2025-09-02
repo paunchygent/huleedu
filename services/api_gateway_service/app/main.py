@@ -20,7 +20,7 @@ from services.api_gateway_service.config import settings
 
 from ..routers import batch_routes, class_routes, file_routes, status_routes
 from ..routers.health_routes import router as health_router
-from .middleware import CorrelationIDMiddleware
+from .middleware import AuthBridgeMiddleware, CorrelationIDMiddleware
 from .rate_limiter import limiter
 
 
@@ -61,6 +61,9 @@ def create_app() -> FastAPI:
 
     # Setup standard HTTP metrics middleware (third in chain)
     setup_standard_metrics_middleware(app)
+
+    # Bridge DI-auth state for middleware consumers (rate limiter)
+    app.add_middleware(AuthBridgeMiddleware)
 
     # Add Rate Limiting Middleware
     app.state.limiter = limiter

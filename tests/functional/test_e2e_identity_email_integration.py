@@ -372,10 +372,11 @@ class TestIdentityEmailIntegrationE2E:
         Test Email Verification Request → Verification Email flow.
 
         FLOW:
-        1. POST /v1/auth/request-email-verification → EmailVerificationRequestedV1 event
-        2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
-        3. NotificationEmailRequestedV1 event published (template="verification")
-        4. Email Service processes → EmailSentV1 event
+        1. POST /v1/auth/register → UserRegisteredV1 event (creates user first)
+        2. POST /v1/auth/request-email-verification → EmailVerificationRequestedV1 event
+        3. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
+        4. NotificationEmailRequestedV1 event published (template="verification")
+        5. Email Service processes → EmailSentV1 event
         """
 
         # Verify Docker containers are healthy
@@ -394,8 +395,43 @@ class TestIdentityEmailIntegrationE2E:
             print("✅ Comprehensive event monitoring consumer ready")
 
             async with aiohttp.ClientSession() as session:
-                # Step 1: Email Verification Request (public endpoint)
-                print("📝 Step 1: Requesting email verification...")
+                # Step 1: Register user first to ensure they exist for verification
+                print("📝 Step 1: Registering user for verification test...")
+                registration_payload = {
+                    "email": swedish_test_data["email"],
+                    "password": swedish_test_data["password"],
+                    "person_name": swedish_test_data["person_name"],
+                    "organization_name": swedish_test_data["organization_name"],
+                }
+
+                async with session.post(
+                    f"{self.IDENTITY_SERVICE_BASE_URL}/register",
+                    json=registration_payload,
+                    headers={"X-Correlation-ID": correlation_id},
+                ) as response:
+                    assert response.status == 201, (
+                        f"Registration failed with status {response.status}"
+                    )
+                    registration_data = await response.json()
+                    user_id = registration_data["user_id"]
+                    print(f"✅ User registered successfully: {user_id}")
+
+                # Wait for UserRegisteredV1 event to confirm user creation
+                print("🔄 Step 1.5: Waiting for user registration event...")
+                registration_events = await self._wait_for_event_sequence(
+                    consumer, 
+                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)], 
+                    correlation_id, 
+                    timeout=30
+                )
+                
+                assert topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events, (
+                    "UserRegisteredV1 event not found after registration"
+                )
+                print("✅ User registration event confirmed")
+
+                # Step 2: Email Verification Request (now for existing user)
+                print("📝 Step 2: Requesting email verification for existing user...")
                 verification_payload = {"email": swedish_test_data["email"]}
 
                 async with session.post(
@@ -403,15 +439,14 @@ class TestIdentityEmailIntegrationE2E:
                     json=verification_payload,
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
-                    # Note: This endpoint will return 400 if user doesn't exist,
-                    # but event may still be published
+                    # Should succeed since user now exists
                     print(f"📮 Verification request status: {response.status}")
+                    assert response.status == 200, (
+                        f"Email verification request failed with status {response.status}"
+                    )
 
-                    # Even if API returns error, we should still monitor for events
-                    # (this tests the integration robustness)
-
-                # Step 2: Wait for complete event sequence
-                print("🔄 Step 2: Waiting for verification event chain...")
+                # Step 3: Wait for complete verification event sequence
+                print("🔄 Step 3: Waiting for verification event chain...")
                 expected_events = [
                     topic_name(ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED),
@@ -422,49 +457,54 @@ class TestIdentityEmailIntegrationE2E:
                     consumer, expected_events, correlation_id, timeout=45
                 )
 
-                # If no events found, this might be expected if user doesn't exist
+                # Verify we found all expected events
                 if not found_events:
-                    print("ℹ️ No events found - this may be expected if user doesn't exist")
-                    print(
-                        "   Verification request flow requires existing user for event generation"
-                    )
-                    return
+                    print("❌ No verification events found - this indicates a problem")
+                    assert False, "Expected verification events but none were found"
 
-                # Step 3: Verify EmailVerificationRequestedV1 event (if published)
+                # Step 4: Verify EmailVerificationRequestedV1 event
                 verification_topic = topic_name(
                     ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED
                 )
-                if verification_topic in found_events:
-                    verification_event = found_events[verification_topic]
-                    assert verification_event["email"] == swedish_test_data["email"]
-                    assert "verification_token" in verification_event
-                    assert "expires_at" in verification_event
-                    print("✅ EmailVerificationRequestedV1 event verified")
+                assert verification_topic in found_events, (
+                    "EmailVerificationRequestedV1 event not found"
+                )
 
-                    # Step 4: Verify NotificationEmailRequestedV1 event
-                    notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
-                    if notification_topic in found_events:
-                        notification_event = found_events[notification_topic]
-                        assert notification_event["template_id"] == "verification"
-                        assert notification_event["to"] == swedish_test_data["email"]
-                        assert notification_event["category"] == "verification"
-                        assert "verification_link" in notification_event["variables"]
-                        assert "expires_in" in notification_event["variables"]
-                        print(
-                            "✅ NotificationEmailRequestedV1 event verified (verification template)"
-                        )
+                verification_event = found_events[verification_topic]
+                assert verification_event["email"] == swedish_test_data["email"]
+                assert "verification_token" in verification_event
+                assert "expires_at" in verification_event
+                print("✅ EmailVerificationRequestedV1 event verified")
 
-                        # Step 5: Verify EmailSentV1 event
-                        email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
-                        if email_sent_topic in found_events:
-                            email_sent_event = found_events[email_sent_topic]
-                            assert "message_id" in email_sent_event
-                            assert email_sent_event["provider"] in ["mock", "smtp"]
-                            print("✅ EmailSentV1 event verified")
+                # Step 5: Verify NotificationEmailRequestedV1 event
+                notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
+                assert notification_topic in found_events, (
+                    "NotificationEmailRequestedV1 event not found"
+                )
 
-        print("🎉 EMAIL VERIFICATION REQUEST → VERIFICATION EMAIL flow tested!")
-        print("   → Event-driven integration verified")
-        print("   → Template transformation validated")
+                notification_event = found_events[notification_topic]
+                assert notification_event["template_id"] == "verification"
+                assert notification_event["to"] == swedish_test_data["email"]
+                assert notification_event["category"] == "verification"
+                assert "verification_link" in notification_event["variables"]
+                assert "expires_in" in notification_event["variables"]
+                print("✅ NotificationEmailRequestedV1 event verified (verification template)")
+
+                # Step 6: Verify EmailSentV1 event
+                email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
+                assert email_sent_topic in found_events, "EmailSentV1 event not found"
+
+                email_sent_event = found_events[email_sent_topic]
+                assert "message_id" in email_sent_event
+                assert email_sent_event["provider"] in ["mock", "smtp"]
+                print("✅ EmailSentV1 event verified")
+
+        print("🎉 EMAIL VERIFICATION REQUEST → VERIFICATION EMAIL flow COMPLETED successfully!")
+        print("   → User registered first to ensure existence")
+        print("   → EmailVerificationRequestedV1 event published by Identity Service")
+        print("   → NotificationOrchestrator transformed to verification email request")
+        print("   → Email Service processed and sent verification email")
+        print("   → Event-driven integration verified end-to-end")
 
     @pytest.mark.timeout(120)
     async def test_password_reset_request_flow(
@@ -477,10 +517,11 @@ class TestIdentityEmailIntegrationE2E:
         Test Password Reset Request → Reset Email flow.
 
         FLOW:
-        1. POST /v1/auth/request-password-reset → PasswordResetRequestedV1 event
-        2. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
-        3. NotificationEmailRequestedV1 event published (template="password_reset")
-        4. Email Service processes → EmailSentV1 event
+        1. POST /v1/auth/register → UserRegisteredV1 event (creates user first)
+        2. POST /v1/auth/request-password-reset → PasswordResetRequestedV1 event
+        3. IdentityKafkaConsumer processes → NotificationOrchestrator transforms
+        4. NotificationEmailRequestedV1 event published (template="password_reset")
+        5. Email Service processes → EmailSentV1 event
         """
 
         # Verify Docker containers are healthy
@@ -499,8 +540,43 @@ class TestIdentityEmailIntegrationE2E:
             print("✅ Comprehensive event monitoring consumer ready")
 
             async with aiohttp.ClientSession() as session:
-                # Step 1: Password Reset Request
-                print("📝 Step 1: Requesting password reset...")
+                # Step 1: Register user first to ensure they exist for password reset
+                print("📝 Step 1: Registering user for password reset test...")
+                registration_payload = {
+                    "email": swedish_test_data["email"],
+                    "password": swedish_test_data["password"],
+                    "person_name": swedish_test_data["person_name"],
+                    "organization_name": swedish_test_data["organization_name"],
+                }
+
+                async with session.post(
+                    f"{self.IDENTITY_SERVICE_BASE_URL}/register",
+                    json=registration_payload,
+                    headers={"X-Correlation-ID": correlation_id},
+                ) as response:
+                    assert response.status == 201, (
+                        f"Registration failed with status {response.status}"
+                    )
+                    registration_data = await response.json()
+                    user_id = registration_data["user_id"]
+                    print(f"✅ User registered successfully: {user_id}")
+
+                # Wait for UserRegisteredV1 event to confirm user creation
+                print("🔄 Step 1.5: Waiting for user registration event...")
+                registration_events = await self._wait_for_event_sequence(
+                    consumer, 
+                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)], 
+                    correlation_id, 
+                    timeout=30
+                )
+                
+                assert topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events, (
+                    "UserRegisteredV1 event not found after registration"
+                )
+                print("✅ User registration event confirmed")
+
+                # Step 2: Password Reset Request (now for existing user)
+                print("📝 Step 2: Requesting password reset for existing user...")
                 reset_payload = {"email": swedish_test_data["email"]}
 
                 async with session.post(
@@ -508,13 +584,14 @@ class TestIdentityEmailIntegrationE2E:
                     json=reset_payload,
                     headers={"X-Correlation-ID": correlation_id},
                 ) as response:
+                    # Should succeed since user now exists
                     print(f"🔐 Password reset request status: {response.status}")
+                    assert response.status == 200, (
+                        f"Password reset request failed with status {response.status}"
+                    )
 
-                    # Note: Endpoint may return success even if user doesn't exist (security)
-                    # Events may or may not be published depending on user existence
-
-                # Step 2: Wait for complete event sequence
-                print("🔄 Step 2: Waiting for password reset event chain...")
+                # Step 3: Wait for complete password reset event sequence
+                print("🔄 Step 3: Waiting for password reset event chain...")
                 expected_events = [
                     topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED),
                     topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED),
@@ -525,46 +602,52 @@ class TestIdentityEmailIntegrationE2E:
                     consumer, expected_events, correlation_id, timeout=45
                 )
 
-                # If no events found, this might be expected if user doesn't exist
+                # Verify we found all expected events
                 if not found_events:
-                    print("ℹ️ No events found - this may be expected if user doesn't exist")
-                    print("   Password reset flow requires existing user for event generation")
-                    return
+                    print("❌ No password reset events found - this indicates a problem")
+                    assert False, "Expected password reset events but none were found"
 
-                # Step 3: Verify PasswordResetRequestedV1 event (if published)
+                # Step 4: Verify PasswordResetRequestedV1 event
                 reset_topic = topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED)
-                if reset_topic in found_events:
-                    reset_event = found_events[reset_topic]
-                    assert reset_event["email"] == swedish_test_data["email"]
-                    assert "token_id" in reset_event
-                    assert "expires_at" in reset_event
-                    print("✅ PasswordResetRequestedV1 event verified")
+                assert reset_topic in found_events, (
+                    "PasswordResetRequestedV1 event not found"
+                )
 
-                    # Step 4: Verify NotificationEmailRequestedV1 event
-                    notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
-                    if notification_topic in found_events:
-                        notification_event = found_events[notification_topic]
-                        assert notification_event["template_id"] == "password_reset"
-                        assert notification_event["to"] == swedish_test_data["email"]
-                        assert notification_event["category"] == "password_reset"
-                        assert "reset_link" in notification_event["variables"]
-                        assert "expires_in" in notification_event["variables"]
-                        print(
-                            "✅ NotificationEmailRequestedV1 event verified "
-                            "(password_reset template)"
-                        )
+                reset_event = found_events[reset_topic]
+                assert reset_event["email"] == swedish_test_data["email"]
+                assert "token_id" in reset_event
+                assert "expires_at" in reset_event
+                print("✅ PasswordResetRequestedV1 event verified")
 
-                        # Step 5: Verify EmailSentV1 event
-                        email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
-                        if email_sent_topic in found_events:
-                            email_sent_event = found_events[email_sent_topic]
-                            assert "message_id" in email_sent_event
-                            assert email_sent_event["provider"] in ["mock", "smtp"]
-                            print("✅ EmailSentV1 event verified")
+                # Step 5: Verify NotificationEmailRequestedV1 event
+                notification_topic = topic_name(ProcessingEvent.EMAIL_NOTIFICATION_REQUESTED)
+                assert notification_topic in found_events, (
+                    "NotificationEmailRequestedV1 event not found"
+                )
 
-        print("🎉 PASSWORD RESET REQUEST → RESET EMAIL flow tested!")
-        print("   → Event-driven integration verified")
-        print("   → Security-conscious flow validated")
+                notification_event = found_events[notification_topic]
+                assert notification_event["template_id"] == "password_reset"
+                assert notification_event["to"] == swedish_test_data["email"]
+                assert notification_event["category"] == "password_reset"
+                assert "reset_link" in notification_event["variables"]
+                assert "expires_in" in notification_event["variables"]
+                print("✅ NotificationEmailRequestedV1 event verified (password_reset template)")
+
+                # Step 6: Verify EmailSentV1 event
+                email_sent_topic = topic_name(ProcessingEvent.EMAIL_SENT)
+                assert email_sent_topic in found_events, "EmailSentV1 event not found"
+
+                email_sent_event = found_events[email_sent_topic]
+                assert "message_id" in email_sent_event
+                assert email_sent_event["provider"] in ["mock", "smtp"]
+                print("✅ EmailSentV1 event verified")
+
+        print("🎉 PASSWORD RESET REQUEST → RESET EMAIL flow COMPLETED successfully!")
+        print("   → User registered first to ensure existence")
+        print("   → PasswordResetRequestedV1 event published by Identity Service")
+        print("   → NotificationOrchestrator transformed to password reset email request")
+        print("   → Email Service processed and sent password reset email")
+        print("   → Event-driven integration verified end-to-end")
 
     # Helper method for debugging failed tests
     async def _debug_kafka_consumer_groups(self) -> None:

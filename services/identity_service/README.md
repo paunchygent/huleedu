@@ -126,8 +126,14 @@ Environment prefix: `IDENTITY_`
 - `JWT_DEV_SECRET`: Development JWT signing secret
 - `JWT_RS256_PRIVATE_KEY_PATH`: Production private key path
 - `JWT_ACCESS_TOKEN_EXPIRES_SECONDS`: Access token TTL (default: 3600)
+- `JWT_ISSUER`: Canonical issuer for all Identity-minted tokens (default: `huleedu-identity-service`)
+- `JWT_AUDIENCE`: Canonical platform audience for access tokens (default: `huleedu-platform`)
 - `REDIS_URL`: Redis connection for rate limiting/sessions
 - `KAFKA_BOOTSTRAP_SERVERS`: Kafka for event publishing
+
+Token claims
+- Access tokens: include `sub`, `exp`, `iat`, `iss`, `aud`, plus domain claims (`org`, `roles`).
+- Refresh tokens: include `sub`, `exp`, `iat`, `jti`, `typ=refresh`, `iss` — intentionally no `aud`.
 
 ## Development
 

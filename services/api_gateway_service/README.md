@@ -55,10 +55,16 @@ The API Gateway Service is a FastAPI-based microservice that provides client-fac
 
 ### Rate Limiting
 
-- Batch commands: 10 requests/minute
-- File uploads: 5 requests/minute  
-- Status queries: 50 requests/minute
-- Per-client enforcement with Redis backend
+- Batch commands: 20 requests/minute
+- File uploads: 50 requests/minute  
+- Status queries: 50 requests/minute (lightweight)
+- Per-user enforcement with Redis backend; falls back to IP when unauthenticated
+
+### Architecture Decision: DI Bridge for Rate Limiting
+
+- We use a thin AuthBridge middleware to decode JWT once and expose `user_id`/`org_id` on `request.state` so SlowAPI (middleware-first) can key limits per user.
+- The route-level AuthProvider reuses the same decoded payload (no double decode) and remains the single source of truth for authentication errors.
+- This cleanly adapts Dishka DI to middleware expectations without duplicating auth logic.
 
 ### Request Validation
 
@@ -163,6 +169,8 @@ Environment variables (prefix: `API_GATEWAY_`):
 - `API_GATEWAY_BOS_URL`: Batch Orchestrator Service URL (internal-only; default: http://batch_orchestrator_service:5000)
 - `API_GATEWAY_REDIS_URL`: Redis URL for rate limiting (default: redis://redis:6379)
 - `API_GATEWAY_JWT_SECRET_KEY`: JWT signing secret (REQUIRED)
+- `API_GATEWAY_JWT_AUDIENCE`: Expected JWT audience (default: huleedu-platform)
+- `API_GATEWAY_JWT_ISSUER`: Expected JWT issuer (default: huleedu-identity-service)
 
 ## Service Integration
 

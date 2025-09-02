@@ -68,6 +68,14 @@ class Settings(SecureServiceSettings):
         description="JWT secret key for token signing and validation",
     )
     JWT_ALGORITHM: str = "HS256"
+    JWT_AUDIENCE: str = Field(
+        default="huleedu-platform",
+        description="Expected JWT audience for incoming tokens",
+    )
+    JWT_ISSUER: str = Field(
+        default="huleedu-identity-service",
+        description="Expected JWT issuer",
+    )
     JWT_ORG_ID_CLAIM_NAMES: list[str] = Field(
         default_factory=lambda: ["org_id", "org", "organization_id"],
         description=(

@@ -171,6 +171,8 @@ class TestJWTValidator:
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
+            "aud": "huleedu-platform",
+            "iss": "huleedu-identity-service",
         }
         token = jwt.encode(payload, secret, algorithm="HS256")
 
@@ -188,6 +190,8 @@ class TestJWTValidator:
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) - timedelta(hours=1)).timestamp(),
+            "aud": "huleedu-platform",
+            "iss": "huleedu-identity-service",
         }
         token = jwt.encode(payload, secret, algorithm="HS256")
 
@@ -203,7 +207,7 @@ class TestJWTValidator:
         validator = JWTValidator(secret_key=secret)
 
         # Create token without exp
-        payload = {"sub": "user123"}
+        payload = {"sub": "user123", "aud": "huleedu-platform", "iss": "huleedu-identity-service"}
         token = jwt.encode(payload, secret, algorithm="HS256")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -220,6 +224,8 @@ class TestJWTValidator:
         # Create token without sub
         payload = {
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
+            "aud": "huleedu-platform",
+            "iss": "huleedu-identity-service",
         }
         token = jwt.encode(payload, secret, algorithm="HS256")
 
@@ -237,6 +243,8 @@ class TestJWTValidator:
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
+            "aud": "huleedu-platform",
+            "iss": "huleedu-identity-service",
         }
         token = jwt.encode(payload, "wrong-secret", algorithm="HS256")
 
@@ -254,6 +262,44 @@ class TestJWTValidator:
             await validator.validate_token("not.a.jwt")
 
         assert "invalid token" in exc_info.value.error_detail.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_audience_rejection(self) -> None:
+        """Token with wrong audience should be rejected by audience validation."""
+        secret = "test-secret"
+        validator = JWTValidator(secret_key=secret)
+
+        payload = {
+            "sub": "user123",
+            "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
+            "aud": "wrong-audience",
+            "iss": "huleedu-identity-service",
+        }
+        token = jwt.encode(payload, secret, algorithm="HS256")
+
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+
+        assert "aud" in exc_info.value.error_detail.message.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_issuer_rejection(self) -> None:
+        """Token with wrong issuer should be rejected by issuer validation."""
+        secret = "test-secret"
+        validator = JWTValidator(secret_key=secret)
+
+        payload = {
+            "sub": "user123",
+            "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
+            "aud": "huleedu-platform",
+            "iss": "wrong-issuer",
+        }
+        token = jwt.encode(payload, secret, algorithm="HS256")
+
+        with pytest.raises(HuleEduError) as exc_info:
+            await validator.validate_token(token)
+
+        assert "iss" in exc_info.value.error_detail.message.lower()
 
 
 class TestRedisMessageListener:

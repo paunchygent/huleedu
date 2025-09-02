@@ -57,6 +57,8 @@ class WebSocketServiceProvider(Provider):
         return JWTValidator(
             secret_key=config.JWT_SECRET_KEY.get_secret_value(),
             algorithm=config.JWT_ALGORITHM,
+            audience=config.JWT_AUDIENCE,
+            issuer=config.JWT_ISSUER,
         )
 
     @provide(scope=Scope.SESSION)

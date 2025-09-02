@@ -55,8 +55,8 @@ class AuthTestUser:
             "exp": int(
                 (datetime.now(timezone.utc) + timedelta(hours=24)).timestamp()
             ),  # Expires in 24h
-            "iss": "huledu-test-auth",  # Issuer
-            "aud": "huledu-services",  # Audience
+            "iss": "huleedu-identity-service",  # Issuer (standardized)
+            "aud": "huleedu-platform",  # Audience (standardized)
         }
         # Include org_id claim only when non-empty/non-null to allow individual users
         if self.organization_id:
@@ -254,7 +254,7 @@ class AuthTestManager:
                     token,
                     self.jwt_secret,
                     algorithms=[self.jwt_algorithm],
-                    audience="huledu-services",
+                    audience="huleedu-platform",
                 ),
             )
             return payload

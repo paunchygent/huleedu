@@ -694,8 +694,8 @@ services:
       - IDENTITY_SERVICE_JWT_ACCESS_TOKEN_TTL_SECONDS=900  # 15 minutes
       - IDENTITY_SERVICE_JWT_REFRESH_TOKEN_TTL_SECONDS=604800  # 7 days
       - IDENTITY_SERVICE_JWT_RSA_KEY_SIZE=2048
-      - IDENTITY_SERVICE_JWT_ISSUER=huleedu-identity-service
-      - IDENTITY_SERVICE_JWT_AUDIENCE=huleedu-platform
+      - IDENTITY_JWT_ISSUER=huleedu-identity-service
+      - IDENTITY_JWT_AUDIENCE=huleedu-platform
       # Security Configuration
       - IDENTITY_SERVICE_BCRYPT_ROUNDS=12
       - IDENTITY_SERVICE_MAX_LOGIN_ATTEMPTS=5
@@ -826,4 +826,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-

@@ -54,7 +54,8 @@ class Rs256TokenIssuer(TokenIssuer):
             "org": org_id,
             "roles": roles,
             "exp": int(time.time()) + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS,
-            "iss": settings.SERVICE_NAME,
+            "iss": settings.JWT_ISSUER,
+            "aud": settings.JWT_AUDIENCE,
         }
         headers = {"kid": self._kid, "alg": "RS256", "typ": "JWT"}
         return jwt.encode(payload, self._private_key, algorithm="RS256", headers=headers)
@@ -66,7 +67,7 @@ class Rs256TokenIssuer(TokenIssuer):
             "typ": "refresh",
             "jti": jti,
             "exp": int(time.time()) + settings.JWT_ACCESS_TOKEN_EXPIRES_SECONDS * 24,
-            "iss": settings.SERVICE_NAME,
+            "iss": settings.JWT_ISSUER,
         }
         headers = {"kid": self._kid, "alg": "RS256", "typ": "JWT"}
         token = jwt.encode(payload, self._private_key, algorithm="RS256", headers=headers)
@@ -75,7 +76,11 @@ class Rs256TokenIssuer(TokenIssuer):
     def verify(self, token: str) -> dict[str, Any]:
         try:
             decoded = jwt.decode(
-                token, self._public_key, algorithms=["RS256"], options={"verify_aud": False}
+                token,
+                self._public_key,
+                algorithms=["RS256"],
+                issuer=settings.JWT_ISSUER,
+                options={"verify_aud": False},
             )
             return decoded if isinstance(decoded, dict) else {}
         except Exception:

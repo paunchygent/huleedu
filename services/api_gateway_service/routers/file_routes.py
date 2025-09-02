@@ -153,7 +153,7 @@ logger = create_service_logger("api_gateway.file_routes")
                 "application/json": {
                     "example": {
                         "error_type": "RateLimitError",
-                        "message": "Rate limit exceeded: 5 uploads per minute",
+                        "message": "Rate limit exceeded: 50 uploads per minute",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "retry_after": 60,
                     }
@@ -189,7 +189,7 @@ logger = create_service_logger("api_gateway.file_routes")
         },
     },
 )
-@limiter.limit("5/minute")  # Lower limit for file uploads
+@limiter.limit("50/minute")  # Production realistic per-user limit
 @inject
 async def upload_batch_files(
     request: Request,  # Required for rate limiting and form parsing
@@ -211,7 +211,7 @@ async def upload_batch_files(
     - Forwarded Identity: Adds `X-User-ID` and, when present, `X-Org-ID` headers to the
       File Service request for downstream authorization and attribution.
 
-    **Rate Limiting**: 5 uploads per minute per user (lower limit due to resource intensity)
+    **Rate Limiting**: 50 uploads per minute per user (production default)
 
     **File Requirements**:
     - Maximum file size: 50MB per file

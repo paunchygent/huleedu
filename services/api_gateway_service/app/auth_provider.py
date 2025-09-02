@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import NewType
 from uuid import UUID, uuid4
 
@@ -12,6 +11,7 @@ from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import Settings
+from services.api_gateway_service.app.jwt_utils import decode_and_validate_jwt
 
 # Custom type to avoid circular dependency with str
 BearerToken = NewType("BearerToken", str)
@@ -73,34 +73,10 @@ class AuthProvider(Provider):
         correlation_id: UUID = getattr(request.state, "correlation_id", uuid4())
 
         try:
-            # Decode and validate JWT
-            payload = jwt.decode(
-                token,
-                settings.JWT_SECRET_KEY.get_secret_value(),
-                algorithms=[settings.JWT_ALGORITHM],
-                audience="huledu-services",  # Expected audience for HuleEdu services
-            )
-
-            # CRITICAL: Validate token expiry (Architect Feedback #2)
-            exp_timestamp = payload.get("exp")
-            if exp_timestamp is None:
-                raise_authentication_error(
-                    service="api_gateway_service",
-                    operation="validate_jwt",
-                    message="Token missing expiration claim",
-                    correlation_id=correlation_id,
-                    reason="missing_exp",
-                )
-
-            current_time = datetime.now(UTC).timestamp()
-            if current_time >= exp_timestamp:
-                raise_authentication_error(
-                    service="api_gateway_service",
-                    operation="validate_jwt",
-                    message="Token has expired",
-                    correlation_id=correlation_id,
-                    reason="token_expired",
-                )
+            # Reuse payload from bridge when available to avoid re-decoding
+            payload = getattr(request.state, "jwt_payload", None)
+            if not isinstance(payload, dict):
+                payload = decode_and_validate_jwt(token, settings, correlation_id)
 
             # Extract user ID
             user_id = payload.get("sub")
@@ -160,32 +136,10 @@ class AuthProvider(Provider):
         correlation_id: UUID = getattr(request.state, "correlation_id", uuid4())
 
         try:
-            payload = jwt.decode(
-                token,
-                settings.JWT_SECRET_KEY.get_secret_value(),
-                algorithms=[settings.JWT_ALGORITHM],
-                audience="huledu-services",  # Expected audience for HuleEdu services
-            )
-
-            exp_timestamp = payload.get("exp")
-            if exp_timestamp is None:
-                raise_authentication_error(
-                    service="api_gateway_service",
-                    operation="validate_jwt",
-                    message="Token missing expiration claim",
-                    correlation_id=correlation_id,
-                    reason="missing_exp",
-                )
-
-            current_time = datetime.now(UTC).timestamp()
-            if current_time >= exp_timestamp:
-                raise_authentication_error(
-                    service="api_gateway_service",
-                    operation="validate_jwt",
-                    message="Token has expired",
-                    correlation_id=correlation_id,
-                    reason="token_expired",
-                )
+            # Reuse payload from bridge when available to avoid re-decoding
+            payload = getattr(request.state, "jwt_payload", None)
+            if not isinstance(payload, dict):
+                payload = decode_and_validate_jwt(token, settings, correlation_id)
 
             # Try configured org_id claim names in order
             for claim_name in settings.JWT_ORG_ID_CLAIM_NAMES:

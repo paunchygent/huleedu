@@ -16,9 +16,17 @@ class JWTValidator:
     Follows the same validation pattern as the API Gateway.
     """
 
-    def __init__(self, secret_key: str, algorithm: str = "HS256") -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        algorithm: str = "HS256",
+        audience: str = "huleedu-platform",
+        issuer: str = "huleedu-identity-service",
+    ) -> None:
         self._secret_key = secret_key
         self._algorithm = algorithm
+        self._audience = audience
+        self._issuer = issuer
 
     async def validate_token(self, token: str) -> str:
         """
@@ -28,7 +36,13 @@ class JWTValidator:
         correlation_id = uuid4()
         try:
             # Decode and validate JWT
-            payload = jwt.decode(token, self._secret_key, algorithms=[self._algorithm])
+            payload = jwt.decode(
+                token,
+                self._secret_key,
+                algorithms=[self._algorithm],
+                audience=self._audience,
+                issuer=self._issuer,
+            )
 
             # Validate token expiry
             exp_timestamp = payload.get("exp")

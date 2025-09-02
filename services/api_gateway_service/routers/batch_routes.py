@@ -224,7 +224,7 @@ async def register_batch(
                 "application/json": {
                     "example": {
                         "error_type": "RateLimitError",
-                        "message": "Rate limit exceeded: 10 requests per minute",
+                        "message": "Rate limit exceeded: 20 requests per minute",
                         "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
                         "retry_after": 60,
                     }
@@ -247,7 +247,7 @@ async def register_batch(
         },
     },
 )
-@limiter.limit("10/minute")
+@limiter.limit("20/minute")
 @inject
 async def request_pipeline_execution(
     batch_id: str,
@@ -271,7 +271,7 @@ async def request_pipeline_execution(
     - Org Identity Handling: `org_id` is recorded in the event envelope metadata when present
       to support org-first attribution without changing the client command contract.
 
-    **Rate Limiting**: 10 requests per minute per user
+    **Rate Limiting**: 20 requests per minute per user
 
     **Processing Flow**:
     1. Validate batch ownership (user must own the batch)

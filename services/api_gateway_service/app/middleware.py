@@ -7,6 +7,9 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from prometheus_client import Counter, REGISTRY
+from services.api_gateway_service.app.jwt_utils import try_decode_and_validate_jwt
+from services.api_gateway_service.config import settings
 
 logger = create_service_logger("api_gateway.middleware")
 
@@ -87,3 +90,71 @@ class DevelopmentMiddleware(BaseHTTPMiddleware):
         )
 
         return response
+
+
+class AuthBridgeMiddleware(BaseHTTPMiddleware):
+    """
+    Bridge Dishka-auth data into request.state for middleware consumers.
+
+    - Decodes JWT once and caches payload on request.state.jwt_payload
+    - Sets request.state.user_id (and optional org_id) for rate limiter keying
+    - Does not raise on auth errors; route-level DI handles strict auth
+    """
+
+    # Middleware-specific metrics (kept separate from GatewayMetrics to avoid DI coupling)
+    _auth_bridge_success = Counter(
+        "gateway_auth_bridge_success_total",
+        "Number of successful AuthBridge resolutions",
+        ["method"],
+        registry=REGISTRY,
+    )
+    _auth_bridge_miss = Counter(
+        "gateway_auth_bridge_miss_total",
+        "Number of AuthBridge misses by reason",
+        ["reason"],
+        registry=REGISTRY,
+    )
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        # Only attempt when Authorization header present
+        authorization = request.headers.get("Authorization")
+        if authorization:
+            parts = authorization.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                token = parts[1]
+                correlation_id = getattr(request.state, "correlation_id", uuid4())
+                payload = try_decode_and_validate_jwt(token, settings, correlation_id)
+                if isinstance(payload, dict):
+                    # Cache payload for DI to reuse and avoid re-decode
+                    try:
+                        request.state.jwt_payload = payload
+                    except Exception:  # pragma: no cover - defensive
+                        pass
+
+                    # Bridge user_id for rate-limiter keying
+                    sub = payload.get("sub")
+                    if isinstance(sub, str) and sub:
+                        request.state.user_id = sub
+                        # Metrics: successful bridge via JWT
+                        self._auth_bridge_success.labels(method="jwt").inc()
+                    else:
+                        # Metrics: JWT had no subject
+                        self._auth_bridge_miss.labels(reason="no_sub").inc()
+
+                    # Optionally bridge org_id when present
+                    for claim_name in settings.JWT_ORG_ID_CLAIM_NAMES:
+                        value = payload.get(claim_name)
+                        if isinstance(value, str) and value.strip():
+                            request.state.org_id = value.strip()
+                            break
+                else:
+                    # Metrics: JWT invalid or could not decode
+                    self._auth_bridge_miss.labels(reason="jwt_invalid").inc()
+            else:
+                # Metrics: malformed Authorization header
+                self._auth_bridge_miss.labels(reason="bad_auth_format").inc()
+        else:
+            # Metrics: no Authorization header
+            self._auth_bridge_miss.labels(reason="no_token").inc()
+
+        return await call_next(request)

@@ -33,6 +33,14 @@ class Settings(SecureServiceSettings):
         description="JWT signing secret for development environment",
     )
     JWT_ACCESS_TOKEN_EXPIRES_SECONDS: int = 3600
+    JWT_ISSUER: str = Field(
+        default="huleedu-identity-service",
+        description="JWT issuer for tokens minted by Identity",
+    )
+    JWT_AUDIENCE: str = Field(
+        default="huleedu-platform",
+        description="Intended audience for platform access tokens",
+    )
 
     # RS256 / JWKS (prod)
     JWT_RS256_PRIVATE_KEY_PATH: SecretStr | None = Field(

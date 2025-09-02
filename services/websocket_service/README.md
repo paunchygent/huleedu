@@ -58,10 +58,16 @@ REDIS_URL=redis://redis:6379
 # JWT Configuration
 JWT_SECRET_KEY=your-secret-key
 JWT_ALGORITHM=HS256
+JWT_AUDIENCE=huleedu-platform
+JWT_ISSUER=huleedu-identity-service
 
 # CORS Configuration
 CORS_ORIGINS=["http://localhost:3000"]
 ```
+
+Notes
+- JWT_AUDIENCE and JWT_ISSUER default to the platform standards shown above. Override only if you are intentionally testing alternative values.
+- In development, set `JWT_SECRET_KEY` to the same symmetric key used by clients generating test tokens (e.g., `tests/utils/auth_manager.py` uses `test-secret-key`).
 
 ## Development
 

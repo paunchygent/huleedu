@@ -29,6 +29,10 @@ The HuleEdu Identity Service supports two JWT signing mechanisms:
 # Development
 IDENTITY_JWT_DEV_SECRET=<secure-random-secret>
 
+# Canonical JWT identity
+IDENTITY_JWT_ISSUER=huleedu-identity-service
+IDENTITY_JWT_AUDIENCE=huleedu-platform
+
 # Production
 IDENTITY_JWT_RS256_PRIVATE_KEY_PATH=./secrets/jwt-private-key.pem
 IDENTITY_JWT_RS256_PUBLIC_JWKS_KID=huleedu-identity-prod-key-2025-01
@@ -68,7 +72,8 @@ ENVIRONMENT=production
     "org": "org_id",
     "roles": ["teacher", "admin"],
     "exp": 1234567890,
-    "iss": "identity_service"
+    "iss": "huleedu-identity-service",
+    "aud": "huleedu-platform"
   }
 }
 ```
@@ -86,7 +91,23 @@ ENVIRONMENT=production
     "org": "org_id",
     "roles": ["teacher", "admin"],
     "exp": 1234567890,
-    "iss": "identity_service"
+    "iss": "huleedu-identity-service",
+    "aud": "huleedu-platform"
+  }
+}
+```
+
+#### Refresh Tokens (Dev/Prod)
+```json
+{
+  "header": {"alg": "HS256", "typ": "JWT"},
+  "payload": {
+    "sub": "user_id",
+    "typ": "refresh",
+    "jti": "r-<timestamp>",
+    "exp": 1234567890,
+    "iss": "huleedu-identity-service"
+    // Note: no "aud" by design
   }
 }
 ```

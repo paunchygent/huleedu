@@ -51,10 +51,11 @@ Related service contracts & routes (no changes; reference for parity)
 - services/batch_orchestrator_service/api/batch_routes.py (BOS registration receiver)
 
 Repository rules referenced
+
 - .cursor/rules/015-project-structure-standards.mdc
 - .cursor/rules/020-architectural-mandates.mdc
 - .cursor/rules/020.10-api-gateway-service.mdc
-- .cursor/rules/020.17-entitlements-service-architecture.mdc (ensure listed in 000 index)
+- .cursor/rules/020.17-entitlements-service-architecture.mdc
 - .cursor/rules/030-event-driven-architecture-eda-standards.mdc
 - .cursor/rules/042.2-http-proxy-service-patterns.mdc
 - .cursor/rules/046-docker-container-debugging.mdc
@@ -250,9 +251,7 @@ Full quality gates
   - .cursor/rules/020.17-entitlements-service-architecture.mdc
   - .cursor/rules/030-event-driven-architecture-eda-standards.mdc
   - .cursor/rules/042.2-http-proxy-service-patterns.mdc
-  - .cursor/rules/050-python-coding-standards.mdc
-  - .cursor/rules/070-testing-and-quality-assurance.mdc
-  - .cursor/rules/075-test-creation-methodology.mdc
+  - .cursor/rules/046-docker-container-debugging.mdc
   - .cursor/rules/080-repository-workflow-and-tooling.mdc
   - .cursor/rules/090-documentation-standards.mdc
   - .cursor/rules/071-observability-index.mdc
