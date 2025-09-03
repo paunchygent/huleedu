@@ -237,6 +237,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             )
             raise
 
+
     async def handle_validation_failure(
         self, event_data: Any
     ) -> Any | None:  # EssayValidationFailedV1 -> BatchEssaysReady | None

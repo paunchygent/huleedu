@@ -10,19 +10,22 @@ from __future__ import annotations
 from uuid import UUID
 
 from common_core.domain_enums import CourseCode
+from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from services.essay_lifecycle_service.config import settings
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
+from services.essay_lifecycle_service.metrics import get_metrics
 from services.essay_lifecycle_service.models_db import (
     BatchEssayTracker as BatchEssayTrackerDB,
 )
 from services.essay_lifecycle_service.models_db import (
+    EssayStateDB,
     SlotAssignmentDB,
 )
-from services.essay_lifecycle_service.metrics import get_metrics
 
 
 class BatchTrackerPersistence:
@@ -61,28 +64,42 @@ class BatchTrackerPersistence:
         """
         try:
             async with self._session_factory() as session:
-                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_stmt = select(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.batch_id == batch_id
+                )
                 tracker_res = await session.execute(tracker_stmt)
                 tracker = tracker_res.scalar_one_or_none()
                 if tracker is None:
                     return None
 
-                from sqlalchemy import func
+                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
+                    assigned_stmt = select(func.count(EssayStateDB.essay_id)).where(
+                        EssayStateDB.batch_id == batch_id,
+                        EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
+                    )
+                    available_stmt = select(func.count(EssayStateDB.essay_id)).where(
+                        EssayStateDB.batch_id == batch_id,
+                        EssayStateDB.current_status == EssayStatus.UPLOADED,
+                    )
+                    assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
+                    available_count = (await session.execute(available_stmt)).scalar() or 0
+                    expected_count = tracker.expected_count
+                    return assigned_count, available_count, expected_count
+                else:
+                    assigned_stmt = select(func.count(SlotAssignmentDB.id)).where(
+                        SlotAssignmentDB.batch_tracker_id == tracker.id,
+                        SlotAssignmentDB.status == "assigned",
+                    )
+                    available_stmt = select(func.count(SlotAssignmentDB.id)).where(
+                        SlotAssignmentDB.batch_tracker_id == tracker.id,
+                        SlotAssignmentDB.status == "available",
+                    )
 
-                assigned_stmt = select(func.count(SlotAssignmentDB.id)).where(
-                    SlotAssignmentDB.batch_tracker_id == tracker.id,
-                    SlotAssignmentDB.status == "assigned",
-                )
-                available_stmt = select(func.count(SlotAssignmentDB.id)).where(
-                    SlotAssignmentDB.batch_tracker_id == tracker.id,
-                    SlotAssignmentDB.status == "available",
-                )
+                    assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
+                    available_count = (await session.execute(available_stmt)).scalar() or 0
+                    expected_count = tracker.expected_count
 
-                assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
-                available_count = (await session.execute(available_stmt)).scalar() or 0
-                expected_count = tracker.expected_count
-
-                return assigned_count, available_count, expected_count
+                    return assigned_count, available_count, expected_count
         except Exception as e:
             self._logger.error(f"Failed to get status counts for {batch_id}: {e}")
             return None
@@ -91,23 +108,37 @@ class BatchTrackerPersistence:
         """Return list of {internal_essay_id, text_storage_id} for assigned rows."""
         try:
             async with self._session_factory() as session:
-                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_stmt = select(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.batch_id == batch_id
+                )
                 tracker_res = await session.execute(tracker_stmt)
                 tracker = tracker_res.scalar_one_or_none()
                 if tracker is None:
                     return []
 
-                assigned_stmt = select(
-                    SlotAssignmentDB.internal_essay_id, SlotAssignmentDB.text_storage_id
-                ).where(
-                    SlotAssignmentDB.batch_tracker_id == tracker.id,
-                    SlotAssignmentDB.status == "assigned",
-                )
-                rows = (await session.execute(assigned_stmt)).all()
-                return [
-                    {"internal_essay_id": row[0], "text_storage_id": row[1]}
-                    for row in rows
-                ]
+                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
+                    rows = (
+                        await session.execute(
+                            select(EssayStateDB.essay_id, EssayStateDB.text_storage_id).where(
+                                EssayStateDB.batch_id == batch_id,
+                                EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
+                            )
+                        )
+                    ).all()
+                    return [
+                        {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
+                    ]
+                else:
+                    assigned_stmt = select(
+                        SlotAssignmentDB.internal_essay_id, SlotAssignmentDB.text_storage_id
+                    ).where(
+                        SlotAssignmentDB.batch_tracker_id == tracker.id,
+                        SlotAssignmentDB.status == "assigned",
+                    )
+                    rows = (await session.execute(assigned_stmt)).all()
+                    return [
+                        {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
+                    ]
         except Exception as e:
             self._logger.error(f"Failed to get assigned essays for {batch_id}: {e}")
             return []
@@ -116,19 +147,34 @@ class BatchTrackerPersistence:
         """Return list of expected essay IDs that are not yet assigned."""
         try:
             async with self._session_factory() as session:
-                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_stmt = select(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.batch_id == batch_id
+                )
                 tracker_res = await session.execute(tracker_stmt)
                 tracker = tracker_res.scalar_one_or_none()
                 if tracker is None:
                     return []
 
-                assigned_ids_stmt = select(SlotAssignmentDB.internal_essay_id).where(
-                    SlotAssignmentDB.batch_tracker_id == tracker.id,
-                    SlotAssignmentDB.status == "assigned",
-                )
-                assigned_ids = {row[0] for row in (await session.execute(assigned_ids_stmt)).all()}
-                expected_ids = set(tracker.expected_essay_ids)
-                return sorted(list(expected_ids - assigned_ids))
+                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
+                    assigned_ids_stmt = select(EssayStateDB.essay_id).where(
+                        EssayStateDB.batch_id == batch_id,
+                        EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
+                    )
+                    assigned_ids = {
+                        row[0] for row in (await session.execute(assigned_ids_stmt)).all()
+                    }
+                    expected_ids = set(tracker.expected_essay_ids)
+                    return sorted(list(expected_ids - assigned_ids))
+                else:
+                    assigned_ids_stmt = select(SlotAssignmentDB.internal_essay_id).where(
+                        SlotAssignmentDB.batch_tracker_id == tracker.id,
+                        SlotAssignmentDB.status == "assigned",
+                    )
+                    assigned_ids = {
+                        row[0] for row in (await session.execute(assigned_ids_stmt)).all()
+                    }
+                    expected_ids = set(tracker.expected_essay_ids)
+                    return sorted(list(expected_ids - assigned_ids))
         except Exception as e:
             self._logger.error(f"Failed to get missing slots for {batch_id}: {e}")
             return []
@@ -290,7 +336,7 @@ class BatchTrackerPersistence:
         async def _do_mark(db_session: AsyncSession) -> None:
             # Use explicit UPDATE statement to ensure change is tracked
             from sqlalchemy import update
-            
+
             update_stmt = (
                 update(BatchEssayTrackerDB)
                 .where(BatchEssayTrackerDB.batch_id == batch_id)
@@ -321,26 +367,34 @@ class BatchTrackerPersistence:
         async with self._session_factory() as session:
             # Active counts
             active_guest_count = await session.execute(
-                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                select(func.count())
+                .select_from(BatchEssayTrackerDB)
+                .where(
                     BatchEssayTrackerDB.completed_at.is_(None),
                     BatchEssayTrackerDB.org_id.is_(None),
                 )
             )
             active_regular_count = await session.execute(
-                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                select(func.count())
+                .select_from(BatchEssayTrackerDB)
+                .where(
                     BatchEssayTrackerDB.completed_at.is_(None),
                     BatchEssayTrackerDB.org_id.is_not(None),
                 )
             )
             # Completed counts
             completed_guest_count = await session.execute(
-                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                select(func.count())
+                .select_from(BatchEssayTrackerDB)
+                .where(
                     BatchEssayTrackerDB.completed_at.is_not(None),
                     BatchEssayTrackerDB.org_id.is_(None),
                 )
             )
             completed_regular_count = await session.execute(
-                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                select(func.count())
+                .select_from(BatchEssayTrackerDB)
+                .where(
                     BatchEssayTrackerDB.completed_at.is_not(None),
                     BatchEssayTrackerDB.org_id.is_not(None),
                 )

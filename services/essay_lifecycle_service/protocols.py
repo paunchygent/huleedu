@@ -500,6 +500,7 @@ class BatchEssayTracker(Protocol):
         """Get current status of a batch."""
         ...
 
+
     async def list_active_batches(self) -> list[str]:
         """Get list of currently tracked batch IDs."""
         ...

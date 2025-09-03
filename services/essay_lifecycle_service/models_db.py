@@ -99,6 +99,14 @@ class EssayStateDB(Base):
             name="fk_essay_states_batch_id",
             ondelete="SET NULL",
         ),
+        # Partial unique index for idempotency: one content per batch
+        Index(
+            "ix_essay_states_batch_tsid_unique",
+            "batch_id",
+            "text_storage_id",
+            unique=True,
+            postgresql_where=text("text_storage_id IS NOT NULL"),
+        ),
     )
 
 

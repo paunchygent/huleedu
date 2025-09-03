@@ -85,6 +85,14 @@ class Settings(SecureServiceSettings):
         ),
     )
 
+    # Essay States as Inventory (Option B)
+    ELS_USE_ESSAY_STATES_AS_INVENTORY: bool = Field(
+        default=True,
+        description=(
+            "Use essay_states as the single inventory for slot assignment (single UPDATE hot path)."
+        ),
+    )
+
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(
         default=True, description="Enable circuit breaker protection for external service calls"

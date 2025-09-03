@@ -167,7 +167,7 @@ class DatabaseSlotOperations:
                     await session.rollback()
 
                     retry_delays = [0.005, 0.01, 0.02, 0.04, 0.08]
-                    last_seen: str | None = None
+                    last_seen = None
                     for delay in retry_delays:
                         existing_res = await session.execute(existing_stmt)
                         last_seen = existing_res.scalar_one_or_none()
@@ -190,7 +190,7 @@ class DatabaseSlotOperations:
 
                 # Retry reading the now-existing assignment (winner may not have committed yet).
                 retry_delays = [0.005, 0.01, 0.02, 0.04, 0.08]
-                last_seen: str | None = None
+                last_seen = None
                 for delay in retry_delays:
                     existing_res = await session.execute(existing_stmt)
                     last_seen = existing_res.scalar_one_or_none()

@@ -93,8 +93,8 @@ class TestConcurrentSlotAssignment:
         engine = create_async_engine(
             distributed_settings.DATABASE_URL,
             echo=False,
-            pool_size=20,
-            max_overflow=30,
+            pool_size=32,
+            max_overflow=64,
             pool_pre_ping=True,
             pool_recycle=1800,
         )
@@ -130,8 +130,8 @@ class TestConcurrentSlotAssignment:
         engine = create_async_engine(
             distributed_settings.DATABASE_URL,
             echo=False,
-            pool_size=36,
-            max_overflow=48,
+            pool_size=80,
+            max_overflow=120,
             pool_pre_ping=True,
             pool_recycle=1800,
         )
