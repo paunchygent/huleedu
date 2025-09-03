@@ -82,6 +82,19 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         batch_essays_registered = BatchEssaysRegistered.model_validate(event)
         batch_id = batch_essays_registered.entity_id
 
+        # Validate non-empty essay list
+        if not batch_essays_registered.essay_ids:
+            from huleedu_service_libs.error_handling import raise_validation_error
+
+            raise_validation_error(
+                service="essay_lifecycle_service",
+                operation="register_batch",
+                field="essay_ids",
+                message="Cannot register batch with empty essay_ids",
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+            )
+
         # **DB-only idempotency check**
         existing_batch = await self._persistence.get_tracker_by_batch_id(batch_id)
         if existing_batch is not None:
@@ -223,7 +236,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 f"DB batch status check failed for batch {batch_id}: {e}", exc_info=True
             )
             raise
-
 
     async def handle_validation_failure(
         self, event_data: Any

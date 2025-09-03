@@ -179,6 +179,7 @@ class BatchTrackerPersistence:
                     course_code=expectation.course_code.value,
                     essay_instructions=expectation.essay_instructions,
                     user_id=expectation.user_id,
+                    org_id=expectation.org_id,
                     correlation_id=str(expectation.correlation_id),
                     timeout_seconds=expectation.timeout_seconds,
                 )
@@ -287,12 +288,15 @@ class BatchTrackerPersistence:
         from datetime import UTC, datetime
 
         async def _do_mark(db_session: AsyncSession) -> None:
-            tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
-            res = await db_session.execute(tracker_stmt)
-            tracker = res.scalar_one_or_none()
-            if tracker is None:
-                return
-            tracker.completed_at = datetime.now(UTC)
+            # Use explicit UPDATE statement to ensure change is tracked
+            from sqlalchemy import update
+            
+            update_stmt = (
+                update(BatchEssayTrackerDB)
+                .where(BatchEssayTrackerDB.batch_id == batch_id)
+                .values(completed_at=datetime.now(UTC))
+            )
+            await db_session.execute(update_stmt)
 
         try:
             if session is not None:

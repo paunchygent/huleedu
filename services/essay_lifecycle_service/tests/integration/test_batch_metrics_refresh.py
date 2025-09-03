@@ -2,28 +2,31 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import CourseCode
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
-    BatchTrackerPersistence,
-)
 from services.essay_lifecycle_service.implementations.batch_expectation import (
     BatchExpectation,
 )
+from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
+    BatchTrackerPersistence,
+)
 from services.essay_lifecycle_service.metrics import get_metrics
 from services.essay_lifecycle_service.models_db import Base
-from common_core.domain_enums import CourseCode
-from uuid import uuid4
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_refresh_batch_metrics_updates_gauges() -> None:
     with PostgresContainer("postgres:15-alpine") as pg:
-        engine = create_async_engine(pg.get_connection_url().replace("postgresql://", "postgresql+asyncpg://"))
+        pg_url = pg.get_connection_url().replace("psycopg2", "asyncpg")
+        if "postgresql://" in pg_url:
+            pg_url = pg_url.replace("postgresql://", "postgresql+asyncpg://")
+        engine = create_async_engine(pg_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -95,4 +98,3 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
         assert gauge_value(completed, "REGULAR") == 0.0
 
         await engine.dispose()
-
