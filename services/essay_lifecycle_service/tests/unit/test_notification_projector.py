@@ -208,8 +208,10 @@ class TestELSNotificationProjector:
         sample_spellcheck_outcome: ELSBatchPhaseOutcomeV1,
     ) -> None:
         """Test that Kafka publishing failures are properly handled."""
-        # Configure mock to raise exception
-        mock_kafka_publisher.publish.side_effect = Exception("Kafka connection failed")
+        # Configure mock to raise exception with async side effect to match awaited interface
+        async def failing_publish(*args, **kwargs):
+            raise Exception("Kafka connection failed")
+        mock_kafka_publisher.publish.side_effect = failing_publish
 
         teacher_id = "teacher-error"
 

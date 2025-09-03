@@ -220,6 +220,10 @@ class TestBatchCoordinationBusinessImpact:
             batch_lifecycle_publisher=event_publisher,
         )
 
+        # Ensure Option B assignment path doesn't touch DB in this unit test
+        from services.essay_lifecycle_service.implementations import batch_coordination_handler_impl as handler_mod
+        handler_mod.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, "essay_0"))
+
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
             repository=mock_repository,
@@ -357,17 +361,14 @@ class TestBatchCoordinationBusinessImpact:
             session_factory=mock_session_factory,
         )
 
-        # Mock batch tracker to assign a slot
-        mock_batch_tracker.assign_slot_to_content.return_value = "essay_0"
+        # Patch Option B assignment to avoid DB and return deterministic result
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, "essay_0"))
 
         # Mock get_batch_status to return batch info with user_id
         mock_batch_tracker.get_batch_status.return_value = {"user_id": "test_user_123"}
 
-        # Mock repository to succeed in creating essay state
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,  # was_created
-            "essay_0",  # final_essay_id
-        )
+        # Repository legacy path not used in Option B
 
         # Create ready essays for the batch ready event
         ready_essays = [
@@ -422,26 +423,18 @@ class TestBatchCoordinationBusinessImpact:
         # Assert: Business impact verification
         # Even though the handler raised an exception, we can verify partial progress
 
-        # Verify content assignment happened before publishing failure
-        # Note: With ContentAssignmentService architecture, this may be called multiple times for idempotency
-        mock_batch_tracker.assign_slot_to_content.assert_called()
-        # Verify the calls were for the expected content
-        expected_call = call(business_context.batch_id, "content_123", "essay.txt")
-        assert expected_call in mock_batch_tracker.assign_slot_to_content.call_args_list
-        mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
+        # Verify content assignment and event publishing occurred before failure
+        event_publisher.publish_essay_slot_assigned.assert_called_once()
 
         # Verify mark_slot_fulfilled was called (happens before publishing)
         mock_batch_tracker.mark_slot_fulfilled.assert_called_once_with(
             business_context.batch_id, "essay_0", "content_123"
         )
 
-        # With TRUE OUTBOX PATTERN, no direct Kafka calls or outbox repository calls
-        # The event publisher handles everything internally
-        failing_kafka_bus.publish.assert_not_called()  # No direct Kafka
-
-        # The event publisher methods would have been called
-        event_publisher.publish_essay_slot_assigned.assert_called_once()
-        event_publisher.publish_batch_content_provisioning_completed.assert_called_once()  # This one failed
+        # With TRUE OUTBOX PATTERN, no direct Kafka calls (publisher abstraction handles it)
+        failing_kafka_bus.publish.assert_not_called()
+        # The event publisher methods would have been called; batch completion failed as expected
+        event_publisher.publish_batch_content_provisioning_completed.assert_called_once()
 
         # BUSINESS IMPACT VERIFICATION:
         # 1. Content is provisioned and essays are ready for processing

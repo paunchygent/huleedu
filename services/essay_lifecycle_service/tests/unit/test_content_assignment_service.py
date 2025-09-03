@@ -98,6 +98,7 @@ class TestContentAssignmentService:
         slot_assignment_result: str | None,
         repository_result: tuple[bool, str] | None,
         expected_outcome: tuple[bool, str | None],
+        monkeypatch: Any,
     ) -> None:
         """Test basic assignment scenarios: success, idempotency, no slots."""
         # Arrange
@@ -105,13 +106,11 @@ class TestContentAssignmentService:
         text_storage_id = "text_storage_123"
         correlation_id = uuid4()
 
-        mock_batch_tracker.assign_slot_to_content.return_value = slot_assignment_result
-        if repository_result:
-            mock_repository.create_essay_state_with_content_idempotency.return_value = (
-                repository_result
-            )
-            # Mock mark_slot_fulfilled to return None (no batch completion) for basic scenarios
-            mock_batch_tracker.mark_slot_fulfilled.return_value = None
+        # Option B: mock the single-statement assignment to return expected outcome
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=expected_outcome)
+        # Mark slot fulfillment yields no completion by default
+        mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
         # Act
         result = await service.assign_content_to_essay(
@@ -125,25 +124,17 @@ class TestContentAssignmentService:
         # Assert
         assert result == expected_outcome
 
-        # Verify slot assignment was attempted
-        mock_batch_tracker.assign_slot_to_content.assert_called_once_with(
-            batch_id, text_storage_id, sample_content_metadata["original_file_name"]
-        )
-
-        if slot_assignment_result is None:
-            # No slots available - should not proceed to database operations
-            mock_repository.create_essay_state_with_content_idempotency.assert_not_called()
+        if expected_outcome[1] is None:
             mock_publisher.publish_essay_slot_assigned.assert_not_called()
+            mock_batch_tracker.mark_slot_fulfilled.assert_not_called()
         else:
-            # Slot assigned - should proceed with database operations
-            mock_repository.create_essay_state_with_content_idempotency.assert_called_once()
-
-            # Verify essay data structure
-            call_args = mock_repository.create_essay_state_with_content_idempotency.call_args
-            essay_data = call_args.kwargs["essay_data"]
-            assert essay_data["internal_essay_id"] == slot_assignment_result
-            assert essay_data["initial_status"] == EssayStatus.READY_FOR_PROCESSING
-            assert essay_data["original_file_name"] == sample_content_metadata["original_file_name"]
+            mock_publisher.publish_essay_slot_assigned.assert_called_once()
+            # Verify event payload
+            call_args = mock_publisher.publish_essay_slot_assigned.call_args
+            event = call_args.kwargs["event_data"]
+            assert event.batch_id == batch_id
+            assert event.essay_id == expected_outcome[1]
+            assert event.text_storage_id == text_storage_id
 
     async def test_assign_content_to_essay_slot_persistence_on_creation(
         self,
@@ -161,11 +152,9 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
         assigned_essay_id = "essay_789"
 
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,  # was_created = True
-            assigned_essay_id,
-        )
+        # Option B: mock assignment to return created essay id
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -178,14 +167,8 @@ class TestContentAssignmentService:
         )
 
         # Assert
-        # Should persist slot assignment since was_created=True
-        mock_batch_tracker.persist_slot_assignment.assert_called_once_with(
-            batch_id,
-            assigned_essay_id,
-            text_storage_id,
-            sample_content_metadata["original_file_name"],
-            session=mock_session,
-        )
+        # In Option B path, no separate slot persistence occurs
+        mock_batch_tracker.persist_slot_assignment.assert_not_called()
 
         # Should publish slot assigned event
         mock_publisher.publish_essay_slot_assigned.assert_called_once()
@@ -211,11 +194,8 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
         assigned_essay_id = "essay_999"
 
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            False,  # was_created = False (idempotent)
-            assigned_essay_id,
-        )
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(False, assigned_essay_id))
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -334,11 +314,8 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
         assigned_essay_id = "essay_events"
 
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,
-            assigned_essay_id,
-        )
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -396,10 +373,6 @@ class TestContentAssignmentService:
         )
 
         # Assert
-        # Verify correlation ID is passed to repository
-        repo_call = mock_repository.create_essay_state_with_content_idempotency.call_args
-        assert repo_call.kwargs["correlation_id"] == correlation_id
-
         # Verify correlation ID is passed to event publishing
         event_call = mock_publisher.publish_essay_slot_assigned.call_args
         assert event_call.kwargs["correlation_id"] == correlation_id
@@ -425,11 +398,8 @@ class TestContentAssignmentService:
             # Missing file_size_bytes, file_upload_id, content_md5_hash
         }
 
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,
-            assigned_essay_id,
-        )
+        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
         # Act
@@ -443,10 +413,8 @@ class TestContentAssignmentService:
 
         # Assert
         # Verify essay data handles missing fields gracefully
-        repo_call = mock_repository.create_essay_state_with_content_idempotency.call_args
-        essay_data = repo_call.kwargs["essay_data"]
-
-        assert essay_data["original_file_name"] == "test.docx"
-        assert essay_data["file_size"] == 0  # Default for missing file_size_bytes
-        assert essay_data["file_upload_id"] is None  # Default for missing file_upload_id
-        assert essay_data["content_hash"] is None  # Default for missing content_md5_hash
+        # Verify event payload reflects provided metadata
+        event_call = mock_publisher.publish_essay_slot_assigned.call_args
+        event_data = event_call.kwargs["event_data"]
+        assert event_data.batch_id == batch_id
+        assert event_data.text_storage_id == text_storage_id

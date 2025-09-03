@@ -21,15 +21,15 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from services.essay_lifecycle_service.config import settings
+from services.essay_lifecycle_service.implementations.assignment_sql import (
+    assign_via_essay_states_immediate_commit,
+)
 from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
     BatchLifecyclePublisher,
 )
 from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
     DBPendingContentOperations,
-)
-from services.essay_lifecycle_service.config import settings
-from services.essay_lifecycle_service.implementations.assignment_sql import (
-    assign_via_essay_states_immediate_commit,
 )
 from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
@@ -76,14 +76,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
 
-            # START UNIT OF WORK
+            # PHASE 1: Register and create essays atomically, then commit
             async with self.session_factory() as session:
-                async with session.begin():  # Auto commit/rollback
-                    # Register batch with tracker, preserving correlation ID
+                async with session.begin():
                     await self.batch_tracker.register_batch(event_data, correlation_id)
-
-                    # Create initial essay records in the database (atomic batch operation)
-                    # EntityReference removed - using primitive parameters
 
                     logger.info(
                         "Creating initial essay records in database for batch",
@@ -94,9 +90,6 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         },
                     )
 
-                    # Create all essay data dictionaries for atomic batch operation
-                    # Note: Protocol expects str | None values, but in this context
-                    # all values are guaranteed non-None
                     typed_essay_data: list[dict[str, str | None]] = [
                         {
                             "entity_id": essay_id,
@@ -106,7 +99,6 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         for essay_id in event_data.essay_ids
                     ]
 
-                    # Create all essay records in single atomic transaction
                     await self.repository.create_essay_records_batch(
                         typed_essay_data, correlation_id=correlation_id, session=session
                     )
@@ -119,17 +111,17 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         },
                     )
 
-                    # Process pending content using proper domain service coordination
-                    pending_content_list = await self.pending_content_ops.get_pending_content(
-                        event_data.entity_id
-                    )
+            # PHASE 2: Process any pending content after commit to ensure MVCC visibility
+            pending_content_list = await self.pending_content_ops.get_pending_content(
+                event_data.entity_id
+            )
+            assigned_count = 0
+            if pending_content_list:
+                for content_metadata in pending_content_list:
+                    text_storage_id = content_metadata["text_storage_id"]
 
-                    if pending_content_list:
-                        assigned_count = 0
-                        for content_metadata in pending_content_list:
-                            text_storage_id = content_metadata["text_storage_id"]
-
-                            # Use injected domain service for proper atomic content assignment
+                    async with self.session_factory() as session:
+                        async with session.begin():
                             (
                                 was_created,
                                 _,
@@ -141,66 +133,61 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                                 session=session,
                             )
 
-                            if was_created:
-                                assigned_count += 1
-                                # Remove from pending since successfully assigned
-                                await self.pending_content_ops.remove_pending_content(
-                                    event_data.entity_id, text_storage_id
-                                )
+                    if was_created:
+                        assigned_count += 1
+                        await self.pending_content_ops.remove_pending_content(
+                            event_data.entity_id, text_storage_id
+                        )
 
-                        if assigned_count > 0:
-                            logger.info(
-                                f"Processed {assigned_count} pending content items for batch "
-                                f"using ContentAssignmentService",
-                                extra={
-                                    "batch_id": event_data.entity_id,
-                                    "assigned_count": assigned_count,
-                                    "correlation_id": str(correlation_id),
-                                },
-                            )
-
-                    # Check if batch is immediately complete due to pending failures
-                    batch_completion_result = await self.batch_tracker.check_batch_completion(
-                        event_data.entity_id
+                if assigned_count > 0:
+                    logger.info(
+                        f"Processed {assigned_count} pending content items for batch using ContentAssignmentService",
+                        extra={
+                            "batch_id": event_data.entity_id,
+                            "assigned_count": assigned_count,
+                            "correlation_id": str(correlation_id),
+                        },
                     )
-                    if batch_completion_result is not None:
-                        batch_ready_event, original_correlation_id = batch_completion_result
-                        # Use original correlation ID from batch registration
-                        publish_correlation_id = original_correlation_id or correlation_id
 
-                        logger.info(
-                            "Batch is immediately complete, publishing "
-                            "BatchContentProvisioningCompletedV1 event",
-                            extra={
-                                "batch_id": batch_ready_event.batch_id,
-                                "ready_count": len(batch_ready_event.ready_essays),
-                                "correlation_id": str(publish_correlation_id),
-                            },
-                        )
+            # PHASE 3: If no pending content processed, check for immediate completion (e.g., failures)
+            if assigned_count == 0:
+                batch_completion_result = await self.batch_tracker.check_batch_completion(
+                    event_data.entity_id
+                )
+                if batch_completion_result is not None:
+                    batch_ready_event, original_correlation_id = batch_completion_result
+                    publish_correlation_id = original_correlation_id or correlation_id
 
-                        # Create BatchContentProvisioningCompletedV1 event
-                        from common_core.events.batch_coordination_events import (
-                            BatchContentProvisioningCompletedV1,
-                        )
+                    logger.info(
+                        "Batch is immediately complete, publishing BatchContentProvisioningCompletedV1 event",
+                        extra={
+                            "batch_id": batch_ready_event.batch_id,
+                            "ready_count": len(batch_ready_event.ready_essays),
+                            "correlation_id": str(publish_correlation_id),
+                        },
+                    )
 
-                        content_completed_event = BatchContentProvisioningCompletedV1(
-                            batch_id=batch_ready_event.batch_id,
-                            provisioned_count=len(batch_ready_event.ready_essays),
-                            expected_count=event_data.expected_essay_count,
-                            course_code=batch_ready_event.course_code,
-                            user_id=event_data.user_id,
-                            essays_for_processing=batch_ready_event.ready_essays,
-                            correlation_id=publish_correlation_id,
-                        )
+                    from common_core.events.batch_coordination_events import (
+                        BatchContentProvisioningCompletedV1,
+                    )
 
-                        await self.batch_lifecycle_publisher.publish_batch_content_provisioning_completed(
-                            event_data=content_completed_event,
-                            correlation_id=publish_correlation_id,
-                            session=session,
-                        )
+                    content_completed_event = BatchContentProvisioningCompletedV1(
+                        batch_id=batch_ready_event.batch_id,
+                        provisioned_count=len(batch_ready_event.ready_essays),
+                        expected_count=event_data.expected_essay_count,
+                        course_code=batch_ready_event.course_code,
+                        user_id=event_data.user_id,
+                        essays_for_processing=batch_ready_event.ready_essays,
+                        correlation_id=publish_correlation_id,
+                    )
 
-                        # No immediate DB cleanup; batch remains for audit. A retention job can purge later.
-                    # Transaction commits here automatically
+                    async with self.session_factory() as session:
+                        async with session.begin():
+                            await self.batch_lifecycle_publisher.publish_batch_content_provisioning_completed(
+                                event_data=content_completed_event,
+                                correlation_id=publish_correlation_id,
+                                session=session,
+                            )
 
             return True
 
@@ -299,6 +286,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     async with self.session_factory() as session:
                         async with session.begin():
                             from datetime import UTC, datetime
+
                             from common_core.events.batch_coordination_events import (
                                 ExcessContentProvisionedV1,
                             )
@@ -322,7 +310,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 # Post-assignment side effects in separate transaction
                 async with self.session_factory() as session:
                     async with session.begin():
-                        was_created2, final2 = await self.content_assignment_service.assign_content_to_essay(
+                        (
+                            was_created2,
+                            final2,
+                        ) = await self.content_assignment_service.assign_content_to_essay(
                             batch_id=event_data.entity_id,
                             text_storage_id=event_data.text_storage_id,
                             content_metadata=content_metadata,
@@ -346,7 +337,10 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 # Legacy path within one transaction
                 async with self.session_factory() as session:
                     async with session.begin():
-                        was_created, final_essay_id = await self.content_assignment_service.assign_content_to_essay(
+                        (
+                            was_created,
+                            final_essay_id,
+                        ) = await self.content_assignment_service.assign_content_to_essay(
                             batch_id=event_data.entity_id,
                             text_storage_id=event_data.text_storage_id,
                             content_metadata=content_metadata,
@@ -463,7 +457,9 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                         # Mark batch completed for GUEST batches after event publication
                         # REGULAR batches are marked complete in student_association_handler
                         if batch_ready_event.class_type == "GUEST":
-                            await self.batch_tracker.mark_batch_completed(batch_ready_event.batch_id, session)
+                            await self.batch_tracker.mark_batch_completed(
+                                batch_ready_event.batch_id, session
+                            )
                             logger.info(
                                 f"GUEST batch {batch_ready_event.batch_id} marked as completed after validation failure BatchContentProvisioningCompleted publication"
                             )

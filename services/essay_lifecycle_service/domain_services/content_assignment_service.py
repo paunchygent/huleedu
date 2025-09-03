@@ -87,78 +87,30 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             - was_created: True if new assignment, False if idempotent
             - final_essay_id: The essay ID that got the content
         """
-        # Step 1: Slot assignment
-        if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-            # If preassignment provided by handler to avoid connection overlap, use it
-            if preassigned_essay_id is not None:
-                was_created = bool(preassigned_was_created)
-                final_essay_id = preassigned_essay_id
-            else:
-                # Use essay_states as inventory; immediate-commit for MVCC visibility
-                was_created, final_essay_id = await assign_via_essay_states_immediate_commit(
-                    session_factory=self.repository.get_session_factory(),
-                    batch_id=batch_id,
-                    text_storage_id=text_storage_id,
-                    original_file_name=content_metadata.get("original_file_name", "unknown"),
-                    file_size=int(content_metadata.get("file_size_bytes", 0) or 0),
-                    content_hash=content_metadata.get("content_md5_hash"),
-                    initial_status=EssayStatus.READY_FOR_PROCESSING,
-                    correlation_id=correlation_id,
-                )
-                if final_essay_id is None:
-                    return False, None
+        # Step 1: Slot assignment via essay_states inventory (Option B)
+        if preassigned_essay_id is not None:
+            was_created = bool(preassigned_was_created)
+            final_essay_id = preassigned_essay_id
         else:
-            # Legacy path: slot_assignments inventory + essay state idempotency
-            assigned_essay_id = await self.batch_tracker.assign_slot_to_content(
-                batch_id, text_storage_id, content_metadata.get("original_file_name", "unknown")
-            )
-            if assigned_essay_id is None:
-                return False, None
-
-        if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-            # Essay state already updated in DAO; reuse final_essay_id
-            pass
-        else:
-            if assigned_essay_id is None:
-                return False, None
-
-        # Step 2: Create/update essay state (legacy only)
-        if not settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-            essay_data = {
-                "internal_essay_id": assigned_essay_id,
-                "initial_status": EssayStatus.READY_FOR_PROCESSING,
-                "original_file_name": content_metadata.get("original_file_name", "unknown"),
-                "file_size": content_metadata.get("file_size_bytes", 0),
-                "file_upload_id": content_metadata.get("file_upload_id"),
-                "content_hash": content_metadata.get("content_md5_hash"),
-            }
-            (
-                was_created,
-                final_essay_id,
-            ) = await self.repository.create_essay_state_with_content_idempotency(
+            was_created, final_essay_id = await assign_via_essay_states_immediate_commit(
+                session_factory=self.repository.get_session_factory(),
                 batch_id=batch_id,
                 text_storage_id=text_storage_id,
-                essay_data=essay_data,
+                original_file_name=content_metadata.get("original_file_name", "unknown"),
+                file_size=int(content_metadata.get("file_size_bytes", 0) or 0),
+                content_hash=content_metadata.get("content_md5_hash"),
+                initial_status=EssayStatus.READY_FOR_PROCESSING,
                 correlation_id=correlation_id,
-                session=session,
             )
-
-        # Step 3: Persist slot assignment if new (legacy only)
-        if not settings.ELS_USE_ESSAY_STATES_AS_INVENTORY and was_created and assigned_essay_id is not None:
-            await self.batch_tracker.persist_slot_assignment(
-                batch_id,
-                assigned_essay_id,
-                text_storage_id,
-                content_metadata.get("original_file_name", "unknown"),
-                session=session,
-            )
+            if final_essay_id is None:
+                return False, None
 
         # Step 4: Publish slot assignment event for traceability
         from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
 
         slot_assigned_event = EssaySlotAssignedV1(
             batch_id=batch_id,
-            essay_id=final_essay_id or assigned_essay_id,
+            essay_id=final_essay_id,
             file_upload_id=content_metadata.get("file_upload_id", "unknown"),
             text_storage_id=text_storage_id,
             correlation_id=correlation_id,
@@ -171,13 +123,9 @@ class ContentAssignmentService(ContentAssignmentProtocol):
         )
 
         # Step 5: Mark slot as fulfilled and check batch completion
-        essay_id_for_completion = final_essay_id or assigned_essay_id
-        if essay_id_for_completion is not None:
-            batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(
-                batch_id, essay_id_for_completion, text_storage_id
-            )
-        else:
-            batch_completion_result = None
+        batch_completion_result = await self.batch_tracker.mark_slot_fulfilled(
+            batch_id, final_essay_id, text_storage_id
+        )
 
         if batch_completion_result is not None:
             batch_ready_event, original_correlation_id = batch_completion_result
