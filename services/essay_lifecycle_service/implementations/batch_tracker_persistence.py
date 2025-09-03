@@ -11,7 +11,7 @@ from uuid import UUID
 
 from common_core.domain_enums import CourseCode
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -22,6 +22,7 @@ from services.essay_lifecycle_service.models_db import (
 from services.essay_lifecycle_service.models_db import (
     SlotAssignmentDB,
 )
+from services.essay_lifecycle_service.metrics import get_metrics
 
 
 class BatchTrackerPersistence:
@@ -43,6 +44,126 @@ class BatchTrackerPersistence:
             self._logger.error(f"Failed to query batch from database {batch_id}: {e}")
             return None
 
+    async def get_tracker_by_batch_id(self, batch_id: str) -> BatchEssayTrackerDB | None:
+        """Fetch full tracker row by external batch_id."""
+        try:
+            async with self._session_factory() as session:
+                stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                res = await session.execute(stmt)
+                return res.scalar_one_or_none()
+        except Exception as e:
+            self._logger.error(f"Failed to fetch tracker by batch_id {batch_id}: {e}")
+            return None
+
+    async def get_status_counts(self, batch_id: str) -> tuple[int, int, int] | None:
+        """
+        Return (assigned_count, available_count, expected_count) for a batch.
+        """
+        try:
+            async with self._session_factory() as session:
+                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_res = await session.execute(tracker_stmt)
+                tracker = tracker_res.scalar_one_or_none()
+                if tracker is None:
+                    return None
+
+                from sqlalchemy import func
+
+                assigned_stmt = select(func.count(SlotAssignmentDB.id)).where(
+                    SlotAssignmentDB.batch_tracker_id == tracker.id,
+                    SlotAssignmentDB.status == "assigned",
+                )
+                available_stmt = select(func.count(SlotAssignmentDB.id)).where(
+                    SlotAssignmentDB.batch_tracker_id == tracker.id,
+                    SlotAssignmentDB.status == "available",
+                )
+
+                assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
+                available_count = (await session.execute(available_stmt)).scalar() or 0
+                expected_count = tracker.expected_count
+
+                return assigned_count, available_count, expected_count
+        except Exception as e:
+            self._logger.error(f"Failed to get status counts for {batch_id}: {e}")
+            return None
+
+    async def get_assigned_essays(self, batch_id: str) -> list[dict[str, str | None]]:
+        """Return list of {internal_essay_id, text_storage_id} for assigned rows."""
+        try:
+            async with self._session_factory() as session:
+                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_res = await session.execute(tracker_stmt)
+                tracker = tracker_res.scalar_one_or_none()
+                if tracker is None:
+                    return []
+
+                assigned_stmt = select(
+                    SlotAssignmentDB.internal_essay_id, SlotAssignmentDB.text_storage_id
+                ).where(
+                    SlotAssignmentDB.batch_tracker_id == tracker.id,
+                    SlotAssignmentDB.status == "assigned",
+                )
+                rows = (await session.execute(assigned_stmt)).all()
+                return [
+                    {"internal_essay_id": row[0], "text_storage_id": row[1]}
+                    for row in rows
+                ]
+        except Exception as e:
+            self._logger.error(f"Failed to get assigned essays for {batch_id}: {e}")
+            return []
+
+    async def get_missing_slot_ids(self, batch_id: str) -> list[str]:
+        """Return list of expected essay IDs that are not yet assigned."""
+        try:
+            async with self._session_factory() as session:
+                tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+                tracker_res = await session.execute(tracker_stmt)
+                tracker = tracker_res.scalar_one_or_none()
+                if tracker is None:
+                    return []
+
+                assigned_ids_stmt = select(SlotAssignmentDB.internal_essay_id).where(
+                    SlotAssignmentDB.batch_tracker_id == tracker.id,
+                    SlotAssignmentDB.status == "assigned",
+                )
+                assigned_ids = {row[0] for row in (await session.execute(assigned_ids_stmt)).all()}
+                expected_ids = set(tracker.expected_essay_ids)
+                return sorted(list(expected_ids - assigned_ids))
+        except Exception as e:
+            self._logger.error(f"Failed to get missing slots for {batch_id}: {e}")
+            return []
+
+    async def get_user_id_for_essay(self, internal_essay_id: str) -> str | None:
+        """Resolve user_id that owns a given internal essay id via slot inventory mapping."""
+        try:
+            async with self._session_factory() as session:
+                # Find tracker owning this essay
+                tracker_join_stmt = (
+                    select(BatchEssayTrackerDB.user_id)
+                    .join(
+                        SlotAssignmentDB,
+                        SlotAssignmentDB.batch_tracker_id == BatchEssayTrackerDB.id,
+                    )
+                    .where(SlotAssignmentDB.internal_essay_id == internal_essay_id)
+                    .limit(1)
+                )
+                res = await session.execute(tracker_join_stmt)
+                return res.scalar_one_or_none()
+        except Exception as e:
+            self._logger.error(f"Failed to resolve user_id for essay {internal_essay_id}: {e}")
+            return None
+
+    async def list_active_batch_ids(self) -> list[str]:
+        """Return list of active batch IDs (basic implementation)."""
+        try:
+            async with self._session_factory() as session:
+                stmt = select(BatchEssayTrackerDB.batch_id)
+                rows = (await session.execute(stmt)).scalars().all()
+                return list(rows)
+        except Exception as e:
+            self._logger.error(f"Failed to list active batch ids: {e}")
+            return []
+
     async def persist_batch_expectation(self, expectation: BatchExpectation) -> None:
         """Persist batch expectation to database (dual-write pattern)."""
         try:
@@ -63,7 +184,21 @@ class BatchTrackerPersistence:
                 )
 
                 session.add(tracker_db)
+                await session.flush()
+
+                # Pre-seed inventory rows for each expected essay slot
+                for essay_id in expectation.expected_essay_ids:
+                    session.add(
+                        SlotAssignmentDB(
+                            batch_tracker_id=tracker_db.id,
+                            internal_essay_id=essay_id,
+                            status="available",
+                        )
+                    )
+
                 await session.commit()
+                # Refresh gauges: a new active batch has been added
+                await self.refresh_batch_metrics()
 
                 self._logger.debug(f"Persisted batch expectation: {expectation.batch_id}")
 
@@ -92,20 +227,29 @@ class BatchTrackerPersistence:
                     self._logger.warning(f"Batch tracker not found for slot assignment: {batch_id}")
                     return
 
-                # Create slot assignment record
-                slot_db = SlotAssignmentDB(
-                    batch_tracker_id=tracker_db.id,
-                    internal_essay_id=internal_essay_id,
-                    text_storage_id=text_storage_id,
-                    original_file_name=original_file_name,
+                # Update existing inventory row for this slot
+                slot_stmt = (
+                    select(SlotAssignmentDB)
+                    .where(
+                        SlotAssignmentDB.batch_tracker_id == tracker_db.id,
+                        SlotAssignmentDB.internal_essay_id == internal_essay_id,
+                    )
+                    .limit(1)
                 )
+                slot_res = await db_session.execute(slot_stmt)
+                slot_db = slot_res.scalar_one_or_none()
 
-                db_session.add(slot_db)
+                if slot_db is None:
+                    # Fallback: create if missing (should not happen after pre-seed)
+                    slot_db = SlotAssignmentDB(
+                        batch_tracker_id=tracker_db.id,
+                        internal_essay_id=internal_essay_id,
+                    )
+                    db_session.add(slot_db)
 
-                # Update available slots (assigned count now tracked in Redis)
-                tracker_db.available_slots = [
-                    slot for slot in tracker_db.available_slots if slot != internal_essay_id
-                ]
+                slot_db.status = "assigned"
+                slot_db.text_storage_id = text_storage_id
+                slot_db.original_file_name = original_file_name
 
             # Use provided session or create a new one
             if session is not None:
@@ -135,6 +279,78 @@ class BatchTrackerPersistence:
 
         except Exception as e:
             self._logger.error(f"Failed to remove batch from database {batch_id}: {e}")
+
+    async def mark_batch_completed(
+        self, batch_id: str, session: AsyncSession | None = None
+    ) -> None:
+        """Mark a batch as completed by setting completed_at timestamp."""
+        from datetime import UTC, datetime
+
+        async def _do_mark(db_session: AsyncSession) -> None:
+            tracker_stmt = select(BatchEssayTrackerDB).where(BatchEssayTrackerDB.batch_id == batch_id)
+            res = await db_session.execute(tracker_stmt)
+            tracker = res.scalar_one_or_none()
+            if tracker is None:
+                return
+            tracker.completed_at = datetime.now(UTC)
+
+        try:
+            if session is not None:
+                await _do_mark(session)
+            else:
+                async with self._session_factory() as new_session:
+                    await _do_mark(new_session)
+                    await new_session.commit()
+            # Refresh gauges after completion
+            await self.refresh_batch_metrics()
+        except Exception as e:
+            self._logger.error(f"Failed to mark batch completed {batch_id}: {e}")
+
+    async def refresh_batch_metrics(self) -> None:
+        """Recompute and publish batch inventory gauges (active/completed, guest/regular)."""
+        metrics = get_metrics()
+        batches_active = metrics.get("batches_active")
+        batches_completed = metrics.get("batches_completed")
+        if batches_active is None or batches_completed is None:
+            return
+
+        async with self._session_factory() as session:
+            # Active counts
+            active_guest_count = await session.execute(
+                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.completed_at.is_(None),
+                    BatchEssayTrackerDB.org_id.is_(None),
+                )
+            )
+            active_regular_count = await session.execute(
+                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.completed_at.is_(None),
+                    BatchEssayTrackerDB.org_id.is_not(None),
+                )
+            )
+            # Completed counts
+            completed_guest_count = await session.execute(
+                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.completed_at.is_not(None),
+                    BatchEssayTrackerDB.org_id.is_(None),
+                )
+            )
+            completed_regular_count = await session.execute(
+                select(func.count()).select_from(BatchEssayTrackerDB).where(
+                    BatchEssayTrackerDB.completed_at.is_not(None),
+                    BatchEssayTrackerDB.org_id.is_not(None),
+                )
+            )
+
+            ag = active_guest_count.scalar()
+            ar = active_regular_count.scalar()
+            cg = completed_guest_count.scalar()
+            cr = completed_regular_count.scalar()
+
+            batches_active.labels(class_type="GUEST").set(ag)
+            batches_active.labels(class_type="REGULAR").set(ar)
+            batches_completed.labels(class_type="GUEST").set(cg)
+            batches_completed.labels(class_type="REGULAR").set(cr)
 
     async def initialize_from_database(self) -> list[BatchExpectation]:
         """Load active batch expectations from database (recovery mechanism)."""

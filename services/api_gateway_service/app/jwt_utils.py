@@ -23,7 +23,7 @@ def decode_and_validate_jwt(token: str, settings: Settings, correlation_id: UUID
     Raises HuleEduError via raise_authentication_error on validation failures.
     Returns the decoded payload dict on success.
     """
-    payload = jwt.decode(
+    payload: dict[str, Any] = jwt.decode(
         token,
         settings.JWT_SECRET_KEY.get_secret_value(),
         algorithms=[settings.JWT_ALGORITHM],

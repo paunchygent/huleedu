@@ -81,7 +81,7 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             - was_created: True if new assignment, False if idempotent
             - final_essay_id: The essay ID that got the content
         """
-        # Step 1: Try Redis slot assignment first
+        # Step 1: Assign slot using separate transaction to ensure cross-transaction visibility
         assigned_essay_id = await self.batch_tracker.assign_slot_to_content(
             batch_id, text_storage_id, content_metadata.get("original_file_name", "unknown")
         )
@@ -182,14 +182,10 @@ class ContentAssignmentService(ContentAssignmentProtocol):
                 correlation_id=publish_correlation_id,
                 session=session,
             )
-
-            # Clean up Redis state for GUEST batches after event publication
-            if batch_ready_event.class_type == "GUEST":
-                await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
-                logger.info(
-                    f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up "
-                    f"after BatchContentProvisioningCompleted publication"
-                )
+            # Mark batch completed for GUEST batches (no immediate deletion)
+            class_type = batch_ready_event.class_type
+            if class_type == "GUEST":
+                await self.batch_tracker.mark_batch_completed(batch_ready_event.batch_id, session)
 
         logger.info(
             "Content assignment completed successfully",

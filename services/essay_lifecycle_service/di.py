@@ -68,15 +68,18 @@ from services.essay_lifecycle_service.implementations.nlp_command_handler import
 )
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
-from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-    RedisFailureTracker,
+from services.essay_lifecycle_service.implementations.db_failure_tracker import (
+    DBFailureTracker,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
+)
+from services.essay_lifecycle_service.implementations.database_slot_operations import (
+    DatabaseSlotOperations,
 )
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
@@ -485,7 +488,7 @@ class BatchCoordinationProvider(Provider):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
-        pending_content_ops: RedisPendingContentOperations,
+        pending_content_ops: DBPendingContentOperations,
         content_assignment_service: ContentAssignmentProtocol,
         session_factory: async_sessionmaker,
     ) -> BatchCoordinationHandler:
@@ -520,6 +523,13 @@ class BatchCoordinationProvider(Provider):
         return RedisSlotOperations(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
+    def provide_db_slot_operations(
+        self, session_factory: async_sessionmaker
+    ) -> DatabaseSlotOperations:
+        """Provide DB-backed slot operations to replace Redis-based assignment."""
+        return DatabaseSlotOperations(session_factory)
+
+    @provide(scope=Scope.APP)
     def provide_redis_batch_state(
         self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
     ) -> RedisBatchState:
@@ -538,34 +548,30 @@ class BatchCoordinationProvider(Provider):
         return RedisBatchQueries(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
-    def provide_redis_failure_tracker(
-        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
-    ) -> RedisFailureTracker:
-        """Provide Redis validation failure tracking."""
-        return RedisFailureTracker(redis_client, script_manager)
+    def provide_db_failure_tracker(
+        self, session_factory: async_sessionmaker
+    ) -> DBFailureTracker:
+        """Provide DB-backed validation failure tracking."""
+        return DBFailureTracker(session_factory)
 
     @provide(scope=Scope.APP)
-    def provide_redis_pending_content_ops(
-        self, redis_client: AtomicRedisClientProtocol
-    ) -> RedisPendingContentOperations:
-        """Provide Redis pending content operations."""
-        return RedisPendingContentOperations(redis_client)
+    def provide_db_pending_content_ops(
+        self, session_factory: async_sessionmaker
+    ) -> DBPendingContentOperations:
+        """Provide DB-backed pending content operations."""
+        return DBPendingContentOperations(session_factory)
 
     @provide(scope=Scope.APP)
     async def provide_batch_essay_tracker(
         self,
         persistence: BatchTrackerPersistence,
-        batch_state: RedisBatchState,
-        batch_queries: RedisBatchQueries,
-        failure_tracker: RedisFailureTracker,
-        slot_operations: RedisSlotOperations,
-        pending_content_ops: RedisPendingContentOperations,
+        failure_tracker: DBFailureTracker,
+        slot_operations: DatabaseSlotOperations,
+        pending_content_ops: DBPendingContentOperations,
     ) -> BatchEssayTracker:
-        """Provide batch essay tracker implementation with direct domain class composition."""
+        """Provide batch essay tracker implementation with direct domain class composition (DB-only)."""
         tracker = DefaultBatchEssayTracker(
             persistence,
-            batch_state,
-            batch_queries,
             failure_tracker,
             slot_operations,
             pending_content_ops,

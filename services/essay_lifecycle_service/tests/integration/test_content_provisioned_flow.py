@@ -2,12 +2,12 @@
 Integration test for EssayContentProvisionedV1 event handling flow.
 
 This test validates the critical File Service → ELS event flow, focusing on:
-- Atomic Redis slot assignment with proper transaction handling
+- Atomic DB slot assignment with proper transaction handling
 - Event publishing patterns and reliability
 - Error scenarios and transaction rollbacks
 - Idempotency of content provisioning
 
-Uses testcontainers for isolated testing environment.
+Uses PostgreSQL testcontainer for isolated testing environment.
 """
 
 from __future__ import annotations
@@ -27,10 +27,8 @@ from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.domain_services import ContentAssignmentService
@@ -49,8 +47,12 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
+)
+from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
+from services.essay_lifecycle_service.implementations.database_slot_operations import (
+    DatabaseSlotOperations,
 )
 from services.essay_lifecycle_service.models_db import Base
 
@@ -64,14 +66,12 @@ class TestContentProvisionedFlow:
 
     @pytest.fixture
     async def test_infrastructure(self) -> AsyncIterator[dict[str, Any]]:
-        """Set up complete test infrastructure with containers."""
-        # Start containers
-        redis_container = RedisContainer("redis:7-alpine")
+        """Set up DB-only test infrastructure with PostgreSQL container."""
+        # Start PostgreSQL container only
         postgres_container = PostgresContainer("postgres:15")
 
-        with redis_container as redis, postgres_container as pg:
-            # Connection strings
-            redis_url = f"redis://{redis.get_container_host_ip()}:{redis.get_exposed_port(6379)}"
+        with postgres_container as pg:
+            # Connection string
             db_url = (
                 f"postgresql+asyncpg://{pg.username}:{pg.password}@"
                 f"{pg.get_container_host_ip()}:{pg.get_exposed_port(5432)}/{pg.dbname}"
@@ -81,40 +81,10 @@ class TestContentProvisionedFlow:
             import os
 
             os.environ["ESSAY_LIFECYCLE_SERVICE_DATABASE_URL"] = db_url
-            os.environ["ESSAY_LIFECYCLE_SERVICE_REDIS_URL"] = redis_url
 
             settings = Settings()
 
-            # Initialize components
-            redis_client = RedisClient(client_id="test-els", redis_url=redis_url)
-            await redis_client.start()
-
-            # Create Redis script manager for domain classes
-            from services.essay_lifecycle_service.implementations.redis_script_manager import (
-                RedisScriptManager,
-            )
-
-            redis_script_manager = RedisScriptManager(redis_client)
-
-            # Create real domain classes with actual Redis operations
-            from services.essay_lifecycle_service.implementations.redis_batch_queries import (
-                RedisBatchQueries,
-            )
-            from services.essay_lifecycle_service.implementations.redis_batch_state import (
-                RedisBatchState,
-            )
-            from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-                RedisFailureTracker,
-            )
-            from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-                RedisSlotOperations,
-            )
-
-            batch_state = RedisBatchState(redis_client, redis_script_manager)
-            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
-            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
-            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
-
+            # Create database connection and components
             engine = create_async_engine(settings.DATABASE_URL, echo=False)
             session_factory = async_sessionmaker(engine, expire_on_commit=False)
             async with engine.begin() as conn:
@@ -123,13 +93,13 @@ class TestContentProvisionedFlow:
 
             persistence = BatchTrackerPersistence(engine)
 
-            # Create mock pending content ops for testing
-            mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+            # Create DB-based implementations
+            failure_tracker = DBFailureTracker(session_factory)
+            slot_operations = DatabaseSlotOperations(session_factory)
+            mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
             batch_tracker = DefaultBatchEssayTracker(
                 persistence,
-                batch_state,
-                batch_queries,
                 failure_tracker,
                 slot_operations,
                 mock_pending_content_ops,
@@ -189,20 +159,18 @@ class TestContentProvisionedFlow:
                 "repository": repository,
                 "batch_tracker": batch_tracker,
                 "slot_operations": slot_operations,
-                "redis_client": redis_client,
                 "event_publisher": event_publisher,
                 "published_events": published_events,
                 "mock_outbox_manager": mock_outbox_manager,
             }
 
             # Cleanup
-            await redis_client.stop()
             await engine.dispose()
 
     async def test_content_provisioned_atomic_slot_assignment(
         self, test_infrastructure: dict[str, Any]
     ) -> None:
-        """Test atomic slot assignment with proper Redis transactions."""
+        """Test atomic slot assignment with proper DB transactions."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
 

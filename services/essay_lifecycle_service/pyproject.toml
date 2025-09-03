@@ -63,6 +63,7 @@ dev = "python app.py --reload"
 test = "pytest tests/ -v"
 format = "ruff format . && ruff check --fix ."
 typecheck = "mypy ."
+db-purge-guest = "python -m services.essay_lifecycle_service.scripts.db_purge_guest --older-than-days 30"
 
 # Alembic database migration commands
 migrate-upgrade = "alembic upgrade head"

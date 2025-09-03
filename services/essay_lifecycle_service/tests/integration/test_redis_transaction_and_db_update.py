@@ -49,11 +49,11 @@ from services.essay_lifecycle_service.implementations.redis_batch_queries import
 from services.essay_lifecycle_service.implementations.redis_batch_state import (
     RedisBatchState,
 )
-from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-    RedisFailureTracker,
+from services.essay_lifecycle_service.implementations.db_failure_tracker import (
+    DBFailureTracker,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.redis_script_manager import (
     RedisScriptManager,
@@ -98,17 +98,18 @@ class TestRedisTransactionAndDatabaseUpdate:
             redis_client = RedisClient(client_id="test-redis", redis_url=redis_url)
             await redis_client.start()
 
+            # Create database connection first
+            engine = create_async_engine(settings.DATABASE_URL, echo=False)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
             # Create Redis script manager for domain classes
             redis_script_manager = RedisScriptManager(redis_client)
 
-            # Create real domain classes with actual Redis operations
+            # Create real domain classes with mixed Redis and DB operations
             batch_state = RedisBatchState(redis_client, redis_script_manager)
             batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
-            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
+            failure_tracker = DBFailureTracker(session_factory)
             slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
-
-            engine = create_async_engine(settings.DATABASE_URL, echo=False)
-            session_factory = async_sessionmaker(engine, expire_on_commit=False)
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             repository = PostgreSQLEssayRepository(session_factory)
@@ -116,12 +117,10 @@ class TestRedisTransactionAndDatabaseUpdate:
             persistence = BatchTrackerPersistence(engine)
 
             # Create mock pending content ops for testing
-            mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+            mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
             batch_tracker = DefaultBatchEssayTracker(
                 persistence,
-                batch_state,
-                batch_queries,
                 failure_tracker,
                 slot_operations,
                 mock_pending_content_ops,

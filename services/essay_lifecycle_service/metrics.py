@@ -142,6 +142,19 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["consumer_group", "topic"],
             registry=registry,
         ),
+        # Batch inventory gauges
+        "batches_active": Gauge(
+            "huleedu_batches_active",
+            "Current count of active (not completed) batches by class type",
+            ["class_type"],
+            registry=registry,
+        ),
+        "batches_completed": Gauge(
+            "huleedu_batches_completed",
+            "Current count of completed batches by class type",
+            ["class_type"],
+            registry=registry,
+        ),
     }
 
     # Add database metrics if provided

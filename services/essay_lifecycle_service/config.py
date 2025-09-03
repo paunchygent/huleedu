@@ -76,6 +76,15 @@ class Settings(SecureServiceSettings):
         default=False, description="Disable idempotency for testing purposes"
     )
 
+    # Slot Assignment Optimization
+    USE_ADVISORY_LOCKS_FOR_ASSIGNMENT: bool = Field(
+        default=False,
+        description=(
+            "Use transaction-scoped PostgreSQL advisory locks keyed by (batch_id, text_storage_id) "
+            "to serialize duplicate content assignments and reduce tail latency."
+        ),
+    )
+
     # Circuit Breaker Configuration
     CIRCUIT_BREAKER_ENABLED: bool = Field(
         default=True, description="Enable circuit breaker protection for external service calls"

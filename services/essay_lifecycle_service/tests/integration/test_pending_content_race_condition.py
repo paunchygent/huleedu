@@ -26,10 +26,8 @@ from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.redis_client import RedisClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.essay_state_machine import EssayStateMachine
@@ -48,23 +46,14 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_queries import (
-    RedisBatchQueries,
+from services.essay_lifecycle_service.implementations.database_slot_operations import (
+    DatabaseSlotOperations,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_state import (
-    RedisBatchState,
+from services.essay_lifecycle_service.implementations.db_failure_tracker import (
+    DBFailureTracker,
 )
-from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-    RedisFailureTracker,
-)
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
-)
-from services.essay_lifecycle_service.implementations.redis_script_manager import (
-    RedisScriptManager,
-)
-from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-    RedisSlotOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import TopicNamingProtocol
@@ -77,22 +66,17 @@ class TestPendingContentRaceCondition:
 
     @pytest.fixture
     async def test_infrastructure(self) -> AsyncIterator[dict[str, Any]]:
-        """Set up complete ELS integration test infrastructure."""
+        """Set up complete ELS integration test infrastructure with PostgreSQL."""
         # Start PostgreSQL container
         postgres_container = PostgresContainer("postgres:15", driver="asyncpg")
         postgres_container.start()
 
-        # Start Redis container
-        redis_container = RedisContainer("redis:7")
-        redis_container.start()
 
-        redis_client = None
         repository = None
         engine = None
 
         try:
-            # Connection strings
-            redis_url = f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
+            # Connection string
             db_url = (
                 f"postgresql+asyncpg://{postgres_container.username}:{postgres_container.password}@"
                 f"{postgres_container.get_container_host_ip()}:{postgres_container.get_exposed_port(5432)}/{postgres_container.dbname}"
@@ -102,23 +86,11 @@ class TestPendingContentRaceCondition:
             import os
 
             os.environ["ESSAY_LIFECYCLE_SERVICE_DATABASE_URL"] = db_url
-            os.environ["ESSAY_LIFECYCLE_SERVICE_REDIS_URL"] = redis_url
 
             settings = Settings()
 
-            # Initialize Redis client
-            redis_client = RedisClient(client_id="test-els-race-condition", redis_url=redis_url)
-            await redis_client.start()
-
-            # Initialize Redis script manager
-            redis_script_manager = RedisScriptManager(redis_client)
-
-            # Initialize Redis operations
-            batch_state = RedisBatchState(redis_client, redis_script_manager)
-            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
-            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
-            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
-            pending_content_ops = RedisPendingContentOperations(redis_client)
+            # Initialize DB operations
+            # (DB components will be created after session_factory is available)
 
             # Initialize repository
             engine = create_async_engine(settings.DATABASE_URL, echo=False)
@@ -129,14 +101,17 @@ class TestPendingContentRaceCondition:
 
             persistence = BatchTrackerPersistence(engine)
 
+            # Create DB-based implementations
+            failure_tracker = DBFailureTracker(session_factory)
+            slot_operations = DatabaseSlotOperations(session_factory)
+            pending_content_ops = DBPendingContentOperations(session_factory)  # Real implementation for race condition testing
+
             # Initialize batch tracker with REAL pending content ops (not mocked)
             batch_tracker = DefaultBatchEssayTracker(
                 persistence,
-                batch_state,
-                batch_queries,
                 failure_tracker,
                 slot_operations,
-                pending_content_ops,  # Real implementation to test the race condition
+                pending_content_ops,  # Real DB implementation to test the race condition
             )
             await batch_tracker.initialize_from_database()
 
@@ -183,19 +158,15 @@ class TestPendingContentRaceCondition:
                 "batch_tracker": batch_tracker,
                 "pending_content_ops": pending_content_ops,
                 "slot_operations": slot_operations,
-                "redis_client": redis_client,
                 "event_publisher": event_publisher,
                 "mock_outbox_manager": mock_outbox_manager,
             }
 
         finally:
             # Cleanup
-            if redis_client:
-                await redis_client.stop()
             if engine:
                 await engine.dispose()
             postgres_container.stop()
-            redis_container.stop()
 
     async def test_pending_content_before_batch_registration_race_condition(
         self, test_infrastructure: dict[str, Any]

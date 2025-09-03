@@ -160,32 +160,6 @@ class EssayIdempotencyOperations:
             HuleEduError: For database errors or constraint violations
         """
         try:
-            # Use SELECT FOR UPDATE for row-level locking to prevent concurrent assignments
-            # First check if this content is already assigned to any essay in this batch
-            stmt = (
-                select(EssayStateDB)
-                .where(
-                    EssayStateDB.batch_id == batch_id,
-                    EssayStateDB.text_storage_id == text_storage_id,
-                )
-                .with_for_update()
-            )
-            result = await session.execute(stmt)
-            existing_essay = result.scalars().first()
-
-            if existing_essay is not None:
-                # Content already assigned - idempotent success case
-                logger.info(
-                    "Content already assigned to essay, returning existing assignment",
-                    extra={
-                        "batch_id": batch_id,
-                        "text_storage_id": text_storage_id,
-                        "existing_essay_id": existing_essay.essay_id,
-                        "correlation_id": str(correlation_id),
-                    },
-                )
-                return False, existing_essay.essay_id
-
             # Get internal essay ID
             internal_essay_id = essay_data["internal_essay_id"]
             initial_status = essay_data.get("initial_status", EssayStatus.READY_FOR_PROCESSING)
@@ -271,12 +245,12 @@ class EssayIdempotencyOperations:
                 )
             ):
                 # Another concurrent process assigned this content - find the existing assignment
-                stmt = select(EssayStateDB).where(
+                stmt2 = select(EssayStateDB).where(
                     EssayStateDB.batch_id == batch_id,
                     EssayStateDB.text_storage_id == text_storage_id,
                 )
-                result = await session.execute(stmt)
-                existing_essay = result.scalars().first()
+                result2 = await session.execute(stmt2)
+                existing_essay = result2.scalars().first()
 
                 if existing_essay:
                     logger.info(

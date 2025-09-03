@@ -24,8 +24,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher import (
     BatchLifecyclePublisher,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.protocols import (
     BatchCoordinationHandler,
@@ -45,7 +45,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
         batch_tracker: BatchEssayTracker,
         repository: EssayRepositoryProtocol,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
-        pending_content_ops: RedisPendingContentOperations,
+        pending_content_ops: DBPendingContentOperations,
         content_assignment_service: ContentAssignmentProtocol,
         session_factory: async_sessionmaker,
     ) -> None:
@@ -195,13 +195,7 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             session=session,
                         )
 
-                        # Clean up Redis state for GUEST batches after event publication
-                        # REGULAR batches are cleaned up in student_association_handler
-                        if batch_ready_event.class_type == "GUEST":
-                            await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
-                            logger.info(
-                                f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after immediate BatchContentProvisioningCompleted publication"
-                            )
+                        # No immediate DB cleanup; batch remains for audit. A retention job can purge later.
                     # Transaction commits here automatically
 
             return True
@@ -240,84 +234,32 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 },
             )
 
-            # **ELS-002 Phase 1: Atomic Content Provisioning**
-            # Replace non-atomic idempotency check + slot assignment with database-level atomicity
+            # Step 1: If batch not registered yet, store as pending. Otherwise, proceed.
+            batch_status = await self.batch_tracker.get_batch_status(event_data.entity_id)
 
-            # Step 1: Try slot assignment first (maintains existing batch tracker logic)
-            # Redis operation, outside transaction
-            assigned_essay_id = await self.batch_tracker.assign_slot_to_content(
-                event_data.entity_id, event_data.text_storage_id, event_data.original_file_name
-            )
-
-            if assigned_essay_id is None:
-                # Check if batch exists before deciding on pending vs excess
-                batch_status = await self.batch_tracker.get_batch_status(event_data.entity_id)
-
-                if batch_status is None:
-                    # ALWAYS store as pending content when batch not registered
-                    logger.info(
-                        "Batch not registered yet, storing content as pending",
-                        extra={
-                            "batch_id": event_data.entity_id,
-                            "text_storage_id": event_data.text_storage_id,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-
-                    # Store as pending
-                    content_metadata = {
-                        "original_file_name": event_data.original_file_name,
-                        "file_upload_id": event_data.file_upload_id,
-                        "raw_file_storage_id": event_data.raw_file_storage_id,
-                        "file_size_bytes": event_data.file_size_bytes,
-                        "content_md5_hash": event_data.content_md5_hash,
-                        "correlation_id": str(event_data.correlation_id),
-                    }
-
-                    await self.pending_content_ops.store_pending_content(
-                        event_data.entity_id, event_data.text_storage_id, content_metadata
-                    )
-
-                    # Successfully handled as pending - NO EXCESS CONTENT EVENT
-                    return True
-
-                # Batch exists but no slots - this is true excess content
-                logger.warning(
-                    "No available slots for content, publishing excess content event",
+            if batch_status is None:
+                logger.info(
+                    "Batch not registered yet, storing content as pending",
                     extra={
                         "batch_id": event_data.entity_id,
                         "text_storage_id": event_data.text_storage_id,
-                        "original_file_name": event_data.original_file_name,
                         "correlation_id": str(correlation_id),
                     },
                 )
 
-                # START UNIT OF WORK for excess content event
-                async with self.session_factory() as session:
-                    async with session.begin():
-                        from datetime import UTC, datetime
+                content_metadata = {
+                    "original_file_name": event_data.original_file_name,
+                    "file_upload_id": event_data.file_upload_id,
+                    "raw_file_storage_id": event_data.raw_file_storage_id,
+                    "file_size_bytes": event_data.file_size_bytes,
+                    "content_md5_hash": event_data.content_md5_hash,
+                    "correlation_id": str(event_data.correlation_id),
+                }
 
-                        from common_core.events.batch_coordination_events import (
-                            ExcessContentProvisionedV1,
-                        )
-
-                        excess_event = ExcessContentProvisionedV1(
-                            batch_id=event_data.entity_id,
-                            original_file_name=event_data.original_file_name,
-                            text_storage_id=event_data.text_storage_id,
-                            reason="NO_AVAILABLE_SLOT",
-                            correlation_id=correlation_id,
-                            timestamp=datetime.now(UTC),
-                        )
-
-                        await self.batch_lifecycle_publisher.publish_excess_content_provisioned(
-                            event_data=excess_event,
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-                        # Transaction commits here
-
-                return False
+                await self.pending_content_ops.store_pending_content(
+                    event_data.entity_id, event_data.text_storage_id, content_metadata
+                )
+                return True
 
             # Step 2: Use ContentAssignmentService for consistent atomic assignment
             # START UNIT OF WORK
@@ -360,6 +302,42 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                     )
 
                     # Transaction commits here
+
+            # If no slot available, publish excess content event here
+            if final_essay_id is None:
+                logger.warning(
+                    "No available slots for content, publishing excess content event",
+                    extra={
+                        "batch_id": event_data.entity_id,
+                        "text_storage_id": event_data.text_storage_id,
+                        "original_file_name": event_data.original_file_name,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+
+                async with self.session_factory() as session:
+                    async with session.begin():
+                        from datetime import UTC, datetime
+                        from common_core.events.batch_coordination_events import (
+                            ExcessContentProvisionedV1,
+                        )
+
+                        excess_event = ExcessContentProvisionedV1(
+                            batch_id=event_data.entity_id,
+                            original_file_name=event_data.original_file_name,
+                            text_storage_id=event_data.text_storage_id,
+                            reason="NO_AVAILABLE_SLOT",
+                            correlation_id=correlation_id,
+                            timestamp=datetime.now(UTC),
+                        )
+
+                        await self.batch_lifecycle_publisher.publish_excess_content_provisioned(
+                            event_data=excess_event,
+                            correlation_id=correlation_id,
+                            session=session,
+                        )
+
+                return False
 
             return True
 
@@ -458,12 +436,12 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                             session=session,
                         )
 
-                        # Clean up Redis state for GUEST batches after event publication
-                        # REGULAR batches are cleaned up in student_association_handler
+                        # Mark batch completed for GUEST batches after event publication
+                        # REGULAR batches are marked complete in student_association_handler
                         if batch_ready_event.class_type == "GUEST":
-                            await self.batch_tracker.cleanup_batch(batch_ready_event.batch_id)
+                            await self.batch_tracker.mark_batch_completed(batch_ready_event.batch_id, session)
                             logger.info(
-                                f"GUEST batch {batch_ready_event.batch_id} Redis state cleaned up after validation failure BatchContentProvisioningCompleted publication"
+                                f"GUEST batch {batch_ready_event.batch_id} marked as completed after validation failure BatchContentProvisioningCompleted publication"
                             )
                         # Transaction commits here
 

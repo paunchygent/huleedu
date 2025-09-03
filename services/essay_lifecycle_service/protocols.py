@@ -548,6 +548,33 @@ class BatchEssayTracker(Protocol):
         """Clean up Redis state for completed batch."""
         ...
 
+    async def mark_batch_completed(
+        self, batch_id: str, session: AsyncSession | None = None
+    ) -> None:
+        """Mark batch as completed (DB), without immediate deletion."""
+        ...
+
+
+class SlotOperationsProtocol(Protocol):
+    """Protocol for slot operation backends (DB-based, etc.)."""
+
+    async def assign_slot_atomic(
+        self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
+    ) -> str | None:
+        """Atomically assign an available slot; idempotent by text_storage_id in batch."""
+        ...
+
+    async def get_available_slot_count(self, batch_id: str) -> int:
+        ...
+
+    async def get_assigned_count(self, batch_id: str) -> int:
+        ...
+
+    async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+        ...
+
+    # Slot operations intentionally minimal to allow both Redis and DB implementations
+
 
 class MetricsCollector(Protocol):
     """Protocol for collecting service metrics."""

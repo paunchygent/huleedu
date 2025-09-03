@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 from common_core.status_enums import EssayStatus
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM as SQLAlchemyEnum
@@ -144,6 +146,9 @@ class BatchEssayTracker(Base):
         DateTime, server_default=text("NOW()"), onupdate=text("NOW()")
     )
 
+    # Completion timestamp for DB-only lifecycle (no immediate deletion)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Relationship to slot assignments
     slot_assignments: Mapped[list[SlotAssignmentDB]] = relationship(
         "SlotAssignmentDB", back_populates="batch_tracker", cascade="all, delete-orphan"
@@ -168,10 +173,12 @@ class SlotAssignmentDB(Base):
         ForeignKey("batch_essay_trackers.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
-    # Slot assignment data
+    # Slot assignment data (inventory-based)
     internal_essay_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    text_storage_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    original_file_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Evolved semantics: pre-seeded slots are 'available' and become 'assigned'
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="available")
+    text_storage_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    original_file_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Assignment timestamp
     assigned_at: Mapped[datetime] = mapped_column(DateTime, server_default=text("NOW()"))
@@ -179,6 +186,88 @@ class SlotAssignmentDB(Base):
     # Relationship back to batch tracker
     batch_tracker: Mapped[BatchEssayTracker] = relationship(
         "BatchEssayTracker", back_populates="slot_assignments"
+    )
+
+    # Indexes/constraints for efficient and correct assignment
+    __table_args__ = (
+        # Guarantee one row per slot
+        UniqueConstraint(
+            "batch_tracker_id",
+            "internal_essay_id",
+            name="uq_slot_unique_per_batch",
+        ),
+        # Idempotency: one content per batch
+        Index(
+            "ix_slot_unique_content_assignment",
+            "batch_tracker_id",
+            "text_storage_id",
+            unique=True,
+            postgresql_where=text("text_storage_id IS NOT NULL"),
+        ),
+        # Fast lookup for available slots
+        Index(
+            "ix_slot_available_slots",
+            "batch_tracker_id",
+            "status",
+            postgresql_where=text("status = 'available'"),
+        ),
+        # Enforce valid status values (includes 'failed' for validation failures)
+        CheckConstraint(
+            "status IN ('available','assigned','failed')",
+            name="ck_slot_status_valid",
+        ),
+        # Additional indexes aligned with migrations
+        Index("idx_slot_batch_status", "batch_tracker_id", "status"),
+        Index(
+            "idx_slot_idempotency",
+            "batch_tracker_id",
+            "text_storage_id",
+            postgresql_where=text("text_storage_id IS NOT NULL"),
+        ),
+    )
+
+
+class BatchValidationFailure(Base):
+    """Tracks validation failures that consume batch slots."""
+
+    __tablename__ = "batch_validation_failures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    batch_tracker_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("batch_essay_trackers.id", ondelete="CASCADE"), index=True
+    )
+    file_upload_id: Mapped[str | None] = mapped_column(String(255))
+    validation_error_code: Mapped[str | None] = mapped_column(String(50))
+    validation_error_detail: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("NOW()")
+    )
+
+    __table_args__ = (
+        Index("idx_failures_batch", "batch_tracker_id"),
+        Index("idx_failures_batch_id", "batch_id"),
+    )
+
+
+class BatchPendingContent(Base):
+    """Stores content that arrives before batch registration."""
+
+    __tablename__ = "batch_pending_content"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    text_storage_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("NOW()")
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "batch_id", "text_storage_id", name="uq_pending_content_per_batch"
+        ),
+        Index("idx_pending_content_batch", "batch_id"),
     )
 
 

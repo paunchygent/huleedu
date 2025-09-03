@@ -207,8 +207,8 @@ class TestStudentAssociationHandler:
         mock_batch_tracker.get_batch_status.assert_called_once_with(event_data.batch_id)
         mock_batch_tracker.check_batch_completion.assert_called_once_with(event_data.batch_id)
 
-        # Should clean up Redis state after successful routing
-        mock_batch_tracker.cleanup_batch.assert_called_once_with(event_data.batch_id)
+        # Should mark batch as completed (no immediate cleanup)
+        mock_batch_tracker.mark_batch_completed.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_publishes_batch_essays_ready(
@@ -372,8 +372,8 @@ class TestStudentAssociationHandler:
         # Act
         await handler.handle_student_associations_confirmed(event_data, correlation_id)
 
-        # Assert - ELS should clean up Redis state after successful routing
-        mock_batch_tracker.cleanup_batch.assert_called_once_with(event_data.batch_id)
+        # Assert - ELS should mark completion (no immediate cleanup)
+        mock_batch_tracker.mark_batch_completed.assert_called_once()
 
         # Should not update any database state during stateless routing
         mock_repository.update_essay_processing_metadata.assert_not_called()

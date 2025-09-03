@@ -150,12 +150,8 @@ class StudentAssociationHandler:
                         },
                     )
 
-                    # Clean up Redis state for REGULAR batch after BatchEssaysReady publication
-                    # This completes the REGULAR batch lifecycle: content → associations → ready → cleanup
-                    await self.batch_tracker.cleanup_batch(batch_id)
-                    logger.info(
-                        f"REGULAR batch {batch_id} Redis state cleaned up after BatchEssaysReady publication"
-                    )
+                    # Mark batch completed (DB) for REGULAR after associations (no immediate deletion)
+                    await self.batch_tracker.mark_batch_completed(batch_id, session)
 
                     logger.info(
                         f"Successfully routed student associations for batch {batch_id} to BOS",

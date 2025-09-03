@@ -4,7 +4,7 @@ Integration tests for atomic batch creation in Essay Lifecycle Service.
 Tests the complete integration of BatchCoordinationHandler with real infrastructure
 to verify that the atomic batch creation fixes the race condition issue.
 
-Uses real PostgreSQL and Redis infrastructure with testcontainers.
+Uses PostgreSQL database infrastructure with testcontainers.
 """
 
 from __future__ import annotations
@@ -21,10 +21,8 @@ from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
-from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
@@ -42,8 +40,12 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
+)
+from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
+from services.essay_lifecycle_service.implementations.database_slot_operations import (
+    DatabaseSlotOperations,
 )
 from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import EventPublisher
@@ -184,23 +186,13 @@ class TestAtomicBatchCreationIntegration:
         yield container
         container.stop()
 
-    @pytest.fixture(scope="class")
-    def redis_container(self) -> Generator[RedisContainer, Any, None]:
-        """Start Redis test container for integration tests."""
-        container = RedisContainer("redis:7-alpine")
-        container.start()
-        yield container
-        container.stop()
-
     class IntegrationTestSettings(Settings):
-        """Test settings that override both DATABASE_URL and REDIS_URL properties."""
+        """Test settings that override DATABASE_URL for testing."""
 
-        def __init__(self, database_url: str, redis_url: str) -> None:
+        def __init__(self, database_url: str) -> None:
             super().__init__()
             # Override DATABASE_URL using private attribute (property pattern)
             object.__setattr__(self, "_database_url", database_url)
-            # Override REDIS_URL directly (simple field)
-            self.REDIS_URL = redis_url
             self.DATABASE_POOL_SIZE = 2
             self.DATABASE_MAX_OVERFLOW = 1
             self.DATABASE_POOL_PRE_PING = True
@@ -213,9 +205,9 @@ class TestAtomicBatchCreationIntegration:
 
     @pytest.fixture
     def test_settings(
-        self, postgres_container: PostgresContainer, redis_container: RedisContainer
+        self, postgres_container: PostgresContainer
     ) -> Settings:
-        """Create test settings pointing to the test containers."""
+        """Create test settings pointing to the PostgreSQL test container."""
         # Get PostgreSQL connection URL and ensure it uses asyncpg driver
         pg_connection_url = postgres_container.get_connection_url()
         if "+psycopg2://" in pg_connection_url:
@@ -223,12 +215,7 @@ class TestAtomicBatchCreationIntegration:
         elif "postgresql://" in pg_connection_url:
             pg_connection_url = pg_connection_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        # Get Redis connection URL
-        redis_connection_url = f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
-
-        return self.IntegrationTestSettings(
-            database_url=pg_connection_url, redis_url=redis_connection_url
-        )
+        return self.IntegrationTestSettings(database_url=pg_connection_url)
 
     @pytest.fixture
     async def postgres_repository(self, test_settings: Settings) -> PostgreSQLEssayRepository:
@@ -253,21 +240,6 @@ class TestAtomicBatchCreationIntegration:
         return repository
 
     @pytest.fixture
-    async def redis_client(self, test_settings: Settings) -> AsyncGenerator[Any, None]:
-        """Create real Redis client for testing."""
-        from huleedu_service_libs.redis_client import RedisClient
-
-        client = RedisClient(client_id="test-els", redis_url=test_settings.REDIS_URL)
-        await client.start()
-
-        try:
-            # Clear any existing data using underlying Redis client
-            await client.client.flushdb()
-            yield client
-        finally:
-            await client.stop()
-
-    @pytest.fixture
     async def batch_tracker_persistence(
         self, test_settings: Settings, postgres_repository: PostgreSQLEssayRepository
     ) -> BatchTrackerPersistence:
@@ -277,78 +249,33 @@ class TestAtomicBatchCreationIntegration:
         return BatchTrackerPersistence(engine)
 
     @pytest.fixture
-    async def redis_script_manager(self, redis_client: AtomicRedisClientProtocol) -> Any:
-        """Create Redis script manager with real Redis client."""
-        from services.essay_lifecycle_service.implementations.redis_script_manager import (
-            RedisScriptManager,
-        )
-
-        return RedisScriptManager(redis_client)
+    async def failure_tracker(self, postgres_repository: PostgreSQLEssayRepository) -> DBFailureTracker:
+        """Create DB-based failure tracker."""
+        session_factory = postgres_repository.get_session_factory()
+        return DBFailureTracker(session_factory)
 
     @pytest.fixture
-    async def batch_state(
-        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
-    ) -> Any:
-        """Create real Redis batch state with actual Redis operations."""
-        from services.essay_lifecycle_service.implementations.redis_batch_state import (
-            RedisBatchState,
-        )
-
-        return RedisBatchState(redis_client, redis_script_manager)
-
-    @pytest.fixture
-    async def batch_queries(
-        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
-    ) -> Any:
-        """Create real Redis batch queries with actual Redis operations."""
-        from services.essay_lifecycle_service.implementations.redis_batch_queries import (
-            RedisBatchQueries,
-        )
-
-        return RedisBatchQueries(redis_client, redis_script_manager)
-
-    @pytest.fixture
-    async def failure_tracker(
-        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
-    ) -> Any:
-        """Create real Redis failure tracker with actual Redis operations."""
-        from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-            RedisFailureTracker,
-        )
-
-        return RedisFailureTracker(redis_client, redis_script_manager)
-
-    @pytest.fixture
-    async def slot_operations(
-        self, redis_client: AtomicRedisClientProtocol, redis_script_manager: Any
-    ) -> Any:
-        """Create real Redis slot operations with actual Redis operations."""
-        from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-            RedisSlotOperations,
-        )
-
-        return RedisSlotOperations(redis_client, redis_script_manager)
+    async def slot_operations(self, postgres_repository: PostgreSQLEssayRepository) -> DatabaseSlotOperations:
+        """Create DB-based slot operations."""
+        session_factory = postgres_repository.get_session_factory()
+        return DatabaseSlotOperations(session_factory)
 
     @pytest.fixture
     async def batch_tracker(
         self,
         batch_tracker_persistence: BatchTrackerPersistence,
-        batch_state: Any,
-        batch_queries: Any,
-        failure_tracker: Any,
-        slot_operations: Any,
+        failure_tracker: DBFailureTracker,
+        slot_operations: DatabaseSlotOperations,
     ) -> DefaultBatchEssayTracker:
-        """Create real batch tracker with PostgreSQL persistence and domain class composition."""
+        """Create real batch tracker with PostgreSQL persistence and DB-based implementations."""
         # Create mock pending content ops for testing
-        mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+        mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
         return DefaultBatchEssayTracker(
-            persistence=batch_tracker_persistence,
-            batch_state=batch_state,
-            batch_queries=batch_queries,
-            failure_tracker=failure_tracker,
-            slot_operations=slot_operations,
-            pending_content_ops=mock_pending_content_ops,
+            batch_tracker_persistence,
+            failure_tracker,
+            slot_operations,
+            mock_pending_content_ops,
         )
 
     @pytest.fixture
@@ -390,7 +317,7 @@ class TestAtomicBatchCreationIntegration:
     ) -> DefaultBatchCoordinationHandler:
         """Create coordination handler with real components including session factory."""
         # Create mock pending content ops for testing
-        mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+        mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
         # Create content assignment service
         from services.essay_lifecycle_service.domain_services import ContentAssignmentService

@@ -195,5 +195,5 @@ class TestDefaultBatchCommandHandler:
 
         # Verify delegation to CJ assessment handler
         mock_cj_assessment_handler.process_initiate_cj_assessment_command.assert_called_once_with(
-            mock_command, correlation_id
+            mock_command, correlation_id, None
         )

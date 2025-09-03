@@ -1,7 +1,7 @@
 """
 Concurrent race condition tests for distributed Essay Lifecycle Service.
 
-Tests validate that multiple ELS instances coordinating via Redis prevent
+Tests validate that multiple ELS instances coordinating via PostgreSQL prevent
 race conditions in slot assignment and maintain data integrity under concurrent load.
 
 Uses testcontainers for real infrastructure testing as per Rule 070.
@@ -23,7 +23,6 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
-from testcontainers.redis import RedisContainer
 
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.domain_services import ContentAssignmentService
@@ -39,31 +38,24 @@ from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher 
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
+from services.essay_lifecycle_service.implementations.database_slot_operations import (
+    DatabaseSlotOperations,
+)
+from services.essay_lifecycle_service.implementations.db_failure_tracker import (
+    DBFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_queries import (
-    RedisBatchQueries,
-)
-from services.essay_lifecycle_service.implementations.redis_batch_state import (
-    RedisBatchState,
-)
-from services.essay_lifecycle_service.implementations.redis_failure_tracker import (
-    RedisFailureTracker,
-)
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
-)
-from services.essay_lifecycle_service.implementations.redis_script_manager import (
-    RedisScriptManager,
-)
-from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-    RedisSlotOperations,
-)
 from services.essay_lifecycle_service.models_db import Base
-
-from .test_sync_utils import wait_for_batch_ready, wait_for_condition
-from .test_utils import DistributedTestSettings, PerformanceMetrics
+from services.essay_lifecycle_service.tests.distributed.test_sync_utils import (
+    wait_for_batch_ready,
+    wait_for_condition,
+)
+from services.essay_lifecycle_service.tests.distributed.test_utils import PerformanceMetrics
 
 
 @pytest.mark.docker
@@ -79,48 +71,33 @@ class TestConcurrentSlotAssignment:
         yield container
         container.stop()
 
-    @pytest.fixture(scope="class")
-    def redis_container(self) -> Generator[RedisContainer, Any, None]:
-        """Redis container for distributed coordination."""
-        container = RedisContainer("redis:7-alpine")
-        container.start()
-        yield container
-        container.stop()
-
     @pytest.fixture
-    def distributed_settings(
-        self, postgres_container: PostgresContainer, redis_container: RedisContainer
-    ) -> Settings:
+    def distributed_settings(self, postgres_container: PostgresContainer) -> Settings:
         """Create distributed test settings."""
         pg_url = postgres_container.get_connection_url().replace("psycopg2", "asyncpg")
         if "postgresql://" in pg_url:
             pg_url = pg_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        redis_url = f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
+        # Use regular Settings for DB-only testing
+        import os
 
-        return DistributedTestSettings.create_basic_settings(
-            database_url=pg_url, redis_url=redis_url
-        )
+        os.environ["ESSAY_LIFECYCLE_SERVICE_DATABASE_URL"] = pg_url
+        return Settings()
 
     @pytest.fixture
     async def clean_distributed_state(
         self, distributed_settings: Settings
     ) -> AsyncGenerator[None, None]:
-        """Clean Redis and PostgreSQL state between tests."""
-        from huleedu_service_libs.redis_client import RedisClient
-
-        # Clean Redis
-        redis_client = RedisClient(
-            client_id="test-cleanup", redis_url=distributed_settings.REDIS_URL
-        )
-        await redis_client.start()
-        try:
-            await redis_client.client.flushdb()
-        finally:
-            await redis_client.stop()
-
+        """Clean PostgreSQL state between tests."""
         # Clean PostgreSQL
-        engine = create_async_engine(distributed_settings.DATABASE_URL, echo=False)
+        engine = create_async_engine(
+            distributed_settings.DATABASE_URL,
+            echo=False,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+        )
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -149,43 +126,38 @@ class TestConcurrentSlotAssignment:
 
         instances = []
 
-        # Create 3 instances
+        # Create a single shared engine for all instances with a larger pool
+        engine = create_async_engine(
+            distributed_settings.DATABASE_URL,
+            echo=False,
+            pool_size=36,
+            max_overflow=48,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+        )
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Create 3 instances sharing the same engine/pool
         for instance_id in range(3):
-            # Each instance gets its own Redis client but shares the same Redis server
-            from huleedu_service_libs.redis_client import RedisClient
-
-            redis_client = RedisClient(
-                client_id=f"test-instance-{instance_id}", redis_url=distributed_settings.REDIS_URL
-            )
-            await redis_client.start()
-
-            # Shared PostgreSQL repository
-            engine = create_async_engine(distributed_settings.DATABASE_URL, echo=False)
-            session_factory = async_sessionmaker(engine, expire_on_commit=False)
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
             repository = PostgreSQLEssayRepository(session_factory)
 
-            # Create modular Redis components
-            redis_script_manager = RedisScriptManager(redis_client)
-            batch_state = RedisBatchState(redis_client, redis_script_manager)
-            batch_queries = RedisBatchQueries(redis_client, redis_script_manager)
-            failure_tracker = RedisFailureTracker(redis_client, redis_script_manager)
-            slot_operations = RedisSlotOperations(redis_client, redis_script_manager)
+            # Create DB-based implementations
+            failure_tracker = DBFailureTracker(session_factory)
+            slot_operations = DatabaseSlotOperations(session_factory)
 
             # Batch tracker with modular DI components
             batch_tracker_persistence = BatchTrackerPersistence(engine)
 
             # Create mock pending content ops for testing
-            mock_pending_content_ops = AsyncMock(spec=RedisPendingContentOperations)
+            mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
             batch_tracker = DefaultBatchEssayTracker(
-                persistence=batch_tracker_persistence,
-                batch_state=batch_state,
-                batch_queries=batch_queries,
-                failure_tracker=failure_tracker,
-                slot_operations=slot_operations,
-                pending_content_ops=mock_pending_content_ops,
+                batch_tracker_persistence,
+                failure_tracker,
+                slot_operations,
+                mock_pending_content_ops,
             )
 
             # Event publisher
@@ -213,17 +185,8 @@ class TestConcurrentSlotAssignment:
         try:
             yield instances
         finally:
-            # Cleanup Redis clients
-            for coordination_handler, _, _ in instances:
-                # Access the Redis client through the modular components
-                try:
-                    tracker = coordination_handler.batch_tracker
-                    if hasattr(tracker, "_batch_state") and hasattr(
-                        tracker._batch_state, "_redis_client"
-                    ):
-                        await tracker._batch_state._redis_client.stop()
-                except Exception:
-                    pass  # Best effort cleanup
+            # No Redis client cleanup needed for DB-only implementation
+            await engine.dispose()
 
     async def test_concurrent_identical_content_provisioning_race_prevention(
         self,

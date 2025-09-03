@@ -240,10 +240,10 @@ class TestContentAssignmentService:
         )
 
     @pytest.mark.parametrize(
-        "class_type, should_cleanup",
+        "class_type, should_mark_completed",
         [
-            ("GUEST", True),  # GUEST batches are cleaned up
-            ("REGULAR", False),  # REGULAR batches are not cleaned up
+            ("GUEST", True),   # GUEST batches are marked completed (no immediate deletion)
+            ("REGULAR", False),  # REGULAR batches are completed after associations
         ],
     )
     async def test_assign_content_to_essay_batch_completion_cleanup(
@@ -255,7 +255,7 @@ class TestContentAssignmentService:
         mock_session: AsyncMock,
         sample_content_metadata: dict[str, Any],
         class_type: str,
-        should_cleanup: bool,
+        should_mark_completed: bool,
     ) -> None:
         """Test batch completion behavior and cleanup for GUEST vs REGULAR batches."""
         # Arrange
@@ -311,11 +311,12 @@ class TestContentAssignmentService:
         assert event_data.expected_count == 1
         assert event_data.user_id == "test_user"
 
-        # Verify cleanup behavior
-        if should_cleanup:
-            mock_batch_tracker.cleanup_batch.assert_called_once_with(batch_id)
+        # Verify completion marking (no immediate cleanup)
+        mock_batch_tracker.cleanup_batch.assert_not_called()
+        if should_mark_completed:
+            mock_batch_tracker.mark_batch_completed.assert_called_once()
         else:
-            mock_batch_tracker.cleanup_batch.assert_not_called()
+            mock_batch_tracker.mark_batch_completed.assert_not_called()
 
     async def test_assign_content_to_essay_event_structure_validation(
         self,
