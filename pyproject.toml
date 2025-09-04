@@ -344,6 +344,7 @@ prod-migrate = "scripts/migrate-production.sh"  # Run production migrations
 build-common-core = "pdm build -p libs/common_core"  # Build shared library
 kafka-setup = "python scripts/kafka_topic_bootstrap.py"  # Initialize Kafka topics
 docker-clean = "docker system prune -af"  # Clean Docker resources (use with caution)
+codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning
 
 # Observability is integrated into main stack - use standard docker compose commands
 obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"

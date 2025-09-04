@@ -1,0 +1,215 @@
+#!/bin/bash
+
+# codex-exec: Enhanced codex CLI wrapper with execution capabilities
+# Combines standard configuration with dynamic command execution and file handling
+
+set -euo pipefail
+
+# Default configuration
+DEFAULT_CONFIG="model_reasoning_effort=\"high\""
+SANDBOX_MODE="danger-full-access"
+APPROVAL_POLICY="untrusted"
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Help function
+show_help() {
+    cat << EOF
+codex-exec: Enhanced codex CLI wrapper with execution capabilities
+
+USAGE:
+    codex-exec [OPTIONS] [PROMPT]
+
+DESCRIPTION:
+    Combines your standard codex configuration (model_reasoning_effort="high") 
+    with full system access for running bash commands, Docker, and any files.
+    Default mode provides unrestricted access for local development.
+
+OPTIONS:
+    -h, --help              Show this help message
+    -s, --sandbox MODE      Sandbox mode: read-only, workspace-write, danger-full-access
+                           Default: danger-full-access (unrestricted)
+    -a, --approval POLICY   Approval policy: untrusted, on-failure, on-request, never
+                           Default: untrusted (trusted commands only)
+    --safe                 Use safe mode (workspace-write + on-request)
+    --read-only            Use read-only mode for analysis only
+    -m, --model MODEL      Override the model
+    -C, --cd DIR           Change to directory before starting
+    -i, --image FILE       Attach image file(s)
+    -c, --config KEY=VALUE Additional config overrides
+    --dry-run              Show the command that would be executed
+    --setup-cmd CMD        Run setup command before starting codex session
+
+EXECUTION MODES:
+    Full Access (default):  Complete system access, trusted commands only
+    Safe Mode:              Workspace access with approval prompts
+    Read-Only Mode:         Analysis only, no file modifications
+
+EXAMPLES:
+    # Start codex with full access (default)
+    codex-exec
+    
+    # Start with initial prompt
+    codex-exec "Help me run Docker tests and fix any issues"
+    
+    # Run setup commands first, then start codex
+    codex-exec --setup-cmd "docker-compose up -d" "Debug the running containers"
+    
+    # Safe mode for untrusted operations
+    codex-exec --safe "Analyze this codebase structure"
+    
+    # Read-only mode for analysis
+    codex-exec --read-only "Review the architecture and suggest improvements"
+    
+    # Custom model and directory
+    codex-exec -C /path/to/project -c model="o3" "Optimize this service"
+
+SAFETY NOTES:
+    - Default mode provides full system access with trusted command approval
+    - Use --safe for operations requiring explicit approval
+    - Use --read-only for analysis without modifications
+    - Setup commands run before starting the codex session
+
+EOF
+}
+
+# Parse command line arguments
+PROMPT=""
+ADDITIONAL_CONFIGS=()
+CODEX_ARGS=()
+DRY_RUN=false
+SETUP_CMD=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -s|--sandbox)
+            SANDBOX_MODE="$2"
+            shift 2
+            ;;
+        -a|--approval)
+            APPROVAL_POLICY="$2"
+            shift 2
+            ;;
+        --safe)
+            SANDBOX_MODE="workspace-write"
+            APPROVAL_POLICY="on-request"
+            shift
+            ;;
+        --read-only)
+            SANDBOX_MODE="read-only"
+            APPROVAL_POLICY="untrusted"
+            shift
+            ;;
+        --setup-cmd)
+            SETUP_CMD="$2"
+            shift 2
+            ;;
+        -m|--model)
+            CODEX_ARGS+=("--model" "$2")
+            shift 2
+            ;;
+        -C|--cd)
+            CODEX_ARGS+=("--cd" "$2")
+            shift 2
+            ;;
+        -i|--image)
+            CODEX_ARGS+=("--image" "$2")
+            shift 2
+            ;;
+        -c|--config)
+            ADDITIONAL_CONFIGS+=("$2")
+            shift 2
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -*)
+            echo -e "${RED}Error: Unknown option $1${NC}" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
+            ;;
+        *)
+            # Remaining arguments are the prompt
+            PROMPT="$*"
+            break
+            ;;
+    esac
+done
+
+# Build the complete codex command
+CODEX_CMD=(
+    "codex"
+    "--sandbox" "$SANDBOX_MODE"
+    "--ask-for-approval" "$APPROVAL_POLICY"
+    "-c" "$DEFAULT_CONFIG"
+)
+
+# Add additional configs
+if [[ ${#ADDITIONAL_CONFIGS[@]} -gt 0 ]]; then
+    for config in "${ADDITIONAL_CONFIGS[@]}"; do
+        CODEX_CMD+=("-c" "$config")
+    done
+fi
+
+# Add other arguments
+if [[ ${#CODEX_ARGS[@]} -gt 0 ]]; then
+    CODEX_CMD+=("${CODEX_ARGS[@]}")
+fi
+
+# Add prompt if provided
+if [[ -n "$PROMPT" ]]; then
+    CODEX_CMD+=("$PROMPT")
+fi
+
+# Run setup command if provided
+if [[ -n "$SETUP_CMD" ]]; then
+    echo -e "${BLUE}Running setup command:${NC} ${YELLOW}$SETUP_CMD${NC}"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "${YELLOW}[DRY RUN] Would execute: $SETUP_CMD${NC}"
+    else
+        eval "$SETUP_CMD"
+        echo -e "${GREEN}Setup command completed${NC}"
+        echo ""
+    fi
+fi
+
+# Show configuration
+echo -e "${BLUE}Codex Execution Configuration:${NC}"
+echo -e "  Sandbox Mode: ${YELLOW}$SANDBOX_MODE${NC}"
+echo -e "  Approval Policy: ${YELLOW}$APPROVAL_POLICY${NC}"
+echo -e "  Base Config: ${YELLOW}$DEFAULT_CONFIG${NC}"
+
+if [[ ${#ADDITIONAL_CONFIGS[@]} -gt 0 ]]; then
+    echo -e "  Additional Configs: ${YELLOW}${ADDITIONAL_CONFIGS[*]}${NC}"
+fi
+
+if [[ -n "$SETUP_CMD" ]]; then
+    echo -e "  Setup Command: ${YELLOW}$SETUP_CMD${NC}"
+fi
+
+if [[ -n "$PROMPT" ]]; then
+    echo -e "  Initial Prompt: ${GREEN}$PROMPT${NC}"
+fi
+
+echo ""
+
+# Execute or show dry run
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo -e "${YELLOW}Dry run - would execute:${NC}"
+    printf '%q ' "${CODEX_CMD[@]}"
+    echo ""
+else
+    echo -e "${GREEN}Starting codex session with full system access...${NC}"
+    echo ""
+    exec "${CODEX_CMD[@]}"
+fi

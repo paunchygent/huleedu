@@ -1,0 +1,155 @@
+---
+description: CJ Assessment phase processing flow from ELS initiation through completion event consumption
+globs: 
+  - "services/cj_assessment_service/**/*.py"
+  - "services/llm_provider_service/**/*.py"
+alwaysApply: false
+---
+
+# 037.1: CJ Assessment Phase Processing Flow
+
+## 1. Flow Architecture
+- **Pattern**: Fully async event-driven via Kafka callbacks
+- **Services**: ELS → CJ Assessment → LLM Provider → Callbacks
+- **State Machine**: INITIALIZING → GENERATING_PAIRS → WAITING_CALLBACKS → SCORING → COMPLETED
+- **Identity Threading**: Mandatory user_id/org_id propagation 
+- **Publishing**: Dual events (thin for state, rich for analytics)
+
+## 2. Phase Initiation
+
+| Phase | Service | Handler | Event |
+| ----- | ------- | ------- | ----- |
+| Command | ELS | `batch_command_handler_impl.py` | `BATCH_SERVICE_CJ_ASSESSMENT_INITIATE_COMMAND_DATA_V1` |
+| Dispatch | ELS | `ServiceRequestDispatcher.dispatch_cj_assessment_request()` | `huleedu.els.cj_assessment.requested.v1` |
+| Consume | CJ Assessment | `event_processor.py:process_single_message()` | Request processing |
+
+### 2.1. Request Construction
+```python
+cj_request = ELS_CJAssessmentRequestV1(
+    entity_id=batch_id,
+    essays_for_cj=essays_to_process,
+    user_id=user_id,  # MANDATORY
+    org_id=org_id,    # Optional
+    language=language.value,
+    course_code=course_code,
+)
+```
+
+### 2.2. Transactional Publishing  
+- **Pattern**: Outbox for atomicity
+- **Topic**: `huleedu.els.cj_assessment.requested.v1`
+- **Payload**: 500-1500 bytes
+- **Key**: batch_id
+
+## 3. CJ Assessment Processing
+
+### 3.1. Core Workflow
+| Function | Purpose | Implementation |
+| -------- | ------- | -------------- |
+| `run_cj_assessment_workflow()` | Main orchestrator | `workflow_orchestrator.py` |
+| `create_cj_batch()` | Batch initialization | `batch_preparation.py` |
+| `submit_comparisons_for_async_processing()` | LLM submission | `comparison_processing.py` |
+
+### 3.2. State Machine
+| State | Purpose | Next State |
+| ----- | ------- | ---------- |
+| INITIALIZING | Batch creation, essay prep | GENERATING_PAIRS |
+| GENERATING_PAIRS | Bradley-Terry pair generation | WAITING_CALLBACKS |
+| WAITING_CALLBACKS | Async LLM processing | SCORING |
+| SCORING | Bradley-Terry scoring | COMPLETED |
+| COMPLETED | Final rankings, events | N/A |
+
+### 3.3. Single Essay Fast Path
+- **Condition**: `student_count < 2`  
+- **Handler**: `BatchFinalizer.finalize_single_essay()`
+- **Result**: Direct to COMPLETED
+
+### 3.4. Database Schema
+| Table | Purpose |
+| ----- | ------- |
+| `cj_batch_uploads` | Batch metadata with identity |
+| `cj_batch_states` | State tracking with optimistic locking |
+| `cj_comparison_pairs` | Individual comparisons |
+| `cj_processed_essays` | Content and Bradley-Terry scores |
+
+## 4. LLM Provider Integration
+
+### 4.1. HTTP Pattern
+- **Endpoint**: `POST /api/v1/comparison` (port 8080)
+- **200 Response**: Immediate result (rare)
+- **202 Response**: Queued processing (standard)
+- **NO Polling**: Results via Kafka callbacks only
+
+### 4.2. Callback Processing
+- **Topic**: `huleedu.llm_provider.comparison_result.v1`
+- **Handler**: `process_llm_result()` → `continue_cj_assessment_workflow()`
+- **Correlation**: `request_correlation_id` links requests to callbacks
+
+### 4.3. Concurrency Control
+- **Max Concurrent**: 100 comparisons
+- **Semaphore**: `asyncio.Semaphore(MAX_CONCURRENT_COMPARISONS)`
+- **Content Fetching**: Semaphore(10) for parallel essay retrieval
+
+## 5. Completion and Publishing
+
+### 5.1. Completion Detection
+- **Trigger**: Sufficient comparisons complete via callbacks
+- **Scoring**: Bradley-Terry algorithm
+- **Grades**: Swedish 8-anchor system (F, E, D, D+, C, C+, B, A)
+
+### 5.2. Dual Event Publishing
+| Event Type | Size | Purpose | Consumers |
+| ---------- | ---- | ------- | --------- |
+| `CJAssessmentCompletedV1` | ~300 bytes | State management | ELS, BOS |
+| `CJAssessmentResultV1` | 2-5KB | Analytics | RAS, Analytics |
+
+## 6. Error Handling
+
+### 6.1. Batch Monitoring
+- **Monitor**: `BatchMonitor.check_stuck_batches()`
+- **Timeout**: 4 hours
+- **Recovery**: ≥80% complete → force SCORING, <80% → FAILED
+
+### 6.2. Error Patterns
+| Error Type | Handler | Recovery |
+| ---------- | ------- | -------- |
+| Processing | HuleEduError with ErrorDetail | Structured logging |
+| Timeout | BatchMonitor | Auto force to SCORING/FAILED |
+| Publishing | Circuit breaker | Queue for retry |
+
+### 6.3. Idempotency  
+- **Implementation**: Redis TTL (24 hours)
+- **Key**: `cj_assessment:idempotency:{event_id}`
+
+## 7. Performance Specifications
+
+### 7.1. Processing Targets
+| Operation | Target | Implementation |
+| --------- | ------ | -------------- |
+| Essay Content | <2s per essay | Parallel semaphore |
+| Pair Generation | <5s for 30 essays | O(n log n) algorithm |
+| Callback Processing | <500ms per result | Atomic state updates |
+| Total Pipeline | <5 minutes for 30 essays | End-to-end |
+
+### 7.2. Metrics
+```python
+cj_comparisons_made = Counter("cj_comparisons_made_total")
+cj_assessment_duration_seconds = Histogram("cj_assessment_duration_seconds")  
+cj_callback_latency_seconds = Histogram("cj_callback_latency_seconds")
+cj_stuck_batches_detected = Gauge("cj_stuck_batches_detected")
+```
+
+## 8. Service Contracts
+
+### 8.1. Event Contracts
+| Direction | Event | Topic | Size |
+| --------- | ----- | ----- | ---- |
+| ELS → CJ | `ELS_CJAssessmentRequestV1` | `huleedu.els.cj_assessment.requested.v1` | 500-1500B |
+| LLM → CJ | `LLMComparisonResultV1` | `huleedu.llm_provider.comparison_result.v1` | 200-800B |
+| CJ → ELS | `CJAssessmentCompletedV1` | `huleedu.cj_assessment.completed.v1` | ~300B |
+| CJ → RAS | `CJAssessmentResultV1` | `huleedu.cj_assessment.result.v1` | 2-5KB |
+
+### 8.2. Critical Patterns
+- **FORBIDDEN**: Synchronous LLM calls, direct Kafka publishing, missing identity
+- **MANDATORY**: Transactional outbox, UUID correlation IDs, atomic state transitions
+- **REQUIRED**: user_id for credit attribution, optimistic locking, header-first processing

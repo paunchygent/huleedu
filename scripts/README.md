@@ -10,6 +10,41 @@ This directory contains project-level scripts and utilities for the HuleEdu micr
 
 **Purpose**: Sets up the complete HuleEdu development environment for OpenAI Codex agent work.
 
+#### `codex-exec`
+
+**Purpose**: Enhanced codex CLI wrapper that combines your standard configuration with execution capabilities for running bash commands and files.
+
+**Usage**:
+
+```bash
+# Basic usage with standard config (model_reasoning_effort="high")
+./scripts/codex-exec "Help me analyze this Python file"
+
+# Full automation for trusted environments
+./scripts/codex-exec --full-auto "Run the test suite and fix any failures"
+
+# Danger mode for isolated environments only
+./scripts/codex-exec --danger "Install dependencies and deploy the application"
+
+# Custom configurations
+./scripts/codex-exec -c model="o3" "Optimize this algorithm"
+
+# With images and directory changes
+./scripts/codex-exec -C /path/to/project -i screenshot.png "Debug this UI issue"
+```
+
+**Execution Modes**:
+- **Safe Mode (default)**: Requires approval for potentially dangerous commands
+- **Full Auto Mode**: Executes most commands automatically with workspace sandboxing
+- **Danger Mode**: Full system access without prompts (USE WITH CAUTION)
+
+**Key Features**:
+- Combines your standard `model_reasoning_effort="high"` configuration
+- Configurable sandbox modes: `read-only`, `workspace-write`, `danger-full-access`
+- Approval policies: `untrusted`, `on-failure`, `on-request`, `never`
+- Support for all codex CLI arguments (model, images, config overrides, etc.)
+- Dry-run mode for testing commands before execution
+
 **Usage**:
 
 ```bash
