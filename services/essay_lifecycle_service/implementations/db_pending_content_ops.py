@@ -10,11 +10,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
-
-from huleedu_service_libs.logging_utils import create_service_logger
-
 
 logger = create_service_logger("els.db_pending_content")
 
@@ -27,7 +25,7 @@ class DBPendingContentOperations:
         self, batch_id: str, text_storage_id: str, content_metadata: dict[str, Any]
     ) -> None:
         async with self._session_factory() as session:
-            # Use explicit parameter binding to avoid mixing parameter styles  
+            # Use explicit parameter binding to avoid mixing parameter styles
             await session.execute(
                 text(
                     """
@@ -72,4 +70,3 @@ class DBPendingContentOperations:
                 {"batch_id": batch_id, "tsid": text_storage_id},
             )
             await session.commit()
-

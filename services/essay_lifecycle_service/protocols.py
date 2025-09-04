@@ -126,36 +126,10 @@ class EssayRepositoryProtocol(Protocol):
         """Retrieve essay state by text_storage_id and batch_id for idempotency checking."""
         ...
 
-    async def create_or_update_essay_state_for_slot_assignment(
-        self,
-        internal_essay_id: str,
-        batch_id: str,
-        text_storage_id: str,
-        original_file_name: str,
-        file_size: int,
-        content_hash: str | None,
-        initial_status: EssayStatus,
-        session: AsyncSession | None = None,
-        correlation_id: UUID | None = None,
-    ) -> EssayState:
-        """[DEPRECATED] Legacy slot-assignment updater; Option B supersedes this."""
-        ...
-
     async def list_essays_by_batch_and_phase(
         self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[EssayState]:
         """List all essays in a batch that are part of a specific processing phase."""
-        ...
-
-    async def create_essay_state_with_content_idempotency(
-        self,
-        batch_id: str,
-        text_storage_id: str,
-        essay_data: dict[str, Any],
-        correlation_id: UUID,
-        session: AsyncSession | None = None,
-    ) -> tuple[bool, str | None]:
-        """[DEPRECATED] Legacy idempotency helper; use Option B assignment_sql instead."""
         ...
 
     def get_session_factory(self) -> Any:
@@ -471,12 +445,6 @@ class BatchEssayTracker(Protocol):
         """Register batch expectations from BOS."""
         ...
 
-    async def assign_slot_to_content(
-        self, batch_id: str, text_storage_id: str, original_file_name: str
-    ) -> str | None:
-        """Assign an available slot to content and return assigned internal essay ID."""
-        ...
-
     async def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
     ) -> Any | None:  # BatchEssaysReady | None
@@ -492,7 +460,6 @@ class BatchEssayTracker(Protocol):
     async def get_batch_status(self, batch_id: str) -> dict[str, Any] | None:
         """Get current status of a batch."""
         ...
-
 
     async def list_active_batches(self) -> list[str]:
         """Get list of currently tracked batch IDs."""
@@ -529,15 +496,6 @@ class BatchEssayTracker(Protocol):
         """Remove completed batch from database."""
         ...
 
-    async def process_pending_content_for_batch(self, batch_id: str) -> int:
-        """
-        Process any pending content for a newly registered batch.
-
-        Returns:
-            Number of pending content items processed
-        """
-        ...
-
     async def cleanup_batch(self, batch_id: str) -> None:
         """Clean up Redis state for completed batch."""
         ...
@@ -558,14 +516,11 @@ class SlotOperationsProtocol(Protocol):
         """Atomically assign an available slot; idempotent by text_storage_id in batch."""
         ...
 
-    async def get_available_slot_count(self, batch_id: str) -> int:
-        ...
+    async def get_available_slot_count(self, batch_id: str) -> int: ...
 
-    async def get_assigned_count(self, batch_id: str) -> int:
-        ...
+    async def get_assigned_count(self, batch_id: str) -> int: ...
 
-    async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
-        ...
+    async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None: ...
 
     # Slot operations intentionally minimal to allow both Redis and DB implementations
 

@@ -7,15 +7,14 @@ Provides an immediate-commit, DB-only operation suitable for cross-process coord
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import JSON, select, bindparam
+from sqlalchemy import JSON, bindparam, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from services.essay_lifecycle_service.models_db import EssayStateDB
 
@@ -85,7 +84,7 @@ async def assign_via_essay_states_immediate_commit(
                     WHERE es.essay_id = c.essay_id
                     RETURNING es.essay_id
                 )
-                SELECT 
+                SELECT
                     (SELECT essay_id FROM existing) AS existing_essay_id,
                     (SELECT essay_id FROM upd) AS updated_essay_id;
                 """

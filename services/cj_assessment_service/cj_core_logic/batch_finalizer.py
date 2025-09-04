@@ -124,9 +124,7 @@ class BatchFinalizer:
                 rankings=rankings,
                 cj_batch_id=batch_id,
                 assignment_id=(
-                    batch_upload.assignment_id
-                    if hasattr(batch_upload, "assignment_id")
-                    else None
+                    batch_upload.assignment_id if hasattr(batch_upload, "assignment_id") else None
                 ),
                 course_code=(
                     batch_upload.course_code if hasattr(batch_upload, "course_code") else ""
@@ -262,9 +260,7 @@ class BatchFinalizer:
                 rankings=rankings,
                 cj_batch_id=batch_id,
                 assignment_id=(
-                    batch_upload.assignment_id
-                    if hasattr(batch_upload, "assignment_id")
-                    else None
+                    batch_upload.assignment_id if hasattr(batch_upload, "assignment_id") else None
                 ),
                 course_code=(
                     batch_upload.course_code if hasattr(batch_upload, "course_code") else ""

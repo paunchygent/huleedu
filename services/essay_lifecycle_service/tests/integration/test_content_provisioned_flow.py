@@ -44,13 +44,13 @@ from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher 
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
-    PostgreSQLEssayRepository,
-)
+from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
 from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
     DBPendingContentOperations,
 )
-from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
+from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
+    PostgreSQLEssayRepository,
+)
 from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import SlotOperationsProtocol
 
@@ -100,7 +100,10 @@ class TestContentProvisionedFlow:
 
             class NoopSlotOperations(SlotOperationsProtocol):
                 async def assign_slot_atomic(
-                    self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
+                    self,
+                    batch_id: str,
+                    content_metadata: dict[str, Any],
+                    correlation_id: UUID | None = None,
                 ) -> str | None:
                     return None
 
@@ -110,7 +113,9 @@ class TestContentProvisionedFlow:
                 async def get_assigned_count(self, batch_id: str) -> int:
                     return 0
 
-                async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+                async def get_essay_id_for_content(
+                    self, batch_id: str, text_storage_id: str
+                ) -> str | None:
                     return None
 
             slot_operations = NoopSlotOperations()
@@ -354,9 +359,7 @@ class TestContentProvisionedFlow:
         assert len(assigned_essays) + available == 5
 
         # Log the distribution for debugging (Option B inventory)
-        logger.info(
-            f"Distribution: assigned={len(assigned_essays)}, available={available}"
-        )
+        logger.info(f"Distribution: assigned={len(assigned_essays)}, available={available}")
 
         # If there were failures, verify ExcessContentProvisionedV1 events were published
         if failed_provisions:

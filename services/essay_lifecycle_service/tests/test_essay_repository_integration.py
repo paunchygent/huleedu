@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import ContentType, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 
 # EntityReference removed - using primitive parameters
@@ -239,52 +239,6 @@ class TestPostgreSQLEssayRepositoryIntegration:
         assert updated_essay.processing_metadata["updated_by"] == "test"
         assert updated_essay.processing_metadata["processing_step"] == "spellcheck"
         assert EssayStatus.AWAITING_SPELLCHECK.value in updated_essay.timeline
-
-    @pytest.mark.asyncio
-    async def test_slot_assignment_operations(
-        self, postgres_repository: PostgreSQLEssayRepository
-    ) -> None:
-        """Test slot assignment create/update operations."""
-        # Arrange
-        essay_id = "slot-test-essay"
-        batch_id = "slot-test-batch"
-        text_storage_id = "storage-123"
-
-        # Create batch tracker first to satisfy foreign key constraint
-        await self.create_batch_tracker(postgres_repository, batch_id, [essay_id])
-
-        # Act - Create essay for slot assignment using Unit of Work pattern
-        async with postgres_repository.get_session_factory()() as session:
-            async with session.begin():
-                created_essay = (
-                    await postgres_repository.create_or_update_essay_state_for_slot_assignment(
-                        internal_essay_id=essay_id,
-                        batch_id=batch_id,
-                        text_storage_id=text_storage_id,
-                        original_file_name="test_essay.txt",
-                        file_size=1024,
-                        content_hash="abc123",
-                        initial_status=EssayStatus.READY_FOR_PROCESSING,
-                        session=session,
-                    )
-                )
-
-        # Assert essay creation
-        assert created_essay.essay_id == essay_id
-        assert created_essay.batch_id == batch_id
-        assert created_essay.current_status == EssayStatus.READY_FOR_PROCESSING
-        assert created_essay.storage_references[ContentType.ORIGINAL_ESSAY] == text_storage_id
-        assert created_essay.processing_metadata["original_file_name"] == "test_essay.txt"
-        assert created_essay.processing_metadata["file_size"] == 1024
-
-        # Act - Test idempotency check
-        found_essay = await postgres_repository.get_essay_by_text_storage_id_and_batch_id(
-            batch_id, text_storage_id
-        )
-
-        # Assert idempotency
-        assert found_essay is not None
-        assert found_essay.essay_id == essay_id
 
     @pytest.mark.asyncio
     async def test_batch_operations(self, postgres_repository: PostgreSQLEssayRepository) -> None:

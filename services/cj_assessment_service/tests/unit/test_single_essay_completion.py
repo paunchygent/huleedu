@@ -56,7 +56,9 @@ class RepoMock(CJRepositoryProtocol):
         self.score_updates.append(scores)
 
     # Unused protocol methods for this test
-    async def get_assessment_instruction(self, session: Any, assignment_id: str | None, course_id: str | None) -> Any | None:  # noqa: E501
+    async def get_assessment_instruction(
+        self, session: Any, assignment_id: str | None, course_id: str | None
+    ) -> Any | None:  # noqa: E501
         return None
 
     async def get_cj_batch_upload(self, session: Any, cj_batch_id: int) -> Any | None:
@@ -179,8 +181,7 @@ async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> 
     # Assert: status updated, minimal score set, events published
     assert repo.status_updates[-1][1] == CJBatchStatusEnum.COMPLETE_INSUFFICIENT_ESSAYS
     assert any(
-        "student_1" in scores and scores["student_1"] == 0.0
-        for scores in repo.score_updates
+        "student_1" in scores and scores["student_1"] == 0.0 for scores in repo.score_updates
     )
     event_publisher.publish_assessment_completed.assert_called_once()
     event_publisher.publish_assessment_result.assert_called_once()

@@ -4,10 +4,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import Request
+from prometheus_client import REGISTRY, Counter
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from huleedu_service_libs.logging_utils import create_service_logger
-from prometheus_client import Counter, REGISTRY
 from services.api_gateway_service.app.jwt_utils import try_decode_and_validate_jwt
 from services.api_gateway_service.config import settings
 

@@ -73,14 +73,14 @@ def assert_metric_incremented(
         # If not present before, require non-zero after
         if max(after_vals) <= 0:
             raise AssertionError(
-                (
-                    "Metric '{}' did not increase; 'before' missing, 'after' max={}"
-                ).format(metric_name, max(after_vals))
+                ("Metric '{}' did not increase; 'before' missing, 'after' max={}").format(
+                    metric_name, max(after_vals)
+                )
             )
         return
     if max(after_vals) <= max(before_vals):
         raise AssertionError(
-            (
-                "Metric '{}' did not increase: before={} after={}"
-            ).format(metric_name, max(before_vals), max(after_vals))
+            ("Metric '{}' did not increase: before={} after={}").format(
+                metric_name, max(before_vals), max(after_vals)
+            )
         )

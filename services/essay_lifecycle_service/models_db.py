@@ -272,9 +272,7 @@ class BatchPendingContent(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "batch_id", "text_storage_id", name="uq_pending_content_per_batch"
-        ),
+        UniqueConstraint("batch_id", "text_storage_id", name="uq_pending_content_per_batch"),
         Index("idx_pending_content_batch", "batch_id"),
     )
 

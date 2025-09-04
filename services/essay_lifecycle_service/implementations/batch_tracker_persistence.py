@@ -107,9 +107,7 @@ class BatchTrackerPersistence:
                         )
                     )
                 ).all()
-                return [
-                    {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
-                ]
+                return [{"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows]
         except Exception as e:
             self._logger.error(f"Failed to get assigned essays for {batch_id}: {e}")
             return []
@@ -130,11 +128,9 @@ class BatchTrackerPersistence:
                     EssayStateDB.batch_id == batch_id,
                     EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
                 )
-                assigned_ids = {
-                    row[0] for row in (await session.execute(assigned_ids_stmt)).all()
-                }
+                assigned_ids = {row[0] for row in (await session.execute(assigned_ids_stmt)).all()}
                 expected_ids = set(tracker.expected_essay_ids)
-                return sorted(list(expected_ids - assigned_ids))
+                return sorted(expected_ids - assigned_ids)
         except Exception as e:
             self._logger.error(f"Failed to get missing slots for {batch_id}: {e}")
             return []

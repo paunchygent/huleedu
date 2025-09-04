@@ -351,7 +351,6 @@ class TestConstantsIntegration:
             RepositoryOperation.LIST_ESSAYS_BY_BATCH,
             RepositoryOperation.LIST_ESSAYS_BY_BATCH_AND_PHASE,
             RepositoryOperation.GET_BATCH_STATUS_SUMMARY,
-            RepositoryOperation.CREATE_WITH_CONTENT_IDEMPOTENCY,
         ]
 
         # Verify all operation constants are defined and are strings

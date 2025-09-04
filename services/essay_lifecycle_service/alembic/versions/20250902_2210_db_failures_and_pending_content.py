@@ -9,6 +9,7 @@ Create Date: 2025-09-02 22:10:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -37,7 +38,9 @@ def upgrade() -> None:
         sa.Column("validation_error_code", sa.String(length=50), nullable=True),
         sa.Column("validation_error_detail", sa.dialects.postgresql.JSONB, nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()")),
-        sa.ForeignKeyConstraint(["batch_tracker_id"], ["batch_essay_trackers.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["batch_tracker_id"], ["batch_essay_trackers.id"], ondelete="CASCADE"
+        ),
     )
     op.create_index("idx_failures_batch", "batch_validation_failures", ["batch_tracker_id"])
     op.create_index("idx_failures_batch_id", "batch_validation_failures", ["batch_id"])
@@ -85,4 +88,3 @@ def downgrade() -> None:
         "slot_assignments",
         "status IN ('available','assigned')",
     )
-

@@ -24,7 +24,10 @@ BOS implements the **Count-Based Aggregation Pattern** as the central orchestrat
 #### Phase 0: Batch Setup
 1. **Batch Creation**: BOS creates batch with internal essay ID slots, storing `class_id` for REGULAR batches
 2. **Registration**: BOS registers batch with ELS (`BatchEssaysRegistered`)
-3. **Content Coordination**: File Service provisions content to ELS for slot assignment
+3. **Content Coordination**: 
+   - File Service processes uploads → sends `EssayContentProvisionedV1` to ELS
+   - ELS assigns via Option B (PostgreSQL single UPDATE on essay_states)
+   - No Redis coordination, direct database assignment
 
 #### Phase 1: Content Readiness & Student Matching
 4. **Content Provisioning**: ELS notifies BOS when all slots are filled (`BatchContentProvisioningCompletedV1`)

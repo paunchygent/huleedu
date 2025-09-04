@@ -19,9 +19,6 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from services.essay_lifecycle_service.domain_models import EssayState as ConcreteEssayState
-from services.essay_lifecycle_service.implementations.essay_repository_idempotency import (
-    EssayIdempotencyOperations,
-)
 from services.essay_lifecycle_service.implementations.essay_repository_queries import (
     EssayRepositoryQueries,
 )
@@ -46,7 +43,6 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
 
         # Delegate to specialized modules
         self.queries = EssayRepositoryQueries()
-        self.idempotency = EssayIdempotencyOperations()
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -220,44 +216,6 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                 session, batch_id, text_storage_id
             )
 
-    async def create_or_update_essay_state_for_slot_assignment(
-        self,
-        internal_essay_id: str,
-        batch_id: str,
-        text_storage_id: str,
-        original_file_name: str,
-        file_size: int,
-        content_hash: str | None,
-        initial_status: EssayStatus,
-        session: AsyncSession | None = None,
-        correlation_id: UUID | None = None,
-    ) -> ConcreteEssayState:
-        """Create or update essay state for slot assignment with content metadata."""
-        if session is None:
-            async with self.session() as session:
-                return await self.idempotency.create_or_update_essay_state_for_slot_assignment(
-                    session,
-                    internal_essay_id,
-                    batch_id,
-                    text_storage_id,
-                    original_file_name,
-                    file_size,
-                    content_hash,
-                    initial_status,
-                    correlation_id,
-                )
-        return await self.idempotency.create_or_update_essay_state_for_slot_assignment(
-            session,
-            internal_essay_id,
-            batch_id,
-            text_storage_id,
-            original_file_name,
-            file_size,
-            content_hash,
-            initial_status,
-            correlation_id,
-        )
-
     async def list_essays_by_batch_and_phase(
         self, batch_id: str, phase_name: str, session: AsyncSession | None = None
     ) -> list[EssayState]:
@@ -268,21 +226,3 @@ class PostgreSQLEssayRepository(EssayRepositoryProtocol):
                     session, batch_id, phase_name
                 )
         return await self.queries.list_essays_by_batch_and_phase(session, batch_id, phase_name)
-
-    async def create_essay_state_with_content_idempotency(
-        self,
-        batch_id: str,
-        text_storage_id: str,
-        essay_data: dict[str, Any],
-        correlation_id: UUID,
-        session: AsyncSession | None = None,
-    ) -> tuple[bool, str | None]:
-        """Create essay state with atomic idempotency check for content provisioning."""
-        if session is None:
-            async with self.session() as session:
-                return await self.idempotency.create_essay_state_with_content_idempotency(
-                    session, batch_id, text_storage_id, essay_data, correlation_id
-                )
-        return await self.idempotency.create_essay_state_with_content_idempotency(
-            session, batch_id, text_storage_id, essay_data, correlation_id
-        )

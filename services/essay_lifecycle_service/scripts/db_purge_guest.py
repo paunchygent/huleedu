@@ -4,15 +4,16 @@ import argparse
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
-
 from services.essay_lifecycle_service.config import Settings
 from services.essay_lifecycle_service.models_db import (
     BatchEssayTracker as BatchEssayTrackerDB,
+)
+from services.essay_lifecycle_service.models_db import (
     BatchPendingContent,
     BatchValidationFailure,
 )
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 
 async def purge_guest_batches(older_than_days: int, dry_run: bool = False) -> dict[str, int]:
@@ -103,4 +104,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

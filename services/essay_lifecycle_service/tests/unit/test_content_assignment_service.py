@@ -15,7 +15,6 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.domain_services.content_assignment_service import (
     ContentAssignmentService,
@@ -107,7 +106,10 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
 
         # Option B: mock the single-statement assignment to return expected outcome
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
         cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=expected_outcome)
         # Mark slot fulfillment yields no completion by default
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
@@ -153,8 +155,13 @@ class TestContentAssignmentService:
         assigned_essay_id = "essay_789"
 
         # Option B: mock assignment to return created essay id
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
-        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(
+            return_value=(True, assigned_essay_id)
+        )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -194,8 +201,13 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
         assigned_essay_id = "essay_999"
 
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
-        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(False, assigned_essay_id))
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(
+            return_value=(False, assigned_essay_id)
+        )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -222,7 +234,7 @@ class TestContentAssignmentService:
     @pytest.mark.parametrize(
         "class_type, should_mark_completed",
         [
-            ("GUEST", True),   # GUEST batches are marked completed (no immediate deletion)
+            ("GUEST", True),  # GUEST batches are marked completed (no immediate deletion)
             ("REGULAR", False),  # REGULAR batches are completed after associations
         ],
     )
@@ -243,12 +255,6 @@ class TestContentAssignmentService:
         text_storage_id = "text_storage_completion"
         correlation_id = uuid4()
         assigned_essay_id = "essay_completion"
-
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,
-            assigned_essay_id,
-        )
 
         # Mock batch completion with proper essay data structure
         batch_ready_event = AsyncMock()
@@ -314,8 +320,13 @@ class TestContentAssignmentService:
         correlation_id = uuid4()
         assigned_essay_id = "essay_events"
 
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
-        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(
+            return_value=(True, assigned_essay_id)
+        )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None  # No batch completion
 
         # Act
@@ -354,13 +365,7 @@ class TestContentAssignmentService:
         batch_id = "test_batch_correlation"
         text_storage_id = "text_storage_correlation"
         correlation_id = uuid4()
-        assigned_essay_id = "essay_correlation"
 
-        mock_batch_tracker.assign_slot_to_content.return_value = assigned_essay_id
-        mock_repository.create_essay_state_with_content_idempotency.return_value = (
-            True,
-            assigned_essay_id,
-        )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
         # Act
@@ -398,8 +403,13 @@ class TestContentAssignmentService:
             # Missing file_size_bytes, file_upload_id, content_md5_hash
         }
 
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
-        cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, assigned_essay_id))
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
+        cas.assign_via_essay_states_immediate_commit = AsyncMock(
+            return_value=(True, assigned_essay_id)
+        )
         mock_batch_tracker.mark_slot_fulfilled.return_value = None
 
         # Act

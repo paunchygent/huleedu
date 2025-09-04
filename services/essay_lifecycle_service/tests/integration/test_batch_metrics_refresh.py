@@ -29,7 +29,7 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
         engine = create_async_engine(pg_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async_sessionmaker(engine, expire_on_commit=False)
         persistence = BatchTrackerPersistence(engine)
 
         # Create one GUEST active, one GUEST completed, and one REGULAR active

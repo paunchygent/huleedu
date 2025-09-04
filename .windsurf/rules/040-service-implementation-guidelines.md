@@ -1,35 +1,22 @@
 ---
-description: Read before all work on web framework, I/O, API etc
+description: Service implementation patterns and requirements for HuleEdu microservices
 globs: 
 alwaysApply: false
 ---
+
 # 040: Service Implementation Guidelines
 
-## 1. Purpose
-Complete service implementation patterns and requirements for HuleEdu microservices. Contains ALL patterns used across services.
-
-Model service: `@identity_service/`
-
-**Related Rules**:
-- [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc) - HTTP Blueprint patterns
-- [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc) - Async/DI patterns
-- [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc) - Config/logging
-- [047-security-configuration-standards.mdc](mdc:047-security-configuration-standards.mdc) - Security patterns
-- [048-structured-error-handling-standards.mdc](mdc:048-structured-error-handling-standards.mdc) - Error patterns
-- [071.1-prometheus-metrics-patterns.mdc](mdc:071.1-prometheus-metrics-patterns.mdc) - Metrics patterns
-- [087-docker-development-container-patterns.mdc](mdc:087-docker-development-container-patterns.mdc) - Docker patterns
-
-## 2. Core Stack
+## Core Stack
 - **Framework**: HuleEduApp (typed Quart) with guaranteed infrastructure
 - **Dependencies**: PDM exclusively (`pyproject.toml`, `pdm.lock`)  
 - **DI**: Dishka with `APP`/`REQUEST` scopes + QuartDishka integration
-- **Config**: SecureServiceSettings base with environment detection → [047](mdc:047-security-configuration-standards.mdc)
-- **Errors**: HuleEduError + domain factories → [048](mdc:048-structured-error-handling-standards.mdc)
-- **Observability**: Prometheus + OpenTelemetry → [071.1](mdc:071.1-prometheus-metrics-patterns.mdc)
+- **Config**: SecureServiceSettings base with environment detection
+- **Errors**: HuleEduError + domain factories from `huleedu_service_libs.error_handling`
+- **Observability**: Prometheus + OpenTelemetry
 
-## 3. Mandatory Service Patterns
+## Mandatory Service Patterns
 
-### 3.1. Application Structure
+### Application Structure
 ```python
 # app.py - Application initialization (<150 LoC)
 from huleedu_service_libs import HuleEduApp
@@ -46,7 +33,7 @@ async def shutdown() -> None:
     await shutdown_services()
 ```
 
-### 3.2. Startup Setup Pattern
+### Startup Setup Pattern
 ```python
 # startup_setup.py - Centralized initialization
 async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
@@ -58,37 +45,28 @@ async def initialize_services(app: HuleEduApp, settings: Settings) -> None:
     # Optional: tracer, consumer_task, etc.
 ```
 
-### 3.3. Configuration Standards
+### Configuration Standards
 ```python
 # config.py - Must inherit SecureServiceSettings
 from huleedu_service_libs.config import SecureServiceSettings
 
 class Settings(SecureServiceSettings):
     model_config = SettingsConfigDict(env_prefix="SERVICE_", extra="ignore")
-    
     SERVICE_NAME: str = "service_name"
     # Environment detection via base class: is_production(), is_development()
 ```
 
-### 3.4. Error Handling Integration
-```python
-# Use structured error factories from huleedu_service_libs
-from huleedu_service_libs.error_handling import (
-    HuleEduError,
-    raise_validation_error,
-    raise_user_not_found_error,  # Domain-specific factories
-)
+## Infrastructure Integration Requirements
 
-try:
-    result = await handler.process()
-except HuleEduError as e:
-    logger.warning(f"Business error: {e.error_detail.message}")
-    return jsonify({"error": e.error_detail.model_dump()}), e.error_detail.status_code
-```
+### Service Libraries Integration
+- **MUST** use `huleedu_service_libs.kafka_client.KafkaBus` for Kafka with circuit breakers
+- **MUST** use `huleedu_service_libs.redis_client.RedisClient` for Redis with lifecycle management
+- **MUST** use `huleedu_service_libs.logging_utils` for structured logging
+- **MUST** use `huleedu_service_libs.error_handling` for all exceptions
+- **MUST** use `@idempotent_consumer` decorator for ALL Kafka consumers
+- **MUST** integrate database monitoring for PostgreSQL services
 
-## 4. Infrastructure Patterns
-
-### 4.1. Protocols and DI
+### Protocols and DI Pattern
 ```python
 # protocols.py - Behavioral contracts
 class Repository(Protocol):
@@ -102,58 +80,31 @@ def provide_circuit_breaker_registry(settings: Settings) -> CircuitBreakerRegist
         registry.register("kafka_producer", CircuitBreaker(...))
     return registry
 
-@provide(scope=Scope.APP)
-def provide_idempotency_config(settings: Settings) -> IdempotencyConfig:
-    from huleedu_service_libs.idempotency_v2 import IdempotencyConfig
-    return IdempotencyConfig(
-        service_name=settings.SERVICE_NAME,
-        enable_debug_logging=settings.ENVIRONMENT == "development"
-    )
-
 @provide(scope=Scope.REQUEST)  # Per-operation instances  
 def provide_repository(session: AsyncSession, settings: Settings) -> Repository:
-    if settings.ENVIRONMENT == "testing" or getattr(settings, "USE_MOCK_REPOSITORY", False):
-        return MockRepositoryImpl()
-    return ProductionRepositoryImpl()
+    return MockRepositoryImpl() if settings.USE_MOCK_REPOSITORY else ProductionRepositoryImpl()
 ```
 
-### 4.2. Service Libraries Integration
-- **MUST** use `huleedu_service_libs.kafka_client.KafkaBus` for Kafka with circuit breakers
-- **MUST** use `huleedu_service_libs.redis_client.RedisClient` for Redis with lifecycle management
-- **MUST** use `huleedu_service_libs.logging_utils` for structured logging
-- **MUST** use `huleedu_service_libs.error_handling` for all exceptions
-- **MUST** use `@idempotent_consumer` decorator for ALL Kafka consumers
-- **MUST** integrate database monitoring for PostgreSQL services
-
-### 4.3. Circuit Breaker Standards
+### Circuit Breaker Standards
 ```python
 # Shared protocols: Use service library wrappers
 @provide(scope=Scope.APP)
-def provide_http_client(
-    base_client: HttpClientProtocol,
-    circuit_breaker_registry: CircuitBreakerRegistry,
-) -> HttpClientProtocol:
+def provide_http_client(base_client: HttpClientProtocol, circuit_breaker_registry: CircuitBreakerRegistry) -> HttpClientProtocol:
     from huleedu_service_libs.resilience import CircuitBreakerHttpClient
     breaker = circuit_breaker_registry.get("http_client")
     return CircuitBreakerHttpClient(base_client, breaker)
 
 # Service-specific protocols: Create service-specific wrappers
 @provide(scope=Scope.APP)
-def provide_service_client(
-    base_client: ServiceSpecificProtocol,
-    circuit_breaker_registry: CircuitBreakerRegistry,
-) -> ServiceSpecificProtocol:
+def provide_service_client(base_client: ServiceSpecificProtocol, circuit_breaker_registry: CircuitBreakerRegistry) -> ServiceSpecificProtocol:
     from .implementations.circuit_breaker_service_client import CircuitBreakerServiceClient
     breaker = circuit_breaker_registry.get("service_client")
     return CircuitBreakerServiceClient(base_client, breaker)
 ```
 
-### 4.4. Repository Selection Standards
-- **Pattern**: `USE_MOCK_REPOSITORY` flag for development/testing environments
-- **Testing**: Always use mock repositories regardless of USE_MOCK_REPOSITORY flag
-- **Development**: Mock repositories simulate production behavior (atomic operations, TTL)
+## Required Integrations
 
-### 4.5. Database Integration
+### Database Integration
 ```python
 # Database monitoring + health checking (startup_setup.py)
 db_metrics = setup_database_monitoring(engine, "service_name")
@@ -162,7 +113,7 @@ app.health_checker = DatabaseHealthChecker(engine, "service_name")
 app.database_engine = database_engine  # REQUIRED HuleEduApp attribute
 ```
 
-### 4.6. Kafka Consumer Integration
+### Kafka Consumer Integration
 ```python
 # Idempotent consumers with Redis deduplication
 @idempotent_consumer(redis_client=redis_client, config=idempotency_config)
@@ -176,17 +127,7 @@ consumer_task = asyncio.create_task(kafka_consumer.start_consumer())
 app.consumer_task = consumer_task  # Optional HuleEduApp attribute
 ```
 
-### 4.7. App Extensions Pattern
-```python
-# Standard extension storage in app.extensions dict
-app.extensions["metrics"] = metrics
-app.extensions["tracer"] = tracer  
-app.extensions["relay_worker"] = relay_worker
-app.extensions["queue_processor"] = queue_processor  # LLM Provider
-app.extensions["dishka_container"] = container  # Alternative storage
-```
-
-### 4.8. Outbox Pattern Integration
+### Outbox Pattern Integration
 ```python
 # EventRelayWorker startup (startup_setup.py) 
 relay_worker = await request_container.get(EventRelayWorker)
@@ -195,11 +136,10 @@ app.extensions["relay_worker"] = relay_worker
 
 # Transactional outbox for reliable event publishing
 # Shared DB session ensures atomicity with domain operations
+# OutboxManager automatically adds Kafka headers (event_id, event_type, trace_id, source_service)
 ```
 
-**Header Automation**: OutboxManager automatically adds Kafka headers (`event_id`, `event_type`, `trace_id`, `source_service`) enabling consuming services to skip JSON parsing during idempotency processing.
-
-### 4.9. Observability Middleware Setup
+### Observability Middleware Setup
 ```python  
 # Metrics middleware (startup_setup.py)
 setup_standard_service_metrics_middleware(app, "service_abbreviation")
@@ -210,7 +150,7 @@ app.extensions["tracer"] = tracer
 setup_tracing_middleware(app, tracer)
 ```
 
-### 4.10. Error Handler Patterns
+## Error Handler Patterns
 ```python
 # Global error handlers (app.py)
 @app.errorhandler(HuleEduError)
@@ -226,7 +166,36 @@ async def handle_general_error(error: Exception) -> Response:
     raise_processing_error(service="service", operation="processing", ...)
 ```
 
-### 4.11. Alembic Migration Standards
+## Service Types
+
+| Service Type | Characteristics | Required Attributes |
+|-------------|----------------|-------------------|
+| HTTP Services | HuleEduApp + Blueprint pattern | `database_engine`, `container`, `/health`, `/metrics` |
+| Worker Services | Event processor + background Kafka consumer | Same DI, error handling, observability |
+| Hybrid Services | Combined HTTP + Worker | Single `startup_setup.py`, shared metrics registry |
+
+## Production Requirements
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts  
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
+
+## Repository Selection Standards
+- **Pattern**: `USE_MOCK_REPOSITORY` flag for development/testing environments
+- **Testing**: Always use mock repositories regardless of USE_MOCK_REPOSITORY flag
+- **Development**: Mock repositories simulate production behavior (atomic operations, TTL)
+
+## App Extensions Pattern
+```python
+# Standard extension storage in app.extensions dict
+app.extensions["metrics"] = metrics
+app.extensions["tracer"] = tracer  
+app.extensions["relay_worker"] = relay_worker
+app.extensions["queue_processor"] = queue_processor  # LLM Provider
+app.extensions["dishka_container"] = container  # Alternative storage
+```
+
+## Alembic Migration Standards
 ```python
 # config.py - REQUIRED for Alembic
 @property
@@ -242,50 +211,15 @@ migrate-downgrade = "alembic downgrade -1"
 migrate-revision = "alembic revision --autogenerate"
 ```
 
-### 4.12. Lifecycle Management
-```python
-# Startup pattern (app.py)
-@app.before_serving
-async def startup() -> None:
-    await initialize_services(app, settings)
-    setup_standard_service_metrics_middleware(app, "abbrev")
-    
-@app.after_serving
-async def shutdown() -> None:
-    await shutdown_services()
-```
-
-### 4.13. Production Patterns
-- **MUST** implement graceful shutdown with proper async resource cleanup
-- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts  
-- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
-- **MUST** fail fast on startup errors with `logger.critical()` and `raise`
-
-## 5. Service Types
-
-### 5.1. HTTP Services → [041](mdc:041-http-service-blueprint.mdc)
-- HuleEduApp with Blueprint pattern
-- `/health` and `/metrics` endpoints mandatory
-- `database_engine` and `container` are REQUIRED attributes
-
-### 5.2. Worker Services → [042](mdc:042-async-patterns-and-di.mdc)
-- Event processor pattern with background Kafka consumer
-- Same DI, error handling, and observability patterns as HTTP services
-
-### 5.3. Hybrid Services
-- Combined HTTP + Worker (e.g., CJ Assessment, Essay Lifecycle)
-- Single `startup_setup.py` manages both lifecycles
-- Shared metrics registry prevents collisions
-
-## 6. Implementation Checklist
+## Implementation Checklist
 - [ ] HuleEduApp with `startup_setup.py` initialization
-- [ ] SecureServiceSettings inheritance → [047](mdc:047-security-configuration-standards.mdc)
-- [ ] Error handling with HuleEduError factories → [048](mdc:048-structured-error-handling-standards.mdc)
+- [ ] SecureServiceSettings inheritance
+- [ ] Error handling with HuleEduError factories
 - [ ] Circuit breakers for external dependencies
 - [ ] Repository selection with `USE_MOCK_REPOSITORY` support
 - [ ] Database monitoring + health checking integration
 - [ ] `@idempotent_consumer` for all Kafka consumers
 - [ ] Outbox pattern with EventRelayWorker
-- [ ] Metrics class + observability middleware → [071.1](mdc:071.1-prometheus-metrics-patterns.mdc)
+- [ ] Metrics class + observability middleware
 - [ ] Alembic migration setup for PostgreSQL services
-- [ ] Docker multi-stage builds → [087](mdc:087-docker-development-container-patterns.mdc)
+- [ ] Docker multi-stage builds

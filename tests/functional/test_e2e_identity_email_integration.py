@@ -419,15 +419,15 @@ class TestIdentityEmailIntegrationE2E:
                 # Wait for UserRegisteredV1 event to confirm user creation
                 print("🔄 Step 1.5: Waiting for user registration event...")
                 registration_events = await self._wait_for_event_sequence(
-                    consumer, 
-                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)], 
-                    correlation_id, 
-                    timeout=30
+                    consumer,
+                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)],
+                    correlation_id,
+                    timeout=30,
                 )
-                
-                assert topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events, (
-                    "UserRegisteredV1 event not found after registration"
-                )
+
+                assert (
+                    topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events
+                ), "UserRegisteredV1 event not found after registration"
                 print("✅ User registration event confirmed")
 
                 # Step 2: Email Verification Request (now for existing user)
@@ -564,15 +564,15 @@ class TestIdentityEmailIntegrationE2E:
                 # Wait for UserRegisteredV1 event to confirm user creation
                 print("🔄 Step 1.5: Waiting for user registration event...")
                 registration_events = await self._wait_for_event_sequence(
-                    consumer, 
-                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)], 
-                    correlation_id, 
-                    timeout=30
+                    consumer,
+                    [topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED)],
+                    correlation_id,
+                    timeout=30,
                 )
-                
-                assert topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events, (
-                    "UserRegisteredV1 event not found after registration"
-                )
+
+                assert (
+                    topic_name(ProcessingEvent.IDENTITY_USER_REGISTERED) in registration_events
+                ), "UserRegisteredV1 event not found after registration"
                 print("✅ User registration event confirmed")
 
                 # Step 2: Password Reset Request (now for existing user)
@@ -609,9 +609,7 @@ class TestIdentityEmailIntegrationE2E:
 
                 # Step 4: Verify PasswordResetRequestedV1 event
                 reset_topic = topic_name(ProcessingEvent.IDENTITY_PASSWORD_RESET_REQUESTED)
-                assert reset_topic in found_events, (
-                    "PasswordResetRequestedV1 event not found"
-                )
+                assert reset_topic in found_events, "PasswordResetRequestedV1 event not found"
 
                 reset_event = found_events[reset_topic]
                 assert reset_event["email"] == swedish_test_data["email"]

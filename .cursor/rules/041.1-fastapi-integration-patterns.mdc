@@ -3,11 +3,11 @@ description: FastAPI integration patterns for client-facing services with HuleEd
 globs: []
 alwaysApply: false
 ---
-# 041: FastAPI Integration Patterns
+
+# 041.1: FastAPI Integration Patterns
 
 ## Overview
-
-FastAPI is approved ONLY for client-facing services that directly support React frontend. All internal services **MUST** use Quart.
+FastAPI is approved **ONLY** for client-facing services that directly support React frontend. All internal services **MUST** use Quart.
 
 **Key Requirements:**
 - **DI First**: Use Dishka for dependency injection
@@ -15,27 +15,7 @@ FastAPI is approved ONLY for client-facing services that directly support React 
 - **Clear Contracts**: Explicit Pydantic models for requests/responses/errors
 - **Testability**: Dependencies easily mocked for testing
 
-## Core Structure
-
-```
-services/<fastapi_service>/
-├── main.py                 # App creation and setup
-├── startup_setup.py        # DI, middleware, metrics
-├── routers/
-│   ├── health_routes.py
-│   └── <domain>_routes.py
-├── models/
-│   ├── requests.py
-│   └── responses.py
-├── protocols.py            # Behavioral contracts
-├── implementations/
-├── di.py                   # Dishka providers
-├── config.py
-└── tests/
-```
-
 ## Application Setup
-
 ```python
 # main.py
 from fastapi import FastAPI
@@ -60,7 +40,6 @@ def create_di_container():
 ```
 
 ## Router Patterns
-
 ```python
 # routers/domain_routes.py
 from fastapi import APIRouter, Depends
@@ -69,18 +48,12 @@ from dishka.integrations.fastapi import FromDishka
 router = APIRouter(prefix="/api/v1", tags=["domain"])
 
 @router.post("/endpoint", response_model=ResponseModel)
-async def create_resource(
-    request: RequestModel,
-    service: FromDishka[ServiceProtocol],
-) -> ResponseModel:
+async def create_resource(request: RequestModel, service: FromDishka[ServiceProtocol]) -> ResponseModel:
     result = await service.process(request)
     return ResponseModel.from_domain(result)
 
 @router.get("/endpoint/{resource_id}")
-async def get_resource(
-    resource_id: str,
-    service: FromDishka[ServiceProtocol],
-) -> ResponseModel:
+async def get_resource(resource_id: str, service: FromDishka[ServiceProtocol]) -> ResponseModel:
     result = await service.get_by_id(resource_id)
     if not result:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -88,7 +61,6 @@ async def get_resource(
 ```
 
 ## Error Handling
-
 ```python
 # Custom exception handlers
 from fastapi import HTTPException
@@ -96,21 +68,14 @@ from fastapi.responses import JSONResponse
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=422,
-        content={"detail": "Validation error", "errors": exc.errors()}
-    )
+    return JSONResponse(status_code=422, content={"detail": "Validation error", "errors": exc.errors()})
 
 @app.exception_handler(DomainError)
 async def domain_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc), "error_code": exc.error_code}
-    )
+    return JSONResponse(status_code=400, content={"detail": str(exc), "error_code": exc.error_code})
 ```
 
 ## Frontend Integration (React)
-
 ```python
 # CORS configuration for React frontend
 from fastapi.middleware.cors import CORSMiddleware
@@ -132,16 +97,10 @@ class StudentResponse(BaseModel):
     
     @classmethod
     def from_domain(cls, student: Student) -> "StudentResponse":
-        return cls(
-            id=str(student.id),
-            name=student.full_name,
-            email=student.email,
-            created_at=student.created_at
-        )
+        return cls(id=str(student.id), name=student.full_name, email=student.email, created_at=student.created_at)
 ```
 
 ## Observability Integration
-
 ```python
 # Metrics integration
 from huleedu_service_libs.observability import create_service_metrics
@@ -160,15 +119,11 @@ from huleedu_service_libs.observability import trace_request
 
 @router.post("/endpoint")
 @trace_request("endpoint_operation")
-async def traced_endpoint(
-    request: RequestModel,
-    service: FromDishka[ServiceProtocol],
-):
+async def traced_endpoint(request: RequestModel, service: FromDishka[ServiceProtocol]):
     return await service.process(request)
 ```
 
 ## Health Endpoints
-
 ```python
 # routers/health_routes.py
 from fastapi import APIRouter
@@ -178,27 +133,40 @@ health_router = APIRouter(tags=["health"])
 
 @health_router.get("/healthz")
 async def health_check():
-    return {
-        "service": "service_name",
-        "status": "healthy",
-        "environment": settings.ENVIRONMENT.value,
-    }
+    return {"service": "service_name", "status": "healthy", "environment": settings.ENVIRONMENT.value}
 
 @health_router.get("/healthz/database")
-async def database_health(
-    health_checker: FromDishka[DatabaseHealthChecker],
-):
+async def database_health(health_checker: FromDishka[DatabaseHealthChecker]):
     health_data = await health_checker.check_detailed_health()
     status_code = 200 if health_data["healthy"] else 503
-    return Response(
-        content=json.dumps(health_data),
-        status_code=status_code,
-        media_type="application/json"
-    )
+    return Response(content=json.dumps(health_data), status_code=status_code, media_type="application/json")
+```
+
+## DI Provider Pattern
+```python
+# di.py
+from dishka import Provider, provide, Scope
+from huleedu_service_libs import RedisClient, KafkaBus
+
+class ServiceProvider(Provider):
+    @provide(scope=Scope.APP)
+    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
+        client = RedisClient(client_id="service", redis_url=settings.REDIS_URL)
+        await client.start()
+        return client
+    
+    @provide(scope=Scope.APP)  
+    async def provide_kafka_bus(self, settings: Settings) -> KafkaPublisherProtocol:
+        bus = KafkaBus(client_id="service", bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
+        await bus.start()
+        return bus
+    
+    @provide(scope=Scope.REQUEST)
+    async def provide_service(self, repository: RepositoryProtocol, publisher: EventPublisherProtocol) -> ServiceProtocol:
+        return ServiceImpl(repository, publisher)
 ```
 
 ## Testing Patterns
-
 ```python
 # tests/conftest.py
 import pytest
@@ -225,40 +193,13 @@ def test_create_resource(client, mock_service):
     mock_service.process.assert_called_once()
 ```
 
-## DI Provider Pattern
-
-```python
-# di.py
-from dishka import Provider, provide, Scope
-from huleedu_service_libs import RedisClient, KafkaBus
-
-class ServiceProvider(Provider):
-    @provide(scope=Scope.APP)
-    async def provide_redis_client(self, settings: Settings) -> RedisClientProtocol:
-        client = RedisClient(client_id="service", redis_url=settings.REDIS_URL)
-        await client.start()
-        return client
-    
-    @provide(scope=Scope.APP)  
-    async def provide_kafka_bus(self, settings: Settings) -> KafkaPublisherProtocol:
-        bus = KafkaBus(client_id="service", bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
-        await bus.start()
-        return bus
-    
-    @provide(scope=Scope.REQUEST)
-    async def provide_service(
-        self,
-        repository: RepositoryProtocol,
-        publisher: EventPublisherProtocol,
-    ) -> ServiceProtocol:
-        return ServiceImpl(repository, publisher)
-```
-
 ## Compliance Requirements
 
-1. **DI Framework**: MUST use Dishka for all dependencies
-2. **Service Libraries**: MUST use HuleEdu service libraries for infrastructure
-3. **Protocol Contracts**: MUST define behavioral contracts using `typing.Protocol`
-4. **Error Handling**: MUST implement custom exception handlers for domain errors
-5. **Observability**: MUST integrate metrics, tracing, and health endpoints
-6. **Testing**: MUST support dependency injection in tests with mocked protocols
+| Requirement | Specification |
+|------------|---------------|
+| **DI Framework** | MUST use Dishka for all dependencies |
+| **Service Libraries** | MUST use HuleEdu service libraries for infrastructure |
+| **Protocol Contracts** | MUST define behavioral contracts using `typing.Protocol` |
+| **Error Handling** | MUST implement custom exception handlers for domain errors |
+| **Observability** | MUST integrate metrics, tracing, and health endpoints |
+| **Testing** | MUST support dependency injection in tests with mocked protocols |

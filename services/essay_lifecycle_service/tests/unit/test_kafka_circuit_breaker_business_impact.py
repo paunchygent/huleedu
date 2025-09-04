@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import Any
-from unittest.mock import AsyncMock, Mock, call
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -221,8 +221,13 @@ class TestBatchCoordinationBusinessImpact:
         )
 
         # Ensure Option B assignment path doesn't touch DB in this unit test
-        from services.essay_lifecycle_service.implementations import batch_coordination_handler_impl as handler_mod
-        handler_mod.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, "essay_0"))
+        from services.essay_lifecycle_service.implementations import (
+            batch_coordination_handler_impl as handler_mod,
+        )
+
+        handler_mod.assign_via_essay_states_immediate_commit = AsyncMock(
+            return_value=(True, "essay_0")
+        )
 
         coordination_handler = DefaultBatchCoordinationHandler(
             batch_tracker=mock_batch_tracker,
@@ -362,7 +367,10 @@ class TestBatchCoordinationBusinessImpact:
         )
 
         # Patch Option B assignment to avoid DB and return deterministic result
-        from services.essay_lifecycle_service.domain_services import content_assignment_service as cas
+        from services.essay_lifecycle_service.domain_services import (
+            content_assignment_service as cas,
+        )
+
         cas.assign_via_essay_states_immediate_commit = AsyncMock(return_value=(True, "essay_0"))
 
         # Mock get_batch_status to return batch info with user_id

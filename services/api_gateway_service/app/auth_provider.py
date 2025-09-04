@@ -10,8 +10,8 @@ from fastapi import Request
 from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.api_gateway_service.config import Settings
 from services.api_gateway_service.app.jwt_utils import decode_and_validate_jwt
+from services.api_gateway_service.config import Settings
 
 # Custom type to avoid circular dependency with str
 BearerToken = NewType("BearerToken", str)

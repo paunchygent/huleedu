@@ -9,15 +9,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from huleedu_service_libs.logging_utils import create_service_logger
 from services.essay_lifecycle_service.models_db import (
     BatchEssayTracker as BatchEssayTrackerDB,
 )
-from services.essay_lifecycle_service.models_db import SlotAssignmentDB
-
 
 logger = create_service_logger("els.db_failure_tracker")
 
@@ -82,9 +80,7 @@ class DBFailureTracker:
 
     async def get_validation_failure_count(self, batch_id: str) -> int:
         async with self._session_factory() as session:
-            stmt = text(
-                "SELECT COUNT(1) FROM batch_validation_failures WHERE batch_id = :batch_id"
-            )
+            stmt = text("SELECT COUNT(1) FROM batch_validation_failures WHERE batch_id = :batch_id")
             res = await session.execute(stmt, {"batch_id": batch_id})
             count_val = int(res.scalar_one() or 0)
             return count_val
@@ -107,4 +103,3 @@ class DBFailureTracker:
                 }
                 for row in rows
             ]
-

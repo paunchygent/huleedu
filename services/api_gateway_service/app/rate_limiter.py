@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
+
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 
-import os
 from services.api_gateway_service.config import settings
 
 

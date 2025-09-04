@@ -28,10 +28,10 @@ if TYPE_CHECKING:
     )
 
 # Import protocol outside TYPE_CHECKING for runtime inheritance
-from services.essay_lifecycle_service.protocols import ContentAssignmentProtocol
 from services.essay_lifecycle_service.implementations.assignment_sql import (
     assign_via_essay_states_immediate_commit,
 )
+from services.essay_lifecycle_service.protocols import ContentAssignmentProtocol
 
 logger = create_service_logger("content_assignment_service")
 

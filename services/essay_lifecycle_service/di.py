@@ -13,7 +13,6 @@ from datetime import timedelta
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
-from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -55,6 +54,12 @@ from services.essay_lifecycle_service.implementations.consumer_health_monitor_im
 from services.essay_lifecycle_service.implementations.consumer_recovery_manager_impl import (
     ConsumerRecoveryManagerImpl,
 )
+from services.essay_lifecycle_service.implementations.db_failure_tracker import (
+    DBFailureTracker,
+)
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
+)
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
 )
@@ -67,20 +72,14 @@ from services.essay_lifecycle_service.implementations.mock_essay_repository impo
 from services.essay_lifecycle_service.implementations.nlp_command_handler import (
     NlpCommandHandler,
 )
+from services.essay_lifecycle_service.implementations.noop_slot_operations import (
+    NoopSlotOperations,
+)
 from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
 from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
-from services.essay_lifecycle_service.implementations.db_failure_tracker import (
-    DBFailureTracker,
-)
-from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
-    DBPendingContentOperations,
-)
 from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
 from services.essay_lifecycle_service.implementations.redis_slot_operations import (
     RedisSlotOperations,
-)
-from services.essay_lifecycle_service.implementations.database_slot_operations import (
-    DatabaseSlotOperations,
 )
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
@@ -524,20 +523,13 @@ class BatchCoordinationProvider(Provider):
         return RedisSlotOperations(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
-    def provide_db_slot_operations(
-        self, session_factory: async_sessionmaker
-    ) -> DatabaseSlotOperations:
-        """Provide DB-backed slot operations (legacy, deprecated).
+    def provide_noop_slot_operations(self) -> NoopSlotOperations:
+        """Provide no-op slot operations for Option B architecture.
 
-        Note: Service hot path uses Option B assignment via essay_states; this
-        provider remains for tests/metrics-only and will be removed when tests
-        are migrated.
+        Option B uses direct essay_states assignment via assignment_sql module.
+        This provider satisfies SlotOperationsProtocol dependencies without operations.
         """
-        logger = create_service_logger("di")
-        logger.warning(
-            "Providing deprecated DatabaseSlotOperations; Option B is the hot path",
-        )
-        return DatabaseSlotOperations(session_factory)
+        return NoopSlotOperations()
 
     @provide(scope=Scope.APP)
     def provide_redis_batch_state(
@@ -558,9 +550,7 @@ class BatchCoordinationProvider(Provider):
         return RedisBatchQueries(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
-    def provide_db_failure_tracker(
-        self, session_factory: async_sessionmaker
-    ) -> DBFailureTracker:
+    def provide_db_failure_tracker(self, session_factory: async_sessionmaker) -> DBFailureTracker:
         """Provide DB-backed validation failure tracking."""
         return DBFailureTracker(session_factory)
 
@@ -576,7 +566,7 @@ class BatchCoordinationProvider(Provider):
         self,
         persistence: BatchTrackerPersistence,
         failure_tracker: DBFailureTracker,
-        slot_operations: DatabaseSlotOperations,
+        slot_operations: NoopSlotOperations,
         pending_content_ops: DBPendingContentOperations,
     ) -> BatchEssayTracker:
         """Provide batch essay tracker implementation with direct domain class composition (DB-only)."""

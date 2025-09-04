@@ -14,14 +14,14 @@ from common_core.domain_enums import CourseCode
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
+from services.essay_lifecycle_service.implementations.assignment_sql import (
+    assign_via_essay_states_immediate_commit,
+)
 from services.essay_lifecycle_service.implementations.batch_expectation import (
     BatchExpectation,
 )
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
-)
-from services.essay_lifecycle_service.implementations.assignment_sql import (
-    assign_via_essay_states_immediate_commit,
 )
 from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
     PostgreSQLEssayRepository,
@@ -67,8 +67,7 @@ async def test_option_b_assignment_idempotency_and_exhaustion() -> None:
         # Option B requires essay rows to exist in essay_states for inventory
         repository = PostgreSQLEssayRepository(session_factory)
         essay_data: list[dict[str, str | None]] = [
-            {"entity_id": eid, "parent_id": batch_id, "entity_type": "essay"}
-            for eid in essay_ids
+            {"entity_id": eid, "parent_id": batch_id, "entity_type": "essay"} for eid in essay_ids
         ]
         await repository.create_essay_records_batch(essay_data=essay_data, correlation_id=uuid4())
 

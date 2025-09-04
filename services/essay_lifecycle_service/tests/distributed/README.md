@@ -4,7 +4,7 @@ This directory contains comprehensive distributed testing infrastructure for val
 
 ## Overview
 
-The distributed testing infrastructure implements **Phase 3: Integration Testing** of the ELS-002 distributed state management implementation. It validates that the Redis-based coordination system correctly prevents race conditions and maintains data integrity across multiple service instances.
+The distributed testing infrastructure implements **Phase 3: Integration Testing** of the ELS-002 distributed state management implementation. It validates Option B database-only assignment prevents race conditions across instances.
 
 ## Key Testing Capabilities
 
@@ -39,32 +39,35 @@ The distributed testing infrastructure implements **Phase 3: Integration Testing
 ```
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   ELS Worker 1  │  │   ELS Worker 2  │  │   ELS Worker 3  │
-│   (Instance)    │  │   (Instance)    │  │   (Instance)    │
 └─────────┬───────┘  └─────────┬───────┘  └─────────┬───────┘
-          │                    │                    │
           └────────────────────┼────────────────────┘
                                │
                     ┌─────────┴────────┐
                     │  Load Balancer   │
-                    │     (Nginx)      │
                     └─────────┬────────┘
+                              │
+                    ┌─────────▼────────┐
+                    │   PostgreSQL     │
+                    │  (Option B MVCC) │
+                    └──────────────────┘
                               │
           ┌───────────────────┼───────────────────┐
           │                   │                   │
     ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
-    │   Redis   │       │PostgreSQL │       │   Kafka   │
-    │(Coordination)│     │ (State)   │       │ (Events)  │
+    │   Redis   │       │   Kafka   │       │ Prometheus │
+    │(Idempotency)│     │ (Events)  │       │ (Metrics)  │
     └───────────┘       └───────────┘       └───────────┘
 ```
 
-### Distributed Coordination Flow
+### Option B Coordination Flow
 
-1. **Batch Registration**: BOS registers batch with available essay slots in Redis
-2. **Content Events**: Content service publishes content provisioned events to Kafka
-3. **Load Distribution**: Nginx distributes events across ELS worker instances
-4. **Atomic Assignment**: Redis SPOP ensures only one instance assigns content to slot
-5. **State Persistence**: PostgreSQL maintains essay state with unique constraints
-6. **Completion Detection**: Redis state determines when batch is fully provisioned
+1. **Batch Setup**: BOS sends `BatchEssaysRegistered` to ELS
+2. **Slot Creation**: ELS creates essay_states rows with status='UPLOADED'  
+3. **Content Events**: File Service sends `EssayContentProvisionedV1` to Kafka
+4. **Load Distribution**: Kafka distributes to N ELS instances
+5. **Assignment**: PostgreSQL FOR UPDATE SKIP LOCKED ensures single winner
+6. **Idempotency**: Partial unique index on (batch_id, text_storage_id)
+7. **Completion**: ELS publishes `BatchContentProvisioningCompletedV1` to BOS
 
 ## Test Files
 

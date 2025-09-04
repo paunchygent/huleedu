@@ -38,7 +38,6 @@ from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher 
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.protocols import SlotOperationsProtocol
 from services.essay_lifecycle_service.implementations.db_failure_tracker import (
     DBFailureTracker,
 )
@@ -49,6 +48,7 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.models_db import Base
+from services.essay_lifecycle_service.protocols import SlotOperationsProtocol
 from services.essay_lifecycle_service.tests.distributed.test_sync_utils import (
     wait_for_batch_ready,
     wait_for_condition,
@@ -138,19 +138,30 @@ class TestConcurrentSlotAssignment:
             await conn.run_sync(Base.metadata.create_all)
 
         # Create 3 instances sharing the same engine/pool
-        for instance_id in range(3):
+        for _instance_id in range(3):
             repository = PostgreSQLEssayRepository(session_factory)
 
             # Create DB-based implementations
             failure_tracker = DBFailureTracker(session_factory)
+
             class NoopSlotOperations(SlotOperationsProtocol):
-                async def assign_slot_atomic(self, batch_id: str, content_metadata: dict[str, Any], correlation_id: Any | None = None) -> str | None:
+                async def assign_slot_atomic(
+                    self,
+                    batch_id: str,
+                    content_metadata: dict[str, Any],
+                    correlation_id: Any | None = None,
+                ) -> str | None:
                     return None
+
                 async def get_available_slot_count(self, batch_id: str) -> int:
                     return 0
+
                 async def get_assigned_count(self, batch_id: str) -> int:
                     return 0
-                async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+
+                async def get_essay_id_for_content(
+                    self, batch_id: str, text_storage_id: str
+                ) -> str | None:
                     return None
 
             slot_operations = NoopSlotOperations()

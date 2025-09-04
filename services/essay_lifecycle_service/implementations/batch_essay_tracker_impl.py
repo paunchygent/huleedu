@@ -133,41 +133,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             f"{batch_essays_registered.course_code.value}"
         )
 
-    async def assign_slot_to_content(
-        self, batch_id: str, text_storage_id: str, original_file_name: str
-    ) -> str | None:
-        """
-        Assign an available slot to content using Redis coordinator for atomic operations.
-
-        Uses Redis-based atomic slot assignment to eliminate race conditions
-        in distributed deployments.
-
-        Args:
-            batch_id: The batch ID
-            text_storage_id: Storage ID for the essay content
-            original_file_name: Original name of uploaded file
-
-        Returns:
-            The assigned internal essay ID if successful, None if no slots available
-        """
-        try:
-            # Create content metadata for Redis storage
-            content_metadata = {
-                "text_storage_id": text_storage_id,
-                "original_file_name": original_file_name,
-                "assigned_at": datetime.now(UTC).isoformat(),
-            }
-
-            # Use DB coordinator for atomic slot assignment with its own transaction
-            return await self._slot_operations.assign_slot_atomic(batch_id, content_metadata)
-
-        except Exception as e:
-            self._logger.error(
-                f"Redis slot assignment failed for batch {batch_id}: {e}", exc_info=True
-            )
-            # Re-raise to let caller handle the error
-            raise
-
     async def mark_slot_fulfilled(
         self, batch_id: str, internal_essay_id: str, text_storage_id: str
     ) -> tuple[BatchEssaysReady, UUID] | None:  # (BatchEssaysReady, correlation_id) | None
@@ -236,7 +201,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 f"DB batch status check failed for batch {batch_id}: {e}", exc_info=True
             )
             raise
-
 
     async def handle_validation_failure(
         self, event_data: Any
@@ -399,59 +363,6 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         )
 
         return event, correlation_id
-
-    async def process_pending_content_for_batch(self, batch_id: str) -> int:
-        """
-        Process any pending content for a newly registered batch.
-
-        This method handles only Redis-level slot assignment operations.
-        Database coordination is handled separately by the ContentAssignmentService.
-
-        Returns:
-            Number of pending content items successfully assigned to slots
-        """
-        # Get all pending content
-        pending_content = await self._pending_content_ops.get_pending_content(batch_id)
-
-        if not pending_content:
-            return 0
-
-        assigned_count = 0
-
-        for content_metadata in pending_content:
-            text_storage_id = content_metadata["text_storage_id"]
-
-            # Try to assign to available slot (Redis operation only)
-            assigned_essay_id = await self._slot_operations.assign_slot_atomic(
-                batch_id, content_metadata
-            )
-
-            if assigned_essay_id:
-                # Successfully assigned - remove from pending
-                await self._pending_content_ops.remove_pending_content(batch_id, text_storage_id)
-                assigned_count += 1
-
-                self._logger.info(
-                    f"Assigned pending content to Redis slot: {text_storage_id} -> {assigned_essay_id}",
-                    extra={
-                        "batch_id": batch_id,
-                        "text_storage_id": text_storage_id,
-                        "assigned_essay_id": assigned_essay_id,
-                    },
-                )
-            else:
-                # No slots available - content remains as excess
-                self._logger.warning(
-                    f"No slots for pending content {text_storage_id} in batch {batch_id}",
-                    extra={"batch_id": batch_id, "text_storage_id": text_storage_id},
-                )
-
-        self._logger.info(
-            f"Processed {assigned_count} pending content items for batch {batch_id}",
-            extra={"batch_id": batch_id, "assigned_count": assigned_count},
-        )
-
-        return assigned_count
 
     async def initialize_from_database(self) -> None:
         """No-op in DB-only mode; state is already persisted."""

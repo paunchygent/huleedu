@@ -63,8 +63,8 @@ class TestMockRepositoryProtocolCompliance:
         )
 
         # Log discovered method count for visibility
-        assert len(protocol_methods) >= 15, (
-            f"Expected at least 15 protocol methods, found {len(protocol_methods)}"
+        assert len(protocol_methods) >= 13, (
+            f"Expected at least 13 protocol methods, found {len(protocol_methods)}"
         )
 
     def test_get_essay_state_signature(self) -> None:
@@ -281,19 +281,6 @@ class TestMockRepositoryProtocolCompliance:
         assert all(isinstance(key, EssayStatus) for key in summary.keys())
         assert all(isinstance(value, int) for value in summary.values())
 
-        # Test create_essay_state_with_content_idempotency return type
-        (
-            was_created,
-            returned_essay_id,
-        ) = await mock_repository.create_essay_state_with_content_idempotency(
-            batch_id="test-batch-2",
-            text_storage_id="text-123",
-            essay_data={"internal_essay_id": "test-essay-2"},
-            correlation_id=uuid4(),
-        )
-        assert isinstance(was_created, bool)
-        assert returned_essay_id is None or isinstance(returned_essay_id, str)
-
         # Test get_session_factory return type
         session_factory = mock_repository.get_session_factory()
         # Should return None for mock implementation as documented
@@ -341,9 +328,7 @@ class TestMockRepositoryProtocolCompliance:
             "get_batch_status_summary",
             "get_batch_summary_with_essays",
             "get_essay_by_text_storage_id_and_batch_id",
-            # deprecated: "create_or_update_essay_state_for_slot_assignment",
             "list_essays_by_batch_and_phase",
-            # deprecated: "create_essay_state_with_content_idempotency",
             "get_session_factory",
             "update_essay_processing_metadata",
             "update_student_association",
@@ -383,6 +368,6 @@ class TestMockRepositoryProtocolCompliance:
         )
 
         # Verify we found the expected number of public methods
-        assert len(public_methods) >= 15, (
-            f"Expected at least 15 public methods, found {len(public_methods)}"
+        assert len(public_methods) >= 13, (
+            f"Expected at least 13 public methods, found {len(public_methods)}"
         )

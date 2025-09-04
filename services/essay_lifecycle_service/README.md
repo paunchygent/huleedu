@@ -12,9 +12,17 @@ ELS implements the **Slot Assignment Pattern** for coordinating content with bat
 
 ### Coordination Flow
 
-1. **Slot Registration**: BOS informs ELS about batch slots (`BatchEssaysRegistered`).
-2. **Content Assignment**: ELS assigns incoming content from File Service to available slots (`EssayContentProvisionedV1`).
-3. **Batch Completion**: ELS notifies BOS when all slots are filled (`BatchEssaysReady`).
+1. **Registration**: BOS → ELS `BatchEssaysRegistered`
+   - Creates batch expectation with essay IDs
+   - Creates `essay_states` rows (status='UPLOADED') as available slots
+   
+2. **Content Provisioning**: File Service → ELS `EssayContentProvisionedV1`
+   - File Service processes uploads and notifies ELS
+   - ELS assigns via Option B single UPDATE (UPLOADED → READY_FOR_PROCESSING)
+   
+3. **Completion**: ELS → BOS `BatchContentProvisioningCompletedV1`
+   - COUNT(*) FROM essay_states WHERE status='READY_FOR_PROCESSING'
+   - Publishes when provisioned_count == expected_count
 4. **Command Processing**: ELS processes batch commands from BOS (`BatchSpellcheckInitiateCommand`) and transitions individual essay states using its state machine.
 5. **Phase Outcome Reporting**: After a phase completes for a batch, ELS reports the outcome to BOS (`ELSBatchPhaseOutcomeV1`).
 
@@ -36,6 +44,38 @@ ELS is a hybrid service combining a Kafka-based worker for asynchronous processi
 - **Dependency Injection**: Utilizes Dishka for managing dependencies. Providers in `di.py` supply implementations for protocols defined in `protocols.py`.
 - **Implementation Layer**: Business logic is cleanly separated in the `implementations/` directory, covering command handlers, event publishers, and repository logic.
 - **Batch Coordination**: The `batch_tracker.py` module implements count-based aggregation for coordinating batch readiness.
+
+### Option B Assignment Implementation
+
+```sql
+UPDATE essay_states
+SET current_status = 'READY_FOR_PROCESSING',
+    text_storage_id = :text_storage_id,
+    updated_at = NOW()
+WHERE batch_id = :batch_id 
+  AND current_status = 'UPLOADED'
+  AND NOT EXISTS (
+    SELECT 1 FROM essay_states e2 
+    WHERE e2.batch_id = :batch_id 
+    AND e2.text_storage_id = :text_storage_id
+  )
+ORDER BY essay_id
+LIMIT 1
+FOR UPDATE SKIP LOCKED
+RETURNING essay_id;
+```
+
+- **Transaction**: Immediate commit per assignment
+- **Idempotency**: IntegrityError on duplicate → read winner
+- **Implementation**: `assignment_sql.assign_via_essay_states_immediate_commit()`
+
+### Service Contract Stability
+
+**UNCHANGED**: All service boundaries and event contracts remain identical
+- BOS still sends `BatchEssaysRegistered` with essay IDs
+- File Service still sends `EssayContentProvisionedV1` per processed file
+- ELS still publishes `BatchContentProvisioningCompletedV1` on completion
+- **ONLY CHANGE**: Internal assignment uses PostgreSQL UPDATE instead of Redis coordination
 
 ## 🔄 Data Flow: Commands, Events, and Queries
 
@@ -383,7 +423,7 @@ Error scenarios mapped to specific error codes:
 - `RESOURCE_NOT_FOUND`: Essay/batch not found in database
 - `PROCESSING_ERROR`: State machine transitions, business logic failures  
 - `KAFKA_PUBLISH_ERROR`: Event publishing failures with circuit breaker integration
-- `CONNECTION_ERROR`: Database connection failures, Redis coordination errors
+- `CONNECTION_ERROR`: Database connection failures
 - `VALIDATION_ERROR`: Input validation, constraint violations
 
 ### Contract Testing

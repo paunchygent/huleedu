@@ -9,7 +9,7 @@ Uses PostgreSQL database infrastructure with testcontainers.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
@@ -37,13 +37,13 @@ from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher 
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
-    PostgreSQLEssayRepository,
-)
+from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
 from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
     DBPendingContentOperations,
 )
-from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
+from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
+    PostgreSQLEssayRepository,
+)
 from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import EventPublisher, SlotOperationsProtocol
 
@@ -201,9 +201,7 @@ class TestAtomicBatchCreationIntegration:
             return str(object.__getattribute__(self, "_database_url"))
 
     @pytest.fixture
-    def test_settings(
-        self, postgres_container: PostgresContainer
-    ) -> Settings:
+    def test_settings(self, postgres_container: PostgresContainer) -> Settings:
         """Create test settings pointing to the PostgreSQL test container."""
         # Get PostgreSQL connection URL and ensure it uses asyncpg driver
         pg_connection_url = postgres_container.get_connection_url()
@@ -246,7 +244,9 @@ class TestAtomicBatchCreationIntegration:
         return BatchTrackerPersistence(engine)
 
     @pytest.fixture
-    async def failure_tracker(self, postgres_repository: PostgreSQLEssayRepository) -> DBFailureTracker:
+    async def failure_tracker(
+        self, postgres_repository: PostgreSQLEssayRepository
+    ) -> DBFailureTracker:
         """Create DB-based failure tracker."""
         session_factory = postgres_repository.get_session_factory()
         return DBFailureTracker(session_factory)
@@ -262,11 +262,13 @@ class TestAtomicBatchCreationIntegration:
         mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
 
         # Provide a no-op slot operations implementation (Option B does not use it)
-        from uuid import UUID
 
         class NoopSlotOperations(SlotOperationsProtocol):
             async def assign_slot_atomic(
-                self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
+                self,
+                batch_id: str,
+                content_metadata: dict[str, Any],
+                correlation_id: UUID | None = None,
             ) -> str | None:
                 return None
 
@@ -276,7 +278,9 @@ class TestAtomicBatchCreationIntegration:
             async def get_assigned_count(self, batch_id: str) -> int:
                 return 0
 
-            async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+            async def get_essay_id_for_content(
+                self, batch_id: str, text_storage_id: str
+            ) -> str | None:
                 return None
 
         slot_operations = NoopSlotOperations()

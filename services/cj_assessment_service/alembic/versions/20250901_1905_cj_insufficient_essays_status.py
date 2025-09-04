@@ -39,4 +39,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     """No-op: Removing enum values is not supported safely in Postgres."""
     pass
-

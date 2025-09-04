@@ -98,8 +98,6 @@ class RepositoryOperation:
     GET_BATCH_SUMMARY_WITH_ESSAYS = "get_batch_summary_with_essays"
 
     # Specialized operations
-    CREATE_WITH_CONTENT_IDEMPOTENCY = "create_essay_state_with_content_idempotency"
-    CREATE_OR_UPDATE_FOR_SLOT_ASSIGNMENT = "create_or_update_essay_state_for_slot_assignment"
     GET_BY_TEXT_STORAGE_ID_AND_BATCH = "get_essay_by_text_storage_id_and_batch_id"
     UPDATE_ESSAY_PROCESSING_METADATA = "update_essay_processing_metadata"
     UPDATE_STUDENT_ASSOCIATION = "update_student_association"
