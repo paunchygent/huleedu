@@ -16,7 +16,6 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from services.essay_lifecycle_service.config import settings
 from services.essay_lifecycle_service.implementations.batch_expectation import BatchExpectation
 from services.essay_lifecycle_service.metrics import get_metrics
 from services.essay_lifecycle_service.models_db import (
@@ -72,34 +71,18 @@ class BatchTrackerPersistence:
                 if tracker is None:
                     return None
 
-                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-                    assigned_stmt = select(func.count(EssayStateDB.essay_id)).where(
-                        EssayStateDB.batch_id == batch_id,
-                        EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
-                    )
-                    available_stmt = select(func.count(EssayStateDB.essay_id)).where(
-                        EssayStateDB.batch_id == batch_id,
-                        EssayStateDB.current_status == EssayStatus.UPLOADED,
-                    )
-                    assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
-                    available_count = (await session.execute(available_stmt)).scalar() or 0
-                    expected_count = tracker.expected_count
-                    return assigned_count, available_count, expected_count
-                else:
-                    assigned_stmt = select(func.count(SlotAssignmentDB.id)).where(
-                        SlotAssignmentDB.batch_tracker_id == tracker.id,
-                        SlotAssignmentDB.status == "assigned",
-                    )
-                    available_stmt = select(func.count(SlotAssignmentDB.id)).where(
-                        SlotAssignmentDB.batch_tracker_id == tracker.id,
-                        SlotAssignmentDB.status == "available",
-                    )
-
-                    assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
-                    available_count = (await session.execute(available_stmt)).scalar() or 0
-                    expected_count = tracker.expected_count
-
-                    return assigned_count, available_count, expected_count
+                assigned_stmt = select(func.count(EssayStateDB.essay_id)).where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
+                )
+                available_stmt = select(func.count(EssayStateDB.essay_id)).where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.current_status == EssayStatus.UPLOADED,
+                )
+                assigned_count = (await session.execute(assigned_stmt)).scalar() or 0
+                available_count = (await session.execute(available_stmt)).scalar() or 0
+                expected_count = tracker.expected_count
+                return assigned_count, available_count, expected_count
         except Exception as e:
             self._logger.error(f"Failed to get status counts for {batch_id}: {e}")
             return None
@@ -116,29 +99,17 @@ class BatchTrackerPersistence:
                 if tracker is None:
                     return []
 
-                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-                    rows = (
-                        await session.execute(
-                            select(EssayStateDB.essay_id, EssayStateDB.text_storage_id).where(
-                                EssayStateDB.batch_id == batch_id,
-                                EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
-                            )
+                rows = (
+                    await session.execute(
+                        select(EssayStateDB.essay_id, EssayStateDB.text_storage_id).where(
+                            EssayStateDB.batch_id == batch_id,
+                            EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
                         )
-                    ).all()
-                    return [
-                        {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
-                    ]
-                else:
-                    assigned_stmt = select(
-                        SlotAssignmentDB.internal_essay_id, SlotAssignmentDB.text_storage_id
-                    ).where(
-                        SlotAssignmentDB.batch_tracker_id == tracker.id,
-                        SlotAssignmentDB.status == "assigned",
                     )
-                    rows = (await session.execute(assigned_stmt)).all()
-                    return [
-                        {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
-                    ]
+                ).all()
+                return [
+                    {"internal_essay_id": row[0], "text_storage_id": row[1]} for row in rows
+                ]
         except Exception as e:
             self._logger.error(f"Failed to get assigned essays for {batch_id}: {e}")
             return []
@@ -155,42 +126,33 @@ class BatchTrackerPersistence:
                 if tracker is None:
                     return []
 
-                if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-                    assigned_ids_stmt = select(EssayStateDB.essay_id).where(
-                        EssayStateDB.batch_id == batch_id,
-                        EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
-                    )
-                    assigned_ids = {
-                        row[0] for row in (await session.execute(assigned_ids_stmt)).all()
-                    }
-                    expected_ids = set(tracker.expected_essay_ids)
-                    return sorted(list(expected_ids - assigned_ids))
-                else:
-                    assigned_ids_stmt = select(SlotAssignmentDB.internal_essay_id).where(
-                        SlotAssignmentDB.batch_tracker_id == tracker.id,
-                        SlotAssignmentDB.status == "assigned",
-                    )
-                    assigned_ids = {
-                        row[0] for row in (await session.execute(assigned_ids_stmt)).all()
-                    }
-                    expected_ids = set(tracker.expected_essay_ids)
-                    return sorted(list(expected_ids - assigned_ids))
+                assigned_ids_stmt = select(EssayStateDB.essay_id).where(
+                    EssayStateDB.batch_id == batch_id,
+                    EssayStateDB.current_status == EssayStatus.READY_FOR_PROCESSING,
+                )
+                assigned_ids = {
+                    row[0] for row in (await session.execute(assigned_ids_stmt)).all()
+                }
+                expected_ids = set(tracker.expected_essay_ids)
+                return sorted(list(expected_ids - assigned_ids))
         except Exception as e:
             self._logger.error(f"Failed to get missing slots for {batch_id}: {e}")
             return []
 
     async def get_user_id_for_essay(self, internal_essay_id: str) -> str | None:
-        """Resolve user_id that owns a given internal essay id via slot inventory mapping."""
+        """Resolve user_id for a given essay via essay_states → batch tracker.
+
+        Option B path: join essay_states to batch_essay_trackers by batch_id.
+        """
         try:
             async with self._session_factory() as session:
-                # Find tracker owning this essay
                 tracker_join_stmt = (
                     select(BatchEssayTrackerDB.user_id)
                     .join(
-                        SlotAssignmentDB,
-                        SlotAssignmentDB.batch_tracker_id == BatchEssayTrackerDB.id,
+                        EssayStateDB,
+                        EssayStateDB.batch_id == BatchEssayTrackerDB.batch_id,
                     )
-                    .where(SlotAssignmentDB.internal_essay_id == internal_essay_id)
+                    .where(EssayStateDB.essay_id == internal_essay_id)
                     .limit(1)
                 )
                 res = await session.execute(tracker_join_stmt)

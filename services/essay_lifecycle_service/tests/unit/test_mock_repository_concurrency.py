@@ -93,56 +93,7 @@ class TestMockRepositoryConcurrency:
         assert essay is not None
         assert essay.essay_id == essay_id
 
-    @pytest.mark.parametrize("concurrency_level", [50, 100, 150])
-    @pytest.mark.asyncio
-    async def test_concurrent_content_idempotency_atomicity(
-        self, mock_repository: MockEssayRepository, concurrency_level: int
-    ) -> None:
-        """Test atomic idempotency check for content provisioning under concurrency."""
-        correlation_id = uuid4()
-        batch_id = "idempotency-batch"
-        text_storage_id = "shared-text-storage"
-
-        essay_data = {
-            "internal_essay_id": "idempotent-essay",
-            "original_file_name": "test.txt",
-            "file_size": 1024,
-        }
-
-        # Create multiple concurrent idempotency operations
-        async def create_with_idempotency() -> tuple[bool, str | None]:
-            return await mock_repository.create_essay_state_with_content_idempotency(
-                batch_id=batch_id,
-                text_storage_id=text_storage_id,
-                essay_data=essay_data,
-                correlation_id=correlation_id,
-            )
-
-        # Execute concurrent calls to stress-test atomic behavior
-        tasks = [create_with_idempotency() for _ in range(concurrency_level)]
-        results = await asyncio.gather(*tasks)
-
-        # Count creation vs idempotent responses
-        creations = sum(1 for was_created, _ in results if was_created)
-        idempotent_responses = sum(1 for was_created, _ in results if not was_created)
-
-        # Should have exactly 1 creation and (concurrency_level - 1) idempotent responses
-        expected_idempotent = concurrency_level - 1
-        assert creations == 1, f"Expected exactly 1 creation, got {creations}"
-        assert idempotent_responses == expected_idempotent, (
-            f"Expected {expected_idempotent} idempotent responses, got {idempotent_responses}"
-        )
-
-        # All responses should return the same essay_id
-        essay_ids = [essay_id for _, essay_id in results]
-        unique_essay_ids = set(essay_ids)
-        assert len(unique_essay_ids) == 1, f"Expected single essay_id, got {unique_essay_ids}"
-        assert "idempotent-essay" in unique_essay_ids
-
-        # Verify essay was created correctly
-        essay = await mock_repository.get_essay_state("idempotent-essay")
-        assert essay is not None
-        assert essay.text_storage_id == text_storage_id
+    # Removed legacy idempotency concurrency test tied to deprecated repository method
 
     @pytest.mark.asyncio
     async def test_concurrent_essay_state_updates(

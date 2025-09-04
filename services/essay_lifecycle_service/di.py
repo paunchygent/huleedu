@@ -13,6 +13,7 @@ from datetime import timedelta
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
@@ -526,7 +527,16 @@ class BatchCoordinationProvider(Provider):
     def provide_db_slot_operations(
         self, session_factory: async_sessionmaker
     ) -> DatabaseSlotOperations:
-        """Provide DB-backed slot operations to replace Redis-based assignment."""
+        """Provide DB-backed slot operations (legacy, deprecated).
+
+        Note: Service hot path uses Option B assignment via essay_states; this
+        provider remains for tests/metrics-only and will be removed when tests
+        are migrated.
+        """
+        logger = create_service_logger("di")
+        logger.warning(
+            "Providing deprecated DatabaseSlotOperations; Option B is the hot path",
+        )
         return DatabaseSlotOperations(session_factory)
 
     @provide(scope=Scope.APP)

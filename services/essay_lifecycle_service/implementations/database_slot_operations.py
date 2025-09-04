@@ -1,8 +1,12 @@
 """
-Database-backed slot assignment operations using PostgreSQL transactions.
+DEPRECATED: Database-backed slot assignment helper (legacy inventory).
 
-Implements atomic slot selection with FOR UPDATE SKIP LOCKED and idempotency
-enforcement via partial unique indexes, replacing Redis-based assignment.
+This module is retained temporarily for tests and metrics-only flows.
+The service hot path uses Option B single-statement assignment via
+`implementations.assignment_sql.assign_via_essay_states_immediate_commit` and
+derives inventory exclusively from `essay_states`.
+
+Pending removal after tests are migrated off this helper.
 """
 
 from __future__ import annotations

@@ -4,6 +4,7 @@ Tests behavioral outcomes rather than implementation details following Rule 075.
 """
 
 from unittest.mock import AsyncMock
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -209,7 +210,7 @@ class TestELSNotificationProjector:
     ) -> None:
         """Test that Kafka publishing failures are properly handled."""
         # Configure mock to raise exception with async side effect to match awaited interface
-        async def failing_publish(*args, **kwargs):
+        async def failing_publish(*args: Any, **kwargs: Any) -> None:
             raise Exception("Kafka connection failed")
         mock_kafka_publisher.publish.side_effect = failing_publish
 

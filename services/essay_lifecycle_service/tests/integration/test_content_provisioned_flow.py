@@ -51,10 +51,8 @@ from services.essay_lifecycle_service.implementations.db_pending_content_ops imp
     DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
-from services.essay_lifecycle_service.implementations.database_slot_operations import (
-    DatabaseSlotOperations,
-)
 from services.essay_lifecycle_service.models_db import Base
+from services.essay_lifecycle_service.protocols import SlotOperationsProtocol
 
 logger = create_service_logger("test.content_provisioned_flow")
 
@@ -95,8 +93,27 @@ class TestContentProvisionedFlow:
 
             # Create DB-based implementations
             failure_tracker = DBFailureTracker(session_factory)
-            slot_operations = DatabaseSlotOperations(session_factory)
             mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
+
+            # Provide a no-op slot operations implementation (Option B does not use it)
+            from uuid import UUID
+
+            class NoopSlotOperations(SlotOperationsProtocol):
+                async def assign_slot_atomic(
+                    self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
+                ) -> str | None:
+                    return None
+
+                async def get_available_slot_count(self, batch_id: str) -> int:
+                    return 0
+
+                async def get_assigned_count(self, batch_id: str) -> int:
+                    return 0
+
+                async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+                    return None
+
+            slot_operations = NoopSlotOperations()
 
             batch_tracker = DefaultBatchEssayTracker(
                 persistence,
@@ -158,7 +175,6 @@ class TestContentProvisionedFlow:
                 "handler": handler,
                 "repository": repository,
                 "batch_tracker": batch_tracker,
-                "slot_operations": slot_operations,
                 "event_publisher": event_publisher,
                 "published_events": published_events,
                 "mock_outbox_manager": mock_outbox_manager,
@@ -253,7 +269,6 @@ class TestContentProvisionedFlow:
         """Test multiple concurrent content provisioning requests."""
         handler = test_infrastructure["handler"]
         repository = test_infrastructure["repository"]
-        slot_operations = test_infrastructure["slot_operations"]
 
         # Setup: Register batch with 5 essays
         batch_id = str(uuid4())
@@ -333,20 +348,14 @@ class TestContentProvisionedFlow:
         )
 
         # Verify Redis state consistency
-        remaining_slots = await slot_operations.get_available_slot_count(batch_id)
-        lost_slots = 5 - len(assigned_essays) - remaining_slots
+        # Verify counts via repository summary (essay_states inventory)
+        summary = await repository.get_batch_status_summary(batch_id)
+        available = summary.get(EssayStatus.UPLOADED, 0)
+        assert len(assigned_essays) + available == 5
 
-        # Under high concurrency, some slots might be "lost" due to race conditions
-        # These are slots that were popped but not successfully assigned or returned
-        assert len(assigned_essays) + remaining_slots + lost_slots == 5, (
-            f"Inconsistent state: {len(assigned_essays)} assigned + {remaining_slots} remaining "
-            f"+ {lost_slots} lost != 5"
-        )
-
-        # Log the distribution for debugging
+        # Log the distribution for debugging (Option B inventory)
         logger.info(
-            f"Slot distribution: {len(assigned_essays)} assigned, {remaining_slots} available, "
-            f"{lost_slots} lost to race conditions"
+            f"Distribution: assigned={len(assigned_essays)}, available={available}"
         )
 
         # If there were failures, verify ExcessContentProvisionedV1 events were published

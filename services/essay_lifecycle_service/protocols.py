@@ -138,7 +138,7 @@ class EssayRepositoryProtocol(Protocol):
         session: AsyncSession | None = None,
         correlation_id: UUID | None = None,
     ) -> EssayState:
-        """Create or update essay state for slot assignment with content metadata."""
+        """[DEPRECATED] Legacy slot-assignment updater; Option B supersedes this."""
         ...
 
     async def list_essays_by_batch_and_phase(
@@ -155,14 +155,7 @@ class EssayRepositoryProtocol(Protocol):
         correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> tuple[bool, str | None]:
-        """
-        Create essay state with atomic idempotency check for content provisioning.
-
-        Returns tuple of (was_created, essay_id) where was_created indicates if this
-        was a new creation (True) or idempotent case (False).
-
-        Addresses ELS-002 Phase 1 requirements for database-level race condition prevention.
-        """
+        """[DEPRECATED] Legacy idempotency helper; use Option B assignment_sql instead."""
         ...
 
     def get_session_factory(self) -> Any:
@@ -649,6 +642,8 @@ class ContentAssignmentProtocol(Protocol):
         content_metadata: dict[str, Any],
         correlation_id: UUID,
         session: AsyncSession,
+        preassigned_essay_id: str | None = None,
+        preassigned_was_created: bool | None = None,
     ) -> tuple[bool, str | None]:
         """
         Perform atomic content-to-essay assignment with full state coordination.
@@ -659,6 +654,8 @@ class ContentAssignmentProtocol(Protocol):
             content_metadata: Content metadata (file_name, size, hash, etc.)
             correlation_id: Operation correlation ID
             session: Database session for atomic operations
+            preassigned_essay_id: If provided, reuse previously assigned essay id (Option B pre-commit)
+            preassigned_was_created: Whether the preassignment created a new record
 
         Returns:
             Tuple of (was_created, final_essay_id)

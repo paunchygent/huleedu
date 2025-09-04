@@ -1,8 +1,11 @@
 """
-Content idempotency and slot assignment operations for Essay Lifecycle Service.
+DEPRECATED: Legacy content idempotency helpers (pre-Option B).
 
-Handles complex transactional operations for content provisioning
-with atomic idempotency checks and race condition prevention.
+These operations are no longer used in the service hot path. Option B uses a
+single-statement UPDATE against `essay_states` with immediate commit and relies
+on a partial unique index for idempotency. This module is retained only to avoid
+breaking tests that still reference it during the transition and will be
+removed once those tests are migrated.
 """
 
 from __future__ import annotations

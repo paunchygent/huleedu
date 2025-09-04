@@ -86,10 +86,11 @@ class Settings(SecureServiceSettings):
     )
 
     # Essay States as Inventory (Option B)
+    # Deprecated: Option B is always used in service code; flag retained for compatibility only.
     ELS_USE_ESSAY_STATES_AS_INVENTORY: bool = Field(
         default=True,
         description=(
-            "Use essay_states as the single inventory for slot assignment (single UPDATE hot path)."
+            "[DEPRECATED] essay_states is always used; flag retained for compatibility only."
         ),
     )
 

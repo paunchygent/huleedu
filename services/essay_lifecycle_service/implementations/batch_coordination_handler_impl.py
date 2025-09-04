@@ -21,7 +21,6 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from services.essay_lifecycle_service.config import settings
 from services.essay_lifecycle_service.implementations.assignment_sql import (
     assign_via_essay_states_immediate_commit,
 )
@@ -260,104 +259,78 @@ class DefaultBatchCoordinationHandler(BatchCoordinationHandler):
                 "content_md5_hash": event_data.content_md5_hash,
             }
 
-            if settings.ELS_USE_ESSAY_STATES_AS_INVENTORY:
-                # Perform assignment first (immediate-commit) to avoid overlapping DB connections
-                was_created, final_essay_id = await assign_via_essay_states_immediate_commit(
-                    session_factory=self.session_factory,
-                    batch_id=event_data.entity_id,
-                    text_storage_id=event_data.text_storage_id,
-                    original_file_name=event_data.original_file_name,
-                    file_size=event_data.file_size_bytes,
-                    content_hash=event_data.content_md5_hash,
-                    correlation_id=correlation_id,
-                )
+            # Option B only: Perform assignment first (immediate-commit) for MVCC visibility
+            was_created, final_essay_id = await assign_via_essay_states_immediate_commit(
+                session_factory=self.session_factory,
+                batch_id=event_data.entity_id,
+                text_storage_id=event_data.text_storage_id,
+                original_file_name=event_data.original_file_name,
+                file_size=event_data.file_size_bytes,
+                content_hash=event_data.content_md5_hash,
+                correlation_id=correlation_id,
+            )
 
-                if final_essay_id is None:
-                    # No slot: publish excess content event
-                    logger.warning(
-                        "No available slots for content, publishing excess content event",
+            if final_essay_id is None:
+                # No slot: publish excess content event
+                logger.warning(
+                    "No available slots for content, publishing excess content event",
+                    extra={
+                        "batch_id": event_data.entity_id,
+                        "text_storage_id": event_data.text_storage_id,
+                        "original_file_name": event_data.original_file_name,
+                        "correlation_id": str(correlation_id),
+                    },
+                )
+                async with self.session_factory() as session:
+                    async with session.begin():
+                        from datetime import UTC, datetime
+
+                        from common_core.events.batch_coordination_events import (
+                            ExcessContentProvisionedV1,
+                        )
+
+                        excess_event = ExcessContentProvisionedV1(
+                            batch_id=event_data.entity_id,
+                            original_file_name=event_data.original_file_name,
+                            text_storage_id=event_data.text_storage_id,
+                            reason="NO_AVAILABLE_SLOT",
+                            correlation_id=correlation_id,
+                            timestamp=datetime.now(UTC),
+                        )
+
+                        await self.batch_lifecycle_publisher.publish_excess_content_provisioned(
+                            event_data=excess_event,
+                            correlation_id=correlation_id,
+                            session=session,
+                        )
+                return False
+
+            # Post-assignment side effects in separate transaction
+            async with self.session_factory() as session:
+                async with session.begin():
+                    (
+                        was_created2,
+                        final2,
+                    ) = await self.content_assignment_service.assign_content_to_essay(
+                        batch_id=event_data.entity_id,
+                        text_storage_id=event_data.text_storage_id,
+                        content_metadata=content_metadata,
+                        correlation_id=correlation_id,
+                        session=session,
+                        preassigned_essay_id=final_essay_id,
+                        preassigned_was_created=was_created,
+                    )
+                    logger.info(
+                        "Content assignment post-effects completed",
                         extra={
                             "batch_id": event_data.entity_id,
                             "text_storage_id": event_data.text_storage_id,
-                            "original_file_name": event_data.original_file_name,
+                            "final_essay_id": final2,
+                            "was_created": was_created2,
                             "correlation_id": str(correlation_id),
                         },
                     )
-                    async with self.session_factory() as session:
-                        async with session.begin():
-                            from datetime import UTC, datetime
-
-                            from common_core.events.batch_coordination_events import (
-                                ExcessContentProvisionedV1,
-                            )
-
-                            excess_event = ExcessContentProvisionedV1(
-                                batch_id=event_data.entity_id,
-                                original_file_name=event_data.original_file_name,
-                                text_storage_id=event_data.text_storage_id,
-                                reason="NO_AVAILABLE_SLOT",
-                                correlation_id=correlation_id,
-                                timestamp=datetime.now(UTC),
-                            )
-
-                            await self.batch_lifecycle_publisher.publish_excess_content_provisioned(
-                                event_data=excess_event,
-                                correlation_id=correlation_id,
-                                session=session,
-                            )
-                    return False
-
-                # Post-assignment side effects in separate transaction
-                async with self.session_factory() as session:
-                    async with session.begin():
-                        (
-                            was_created2,
-                            final2,
-                        ) = await self.content_assignment_service.assign_content_to_essay(
-                            batch_id=event_data.entity_id,
-                            text_storage_id=event_data.text_storage_id,
-                            content_metadata=content_metadata,
-                            correlation_id=correlation_id,
-                            session=session,
-                            preassigned_essay_id=final_essay_id,
-                            preassigned_was_created=was_created,
-                        )
-                        logger.info(
-                            "Content assignment post-effects completed",
-                            extra={
-                                "batch_id": event_data.entity_id,
-                                "text_storage_id": event_data.text_storage_id,
-                                "final_essay_id": final2,
-                                "was_created": was_created2,
-                                "correlation_id": str(correlation_id),
-                            },
-                        )
-                return True
-            else:
-                # Legacy path within one transaction
-                async with self.session_factory() as session:
-                    async with session.begin():
-                        (
-                            was_created,
-                            final_essay_id,
-                        ) = await self.content_assignment_service.assign_content_to_essay(
-                            batch_id=event_data.entity_id,
-                            text_storage_id=event_data.text_storage_id,
-                            content_metadata=content_metadata,
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-                        logger.info(
-                            "Content assignment completed via ContentAssignmentService",
-                            extra={
-                                "batch_id": event_data.entity_id,
-                                "text_storage_id": event_data.text_storage_id,
-                                "final_essay_id": final_essay_id,
-                                "was_created": was_created,
-                                "correlation_id": str(correlation_id),
-                            },
-                        )
-                return True
+            return True
 
         except HuleEduError:
             # Re-raise HuleEdu errors to preserve error type (EXTERNAL_SERVICE_ERROR, etc.)

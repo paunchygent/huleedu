@@ -46,8 +46,9 @@ EST). Mark completion in DB, use a retention script to purge later.
 ate_all works with testcontainers (no migrations needed in tests).
   - Observability: Introduce Prometheus Gauges to reflect active and completed b
 atch counts per class type (GUEST/REGULAR).
-- Current status:
-  - Slot assignment logic is DB-only and idempotent (DatabaseSlotOperations).
+ - Current status:
+  - Slot assignment logic is DB-only and idempotent. Primary production path uses essay_states as the single inventory via a single-statement UPDATE with immediate commit (Option B).
+  - Legacy DatabaseSlotOperations remains available for tests/metrics-only, not used in the service hot path.
   - ELS handlers/services refactored to remove Redis from the critical path.
   - New ORM models for batch_validation_failures and batch_pending_content, evol
 ved SlotAssignmentDB to “inventory” with statuses available/assigned/failed.
@@ -67,8 +68,8 @@ d, failed}
     - BatchValidationFailure (new)
     - BatchPendingContent (new)
 - Core implementations:
-  - Slot ops (DB): services/essay_lifecycle_service/implementations/database_slo
-t_operations.py
+  - Assignment (Option B hot path): services/essay_lifecycle_service/implementations/assignment_sql.py
+  - Slot ops (legacy metrics/testing): services/essay_lifecycle_service/implementations/database_slot_operations.py
   - Batch tracker: services/essay_lifecycle_service/implementations/batch_essay_
 tracker_impl.py
   - Persistence: services/essay_lifecycle_service/implementations/batch_tracker_
@@ -177,9 +178,12 @@ scaping outer boundaries.
 
 Open Follow-ups (if time allows)
 
-- Fully remove legacy Redis coordinators (redis_batch_state/queries/script_manag
-er/redis_slot_operations) if no longer required by any tests or code paths; upda
-te DI accordingly.
+- Prune legacy slot assignment artifacts (slot_assignments inventory, DatabaseSlotOperations, repository idempotency helpers) after test migration:
+  - Replace DatabaseSlotOperations usages in tests with assignment_sql.assign_via_essay_states_immediate_commit
+  - Remove EssayRepositoryProtocol legacy methods and update tests verifying protocol compliance
+  - Drop implementations/essay_repository_idempotency.py and related imports
+  - Remove DI provider provide_db_slot_operations and DefaultBatchEssayTracker dependency
+  - Delete tests dedicated to DatabaseSlotOperations once Option B equivalents exist
 - Documentation updates:
   - ELS README: update architecture and DB-first rationale, no-immediate-cleanup
  policy, retention script usage.

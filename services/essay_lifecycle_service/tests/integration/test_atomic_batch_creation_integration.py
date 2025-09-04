@@ -44,11 +44,8 @@ from services.essay_lifecycle_service.implementations.db_pending_content_ops imp
     DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.db_failure_tracker import DBFailureTracker
-from services.essay_lifecycle_service.implementations.database_slot_operations import (
-    DatabaseSlotOperations,
-)
 from services.essay_lifecycle_service.models_db import Base
-from services.essay_lifecycle_service.protocols import EventPublisher
+from services.essay_lifecycle_service.protocols import EventPublisher, SlotOperationsProtocol
 
 
 class MockEventPublisher(EventPublisher):
@@ -255,21 +252,34 @@ class TestAtomicBatchCreationIntegration:
         return DBFailureTracker(session_factory)
 
     @pytest.fixture
-    async def slot_operations(self, postgres_repository: PostgreSQLEssayRepository) -> DatabaseSlotOperations:
-        """Create DB-based slot operations."""
-        session_factory = postgres_repository.get_session_factory()
-        return DatabaseSlotOperations(session_factory)
-
-    @pytest.fixture
     async def batch_tracker(
         self,
         batch_tracker_persistence: BatchTrackerPersistence,
         failure_tracker: DBFailureTracker,
-        slot_operations: DatabaseSlotOperations,
     ) -> DefaultBatchEssayTracker:
         """Create real batch tracker with PostgreSQL persistence and DB-based implementations."""
         # Create mock pending content ops for testing
         mock_pending_content_ops = AsyncMock(spec=DBPendingContentOperations)
+
+        # Provide a no-op slot operations implementation (Option B does not use it)
+        from uuid import UUID
+
+        class NoopSlotOperations(SlotOperationsProtocol):
+            async def assign_slot_atomic(
+                self, batch_id: str, content_metadata: dict[str, Any], correlation_id: UUID | None = None
+            ) -> str | None:
+                return None
+
+            async def get_available_slot_count(self, batch_id: str) -> int:
+                return 0
+
+            async def get_assigned_count(self, batch_id: str) -> int:
+                return 0
+
+            async def get_essay_id_for_content(self, batch_id: str, text_storage_id: str) -> str | None:
+                return None
+
+        slot_operations = NoopSlotOperations()
 
         return DefaultBatchEssayTracker(
             batch_tracker_persistence,

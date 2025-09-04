@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 # Import protocol outside TYPE_CHECKING for runtime inheritance
 from services.essay_lifecycle_service.protocols import ContentAssignmentProtocol
-from services.essay_lifecycle_service.config import settings
 from services.essay_lifecycle_service.implementations.assignment_sql import (
     assign_via_essay_states_immediate_commit,
 )
@@ -42,8 +41,7 @@ class ContentAssignmentService(ContentAssignmentProtocol):
     Domain service for handling content-to-essay assignment operations.
 
     Encapsulates the business logic for atomic content assignment that includes:
-    - Redis slot assignment
-    - Database essay state creation
+    - Single-statement DB assignment via essay_states inventory (Option B)
     - Event publication
     - Batch completion coordination
     """
@@ -88,6 +86,7 @@ class ContentAssignmentService(ContentAssignmentProtocol):
             - final_essay_id: The essay ID that got the content
         """
         # Step 1: Slot assignment via essay_states inventory (Option B)
+        final_essay_id: str | None
         if preassigned_essay_id is not None:
             was_created = bool(preassigned_was_created)
             final_essay_id = preassigned_essay_id

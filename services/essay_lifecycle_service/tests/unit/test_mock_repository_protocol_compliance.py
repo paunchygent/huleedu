@@ -198,26 +198,7 @@ class TestMockRepositoryProtocolCompliance:
             assert protocol_param.annotation == mock_param.annotation
             assert protocol_param.default == mock_param.default
 
-    def test_create_essay_state_with_content_idempotency_signature(self) -> None:
-        """Test create_essay_state_with_content_idempotency method signature compliance."""
-        protocol_sig = inspect.signature(
-            EssayRepositoryProtocol.create_essay_state_with_content_idempotency
-        )
-        mock_sig = inspect.signature(
-            MockEssayRepository.create_essay_state_with_content_idempotency
-        )
-
-        protocol_params = list(protocol_sig.parameters.values())[1:]
-        mock_params = list(mock_sig.parameters.values())[1:]
-
-        assert len(protocol_params) == len(mock_params)
-
-        for protocol_param, mock_param in zip(protocol_params, mock_params, strict=False):
-            assert protocol_param.name == mock_param.name
-            assert protocol_param.annotation == mock_param.annotation
-            assert protocol_param.default == mock_param.default
-
-        assert protocol_sig.return_annotation == mock_sig.return_annotation
+    # Deprecated repository idempotency method signature test removed (migrated off legacy)
 
     def test_get_session_factory_signature(self) -> None:
         """Test get_session_factory method signature compliance."""
@@ -346,15 +327,7 @@ class TestMockRepositoryProtocolCompliance:
         )
         assert isinstance(phase_essays, list)
 
-        # create_essay_state_with_content_idempotency with session
-        was_created, _ = await mock_repository.create_essay_state_with_content_idempotency(
-            batch_id="param-batch-2",
-            text_storage_id="param-text",
-            essay_data={"internal_essay_id": "param-essay"},
-            correlation_id=correlation_id,
-            session=mock_session,
-        )
-        assert isinstance(was_created, bool)
+        # Deprecated idempotency method usage removed from parameter handling test
 
     @pytest.mark.parametrize(
         "method_name",
@@ -368,9 +341,9 @@ class TestMockRepositoryProtocolCompliance:
             "get_batch_status_summary",
             "get_batch_summary_with_essays",
             "get_essay_by_text_storage_id_and_batch_id",
-            "create_or_update_essay_state_for_slot_assignment",
+            # deprecated: "create_or_update_essay_state_for_slot_assignment",
             "list_essays_by_batch_and_phase",
-            "create_essay_state_with_content_idempotency",
+            # deprecated: "create_essay_state_with_content_idempotency",
             "get_session_factory",
             "update_essay_processing_metadata",
             "update_student_association",

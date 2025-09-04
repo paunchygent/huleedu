@@ -43,20 +43,17 @@ from services.essay_lifecycle_service.implementations.batch_lifecycle_publisher 
 from services.essay_lifecycle_service.implementations.batch_tracker_persistence import (
     BatchTrackerPersistence,
 )
-from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
-    PostgreSQLEssayRepository,
-)
-from services.essay_lifecycle_service.implementations.database_slot_operations import (
-    DatabaseSlotOperations,
-)
 from services.essay_lifecycle_service.implementations.db_failure_tracker import (
     DBFailureTracker,
 )
 from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
     DBPendingContentOperations,
 )
+from services.essay_lifecycle_service.implementations.essay_repository_postgres_impl import (
+    PostgreSQLEssayRepository,
+)
 from services.essay_lifecycle_service.models_db import Base
-from services.essay_lifecycle_service.protocols import TopicNamingProtocol
+from services.essay_lifecycle_service.protocols import SlotOperationsProtocol, TopicNamingProtocol
 
 logger = create_service_logger("test_pending_content_race_condition")
 
@@ -70,7 +67,6 @@ class TestPendingContentRaceCondition:
         # Start PostgreSQL container
         postgres_container = PostgresContainer("postgres:15", driver="asyncpg")
         postgres_container.start()
-
 
         repository = None
         engine = None
@@ -103,8 +99,33 @@ class TestPendingContentRaceCondition:
 
             # Create DB-based implementations
             failure_tracker = DBFailureTracker(session_factory)
-            slot_operations = DatabaseSlotOperations(session_factory)
-            pending_content_ops = DBPendingContentOperations(session_factory)  # Real implementation for race condition testing
+
+            from uuid import UUID
+
+            class NoopSlotOperations(SlotOperationsProtocol):
+                async def assign_slot_atomic(
+                    self,
+                    batch_id: str,
+                    content_metadata: dict[str, Any],
+                    correlation_id: UUID | None = None,
+                ) -> str | None:
+                    return None
+
+                async def get_available_slot_count(self, batch_id: str) -> int:
+                    return 0
+
+                async def get_assigned_count(self, batch_id: str) -> int:
+                    return 0
+
+                async def get_essay_id_for_content(
+                    self, batch_id: str, text_storage_id: str
+                ) -> str | None:
+                    return None
+
+            slot_operations = NoopSlotOperations()
+            pending_content_ops = DBPendingContentOperations(
+                session_factory
+            )  # Real implementation for race condition testing
 
             # Initialize batch tracker with REAL pending content ops (not mocked)
             batch_tracker = DefaultBatchEssayTracker(
