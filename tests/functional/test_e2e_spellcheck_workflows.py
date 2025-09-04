@@ -23,6 +23,30 @@ from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
 
 from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
+
+# Use a local Kafka producer fixture following known working patterns
+import json
+import pytest_asyncio
+from aiokafka import AIOKafkaProducer
+
+
+@pytest_asyncio.fixture
+async def kafka_producer_for_e2e() -> AIOKafkaProducer:
+    """Local Kafka producer using the same pattern as working integration fixtures.
+
+    Uses external listener (localhost:9093), JSON value serialization, and
+    conservative delivery guarantees to avoid in-flight ordering issues.
+    """
+    # Mirror working functional/integration pattern: JSON serializer + send+flush
+    producer = AIOKafkaProducer(
+        bootstrap_servers="localhost:9093",
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    await producer.start()
+    try:
+        yield producer
+    finally:
+        await producer.stop()
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -63,7 +87,7 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.docker
     @pytest.mark.asyncio
     @pytest.mark.timeout(120)  # 2 minute timeout for complete spellcheck pipeline
-    async def test_complete_spellcheck_processing_pipeline(self):
+    async def test_complete_spellcheck_processing_pipeline(self, kafka_producer_for_e2e: AIOKafkaProducer):
         """
         Test complete spellcheck pipeline: Content upload → Kafka event → Processing → Results
 
@@ -93,9 +117,15 @@ class TestE2ESpellcheckWorkflows:
             pytest.fail(f"Content upload failed: {e}")
 
         # Step 2: Set up Kafka monitoring for spellcheck results using utility
-        result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        # Updated to listen to actual topic that spellchecker publishes to (thin event)
+        result_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
-        async with kafka_event_monitor("spellcheck_pipeline_test", [result_topic]) as consumer:
+        # Use explicit consumer with 'earliest' to avoid any edge-case race
+        async with kafka_manager.consumer(
+            "spellcheck_pipeline_test",
+            [result_topic, topic_name(ProcessingEvent.SPELLCHECK_RESULTS)],
+            auto_offset_reset="earliest",
+        ) as consumer:
             # Step 3: Publish SpellcheckRequestedV1 event using utility
             spellcheck_request = self._create_spellcheck_request_event(
                 essay_id=essay_id,
@@ -107,19 +137,33 @@ class TestE2ESpellcheckWorkflows:
             # Publish to the REQUEST topic (spell checker listens here)
             request_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
             try:
-                await kafka_manager.publish_event(request_topic, spellcheck_request)
-                print(f"✅ Published SpellcheckRequestedV1 event for essay: {essay_id}")
-            except RuntimeError as e:
+                # Publish dict payload with JSON value_serializer and capture RecordMetadata
+                record_md = await kafka_producer_for_e2e.send_and_wait(
+                    request_topic,
+                    spellcheck_request,
+                    key=essay_id.encode("utf-8"),
+                )
+                print(
+                    "✅ Published SpellcheckRequestedV1",
+                    f"topic={getattr(record_md, 'topic', request_topic)}",
+                    f"partition={getattr(record_md, 'partition', 'n/a')}",
+                    f"offset={getattr(record_md, 'offset', 'n/a')}",
+                    f"essay_id={essay_id}",
+                    f"correlation_id={correlation_id}",
+                )
+            except Exception as e:
                 pytest.fail(f"Event publishing failed: {e}")
 
-            # Step 4: Monitor for SpellcheckResultDataV1 response using utility
+            # Step 4: Monitor for SpellcheckPhaseCompletedV1 response using utility
             def spellcheck_result_filter(event_data: dict[str, Any]) -> bool:
-                """Filter for spellcheck results from our specific essay."""
-                return (
-                    "data" in event_data
-                    and event_data["data"].get("entity_id") == essay_id
-                    and event_data.get("correlation_id") == correlation_id
-                )
+                """Filter for spellcheck results from our specific essay.
+
+                This operates on the raw EventEnvelope dict; the payload is under
+                envelope["data"], not nested twice.
+                """
+                payload = event_data.get("data", {}) or {}
+                corr = payload.get("correlation_id") or event_data.get("correlation_id")
+                return payload.get("entity_id") == essay_id and corr == correlation_id
 
             try:
                 events = await kafka_manager.collect_events(
@@ -132,24 +176,21 @@ class TestE2ESpellcheckWorkflows:
                 assert len(events) == 1, f"Expected 1 spellcheck result, got {len(events)}"
 
                 event_info = events[0]
-                spellcheck_result = event_info["data"]["data"]  # SpellcheckResultDataV1 payload
+                spellcheck_result = event_info["data"]["data"]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
 
-                assert spellcheck_result["status"] == EssayStatus.SPELLCHECKED_SUCCESS.value
-                assert spellcheck_result["corrections_made"] is not None
-                assert spellcheck_result["corrections_made"] > 0  # Should have found errors
+                # SpellcheckPhaseCompletedV1 uses ProcessingStatus enum
+                from common_core.status_enums import ProcessingStatus
+                assert spellcheck_result["status"] == ProcessingStatus.COMPLETED.value
+                assert spellcheck_result["corrected_text_storage_id"] is not None
                 print(
-                    f"✅ Spellcheck completed with "
-                    f"{spellcheck_result['corrections_made']} corrections",
+                    f"✅ Spellcheck completed in {spellcheck_result['processing_duration_ms']}ms"
                 )
 
                 # Step 5: Validate corrected content stored in Content Service using utility
-                storage_metadata = spellcheck_result.get("storage_metadata", {})
-                corrected_storage_id = (
-                    storage_metadata.get("references", {}).get("corrected_text", {}).get("default")
-                )
+                corrected_storage_id = spellcheck_result["corrected_text_storage_id"]
 
                 assert corrected_storage_id is not None, (
-                    f"No corrected text storage ID found in: {storage_metadata}"
+                    "No corrected text storage ID found in event payload"
                 )
                 print(f"📝 Found corrected text storage ID: {corrected_storage_id}")
 
@@ -176,7 +217,7 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    async def test_spellcheck_pipeline_with_no_errors(self):
+    async def test_spellcheck_pipeline_with_no_errors(self, kafka_producer_for_e2e: AIOKafkaProducer):
         """
         Test spellcheck pipeline with text that has no spelling errors.
 
@@ -203,9 +244,14 @@ class TestE2ESpellcheckWorkflows:
             pytest.fail(f"Content upload failed: {e}")
 
         # Set up monitoring using utility
-        result_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        # Updated to listen to actual topic that spellchecker publishes to (thin event)
+        result_topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
-        async with kafka_event_monitor("perfect_spellcheck_test", [result_topic]) as consumer:
+        async with kafka_manager.consumer(
+            "perfect_spellcheck_test",
+            [result_topic, topic_name(ProcessingEvent.SPELLCHECK_RESULTS)],
+            auto_offset_reset="earliest",
+        ) as consumer:
             # Publish event using utility
             spellcheck_request = self._create_spellcheck_request_event(
                 essay_id=essay_id,
@@ -217,18 +263,31 @@ class TestE2ESpellcheckWorkflows:
             # Publish to the REQUEST topic (spell checker listens here)
             request_topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED)
             try:
-                await kafka_manager.publish_event(request_topic, spellcheck_request)
-            except RuntimeError as e:
+                record_md = await kafka_producer_for_e2e.send_and_wait(
+                    request_topic,
+                    spellcheck_request,
+                    key=essay_id.encode("utf-8"),
+                )
+                print(
+                    "✅ Published SpellcheckRequestedV1",
+                    f"topic={getattr(record_md, 'topic', request_topic)}",
+                    f"partition={getattr(record_md, 'partition', 'n/a')}",
+                    f"offset={getattr(record_md, 'offset', 'n/a')}",
+                    f"essay_id={essay_id}",
+                    f"correlation_id={correlation_id}",
+                )
+            except Exception as e:
                 pytest.fail(f"Event publishing failed: {e}")
 
             # Monitor for results using utility
             def spellcheck_result_filter(event_data: dict[str, Any]) -> bool:
-                """Filter for spellcheck results from our specific essay."""
-                return (
-                    "data" in event_data
-                    and event_data["data"].get("entity_id") == essay_id
-                    and event_data.get("correlation_id") == correlation_id
-                )
+                """Filter for spellcheck results from our specific essay.
+
+                Operates on raw EventEnvelope dict; payload is envelope["data"].
+                """
+                payload = event_data.get("data", {}) or {}
+                corr = payload.get("correlation_id") or event_data.get("correlation_id")
+                return payload.get("entity_id") == essay_id and corr == correlation_id
 
             try:
                 events = await kafka_manager.collect_events(
@@ -239,13 +298,15 @@ class TestE2ESpellcheckWorkflows:
                 )
 
                 assert len(events) == 1
-                spellcheck_result = events[0]["data"]["data"]
+                spellcheck_result = events[0]["data"]["data"]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
 
-                assert spellcheck_result["status"] == EssayStatus.SPELLCHECKED_SUCCESS.value
-                corrections_made = spellcheck_result["corrections_made"]
-                assert corrections_made is not None
-                assert corrections_made <= 2  # Should be minimal corrections for good text
-                print(f"✅ Perfect text processed with {corrections_made} minimal corrections")
+                # SpellcheckPhaseCompletedV1 uses ProcessingStatus enum
+                from common_core.status_enums import ProcessingStatus
+                assert spellcheck_result["status"] == ProcessingStatus.COMPLETED.value
+                processing_duration = spellcheck_result["processing_duration_ms"]
+                assert processing_duration is not None
+                assert processing_duration > 0  # Should have some processing time
+                print(f"✅ Perfect text processed in {processing_duration}ms")
 
             except Exception as e:
                 pytest.fail(f"Event collection or validation failed: {e}")

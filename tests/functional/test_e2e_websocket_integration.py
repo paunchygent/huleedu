@@ -503,7 +503,19 @@ class TestCompleteWebSocketServiceIntegration:
         channel_name = f"ws:{test_teacher_id}"
         pubsub = redis_client.pubsub()
         await pubsub.subscribe(channel_name)
-        await pubsub.get_message(timeout=1.0)  # Skip subscription confirmation
+
+        # Wait for subscription confirmation per async protocol
+        subscription_confirmed = False
+        timeout_count = 0
+        while not subscription_confirmed and timeout_count < 10:
+            message = await pubsub.get_message(timeout=1.0)
+            if message and message["type"] == "subscribe":
+                subscription_confirmed = True
+                break
+            timeout_count += 1
+
+        if not subscription_confirmed:
+            pytest.fail(f"Failed to confirm Redis subscription to {channel_name}")
 
         # Act - Publish TeacherNotificationRequestedV1 to Kafka
         # WebSocket service should consume this and publish to Redis
@@ -597,7 +609,19 @@ class TestCompleteWebSocketServiceIntegration:
             channel_name = f"ws:{test_teacher_id}"
             pubsub = redis_client.pubsub()
             await pubsub.subscribe(channel_name)
-            await pubsub.get_message(timeout=1.0)
+
+            # Wait for subscription confirmation per async protocol
+            subscription_confirmed = False
+            timeout_count = 0
+            while not subscription_confirmed and timeout_count < 10:
+                message = await pubsub.get_message(timeout=1.0)
+                if message and message["type"] == "subscribe":
+                    subscription_confirmed = True
+                    break
+                timeout_count += 1
+
+            if not subscription_confirmed:
+                pytest.fail(f"Failed to confirm Redis subscription to {channel_name}")
 
             # Act - Publish to Kafka
             await self._publish_teacher_notification_to_kafka(kafka_producer, notification)
@@ -665,7 +689,19 @@ class TestCompleteWebSocketServiceIntegration:
             channel_name = f"ws:{test_teacher_id}"
             pubsub = redis_client.pubsub()
             await pubsub.subscribe(channel_name)
-            await pubsub.get_message(timeout=1.0)
+
+            # Wait for subscription confirmation per async protocol
+            subscription_confirmed = False
+            timeout_count = 0
+            while not subscription_confirmed and timeout_count < 10:
+                message = await pubsub.get_message(timeout=1.0)
+                if message and message["type"] == "subscribe":
+                    subscription_confirmed = True
+                    break
+                timeout_count += 1
+
+            if not subscription_confirmed:
+                pytest.fail(f"Failed to confirm Redis subscription to {channel_name}")
 
             # Act
             await self._publish_teacher_notification_to_kafka(kafka_producer, notification)
@@ -710,7 +746,19 @@ class TestCompleteWebSocketServiceIntegration:
         channel_name = f"ws:{test_teacher_id}"
         pubsub = redis_client.pubsub()
         await pubsub.subscribe(channel_name)
-        await pubsub.get_message(timeout=1.0)
+
+        # Wait for subscription confirmation per async protocol
+        subscription_confirmed = False
+        timeout_count = 0
+        while not subscription_confirmed and timeout_count < 10:
+            message = await pubsub.get_message(timeout=1.0)
+            if message and message["type"] == "subscribe":
+                subscription_confirmed = True
+                break
+            timeout_count += 1
+
+        if not subscription_confirmed:
+            pytest.fail(f"Failed to confirm Redis subscription to {channel_name}")
 
         # Act - Send the same notification twice (duplicate)
         await self._publish_teacher_notification_to_kafka(kafka_producer, notification)

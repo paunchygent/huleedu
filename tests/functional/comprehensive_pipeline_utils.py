@@ -31,7 +31,7 @@ PIPELINE_TOPICS = {
     ),  # Phase 1 event
     "batch_spellcheck_initiate": topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
     "els_batch_phase_outcome": topic_name(ProcessingEvent.ELS_BATCH_PHASE_OUTCOME),
-    "essay_spellcheck_completed": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+    "essay_spellcheck_completed": topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
     "batch_cj_assessment_initiate": topic_name(
         ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
     ),

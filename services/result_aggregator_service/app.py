@@ -26,7 +26,6 @@ from services.result_aggregator_service.di import (
     ServiceProvider,
 )
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
-from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 from services.result_aggregator_service.startup_setup import setup_metrics_endpoint
 
 logger = create_service_logger("result_aggregator.app")
@@ -79,12 +78,9 @@ app = create_app()
 async def startup() -> None:
     """Initialize services on startup."""
     try:
-        # Initialize database schema using existing engine and setup Kafka consumer
+        # Setup Kafka consumer
         async with app.container() as request_container:
             settings = await request_container.get(Settings)
-            batch_repository = await request_container.get(BatchRepositoryProtocol)
-            await batch_repository.initialize_schema()
-            logger.info("Database schema initialized")
 
             # Get Kafka consumer and relay worker
             consumer = await request_container.get(ResultAggregatorKafkaConsumer)
