@@ -40,7 +40,7 @@ logger = get_logger(__name__)
 @pytest.mark.timeout(600)  # 10 minute timeout for multiple pipeline executions
 @pytest.mark.skipif(
     not os.getenv("ENABLE_AI_FEEDBACK_TESTS"),
-    reason="AI Feedback phase not implemented - skipping until service exists"
+    reason="AI Feedback phase not implemented - skipping until service exists",
 )
 async def test_e2e_sequential_pipelines_with_phase_pruning(
     clean_distributed_state: Any,
@@ -229,7 +229,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
 @pytest.mark.timeout(300)
 @pytest.mark.skipif(
     not os.getenv("ENABLE_AI_FEEDBACK_TESTS"),
-    reason="AI Feedback phase not implemented - skipping until service exists"
+    reason="AI Feedback phase not implemented - skipping until service exists",
 )
 async def test_e2e_comprehensive_pipeline_all_phases(
     clean_distributed_state: Any,

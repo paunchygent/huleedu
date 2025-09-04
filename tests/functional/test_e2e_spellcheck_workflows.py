@@ -11,23 +11,23 @@ correction counting, content verification.
 
 from __future__ import annotations
 
+# Use a local Kafka producer fixture following known working patterns
+import json
 import uuid
 from datetime import UTC
 from typing import Any
 
 import pytest
+import pytest_asyncio
+from aiokafka import AIOKafkaProducer
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus, ProcessingStage
 
-from tests.utils.kafka_test_manager import kafka_event_monitor, kafka_manager
-
-# Use a local Kafka producer fixture following known working patterns
-import json
-import pytest_asyncio
-from aiokafka import AIOKafkaProducer
+from tests.utils.kafka_test_manager import kafka_manager
+from tests.utils.service_test_manager import ServiceTestManager
 
 
 @pytest_asyncio.fixture
@@ -47,7 +47,6 @@ async def kafka_producer_for_e2e() -> AIOKafkaProducer:
         yield producer
     finally:
         await producer.stop()
-from tests.utils.service_test_manager import ServiceTestManager
 
 
 class TestE2ESpellcheckWorkflows:
@@ -87,7 +86,9 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.docker
     @pytest.mark.asyncio
     @pytest.mark.timeout(120)  # 2 minute timeout for complete spellcheck pipeline
-    async def test_complete_spellcheck_processing_pipeline(self, kafka_producer_for_e2e: AIOKafkaProducer):
+    async def test_complete_spellcheck_processing_pipeline(
+        self, kafka_producer_for_e2e: AIOKafkaProducer
+    ):
         """
         Test complete spellcheck pipeline: Content upload → Kafka event → Processing → Results
 
@@ -176,15 +177,16 @@ class TestE2ESpellcheckWorkflows:
                 assert len(events) == 1, f"Expected 1 spellcheck result, got {len(events)}"
 
                 event_info = events[0]
-                spellcheck_result = event_info["data"]["data"]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
+                spellcheck_result = event_info["data"][
+                    "data"
+                ]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
 
                 # SpellcheckPhaseCompletedV1 uses ProcessingStatus enum
                 from common_core.status_enums import ProcessingStatus
+
                 assert spellcheck_result["status"] == ProcessingStatus.COMPLETED.value
                 assert spellcheck_result["corrected_text_storage_id"] is not None
-                print(
-                    f"✅ Spellcheck completed in {spellcheck_result['processing_duration_ms']}ms"
-                )
+                print(f"✅ Spellcheck completed in {spellcheck_result['processing_duration_ms']}ms")
 
                 # Step 5: Validate corrected content stored in Content Service using utility
                 corrected_storage_id = spellcheck_result["corrected_text_storage_id"]
@@ -217,7 +219,9 @@ class TestE2ESpellcheckWorkflows:
     @pytest.mark.e2e
     @pytest.mark.docker
     @pytest.mark.asyncio
-    async def test_spellcheck_pipeline_with_no_errors(self, kafka_producer_for_e2e: AIOKafkaProducer):
+    async def test_spellcheck_pipeline_with_no_errors(
+        self, kafka_producer_for_e2e: AIOKafkaProducer
+    ):
         """
         Test spellcheck pipeline with text that has no spelling errors.
 
@@ -298,14 +302,18 @@ class TestE2ESpellcheckWorkflows:
                 )
 
                 assert len(events) == 1
-                spellcheck_result = events[0]["data"]["data"]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
+                spellcheck_result = events[0]["data"][
+                    "data"
+                ]  # EventEnvelope.data contains SpellcheckPhaseCompletedV1
 
                 # SpellcheckPhaseCompletedV1 uses ProcessingStatus enum
                 from common_core.status_enums import ProcessingStatus
+
                 assert spellcheck_result["status"] == ProcessingStatus.COMPLETED.value
                 processing_duration = spellcheck_result["processing_duration_ms"]
                 assert processing_duration is not None
-                assert processing_duration > 0  # Should have some processing time
+                # Extremely fast runs can legitimately be 0ms after int() rounding
+                assert processing_duration >= 0
                 print(f"✅ Perfect text processed in {processing_duration}ms")
 
             except Exception as e:
