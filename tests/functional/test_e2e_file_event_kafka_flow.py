@@ -263,7 +263,7 @@ class TestEndToEndFileEventKafkaFlow:
             print(f"  Batch ID: {notification.get('data', {}).get('batch_id')}")
 
             if (
-                notification.get("event") == "batch_file_added"
+                notification.get("event") == "batch_files_uploaded"
                 and notification.get("data", {}).get("batch_id") == test_batch_id
             ):
                 redis_notification_found = True

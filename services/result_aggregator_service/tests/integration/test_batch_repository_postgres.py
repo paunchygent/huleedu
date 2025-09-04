@@ -103,7 +103,6 @@ async def batch_repository(
     )
 
     repo = BatchRepositoryPostgresImpl(session_factory=session_factory, metrics=None)
-    await repo.initialize_schema()
     yield repo
 
 

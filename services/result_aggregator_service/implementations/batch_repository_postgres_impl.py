@@ -56,11 +56,6 @@ class BatchRepositoryPostgresImpl(BatchRepositoryProtocol):
         self.statistics = BatchStatisticsCalculator(session_factory)
         self.mappers = BatchRepositoryMappers()
 
-    async def initialize_schema(self) -> None:
-        """Initialize database schema if needed."""
-        # Schema initialization is handled at the service level
-        pass
-
     def _record_operation_metrics(
         self,
         operation: str,
