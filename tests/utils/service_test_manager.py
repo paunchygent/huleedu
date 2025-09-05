@@ -256,89 +256,30 @@ class ServiceTestManager:
         class_id: str | None = None,
     ) -> tuple[str, str]:
         """
-        Create a test batch via BOS API using lean registration model.
+        Create a test batch via API Gateway.
+
+        All client-facing test flows use AGW as the entry point.
+        Identity is injected at the edge; do not include user_id in the body.
 
         Args:
             expected_essay_count: Number of essays expected in batch
             course_code: Course code for the batch
             user: Test user (uses default if None)
             correlation_id: Correlation ID for tracking
+            enable_cj_assessment: Enable CJ assessment for the batch
+            class_id: Optional class ID (triggers REGULAR batch flow)
 
         Returns:
             tuple[str, str]: (batch_id, correlation_id)
         """
-        endpoints = await self.get_validated_endpoints()
-
-        if "batch_orchestrator_service" not in endpoints:
-            raise RuntimeError("Batch Orchestrator Service not available for batch creation")
-
-        import uuid
-
-        if correlation_id is None:
-            correlation_id = str(uuid.uuid4())
-
-        if user is None:
-            user = self.auth_manager.get_default_user()
-
-        bos_base_url = endpoints["batch_orchestrator_service"]["base_url"]
-
-        # Convert string course codes to CourseCode enum if possible, fallback to ENG5
-        if isinstance(course_code, str):
-            try:
-                course_code_enum = CourseCode(course_code)
-            except ValueError:
-                # Invalid course code string, use default
-                course_code_enum = CourseCode.ENG5
-                logger.warning(
-                    f"Invalid course code '{course_code}', using default {CourseCode.ENG5.value}"
-                )
-        else:
-            course_code_enum = course_code
-
-        # Generate unique essay instructions to prevent idempotency collisions
-        import datetime
-
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_id = uuid.uuid4().hex[:8]
-        unique_instructions = (
-            f"Test batch created by ServiceTestManager at {timestamp} (ID: {unique_id})"
+        return await self.create_batch_via_agw(
+            expected_essay_count=expected_essay_count,
+            course_code=course_code,
+            user=user,
+            correlation_id=correlation_id,
+            enable_cj_assessment=enable_cj_assessment,
+            class_id=class_id,
         )
-
-        batch_request = {
-            "course_code": course_code_enum.value,
-            "expected_essay_count": expected_essay_count,
-            "essay_instructions": unique_instructions,
-            "user_id": user.user_id,
-            "enable_cj_assessment": enable_cj_assessment,
-        }
-
-        # Add class_id if provided (triggers REGULAR batch flow)
-        if class_id is not None:
-            batch_request["class_id"] = class_id
-
-        # Get authentication headers
-        auth_headers = self.auth_manager.get_auth_headers(user)
-        headers = {
-            **auth_headers,
-            "X-Correlation-ID": correlation_id,
-        }
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{bos_base_url}/v1/batches/register",
-                json=batch_request,
-                headers=headers,
-            ) as response:
-                if response.status != 202:
-                    error_text = await response.text()
-                    raise RuntimeError(f"Batch creation failed: {response.status} - {error_text}")
-
-                result = await response.json()
-                batch_id = result["batch_id"]
-                returned_correlation_id = result["correlation_id"]
-
-                logger.info(f"Created batch {batch_id} with correlation {returned_correlation_id}")
-                return batch_id, returned_correlation_id
 
     async def upload_files(
         self,

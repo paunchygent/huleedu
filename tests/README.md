@@ -55,6 +55,17 @@ tests/
 - **Event-Driven Flows**: Kafka event propagation validation
 - **Error Scenarios**: Failure handling and recovery testing
 
+## Batch Registration Entry Point
+
+All functional tests register batches through the API Gateway (AGW) at port 8080.
+This ensures tests validate the complete client flow including:
+- Edge identity injection from JWT tokens
+- Proper header forwarding (X-User-ID, X-Org-ID, X-Correlation-ID)
+- EventEnvelope metadata population with org_id
+
+Integration tests that mock service internals may bypass AGW as appropriate
+for their abstraction level (see Rule 070/075).
+
 ## Usage
 
 ### Prerequisites
