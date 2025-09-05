@@ -15,13 +15,13 @@ Test Flow:
 """
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 from structlog import get_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
@@ -34,9 +34,7 @@ logger = get_logger(__name__)
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)  # 5 minute timeout for complete multi-pipeline execution
-async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
-    clean_distributed_state: Any,
-) -> None:
+async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning() -> None:
     """
     Test CJ Assessment pipeline execution after NLP pipeline with proper phase pruning.
 
@@ -48,6 +46,9 @@ async def test_e2e_cj_assessment_after_nlp_with_spellcheck_pruning(
     5. Storage IDs from spellcheck are reused
     6. Pipeline completes successfully with pruning
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays with student names
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"

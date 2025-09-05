@@ -13,6 +13,7 @@ Based on modern testing practices:
 """
 
 import asyncio
+import time
 from typing import Any, Dict, NamedTuple, Optional
 
 import aiohttp
@@ -23,6 +24,38 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from tests.utils.auth_manager import AuthTestManager, AuthTestUser
 
 logger = create_service_logger("test.service_manager")
+
+
+class ServiceHealthCache:
+    """Shared cache for service health validation across all test instances."""
+
+    def __init__(self):
+        self._endpoints: dict[str, Any] = {}  # Always initialized, never None
+        self._cache_timestamp: float = 0.0     # Always initialized, never None
+        self.lock = asyncio.Lock()
+        self.cache_ttl = 60.0  # 60 seconds cache
+
+    def _is_cache_valid(self) -> bool:
+        """Check if the current cache is still valid."""
+        if not self._endpoints:  # Empty dict means not initialized
+            return False
+        return (time.time() - self._cache_timestamp) < self.cache_ttl
+
+    async def get_or_validate(self, validator_func) -> dict[str, Any]:
+        """Get cached endpoints or validate if cache is stale."""
+        async with self.lock:
+            if self._is_cache_valid():
+                logger.info("✅ Using cached service endpoints")
+                return self._endpoints.copy()
+
+            logger.info("🔄 Validating services (cache expired or empty)")
+            self._endpoints = await validator_func()
+            self._cache_timestamp = time.time()
+            return self._endpoints.copy()
+
+
+# Shared cache instance across all ServiceTestManager instances
+_shared_health_cache = ServiceHealthCache()
 
 
 class ServiceEndpoint(NamedTuple):
@@ -65,89 +98,112 @@ class ServiceTestManager:
         Args:
             auth_manager: Authentication manager (creates default if None)
         """
-        self._validated_endpoints: dict[str, Any] | None = None
-        self._validation_lock = asyncio.Lock()
         self.auth_manager = auth_manager or AuthTestManager()
 
     async def get_validated_endpoints(self, force_revalidation: bool = False) -> dict[str, Any]:
         """
-        Get validated service endpoints with caching.
+        Get validated service endpoints with shared caching and TTL.
 
-        Performs validation once per test session unless force_revalidation=True.
-        This replaces the session-scoped fixture pattern.
+        Uses shared cache with 60-second TTL across all test instances.
+        Performs validation once per session unless force_revalidation=True.
         """
-        async with self._validation_lock:
-            if self._validated_endpoints is None or force_revalidation:
-                self._validated_endpoints = await self._validate_all_services()
+        if force_revalidation:
+            # Force cache invalidation by setting timestamp to 0
+            _shared_health_cache._cache_timestamp = 0.0
 
-            return self._validated_endpoints.copy()
+        return await _shared_health_cache.get_or_validate(self._validate_all_services)
 
     async def _validate_all_services(self) -> dict[str, Any]:
-        """Validate all services and return their configuration."""
-        validated_endpoints = {}
-
+        """Validate all services in parallel using asyncio.gather()."""
         async with httpx.AsyncClient(timeout=10.0) as client:
-            for service in self.SERVICE_ENDPOINTS:
-                if service.has_http_api:
-                    # Validate HTTP API health
-                    health_url = f"http://localhost:{service.port}/healthz"
-                    try:
-                        response = await client.get(health_url)
-                        if response.status_code != 200:
-                            logger.warning(
-                                f"{service.name} health check failed: {response.status_code}",
-                            )
-                            continue
+            # Create validation tasks for all services in parallel
+            validation_tasks = [
+                self._validate_single_service(client, service)
+                for service in self.SERVICE_ENDPOINTS
+            ]
 
-                        response_data = response.json()
-                        if "status" not in response_data or "message" not in response_data:
-                            logger.warning(f"{service.name} invalid health response format")
-                            continue
+            # Run all validations in parallel
+            service_results = await asyncio.gather(*validation_tasks, return_exceptions=True)
 
-                        validated_endpoints[service.name] = {
-                            "health_url": health_url,
-                            "metrics_url": f"http://localhost:{service.port}/metrics",
-                            "base_url": f"http://localhost:{service.port}",
-                            "status": "healthy",
-                        }
-                        logger.info(f"✅ {service.name} HTTP API healthy")
+            # Collect successful validations
+            validated_endpoints = {}
+            for i, result in enumerate(service_results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Service validation failed: {result}")
+                    continue
 
-                    except (httpx.ConnectError, httpx.TimeoutException) as e:
-                        logger.warning(f"⚠️  {service.name} not accessible: {e}")
-                        continue
+                if result:  # Service validation returned data
+                    service_name = self.SERVICE_ENDPOINTS[i].name
+                    validated_endpoints[service_name] = result
 
-                if service.has_metrics:
-                    # Validate metrics endpoint
-                    metrics_url = f"http://localhost:{service.port}/metrics"
-                    try:
-                        response = await client.get(metrics_url)
-                        if response.status_code != 200:
-                            logger.warning(f"{service.name} metrics endpoint failed")
-                            continue
+            logger.info(
+                f"✅ Validated {len(validated_endpoints)}/{len(self.SERVICE_ENDPOINTS)} "
+                f"services in parallel"
+            )
+            return validated_endpoints
 
-                        # Validate Prometheus format
-                        metrics_text = response.text
-                        content_type = response.headers.get("content-type", "")
+    async def _validate_single_service(
+        self, client: httpx.AsyncClient, service: ServiceEndpoint
+    ) -> dict[str, Any] | None:
+        """Validate a single service's health and metrics endpoints."""
+        service_config = {}
 
-                        if "text/plain" not in content_type:
-                            logger.warning(f"{service.name} invalid metrics Content-Type")
-                            continue
+        # Validate HTTP API health
+        if service.has_http_api:
+            health_url = f"http://localhost:{service.port}/healthz"
+            try:
+                response = await client.get(health_url)
+                if response.status_code != 200:
+                    logger.warning(f"{service.name} health check failed: {response.status_code}")
+                    return None
 
-                        if metrics_text.strip():
-                            if "# HELP" not in metrics_text or "# TYPE" not in metrics_text:
-                                logger.warning(f"{service.name} invalid Prometheus format")
-                                continue
+                response_data = response.json()
+                if "status" not in response_data or "message" not in response_data:
+                    logger.warning(f"{service.name} invalid health response format")
+                    return None
 
-                        if service.name not in validated_endpoints:
-                            validated_endpoints[service.name] = {}
-                        validated_endpoints[service.name]["metrics_url"] = metrics_url
-                        validated_endpoints[service.name]["metrics_status"] = "valid"
-                        logger.info(f"📊 {service.name} metrics endpoint valid")
+                service_config.update({
+                    "health_url": health_url,
+                    "metrics_url": f"http://localhost:{service.port}/metrics",
+                    "base_url": f"http://localhost:{service.port}",
+                    "status": "healthy",
+                })
+                logger.info(f"✅ {service.name} HTTP API healthy")
 
-                    except (httpx.ConnectError, httpx.TimeoutException) as e:
-                        logger.warning(f"⚠️  {service.name} metrics not accessible: {e}")
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
+                logger.warning(f"⚠️  {service.name} not accessible: {e}")
+                return None
 
-        return validated_endpoints
+        # Validate metrics endpoint
+        if service.has_metrics:
+            metrics_url = f"http://localhost:{service.port}/metrics"
+            try:
+                response = await client.get(metrics_url)
+                if response.status_code != 200:
+                    logger.warning(f"{service.name} metrics endpoint failed")
+                    return service_config if service_config else None
+
+                # Validate Prometheus format
+                metrics_text = response.text
+                content_type = response.headers.get("content-type", "")
+
+                if "text/plain" not in content_type:
+                    logger.warning(f"{service.name} invalid metrics Content-Type")
+                    return service_config if service_config else None
+
+                if metrics_text.strip():
+                    if "# HELP" not in metrics_text or "# TYPE" not in metrics_text:
+                        logger.warning(f"{service.name} invalid Prometheus format")
+                        return service_config if service_config else None
+
+                service_config["metrics_url"] = metrics_url
+                service_config["metrics_status"] = "valid"
+                logger.info(f"📊 {service.name} metrics endpoint valid")
+
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
+                logger.warning(f"⚠️  {service.name} metrics not accessible: {e}")
+
+        return service_config if service_config else None
 
     async def create_batch_via_agw(
         self,

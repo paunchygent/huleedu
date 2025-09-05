@@ -28,6 +28,7 @@ import pytest
 # Identity Service and event models
 from common_core.event_enums import ProcessingEvent, topic_name
 
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 
 # Test utilities (existing only - DO NOT create new utilities)
@@ -82,7 +83,6 @@ class TestIdentityServiceE2E:
     @pytest.mark.timeout(120)  # 2 minute timeout for complete user lifecycle
     async def test_complete_user_lifecycle(
         self,
-        clean_distributed_state,
         kafka_manager: KafkaTestManager,
         identity_event_topics: list[str],
         swedish_test_data: Dict[str, Any],
@@ -95,8 +95,8 @@ class TestIdentityServiceE2E:
         - Registration automatically sends verification email
         - Users cannot login with unverified email addresses
         """
-        # Ensure clean state
-        _ = clean_distributed_state
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
 
         # Initialize unique correlation ID for this test
         event_factory = reset_test_event_factory()

@@ -34,11 +34,11 @@ from tests.functional.workflow_monitoring_utils import (
     monitor_pipeline_resolution_workflow,
 )
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 
 
-@pytest.mark.usefixtures("clean_distributed_state")
 class TestClientPipelineResolutionWorkflow:
     """End-to-end tests for complete client pipeline resolution workflow."""
 
@@ -88,7 +88,6 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: dict[str, Any],
         test_teacher,
     ):
         """
@@ -100,6 +99,9 @@ class TestClientPipelineResolutionWorkflow:
         - Resolved pipeline initiates specialized service execution
         - Complete pipeline workflow executes correctly
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
+
         print("\n🚀 Starting complete client pipeline resolution workflow test")
 
         try:
@@ -241,7 +243,6 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: dict[str, Any],
         test_teacher,
     ):
         """
@@ -252,6 +253,9 @@ class TestClientPipelineResolutionWorkflow:
         - Pipeline dependency resolution optimizes based on current state
         - Resolved pipeline reflects intelligent state analysis
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
+
         print("\n🧠 Starting state-aware pipeline optimization test")
 
         try:
@@ -319,7 +323,6 @@ class TestClientPipelineResolutionWorkflow:
         self,
         service_manager: ServiceTestManager,
         kafka_manager: KafkaTestManager,
-        validated_services: dict[str, Any],
         test_teacher,
     ):
         """
@@ -330,6 +333,9 @@ class TestClientPipelineResolutionWorkflow:
         - BOS maintains request isolation
         - No race conditions in pipeline resolution
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
+
         print("\n🔄 Starting concurrent client pipeline requests test")
 
         try:

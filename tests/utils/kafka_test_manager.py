@@ -26,6 +26,157 @@ from huleedu_service_libs.logging_utils import create_service_logger
 logger = create_service_logger("test.kafka_manager")
 
 
+class KafkaConsumerPool:
+    """Simplified consumer cache - lazy creation with topic-based reuse."""
+
+    def __init__(self, bootstrap_servers: str):
+        self.bootstrap_servers = bootstrap_servers
+        # Cache: topics_key -> (consumer, loop)
+        self._consumer_cache: dict[str, tuple[AIOKafkaConsumer, asyncio.AbstractEventLoop]] = {}
+        self._lock = asyncio.Lock()
+
+    async def get_consumer(self, test_name: str, topics: list[str]) -> AIOKafkaConsumer:
+        """Get or create consumer for specific topics."""
+        topics_key = "|".join(sorted(topics))  # Simple cache key
+        current_loop = asyncio.get_event_loop()
+
+        async with self._lock:
+            # Check if we have a consumer for these exact topics
+            if topics_key in self._consumer_cache:
+                consumer, created_loop = self._consumer_cache[topics_key]
+
+                # Verify consumer was created in the same loop
+                if created_loop is current_loop:
+                    try:
+                        # Reset consumer to end positions for clean test isolation
+                        await consumer.seek_to_end()
+                        logger.info(f"♻️ Reusing cached consumer for {test_name}")
+                        return consumer
+                    except Exception as e:
+                        # Consumer is broken, remove from cache and create new one
+                        logger.warning(f"Cached consumer broken for {test_name}, creating new: {e}")
+                        try:
+                            await consumer.stop()
+                        except Exception:
+                            # If stop fails, mark as closed to prevent warnings
+                            try:
+                                consumer._closed = True
+                            except Exception:
+                                pass
+                        del self._consumer_cache[topics_key]
+                else:
+                    # Consumer from different loop, cannot reuse
+                    logger.debug(f"Consumer for {topics_key} from different loop, creating new")
+                    # Mark consumer as closed to prevent "Unclosed" warnings
+                    try:
+                        consumer._closed = True
+                    except Exception:
+                        pass
+                    del self._consumer_cache[topics_key]
+
+            # Create new consumer on-demand
+            consumer = AIOKafkaConsumer(
+                *topics,  # Subscribe to topics
+                bootstrap_servers=self.bootstrap_servers,
+                group_id=f"test_{test_name}_{uuid.uuid4().hex[:8]}",
+                auto_offset_reset="latest",
+                enable_auto_commit=False,
+            )
+
+            try:
+                await consumer.start()
+                # Wait for assignment (sequential creation avoids coordinator overload)
+                await self._wait_for_assignment(consumer, test_name)
+                await consumer.seek_to_end()
+
+                # Cache it for reuse with loop reference
+                self._consumer_cache[topics_key] = (consumer, current_loop)
+                logger.info(f"✅ Created and cached consumer for {test_name}")
+                return consumer
+            except Exception as e:
+                # Clean up failed consumer
+                try:
+                    await consumer.stop()
+                except Exception:
+                    pass
+                raise RuntimeError(f"Failed to create consumer for {test_name}: {e}")
+
+    async def _wait_for_assignment(self, consumer: AIOKafkaConsumer, test_name: str) -> None:
+        """Wait for consumer to get partition assignment."""
+        start_time = asyncio.get_event_loop().time()
+
+        while True:
+            if asyncio.get_event_loop().time() - start_time > 15.0:
+                raise RuntimeError(f"Consumer {test_name} partition assignment timeout (15s)")
+
+            assigned_partitions = consumer.assignment()
+            if assigned_partitions:
+                logger.debug(f"Consumer {test_name} assigned {len(assigned_partitions)} partitions")
+                break
+            else:
+                await asyncio.sleep(0.1)
+
+    async def cleanup_pool(self) -> None:
+        """Clean up cached consumers - gracefully handles cross-loop scenarios."""
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop - just clear cache
+            self._consumer_cache.clear()
+            logger.info("🧹 Kafka consumer cache cleared (no active loop)")
+            return
+
+        # Clean up consumers belonging to current loop, skip others
+        async with self._lock:
+            consumers_to_remove = []
+            same_loop_count = 0
+            different_loop_count = 0
+
+            for topics_key, (consumer, created_loop) in list(self._consumer_cache.items()):
+                if created_loop is current_loop:
+                    # Same loop - safe to stop normally
+                    same_loop_count += 1
+                    try:
+                        await consumer.stop()
+                        logger.debug(f"Stopped consumer for topics: {topics_key}")
+                    except Exception as e:
+                        logger.debug(f"Error stopping consumer {topics_key}: {e}")
+                    consumers_to_remove.append(topics_key)
+                else:
+                    # Different loop - mark as closed and remove from cache
+                    different_loop_count += 1
+                    try:
+                        # Mark consumer as closed to prevent warnings
+                        consumer._closed = True
+                        logger.debug(f"Removing consumer {topics_key} from cache (different loop)")
+                    except Exception as e:
+                        logger.debug(f"Error marking consumer {topics_key} as closed: {e}")
+                    consumers_to_remove.append(topics_key)
+
+            # Remove all consumers from cache
+            for topics_key in consumers_to_remove:
+                del self._consumer_cache[topics_key]
+
+        logger.info(
+            f"🧹 Kafka consumer cache cleaned up "
+            f"({same_loop_count} stopped, {different_loop_count} removed)"
+        )
+
+
+# Global consumer pool instance
+_kafka_consumer_pool: KafkaConsumerPool | None = None
+
+
+def get_or_create_consumer_pool(bootstrap_servers: str) -> KafkaConsumerPool:
+    """Get or create the global consumer pool."""
+    global _kafka_consumer_pool
+
+    if _kafka_consumer_pool is None:
+        _kafka_consumer_pool = KafkaConsumerPool(bootstrap_servers)
+
+    return _kafka_consumer_pool
+
+
 class KafkaTestConfig(NamedTuple):
     """Kafka testing configuration."""
 
@@ -68,6 +219,7 @@ class KafkaTestManager:
     def __init__(self, config: KafkaTestConfig | None = None):
         self.config = config or create_kafka_test_config()
         self._created_consumers: list[AIOKafkaConsumer] = []
+        self._use_consumer_pool = True  # Enable consumer pooling with simplified implementation
 
     @asynccontextmanager
     async def consumer(
@@ -77,12 +229,15 @@ class KafkaTestManager:
         auto_offset_reset: str = "latest",
     ) -> AsyncIterator[AIOKafkaConsumer]:
         """
-        Context manager for Kafka consumer with automatic cleanup.
+        Context manager for Kafka consumer with automatic cleanup and pooling.
+
+        Uses consumer pool for significant performance improvement by reusing consumers
+        instead of creating new ones for each test.
 
         Args:
             test_name: Name of test for unique group ID
             topics: List of topics to subscribe to (uses default if None)
-            auto_offset_reset: Offset reset strategy
+            auto_offset_reset: Offset reset strategy (only "latest" supported with pool)
 
         Yields:
             Configured and started AIOKafkaConsumer
@@ -90,6 +245,32 @@ class KafkaTestManager:
         if topics is None:
             topics = list(self.config.topics.values())
 
+        if self._use_consumer_pool and auto_offset_reset == "latest":
+            # Use consumer pool for significant performance improvement
+            pool = get_or_create_consumer_pool(self.config.bootstrap_servers)
+            consumer = await pool.get_consumer(test_name, topics)
+
+            try:
+                yield consumer
+            finally:
+                # Consumer stays in pool for reuse, no explicit cleanup here
+                # Pool tracks loop ownership and handles cleanup appropriately
+                pass
+        else:
+            # Fallback to individual consumer creation
+            async with self._create_individual_consumer(
+                test_name, topics, auto_offset_reset
+            ) as consumer:
+                yield consumer
+
+    @asynccontextmanager
+    async def _create_individual_consumer(
+        self,
+        test_name: str,
+        topics: list[str],
+        auto_offset_reset: str
+    ) -> AsyncIterator[AIOKafkaConsumer]:
+        """Create an individual consumer (fallback when pool is not suitable)."""
         consumer_group_id = f"test_{test_name}_{uuid.uuid4().hex[:8]}"
 
         consumer = AIOKafkaConsumer(
@@ -182,7 +363,7 @@ class KafkaTestManager:
         while len(collected_events) < expected_count and asyncio.get_event_loop().time() < end_time:
             msg_batch = await consumer.getmany(timeout_ms=1000, max_records=10)
 
-            for topic_partition, messages in msg_batch.items():
+            for _topic_partition, messages in msg_batch.items():
                 for message in messages:
                     # Parse raw message like production services do
                     raw_message = message.value

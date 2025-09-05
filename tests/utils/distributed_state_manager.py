@@ -8,7 +8,7 @@ idempotency collisions and ensure clean test environments.
 import asyncio
 import subprocess
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -85,46 +85,107 @@ class DistributedStateManager:
         logger.warning(f"⚠️ Timeout waiting for services to be idle. Active: {active_services}")
         return False
 
-    async def _atomic_redis_cleanup(self) -> int:
+    async def _smart_redis_cleanup(self) -> int:
         """
-        Perform complete Redis cleanup using FLUSHALL to ensure test isolation.
+        Perform targeted Redis cleanup using TTL and pattern-based deletion.
 
-        For tests, we need absolute certainty that no stale data remains,
-        so we use FLUSHALL rather than pattern matching which can miss keys.
+        Instead of FLUSHALL, this targets specific test-related key patterns:
+        - Idempotency keys: huleedu:idempotency:v2:*
+        - Outbox keys: outbox:*
+        - Batch tracking: batch:*
+        - Test keys: test:*
 
-        Returns number of keys cleared (from DBSIZE before flush).
+        Returns number of keys cleared.
+        """
+        try:
+            total_keys_cleared = 0
+
+            # Define key patterns that need cleanup for test isolation
+            cleanup_patterns = [
+                "huleedu:idempotency:v2:*",  # Event idempotency keys
+                "outbox:*",                  # Outbox relay keys
+                "batch:*",                   # Batch tracking keys
+                "test:*",                    # Explicit test keys
+                "correlation:*",             # Correlation tracking
+                "pipeline:*",                # Pipeline state keys
+                "essay:*",                   # Essay processing keys
+                "bcs:essay_state:*",         # BCS essay state tracking keys
+            ]
+
+            for pattern in cleanup_patterns:
+                keys_cleared = await self._delete_keys_by_pattern(pattern)
+                total_keys_cleared += keys_cleared
+                if keys_cleared > 0:
+                    logger.info(f"🗑️ Cleared {keys_cleared} keys matching pattern: {pattern}")
+
+            if total_keys_cleared > 0:
+                logger.info(f"✅ Smart Redis cleanup completed: {total_keys_cleared} keys cleared")
+            else:
+                logger.info("✅ Redis was already clean (no test keys found)")
+
+            return total_keys_cleared
+
+        except Exception as e:
+            logger.warning(f"⚠️ Smart Redis cleanup failed, falling back to FLUSHALL: {e}")
+            # Fallback to original FLUSHALL if smart cleanup fails
+            return await self._atomic_redis_flushall()
+
+    async def _delete_keys_by_pattern(self, pattern: str) -> int:
+        """Delete all keys matching a specific pattern."""
+        try:
+            # Get keys matching pattern
+            keys_cmd = ["docker", "exec", self.redis_container, "redis-cli", "KEYS", pattern]
+            keys_result = subprocess.run(keys_cmd, capture_output=True, text=True, check=True)
+
+            if not keys_result.stdout.strip():
+                return 0
+
+            keys = keys_result.stdout.strip().split("\n")
+            keys = [k for k in keys if k]  # Filter out empty strings
+
+            if not keys:
+                return 0
+
+            # Delete keys in batches to avoid command line length limits
+            batch_size = 100
+            keys_deleted = 0
+
+            for i in range(0, len(keys), batch_size):
+                batch = keys[i:i + batch_size]
+                del_cmd = ["docker", "exec", self.redis_container, "redis-cli", "DEL"] + batch
+
+                del_result = subprocess.run(del_cmd, capture_output=True, text=True, check=True)
+                keys_deleted += int(del_result.stdout.strip())
+
+            return keys_deleted
+
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"⚠️ Failed to delete keys for pattern {pattern}: {e.stderr}")
+            return 0
+        except Exception as e:
+            logger.warning(f"⚠️ Unexpected error deleting keys for pattern {pattern}: {e}")
+            return 0
+
+    async def _atomic_redis_flushall(self) -> int:
+        """
+        Fallback: Perform complete Redis cleanup using FLUSHALL.
+
+        Only used when smart cleanup fails.
         """
         try:
             # First, count existing keys for reporting
             count_cmd = ["docker", "exec", self.redis_container, "redis-cli", "DBSIZE"]
-
             count_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
             key_count_before = int(count_result.stdout.strip())
 
             # Perform complete flush
             flush_cmd = ["docker", "exec", self.redis_container, "redis-cli", "FLUSHALL"]
-
             flush_result = subprocess.run(flush_cmd, capture_output=True, text=True, check=True)
 
             if "OK" not in flush_result.stdout:
                 raise RuntimeError(f"FLUSHALL command failed: {flush_result.stdout}")
 
-            # Verify cleanup was successful
-            verify_result = subprocess.run(count_cmd, capture_output=True, text=True, check=True)
-            key_count_after = int(verify_result.stdout.strip())
-
-            if key_count_after != 0:
-                logger.warning(f"⚠️ Redis cleanup incomplete: {key_count_after} keys remain")
-                return key_count_before
-
-            if key_count_before > 0:
-                logger.info(
-                    f"🗑️ Completely flushed Redis: {key_count_before} keys cleared "
-                    f"(idempotency, outbox, and all test state)"
-                )
-            else:
-                logger.info("✅ Redis was already clean (0 keys)")
-
+            logger.warning(f"⚠️ Used FLUSHALL fallback: {key_count_before} keys cleared")
             return key_count_before
 
         except subprocess.CalledProcessError as e:
@@ -133,6 +194,119 @@ class DistributedStateManager:
         except Exception as e:
             logger.warning(f"⚠️ Unexpected error in Redis cleanup: {e}")
             raise
+
+    async def quick_redis_cleanup(self, patterns: Optional[List[str]] = None) -> int:
+        """
+        Quick Redis cleanup without service checks or retry logic.
+
+        Performs direct pattern-based cleanup in <1 second for fast test execution.
+
+        Args:
+            patterns: Optional list of Redis key patterns to clean.
+                     If None, uses default cleanup patterns.
+
+        Returns:
+            Number of keys cleared
+        """
+        try:
+            if patterns is None:
+                # Use the same patterns as _smart_redis_cleanup but without service coordination
+                patterns = [
+                    "huleedu:idempotency:v2:*",  # Event idempotency keys
+                    "outbox:*",                  # Outbox relay keys
+                    "batch:*",                   # Batch tracking keys
+                    "test:*",                    # Explicit test keys
+                    "correlation:*",             # Correlation tracking
+                    "pipeline:*",                # Pipeline state keys
+                    "essay:*",                   # Essay processing keys
+                    "bcs:essay_state:*",         # BCS essay state tracking keys
+                ]
+
+            total_keys_cleared = 0
+
+            for pattern in patterns:
+                keys_cleared = await self._delete_keys_by_pattern(pattern)
+                total_keys_cleared += keys_cleared
+                if keys_cleared > 0:
+                    logger.info(f"🗑️ Quick cleanup: {keys_cleared} keys matching {pattern}")
+
+            if total_keys_cleared > 0:
+                logger.info(f"✅ Quick Redis cleanup completed: {total_keys_cleared} keys cleared")
+
+            return total_keys_cleared
+
+        except Exception as e:
+            logger.warning(f"⚠️ Quick Redis cleanup failed: {e}")
+            raise
+
+    async def cleanup_for_test(
+        self,
+        test_name: str,
+        patterns: Optional[List[str]] = None,
+        consumer_groups: Optional[List[str]] = None
+    ) -> dict[str, Any]:
+        """
+        Targeted cleanup for specific test needs without over-engineering.
+
+        Args:
+            test_name: Name of the test for logging
+            patterns: Specific Redis patterns to clean (defaults to all)
+            consumer_groups: Specific Kafka consumer groups to reset (defaults to none)
+
+        Returns:
+            Cleanup results with counts and timing
+        """
+        logger.info(f"🧹 Targeted cleanup for test: {test_name}")
+        start_time = time.time()
+
+        # Redis cleanup
+        redis_keys_cleared = await self.quick_redis_cleanup(patterns)
+
+        # Kafka cleanup (only if specified)
+        kafka_groups_reset = 0
+        if consumer_groups:
+            for group in consumer_groups:
+                try:
+                    reset_cmd = [
+                        "docker", "exec", self.kafka_container,
+                        "kafka-consumer-groups.sh", "--bootstrap-server", "localhost:9092",
+                        "--group", group, "--reset-offsets", "--to-latest",
+                        "--all-topics", "--execute"
+                    ]
+                    result = subprocess.run(reset_cmd, capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        kafka_groups_reset += 1
+                        logger.info(f"🔄 Reset Kafka consumer group: {group}")
+                except Exception as e:
+                    logger.debug(f"Consumer group {group} reset failed: {e}")
+
+        execution_time = time.time() - start_time
+
+        results = {
+            "test_name": test_name,
+            "redis_keys_cleared": redis_keys_cleared,
+            "kafka_groups_reset": kafka_groups_reset,
+            "execution_time_seconds": execution_time,
+            "clean": redis_keys_cleared >= 0  # Success if no errors
+        }
+
+        logger.info(
+            f"✅ Targeted cleanup complete for {test_name}: "
+            f"{redis_keys_cleared} keys, {kafka_groups_reset} groups in {execution_time:.2f}s"
+        )
+
+        return results
+
+    async def minimal_cleanup(self) -> int:
+        """
+        Minimal cleanup for tests with proper isolation.
+        Only clears idempotency keys that could cause test interference.
+
+        Returns:
+            Number of idempotency keys cleared
+        """
+        idempotency_patterns = ["huleedu:idempotency:v2:*"]
+        return await self.quick_redis_cleanup(idempotency_patterns)
 
     async def ensure_clean_test_environment(
         self, test_name: str, clear_redis: bool = True, reset_kafka_offsets: bool = True
@@ -160,8 +334,8 @@ class DistributedStateManager:
             if not services_idle:
                 logger.warning("⚠️ Proceeding with cleanup despite active services")
 
-            # Step 2: Atomic Redis cleanup (no race conditions)
-            await self._atomic_redis_cleanup()
+            # Step 2: Smart Redis cleanup (pattern-based, no race conditions)
+            await self._smart_redis_cleanup()
 
         if reset_kafka_offsets:
             await self._reset_kafka_consumer_offsets()
@@ -226,10 +400,10 @@ class DistributedStateManager:
 
     async def validate_clean_state(self) -> dict[str, Any]:
         """
-        Validate that distributed system state is completely clean.
+        Validate that distributed system state is clean of test-related keys.
 
-        Since we use FLUSHALL for cleanup, we simply verify that Redis is empty
-        and provide sample keys if any remain for debugging.
+        Since we use smart pattern-based cleanup, we check for remaining keys
+        and specifically flag test-critical patterns like idempotency keys.
 
         Returns:
             Dict with validation results for debugging

@@ -19,13 +19,13 @@ This validates:
 
 import os
 from pathlib import Path
-from typing import Any
 
 import pytest
 from structlog import get_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
@@ -42,9 +42,7 @@ logger = get_logger(__name__)
     not os.getenv("ENABLE_AI_FEEDBACK_TESTS"),
     reason="AI Feedback phase not implemented - skipping until service exists",
 )
-async def test_e2e_sequential_pipelines_with_phase_pruning(
-    clean_distributed_state: Any,
-) -> None:
+async def test_e2e_sequential_pipelines_with_phase_pruning() -> None:
     """
     Test sequential pipeline execution with phase pruning.
 
@@ -60,6 +58,9 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
     - cj_assessment: [spellcheck, cj_assessment]
     - ai_feedback: [spellcheck, nlp, ai_feedback]
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"
@@ -231,9 +232,7 @@ async def test_e2e_sequential_pipelines_with_phase_pruning(
     not os.getenv("ENABLE_AI_FEEDBACK_TESTS"),
     reason="AI Feedback phase not implemented - skipping until service exists",
 )
-async def test_e2e_comprehensive_pipeline_all_phases(
-    clean_distributed_state: Any,
-) -> None:
+async def test_e2e_comprehensive_pipeline_all_phases() -> None:
     """
     Test the comprehensive pipeline that includes all phases.
 
@@ -242,6 +241,9 @@ async def test_e2e_comprehensive_pipeline_all_phases(
 
     This validates that a single pipeline can orchestrate all phases.
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"

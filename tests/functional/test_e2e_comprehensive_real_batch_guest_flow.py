@@ -25,6 +25,7 @@ from tests.functional.comprehensive_pipeline_utils import (
     watch_pipeline_progression_with_consumer,
 )
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.service_test_manager import ServiceTestManager
 
@@ -34,7 +35,7 @@ from tests.utils.service_test_manager import ServiceTestManager
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(240)  # 4 minute timeout for complete pipeline with mock LLM
-async def test_comprehensive_real_batch_pipeline(clean_distributed_state):
+async def test_comprehensive_real_batch_pipeline():
     """
     Test complete pipeline with real student essays through actual BOS orchestration.
 
@@ -47,11 +48,9 @@ async def test_comprehensive_real_batch_pipeline(clean_distributed_state):
 
     Uses real student essays and follows actual event orchestration.
     Uses mock LLM for fast, cost-effective testing.
-
-    The clean_distributed_state fixture ensures clean Redis and Kafka state before test.
     """
-    # Fixture ensures clean distributed state
-    _ = clean_distributed_state
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
 
     # Initialize unique event factory for this test run
     event_factory = reset_test_event_factory()

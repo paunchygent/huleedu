@@ -34,6 +34,7 @@ from tests.functional.comprehensive_pipeline_utils import (
     watch_pipeline_progression_with_consumer,
 )
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.service_test_manager import ServiceTestManager
 
@@ -143,8 +144,8 @@ async def setup_test_class_with_roster(service_manager: ServiceTestManager, teac
 
 
 async def wait_for_student_matching_events(
-    consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 60
-) -> Optional[dict[str, Any]]:  # batch_id is logged in error messages
+    consumer: Any, _batch_id: str, correlation_id: str, timeout_seconds: int = 60
+) -> Optional[dict[str, Any]]:  # _batch_id available for future error logging
     """
     Monitor Phase 2 student matching events.
 
@@ -253,8 +254,8 @@ async def confirm_student_associations(
 
 
 async def wait_for_batch_essays_ready(
-    consumer: Any, batch_id: str, correlation_id: str, timeout_seconds: int = 30
-) -> bool:  # batch_id is used in filtering events
+    consumer: Any, _batch_id: str, correlation_id: str, timeout_seconds: int = 30
+) -> bool:  # _batch_id available for future event filtering
     """Wait for BatchEssaysReady event after associations are confirmed."""
     start_time = asyncio.get_event_loop().time()
     end_time = start_time + timeout_seconds
@@ -301,9 +302,7 @@ async def wait_for_batch_essays_ready(
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)  # 5 minute timeout for complete pipeline with student matching
-async def test_comprehensive_real_batch_with_student_matching(
-    clean_distributed_state: Any,
-) -> None:  # clean_distributed_state fixture ensures clean Redis and Kafka state
+async def test_comprehensive_real_batch_with_student_matching() -> None:
     """
     Test complete Phase 2 pipeline with student matching for REGULAR batches.
 
@@ -318,6 +317,9 @@ async def test_comprehensive_real_batch_with_student_matching(
 
     Uses real student essays with actual names that need to be matched.
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays with student names
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"

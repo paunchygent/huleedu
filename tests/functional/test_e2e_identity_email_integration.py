@@ -40,6 +40,7 @@ import pytest
 from common_core.event_enums import ProcessingEvent, topic_name
 
 # Test utilities
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
 
@@ -54,11 +55,7 @@ class TestIdentityEmailIntegrationE2E:
     # Service endpoints
     IDENTITY_SERVICE_BASE_URL = "http://localhost:7005/v1/auth"
 
-    @pytest.fixture(scope="function", autouse=True)
-    def setup_clean_state(self, clean_distributed_state):
-        """Set up clean distributed state for each test for proper isolation."""
-        _ = clean_distributed_state  # Ensure clean state before running any tests
-        return None
+    # Clean distributed state setup removed - using explicit calls in tests
 
     @pytest.fixture
     def kafka_manager(self) -> KafkaTestManager:
@@ -235,6 +232,8 @@ class TestIdentityEmailIntegrationE2E:
         3. NotificationEmailRequestedV1 event published (template="welcome")
         4. Email Service processes → EmailSentV1 event
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
 
         # Verify Docker containers are healthy
         await self._verify_docker_container_health()
@@ -378,6 +377,8 @@ class TestIdentityEmailIntegrationE2E:
         4. NotificationEmailRequestedV1 event published (template="verification")
         5. Email Service processes → EmailSentV1 event
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
 
         # Verify Docker containers are healthy
         await self._verify_docker_container_health()
@@ -523,6 +524,8 @@ class TestIdentityEmailIntegrationE2E:
         4. NotificationEmailRequestedV1 event published (template="password_reset")
         5. Email Service processes → EmailSentV1 event
         """
+        # Ensure clean distributed state for test isolation
+        await distributed_state_manager.quick_redis_cleanup()
 
         # Verify Docker containers are healthy
         await self._verify_docker_container_health()

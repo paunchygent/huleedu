@@ -20,13 +20,13 @@ Tests the full NLP pipeline flow with real student essays and linguistic analysi
 """
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 from structlog import get_logger
 
 from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
+from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.event_factory import reset_test_event_factory
 from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
@@ -39,9 +39,7 @@ logger = get_logger(__name__)
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)  # 5 minute timeout for complete pipeline with student matching
-async def test_e2e_nlp_pipeline_with_student_matching(
-    clean_distributed_state: Any,
-) -> None:  # clean_distributed_state fixture ensures clean Redis and Kafka state
+async def test_e2e_nlp_pipeline_with_student_matching() -> None:
     """
     Test complete NLP pipeline with student matching for REGULAR batches.
 
@@ -56,6 +54,9 @@ async def test_e2e_nlp_pipeline_with_student_matching(
 
     Uses real student essays with actual names that need to be matched.
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays with student names
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"
@@ -123,9 +124,7 @@ async def test_e2e_nlp_pipeline_with_student_matching(
 @pytest.mark.functional
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
-async def test_e2e_nlp_pipeline_guest_batch(
-    clean_distributed_state: Any,
-) -> None:
+async def test_e2e_nlp_pipeline_guest_batch() -> None:
     """
     Test NLP pipeline for GUEST batches (no student matching).
 
@@ -137,6 +136,9 @@ async def test_e2e_nlp_pipeline_guest_batch(
 
     Uses real essays but without student matching phase.
     """
+    # Ensure clean distributed state for test isolation
+    await distributed_state_manager.quick_redis_cleanup()
+
     # Load real essays
     essay_dir = Path(
         "/Users/olofs_mba/Documents/Repos/huledu-reboot/test_uploads/Book-Report-ES24B-2025-04-09-104843"
