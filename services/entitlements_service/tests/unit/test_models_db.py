@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Type
 from uuid import uuid4
 
 import pytest
@@ -39,7 +40,9 @@ class TestEnumBehavior:
             (OperationStatus, {"pending", "completed", "failed"}),
         ],
     )
-    def test_enum_values_and_behavior(self, enum_class, expected_values: set[str]) -> None:
+    def test_enum_values_and_behavior(
+        self, enum_class: Type[Any], expected_values: set[str]
+    ) -> None:
         """Test enum classes contain expected values and proper equality behavior."""
         actual_values = {member.value for member in enum_class}
         assert actual_values == expected_values

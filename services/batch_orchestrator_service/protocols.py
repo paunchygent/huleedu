@@ -339,3 +339,30 @@ class BatchMetricsProtocol(Protocol):
     ) -> None:
         """Record validation operation metrics."""
         pass
+
+
+class EntitlementsServiceProtocol(Protocol):
+    """Protocol for interacting with the Entitlements Service for credit checking."""
+
+    async def check_credits(
+        self,
+        user_id: str,
+        org_id: str | None,
+        required_credits: list[tuple[str, int]],
+        correlation_id: str,
+    ) -> dict[str, Any]:
+        """Check if sufficient credits are available for the given requirements.
+
+        Args:
+            user_id: User requesting the credits
+            org_id: Organization ID (if applicable)
+            required_credits: List of (metric_name, quantity) tuples
+            correlation_id: Request correlation ID for tracing
+
+        Returns:
+            Dict with 'sufficient': bool and details about credit availability
+
+        Raises:
+            Exception: If entitlements service communication fails
+        """
+        pass

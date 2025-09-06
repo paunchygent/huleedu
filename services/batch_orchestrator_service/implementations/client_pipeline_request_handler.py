@@ -12,13 +12,20 @@ from typing import Any
 
 from common_core.events.client_commands import ClientBatchPipelineRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.events.pipeline_events import PipelineDeniedV1
 from common_core.pipeline_models import PhaseName, ProcessingPipelineState
 from huleedu_service_libs.logging_utils import create_service_logger
 
+from services.batch_orchestrator_service.domain.pipeline_cost_strategy import PipelineCostStrategy
+from services.batch_orchestrator_service.domain.pipeline_credit_guard import (
+    PipelineCreditGuard,
+)
 from services.batch_orchestrator_service.notification_projector import NotificationProjector
 from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
+    BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
+    EntitlementsServiceProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
 
@@ -37,13 +44,24 @@ class ClientPipelineRequestHandler:
         bcs_client: BatchConductorClientProtocol,
         batch_repo: BatchRepositoryProtocol,
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
+        entitlements_client: EntitlementsServiceProtocol,
+        cost_strategy: PipelineCostStrategy | None = None,
+        credit_guard: PipelineCreditGuard | None = None,
         notification_projector: NotificationProjector | None = None,
+        event_publisher: BatchEventPublisherProtocol | None = None,
     ) -> None:
         """Initialize with required dependencies."""
         self.bcs_client = bcs_client
         self.batch_repo = batch_repo
         self.phase_coordinator = phase_coordinator
+        self.entitlements_client = entitlements_client
+        self.cost_strategy = cost_strategy or PipelineCostStrategy()
+        self.credit_guard = credit_guard or PipelineCreditGuard(
+            entitlements_client=self.entitlements_client,
+            cost_strategy=self.cost_strategy,
+        )
         self.notification_projector = notification_projector
+        self.event_publisher = event_publisher
 
     async def handle_client_pipeline_request(self, msg: Any) -> None:
         """
@@ -247,6 +265,60 @@ class ClientPipelineRequestHandler:
                         },
                     )
 
+                    # PHASE 4: Credit checking before pipeline execution
+                    try:
+                        outcome = await self.credit_guard.evaluate(
+                            batch_id=batch_id,
+                            resolved_pipeline=resolved_pipeline,
+                            batch_context=batch_context,
+                            correlation_id=str(correlation_id),
+                        )
+                    except Exception as e:
+                        error_msg = f"Credit check failed for batch {batch_id}: {e}"
+                        logger.error(
+                            error_msg,
+                            extra={
+                                "batch_id": batch_id,
+                                "correlation_id": correlation_id,
+                            },
+                            exc_info=True,
+                        )
+                        raise Exception(error_msg) from e
+
+                    if not outcome.allowed:
+                        logger.warning(
+                            "Pipeline denied due to insufficient credits",
+                            extra={
+                                "batch_id": batch_id,
+                                "required_credits": outcome.required_credits,
+                                "available_credits": outcome.available_credits,
+                                "correlation_id": correlation_id,
+                            },
+                        )
+
+                        # Extract identity for event payload
+                        user_id = self._require_non_empty_str(
+                            getattr(batch_context, "user_id", None),
+                            field="user_id",
+                            batch_id=batch_id,
+                        )
+                        org_id = getattr(batch_context, "org_id", None)
+
+                        await self._publish_pipeline_denied_event(
+                            batch_id=batch_id,
+                            user_id=user_id,
+                            org_id=org_id,
+                            requested_pipeline=requested_pipeline,
+                            denial_reason=outcome.denial_reason or "insufficient_credits",
+                            required_credits=outcome.required_credits,
+                            available_credits=outcome.available_credits,
+                            resource_breakdown=outcome.resource_breakdown,
+                            correlation_id=str(correlation_id),
+                        )
+
+                        # Stop processing - do not initiate pipeline
+                        return
+
                     # Update batch with resolved pipeline
                     await self._update_batch_with_resolved_pipeline(
                         batch_id,
@@ -279,14 +351,16 @@ class ClientPipelineRequestHandler:
                         # CRITICAL UX: Notify teacher their "Start Processing" action succeeded
                         if self.notification_projector:
                             # Get user_id from batch context for teacher notification
-                            user_id = batch_context.user_id if batch_context else None
+                            notif_user_id: str | None = (
+                                batch_context.user_id if batch_context else None
+                            )
 
-                            if user_id:
+                            if notif_user_id:
                                 await self.notification_projector.handle_batch_processing_started(
                                     batch_id=batch_id,
                                     requested_pipeline=requested_pipeline,
                                     resolved_pipeline=resolved_pipeline,
-                                    user_id=user_id,
+                                    user_id=notif_user_id,
                                     correlation_id=correlation_id,
                                 )
                             else:
@@ -330,6 +404,16 @@ class ClientPipelineRequestHandler:
                 exc_info=True,
             )
             raise
+
+    @staticmethod
+    def _require_non_empty_str(value: object | None, *, field: str, batch_id: str) -> str:
+        """Validate that a value is a non-empty string and return it.
+
+        Raises ValueError with contextual information if validation fails.
+        """
+        if isinstance(value, str) and value:
+            return value
+        raise ValueError(f"Expected non-empty string for {field} in batch context of {batch_id}")
 
     def _parse_message_envelope(self, msg: Any) -> EventEnvelope[ClientBatchPipelineRequestV1]:
         """Parse and validate Kafka message envelope."""
@@ -469,3 +553,108 @@ class ClientPipelineRequestHandler:
                 "requested_pipelines": updated_pipeline_state.requested_pipelines,
             },
         )
+
+    async def _publish_pipeline_denied_event(
+        self,
+        batch_id: str,
+        user_id: str,
+        org_id: str | None,
+        requested_pipeline: str,
+        denial_reason: str,
+        required_credits: int,
+        available_credits: int,
+        resource_breakdown: dict[str, int],
+        correlation_id: str,
+    ) -> None:
+        """Publish PipelineDeniedV1 event when pipeline is denied due to insufficient credits.
+
+        This event will be consumed by:
+        1. API Gateway - to return 402 Payment Required response
+        2. NotificationProjector - to send real-time teacher notification
+
+        Args:
+            batch_id: ID of the batch whose pipeline was denied
+            user_id: User who requested the pipeline
+            org_id: Organization ID (if applicable)
+            requested_pipeline: Name of the pipeline that was requested
+            denial_reason: Reason for denial ("insufficient_credits" or "rate_limit_exceeded")
+            required_credits: Total credits required for the pipeline
+            available_credits: Credits currently available
+            resource_breakdown: Breakdown of required resources by type
+            correlation_id: Request correlation ID for tracing
+        """
+        # Import here to avoid circular imports
+        from common_core.event_enums import ProcessingEvent, topic_name
+        from common_core.events import EventEnvelope
+
+        try:
+            # Create PipelineDeniedV1 event
+            pipeline_denied_event = PipelineDeniedV1(
+                entity_id=batch_id,
+                entity_type="batch",
+                batch_id=batch_id,
+                user_id=user_id,
+                org_id=org_id,
+                requested_pipeline=requested_pipeline,
+                denial_reason=denial_reason,
+                required_credits=required_credits,
+                available_credits=available_credits,
+                resource_breakdown=resource_breakdown,
+                correlation_id=correlation_id,
+            )
+
+            # Create event envelope
+            envelope = EventEnvelope[PipelineDeniedV1](
+                event_type=topic_name(ProcessingEvent.PIPELINE_DENIED),
+                source_service="batch_orchestrator_service",
+                data=pipeline_denied_event.model_dump(),
+                correlation_id=correlation_id,
+            )
+
+            # Publish event via outbox publisher if available; else fall back to KafkaBus in settings
+            topic = topic_name(ProcessingEvent.PIPELINE_DENIED)
+            if self.event_publisher is not None:
+                await self.event_publisher.publish_batch_event(envelope)
+            else:
+                # As a minimal fallback, use KafkaBus directly
+                from huleedu_service_libs.kafka_client import KafkaBus
+
+                kafka_bus = KafkaBus(
+                    client_id="batch-service-producer",
+                )
+                await kafka_bus.start()
+                try:
+                    await kafka_bus.publish(
+                        topic=topic,
+                        envelope=envelope,
+                        key=batch_id,
+                    )
+                finally:
+                    await kafka_bus.stop()
+
+            logger.info(
+                "Published PipelineDeniedV1 event",
+                extra={
+                    "batch_id": batch_id,
+                    "user_id": user_id,
+                    "org_id": org_id,
+                    "denial_reason": denial_reason,
+                    "required_credits": required_credits,
+                    "available_credits": available_credits,
+                    "topic": topic,
+                    "correlation_id": correlation_id,
+                },
+            )
+
+        except Exception as e:
+            # Event publishing failure should not block the denial logic
+            # The pipeline is still denied, but downstream services won't be notified
+            logger.error(
+                f"Failed to publish PipelineDeniedV1 event for batch {batch_id}: {e}",
+                extra={
+                    "batch_id": batch_id,
+                    "user_id": user_id,
+                    "correlation_id": correlation_id,
+                },
+                exc_info=True,
+            )

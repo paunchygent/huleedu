@@ -34,6 +34,7 @@ from .llm_provider_events import LLMComparisonResultV1, TokenUsage
 from .nlp_events import (
     StudentMatchSuggestion,
 )
+from .pipeline_events import PipelineDeniedV1
 from .resource_consumption_events import ResourceConsumptionV1
 from .spellcheck_models import (
     SpellcheckMetricsV1,
@@ -74,6 +75,7 @@ __all__ = [
     "EventTracker",
     "ExcessContentProvisionedV1",
     "LLMComparisonResultV1",
+    "PipelineDeniedV1",
     "ProcessingUpdate",
     "SpellcheckMetricsV1",
     "SpellcheckPhaseCompletedV1",

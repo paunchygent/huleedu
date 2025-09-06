@@ -33,6 +33,7 @@ from services.batch_orchestrator_service.implementations.client_pipeline_request
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
     BatchRepositoryProtocol,
+    EntitlementsServiceProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
 from tests.utils.service_test_manager import ServiceTestManager
@@ -140,11 +141,30 @@ class TestPipelineResolutionIntegration:
         bcs_url = bcs_config["base_url"]
         test_bcs_client = MockBatchConductorClient(base_url=bcs_url)
 
+        # Minimal entitlements client that always authorizes to avoid denial path here
+        class _OkEntitlementsClient(EntitlementsServiceProtocol):
+            async def check_credits(
+                self,
+                user_id: str,
+                org_id: str | None,
+                required_credits: list[tuple[str, int]],
+                correlation_id: str,
+            ) -> dict[str, Any]:
+                return {
+                    "sufficient": True,
+                    "available_credits": 10_000,
+                    "required_credits": sum(q for _, q in required_credits),
+                    "source": "user" if org_id is None else "org",
+                }
+
+        entitlements_client = _OkEntitlementsClient()
+
         # Create handler with test BCS client and mocked dependencies
         handler = ClientPipelineRequestHandler(
             bcs_client=test_bcs_client,
             batch_repo=mock_batch_repository,
             phase_coordinator=mock_phase_coordinator,
+            entitlements_client=entitlements_client,
         )
 
         return handler

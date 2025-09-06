@@ -13,6 +13,7 @@ validation, not internal business logic which is tested in other unit tests.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -70,11 +71,11 @@ class TestEntitlementsRoutes:
         from pydantic import ValidationError
 
         @test_app.errorhandler(HuleEduError)
-        async def handle_huleedu_error(error: HuleEduError):
+        async def handle_huleedu_error(error: HuleEduError) -> Any:
             return create_error_response(error.error_detail)
 
         @test_app.errorhandler(ValidationError)
-        async def handle_validation_error(error: ValidationError):
+        async def handle_validation_error(error: ValidationError) -> Any:
             return {
                 "error": "validation_error",
                 "message": "Invalid request data",

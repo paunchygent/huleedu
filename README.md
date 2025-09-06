@@ -23,6 +23,27 @@ Event-driven microservice platform for automated essay processing and assessment
 - OpenTelemetry tracing, Prometheus metrics, structured logging
 - Grafana (3000), Prometheus (9091), Jaeger (16686), Loki (3100)
 
+## Testing & Quality
+
+### Standard Test Runner
+
+Use the root-aware runner for consistent config and path resolution across the monorepo.
+
+```bash
+# Go-to method
+pdm run pytest-root <path-or-nodeid> [pytest args]
+
+# From any directory (helpers)
+source scripts/dev-aliases.sh
+pyp <path-or-nodeid> [args]                 # run tests via root-aware wrapper
+pdmr pytest-root <path-or-nodeid> [args]    # force PDM to use repo root
+
+# Optional global shim (configured above)
+pytest-root <path-or-nodeid> [args]
+```
+
+See also: `CODEX.md` and `CLAUDE.md`for detailed guidance.
+
 ## Monorepo Structure
 
 PDM-managed monorepo with unified dependency management:

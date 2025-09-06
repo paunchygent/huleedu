@@ -96,6 +96,15 @@ class Settings(SecureServiceSettings):
         default=1000, description="Maximum size of fallback queue for failed Kafka messages"
     )
 
+    # Entitlements Service configuration
+    ENTITLEMENTS_BASE_URL: str = Field(
+        default="http://entitlements_service:8083",
+        description="Entitlements Service base URL",
+    )
+    ENTITLEMENTS_HTTP_TIMEOUT_SECONDS: int = Field(
+        default=10, description="Entitlements Service HTTP timeout in seconds"
+    )
+
     # Outbox configuration is handled by the library's OutboxProvider based on ENVIRONMENT
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -12,6 +12,7 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.notification_events import TeacherNotificationRequestedV1
+from common_core.events.pipeline_events import PipelineDeniedV1
 from common_core.pipeline_models import PhaseName
 from common_core.websocket_enums import NotificationPriority, WebSocketEventCategory
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -160,6 +161,93 @@ class NotificationProjector:
                 "correlation_id": str(event.correlation_id),
             },
         )
+
+    async def handle_pipeline_denied(
+        self,
+        event: PipelineDeniedV1,
+        *,
+        correlation_id: str | None = None,
+    ) -> None:
+        """Project pipeline denial to immediate teacher notification.
+
+        Called when a pipeline request is denied due to insufficient credits or rate limits.
+        Provides immediate feedback to teachers about why their pipeline request failed
+        and what they need to do to proceed.
+        """
+        # Create immediate notification with CRITICAL priority
+        # Teachers need to know immediately when their action failed
+        message = self._create_pipeline_denial_message(event)
+
+        notification = TeacherNotificationRequestedV1(
+            teacher_id=event.user_id,
+            notification_type="pipeline_denied_insufficient_credits"
+            if event.denial_reason == "insufficient_credits"
+            else "pipeline_denied_rate_limit",
+            category=WebSocketEventCategory.BATCH_PROGRESS,
+            priority=NotificationPriority.IMMEDIATE,  # Critical: teacher action failed
+            payload={
+                "batch_id": event.batch_id,
+                "requested_pipeline": event.requested_pipeline,
+                "denial_reason": event.denial_reason,
+                "required_credits": event.required_credits,
+                "available_credits": event.available_credits,
+                "resource_breakdown": event.resource_breakdown or {},
+                "message": message,
+                "org_id": event.org_id,
+                # Include actionable information for teachers
+                "credit_deficit": max(0, event.required_credits - event.available_credits),
+                "next_steps": self._get_denial_next_steps(event),
+            },
+            action_required=True,  # Teacher needs to take action (purchase credits, wait for rate limit)
+            correlation_id=correlation_id or "",
+            batch_id=event.batch_id,
+        )
+
+        await self._publish_notification(notification)
+
+        logger.info(
+            "Published pipeline_denied notification",
+            extra={
+                "batch_id": event.batch_id,
+                "teacher_id": event.user_id,
+                "org_id": event.org_id,
+                "denial_reason": event.denial_reason,
+                "required_credits": event.required_credits,
+                "available_credits": event.available_credits,
+                "correlation_id": correlation_id or "",
+            },
+        )
+
+    def _create_pipeline_denial_message(self, event: PipelineDeniedV1) -> str:
+        """Create user-friendly message explaining pipeline denial."""
+        if event.denial_reason == "insufficient_credits":
+            deficit = event.required_credits - event.available_credits
+            return (
+                f"Processing cannot start: {deficit} more credits needed. "
+                f"Required: {event.required_credits}, Available: {event.available_credits}"
+            )
+        elif event.denial_reason == "rate_limit_exceeded":
+            return (
+                "Processing temporarily unavailable: rate limit exceeded. Please try again later."
+            )
+        else:
+            return f"Processing denied: {event.denial_reason}"
+
+    def _get_denial_next_steps(self, event: PipelineDeniedV1) -> list[str]:
+        """Get actionable next steps for teachers when pipeline is denied."""
+        if event.denial_reason == "insufficient_credits":
+            steps = ["Purchase additional credits to continue processing"]
+            if event.org_id:
+                steps.append("Contact your organization administrator about credit allocation")
+            return steps
+        elif event.denial_reason == "rate_limit_exceeded":
+            return [
+                "Wait for rate limit to reset",
+                "Try processing a smaller batch",
+                "Contact support if this persists",
+            ]
+        else:
+            return ["Contact support for assistance"]
 
     async def _publish_notification(self, notification: TeacherNotificationRequestedV1) -> None:
         """Publish notification event to Kafka via outbox pattern."""

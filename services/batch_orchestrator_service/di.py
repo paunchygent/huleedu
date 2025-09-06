@@ -21,6 +21,12 @@ from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from services.batch_orchestrator_service.config import Settings, settings
+from services.batch_orchestrator_service.domain.pipeline_cost_strategy import (
+    PipelineCostStrategy,
+)
+from services.batch_orchestrator_service.domain.pipeline_credit_guard import (
+    PipelineCreditGuard,
+)
 from services.batch_orchestrator_service.implementations.ai_feedback_initiator_impl import (
     AIFeedbackInitiatorImpl,
 )
@@ -63,6 +69,9 @@ from services.batch_orchestrator_service.implementations.client_pipeline_request
 from services.batch_orchestrator_service.implementations.els_batch_phase_outcome_handler import (
     ELSBatchPhaseOutcomeHandler,
 )
+from services.batch_orchestrator_service.implementations.entitlements_service_client_impl import (
+    EntitlementsServiceClientImpl,
+)
 from services.batch_orchestrator_service.implementations.essay_lifecycle_client_impl import (
     DefaultEssayLifecycleClientImpl,
 )
@@ -98,6 +107,7 @@ from services.batch_orchestrator_service.protocols import (
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
     CJAssessmentInitiatorProtocol,
+    EntitlementsServiceProtocol,
     EssayLifecycleClientProtocol,
     NLPInitiatorProtocol,
     PipelinePhaseCoordinatorProtocol,
@@ -316,6 +326,14 @@ class ExternalClientsProvider(Provider):
 
         return base_client
 
+    @provide(scope=Scope.APP)
+    def provide_entitlements_client(self, settings: Settings) -> EntitlementsServiceProtocol:
+        """Provide Entitlements Service HTTP client implementation."""
+        return EntitlementsServiceClientImpl(
+            base_url=settings.ENTITLEMENTS_BASE_URL,
+            timeout_seconds=float(settings.ENTITLEMENTS_HTTP_TIMEOUT_SECONDS),
+        )
+
 
 class PhaseInitiatorsProvider(Provider):
     """Provider for pipeline phase initiator implementations."""
@@ -439,6 +457,22 @@ class PipelineCoordinationProvider(Provider):
         """Provide batch processing service implementation."""
         return BatchProcessingServiceImpl(batch_repo, event_publisher, settings)
 
+    @provide(scope=Scope.APP)
+    def provide_pipeline_cost_strategy(self) -> PipelineCostStrategy:
+        """Provide pipeline cost strategy for resource calculations."""
+        return PipelineCostStrategy()
+
+    @provide(scope=Scope.APP)
+    def provide_pipeline_credit_guard(
+        self,
+        entitlements_client: EntitlementsServiceProtocol,
+        cost_strategy: PipelineCostStrategy,
+    ) -> PipelineCreditGuard:
+        """Provide credit guard that evaluates entitlements before execution."""
+        return PipelineCreditGuard(
+            entitlements_client=entitlements_client, cost_strategy=cost_strategy
+        )
+
 
 class EventHandlingProvider(Provider):
     """Provider for event handling and Kafka consumer dependencies."""
@@ -475,11 +509,22 @@ class EventHandlingProvider(Provider):
         bcs_client: BatchConductorClientProtocol,
         batch_repo: BatchRepositoryProtocol,
         phase_coordinator: PipelinePhaseCoordinatorProtocol,
+        entitlements_client: EntitlementsServiceProtocol,
+        cost_strategy: PipelineCostStrategy,
+        credit_guard: PipelineCreditGuard,
         notification_projector: NotificationProjector,
+        event_publisher: BatchEventPublisherProtocol,
     ) -> ClientPipelineRequestHandler:
         """Provide ClientBatchPipelineRequest message handler."""
         return ClientPipelineRequestHandler(
-            bcs_client, batch_repo, phase_coordinator, notification_projector
+            bcs_client=bcs_client,
+            batch_repo=batch_repo,
+            phase_coordinator=phase_coordinator,
+            entitlements_client=entitlements_client,
+            cost_strategy=cost_strategy,
+            credit_guard=credit_guard,
+            notification_projector=notification_projector,
+            event_publisher=event_publisher,
         )
 
     @provide(scope=Scope.APP)

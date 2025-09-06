@@ -35,6 +35,7 @@ class ProcessingEvent(str, Enum):
     BATCH_VALIDATION_ERRORS = "batch.validation.errors"
     # -------------  Client commands  -------------#
     CLIENT_BATCH_PIPELINE_REQUEST = "client.batch.pipeline.request"
+    PIPELINE_DENIED = "pipeline.denied"
     # -------------  Results from specialised services -############
     ESSAY_SPELLCHECK_COMPLETED = "essay.spellcheck.completed"
     ESSAY_SPELLCHECK_REQUESTED = "essay.spellcheck.requested"
@@ -169,6 +170,7 @@ _TOPIC_MAPPING = {
     # New dual-event architecture topics
     ProcessingEvent.BATCH_VALIDATION_ERRORS: "huleedu.els.batch.validation.errors.v1",
     ProcessingEvent.CLIENT_BATCH_PIPELINE_REQUEST: "huleedu.commands.batch.pipeline.v1",
+    ProcessingEvent.PIPELINE_DENIED: "huleedu.pipeline.denied.v1",
     # Identity topics
     ProcessingEvent.IDENTITY_USER_REGISTERED: "huleedu.identity.user.registered.v1",
     ProcessingEvent.IDENTITY_EMAIL_VERIFICATION_REQUESTED: (

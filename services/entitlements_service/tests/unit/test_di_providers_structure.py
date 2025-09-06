@@ -141,4 +141,3 @@ class TestDIContainerBasics:
         assert ents.scope == Scope.APP
         assert impl.scope == Scope.REQUEST
         assert svc.scope == Scope.REQUEST
-
