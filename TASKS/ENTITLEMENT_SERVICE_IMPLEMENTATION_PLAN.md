@@ -8,7 +8,7 @@
 
 **Integration**: BOS-centric architecture where pipeline cost calculations occur in Batch Orchestrator Service, with optimistic consumption on phase completion events.
 
-## Session Progress Update (2025-08-31)
+## Session Progress Update (2025-09-06)
 
 Recent cross-service identity and gateway work completed to support org-first credit attribution:
 
@@ -27,7 +27,7 @@ Implication for Entitlements: Identity is now captured at the AGW boundary and c
 
 ## Implementation Status
 
-### ✅ **Phase 1: COMPLETE** - Core Infrastructure
+### ✅ Phase 1 — Core Infrastructure (Complete)
 
 - Database models and migrations
 - Credit Manager with dual system (org/user precedence)
@@ -39,16 +39,35 @@ Implication for Entitlements: Identity is now captured at the AGW boundary and c
 - **Event Publishing**: Proper ProcessingEvent enum usage (no magic strings)
 - **Type Safety**: All type annotation issues resolved
 
-### ✅ **Phase 2: COMPLETE** - Event Publishing Integration
+### ✅ Phase 2 — Event Publishing Integration (Complete)
 
 - ✅ EventPublisher injected into CreditManager via DI
 - ✅ Publish CreditBalanceChangedV1 after credit operations  
 - ✅ Publish RateLimitExceededV1 when limits hit
 - ✅ Publish UsageRecordedV1 for tracking
 
-### 📋 **Phases 3-6: PLANNED** - Full Platform Integration
+### ✅ Phase 3 — ResourceConsumption + Identity Threading (Complete)
 
-Note: With AGW registration and identity extraction completed, integration work focuses on verification and cross-cutting test alignment (see new Test Infrastructure Alignment task).
+- ResourceConsumptionV1 contract standardized in common_core and published by CJ/other services
+- Identity threading org-first preserved across AGW → BOS → downstream services → consumption events
+- Entitlements consumer persists consumption with proper audit trail and outbox publishing
+
+### ✅ Phase 4 — BOS Credit Guard & Pipeline Denial (Complete)
+
+- Extracted credit logic from handler into domain service `PipelineCreditGuard`
+- Kept `PipelineCostStrategy` in BOS domain to calculate requirements (pairwise CJ, linear AI feedback)
+- Handler now delegates to guard; denial publishes `PipelineDeniedV1` and does not initiate pipeline
+- SRP restored; no duplicated embedded credit logic remains in handler
+
+### ✅ Phase 5 — Policy Configuration (Complete)
+
+- `services/entitlements_service/policies/default.yaml` updated for resource-based costs and limits
+
+### ✅ Phase 6 — API Gateway 402 Integration (Complete)
+
+- Introduced BOS preflight endpoint and Gateway-side preflight check to deterministically return 402
+- Gateway returns 202 only when preflight passes; still publishes async command
+- Runtime denials still publish `PipelineDeniedV1` to power notifications/analytics
 
 ## Architecture Alignment
 
@@ -74,8 +93,8 @@ Note: With AGW registration and identity extraction completed, integration work 
 
 ### Optimistic Consumption Pattern
 
-**Flow**: Check credits → Start pipeline → Consume credits on phase completion
-**Benefits**: Fair billing (pay for success), graceful failure handling, educational trust model
+- Preflight is advisory-only (no hold). Consumption occurs on successful phase outcome events
+- If credits change between preflight and start, BOS will deny at runtime and publish `PipelineDeniedV1`
 
 ## Current Service Structure
 
@@ -179,26 +198,69 @@ signup_bonuses:
 cache_ttl: 300      # Cache policies in Redis for 5 minutes
 ```
 
-## Integration Flow Architecture
+## Integration Flow Architecture (Final)
 
-### Complete Pipeline Flow with Credit Management
+1. Teacher clicks Start → API Gateway `POST /v1/batches/{batch_id}/pipelines`
+2. API Gateway performs BOS preflight: `POST /internal/v1/batches/{batch_id}/pipelines/{phase}/preflight`
+3. BOS preflight:
+   - BOS → BCS resolves final pipeline
+   - BOS → PipelineCreditGuard calculates requirements (PipelineCostStrategy) and checks credits
+   - Returns 200 allowed or 402 denial with breakdown; 429 for rate limits
+4. If allowed: Gateway publishes `ClientBatchPipelineRequestV1` to Kafka and returns 202
+5. Pipeline executes asynchronously; phases publish outcomes; Entitlements consumes credits from `ResourceConsumptionV1`
+6. If runtime denial occurs (credits changed), BOS publishes `PipelineDeniedV1` and NotificationProjector emits teacher notification
 
-```
-1. Teacher clicks "Start Processing" → API Gateway → BOS
-2. BOS → BCS (resolve pipeline) → ["spellcheck", "cj_assessment", "nlp"]
-3. BOS calculates resource requirements:
-   - CJ: essays*(essays-1)/2 comparisons
-   - AI: essays API calls  
-   - Spellcheck/NLP: 0 (free)
-4. BOS → Entitlements (check_credits for each resource)
-5. Entitlements validates credits + rate limits
-6. If sufficient: BOS starts pipeline → ELS → Services
-7. Services complete phases → Publish completion events
-8. Entitlements consumes credits on phase completion events
-9. If insufficient: 
-   - BOS publishes PipelineDeniedV1 → API Gateway → 402 Payment Required
-   - BOS projects TeacherNotificationRequestedV1 → WebSocket → Real-time teacher notification
-```
+This keeps queries synchronous (preflight) and execution event-driven, per Rule 020.
+
+## Boundary Objects (Source of Truth)
+
+These contracts are stable and must be used for onboarding and E2E tests.
+
+- EventEnvelope (common_core.events.envelope)
+  - Fields: `event_id: UUID`, `event_type: str`, `event_timestamp: datetime`, `source_service: str`, `correlation_id: UUID`, `data: Any`, `metadata: dict | None`
+
+- ClientBatchPipelineRequestV1 (common_core.events.client_commands)
+  - Fields: `batch_id: str`, `requested_pipeline: str`, `user_id: str`, `client_correlation_id: UUID`, optional `is_retry`, `retry_reason`
+
+- PipelineDeniedV1 (common_core.events.pipeline_events)
+  - Fields: `batch_id: str`, `user_id: str`, `org_id: Optional[str]`, `requested_pipeline: str`, `denial_reason: str`, `required_credits: int`, `available_credits: int`, `resource_breakdown: dict[str,int]`, `denied_at: datetime`
+  - Topic: `huleedu.pipeline.denied.v1`
+
+- ResourceConsumptionV1 (common_core.events.resource_consumption_events)
+  - Fields: `user_id: str`, `org_id: Optional[str]`, `resource_type: str`, `quantity: int`, `service_name: str`, `processing_id: str`, `consumed_at: datetime` (enveloped with correlation)
+  - Topic: `huleedu.resource.consumption.v1`
+
+- BOS Preflight (new)
+  - Endpoint: `POST /internal/v1/batches/{batch_id}/pipelines/{phase}/preflight`
+  - Headers: `X-Correlation-ID: <uuid>`
+  - 200 body: `{ allowed: true, batch_id, requested_pipeline, resolved_pipeline: [str], required_credits, available_credits, resource_breakdown, correlation_id }`
+  - 402 body: `{ allowed: false, denial_reason: "insufficient_credits"|..., required_credits, available_credits, resource_breakdown, correlation_id }`
+  - 429: rate-limit exceeded; 400/404 for invalid inputs; 500 on BOS error
+
+- API Gateway Pipeline Request
+  - Endpoint: `POST /v1/batches/{batch_id}/pipelines`
+  - Preflight: calls BOS preflight; returns 402/429/400/404 per BOS; maps BOS 500→503
+  - On pass: publishes `ClientBatchPipelineRequestV1`, returns `{ status: "accepted", correlation_id }`
+
+- Entitlements API
+  - `POST /v1/entitlements/check-credits` (single metric)
+    - Request: `CreditCheckRequestV1 { user_id, org_id?, metric, amount }`
+    - Response: `CreditCheckResponseV1 { allowed, reason?, required_credits, available_credits, source? }`
+  - `POST /v1/entitlements/consume-credits` (single metric)
+    - Request: `CreditConsumptionV1 { user_id, org_id?, metric, amount, batch_id?, correlation_id }`
+    - Response: `{ success, new_balance, consumed_from }`
+
+Decision: Entitlements will provide a bulk credit check endpoint and BOS will use it exclusively (no BOS-side loops).
+
+- Endpoint: `POST /v1/entitlements/check-credits/bulk`
+- Request: `{ user_id, org_id?, requirements: { [metric: string]: int }, correlation_id? }`
+- Response (200 allowed, 402 denied, 429 rate-limit):
+  - `allowed: bool` (overall)
+  - `required_credits: int` (sum)
+  - `available_credits: int`
+  - `per_metric: { [metric]: { required, available, allowed, source, reason? } }`
+  - `denial_reason?: "insufficient_credits" | "rate_limit_exceeded" | "policy_denied"`
+  - `correlation_id: string`
 
 ## Implementation Phases
 
@@ -365,53 +427,36 @@ async def handle_resource_consumption(event: ResourceConsumptionV1):
 - Idempotency tests validate duplicate event handling
 - `pdm run test-all` runs clean from repository root
 
-### 📋 **Phase 4: PLANNED** - BOS Integration
+## Finalized Phase Summaries (4–6)
 
-**Timeline**: Following sprint  
-**Purpose**: BOS-centric credit checking before pipeline execution
+- Phase 4: Completed with SRP refactor (`PipelineCreditGuard`), denial events, and notification integration
+- Phase 5: Completed with resource-based policy update
+- Phase 6: Completed with BOS preflight + Gateway 402 handling
 
-**Tasks**:
+## Next Steps (Immediate)
 
-1. Create PipelineCostStrategy domain service in BOS:
+- Entitlements Service
+  - Implement `POST /v1/entitlements/check-credits/bulk` endpoint and request/response schemas
+  - Evaluate all requested metrics atomically (org-first source selection per policy)
+  - Return aggregated + per-metric details; 200/402/429 semantics as above
+  - Add unit tests: validation, Swedish IDs, org-first attribution, rate-limit denial, mixed metrics → overall denial
 
-   ```python
-   def calculate_cj_comparisons(n: int) -> int:
-       return n * (n - 1) // 2  # Simple full pairwise
-   ```
+- BOS (Batch Orchestrator Service)
+  - Update `EntitlementsServiceProtocol` to add `check_credits_bulk(...)`
+  - Update `EntitlementsServiceClientImpl` to call bulk endpoint with requirements dict
+  - Update `PipelineCreditGuard` to use bulk response (remove any per-metric loops if present)
+  - Update BOS preflight route to map bulk response 1:1 to 200/402 payloads
+  - Add/adjust unit and integration tests (preflight allowed/denied for multi-metric requirements; Swedish/org-first)
 
-2. Add credit checking to BOS pipeline request handler
-3. Create PipelineDeniedV1 event model in common_core
-4. Publish denial events when insufficient credits
-5. Project credit denial notifications to WebSocket:
-   - Use existing NotificationProjector (services/batch_orchestrator_service/notification_projector.py)
-   - Create TeacherNotificationRequestedV1 for real-time teacher feedback
-   - Include denial reason, required credits, and available credits in payload
-6. Handle credit denial in ClientPipelineRequestHandler:
-   - After credit check failure, call notification_projector.handle_pipeline_denied_credits()
-   - Ensure teacher gets immediate visual feedback about credit insufficiency
+- API Gateway
+  - No changes required; continues to call BOS preflight and return 402/202
 
-### 📋 **Phase 5: PLANNED** - Policy Configuration Update
-
-**Timeline**: Same sprint as Phase 4
-**Purpose**: Align policy with resource-based pricing
-
-**Tasks**:
-
-1. Update services/entitlements_service/policies/default.yaml
-2. Migrate from batch/essay-based to resource-based costs
-3. Update rate limits to reflect actual resource constraints
-4. Test policy loading and caching
-
-### 📋 **Phase 6: PLANNED** - API Gateway Integration
-
-**Timeline**: Final integration sprint
-**Purpose**: Complete end-to-end credit enforcement
-
-**Tasks**:
-
-1. Handle PipelineDeniedV1 events in API Gateway
-2. Validate registration proxy behavior under load and edge cases
-3. Confirm identity propagation in envelope metadata for pipeline requests
+- End-to-End Testing
+  - Add functional scenarios in `tests/functional`: 
+    - Preflight 402 with structured denial (Swedish IDs, org-first)
+    - Preflight 202 + async command publication and pipeline start
+    - Runtime denial after preflight → `PipelineDeniedV1` and teacher notification
+    - ResourceConsumptionV1 → Entitlements consumption → CreditBalanceChangedV1 via outbox
 
 ### 📋 New Cross-Cutting Task (Test Infrastructure Alignment)
 
@@ -427,9 +472,13 @@ Scope: Align integration and functional test harnesses with the new AGW registra
   - Replace direct BOS registration calls with AGW proxy usage
   - Update assertions for `X-Org-ID` forwarding and envelope metadata `org_id`
 - Run `typecheck-all` and targeted suites; fix fixtures to include optional `org_id`
-2. Return 402 Payment Required with credit details
-3. Update client-facing error messages
-4. Add credit purchase flow hooks (future payment integration)
+## Lessons Learned
+
+- Keep “queries” synchronous and “commands” event-driven; BOS preflight pattern simplifies UX and aligns with Rule 020
+- Centralize credit policy evaluation in BOS domain; keep Entitlements focused on balance/rates and consumption
+- Define boundary objects explicitly to avoid drift and accelerate onboarding
+- Maintain org-first identity across all contracts; include Swedish characters in tests and schema validation
+- Plan for bulk credit checks at Entitlements to avoid BOS-side loops when multiple resources are required
 
 ## BOS PipelineCostStrategy Implementation
 

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 from dishka import make_async_container, provide
 from huleedu_service_libs.outbox.manager import OutboxManager
+from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
 from huleedu_service_libs.resilience import CircuitBreakerRegistry
@@ -36,17 +37,17 @@ from services.entitlements_service.protocols import (
 class CoreProviderOverrideForTests(CoreProvider):
     """CoreProvider override to avoid real Redis connections."""
 
-    @provide  # type: ignore[override]
-    async def provide_redis_client(self) -> AtomicRedisClientProtocol:  # type: ignore[override]
+    @provide
+    async def provide_redis_client(self, settings: Settings) -> AtomicRedisClientProtocol:
         client = AsyncMock(spec=AtomicRedisClientProtocol)
         return client
 
-    @provide  # type: ignore[override]
+    @provide
     async def provide_kafka_publisher(
         self,
         settings: Settings,
         circuit_breaker_registry: CircuitBreakerRegistry,
-    ) -> KafkaPublisherProtocol:  # type: ignore[override]
+    ) -> KafkaPublisherProtocol:
         # Return a lightweight mock to avoid creating real Kafka producers
         return AsyncMock(spec=KafkaPublisherProtocol)
 
@@ -54,12 +55,21 @@ class CoreProviderOverrideForTests(CoreProvider):
 class ImplementationProviderOverrideForTests(ImplementationProvider):
     """Implementation override to avoid outbox wiring and Kafka objects."""
 
-    @provide  # type: ignore[override]
-    def provide_outbox_manager(self) -> OutboxManager:  # type: ignore[override]
+    @provide
+    def provide_outbox_manager(
+        self,
+        outbox_repository: OutboxRepositoryProtocol,
+        redis_client: AtomicRedisClientProtocol,
+        settings: Settings,
+    ) -> OutboxManager:
         return AsyncMock(spec=OutboxManager)
 
-    @provide  # type: ignore[override]
-    def provide_event_publisher(self) -> EventPublisherProtocol:  # type: ignore[override]
+    @provide
+    def provide_event_publisher(
+        self,
+        outbox_manager: OutboxManager,
+        settings: Settings,
+    ) -> EventPublisherProtocol:
         return AsyncMock(spec=EventPublisherProtocol)
 
 

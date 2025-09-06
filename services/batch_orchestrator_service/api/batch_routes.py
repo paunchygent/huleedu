@@ -23,6 +23,8 @@ from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
+from services.batch_orchestrator_service.domain.pipeline_credit_guard import PipelineCreditGuard
+from services.batch_orchestrator_service.protocols import BatchConductorClientProtocol
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -310,3 +312,86 @@ async def retry_phase(
     except Exception as e:
         logger.error(f"Error processing retry request for batch {batch_id}: {e}", exc_info=True)
         return {"error": "Internal server error"}, 500
+
+
+@internal_bp.route("/<batch_id>/pipelines/<phase>/preflight", methods=["POST"])
+@inject
+async def preflight_pipeline(
+    batch_id: str,
+    phase: str,
+    batch_repo: FromDishka[BatchRepositoryProtocol],
+    bcs_client: FromDishka[BatchConductorClientProtocol],
+    credit_guard: FromDishka[PipelineCreditGuard],
+) -> tuple[dict[str, Any], int]:
+    """Preflight credit evaluation for a requested pipeline.
+
+    Resolves the full pipeline via BCS and evaluates credits using PipelineCreditGuard.
+    Returns 200 with allowed details, or 402 with denial details.
+    """
+    # Correlation from header if supplied
+    corr_header = request.headers.get("X-Correlation-ID")
+    try:
+        correlation_id = str(uuid.UUID(corr_header)) if corr_header else str(uuid4())
+    except ValueError:
+        correlation_id = str(uuid4())
+
+    try:
+        # Validate batch exists and get context
+        batch_context = await batch_repo.get_batch_context(batch_id)
+        if not batch_context:
+            return {"error": "Batch not found", "batch_id": batch_id}, 404
+
+        # Validate requested phase
+        try:
+            requested_phase = PhaseName(phase)
+        except ValueError:
+            return {"error": f"Invalid pipeline phase: {phase}"}, 400
+
+        # Resolve pipeline via BCS
+        bcs_response = await bcs_client.resolve_pipeline(
+            batch_id, requested_phase, correlation_id
+        )
+        resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
+        if not resolved_pipeline_strings:
+            return {
+                "error": f"BCS returned empty pipeline for {phase}",
+                "details": bcs_response,
+            }, 400
+
+        resolved_pipeline: list[PhaseName] = []
+        for p in resolved_pipeline_strings:
+            try:
+                resolved_pipeline.append(PhaseName(p))
+            except ValueError:
+                # Ignore unknown steps for preflight evaluation
+                continue
+
+        # Evaluate credits
+        outcome = await credit_guard.evaluate(
+            batch_id=batch_id,
+            resolved_pipeline=resolved_pipeline,
+            batch_context=batch_context,
+            correlation_id=correlation_id,
+        )
+
+        common_payload = {
+            "batch_id": batch_id,
+            "requested_pipeline": phase,
+            "resolved_pipeline": [p.value for p in resolved_pipeline],
+            "required_credits": outcome.required_credits,
+            "available_credits": outcome.available_credits,
+            "resource_breakdown": outcome.resource_breakdown,
+            "correlation_id": correlation_id,
+        }
+
+        if outcome.allowed:
+            return {"allowed": True, **common_payload}, 200
+        else:
+            return {"allowed": False, "denial_reason": outcome.denial_reason, **common_payload}, 402
+
+    except Exception as e:
+        logger.error(
+            f"Preflight evaluation failed for batch {batch_id}, phase {phase}: {e}",
+            exc_info=True,
+        )
+        return {"error": "Preflight evaluation failed", "details": str(e)}, 500

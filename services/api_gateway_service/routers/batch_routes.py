@@ -253,6 +253,7 @@ async def request_pipeline_execution(
     batch_id: str,
     request: Request,  # Required for rate limiting
     pipeline_request: BatchPipelineRequest,
+    http_client: FromDishka[HttpClientProtocol],
     kafka_bus: FromDishka[KafkaBus],
     metrics: FromDishka[GatewayMetrics],
     user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
@@ -318,7 +319,38 @@ async def request_pipeline_execution(
                     expected=batch_id,
                 )
 
-            # Construct ClientBatchPipelineRequestV1 with authenticated user_id
+            # Preflight: Ask BOS to resolve pipeline and evaluate credits before publishing
+            preflight_url = (
+                f"{settings.BOS_URL}/internal/v1/batches/{batch_id}/pipelines/"
+                f"{pipeline_request.requested_pipeline.value}/preflight"
+            )
+            pre_headers = {"X-Correlation-ID": str(correlation_id)}
+            pre_resp = await http_client.post(preflight_url, json={}, headers=pre_headers, timeout=10.0)
+
+            # If insufficient credits or other denial, return appropriate status with details
+            if pre_resp.status_code in (402, 429, 400, 404, 500):
+                try:
+                    body = pre_resp.json()
+                except Exception:
+                    body = {"detail": "Invalid response from BOS preflight"}
+
+                # Map 500 from BOS to 503 to reflect downstream dependency status
+                status_to_return = 503 if pre_resp.status_code == 500 else pre_resp.status_code
+
+                logger.info(
+                    "Preflight blocked pipeline request",
+                    extra={
+                        "batch_id": batch_id,
+                        "user_id": user_id,
+                        "org_id": org_id,
+                        "correlation_id": str(correlation_id),
+                        "preflight_status": pre_resp.status_code,
+                    },
+                )
+
+                return JSONResponse(status_code=status_to_return, content=body)
+
+            # Construct ClientBatchPipelineRequestV1 with authenticated user_id (preflight passed)
             client_request = ClientBatchPipelineRequestV1(
                 batch_id=batch_id,  # Always use path batch_id
                 requested_pipeline=(

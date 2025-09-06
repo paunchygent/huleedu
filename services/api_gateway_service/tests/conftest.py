@@ -8,7 +8,7 @@ mock provider that mirrors production ApiGatewayProvider interface.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import cast
+from typing import cast, AsyncIterator
 from unittest.mock import AsyncMock
 
 import httpx
@@ -20,6 +20,8 @@ from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from services.api_gateway_service.app.metrics import GatewayMetrics
 from services.api_gateway_service.config import Settings, settings
+from services.api_gateway_service.implementations.http_client import ApiGatewayHttpClient
+from services.api_gateway_service.protocols import HttpClientProtocol
 
 
 class UnifiedMockApiGatewayProvider(Provider):
@@ -44,10 +46,10 @@ class UnifiedMockApiGatewayProvider(Provider):
         return settings
 
     @provide
-    async def get_http_client(self) -> AsyncIterator[httpx.AsyncClient]:
-        """Provide real HTTP client for actual HTTP calls in tests."""
+    async def get_http_client(self) -> AsyncIterator[HttpClientProtocol]:
+        """Provide HTTP client implementing HttpClientProtocol for tests."""
         async with httpx.AsyncClient() as client:
-            yield client
+            yield ApiGatewayHttpClient(client)
 
     @provide
     async def get_redis_client(self, config: Settings) -> AsyncIterator[AtomicRedisClientProtocol]:

@@ -4,8 +4,8 @@
 
 **Purpose**: Implement comprehensive test coverage for entitlements service to achieve 85% coverage following HuleEdu's parallel test creation methodology and architectural standards.
 
-**Current Status**: Service is healthy (recently restarted), 88 tests pass, 1 fails, 33% coverage
-**Target**: 85% coverage with full architectural compliance and test reliability
+**Current Status**: Core units and routes are covered; mypy clean across repo; BOS preflight + Gateway 402 tests added
+**Target**: ≥85% coverage with integration across AGW, BOS, Entitlements and end-to-end functional validation
 
 **Integration**: Validates core credit management, org-first identity attribution, ResourceConsumptionV1 processing, and event-driven patterns per Rule 020.17.
 
@@ -35,21 +35,25 @@ Critical Gaps:
 - policy_loader_impl.py: Not tested (estimated 0%)
 ```
 
-### 🔧 **Issues to Fix**
-- `test_event_validation_error_handling` fails due to incorrect ResourceConsumptionV1 schema usage
-- Need tests for all implementation classes following Rule 075 standards
+### 🔧 **Issues to Resolve / Align**
+- Entitlements API currently supports single-metric checks; BOS preflight can produce multi-resource requirements (cj_comparison + ai_feedback_generation)
+  - Option A (preferred): Add `POST /v1/entitlements/check-credits/bulk` with `{ requirements: { metric: quantity } }`
+  - Option B: BOS loops single checks per metric and aggregates results
+- Add BOS preflight route tests (done) and expand to include Swedish identity cases and org-first attribution
 
 ## Test Creation Strategy: Parallel Methodology (Rule 075.1)
 
-### **Phase 0: Fix Breaking Test** 
-**Status**: PENDING
-- Fix `test_event_validation_error_handling` 
-- Root cause: Uses old event format instead of ResourceConsumptionV1 schema
-- Expected: 33% → 35% coverage
+### **Phase 0: Foundation & Fast Wins**
+**Status**: In Progress
+- Keep repo-wide type checks at zero errors (done)
+- Targeted unit tests added:
+  - BOS: preflight route (allowed/denied/invalid) — done
+  - AGW: preflight denial returns 402 — done
+  - Entitlements: route tests and DI provision tests — present and typed
 
 ### **Phase 1: Core Business Logic** (Batch 1)
-**Status**: PENDING
-**Coverage Target**: 35% → 50%
+**Status**: Planned
+**Coverage Target**: +15–20%
 
 Launch 3 parallel test-engineer agents:
 1. **test_repository_impl.py** (0% → 90%)
@@ -71,8 +75,8 @@ Launch 3 parallel test-engineer agents:
    - Threshold enforcement and limit exceeded scenarios
 
 ### **Phase 2: Service Infrastructure** (Batch 2)
-**Status**: PENDING
-**Coverage Target**: 50% → 65%
+**Status**: Planned
+**Coverage Target**: +15–20%
 
 Launch 3 parallel test-engineer agents:
 1. **test_policy_loader_impl.py** (0% → 90%)
@@ -94,8 +98,8 @@ Launch 3 parallel test-engineer agents:
    - Error handling and status codes
 
 ### **Phase 3: Integration Layer** (Batch 3)
-**Status**: PENDING
-**Coverage Target**: 65% → 78%
+**Status**: Planned
+**Coverage Target**: +15%
 
 Launch 3 parallel test-engineer agents:
 1. **test_di_setup.py** (0% → 85%)
@@ -117,8 +121,8 @@ Launch 3 parallel test-engineer agents:
    - Component initialization order and dependencies
 
 ### **Phase 4: Data Models & App** (Batch 4)
-**Status**: PENDING
-**Coverage Target**: 78% → 85%+
+**Status**: Planned
+**Coverage Target**: reach ≥85%
 
 Launch 2 parallel test-engineer agents:
 1. **test_models_db.py** (0% → 85%)
@@ -222,21 +226,30 @@ Phase 4: 78% → 85%+ (models & app - 2 files)
 - ✅ Swedish character edge cases tested where applicable
 - ✅ Protocol-based testing for all dependencies
 
-### **Integration Validation**
-- ✅ ResourceConsumptionV1 processing end-to-end tested
-- ✅ Event publishing with outbox pattern validated
-- ✅ Health monitoring and component status checks working
-- ✅ Identity threading (org-first) logic fully validated
+### **Integration Validation (Targeted Next Steps)**
+- BOS preflight end-to-end via AGW
+  - Test: AGW preflight → 402 returns structured denial (Swedish IDs, org-first)
+  - Test: AGW preflight → 202; then BOS publishes command
+- Runtime denial path
+  - Simulate credits changed after preflight → BOS publishes `PipelineDeniedV1`; WebSocket notification projected
+- Resource consumption path
+  - CJ/other services publish `ResourceConsumptionV1` → Entitlements consumes and emits `CreditBalanceChangedV1`
+  - Verify outbox relay publishes to Kafka
+- Idempotency and tracing
+  - Duplicate events ignored; correlation IDs propagated across boundaries (headers + envelopes)
 
-## Timeline & Execution
+## Execution & Tooling
 
-**Estimated Duration**: ~85 minutes total
-- Phase 0: 5 minutes (single fix)
-- Phases 1-4: 20 minutes per batch (parallel execution)
-- Validation: 10 minutes between phases
-
-**Agent Coordination**: Use Task tool with test-engineer subagent_type for all batch executions, lead-architect-planner for post-batch reviews.
+- Use `pdm run pytest-root` to target service suites:
+  - `pdm run pytest-root services/api_gateway_service/tests`
+  - `pdm run pytest-root services/batch_orchestrator_service/tests`
+  - `pdm run pytest-root services/entitlements_service/tests`
+- Functional E2E harness (root tests/functional):
+  - Add scenarios covering: preflight 402 path, happy-path 202 + pipeline finish, runtime denial, and consumption
+  - Reuse common JWT utilities and identity fixtures; include Swedish characters in identities
+  - Ensure org-first attribution in assertions and that correlation IDs are consistent
+  - Validate WebSocket projection by consuming TeacherNotificationRequestedV1 (or via API where applicable)
 
 ---
 
-**This plan ensures the entitlements service achieves production-ready test coverage following established HuleEdu architectural patterns and parallel test creation methodology.**
+**This plan is up to date with BOS preflight + AGW 402 handling and defines concrete next steps for cross-service integration and functional E2E tests.**
