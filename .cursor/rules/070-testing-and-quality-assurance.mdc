@@ -12,10 +12,12 @@ alwaysApply: true
 - **E2E Tests**: Major user flows (use sparingly)
 
 ## 2. Core Rules
-- **Runner**: `pdm run pytest` (always use PDM)
+- **Runner (Standard)**: `pdm run pytest-root <path-or-nodeid>`
+- **Anywhere (Alias)**: `pyp <path-or-nodeid>` after `source scripts/dev-aliases.sh`
+- **Force Root Project**: `pdmr pytest-root <path-or-nodeid>` from any dir
 - **Naming**: `test_*.py` files, `test_*` functions
 - **Isolation**: Tests must be independent
-- **Debug**: `pdm run pytest -s` for print statements
+- **Debug**: add `-s` to the runner, e.g. `pdm run pytest-root -s <path>`
 - **FORBIDDEN**: Mixing abstraction levels in same test
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
 

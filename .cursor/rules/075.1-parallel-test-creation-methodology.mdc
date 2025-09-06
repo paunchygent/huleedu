@@ -21,7 +21,7 @@ i.e., FORCE the architect agent to return a report with a clear analysis of the 
 ### Quality Gate Sequence
 1. **Architect Analysis**: Test quality, root cause identification, implementation validation
 2. **DI Compliance**: `grep -r "@patch|mock\.patch"` → zero results required  
-3. **Test Execution**: `pdm run pytest batch_files -v` → 100% pass rate required
+3. **Test Execution**: `pdm run pytest-root batch_files -v` → 100% pass rate required
 4. **Type Safety**: `pdm run typecheck-all` → zero errors required
 
 ## Implementation Bug Protocol

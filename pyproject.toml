@@ -131,6 +131,7 @@ module = [
     "services.nlp_service.*",
     "services.identity_service.*",
     "services.email_service.*",
+    "services.entitlements_service.*",
 ]
 ignore_missing_imports = false
 disallow_untyped_defs = true
@@ -264,7 +265,8 @@ testpaths = [
     "services/websocket_service/tests",
     "services/nlp_service/tests",
     "services/identity_service/tests",
-    "services/email_service/tests"
+    "services/email_service/tests",
+    "services/entitlements_service/tests"
 ]
 pythonpath = [
     "."
@@ -323,6 +325,7 @@ test-sequential = "pytest -n 0"
 test-expensive = "pytest -m 'financial or slow or docker' -v --tb=short"
 test-financial = "pytest -m financial -v --tb=short"
 test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
+pytest-root = "scripts/pytest-root.sh"
 
 # Core Development Workflows (use scripts/dev-workflow.sh for most tasks)
 dev = "scripts/dev-workflow.sh"  # Main development script: pdm run dev <command> <service>
@@ -369,6 +372,7 @@ dev = [
     "-e file:///${PROJECT_ROOT}/services/nlp_service",
     "-e file:///${PROJECT_ROOT}/services/identity_service",
     "-e file:///${PROJECT_ROOT}/services/email_service",
+    "-e file:///${PROJECT_ROOT}/services/entitlements_service",
 ]
 [build-system]
 requires = ["pdm-backend"]

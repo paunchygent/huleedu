@@ -34,7 +34,7 @@ alwaysApply: false
 
 ### 3.3. Multi-Service Debugging
 - **MUST** trace `correlation_id` through logs across services
-- Use `pdm run pytest -s` for debug output
+- Use the standard runner with `-s` for debug output, e.g. `pdm run pytest-root -s <path>`
 
 ## 4. Container Log Debugging Best Practices
 

@@ -290,22 +290,29 @@ class TestCreditAttribution:
         mock_credit_manager: AsyncMock,
     ) -> None:
         """Test handling of malformed ResourceConsumption events."""
-        # Arrange - Invalid event structure
+        # Arrange - Create malformed envelope JSON with missing required fields
         invalid_envelope = {
             "event_type": "huleedu.resource.consumption.v1",
             "source_service": "test_service",
             "correlation_id": str(uuid4()),
+            "timestamp": datetime.now(UTC).isoformat(),
             "data": {
-                "event_name": "RESOURCE_CONSUMPTION_REPORTED",
+                "event_name": ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED.value,
+                "entity_id": "batch-123",
+                "entity_type": "batch",
                 # Missing required user_id field
                 "resource_type": "test_metric",
                 "quantity": 1,
+                # Missing required service_name field
+                # Missing required processing_id field
+                "consumed_at": datetime.now(UTC).isoformat(),
             },
         }
+
         message = MagicMock()
         message.value = json.dumps(invalid_envelope).encode("utf-8")
 
-        # Act & Assert
+        # Act & Assert - Should raise validation error due to missing required fields
         with pytest.raises(Exception):  # Pydantic validation error expected
             await kafka_consumer._handle_message(message)
 

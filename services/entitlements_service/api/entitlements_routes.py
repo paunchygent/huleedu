@@ -19,6 +19,7 @@ from huleedu_service_libs.error_handling import raise_validation_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from quart import Blueprint, current_app, request
+from quart_dishka import inject
 
 from services.entitlements_service.protocols import CreditManagerProtocol
 
@@ -49,6 +50,7 @@ class BalanceResponse(BaseModel):
 
 
 @entitlements_bp.route("/check-credits", methods=["POST"])
+@inject
 async def check_credits(
     credit_manager: FromDishka[CreditManagerProtocol],
 ) -> tuple[dict[str, Any], int]:
@@ -114,6 +116,7 @@ async def check_credits(
 
 
 @entitlements_bp.route("/consume-credits", methods=["POST"])
+@inject
 async def consume_credits(
     credit_manager: FromDishka[CreditManagerProtocol],
 ) -> tuple[dict[str, Any], int]:
@@ -181,6 +184,7 @@ async def consume_credits(
 
 
 @entitlements_bp.route("/balance/<user_id>", methods=["GET"])
+@inject
 async def get_balance(
     user_id: str,
     credit_manager: FromDishka[CreditManagerProtocol],

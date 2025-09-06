@@ -265,10 +265,7 @@ class KafkaTestManager:
 
     @asynccontextmanager
     async def _create_individual_consumer(
-        self,
-        test_name: str,
-        topics: list[str],
-        auto_offset_reset: str
+        self, test_name: str, topics: list[str], auto_offset_reset: str
     ) -> AsyncIterator[AIOKafkaConsumer]:
         """Create an individual consumer (fallback when pool is not suitable)."""
         consumer_group_id = f"test_{test_name}_{uuid.uuid4().hex[:8]}"

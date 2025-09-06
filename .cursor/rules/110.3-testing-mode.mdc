@@ -7,7 +7,8 @@ alwaysApply: false
 
 ## 1. Core Principles
 - **MUST** follow [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
-- **MUST** use `pdm run pytest` for all test execution
+- **MUST** use the root-aware runner: `pdm run pytest-root <path-or-nodeid>`
+- **Alt (any dir)**: `pyp <path-or-nodeid>` after `source scripts/dev-aliases.sh`, or `pdmr pytest-root <path-or-nodeid>`
 - **FORBIDDEN**: Fixing tests to make them pass - fix underlying code issues
 
 ## 2. Test Priorities
@@ -21,7 +22,7 @@ alwaysApply: false
 - **FORBIDDEN**: Using pytest.importorskip to mock same-service functions
 
 ## 4. Debugging
-- Use `pdm run pytest -s` for debug output
+- Add `-s` to the standard runner for debug output, e.g. `pdm run pytest-root -s <path>`
 - Analyze test failures and correlate with code changes
 - Fix application code, not tests
 

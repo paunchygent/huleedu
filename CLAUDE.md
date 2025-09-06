@@ -126,18 +126,50 @@
 
 #### Test Execution
 
+Preferred (root-aware runner)
+
+```bash
+# Go-to method (resolves paths relative to repo root)
+pdm run pytest-root <path-or-nodeid> [pytest args]
+
+# Examples (from repo root):
+pdm run pytest-root services/class_management_service/tests/test_core_logic.py
+pdm run pytest-root 'services/.../test_file.py::TestClass::test_case'
+pdm run pytest-root services/... -k 'expr'          # selection with -k
+pdm run pytest-root services/... -m 'unit'          # override markers
+
+# From any subdirectory
+bash "$(git rev-parse --show-toplevel)"/scripts/pytest-root.sh <path-or-nodeid> [args]
+
+# Optional: enable alias and use `pyp` or `pdmr`
+source scripts/dev-aliases.sh
+pyp <path-or-nodeid> [args]
+pdmr pytest-root <path-or-nodeid> [args]
+
+# Force root project from any dir (PDM)
+pdmr pytest-root <path-or-nodeid> [args]
+```
+
+Suite shortcuts
+
 ```bash
 # From repository root
 pdm run test-all           # Full test suite
-pdm run test-unit         # Unit tests only
-pdm run test-integration  # Integration tests
-pdm run test-cov          # With coverage report
+pdm run test-unit          # Unit tests only
+pdm run test-integration   # Integration tests
+pdm run test-cov           # With coverage report
+```
 
-# Specific test files
-pdm run pytest path/to/test_file.py
+Optional global shim for convenience
 
-# Test markers
-pdm run pytest -m "not (slow or integration)"  # Fast tests only
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -sf "$(git rev-parse --show-toplevel)/scripts/pytest-root.sh" "$HOME/.local/bin/pytest-root"
+chmod +x "$HOME/.local/bin/pytest-root"
+export PATH="$HOME/.local/bin:$PATH"   # add to shell rc if missing
+
+# Then from anywhere
+pytest-root services/... -k 'expr'
 ```
 
 #### Common Markers

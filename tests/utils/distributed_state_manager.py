@@ -103,13 +103,13 @@ class DistributedStateManager:
             # Define key patterns that need cleanup for test isolation
             cleanup_patterns = [
                 "huleedu:idempotency:v2:*",  # Event idempotency keys
-                "outbox:*",                  # Outbox relay keys
-                "batch:*",                   # Batch tracking keys
-                "test:*",                    # Explicit test keys
-                "correlation:*",             # Correlation tracking
-                "pipeline:*",                # Pipeline state keys
-                "essay:*",                   # Essay processing keys
-                "bcs:essay_state:*",         # BCS essay state tracking keys
+                "outbox:*",  # Outbox relay keys
+                "batch:*",  # Batch tracking keys
+                "test:*",  # Explicit test keys
+                "correlation:*",  # Correlation tracking
+                "pipeline:*",  # Pipeline state keys
+                "essay:*",  # Essay processing keys
+                "bcs:essay_state:*",  # BCS essay state tracking keys
             ]
 
             for pattern in cleanup_patterns:
@@ -151,7 +151,7 @@ class DistributedStateManager:
             keys_deleted = 0
 
             for i in range(0, len(keys), batch_size):
-                batch = keys[i:i + batch_size]
+                batch = keys[i : i + batch_size]
                 del_cmd = ["docker", "exec", self.redis_container, "redis-cli", "DEL"] + batch
 
                 del_result = subprocess.run(del_cmd, capture_output=True, text=True, check=True)
@@ -213,13 +213,13 @@ class DistributedStateManager:
                 # Use the same patterns as _smart_redis_cleanup but without service coordination
                 patterns = [
                     "huleedu:idempotency:v2:*",  # Event idempotency keys
-                    "outbox:*",                  # Outbox relay keys
-                    "batch:*",                   # Batch tracking keys
-                    "test:*",                    # Explicit test keys
-                    "correlation:*",             # Correlation tracking
-                    "pipeline:*",                # Pipeline state keys
-                    "essay:*",                   # Essay processing keys
-                    "bcs:essay_state:*",         # BCS essay state tracking keys
+                    "outbox:*",  # Outbox relay keys
+                    "batch:*",  # Batch tracking keys
+                    "test:*",  # Explicit test keys
+                    "correlation:*",  # Correlation tracking
+                    "pipeline:*",  # Pipeline state keys
+                    "essay:*",  # Essay processing keys
+                    "bcs:essay_state:*",  # BCS essay state tracking keys
                 ]
 
             total_keys_cleared = 0
@@ -243,7 +243,7 @@ class DistributedStateManager:
         self,
         test_name: str,
         patterns: Optional[List[str]] = None,
-        consumer_groups: Optional[List[str]] = None
+        consumer_groups: Optional[List[str]] = None,
     ) -> dict[str, Any]:
         """
         Targeted cleanup for specific test needs without over-engineering.
@@ -268,10 +268,18 @@ class DistributedStateManager:
             for group in consumer_groups:
                 try:
                     reset_cmd = [
-                        "docker", "exec", self.kafka_container,
-                        "kafka-consumer-groups.sh", "--bootstrap-server", "localhost:9092",
-                        "--group", group, "--reset-offsets", "--to-latest",
-                        "--all-topics", "--execute"
+                        "docker",
+                        "exec",
+                        self.kafka_container,
+                        "kafka-consumer-groups.sh",
+                        "--bootstrap-server",
+                        "localhost:9092",
+                        "--group",
+                        group,
+                        "--reset-offsets",
+                        "--to-latest",
+                        "--all-topics",
+                        "--execute",
                     ]
                     result = subprocess.run(reset_cmd, capture_output=True, text=True, timeout=5)
                     if result.returncode == 0:
@@ -287,7 +295,7 @@ class DistributedStateManager:
             "redis_keys_cleared": redis_keys_cleared,
             "kafka_groups_reset": kafka_groups_reset,
             "execution_time_seconds": execution_time,
-            "clean": redis_keys_cleared >= 0  # Success if no errors
+            "clean": redis_keys_cleared >= 0,  # Success if no errors
         }
 
         logger.info(

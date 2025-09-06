@@ -132,7 +132,7 @@ validated_by: str          # Who/what validated (SYSTEM_TIMEOUT for timeouts)
 
 ### 6.6. Pre-Deployment Checklist
 **Before container deployment:**
-- [ ] All tests pass (`pdm run pytest`)
+- [ ] All tests pass (`pdm run pytest-root`)
 - [ ] Linting passes (`pdm run lint-all`)
 - [ ] Type checking passes (`pdm run typecheck-all`)
 - [ ] Dockerfile includes `ENV PYTHONPATH=/app`

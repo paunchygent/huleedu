@@ -31,7 +31,7 @@ class ServiceHealthCache:
 
     def __init__(self):
         self._endpoints: dict[str, Any] = {}  # Always initialized, never None
-        self._cache_timestamp: float = 0.0     # Always initialized, never None
+        self._cache_timestamp: float = 0.0  # Always initialized, never None
         self.lock = asyncio.Lock()
         self.cache_ttl = 60.0  # 60 seconds cache
 
@@ -118,8 +118,7 @@ class ServiceTestManager:
         async with httpx.AsyncClient(timeout=10.0) as client:
             # Create validation tasks for all services in parallel
             validation_tasks = [
-                self._validate_single_service(client, service)
-                for service in self.SERVICE_ENDPOINTS
+                self._validate_single_service(client, service) for service in self.SERVICE_ENDPOINTS
             ]
 
             # Run all validations in parallel
@@ -162,12 +161,14 @@ class ServiceTestManager:
                     logger.warning(f"{service.name} invalid health response format")
                     return None
 
-                service_config.update({
-                    "health_url": health_url,
-                    "metrics_url": f"http://localhost:{service.port}/metrics",
-                    "base_url": f"http://localhost:{service.port}",
-                    "status": "healthy",
-                })
+                service_config.update(
+                    {
+                        "health_url": health_url,
+                        "metrics_url": f"http://localhost:{service.port}/metrics",
+                        "base_url": f"http://localhost:{service.port}",
+                        "status": "healthy",
+                    }
+                )
                 logger.info(f"✅ {service.name} HTTP API healthy")
 
             except (httpx.ConnectError, httpx.TimeoutException) as e:

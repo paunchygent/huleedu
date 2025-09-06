@@ -68,7 +68,7 @@ class TestFunctionName:
 ### 4.1. Mandatory Validation Sequence
 **MUST** execute after creating each test file:
 1. **Type Check**: `pdm run typecheck-all` from repository root
-2. **Test Execution**: `pdm run pytest [test_file] -v`
+2. **Test Execution**: `pdm run pytest-root [test_file] -v`
 3. **100% Pass Rate**: Fix ALL failures before proceeding
 4. **Root Cause Analysis**: Fix implementation issues, not just tests
 
