@@ -14,7 +14,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from typing import Optional
 
 from testcontainers.postgres import PostgresContainer
 
@@ -74,4 +73,3 @@ def run() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run())
-

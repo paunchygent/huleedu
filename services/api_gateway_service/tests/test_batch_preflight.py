@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any
-from uuid import UUID, uuid4
 from unittest.mock import AsyncMock
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -60,16 +59,34 @@ class PreflightProvider(Provider):
 async def test_pipeline_request_returns_402_on_preflight_denial():
     # Mock HttpClientProtocol.post to return 402
     class DenyClient(HttpClientProtocol):
-        async def post(self, url: str, *, data: dict | None = None, files: list | None = None, json: dict | None = None, headers: dict[str, str] | None = None, timeout: float | httpx.Timeout | None = None) -> httpx.Response:  # type: ignore[override]
-            return httpx.Response(402, json={
-                "allowed": False,
-                "denial_reason": "insufficient_credits",
-                "required_credits": 10,
-                "available_credits": 3,
-                "resource_breakdown": {"cj_comparison": 7, "ai_feedback_generation": 3},
-            })
+        async def post(
+            self,
+            url: str,
+            *,
+            data: dict | None = None,
+            files: list | None = None,
+            json: dict | None = None,
+            headers: dict[str, str] | None = None,
+            timeout: float | httpx.Timeout | None = None,
+        ) -> httpx.Response:  # type: ignore[override]
+            return httpx.Response(
+                402,
+                json={
+                    "allowed": False,
+                    "denial_reason": "insufficient_credits",
+                    "required_credits": 10,
+                    "available_credits": 3,
+                    "resource_breakdown": {"cj_comparison": 7, "ai_feedback_generation": 3},
+                },
+            )
 
-        async def get(self, url: str, *, headers: dict[str, str] | None = None, timeout: float | httpx.Timeout | None = None) -> httpx.Response:  # type: ignore[override]
+        async def get(
+            self,
+            url: str,
+            *,
+            headers: dict[str, str] | None = None,
+            timeout: float | httpx.Timeout | None = None,
+        ) -> httpx.Response:  # type: ignore[override]
             return httpx.Response(200)
 
     deny_client = DenyClient()

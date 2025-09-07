@@ -98,23 +98,22 @@ logger = create_service_logger("component-name")
 - **Purpose**: Normalize inbound correlation to a canonical `UUID` while preserving the original string for logs and responses
 - **Library**: `huleedu_service_libs.error_handling.correlation`
 - **Middleware**: `setup_correlation_middleware(app)` attaches `g.correlation_context`
+- **Pattern**: See Rule 043.2 for complete implementation
 
 ```python
 # app.py
 from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware import (
     setup_correlation_middleware,
 )
-
 setup_correlation_middleware(app)  # call early in app setup
-```
 
-```python
-# CorrelationContext
+# routes.py - DI injection
+from dishka import FromDishka
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
 
-ctx: CorrelationContext = g.correlation_context
-ctx.original  # original header/query value (str)
-ctx.uuid      # canonical UUID (parsed or uuid5 of original)
+async def endpoint(corr: FromDishka[CorrelationContext]):
+    # Use corr.uuid for internal, corr.original for client echo
+    pass
 ```
 
 ### 3.4. Correlation in Errors + Events
@@ -122,6 +121,6 @@ ctx.uuid      # canonical UUID (parsed or uuid5 of original)
 - **Success responses**: Echo `ctx.original` back to clients
 - **Events**: Use `ctx.uuid` for `envelope.correlation_id`; optionally include `original_correlation_id` in metadata
 
-### 3.3. Consistent Log Levels & Clear Messages
+### 3.5. Consistent Log Levels & Clear Messages
 - Use appropriate levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
 - Log messages **MUST** be clear, concise, and contextual

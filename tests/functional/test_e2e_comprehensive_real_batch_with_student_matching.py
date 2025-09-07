@@ -312,22 +312,34 @@ async def wait_for_entitlements_credit_events(
     saw_balance_changed = False
     saw_usage_recorded = False
 
-    while asyncio.get_event_loop().time() < deadline and not (saw_balance_changed and saw_usage_recorded):
+    while asyncio.get_event_loop().time() < deadline and not (
+        saw_balance_changed and saw_usage_recorded
+    ):
         try:
             msg_batch = await consumer.getmany(timeout_ms=1000, max_records=20)
             for _tp, messages in msg_batch.items():
                 for message in messages:
                     try:
-                        raw = message.value.decode("utf-8") if isinstance(message.value, bytes) else message.value
+                        raw = (
+                            message.value.decode("utf-8")
+                            if isinstance(message.value, bytes)
+                            else message.value
+                        )
                         import json
 
                         env = json.loads(raw)
                         if env.get("correlation_id") != correlation_id:
                             continue
                         et = env.get("event_type", "")
-                        if et.endswith("entitlements.credit.balance.changed.v1") or "entitlements.credit.balance.changed" in et:
+                        if (
+                            et.endswith("entitlements.credit.balance.changed.v1")
+                            or "entitlements.credit.balance.changed" in et
+                        ):
                             saw_balance_changed = True
-                        elif et.endswith("entitlements.usage.recorded.v1") or "entitlements.usage.recorded" in et:
+                        elif (
+                            et.endswith("entitlements.usage.recorded.v1")
+                            or "entitlements.usage.recorded" in et
+                        ):
                             saw_usage_recorded = True
                         if saw_balance_changed and saw_usage_recorded:
                             return True
@@ -568,9 +580,9 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
             )
             # Basic sanity: required_credits should match nC2 for CJ assessment
             expected_comparisons = len(essay_files) * (len(essay_files) - 1) // 2
-            assert (
-                preflight.get("required_credits") == expected_comparisons
-            ), f"Preflight required != expected comparisons ({preflight.get('required_credits')} vs {expected_comparisons})"
+            assert preflight.get("required_credits") == expected_comparisons, (
+                f"Preflight required != expected comparisons ({preflight.get('required_credits')} vs {expected_comparisons})"
+            )
         except Exception as e:
             logger.warning(f"⚠️ BOS preflight logging failed: {e}")
 
@@ -597,7 +609,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
 
         # Watch pipeline progression (same as GUEST flow from here)
         logger.info("⏳ Watching pipeline progression...")
-        final_event = await watch_pipeline_progression_with_consumer(
+        final_event, entitlements_events = await watch_pipeline_progression_with_consumer(
             consumer=consumer,
             batch_id=batch_id,
             correlation_id=request_correlation_id,
@@ -615,14 +627,22 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
             expected_comparisons = len(essay_files) * (len(essay_files) - 1) // 2
 
             try:
-                # Synchronize using entitlements events rather than sleeps
-                ent_events_ok = await wait_for_entitlements_credit_events(
-                    consumer, request_correlation_id, timeout_seconds=30
-                )
-                if not ent_events_ok:
-                    logger.warning(
-                        "Entitlements credit events not both observed within timeout; proceeding with API checks"
+                # Check if already observed during pipeline watching
+                if entitlements_events['balance_changed'] and entitlements_events['usage_recorded']:
+                    logger.info(
+                        "✅ Entitlements events already observed during pipeline progression"
                     )
+                    ent_events_ok = True
+                else:
+                    # Only wait if not already seen
+                    ent_events_ok = await wait_for_entitlements_credit_events(
+                        consumer, request_correlation_id, timeout_seconds=30
+                    )
+                    if not ent_events_ok:
+                        logger.warning(
+                            "Entitlements credit events not both observed within timeout; "
+                            "proceeding with API checks"
+                        )
 
                 # Robustly fetch operations with bounded retries to absorb async propagation
                 operations: list[dict[str, Any]] = []
@@ -638,7 +658,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
                     if operations:
                         break
                     await asyncio.sleep(0.5)
-                
+
                 assert isinstance(operations, list), "Invalid operations response format"
 
                 if not operations:
@@ -686,11 +706,10 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
                 ]
 
                 # Expect exactly one CJ consumption operation for this correlation
-                assert (
-                    len(matching_ops) == 1
-                ), (
+                assert len(matching_ops) == 1, (
                     "Entitlements operations did not include expected CJ consumption: "
-                    f"expected amount={expected_comparisons}, correlation_id={request_correlation_id}"
+                    f"expected amount={expected_comparisons}, "
+                    f"correlation_id={request_correlation_id}"
                 )
 
                 # Optional sanity: ensure correlation and consumed_from fields are present
@@ -698,16 +717,21 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
                     assert op.get("correlation_id") == request_correlation_id
                     assert op.get("consumed_from") in {"org", "user"}
                     # Metric should reflect CJ comparison consumption (event-driven uses singular)
-                    assert op.get("metric") in {"cj_comparison", "cj_comparisons"}
+                    assert op.get("metric") == "cj_comparison"  # Only singular per policy
                     # Subject should reflect the consumed_from source
                     if op.get("consumed_from") == "org":
-                        assert op.get("subject_id") == getattr(teacher_user, "organization_id", None)
+                        assert op.get("subject_id") == getattr(
+                            teacher_user, "organization_id", None
+                        )
                     else:
                         assert op.get("subject_id") == teacher_user.user_id
 
                 # Ensure there are no failed consumption operations for this correlation
                 failed_ops = [
-                    op for op in operations if op.get("correlation_id") == request_correlation_id and op.get("operation_status") == "failed"
+                    op
+                    for op in operations
+                    if op.get("correlation_id") == request_correlation_id
+                    and op.get("operation_status") == "failed"
                 ]
                 assert not failed_ops, f"Unexpected failed consumption operations: {failed_ops}"
 

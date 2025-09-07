@@ -15,7 +15,7 @@ from uuid import uuid4
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
-from huleedu_service_libs.error_handling import HuleEduError, create_test_error_detail
+from huleedu_service_libs.error_handling import HuleEduError
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
@@ -117,7 +117,11 @@ class TestEntitlementsBulkRoute:
     ) -> None:
         per_metric = {
             "cj_comparison": PerMetricCreditStatus(
-                required=200, available=50, allowed=False, source=None, reason="insufficient_credits"
+                required=200,
+                available=50,
+                allowed=False,
+                source=None,
+                reason="insufficient_credits",
             ),
             "ai_feedback_generation": PerMetricCreditStatus(
                 required=50, available=50, allowed=False, source=None, reason="insufficient_credits"
@@ -192,4 +196,3 @@ class TestEntitlementsBulkRoute:
         else:
             assert resp.status_code == 422
         mock_credit_manager.check_credits_bulk.assert_not_called()
-

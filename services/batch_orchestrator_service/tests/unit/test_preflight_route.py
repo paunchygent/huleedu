@@ -10,16 +10,16 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
 import pytest
+from common_core.domain_enums import CourseCode
+from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
+from common_core.status_enums import BatchStatus
 from dishka import Provider, Scope, make_async_container, provide
 from quart import Quart
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 
-from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
-from common_core.status_enums import BatchStatus
-from common_core.domain_enums import CourseCode
-from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.api.batch_routes import internal_bp
+from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.domain.pipeline_credit_guard import (
     CreditCheckOutcome,
     PipelineCreditGuard,
@@ -64,22 +64,35 @@ class _MockRepo(BatchRepositoryProtocol):
     async def create_batch(self, batch_data: dict) -> dict:  # pragma: no cover
         return batch_data
 
-    async def update_batch_status(self, batch_id: str, new_status: BatchStatus) -> bool:  # pragma: no cover
+    async def update_batch_status(
+        self, batch_id: str, new_status: BatchStatus
+    ) -> bool:  # pragma: no cover
         return True
 
-    async def save_processing_pipeline_state(self, batch_id: str, pipeline_state: ProcessingPipelineState) -> bool:  # pragma: no cover
+    async def save_processing_pipeline_state(
+        self, batch_id: str, pipeline_state: ProcessingPipelineState
+    ) -> bool:  # pragma: no cover
         return True
 
-    async def get_processing_pipeline_state(self, batch_id: str) -> ProcessingPipelineState | None:  # pragma: no cover
+    async def get_processing_pipeline_state(
+        self, batch_id: str
+    ) -> ProcessingPipelineState | None:  # pragma: no cover
         return None
 
-    async def store_batch_context(self, batch_id: str, registration_data: BatchRegistrationRequestV1, correlation_id: str | None = None) -> bool:  # pragma: no cover
+    async def store_batch_context(
+        self,
+        batch_id: str,
+        registration_data: BatchRegistrationRequestV1,
+        correlation_id: str | None = None,
+    ) -> bool:  # pragma: no cover
         return True
 
     async def get_batch_context(self, batch_id: str) -> BatchRegistrationRequestV1 | None:
         return self._ctx_model
 
-    async def store_batch_essays(self, batch_id: str, essays: list[Any]) -> bool:  # pragma: no cover
+    async def store_batch_essays(
+        self, batch_id: str, essays: list[Any]
+    ) -> bool:  # pragma: no cover
         return True
 
     async def get_batch_essays(self, batch_id: str) -> list[Any] | None:  # pragma: no cover
@@ -98,11 +111,15 @@ class _MockRepo(BatchRepositoryProtocol):
 
 
 class _MockBCS(BatchConductorClientProtocol):
-    async def resolve_pipeline(self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str) -> dict[str, Any]:
+    async def resolve_pipeline(
+        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+    ) -> dict[str, Any]:
         # Echo back a simple resolution that includes requested phase and a fixed follow-up
         return {"final_pipeline": [requested_pipeline.value, PhaseName.AI_FEEDBACK.value]}
 
-    async def report_phase_completion(self, batch_id: str, completed_phase: PhaseName, success: bool = True) -> None:  # pragma: no cover
+    async def report_phase_completion(
+        self, batch_id: str, completed_phase: PhaseName, success: bool = True
+    ) -> None:  # pragma: no cover
         return None
 
 
@@ -123,7 +140,15 @@ class _StubEntitlements(EntitlementsServiceProtocol):
 class _AllowGuard(PipelineCreditGuard):
     def __init__(self) -> None:
         super().__init__(entitlements_client=_StubEntitlements(), cost_strategy=None)
-    async def evaluate(self, *, batch_id: str, resolved_pipeline: list[PhaseName], batch_context: Any, correlation_id: str) -> CreditCheckOutcome:
+
+    async def evaluate(
+        self,
+        *,
+        batch_id: str,
+        resolved_pipeline: list[PhaseName],
+        batch_context: Any,
+        correlation_id: str,
+    ) -> CreditCheckOutcome:
         return CreditCheckOutcome(
             allowed=True,
             denial_reason=None,
@@ -136,7 +161,15 @@ class _AllowGuard(PipelineCreditGuard):
 class _DenyGuard(PipelineCreditGuard):
     def __init__(self) -> None:
         super().__init__(entitlements_client=_StubEntitlements(), cost_strategy=None)
-    async def evaluate(self, *, batch_id: str, resolved_pipeline: list[PhaseName], batch_context: Any, correlation_id: str) -> CreditCheckOutcome:
+
+    async def evaluate(
+        self,
+        *,
+        batch_id: str,
+        resolved_pipeline: list[PhaseName],
+        batch_context: Any,
+        correlation_id: str,
+    ) -> CreditCheckOutcome:
         return CreditCheckOutcome(
             allowed=False,
             denial_reason="insufficient_credits",
@@ -170,7 +203,12 @@ class _RateLimitGuard(PipelineCreditGuard):
 class _TestProvider(Provider):
     scope = Scope.APP
 
-    def __init__(self, repo: BatchRepositoryProtocol, bcs: BatchConductorClientProtocol, guard: PipelineCreditGuard) -> None:
+    def __init__(
+        self,
+        repo: BatchRepositoryProtocol,
+        bcs: BatchConductorClientProtocol,
+        guard: PipelineCreditGuard,
+    ) -> None:
         super().__init__()
         self._repo = repo
         self._bcs = bcs

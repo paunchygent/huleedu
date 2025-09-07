@@ -9,14 +9,14 @@ from __future__ import annotations
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.entitlements_service.protocols import (
+    BulkCreditCheckResult,
     CreditAdjustment,
     CreditBalanceInfo,
     CreditCheckResponse,
     CreditConsumptionResult,
-    BulkCreditCheckResult,
-    PerMetricCreditStatus,
     EntitlementsRepositoryProtocol,
     EventPublisherProtocol,
+    PerMetricCreditStatus,
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
@@ -239,22 +239,28 @@ class CreditManagerImpl:
             # Skip processing for free operations
             if total_cost == 0:
                 logger.debug("Free operation - no credits consumed")
+                # Still resolve credit source for consistency in reporting
+                source, subject_id = await self._resolve_credit_source(
+                    user_id,
+                    org_id,
+                    total_cost,
+                )
                 await self.repository.record_operation(
-                    subject_type="user",
-                    subject_id=user_id,
+                    subject_type=source,
+                    subject_id=subject_id,
                     metric=metric,
                     amount=0,
-                    consumed_from="none",
+                    consumed_from=source,  # Use actual resolved source
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                     status="completed",
                 )
-                # Return current user balance for reference on free ops
-                current_balance = await self.repository.get_credit_balance("user", user_id)
+                # Return current balance for the resolved source
+                current_balance = await self.repository.get_credit_balance(source, subject_id)
                 return CreditConsumptionResult(
                     success=True,
                     new_balance=current_balance,
-                    consumed_from="none",
+                    consumed_from=source,  # Use actual resolved source
                 )
 
             # Determine credit source using same logic as check_credits
@@ -383,13 +389,18 @@ class CreditManagerImpl:
             )
 
             # Record failed operation for audit trail
+            # In error case, we don't know the source, so fallback to user as default
+            # This preserves the user_id which is always available
+            fallback_source = "user"
+            fallback_subject = user_id
+            
             try:
                 await self.repository.record_operation(
-                    subject_type="user",
-                    subject_id=user_id,
+                    subject_type=fallback_source,
+                    subject_id=fallback_subject,
                     metric=metric,
                     amount=0,
-                    consumed_from="error",
+                    consumed_from=fallback_source,  # Use fallback source
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                     status="failed",
@@ -397,11 +408,11 @@ class CreditManagerImpl:
             except Exception:
                 logger.error("Failed to record error operation", exc_info=True)
 
-            current_balance = await self.repository.get_credit_balance("user", user_id)
+            current_balance = await self.repository.get_credit_balance(fallback_source, fallback_subject)
             return CreditConsumptionResult(
                 success=False,
                 new_balance=current_balance,
-                consumed_from="error",
+                consumed_from=fallback_source,  # Use fallback source
             )
 
     async def get_balance(self, user_id: str, org_id: str | None = None) -> CreditBalanceInfo:

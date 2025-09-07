@@ -22,8 +22,7 @@ import re
 import sys
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
-
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 EXPECTED_INDEXES = {
     "ix_event_outbox_unpublished": {
@@ -43,9 +42,11 @@ async def _fetch_indexes(engine: AsyncEngine) -> dict[str, dict[str, Any]]:
 
     async with engine.begin() as conn:
         # Fetch index definitions
-        idx_rows = (await conn.execute(
-            text(
-                """
+        idx_rows = (
+            (
+                await conn.execute(
+                    text(
+                        """
                 SELECT i.relname AS indexname,
                        pg_get_indexdef(ix.indexrelid) AS indexdef,
                        pg_get_expr(ix.indpred, ix.indrelid) AS predicate
@@ -55,8 +56,12 @@ async def _fetch_indexes(engine: AsyncEngine) -> dict[str, dict[str, Any]]:
                 JOIN pg_class i ON i.oid = ix.indexrelid
                 WHERE n.nspname = current_schema() AND t.relname = 'event_outbox';
                 """
+                    )
+                )
             )
-        )).mappings().all()
+            .mappings()
+            .all()
+        )
 
     result: dict[str, dict[str, Any]] = {}
     for row in idx_rows:
@@ -65,7 +70,7 @@ async def _fetch_indexes(engine: AsyncEngine) -> dict[str, dict[str, Any]]:
         predicate: str | None = row["predicate"]
         # Extract columns from the indexdef using regex to handle partial indexes
         # Pattern matches "USING btree (columns)" and captures the columns part
-        btree_match = re.search(r'USING btree \(([^)]+)\)', indexdef)
+        btree_match = re.search(r"USING btree \(([^)]+)\)", indexdef)
         if btree_match:
             cols_part = btree_match.group(1)
             columns = [c.strip().strip('"') for c in cols_part.split(",")]
@@ -88,7 +93,10 @@ async def main() -> int:
     )
 
     if not database_url:
-        print("ERROR: Provide --database-url or set DATABASE_URL/ENTITLEMENTS_SERVICE_DATABASE_URL", file=sys.stderr)
+        print(
+            "ERROR: Provide --database-url or set DATABASE_URL/ENTITLEMENTS_SERVICE_DATABASE_URL",
+            file=sys.stderr,
+        )
         return 3
 
     engine = create_async_engine(database_url, echo=False)
@@ -138,4 +146,3 @@ if __name__ == "__main__":
     import asyncio
 
     raise SystemExit(asyncio.run(main()))
-

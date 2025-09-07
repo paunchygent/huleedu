@@ -18,13 +18,13 @@ from quart_dishka import inject
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.config import settings
+from services.batch_orchestrator_service.domain.pipeline_credit_guard import PipelineCreditGuard
 from services.batch_orchestrator_service.protocols import (
+    BatchConductorClientProtocol,
     BatchProcessingServiceProtocol,
     BatchRepositoryProtocol,
     PipelinePhaseCoordinatorProtocol,
 )
-from services.batch_orchestrator_service.domain.pipeline_credit_guard import PipelineCreditGuard
-from services.batch_orchestrator_service.protocols import BatchConductorClientProtocol
 
 logger = create_service_logger("bos.api.batch")
 batch_bp = Blueprint("batch_routes", __name__, url_prefix="/v1/batches")
@@ -348,9 +348,7 @@ async def preflight_pipeline(
             return {"error": f"Invalid pipeline phase: {phase}"}, 400
 
         # Resolve pipeline via BCS
-        bcs_response = await bcs_client.resolve_pipeline(
-            batch_id, requested_phase, correlation_id
-        )
+        bcs_response = await bcs_client.resolve_pipeline(batch_id, requested_phase, correlation_id)
         resolved_pipeline_strings = bcs_response.get("final_pipeline", [])
         if not resolved_pipeline_strings:
             return {

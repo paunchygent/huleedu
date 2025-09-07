@@ -56,4 +56,3 @@ def extract_correlation_context_from_request(request: Any) -> CorrelationContext
         canonical = uuid5(NAMESPACE_OID, correlation_id)
 
     return CorrelationContext(original=correlation_id, uuid=canonical, source=source)
-

@@ -19,6 +19,7 @@ from typing import Any, Type
 from uuid import uuid4
 
 import pytest
+from huleedu_service_libs.outbox.models import EventOutbox
 
 from services.entitlements_service.models_db import (
     CreditBalance,
@@ -27,7 +28,6 @@ from services.entitlements_service.models_db import (
     RateLimitBucket,
     SubjectType,
 )
-from huleedu_service_libs.outbox.models import EventOutbox
 
 
 class TestEnumBehavior:

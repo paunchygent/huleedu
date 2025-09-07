@@ -196,7 +196,7 @@ async def test_comprehensive_real_batch_pipeline():
 
         # Step 7: Watch pipeline progression with pre-positioned consumer
         print("⏳ Watching pipeline progression...")
-        result = await watch_pipeline_progression_with_consumer(
+        result, entitlements_events = await watch_pipeline_progression_with_consumer(
             consumer,
             batch_id,
             request_correlation_id,

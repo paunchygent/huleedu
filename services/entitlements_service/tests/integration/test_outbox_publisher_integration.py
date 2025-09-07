@@ -9,8 +9,16 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 
 import pytest
+from common_core import ProcessingEvent, topic_name
 from dishka import Provider, Scope, make_async_container, provide
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 from huleedu_service_libs.error_handling.quart import register_error_handlers
+from huleedu_service_libs.outbox.models import Base as OutboxBase
+from huleedu_service_libs.outbox.models import EventOutbox
+from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 from sqlalchemy import select
@@ -21,10 +29,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from testcontainers.postgres import PostgresContainer
-
-from common_core import ProcessingEvent, topic_name
-from huleedu_service_libs.outbox.models import Base as OutboxBase, EventOutbox
-from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 
 from services.entitlements_service.api.admin_routes import admin_bp
 from services.entitlements_service.api.entitlements_routes import entitlements_bp
@@ -42,7 +46,6 @@ from services.entitlements_service.protocols import (
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
-from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 
 
 class OutboxIntegrationProvider(Provider):
@@ -70,7 +73,9 @@ class OutboxIntegrationProvider(Provider):
     def provide_outbox_repository(
         self, engine: AsyncEngine, settings: Settings
     ) -> PostgreSQLOutboxRepository:  # type: ignore[override]
-        return PostgreSQLOutboxRepository(engine=engine, service_name=settings.SERVICE_NAME, enable_metrics=False)
+        return PostgreSQLOutboxRepository(
+            engine=engine, service_name=settings.SERVICE_NAME, enable_metrics=False
+        )
 
     @provide(scope=Scope.APP)
     def provide_event_publisher(

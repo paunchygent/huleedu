@@ -9,16 +9,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dishka import FromDishka
-from quart_dishka import inject
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_processing_error,
     raise_validation_error,
 )
-from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.error_handling.quart import CorrelationContext
+from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
 from quart import Blueprint, current_app, request
+from quart_dishka import inject
 
 from services.entitlements_service.protocols import (
     CreditManagerProtocol,
@@ -231,7 +231,7 @@ async def set_credits(
 
         # Calculate adjustment needed to reach target balance
         adjustment_needed = set_request.balance - current_balance
-        
+
         # If no adjustment needed, return current state
         if adjustment_needed == 0:
             response = CreditSetResponse(
@@ -394,7 +394,11 @@ async def get_operations(
         )
 
         # Include header correlation in success for symmetry
-        return {"operations": operations, "count": len(operations), "correlation_id": corr.original}, 200
+        return {
+            "operations": operations,
+            "count": len(operations),
+            "correlation_id": corr.original,
+        }, 200
 
     except HuleEduError:
         raise
@@ -470,8 +474,8 @@ async def reset_rate_limit(corr: FromDishka[CorrelationContext]) -> tuple[dict[s
             operation="reset_rate_limit",
             message="Failed to reset rate limit",
             correlation_id=corr.uuid,
-            subject_id=subject_id if 'subject_id' in locals() else None,
-            metric=metric if 'metric' in locals() else None,
+            subject_id=subject_id if "subject_id" in locals() else None,
+            metric=metric if "metric" in locals() else None,
             error=str(e),
             original_correlation_id=corr.original,
         )

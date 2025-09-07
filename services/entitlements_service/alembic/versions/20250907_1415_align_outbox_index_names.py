@@ -64,4 +64,3 @@ def downgrade() -> None:
         ["aggregate_type", "aggregate_id"],
         unique=False,
     )
-

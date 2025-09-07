@@ -12,11 +12,19 @@ from unittest.mock import AsyncMock
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
-from huleedu_service_libs.error_handling import HuleEduError
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 from huleedu_service_libs.error_handling.quart import register_error_handlers
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from testcontainers.postgres import PostgresContainer
 
 from services.entitlements_service.api.admin_routes import admin_bp
@@ -30,7 +38,6 @@ from services.entitlements_service.protocols import (
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
-from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 
 
 class AdminIntegrationProvider(Provider):
@@ -161,7 +168,7 @@ async def test_set_credits_persists_and_audits(app_client: QuartTestClient) -> N
     # Reuse same app_client (admin blueprint also exposes operations)
     # Note: The operations endpoint is on /v1/admin/credits/operations
     resp_ops = await app_client.get(
-        f"/v1/admin/credits/operations?subject_type=user&subject_id=integration-user-1&limit=10"
+        "/v1/admin/credits/operations?subject_type=user&subject_id=integration-user-1&limit=10"
     )
     assert resp_ops.status_code == 200
     ops = await resp_ops.get_json()

@@ -97,6 +97,10 @@ class EntitlementsKafkaConsumer:
 
         try:
             async for msg in self.consumer:
+                logger.info(
+                    "Received message from Kafka",
+                    extra={"topic": msg.topic, "partition": msg.partition, "offset": msg.offset},
+                )
                 if self.should_stop:
                     logger.info("Shutdown requested, stopping Entitlements processing loop")
                     break

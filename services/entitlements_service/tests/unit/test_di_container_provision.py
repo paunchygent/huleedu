@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from dishka import make_async_container, provide
-from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
+from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import AtomicRedisClientProtocol
 from huleedu_service_libs.resilience import CircuitBreakerRegistry

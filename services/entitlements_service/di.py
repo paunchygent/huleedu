@@ -11,9 +11,12 @@ from datetime import timedelta
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
-from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -301,4 +304,6 @@ class EntitlementsServiceProvider(Provider):
         from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
 
         # Disable metrics by default in unit tests; production can override via OutboxProvider
-        return PostgreSQLOutboxRepository(engine=engine, service_name=service_name, enable_metrics=False)
+        return PostgreSQLOutboxRepository(
+            engine=engine, service_name=service_name, enable_metrics=False
+        )

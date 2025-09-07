@@ -13,6 +13,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 from huleedu_service_libs.error_handling.quart import register_error_handlers
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
@@ -36,7 +40,6 @@ from services.entitlements_service.protocols import (
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
-from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 
 
 class ConsumptionIntegrationProvider(Provider):

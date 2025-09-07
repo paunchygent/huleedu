@@ -185,7 +185,7 @@ async def watch_pipeline_progression_with_consumer(
     correlation_id: str,
     expected_essay_count: int,
     timeout_seconds: int = 180,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, dict[str, bool]]:
     """
     Watch complete pipeline progression with dynamic essay count.
 
@@ -197,7 +197,7 @@ async def watch_pipeline_progression_with_consumer(
         timeout_seconds: Maximum wait time
 
     Returns:
-        Final completion event data or None if timeout
+        Tuple of (Final completion event data or None if timeout, Entitlements events dict)
     """
     start_time = asyncio.get_event_loop().time()
     end_time = start_time + timeout_seconds
@@ -206,6 +206,12 @@ async def watch_pipeline_progression_with_consumer(
     spellcheck_completions = 0
     content_provisioned_count = 0
     validation_failure_count = 0
+    
+    # Track Entitlements events (credit consumption IS part of pipeline)
+    entitlements_events = {
+        'balance_changed': False,
+        'usage_recorded': False
+    }
 
     while asyncio.get_event_loop().time() < end_time:
         try:
@@ -265,6 +271,13 @@ async def watch_pipeline_progression_with_consumer(
                             PIPELINE_TOPICS["essay_validation_failed"],
                         ]:
                             # Essay-level events - correlation_id match is sufficient
+                            entity_match = True
+                        elif message.topic in [
+                            "huleedu.entitlements.credit.balance.changed.v1",
+                            "huleedu.entitlements.usage.recorded.v1",
+                        ]:
+                            # Entitlements events - correlation_id match is sufficient
+                            # Credit consumption is part of pipeline execution
                             entity_match = True
                         else:
                             # Skip topics not relevant to this test's flow
@@ -371,7 +384,7 @@ async def watch_pipeline_progression_with_consumer(
                                             f"{processed_count} essays! Complete end-to-end "
                                             f"processing finished."
                                         )
-                                        return dict(envelope_data)
+                                        return dict(envelope_data), entitlements_events
                                 else:
                                     print(
                                         f"📨 🔧 ELS published phase outcome: "
@@ -393,6 +406,12 @@ async def watch_pipeline_progression_with_consumer(
                                     f"📨 5️⃣ CJ assessment completed: {ranking_count} essays ranked",
                                 )
                                 # Pipeline continues - ELS will publish final phase outcome
+                            elif message.topic == "huleedu.entitlements.credit.balance.changed.v1":
+                                entitlements_events['balance_changed'] = True
+                                logger.debug(f"📨 💳 Credit balance changed observed")
+                            elif message.topic == "huleedu.entitlements.usage.recorded.v1":
+                                entitlements_events['usage_recorded'] = True
+                                logger.debug(f"📨 💳 Usage recorded observed")
 
                     except (json.JSONDecodeError, KeyError) as e:
                         logger.warning(f"Failed to parse pipeline message: {e}")
@@ -405,4 +424,4 @@ async def watch_pipeline_progression_with_consumer(
             await asyncio.sleep(1)
 
     logger.error(f"Pipeline did not complete within {timeout_seconds} seconds")
-    return None
+    return None, entitlements_events

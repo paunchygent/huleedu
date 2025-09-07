@@ -1,8 +1,6 @@
 """E2E test for credit preflight 402 denial scenarios."""
 
 import json
-from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
@@ -21,8 +19,12 @@ class TestCreditPreflightDenial402:
         """Validate service health."""
         service_manager = ServiceTestManager()
         endpoints = await service_manager.get_validated_endpoints()
-        
-        required_services = ["api_gateway_service", "batch_orchestrator_service", "entitlements_service"]
+
+        required_services = [
+            "api_gateway_service",
+            "batch_orchestrator_service",
+            "entitlements_service",
+        ]
         for service_name in required_services:
             if service_name not in endpoints:
                 pytest.skip(f"{service_name} not available for credit preflight tests")
@@ -36,14 +38,15 @@ class TestCreditPreflightDenial402:
 
         # Create test user with Swedish characters and organization
         test_user = auth_manager.create_test_user(
-            user_id="lärare_åsa_stockholm_123",
-            organization_id="skola_örebro_456"
+            user_id="lärare_åsa_stockholm_123", organization_id="skola_örebro_456"
         )
 
         try:
             # Set org credits to insufficient
             if test_user.organization_id:
-                await self.setup_credit_balance(service_manager, "org", test_user.organization_id, 0)
+                await self.setup_credit_balance(
+                    service_manager, "org", test_user.organization_id, 0
+                )
 
             # Set up Kafka consumer FIRST to catch readiness event
             kafka_manager = KafkaTestManager()
@@ -76,7 +79,11 @@ class TestCreditPreflightDenial402:
 
                 # Wait for BatchContentProvisioningCompleted event (guest readiness)
                 async for message in consumer:
-                    raw = message.value.decode("utf-8") if isinstance(message.value, bytes) else message.value
+                    raw = (
+                        message.value.decode("utf-8")
+                        if isinstance(message.value, bytes)
+                        else message.value
+                    )
                     envelope = json.loads(raw)
                     if (
                         envelope.get("correlation_id") == correlation_id
@@ -118,9 +125,7 @@ class TestCreditPreflightDenial402:
         service_manager = ServiceTestManager(auth_manager=auth_manager)
 
         # Create individual user (no organization)
-        test_user = auth_manager.create_individual_user(
-            user_id="pedagog_örjan_uppsala_789"
-        )
+        test_user = auth_manager.create_individual_user(user_id="pedagog_örjan_uppsala_789")
 
         try:
             # Set user credits to insufficient
@@ -156,7 +161,11 @@ class TestCreditPreflightDenial402:
 
                 # Wait for readiness event
                 async for message in consumer:
-                    raw = message.value.decode("utf-8") if isinstance(message.value, bytes) else message.value
+                    raw = (
+                        message.value.decode("utf-8")
+                        if isinstance(message.value, bytes)
+                        else message.value
+                    )
                     envelope = json.loads(raw)
                     if (
                         envelope.get("correlation_id") == correlation_id
@@ -197,14 +206,15 @@ class TestCreditPreflightDenial402:
 
         # Maximum Swedish characters
         test_user = auth_manager.create_test_user(
-            user_id="ANVÄNDARE_ÅÄÖ_åäö_901",
-            organization_id="ORGANISATION_ÅÄÖ_234"
+            user_id="ANVÄNDARE_ÅÄÖ_åäö_901", organization_id="ORGANISATION_ÅÄÖ_234"
         )
 
         try:
             # Set zero credits
             if test_user.organization_id:
-                await self.setup_credit_balance(service_manager, "org", test_user.organization_id, 0)
+                await self.setup_credit_balance(
+                    service_manager, "org", test_user.organization_id, 0
+                )
 
             # Set up Kafka consumer FIRST
             kafka_manager = KafkaTestManager()
@@ -236,7 +246,11 @@ class TestCreditPreflightDenial402:
 
                 # Wait for readiness event
                 async for message in consumer:
-                    raw = message.value.decode("utf-8") if isinstance(message.value, bytes) else message.value
+                    raw = (
+                        message.value.decode("utf-8")
+                        if isinstance(message.value, bytes)
+                        else message.value
+                    )
                     envelope = json.loads(raw)
                     if (
                         envelope.get("correlation_id") == correlation_id
@@ -269,11 +283,7 @@ class TestCreditPreflightDenial402:
             pytest.skip(f"Credit system not operational: {e}")
 
     async def setup_credit_balance(
-        self,
-        service_manager: ServiceTestManager,
-        subject_type: str,
-        subject_id: str,
-        balance: int
+        self, service_manager: ServiceTestManager, subject_type: str, subject_id: str, balance: int
     ):
         """Set credit balance via admin endpoint."""
         try:
@@ -281,11 +291,7 @@ class TestCreditPreflightDenial402:
                 method="POST",
                 service="entitlements_service",
                 path="/v1/admin/credits/set",
-                json={
-                    "subject_type": subject_type,
-                    "subject_id": subject_id,
-                    "balance": balance
-                }
+                json={"subject_type": subject_type, "subject_id": subject_id, "balance": balance},
             )
             # If we get here, the request succeeded
             return response_data

@@ -324,7 +324,9 @@ async def request_pipeline_execution(
                 f"{pipeline_request.requested_pipeline.value}/preflight"
             )
             pre_headers = {"X-Correlation-ID": str(correlation_id)}
-            pre_resp = await http_client.post(preflight_url, json={}, headers=pre_headers, timeout=10.0)
+            pre_resp = await http_client.post(
+                preflight_url, json={}, headers=pre_headers, timeout=10.0
+            )
 
             # If insufficient credits or other denial, return appropriate status with details
             if pre_resp.status_code in (402, 429, 400, 404, 500):

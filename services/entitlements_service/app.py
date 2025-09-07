@@ -18,11 +18,11 @@ from huleedu_service_libs.logging_utils import (
 from huleedu_service_libs.metrics_middleware import (
     setup_standard_service_metrics_middleware,
 )
-from huleedu_service_libs.middleware.frameworks.quart_middleware import (
-    setup_tracing_middleware,
-)
 from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware import (
     setup_correlation_middleware,
+)
+from huleedu_service_libs.middleware.frameworks.quart_middleware import (
+    setup_tracing_middleware,
 )
 from huleedu_service_libs.observability import init_tracing
 from huleedu_service_libs.outbox import OutboxProvider

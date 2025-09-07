@@ -28,4 +28,3 @@ def setup_correlation_middleware(app: Quart) -> None:
         g.correlation_context = ctx
         # Backwards-compatible convenience accessors
         g.correlation_id = ctx.original
-

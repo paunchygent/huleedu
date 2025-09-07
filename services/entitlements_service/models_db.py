@@ -77,9 +77,7 @@ class CreditBalance(Base):
     )
 
     # Indexes for efficient queries (avoid duplicate index for balance)
-    __table_args__ = (
-        Index("ix_credit_balances_updated", "updated_at"),
-    )
+    __table_args__ = (Index("ix_credit_balances_updated", "updated_at"),)
 
 
 class CreditOperation(Base):

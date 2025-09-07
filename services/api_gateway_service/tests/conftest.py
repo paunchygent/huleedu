@@ -8,7 +8,7 @@ mock provider that mirrors production ApiGatewayProvider interface.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import cast, AsyncIterator
+from typing import cast
 from unittest.mock import AsyncMock
 
 import httpx

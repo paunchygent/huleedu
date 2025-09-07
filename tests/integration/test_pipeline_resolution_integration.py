@@ -155,7 +155,12 @@ class TestPipelineResolutionIntegration:
                     "available_credits": 10_000,
                     "required_credits": sum(int(q) for q in requirements.values()),
                     "per_metric": {
-                        m: {"required": int(q), "available": 10_000, "allowed": True, "source": ("user" if org_id is None else "org")}
+                        m: {
+                            "required": int(q),
+                            "available": 10_000,
+                            "allowed": True,
+                            "source": ("user" if org_id is None else "org"),
+                        }
                         for m, q in requirements.items()
                     },
                     "correlation_id": correlation_id,

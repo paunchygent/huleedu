@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from common_core.entitlements_models import (
+    BulkCreditCheckRequestV1,
+    BulkCreditCheckResponseV1,
     CreditCheckRequestV1,
     CreditCheckResponseV1,
     CreditConsumptionV1,
-    BulkCreditCheckRequestV1,
-    BulkCreditCheckResponseV1,
 )
 from dishka import FromDishka
 from huleedu_service_libs.error_handling import raise_validation_error
@@ -208,8 +208,8 @@ async def check_credits_bulk(
             )
 
         bulk_req = BulkCreditCheckRequestV1(**data)
-        correlation = bulk_req.correlation_id or request.headers.get("X-Correlation-ID") or str(
-            uuid4()
+        correlation = (
+            bulk_req.correlation_id or request.headers.get("X-Correlation-ID") or str(uuid4())
         )
 
         result = await credit_manager.check_credits_bulk(

@@ -30,7 +30,10 @@ class FakeEntitlementsClient:
             "allowed": self._sufficient,
             "available_credits": self._available,
             "required_credits": total_required,
-            "per_metric": {m: {"required": int(q), "available": self._available, "allowed": self._sufficient} for m, q in requirements.items()},
+            "per_metric": {
+                m: {"required": int(q), "available": self._available, "allowed": self._sufficient}
+                for m, q in requirements.items()
+            },
             "correlation_id": correlation_id,
         }
 

@@ -128,7 +128,9 @@ class PerMetricCreditStatusV1(BaseModel):
     available: int
     allowed: bool
     source: Optional[str] = None  # "user" or "org"
-    reason: Optional[str] = None  # e.g., "insufficient_credits" | "rate_limit_exceeded" | "policy_denied"
+    reason: Optional[str] = (
+        None  # e.g., "insufficient_credits" | "rate_limit_exceeded" | "policy_denied"
+    )
 
 
 class BulkCreditCheckResponseV1(BaseModel):
