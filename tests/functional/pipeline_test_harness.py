@@ -16,6 +16,7 @@ from tests.functional.comprehensive_pipeline_utils import PIPELINE_TOPICS
 from tests.functional.pipeline_harness_helpers import (
     BatchSetupHelper,
     CreditProvisioningHelper,
+    EntitlementsMonitorHelper,
     EventWaitingHelper,
     KafkaMonitorHelper,
     PipelineValidationHelper,
@@ -74,6 +75,10 @@ class PipelineExecutionResult:
     ras_result_event: Optional[dict[str, Any]] = None  # BatchResultsReadyV1 event from RAS
     student_matches_found: int = 0
     execution_time_seconds: float = 0.0
+    entitlements_events: dict[str, bool] = field(
+        default_factory=lambda: {"balance_changed": False, "usage_recorded": False}
+    )  # Track Entitlements events for credit consumption
+    request_correlation_id: str = ""  # Correlation ID used for the pipeline request
 
 
 class PipelineTestHarness:
@@ -285,6 +290,8 @@ class PipelineTestHarness:
             completion_event=completion_event,
             ras_result_event=tracker.ras_result_event,
             execution_time_seconds=time.time() - start_time,
+            entitlements_events=tracker.entitlements_events,  # Include Entitlements tracking
+            request_correlation_id=request_correlation_id,  # Store the pipeline request correlation ID
         )
 
         # Update harness state
@@ -330,6 +337,30 @@ class PipelineTestHarness:
             correlation_id=self.correlation_id,
             amount=amount,
             enabled=provision_credits,
+        )
+
+    async def wait_for_entitlements_events(
+        self,
+        correlation_id: str,
+        timeout_seconds: int = 30,
+    ) -> dict[str, bool]:
+        """
+        Wait for Entitlements credit events if not already observed.
+
+        Args:
+            correlation_id: Correlation ID to filter events
+            timeout_seconds: Maximum wait time
+
+        Returns:
+            Dictionary with balance_changed and usage_recorded status
+        """
+        if not self.consumer:
+            raise RuntimeError("Consumer not initialized")
+
+        return await EntitlementsMonitorHelper.wait_for_entitlements_events(
+            consumer=self.consumer,
+            correlation_id=correlation_id,
+            timeout_seconds=timeout_seconds,
         )
 
     async def cleanup(self) -> None:

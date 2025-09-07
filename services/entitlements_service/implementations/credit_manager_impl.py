@@ -393,7 +393,7 @@ class CreditManagerImpl:
             # This preserves the user_id which is always available
             fallback_source = "user"
             fallback_subject = user_id
-            
+
             try:
                 await self.repository.record_operation(
                     subject_type=fallback_source,
@@ -408,7 +408,9 @@ class CreditManagerImpl:
             except Exception:
                 logger.error("Failed to record error operation", exc_info=True)
 
-            current_balance = await self.repository.get_credit_balance(fallback_source, fallback_subject)
+            current_balance = await self.repository.get_credit_balance(
+                fallback_source, fallback_subject
+            )
             return CreditConsumptionResult(
                 success=False,
                 new_balance=current_balance,

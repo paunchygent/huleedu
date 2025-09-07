@@ -10,6 +10,9 @@ from tests.functional.pipeline_harness_helpers.batch_setup import (
 from tests.functional.pipeline_harness_helpers.credit_provisioning import (
     CreditProvisioningHelper,
 )
+from tests.functional.pipeline_harness_helpers.entitlements_monitor import (
+    EntitlementsMonitorHelper,
+)
 from tests.functional.pipeline_harness_helpers.event_waiters import (
     EventWaitingHelper,
 )
@@ -25,6 +28,7 @@ from tests.functional.pipeline_harness_helpers.validation import (
 
 __all__ = [
     "CreditProvisioningHelper",
+    "EntitlementsMonitorHelper",
     "PipelineValidationHelper",
     "StudentManagementHelper",
     "EventWaitingHelper",

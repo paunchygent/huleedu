@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 if TYPE_CHECKING:
     from tests.utils.kafka_test_manager import KafkaTestManager
 
+from tests.functional.pipeline_harness_helpers.entitlements_monitor import (
+    EntitlementsMonitorHelper,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +26,9 @@ class PipelineExecutionTracker:
     pruned_phases: List[str] = field(default_factory=list)
     reused_storage_ids: Dict[str, str] = field(default_factory=dict)
     ras_result_event: Optional[Dict[str, Any]] = None  # Store BatchResultsReadyV1 event
+    entitlements_events: Dict[str, bool] = field(
+        default_factory=lambda: {"balance_changed": False, "usage_recorded": False}
+    )  # Track Entitlements events
 
 
 class KafkaMonitorHelper:
@@ -50,7 +57,14 @@ class KafkaMonitorHelper:
             "huleedu.class.student.associations.confirmed.v1",
             "huleedu.els.batch.essays.ready.v1",
         ]
-        all_topics = list(pipeline_topics.values()) + phase2_topics
+
+        # Entitlements topics for credit tracking
+        entitlements_topics = [
+            "huleedu.entitlements.credit.balance.changed.v1",
+            "huleedu.entitlements.usage.recorded.v1",
+        ]
+
+        all_topics = list(pipeline_topics.values()) + phase2_topics + entitlements_topics
 
         # Create consumer context
         consumer_context = kafka_manager.consumer("pipeline_test_harness", all_topics)
@@ -254,6 +268,14 @@ class KafkaMonitorHelper:
                                 if "cj_assessment" in tracker.completed_phases:
                                     logger.info("🎯 Pipeline fully completed with RAS results")
                                     return envelope_data
+
+                            # Track Entitlements events (credit consumption is part of pipeline)
+                            if EntitlementsMonitorHelper.is_entitlements_event(message.topic):
+                                EntitlementsMonitorHelper.process_entitlements_event(
+                                    message.topic,
+                                    envelope_data,
+                                    tracker.entitlements_events,
+                                )
 
                         except Exception as e:
                             logger.warning(f"Error parsing message: {e}")

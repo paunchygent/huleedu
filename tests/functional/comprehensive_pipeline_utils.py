@@ -206,12 +206,9 @@ async def watch_pipeline_progression_with_consumer(
     spellcheck_completions = 0
     content_provisioned_count = 0
     validation_failure_count = 0
-    
+
     # Track Entitlements events (credit consumption IS part of pipeline)
-    entitlements_events = {
-        'balance_changed': False,
-        'usage_recorded': False
-    }
+    entitlements_events = {"balance_changed": False, "usage_recorded": False}
 
     while asyncio.get_event_loop().time() < end_time:
         try:
@@ -407,11 +404,11 @@ async def watch_pipeline_progression_with_consumer(
                                 )
                                 # Pipeline continues - ELS will publish final phase outcome
                             elif message.topic == "huleedu.entitlements.credit.balance.changed.v1":
-                                entitlements_events['balance_changed'] = True
-                                logger.debug(f"📨 💳 Credit balance changed observed")
+                                entitlements_events["balance_changed"] = True
+                                logger.debug("📨 💳 Credit balance changed observed")
                             elif message.topic == "huleedu.entitlements.usage.recorded.v1":
-                                entitlements_events['usage_recorded'] = True
-                                logger.debug(f"📨 💳 Usage recorded observed")
+                                entitlements_events["usage_recorded"] = True
+                                logger.debug("📨 💳 Usage recorded observed")
 
                     except (json.JSONDecodeError, KeyError) as e:
                         logger.warning(f"Failed to parse pipeline message: {e}")
