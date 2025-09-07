@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
@@ -12,8 +11,9 @@ if TYPE_CHECKING:
 from tests.functional.pipeline_harness_helpers.entitlements_monitor import (
     EntitlementsMonitorHelper,
 )
+from huleedu_service_libs.logging_utils import create_service_logger
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.kafka_monitor")
 
 
 @dataclass

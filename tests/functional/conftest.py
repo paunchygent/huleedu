@@ -5,11 +5,30 @@ This includes diagnostic fixtures for deep testing of distributed system state
 and session-level resource management for optimal performance.
 """
 
+import os
+import logging
 from typing import AsyncGenerator
 
 import pytest
 import redis.asyncio as aioredis
-from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.logging_utils import (
+    configure_service_logging,
+    create_service_logger,
+)
+
+# Configure structlog once for the functional test session
+# Avoid duplicate log output under pytest by removing any handler
+# added by basicConfig during configure_service_logging.
+_root = logging.getLogger()
+_pre_handlers = list(_root.handlers)
+configure_service_logging(
+    service_name="tests",
+    environment="development",
+    log_level=os.getenv("TEST_LOG_LEVEL", "INFO"),
+)
+for _h in list(_root.handlers):
+    if _h not in _pre_handlers:
+        _root.removeHandler(_h)
 
 logger = create_service_logger("test.functional.conftest")
 

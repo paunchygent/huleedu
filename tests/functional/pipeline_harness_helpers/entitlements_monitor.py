@@ -4,9 +4,9 @@ import asyncio
 import json
 from typing import Any, Dict
 
-from structlog import get_logger
+from huleedu_service_libs.logging_utils import create_service_logger
 
-logger = get_logger(__name__)
+logger = create_service_logger("test.entitlements_monitor")
 
 
 class EntitlementsMonitorHelper:

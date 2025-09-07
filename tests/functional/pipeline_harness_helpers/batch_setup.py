@@ -1,7 +1,7 @@
 """Batch setup helper for pipeline tests."""
 
 import asyncio
-import logging
+from huleedu_service_libs.logging_utils import create_service_logger
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from tests.utils.kafka_test_manager import KafkaTestManager
     from tests.utils.service_test_manager import ServiceTestManager
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.batch_setup")
 
 
 class BatchSetupHelper:

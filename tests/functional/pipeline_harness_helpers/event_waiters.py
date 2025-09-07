@@ -2,10 +2,10 @@
 
 import asyncio
 import json
-import logging
+from huleedu_service_libs.logging_utils import create_service_logger
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.event_waiters")
 
 
 class EventWaitingHelper:

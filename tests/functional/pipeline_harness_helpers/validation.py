@@ -1,9 +1,9 @@
 """Pipeline validation helper for test assertions."""
 
-import logging
+from huleedu_service_libs.logging_utils import create_service_logger
 from typing import Dict, List, Set
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.validation")
 
 
 class PipelineValidationHelper:

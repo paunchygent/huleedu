@@ -1,13 +1,13 @@
 """Credit provisioning helper for pipeline tests."""
 
-import logging
+from huleedu_service_libs.logging_utils import create_service_logger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tests.utils.auth_manager import AuthTestUser
     from tests.utils.service_test_manager import ServiceTestManager
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.credit_provisioning")
 
 
 class CreditProvisioningHelper:

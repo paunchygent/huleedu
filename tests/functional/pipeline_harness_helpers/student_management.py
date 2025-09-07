@@ -1,13 +1,14 @@
 """Student and class management helper for pipeline tests."""
 
-import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
     from tests.utils.auth_manager import AuthTestManager, AuthTestUser
     from tests.utils.service_test_manager import ServiceTestManager
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("test.student_management")
 
 # All student names from essay files (properly capitalized)
 TEST_STUDENT_NAMES = [
