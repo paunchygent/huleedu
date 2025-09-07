@@ -25,74 +25,49 @@ class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):
         self.base_url = base_url.rstrip("/")
         self.timeout = aiohttp.ClientTimeout(total=timeout_seconds)
 
-    async def check_credits(
+    async def check_credits_bulk(
         self,
         user_id: str,
         org_id: str | None,
-        required_credits: list[tuple[str, int]],
+        requirements: dict[str, int],
         correlation_id: str,
     ) -> dict[str, Any]:
-        """Check if sufficient credits are available for the given requirements.
+        """Bulk credit check against Entitlements bulk endpoint.
 
-        Makes HTTP POST request to /v1/entitlements/check-credits endpoint.
-
-        Args:
-            user_id: User requesting the credits
-            org_id: Organization ID (if applicable)
-            required_credits: List of (metric_name, quantity) tuples
-            correlation_id: Request correlation ID for tracing
-
-        Returns:
-            Dict with credit availability information:
-            {
-                "sufficient": bool,
-                "available_credits": int,
-                "required_credits": int,
-                "source": "user" | "org",
-                "details": {...}
-            }
-
-        Raises:
-            aiohttp.ClientError: If HTTP communication fails
-            ValueError: If response format is invalid
-            Exception: If entitlements service returns error
+        Returns the response body with keys: allowed, available_credits,
+        required_credits, per_metric, denial_reason?, correlation_id.
         """
         tracer = get_tracer("batch_orchestrator_service")
-
-        # Convert required_credits list to dict for JSON serialization
-        credit_requirements = {}
-        for metric_name, quantity in required_credits:
-            credit_requirements[metric_name] = quantity
 
         request_data = {
             "user_id": user_id,
             "org_id": org_id,
-            "requirements": credit_requirements,
+            "requirements": requirements,
             "correlation_id": correlation_id,
         }
 
-        url = f"{self.base_url}/v1/entitlements/check-credits"
+        url = f"{self.base_url}/v1/entitlements/check-credits/bulk"
 
         with trace_operation(
             tracer,
-            "entitlements.check_credits",
+            "entitlements.check_credits_bulk",
             {
                 "http.method": "POST",
                 "http.url": url,
                 "user_id": user_id,
                 "org_id": org_id,
                 "correlation_id": correlation_id,
-                "required_resources": len(required_credits),
+                "required_resources": len(requirements),
             },
         ):
             try:
                 async with aiohttp.ClientSession(timeout=self.timeout) as session:
                     logger.info(
-                        "Checking credits with entitlements service",
+                        "Bulk credit check with entitlements service",
                         extra={
                             "user_id": user_id,
                             "org_id": org_id,
-                            "requirements": credit_requirements,
+                            "requirements": requirements,
                             "correlation_id": correlation_id,
                             "url": url,
                         },
@@ -108,28 +83,32 @@ class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):
                     ) as response:
                         response_text = await response.text()
 
-                        if response.status == 200:
+                        def _parse_body() -> dict[str, Any]:
                             try:
-                                result: dict[str, Any] = json.loads(response_text)
-                                logger.info(
-                                    "Credit check completed successfully",
-                                    extra={
-                                        "user_id": user_id,
-                                        "org_id": org_id,
-                                        "sufficient": result.get("sufficient"),
-                                        "correlation_id": correlation_id,
-                                    },
-                                )
-                                return result
+                                body: dict[str, Any] = json.loads(response_text)
+                                return body
                             except json.JSONDecodeError as e:
-                                error_msg = f"Invalid JSON in entitlements response: {e}"
-                                logger.error(error_msg, extra={"correlation_id": correlation_id})
-                                raise ValueError(error_msg) from e
+                                err = f"Invalid JSON in entitlements response: {e}"
+                                logger.error(err, extra={"correlation_id": correlation_id})
+                                raise ValueError(err) from e
+
+                        if response.status in (200, 402, 429):
+                            body = _parse_body()
+                            logger.info(
+                                "Bulk credit check response",
+                                extra={
+                                    "user_id": user_id,
+                                    "org_id": org_id,
+                                    "status": response.status,
+                                    "allowed": body.get("allowed"),
+                                    "correlation_id": correlation_id,
+                                },
+                            )
+                            return body
 
                         elif response.status == 400:
-                            # Client error - invalid request format
                             logger.error(
-                                "Invalid credit check request format",
+                                "Invalid bulk credit check request",
                                 extra={
                                     "status_code": response.status,
                                     "response": response_text,
@@ -139,20 +118,17 @@ class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):
                             raise ValueError(f"Invalid request format: {response_text}")
 
                         elif response.status == 404:
-                            # User/org not found
                             logger.error(
-                                "User or organization not found in entitlements",
+                                "Entitlements resource not found",
                                 extra={
-                                    "user_id": user_id,
-                                    "org_id": org_id,
                                     "status_code": response.status,
+                                    "response": response_text,
                                     "correlation_id": correlation_id,
                                 },
                             )
-                            raise ValueError(f"User or organization not found: {user_id}, {org_id}")
+                            raise ValueError(f"Resource not found: {response_text}")
 
                         elif response.status >= 500:
-                            # Server error - entitlements service issue
                             logger.error(
                                 "Entitlements service error",
                                 extra={
@@ -166,7 +142,6 @@ class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):
                             )
 
                         else:
-                            # Unexpected status code
                             logger.error(
                                 "Unexpected response from entitlements service",
                                 extra={
@@ -194,7 +169,7 @@ class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):
                 raise Exception(error_msg) from e
             except Exception:
                 logger.error(
-                    "Unexpected error during credit check",
+                    "Unexpected error during bulk credit check",
                     extra={
                         "user_id": user_id,
                         "org_id": org_id,

@@ -13,6 +13,8 @@ from services.entitlements_service.protocols import (
     CreditBalanceInfo,
     CreditCheckResponse,
     CreditConsumptionResult,
+    BulkCreditCheckResult,
+    PerMetricCreditStatus,
     EntitlementsRepositoryProtocol,
     EventPublisherProtocol,
     PolicyLoaderProtocol,
@@ -553,3 +555,134 @@ class CreditManagerImpl:
     async def reload_policies(self) -> None:
         """Force reload of policies from file and update cache."""
         await self.policy_loader.reload_policies()
+
+    async def check_credits_bulk(
+        self,
+        user_id: str,
+        org_id: str | None,
+        requirements: dict[str, int],
+        correlation_id: str | None = None,
+    ) -> BulkCreditCheckResult:
+        """Evaluate multiple metrics atomically with org-first attribution.
+
+        - Computes total required credits using policy costs.
+        - Performs rate-limit checks per metric for the user subject.
+        - Chooses a single source (org, then user) that must cover the total.
+        - Does not reserve/consume credits; advisory only.
+        """
+        # Compute per-metric required credits using policy costs
+        per_metric_required: dict[str, int] = {}
+        total_required = 0
+        for metric, qty in requirements.items():
+            cost = await self.policy_loader.get_cost(metric)
+            required = max(0, cost * max(0, qty))
+            per_metric_required[metric] = required
+            total_required += required
+
+        # Short-circuit for all-free operations
+        if total_required == 0:
+            free_per_metric_status = {
+                m: PerMetricCreditStatus(
+                    required=req,
+                    available=0,
+                    allowed=True,
+                    source=None,
+                    reason=None,
+                )
+                for m, req in per_metric_required.items()
+            }
+            return BulkCreditCheckResult(
+                allowed=True,
+                required_credits=0,
+                available_credits=0,
+                per_metric=free_per_metric_status,
+                denial_reason=None,
+                correlation_id=correlation_id,
+            )
+
+        # Rate-limit checks per metric (user-scoped)
+        rate_limited_any = False
+        per_metric_status: dict[str, PerMetricCreditStatus] = {}
+        for metric, qty in requirements.items():
+            rl = await self.rate_limiter.check_rate_limit(user_id, metric, max(0, qty))
+            if not rl.allowed:
+                rate_limited_any = True
+                # Publish RL exceeded event (best-effort)
+                try:
+                    self_event_correlation = (
+                        correlation_id or f"rate_limit_{user_id}_{metric}_{rl.current_count}"
+                    )
+                    await self.event_publisher.publish_rate_limit_exceeded(
+                        subject_id=user_id,
+                        metric=metric,
+                        limit=rl.limit,
+                        current_count=rl.current_count,
+                        window_seconds=rl.window_seconds,
+                        correlation_id=self_event_correlation,
+                    )
+                except Exception:
+                    logger.warning("Failed to publish rate limit event", exc_info=True)
+
+            # Fill status with allowed tentative; credit availability filled later
+            per_metric_status[metric] = PerMetricCreditStatus(
+                required=per_metric_required[metric],
+                available=0,
+                allowed=rl.allowed,
+                source=None,
+                reason=None if rl.allowed else "rate_limit_exceeded",
+            )
+
+        if rate_limited_any:
+            # Aggregate response for RL: 429, no credit source selection
+            # Available credits remains 0 in per-metric (advisory)
+            return BulkCreditCheckResult(
+                allowed=False,
+                required_credits=total_required,
+                available_credits=0,
+                per_metric=per_metric_status,
+                denial_reason="rate_limit_exceeded",
+                correlation_id=correlation_id,
+            )
+
+        # Determine org-first source that can cover the total
+        org_balance = await self.repository.get_credit_balance("org", org_id) if org_id else 0
+        user_balance = await self.repository.get_credit_balance("user", user_id)
+
+        chosen_source: str | None = None
+        available_credits = 0
+        if org_id and org_balance >= total_required:
+            chosen_source = "org"
+            available_credits = org_balance
+        elif user_balance >= total_required:
+            chosen_source = "user"
+            available_credits = user_balance
+        else:
+            chosen_source = None
+            available_credits = user_balance
+
+        # Populate per-metric metadata with chosen source and availability
+        for metric, status in per_metric_status.items():
+            status.source = chosen_source
+            status.available = available_credits
+            if chosen_source is None:
+                status.allowed = False
+                status.reason = "insufficient_credits"
+
+        if chosen_source is None:
+            return BulkCreditCheckResult(
+                allowed=False,
+                required_credits=total_required,
+                available_credits=available_credits,
+                per_metric=per_metric_status,
+                denial_reason="insufficient_credits",
+                correlation_id=correlation_id,
+            )
+
+        return BulkCreditCheckResult(
+            allowed=True,
+            required_credits=total_required,
+            available_credits=available_credits,
+            per_metric=per_metric_status,
+            denial_reason=None,
+            correlation_id=correlation_id,
+        )

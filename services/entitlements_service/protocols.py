@@ -179,6 +179,27 @@ class CreditManagerProtocol(Protocol):
         """Force reload of policies from file and update cache."""
         ...
 
+    # Bulk credit check for multi-resource evaluation
+    async def check_credits_bulk(
+        self,
+        user_id: str,
+        org_id: str | None,
+        requirements: dict[str, int],
+        correlation_id: str | None = None,
+    ) -> "BulkCreditCheckResult":
+        """Evaluate multiple metrics atomically using org-first attribution.
+
+        Args:
+            user_id: User identifier
+            org_id: Organization identifier (optional)
+            requirements: Mapping of metric -> quantity
+            correlation_id: Optional correlation for event threading
+
+        Returns:
+            BulkCreditCheckResult with aggregated outcome and per-metric breakdown
+        """
+        ...
+
 
 class PolicyLoaderProtocol(Protocol):
     """Protocol for loading and managing entitlements policies."""
@@ -414,3 +435,24 @@ class EventPublisherProtocol(Protocol):
             correlation_id: Correlation ID for tracing
         """
         ...
+
+
+class PerMetricCreditStatus(BaseModel):
+    """Per-metric credit evaluation status."""
+
+    required: int
+    available: int
+    allowed: bool
+    source: str | None = None
+    reason: str | None = None
+
+
+class BulkCreditCheckResult(BaseModel):
+    """Aggregated result for bulk credit checks."""
+
+    allowed: bool
+    required_credits: int
+    available_credits: int
+    per_metric: dict[str, PerMetricCreditStatus]
+    denial_reason: str | None = None
+    correlation_id: str | None = None

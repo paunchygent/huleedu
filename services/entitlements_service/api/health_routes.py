@@ -15,6 +15,8 @@ from quart import Blueprint, Response, current_app
 if TYPE_CHECKING:
     from huleedu_service_libs.quart_app import HuleEduApp
 
+from ..config import Settings
+
 logger = create_service_logger("entitlements_service.health")
 
 # Create health blueprint
@@ -67,13 +69,24 @@ async def health_check() -> tuple[dict[str, Any], int]:
 
     # Overall health status
     healthy = db_healthy and kafka_healthy
+    overall_status = "healthy" if healthy else "unhealthy"
+
+    # Get environment information from settings
+    settings = Settings()
+    environment = settings.ENVIRONMENT.value
 
     status_code = 200 if healthy else 503
 
     response = {
-        "status": "healthy" if healthy else "unhealthy",
         "service": "entitlements_service",
+        "status": overall_status,
+        "message": f"Entitlements Service is {overall_status}",
+        "version": "1.0.0",
         "checks": {
+            "service_responsive": True,
+            "dependencies_available": healthy,
+        },
+        "dependencies": {
             "database": {
                 "status": "healthy" if db_healthy else "unhealthy",
                 "message": db_message,
@@ -82,8 +95,8 @@ async def health_check() -> tuple[dict[str, Any], int]:
                 "status": "healthy" if kafka_healthy else "unhealthy",
                 "message": kafka_message,
             },
-            # Redis health could be added here
         },
+        "environment": environment,
     }
 
     logger.debug(f"Health check: {response['status']}")

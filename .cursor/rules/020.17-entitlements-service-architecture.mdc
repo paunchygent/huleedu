@@ -51,3 +51,20 @@ Authoritative credit accounting for HuleEdu. Attributes resource consumption to 
 - The service is write-optimized for event ingestion; reporting paths may use materialized views.
 - Works in tandem with API Gateway org_id extraction and downstream services that propagate identity.
 
+## HTTP APIs
+- Bulk Credit Check: `POST /v1/entitlements/check-credits/bulk`
+  - Request: `{ user_id: str, org_id?: str, requirements: { [metric]: int }, correlation_id?: str }`
+  - Responses:
+    - 200: Allowed with `{ allowed: true, required_credits, available_credits, per_metric, correlation_id }`
+    - 402: Denied with `{ allowed: false, denial_reason: "insufficient_credits", required_credits, available_credits, per_metric, correlation_id }`
+    - 429: Rate-limited with `{ allowed: false, denial_reason: "rate_limit_exceeded", required_credits, available_credits: 0, per_metric, correlation_id }`
+  - Implementation: `services/entitlements_service/api/entitlements_routes.py`
+
+- Consume Credits (post-usage): `POST /v1/entitlements/consume-credits`
+  - Optimistic consumption; persisted with audit trail and outbox publication.
+
+## Preflight Semantics
+- Authority: Entitlements is the primary preflight authority; BOS computes requirements and calls bulk endpoint.
+- Identity: Org-first selection; fallback to user. Per-metric rate limits are evaluated user-scoped before balances.
+- Mapping: BOS internal preflight route (`/internal/v1/batches/{batch_id}/pipelines/{phase}/preflight`) mirrors 200/402/429 semantics and fields.
+

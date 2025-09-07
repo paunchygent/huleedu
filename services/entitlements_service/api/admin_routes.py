@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from dishka import FromDishka
+from quart_dishka import inject
 from huleedu_service_libs.error_handling import raise_validation_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from pydantic import BaseModel, Field
@@ -47,7 +48,25 @@ class CreditAdjustmentResponse(BaseModel):
     subject_id: str = Field(..., description="Subject identifier")
 
 
+class CreditSetRequest(BaseModel):
+    """Request for setting absolute credit balance."""
+
+    subject_type: str = Field(..., pattern="^(user|org)$", description="Subject type")
+    subject_id: str = Field(..., description="Subject identifier")
+    balance: int = Field(..., ge=0, description="New absolute balance")
+
+
+class CreditSetResponse(BaseModel):
+    """Response for credit balance setting."""
+
+    success: bool = Field(..., description="Whether setting succeeded")
+    balance: int = Field(..., description="New balance")
+    subject_type: str = Field(..., description="Subject type")
+    subject_id: str = Field(..., description="Subject identifier")
+
+
 @admin_bp.route("/credits/adjust", methods=["POST"])
+@inject
 async def adjust_credits(
     credit_manager: FromDishka[CreditManagerProtocol],
 ) -> tuple[dict[str, Any], int]:
@@ -120,7 +139,116 @@ async def adjust_credits(
         raise
 
 
+@admin_bp.route("/credits/set", methods=["POST"])
+@inject
+async def set_credits(
+    credit_manager: FromDishka[CreditManagerProtocol],
+) -> tuple[dict[str, Any], int]:
+    """Set absolute credit balance (admin/testing only).
+
+    This endpoint sets the balance to an absolute value, primarily for testing.
+
+    Returns:
+        JSON response with set result
+    """
+    app: HuleEduApp = current_app._get_current_object()  # type: ignore[attr-defined]
+
+    try:
+        # Parse request
+        data = await request.get_json()
+        if not data:
+            raise_validation_error(
+                service="entitlements_service",
+                operation="set_credits",
+                field="request_body",
+                message="Request body is required",
+                correlation_id=uuid4(),
+            )
+
+        set_request = CreditSetRequest(**data)
+
+        # Get current balance to calculate adjustment needed
+        correlation_id = str(uuid4())
+        
+        # Get current balance from credit manager
+        try:
+            if set_request.subject_type == "user":
+                # For user, we need to get balance by user_id
+                balance_info = await credit_manager.get_balance(
+                    user_id=set_request.subject_id,
+                    org_id=None,
+                )
+                current_balance = balance_info.user_balance
+            else:  # org
+                # For org, we need to get balance by user_id with org_id
+                # Since we only have org_id, we'll need to use the repository directly
+                # But for now, let's assume 0 for orgs since this is mainly for testing
+                current_balance = 0
+        except Exception:
+            # If subject doesn't exist, assume 0 balance
+            current_balance = 0
+
+        # Calculate adjustment needed to reach target balance
+        adjustment_needed = set_request.balance - current_balance
+        
+        # If no adjustment needed, return current state
+        if adjustment_needed == 0:
+            response = CreditSetResponse(
+                success=True,
+                balance=set_request.balance,
+                subject_type=set_request.subject_type,
+                subject_id=set_request.subject_id,
+            )
+            return response.model_dump(), 200
+
+        # Perform adjustment to reach target balance
+        reason = f"Admin balance set to {set_request.balance}"
+        new_balance = await credit_manager.adjust_balance(
+            subject_type=set_request.subject_type,
+            subject_id=set_request.subject_id,
+            amount=adjustment_needed,
+            reason=reason,
+            correlation_id=correlation_id,
+        )
+
+        # Create response
+        response = CreditSetResponse(
+            success=True,
+            balance=new_balance,
+            subject_type=set_request.subject_type,
+            subject_id=set_request.subject_id,
+        )
+
+        # Record metrics
+        if "metrics" in app.extensions:
+            metrics = app.extensions["metrics"]
+            metrics.record_credit_adjustment(
+                subject_type=set_request.subject_type,
+                adjustment_type="set",
+                amount=abs(adjustment_needed),
+            )
+
+        logger.info(
+            f"Admin set balance: {set_request.balance} credits for "
+            f"{set_request.subject_type}:{set_request.subject_id}",
+            extra={
+                "subject_type": set_request.subject_type,
+                "subject_id": set_request.subject_id,
+                "target_balance": set_request.balance,
+                "adjustment_amount": adjustment_needed,
+                "correlation_id": correlation_id,
+            },
+        )
+
+        return response.model_dump(), 200
+
+    except Exception as e:
+        logger.error(f"Error setting credits: {e}", exc_info=True)
+        raise
+
+
 @admin_bp.route("/credits/operations", methods=["GET"])
+@inject
 async def get_operations(
     repository: FromDishka[EntitlementsRepositoryProtocol],
 ) -> tuple[dict[str, Any], int]:

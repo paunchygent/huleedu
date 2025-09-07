@@ -387,7 +387,12 @@ async def preflight_pipeline(
         if outcome.allowed:
             return {"allowed": True, **common_payload}, 200
         else:
-            return {"allowed": False, "denial_reason": outcome.denial_reason, **common_payload}, 402
+            status_code = 429 if outcome.denial_reason == "rate_limit_exceeded" else 402
+            return {
+                "allowed": False,
+                "denial_reason": outcome.denial_reason,
+                **common_payload,
+            }, status_code
 
     except Exception as e:
         logger.error(

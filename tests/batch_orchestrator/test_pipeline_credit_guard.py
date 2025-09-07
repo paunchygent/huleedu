@@ -24,13 +24,14 @@ class FakeEntitlementsClient:
         self._sufficient = sufficient
         self._available = available
 
-    async def check_credits(self, user_id, org_id, required_credits, correlation_id):  # type: ignore[no-untyped-def]
-        total_required = sum(q for _, q in required_credits)
+    async def check_credits_bulk(self, user_id, org_id, requirements, correlation_id):  # type: ignore[no-untyped-def]
+        total_required = sum(int(q) for q in requirements.values())
         return {
-            "sufficient": self._sufficient,
+            "allowed": self._sufficient,
             "available_credits": self._available,
             "required_credits": total_required,
-            "source": "user",
+            "per_metric": {m: {"required": int(q), "available": self._available, "allowed": self._sufficient} for m, q in requirements.items()},
+            "correlation_id": correlation_id,
         }
 
 

@@ -39,6 +39,13 @@ pdm run test-parallel       # run with xdist
 pdm run test-sequential     # single-process (deterministic ordering)
 ```
 
+## Prototype Codebase Guardrails (No Legacy Policy)
+
+- No legacy shims: do not keep backward-compatibility wrappers when evolving protocols or APIs in the prototype.
+- No aliases or pass-through methods that duplicate intent; rename or replace and update all call sites.
+- Prefer clear, explicit contracts over transitional indirection; update dependent tests promptly.
+- Rationale: aligning early prevents spaghetti, drift, and hidden behavior. Changes should be surgical, explicit, and type-safe.
+
 ## Optional Global Convenience
 
 Create a system-wide shim so `pytest-root` works from any directory without PDM project discovery:

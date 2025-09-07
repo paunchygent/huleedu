@@ -102,16 +102,20 @@ class PipelineCreditGuard:
                 f"Cannot perform credit check: no user_id in batch context for batch {batch_id}"
             )
 
-        # Call entitlements service
-        result = await self._entitlements.check_credits(
+        # Call entitlements service using bulk endpoint
+        requirements_dict: dict[str, int] = {
+            metric: qty for metric, qty in reqs.to_entitlement_checks()
+        }
+        result = await self._entitlements.check_credits_bulk(
             user_id=user_id,
             org_id=org_id,
-            required_credits=reqs.to_entitlement_checks(),
+            requirements=requirements_dict,
             correlation_id=correlation_id,
         )
 
-        sufficient = bool(result.get("sufficient", False))
+        sufficient = bool(result.get("allowed", False))
         available = int(result.get("available_credits", 0))
+        denial_reason = result.get("denial_reason")
         required_total = int(reqs.total_cost_units)
 
         if sufficient:
@@ -128,7 +132,7 @@ class PipelineCreditGuard:
 
         return CreditCheckOutcome(
             allowed=False,
-            denial_reason="insufficient_credits",
+            denial_reason=str(denial_reason) if denial_reason else "insufficient_credits",
             required_credits=required_total,
             available_credits=available,
             resource_breakdown={

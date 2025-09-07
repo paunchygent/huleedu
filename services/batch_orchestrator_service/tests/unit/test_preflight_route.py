@@ -110,14 +110,14 @@ from services.batch_orchestrator_service.protocols import EntitlementsServicePro
 
 
 class _StubEntitlements(EntitlementsServiceProtocol):
-    async def check_credits(
+    async def check_credits_bulk(
         self,
         user_id: str,
         org_id: str | None,
-        required_credits: list[tuple[str, int]],
+        requirements: dict[str, int],
         correlation_id: str,
     ) -> dict[str, Any]:
-        return {"sufficient": True, "available_credits": 9999}
+        return {"allowed": True, "available_credits": 9999}
 
 
 class _AllowGuard(PipelineCreditGuard):
@@ -143,6 +143,27 @@ class _DenyGuard(PipelineCreditGuard):
             required_credits=10,
             available_credits=3,
             resource_breakdown={"cj_comparison": 7, "ai_feedback_generation": 3},
+        )
+
+
+class _RateLimitGuard(PipelineCreditGuard):
+    def __init__(self) -> None:
+        super().__init__(entitlements_client=_StubEntitlements(), cost_strategy=None)
+
+    async def evaluate(
+        self,
+        *,
+        batch_id: str,
+        resolved_pipeline: list[PhaseName],
+        batch_context: Any,
+        correlation_id: str,
+    ) -> CreditCheckOutcome:
+        return CreditCheckOutcome(
+            allowed=False,
+            denial_reason="rate_limit_exceeded",
+            required_credits=6,
+            available_credits=0,
+            resource_breakdown={"cj_comparison": 3, "ai_feedback_generation": 3},
         )
 
 
@@ -212,3 +233,15 @@ async def test_preflight_invalid_phase_returns_400() -> None:
     assert resp.status_code == 400
     data = await resp.get_json()
     assert "Invalid pipeline phase" in data.get("error", "")
+
+
+@pytest.mark.asyncio
+async def test_preflight_rate_limited_returns_429() -> None:
+    ctx = _BatchContext(batch_id="b4", user_id="u4", org_id=None)
+    app, client = await _create_app(_TestProvider(_MockRepo(ctx), _MockBCS(), _RateLimitGuard()))
+
+    resp = await client.post("/internal/v1/batches/b4/pipelines/cj_assessment/preflight")
+    assert resp.status_code == 429
+    data = await resp.get_json()
+    assert data["allowed"] is False
+    assert data["denial_reason"] == "rate_limit_exceeded"

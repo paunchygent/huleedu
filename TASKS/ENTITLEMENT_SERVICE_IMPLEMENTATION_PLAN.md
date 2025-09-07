@@ -1,3 +1,97 @@
+# Entitlements Service — Final Implementation Reference
+
+## Executive Summary
+- Purpose: Central authority for credit policies and accounting with org-first identity attribution. Provides advisory preflight and post-usage consumption.
+- Scope: Bulk credit preflight authority for BOS; credit consumption via events; per-metric rate limits; no holds at preflight.
+- Interfaces: HTTP bulk preflight; HTTP consumption; Kafka events for consumption and balance changes.
+
+## Final Architecture
+- Pattern: Quart HTTP + DI (Dishka), SQLAlchemy async, Redis (rate limits + policy cache), transactional outbox → Kafka.
+- Identity: org-first selection; fallback to user. Both ids preserved on records for audit.
+- Boundaries:
+  - BOS computes resource requirements and calls Entitlements bulk preflight.
+  - Entitlements is the policy authority; BOS never mutates balances.
+  - Consumption is post-usage via ResourceConsumptionV1 events.
+- Service structure: see `services/entitlements_service/` (api, implementations, protocols, di, policies).
+
+## Key APIs
+- Entitlements: `POST /v1/entitlements/check-credits/bulk`
+  - Request: `{ user_id: str, org_id?: str, requirements: { [metric]: int }, correlation_id?: str }`
+  - Responses:
+    - 200 allowed: `{ allowed: true, required_credits, available_credits, per_metric, correlation_id }`
+    - 402 insufficient: `{ allowed: false, denial_reason: "insufficient_credits", required_credits, available_credits, per_metric, correlation_id }`
+    - 429 rate-limit: `{ allowed: false, denial_reason: "rate_limit_exceeded", required_credits, available_credits: 0, per_metric, correlation_id }`
+  - Source: `services/entitlements_service/api/entitlements_routes.py` → `check_credits/bulk`
+
+- BOS Preflight: `POST /internal/v1/batches/{batch_id}/pipelines/{phase}/preflight`
+  - Returns 200/402/429 mirroring Entitlements outcomes; includes required/available and resource_breakdown.
+  - Source: `services/batch_orchestrator_service/api/batch_routes.py` → `preflight_pipeline()`
+
+- Consumption: `POST /v1/entitlements/consume-credits` (optimistic, post-usage)
+  - Request: `{ user_id, org_id?, metric, amount, batch_id?, correlation_id }`
+  - Source: `services/entitlements_service/api/entitlements_routes.py`
+
+## Policies
+- Org-First Selection: Evaluate org balance first when `org_id` is present; fallback to user if org cannot cover total requirement.
+- Per-Metric Rate Limits: Apply per-user metric limits before credit availability. Any violation yields 429 with `denial_reason="rate_limit_exceeded"` and zero available_credits.
+- Costs & Limits: Defined in `services/entitlements_service/policies/default.yaml`.
+- Cache: Policy loader caches values in Redis; TTL from policy.
+
+## Events
+- Post-usage consumption: `ResourceConsumptionV1` → Entitlements consumer debits and publishes outbox events.
+- Balance changes: `CreditBalanceChangedV1` (outbox → Kafka); RL notifications: `RateLimitExceededV1`.
+- Runtime denial: BOS publishes `PipelineDeniedV1` on start-time denial (credits changed after preflight).
+- Contracts: `libs/common_core/src/common_core/events/*.py` and `libs/common_core/src/common_core/entitlements_models.py`.
+
+## Data Model
+- `credit_balances(subject_type, subject_id, balance, timestamps)` composite PK `(subject_type, subject_id)`.
+- `credit_operations(id, subject_type, subject_id, metric, amount, batch_id, consumed_from, correlation_id, status, created_at)` for audit.
+- `event_outbox(id, aggregate_type, aggregate_id, event_type, event_data, topic, created_at, published_at)`.
+- Implemented via async SQLAlchemy; repository encapsulates all writes.
+
+## Current Service Structure
+- HTTP: `services/entitlements_service/api/entitlements_routes.py`
+- Business logic: `services/entitlements_service/implementations/credit_manager_impl.py`
+- Protocols: `services/entitlements_service/protocols.py`
+- DI: `services/entitlements_service/di.py`
+- Policies: `services/entitlements_service/policies/default.yaml`
+
+## BOS Integration (Authoritative Preflight)
+- Requirement computation: `services/batch_orchestrator_service/domain/pipeline_credit_guard.py` uses `PipelineCostStrategy`.
+- Bulk check client: `services/batch_orchestrator_service/implementations/entitlements_service_client_impl.py`
+- Preflight route mapping: `200/402/429` with consistent body fields `allowed, denial_reason?, required_credits, available_credits, resource_breakdown, correlation_id`.
+
+## Operational Semantics
+- Preflight is advisory-only; no reservation. BOS denies at runtime if balances changed.
+- Consumption only on successful phase completion via events.
+- Correlation ID threading: Header `X-Correlation-ID` → BOS → Entitlements; persisted in audit and events.
+
+## No-Legacy Policy (Prototype)
+- No wrappers or aliases. Protocols reflect final interfaces. All call sites updated immediately.
+- Reference: `CODEX.md` and `services/batch_orchestrator_service/protocols.py`.
+
+## Testing & Quality
+- Unit: bulk endpoint route behavior (200/402/429), cost and RL logic.
+- Contracts: `BulkCreditCheckRequestV1/BulkCreditCheckResponseV1` and BOS preflight mapping.
+- Functional E2E: AGW preflight 402/429/202, BOS runtime denial → `PipelineDeniedV1`, consumption flow `ResourceConsumptionV1 → Entitlements → CreditBalanceChangedV1` (outbox relay).
+- Identity: Swedish characters in user/org IDs; org-first attribution; correlation ID threading tests.
+- Observability: Metrics counters for preflight outcomes (allowed/insufficient/rate_limited).
+
+## Operations
+- Dev: `pdm run dev dev entitlements_service` or `pdm run restart entitlements_service`.
+- Verify: `docker compose ps`, `pdm run logs entitlements_service`.
+- Typecheck/tests: `pdm run typecheck-all`, `pdm run pytest-root services/entitlements_service/tests`.
+
+## Next Steps
+- Expand contract tests for BOS ↔ Entitlements mapping and correlation propagation.
+- Functional flows including runtime denial publication path.
+- Metrics dashboards for preflight outcomes per org/user.
+
+---
+
+## Appendix A — Historical Log (Preserved)
+The following section preserves the original implementation plan content for historical context and traceability. It is no longer normative; the reference above reflects the finalized design and APIs.
+
 # Entitlements Service Implementation Plan
 
 ## Executive Summary
@@ -10,20 +104,21 @@
 
 ## Session Progress Update (2025-09-06)
 
-Recent cross-service identity and gateway work completed to support org-first credit attribution:
+Cross-service orchestration and credit policy flow are aligned and implemented:
 
 - API Gateway
-  - ✅ JWT-based org_id extraction with configurable claim names.
-  - ✅ Identity injection via DI for authenticated routes.
-  - ✅ Registration proxy: `POST /v1/batches/register` now proxies to BOS and injects `user_id`/`org_id`.
-  - ✅ Pipeline request: `org_id` added to `EventEnvelope.metadata` (no contract change).
-- Contracts
-  - ✅ Centralized BatchRegistrationRequestV1 in `common_core.api_models` (BOS re-exports).
-- Downstream services
-  - ✅ ELS and CJ identity threading already complete (org-first, user-fallback).
-  - ✅ ResourceConsumptionV1 path remains identity-aware.
+  - ✅ Preflight orchestration to BOS; returns 402/429 per BOS preflight result.
+  - ✅ Identity threading (user_id/org_id) intact; Swedish characters supported.
+- BOS (Batch Orchestrator Service)
+  - ✅ Domain-level `PipelineCreditGuard` computes resource requirements and performs bulk credit preflight via Entitlements.
+  - ✅ Preflight route: `POST /internal/v1/batches/{batch_id}/pipelines/{phase}/preflight` returns 200/402 and now 429 for rate limits.
+  - ✅ Protocol alignment: uses `check_credits_bulk` only (no legacy wrappers).
+- Entitlements Service
+  - ✅ New route: `POST /v1/entitlements/check-credits/bulk` with org-first attribution and per-metric rate limiting.
+  - ✅ Policy-aware source selection (org preferred, fallback to user) and atomic evaluation across metrics.
+  - ✅ 200 on allowed; 402 on insufficient credits; 429 on rate limits.
 
-Implication for Entitlements: Identity is now captured at the AGW boundary and consistently threaded through BOS→ELS→CJ→ResourceConsumptionV1, enabling org-first debit logic as designed.
+No-legacy policy: Protocols and clients were updated in lockstep; legacy shims and pass-throughs were removed to prevent drift.
 
 ## Implementation Status
 
@@ -63,11 +158,17 @@ Implication for Entitlements: Identity is now captured at the AGW boundary and c
 
 - `services/entitlements_service/policies/default.yaml` updated for resource-based costs and limits
 
-### ✅ Phase 6 — API Gateway 402 Integration (Complete)
+### ✅ Phase 6 — Preflight Integration (Complete)
 
-- Introduced BOS preflight endpoint and Gateway-side preflight check to deterministically return 402
-- Gateway returns 202 only when preflight passes; still publishes async command
-- Runtime denials still publish `PipelineDeniedV1` to power notifications/analytics
+- BOS preflight endpoint returns 200 (allowed), 402 (insufficient), 429 (rate limit)
+- Gateway invokes BOS preflight and returns 402/429 accordingly; 202 + publish on pass
+- Runtime denials still publish `PipelineDeniedV1` for notification flows
+
+### ✅ Phase 7 — Bulk Credit Check (Complete)
+
+- Implemented `POST /v1/entitlements/check-credits/bulk` advisory check (no holds)
+- Per-metric rate limiting; any violation yields rate-limit denial (429)
+- Org-first or user fallback for total coverage; returns per-metric breakdown
 
 ## Architecture Alignment
 
@@ -96,6 +197,12 @@ Implication for Entitlements: Identity is now captured at the AGW boundary and c
 - Preflight is advisory-only (no hold). Consumption occurs on successful phase outcome events
 - If credits change between preflight and start, BOS will deny at runtime and publish `PipelineDeniedV1`
 
+### No Legacy Policy (Prototype Codebase)
+
+- Protocols and clients are evolved in lockstep; do not keep wrappers or pass-through methods.
+- Prefer explicit, type-safe contracts and update all call sites immediately.
+- Rationale: Align early to avoid spaghetti and hidden behavior in the prototype phase.
+
 ## Current Service Structure
 
 ```
@@ -106,10 +213,10 @@ services/entitlements_service/
   protocols.py                  # ✅ All protocols including EventPublisher
   di.py                         # ✅ Providers with EventPublisher integration
   models_db.py                  # ✅ SQLAlchemy models
-  kafka_consumer.py             # ⏳ TO BE CREATED (Phase 3)
+  kafka_consumer.py             # ✅ ResourceConsumptionV1 consumer (credits post-usage)
   api/
     health_routes.py            # ✅ /healthz, /metrics
-    entitlements_routes.py      # ✅ /v1/entitlements/* endpoints
+    entitlements_routes.py      # ✅ /v1/entitlements/* endpoints incl. bulk check
     admin_routes.py             # ✅ /v1/admin/credits/* (dev only)
   implementations/
     credit_manager_impl.py      # ✅ Core credit logic, EventPublisher injected
@@ -118,7 +225,7 @@ services/entitlements_service/
     outbox_manager.py           # ✅ Transactional outbox
     event_publisher_impl.py     # ✅ Event publishing with proper enums
   policies/
-    default.yaml                # ⏳ TO BE UPDATED (Phase 5)
+    default.yaml                # ✅ Updated for resource-based pricing
 ```
 
 ## Database Schema ✅ **IMPLEMENTED**
@@ -250,7 +357,7 @@ These contracts are stable and must be used for onboarding and E2E tests.
     - Request: `CreditConsumptionV1 { user_id, org_id?, metric, amount, batch_id?, correlation_id }`
     - Response: `{ success, new_balance, consumed_from }`
 
-Decision: Entitlements will provide a bulk credit check endpoint and BOS will use it exclusively (no BOS-side loops).
+Decision: Entitlements provides a bulk credit check endpoint and BOS uses it exclusively (no BOS-side loops, no legacy wrappers).
 
 - Endpoint: `POST /v1/entitlements/check-credits/bulk`
 - Request: `{ user_id, org_id?, requirements: { [metric: string]: int }, correlation_id? }`
@@ -262,201 +369,25 @@ Decision: Entitlements will provide a bulk credit check endpoint and BOS will us
   - `denial_reason?: "insufficient_credits" | "rate_limit_exceeded" | "policy_denied"`
   - `correlation_id: string`
 
-## Implementation Phases
-
-### ✅ **Phase 1: COMPLETE** - Core Infrastructure (January 2025)
-
-- Database models, migrations, and indexing
-- Credit Manager with dual system (org → user precedence)
-- Policy Loader with YAML configuration and Redis caching
-- Rate Limiter with Redis sliding window implementation
-- Core API endpoints with proper validation
-- Admin endpoints for manual operations
-- Outbox pattern for reliable event publishing
-- Type-safe event publishing with ProcessingEvent enums
-
-### ✅ **Phase 2: COMPLETE** - Event Publishing Integration
-
-**Timeline**: Completed January 2025
-**Status**: All event publishing integrated into CreditManager
-
-**Completed Tasks**:
-
-1. ✅ Inject EventPublisher into CreditManager via DI
-2. ✅ Publish CreditBalanceChangedV1 after successful credit operations
-3. ✅ Publish RateLimitExceededV1 when rate limits are hit
-4. ✅ Publish UsageRecordedV1 for usage analytics
-5. ✅ Updated tests with MockEventPublisher
-
-### ✅ **Phase 3: COMPLETE** - Resource Consumption Events & Kafka Consumer
-
-**Timeline**: Completed January 2025
-**Purpose**: Consume credits based on actual resource consumption events
-
-**Status**: Core functionality implemented and working. Identity threading complete. Testing phase required.
-
-**Architectural Decision**: Create dedicated `ResourceConsumptionV1` event
-
-- Clean DDD boundaries between services
-- Explicit resource consumption tracking
-- Consistent pattern for all billable services
-
-**Implementation Details**:
-
-#### Part A: Create ResourceConsumptionV1 Event (common_core)
-
-```python
-# libs/common_core/src/common_core/events/resource_consumption_events.py
-class ResourceConsumptionV1(BaseEventData):
-    """Event for tracking billable resource consumption."""
-    event_name: ProcessingEvent = Field(default=ProcessingEvent.RESOURCE_CONSUMPTION_REPORTED)
-    user_id: str
-    org_id: Optional[str]
-    resource_type: str  # "cj_comparison", "ai_feedback_generation"
-    quantity: int
-    service_name: str
-    processing_id: str
-    consumed_at: datetime
-```
-
-#### Part B: Update CJ Assessment Service
-
-```python
-# In dual_event_publisher.py, add third event:
-resource_event = ResourceConsumptionV1(
-    entity_id=bos_batch_id,
-    entity_type="batch",
-    user_id=batch.user_id,  # Need to pass this through
-    org_id=batch.org_id,
-    resource_type="cj_comparison",
-    quantity=len(comparison_results),  # Actual comparisons
-    service_name="cj_assessment_service",
-    processing_id=cj_assessment_job_id,
-    consumed_at=datetime.now(UTC),
-    correlation_id=correlation_id
-)
-await event_publisher.publish(topic="huleedu.resource.consumption.v1", event=resource_event)
-```
-
-#### Part C: Entitlements Kafka Consumer
-
-```python
-# services/entitlements_service/kafka_consumer.py
-async def handle_resource_consumption(event: ResourceConsumptionV1):
-    """Consume credits based on actual resource usage."""
-    await credit_manager.consume_credits(
-        user_id=event.user_id,
-        org_id=event.org_id,
-        metric=event.resource_type,
-        amount=event.quantity,
-        batch_id=event.entity_id,
-        correlation_id=event.correlation_id
-    )
-```
-
-**Tasks**:
-
-1. ✅ Create `ResourceConsumptionV1` event model in common_core
-2. ✅ Add RESOURCE_CONSUMPTION_REPORTED to ProcessingEvent enum + topic mapping
-3. ✅ Update CJ Assessment Service `dual_event_publisher.py` to publish resource events (actual quantity)
-4. ✅ Pass user_id/org_id through CJ Assessment workflow (complete identity threading)
-5. ✅ Create `EntitlementsKafkaConsumer` class
-6. ✅ Subscribe to topic: `huleedu.resource.consumption.v1`
-7. ✅ Implement credit consumption handler and start background task
-8. ✅ Add consumer health checks and monitoring
-9. 📋 Integration tests with testcontainers (Phase 3.1)
-
-**Key Architectural Changes Made:**
-
-- Added `user_id` and `org_id` fields to `CJBatchUpload` model with database migration
-- Updated `ELS_CJAssessmentRequestV1` event contract with required `user_id` field
-- Implemented complete identity threading from event intake to resource consumption publishing
-- Removed conditional publishing logic - ResourceConsumptionV1 events now always published
-- Enhanced health endpoint with Kafka consumer status monitoring
-
-### 🧪 **Phase 3.1: CURRENT** - Comprehensive Testing Implementation
-
-**Timeline**: Current sprint (immediate priority)
-**Purpose**: Create comprehensive test coverage for Phase 3 identity threading and credit consumption
-
-**Critical Need**: The breaking changes made to event contracts and method signatures require immediate test coverage to ensure reliability.
-
-**Testing Strategy Following HuleEdu Methodology**:
-
-#### Testing Priority 1: Event Contract Testing
-
-- **Event Contract Tests**: Update/create tests for `ELS_CJAssessmentRequestV1` with new `user_id`/`org_id` fields
-- **Schema Validation Tests**: Test required `user_id` field validation and optional `org_id`
-- **Cross-Service Contract Tests**: Verify ELS → CJ Assessment event compatibility
-- **EventEnvelope Tests**: Test envelope serialization with updated event data
-
-#### Testing Priority 2: Unit Test Coverage  
-
-- **event_processor.py**: Test identity extraction and threading to workflow
-- **batch_preparation.py**: Test identity extraction and database storage
-- **db_access_impl.py**: Test `create_new_cj_batch()` with identity parameters
-- **dual_event_publisher.py**: Test identity extraction and ResourceConsumptionV1 publishing
-- **health_routes.py**: Test Kafka consumer status reporting logic
-
-#### Testing Priority 3: Integration Testing
-
-- **End-to-End Identity Threading**: Full flow from ELS event → ResourceConsumptionV1 publishing
-- **Credit Consumption Integration**: ResourceConsumptionV1 → Entitlements credit deduction
-- **Idempotency Testing**: Duplicate event handling with same event_id
-- **Health Endpoint Integration**: Consumer status during various states
-
-#### Testing Priority 4: Broken Test Repair
-
-- **Assess Current Test Failures**: Identify tests broken by event contract changes
-- **Update Test Fixtures**: Fix `ELS_CJAssessmentRequestV1` fixtures with required `user_id`
-- **Repository Mock Updates**: Update mocks for `create_new_cj_batch()` signature changes
-- **Contract Test Updates**: Fix cross-service contract validation tests
-
-**Files Requiring Test Updates**:
-
-- `services/cj_assessment_service/tests/conftest.py` - Update fixtures
-- `services/cj_assessment_service/tests/test_llm_config_overrides_contract.py` - Event contract tests
-- `services/entitlements_service/tests/` - New integration tests
-- New contract tests for updated `ELS_CJAssessmentRequestV1`
-
-**Success Criteria**:
-
-- All existing tests pass after breaking changes
-- >90% test coverage for identity threading logic
-- Integration tests prove end-to-end credit consumption works
-- Idempotency tests validate duplicate event handling
-- `pdm run test-all` runs clean from repository root
-
-## Finalized Phase Summaries (4–6)
-
-- Phase 4: Completed with SRP refactor (`PipelineCreditGuard`), denial events, and notification integration
-- Phase 5: Completed with resource-based policy update
-- Phase 6: Completed with BOS preflight + Gateway 402 handling
-
 ## Next Steps (Immediate)
 
-- Entitlements Service
-  - Implement `POST /v1/entitlements/check-credits/bulk` endpoint and request/response schemas
-  - Evaluate all requested metrics atomically (org-first source selection per policy)
-  - Return aggregated + per-metric details; 200/402/429 semantics as above
-  - Add unit tests: validation, Swedish IDs, org-first attribution, rate-limit denial, mixed metrics → overall denial
+- Functional E2E Tests
+  - Add scenarios in `tests/functional` to cover:
+    - Preflight 402 (insufficient) with org-first Swedish IDs
+    - Preflight 429 (rate limit exceeded)
+    - Preflight 202 → BOS publishes `ClientBatchPipelineRequestV1` and pipeline starts
+    - Runtime denial after preflight → `PipelineDeniedV1` consumed by notification path
+    - `ResourceConsumptionV1` → Entitlements consume → `CreditBalanceChangedV1` via outbox relay
 
-- BOS (Batch Orchestrator Service)
-  - Update `EntitlementsServiceProtocol` to add `check_credits_bulk(...)`
-  - Update `EntitlementsServiceClientImpl` to call bulk endpoint with requirements dict
-  - Update `PipelineCreditGuard` to use bulk response (remove any per-metric loops if present)
-  - Update BOS preflight route to map bulk response 1:1 to 200/402 payloads
-  - Add/adjust unit and integration tests (preflight allowed/denied for multi-metric requirements; Swedish/org-first)
+- Cross-Service Contract Tests
+  - Add contract tests for `BulkCreditCheckRequestV1/BulkCreditCheckResponseV1` in common_core
+  - Validate BOS preflight response mapping (stable fields, correlation threading)
 
-- API Gateway
-  - No changes required; continues to call BOS preflight and return 402/202
+- Observability
+  - Add counters/histograms for preflight outcomes (allowed/insufficient/rate-limited) and per-metric rate-limit hits
 
-- End-to-End Testing
-  - Add functional scenarios in `tests/functional`: 
-    - Preflight 402 with structured denial (Swedish IDs, org-first)
-    - Preflight 202 + async command publication and pipeline start
-    - Runtime denial after preflight → `PipelineDeniedV1` and teacher notification
-    - ResourceConsumptionV1 → Entitlements consumption → CreditBalanceChangedV1 via outbox
+- Documentation
+  - Keep TASKS and service READMEs synced with contracts and routes (Rule 090)
 
 ### 📋 New Cross-Cutting Task (Test Infrastructure Alignment)
 
@@ -611,12 +542,13 @@ BOS's NotificationProjector will handle credit denial notifications:
 
 ### Unit Tests
 
-- ✅ Credit resolution logic (dual system precedence)
+- ✅ Credit resolution logic (org-first, user fallback)
 - ✅ Policy loading and caching mechanisms
 - ✅ Rate limiting calculations with Redis
 - ✅ Balance arithmetic operations
-- ⏳ Event publishing integration
-- ⏳ PipelineCostStrategy calculations (10, 30, 60 essay batches)
+- ✅ Entitlements bulk route (allowed/insufficient/rate-limit/validation)
+- ✅ BOS preflight route mapping (200/402/429)
+- ⏳ PipelineCostStrategy calculations (10, 30, 60 essays)
 
 ### Integration Tests
 
@@ -624,16 +556,16 @@ BOS's NotificationProjector will handle credit denial notifications:
 - ✅ Database credit operations with transactions
 - ✅ Policy loading from YAML files
 - ✅ Event publishing via outbox pattern
-- ⏳ BOS ↔ Entitlements communication flow
+- ✅ BOS ↔ Entitlements communication flow (bulk preflight)
 - ⏳ Phase completion event consumption
 
 ### End-to-End Tests
 
-- ⏳ Complete pipeline flow with credit checking
-- ⏳ Credit consumption on successful completion
+- ⏳ Preflight 402/429/202 via AGW → BOS → Entitlements
+- ⏳ Credit consumption on successful completion (ResourceConsumptionV1)
 - ⏳ Failed operations don't consume credits
 - ⏳ Rate limit enforcement across services
-- ⏳ Organization membership changes
+- ⏳ Org-first identity path with Swedish characters
 
 ### Performance Tests
 
@@ -678,7 +610,7 @@ BOS's NotificationProjector will handle credit denial notifications:
 - **YAGNI Compliance**: Simple implementations without unnecessary complexity
 - **EdTech Trust Model**: Optimistic patterns suitable for educational environments
 
-## Phase 3 Technical Implementation Details
+## Appendix A: Phase 3 Technical Implementation (Historical Reference)
 
 ### Files Modified During Phase 3 Implementation
 

@@ -113,3 +113,28 @@ class CreditConsumptionV1(BaseModel):
     amount: int
     batch_id: Optional[str] = None
     correlation_id: str
+
+
+# Bulk credit check models (shared between BOS and Entitlements)
+class BulkCreditCheckRequestV1(BaseModel):
+    user_id: str
+    org_id: Optional[str] = None
+    requirements: dict[str, int]
+    correlation_id: Optional[str] = None
+
+
+class PerMetricCreditStatusV1(BaseModel):
+    required: int
+    available: int
+    allowed: bool
+    source: Optional[str] = None  # "user" or "org"
+    reason: Optional[str] = None  # e.g., "insufficient_credits" | "rate_limit_exceeded" | "policy_denied"
+
+
+class BulkCreditCheckResponseV1(BaseModel):
+    allowed: bool
+    required_credits: int
+    available_credits: int
+    per_metric: dict[str, PerMetricCreditStatusV1]
+    denial_reason: Optional[str] = None
+    correlation_id: str

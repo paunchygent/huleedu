@@ -13,6 +13,8 @@ from common_core.entitlements_models import (
     CreditCheckRequestV1,
     CreditCheckResponseV1,
     CreditConsumptionV1,
+    BulkCreditCheckRequestV1,
+    BulkCreditCheckResponseV1,
 )
 from dishka import FromDishka
 from huleedu_service_libs.error_handling import raise_validation_error
@@ -180,6 +182,82 @@ async def consume_credits(
 
     except Exception as e:
         logger.error(f"Error consuming credits: {e}", exc_info=True)
+        raise
+
+
+@entitlements_bp.route("/check-credits/bulk", methods=["POST"])
+@inject
+async def check_credits_bulk(
+    credit_manager: FromDishka[CreditManagerProtocol],
+) -> tuple[dict[str, Any], int]:
+    """Bulk credit check across multiple metrics with org-first attribution.
+
+    Returns 200 when allowed, 402 when insufficient credits, 429 when rate-limited.
+    """
+    app: HuleEduApp = current_app._get_current_object()  # type: ignore[attr-defined]
+
+    try:
+        data = await request.get_json()
+        if not data:
+            raise_validation_error(
+                service="entitlements_service",
+                operation="check_credits_bulk",
+                field="request_body",
+                message="Request body is required",
+                correlation_id=uuid4(),
+            )
+
+        bulk_req = BulkCreditCheckRequestV1(**data)
+        correlation = bulk_req.correlation_id or request.headers.get("X-Correlation-ID") or str(
+            uuid4()
+        )
+
+        result = await credit_manager.check_credits_bulk(
+            user_id=bulk_req.user_id,
+            org_id=bulk_req.org_id,
+            requirements=bulk_req.requirements,
+            correlation_id=correlation,
+        )
+
+        response = BulkCreditCheckResponseV1(
+            allowed=result.allowed,
+            required_credits=result.required_credits,
+            available_credits=result.available_credits,
+            per_metric={k: v.model_dump() for k, v in result.per_metric.items()},
+            denial_reason=result.denial_reason,
+            correlation_id=correlation,
+        )
+
+        # Metrics instrumentation
+        if hasattr(app, "metrics"):
+            app.metrics.record_credit_check(
+                result="allowed" if result.allowed else (result.denial_reason or "denied"),
+                source=(
+                    next((v.source for v in result.per_metric.values() if v.source), None) or "none"
+                ),
+            )
+
+        logger.info(
+            "Bulk credit check evaluated",
+            extra={
+                "user_id": bulk_req.user_id,
+                "org_id": bulk_req.org_id,
+                "allowed": result.allowed,
+                "required": result.required_credits,
+                "available": result.available_credits,
+                "denial_reason": result.denial_reason,
+                "correlation_id": correlation,
+            },
+        )
+
+        if result.allowed:
+            return response.model_dump(), 200
+        if result.denial_reason == "rate_limit_exceeded":
+            return response.model_dump(), 429
+        return response.model_dump(), 402
+
+    except Exception as e:
+        logger.error(f"Error in bulk credit check: {e}", exc_info=True)
         raise
 
 

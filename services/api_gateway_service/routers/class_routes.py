@@ -11,7 +11,7 @@ from huleedu_service_libs.error_handling import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
 from services.api_gateway_service.config import settings
 
-from ..app.metrics import GatewayMetrics
+from ..protocols import MetricsProtocol
 
 router = APIRouter(route_class=DishkaRoute)
 logger = create_service_logger("api_gateway.class_routes")
@@ -182,7 +182,7 @@ async def proxy_class_requests(
     path: str,
     request: Request,
     http_client: FromDishka[AsyncClient],
-    metrics: FromDishka[GatewayMetrics],
+    metrics: FromDishka[MetricsProtocol],
     user_id: FromDishka[str],
     org_id: FromDishka[str | None],
     correlation_id: FromDishka[UUID],

@@ -23,7 +23,6 @@ from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from ..app.metrics import GatewayMetrics
 from ..app.rate_limiter import limiter
 from ..config import settings
 from ..protocols import HttpClientProtocol, MetricsProtocol
@@ -255,7 +254,7 @@ async def request_pipeline_execution(
     pipeline_request: BatchPipelineRequest,
     http_client: FromDishka[HttpClientProtocol],
     kafka_bus: FromDishka[KafkaBus],
-    metrics: FromDishka[GatewayMetrics],
+    metrics: FromDishka[MetricsProtocol],
     user_id: FromDishka[str],  # Provided by AuthProvider.provide_user_id
     org_id: FromDishka[str | None],  # Provided by AuthProvider.provide_org_id
     correlation_id: FromDishka[UUID],  # Provided by AuthProvider.provide_correlation_id

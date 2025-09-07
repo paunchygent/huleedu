@@ -344,25 +344,22 @@ class BatchMetricsProtocol(Protocol):
 class EntitlementsServiceProtocol(Protocol):
     """Protocol for interacting with the Entitlements Service for credit checking."""
 
-    async def check_credits(
+    async def check_credits_bulk(
         self,
         user_id: str,
         org_id: str | None,
-        required_credits: list[tuple[str, int]],
+        requirements: dict[str, int],
         correlation_id: str,
     ) -> dict[str, Any]:
-        """Check if sufficient credits are available for the given requirements.
+        """Bulk credit check for multiple metrics atomically.
 
         Args:
             user_id: User requesting the credits
             org_id: Organization ID (if applicable)
-            required_credits: List of (metric_name, quantity) tuples
+            requirements: Mapping of metric -> quantity
             correlation_id: Request correlation ID for tracing
 
         Returns:
-            Dict with 'sufficient': bool and details about credit availability
-
-        Raises:
-            Exception: If entitlements service communication fails
+            Dict with 'allowed' bool, optional 'denial_reason', balances and per-metric details
         """
         pass

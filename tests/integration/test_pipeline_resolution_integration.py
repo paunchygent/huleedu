@@ -143,18 +143,22 @@ class TestPipelineResolutionIntegration:
 
         # Minimal entitlements client that always authorizes to avoid denial path here
         class _OkEntitlementsClient(EntitlementsServiceProtocol):
-            async def check_credits(
+            async def check_credits_bulk(
                 self,
                 user_id: str,
                 org_id: str | None,
-                required_credits: list[tuple[str, int]],
+                requirements: dict[str, int],
                 correlation_id: str,
             ) -> dict[str, Any]:
                 return {
-                    "sufficient": True,
+                    "allowed": True,
                     "available_credits": 10_000,
-                    "required_credits": sum(q for _, q in required_credits),
-                    "source": "user" if org_id is None else "org",
+                    "required_credits": sum(int(q) for q in requirements.values()),
+                    "per_metric": {
+                        m: {"required": int(q), "available": 10_000, "allowed": True, "source": ("user" if org_id is None else "org")}
+                        for m, q in requirements.items()
+                    },
+                    "correlation_id": correlation_id,
                 }
 
         entitlements_client = _OkEntitlementsClient()

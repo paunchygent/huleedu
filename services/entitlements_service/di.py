@@ -267,3 +267,16 @@ class EntitlementsServiceProvider(Provider):
     def provide_engine(self) -> AsyncEngine:
         """Provide the database engine passed during initialization."""
         return self.engine
+
+    @provide
+    def provide_outbox_repository(
+        self,
+        engine: AsyncEngine,
+        service_name: str,
+    ) -> OutboxRepositoryProtocol:
+        """Provide Outbox repository implementation for transactional outbox pattern."""
+        # Import locally to avoid unnecessary dependency at module import time
+        from huleedu_service_libs.outbox.repository import PostgreSQLOutboxRepository
+
+        # Disable metrics by default in unit tests; production can override via OutboxProvider
+        return PostgreSQLOutboxRepository(engine=engine, service_name=service_name, enable_metrics=False)
