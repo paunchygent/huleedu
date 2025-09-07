@@ -13,6 +13,7 @@ from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import KafkaPublisherProtocol
@@ -136,6 +137,27 @@ class ImplementationProvider(Provider):
     """Implementation providers for concrete classes."""
 
     scope = Scope.REQUEST
+
+    @provide
+    def provide_correlation_context(self) -> CorrelationContext:
+        """Provide correlation context extracted from the current HTTP request.
+
+        Uses middleware-populated context when available; otherwise, extracts on demand.
+        """
+        try:
+            from quart import g, request
+
+            ctx = getattr(g, "correlation_context", None)
+            if isinstance(ctx, CorrelationContext):
+                return ctx
+            return extract_correlation_context_from_request(request)
+        except Exception:
+            # Fallback: generate a context with a generated correlation
+            class _DummyReq:
+                headers: dict[str, str] = {}
+                args: dict[str, str] = {}
+
+            return extract_correlation_context_from_request(_DummyReq())
 
     @provide
     def provide_repository(

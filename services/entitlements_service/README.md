@@ -10,6 +10,16 @@ Key Notes
 - Outbox schema ownership: This service uses the shared Transactional Outbox model from `libs/huleedu_service_libs.outbox.models.EventOutbox`. Do not define or modify a service-local outbox model. All migrations for the outbox table must align with the shared library conventions (index names, columns, partial index on `published_at IS NULL`).
 - Migrations: Create Alembic migrations from this service directory. Avoid modifying pushed versions. Use `.cursor/rules/085-database-migration-standards.mdc` for guidance.
 
+CorrelationContext (Mandatory)
+
+- Middleware: The service registers `setup_correlation_middleware(app)` to normalize inbound correlation IDs.
+- DI: `CorrelationContext` is provided with `Scope.REQUEST` and injected into routes.
+- Usage:
+  - Errors: pass `corr.uuid` to error factories; include `original_correlation_id=corr.original`.
+  - Responses: echo `corr.original` in successful responses.
+  - Events: use `corr.uuid` for event envelope `correlation_id`.
+  - See `.cursor/rules/043-service-configuration-and-logging.mdc` for details.
+
 Outbox Index Alignment
 
 - Shared index names used by the library:

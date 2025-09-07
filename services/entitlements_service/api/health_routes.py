@@ -83,10 +83,7 @@ async def health_check() -> tuple[dict[str, Any], int]:
         "message": f"Entitlements Service is {overall_status}",
         "version": "1.0.0",
         "checks": {
-            "service_responsive": True,
-            "dependencies_available": healthy,
-        },
-        "dependencies": {
+            # Component checks expected by tests
             "database": {
                 "status": "healthy" if db_healthy else "unhealthy",
                 "message": db_message,
@@ -95,6 +92,9 @@ async def health_check() -> tuple[dict[str, Any], int]:
                 "status": "healthy" if kafka_healthy else "unhealthy",
                 "message": kafka_message,
             },
+            # Aggregate booleans retained for compatibility
+            "service_responsive": True,
+            "dependencies_available": healthy,
         },
         "environment": environment,
     }

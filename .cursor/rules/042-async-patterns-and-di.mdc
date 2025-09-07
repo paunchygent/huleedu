@@ -94,6 +94,21 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     async def provide_service(self, repo, publisher) -> ServiceProtocol:
         return ServiceImpl(repo, publisher)
+
+    # REQUEST scope: Correlation context (Quart)
+    @provide(scope=Scope.REQUEST)
+    def provide_correlation_context(self) -> CorrelationContext:
+        """Prefer middleware-populated context; fallback to request extraction."""
+        from quart import g, request
+        from huleedu_service_libs.error_handling.correlation import (
+            CorrelationContext,
+            extract_correlation_context_from_request,
+        )
+
+        ctx = getattr(g, "correlation_context", None)
+        if isinstance(ctx, CorrelationContext):
+            return ctx
+        return extract_correlation_context_from_request(request)
 ```
 
 ## Key Patterns

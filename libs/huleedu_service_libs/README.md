@@ -56,6 +56,7 @@ This library documentation is organized into focused areas for better navigation
 - **[Database Utilities](docs/database.md)** - PostgreSQL monitoring, health checks, and metrics
 - **[Transactional Outbox](docs/outbox.md)** - Reliable event publishing with database consistency
 - **[Error Handling](docs/error-handling.md)** - Structured error handling with framework separation
+- **[Correlation](docs/correlation.md)** - CorrelationContext middleware, canonicalization, and usage
 
 ### Observability & Reliability
 - **[Observability](docs/observability.md)** - Logging, tracing, and metrics collection

@@ -23,6 +23,10 @@ from services.entitlements_service.protocols import (
     CreditManagerProtocol,
     EntitlementsRepositoryProtocol,
 )
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 
 
 class TestAdminRoutes:
@@ -52,6 +56,13 @@ class TestAdminRoutes:
             @provide(scope=Scope.REQUEST)
             def provide_repository(self) -> EntitlementsRepositoryProtocol:
                 return mock_repository
+
+            @provide(scope=Scope.REQUEST)
+            def provide_correlation_context(self) -> CorrelationContext:
+                # Build from incoming request for route injection
+                from quart import request
+
+                return extract_correlation_context_from_request(request)
 
         app = Quart(__name__)
         app.config.update({"TESTING": True})

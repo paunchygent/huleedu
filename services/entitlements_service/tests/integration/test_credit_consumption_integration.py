@@ -36,6 +36,7 @@ from services.entitlements_service.protocols import (
     PolicyLoaderProtocol,
     RateLimiterProtocol,
 )
+from huleedu_service_libs.error_handling.correlation import CorrelationContext, extract_correlation_context_from_request
 
 
 class ConsumptionIntegrationProvider(Provider):
@@ -96,6 +97,12 @@ class ConsumptionIntegrationProvider(Provider):
         event_publisher: EventPublisherProtocol,
     ) -> CreditManagerProtocol:
         return CreditManagerImpl(repository, policy_loader, rate_limiter, event_publisher)
+
+    @provide(scope=Scope.REQUEST)
+    def provide_correlation_context(self) -> CorrelationContext:
+        from quart import request
+
+        return extract_correlation_context_from_request(request)
 
 
 @pytest.fixture(scope="module")

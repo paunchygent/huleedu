@@ -7,7 +7,6 @@ operations history queries. Only available in non-production environments.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import NAMESPACE_OID, UUID, uuid5
 
 from dishka import FromDishka
 from quart_dishka import inject
@@ -17,6 +16,7 @@ from huleedu_service_libs.error_handling import (
     raise_validation_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.error_handling.quart import CorrelationContext
 from pydantic import BaseModel, Field
 from quart import Blueprint, current_app, request
 
@@ -30,25 +30,8 @@ if TYPE_CHECKING:
 
 logger = create_service_logger("entitlements_service.api.admin")
 
-# Create admin blueprint
 admin_bp = Blueprint("admin", __name__)
-
-
-def _extract_corr_pair() -> tuple[UUID, str]:
-    """Extract correlation ID from request as both UUID (canonical) and original string.
-
-    - Returns a UUID suitable for error factories.
-    - Preserves the original string for logs and error context.
-    """
-    from huleedu_service_libs.error_handling.quart import extract_correlation_id
-
-    original = extract_correlation_id(request)
-    try:
-        canonical = UUID(original)
-    except Exception:
-        # Deterministic mapping to UUID to preserve trace continuity
-        canonical = uuid5(NAMESPACE_OID, original or "missing-correlation-id")
-    return canonical, original
+admin_bp = Blueprint("admin", __name__)
 
 
 class CreditAdjustmentRequest(BaseModel):
@@ -92,6 +75,7 @@ class CreditSetResponse(BaseModel):
 @inject
 async def adjust_credits(
     credit_manager: FromDishka[CreditManagerProtocol],
+    corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Manually adjust credit balance (admin only).
 
@@ -104,21 +88,19 @@ async def adjust_credits(
         # Parse request
         data = await request.get_json()
         if not data:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="adjust_credits",
                 field="request_body",
                 message="Request body is required",
-                correlation_id=corr_uuid,
-                original_correlation_id=corr_str,
+                correlation_id=corr.uuid,
+                original_correlation_id=corr.original,
             )
 
         adjustment_request = CreditAdjustmentRequest(**data)
 
         # Correlation from header if provided
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        correlation_id = extract_correlation_id(request)
+        correlation_id = corr.original
 
         # Perform adjustment
         new_balance = await credit_manager.adjust_balance(
@@ -167,32 +149,30 @@ async def adjust_credits(
 
     except ValueError as e:
         # Validation failure (e.g., would go negative)
-        corr_uuid, corr_str = _extract_corr_pair()
         raise_validation_error(
             service="entitlements_service",
             operation="adjust_credits",
             field="amount",
             message=str(e),
-            correlation_id=corr_uuid,
-            original_correlation_id=corr_str,
+            correlation_id=corr.uuid,
+            original_correlation_id=corr.original,
         )
     except HuleEduError:
         # Preserve structured errors without wrapping
         raise
     except Exception as e:
         # Provide structured processing error for transparency
-        corr_uuid, corr_str = _extract_corr_pair()
         raise_processing_error(
             service="entitlements_service",
             operation="adjust_credits",
             message="Failed to adjust credit balance",
-            correlation_id=corr_uuid,
+            correlation_id=corr.uuid,
             subject_type=data.get("subject_type") if data else None,
             subject_id=data.get("subject_id") if data else None,
             amount=data.get("amount") if data else None,
             reason=data.get("reason") if data else None,
             error=str(e),
-            original_correlation_id=corr_str,
+            original_correlation_id=corr.original,
         )
 
 
@@ -201,6 +181,7 @@ async def adjust_credits(
 async def set_credits(
     credit_manager: FromDishka[CreditManagerProtocol],
     repository: FromDishka[EntitlementsRepositoryProtocol],
+    corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Set absolute credit balance (admin/testing only).
 
@@ -215,21 +196,19 @@ async def set_credits(
         # Parse request
         data = await request.get_json()
         if not data:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="set_credits",
                 field="request_body",
                 message="Request body is required",
-                correlation_id=corr_uuid,
-                original_correlation_id=corr_str,
+                correlation_id=corr.uuid,
+                original_correlation_id=corr.original,
             )
 
         set_request = CreditSetRequest(**data)
 
         # Correlation from header if provided
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        correlation_id = extract_correlation_id(request)
+        correlation_id = corr.original
 
         # Get current balance using repository directly for precise control
         subject_type = set_request.subject_type
@@ -239,16 +218,15 @@ async def set_credits(
         except HuleEduError:
             raise
         except Exception as e:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_processing_error(
                 service="entitlements_service",
                 operation="set_credits",
                 message="Failed to read current balance",
-                correlation_id=corr_uuid,
+                correlation_id=corr.uuid,
                 subject_type=set_request.subject_type,
                 subject_id=set_request.subject_id,
                 error=str(e),
-                original_correlation_id=corr_str,
+                original_correlation_id=corr.original,
             )
 
         # Calculate adjustment needed to reach target balance
@@ -276,33 +254,31 @@ async def set_credits(
                 correlation_id=correlation_id,
             )
         except ValueError as e:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="set_credits",
                 field="balance",
                 message=str(e),
-                correlation_id=corr_uuid,
+                correlation_id=corr.uuid,
                 subject_type=set_request.subject_type,
                 subject_id=set_request.subject_id,
                 target_balance=set_request.balance,
-                original_correlation_id=corr_str,
+                original_correlation_id=corr.original,
             )
         except HuleEduError:
             raise
         except Exception as e:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_processing_error(
                 service="entitlements_service",
                 operation="set_credits",
                 message="Failed to set credit balance",
-                correlation_id=corr_uuid,
+                correlation_id=corr.uuid,
                 subject_type=set_request.subject_type,
                 subject_id=set_request.subject_id,
                 target_balance=set_request.balance,
                 adjustment=adjustment_needed,
                 error=str(e),
-                original_correlation_id=corr_str,
+                original_correlation_id=corr.original,
             )
 
         # Create response
@@ -345,7 +321,6 @@ async def set_credits(
         raise
     except Exception as e:
         # Unhandled errors should be returned as structured processing errors
-        corr_uuid, corr_str = _extract_corr_pair()
         # Try to include identifiers from body if available
         try:
             body = await request.get_json()
@@ -355,12 +330,12 @@ async def set_credits(
             service="entitlements_service",
             operation="set_credits",
             message="Unhandled error while setting credits",
-            correlation_id=corr_uuid,
+            correlation_id=corr.uuid,
             subject_type=(body or {}).get("subject_type"),
             subject_id=(body or {}).get("subject_id"),
             target_balance=(body or {}).get("balance"),
             error=str(e),
-            original_correlation_id=corr_str,
+            original_correlation_id=corr.original,
         )
 
 
@@ -368,6 +343,7 @@ async def set_credits(
 @inject
 async def get_operations(
     repository: FromDishka[EntitlementsRepositoryProtocol],
+    corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
     """Get credit operations history (admin only).
 
@@ -390,14 +366,13 @@ async def get_operations(
 
         # Validate limit
         if limit < 1 or limit > 1000:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="get_operations",
                 field="limit",
                 message="Limit must be between 1 and 1000",
-                correlation_id=corr_uuid,
-                original_correlation_id=corr_str,
+                correlation_id=corr.uuid,
+                original_correlation_id=corr.original,
             )
 
         # Get operations history
@@ -419,29 +394,26 @@ async def get_operations(
         )
 
         # Include header correlation in success for symmetry
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        header_corr = extract_correlation_id(request)
-        return {"operations": operations, "count": len(operations), "correlation_id": header_corr}, 200
+        return {"operations": operations, "count": len(operations), "correlation_id": corr.original}, 200
 
     except HuleEduError:
         raise
     except Exception as e:
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        corr_uuid, corr_str = _extract_corr_pair()
         raise_processing_error(
             service="entitlements_service",
             operation="get_operations",
             message="Failed to get operations history",
-            correlation_id=corr_uuid,
+            correlation_id=corr.uuid,
             subject_type=subject_type,
             subject_id=subject_id,
             error=str(e),
-            original_correlation_id=corr_str,
+            original_correlation_id=corr.original,
         )
 
 
 @admin_bp.route("/credits/reset-rate-limit", methods=["POST"])
-async def reset_rate_limit() -> tuple[dict[str, Any], int]:
+@inject
+async def reset_rate_limit(corr: FromDishka[CorrelationContext]) -> tuple[dict[str, Any], int]:
     """Reset rate limit for a subject/metric (admin only).
 
     Returns:
@@ -451,28 +423,26 @@ async def reset_rate_limit() -> tuple[dict[str, Any], int]:
         # Parse request
         data = await request.get_json()
         if not data:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="reset_rate_limit",
                 field="request_body",
                 message="Request body is required",
-                correlation_id=corr_uuid,
-                original_correlation_id=corr_str,
+                correlation_id=corr.uuid,
+                original_correlation_id=corr.original,
             )
 
         subject_id = data.get("subject_id")
         metric = data.get("metric")
 
         if not subject_id or not metric:
-            corr_uuid, corr_str = _extract_corr_pair()
             raise_validation_error(
                 service="entitlements_service",
                 operation="reset_rate_limit",
                 field="subject_id,metric",
                 message="subject_id and metric are required",
-                correlation_id=corr_uuid,
-                original_correlation_id=corr_str,
+                correlation_id=corr.uuid,
+                original_correlation_id=corr.original,
             )
 
         # TODO: In Phase 2, inject RateLimiterProtocol directly
@@ -486,26 +456,22 @@ async def reset_rate_limit() -> tuple[dict[str, Any], int]:
             },
         )
 
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        corr = extract_correlation_id(request)
         return {
             "success": True,
             "message": f"Rate limit reset for {subject_id}/{metric}",
-            "correlation_id": corr,
+            "correlation_id": corr.original,
         }, 200
 
     except HuleEduError:
         raise
     except Exception as e:
-        from huleedu_service_libs.error_handling.quart import extract_correlation_id
-        corr_uuid, corr_str = _extract_corr_pair()
         raise_processing_error(
             service="entitlements_service",
             operation="reset_rate_limit",
             message="Failed to reset rate limit",
-            correlation_id=corr_uuid,
+            correlation_id=corr.uuid,
             subject_id=subject_id if 'subject_id' in locals() else None,
             metric=metric if 'metric' in locals() else None,
             error=str(e),
-            original_correlation_id=corr_str,
+            original_correlation_id=corr.original,
         )

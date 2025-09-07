@@ -5,9 +5,15 @@ from huleedu_service_libs.error_handling.quart_handlers import (
     extract_correlation_id,
     register_error_handlers,
 )
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 
 __all__ = [
     "register_error_handlers",
     "create_error_response",
     "extract_correlation_id",
+    "CorrelationContext",
+    "extract_correlation_context_from_request",
 ]

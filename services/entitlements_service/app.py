@@ -21,6 +21,9 @@ from huleedu_service_libs.metrics_middleware import (
 from huleedu_service_libs.middleware.frameworks.quart_middleware import (
     setup_tracing_middleware,
 )
+from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware import (
+    setup_correlation_middleware,
+)
 from huleedu_service_libs.observability import init_tracing
 from huleedu_service_libs.outbox import OutboxProvider
 from huleedu_service_libs.quart_app import HuleEduApp
@@ -101,6 +104,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     tracer = init_tracing("entitlements_service")
     app.extensions["tracer"] = tracer
     setup_tracing_middleware(app, tracer)
+    # Correlation context middleware (must run early in request lifecycle)
+    setup_correlation_middleware(app)
 
     # Register health Blueprint
     from services.entitlements_service.api.health_routes import health_bp

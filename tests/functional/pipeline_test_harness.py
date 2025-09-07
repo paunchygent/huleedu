@@ -269,6 +269,10 @@ class PipelineTestHarness:
             raise RuntimeError("BatchEssaysReady not received after association confirmation")
 
         logger.info("✅ Batch ready for pipeline execution")
+        
+        # Provision credits to ensure pipeline preflight passes
+        await self.provision_credits()
+        
         return self.batch_id, self.correlation_id
 
     async def setup_guest_batch(
@@ -341,6 +345,14 @@ class PipelineTestHarness:
             logger.warning("BatchContentProvisioningCompleted not received, but continuing...")
 
         logger.info("✅ GUEST batch ready for pipeline execution")
+        
+        # Store user for credit provisioning (guest batches may not use self.teacher_user)
+        if not self.teacher_user:
+            self.teacher_user = user
+        
+        # Provision credits to ensure pipeline preflight passes
+        await self.provision_credits()
+        
         return self.batch_id, self.correlation_id
 
     async def execute_pipeline(
@@ -807,4 +819,60 @@ class PipelineTestHarness:
             await self.consumer_context.__aexit__(None, None, None)
             self.consumer = None
             self.consumer_context = None
-            logger.info("🧹 Kafka consumer closed")
+
+    async def provision_credits(
+        self,
+        amount: int = 10000,
+        provision_credits: bool = True,
+    ) -> None:
+        """
+        Provision credits for test user to ensure pipelines can execute.
+
+        BOS checks org credits first, then user credits. We provision to both
+        to ensure tests pass regardless of user type.
+
+        Args:
+            amount: Credit amount to provision (default 10000 is sufficient for most tests)
+            provision_credits: Set to False to test credit denial scenarios
+        """
+        if not provision_credits:
+            logger.info("Credit provisioning disabled for this test")
+            return
+
+        # Provision to org if user has one
+        if hasattr(self.teacher_user, "organization_id") and self.teacher_user.organization_id:
+            try:
+                await self.service_manager.make_request(
+                    method="POST",
+                    service="entitlements_service",
+                    path="/v1/admin/credits/set",
+                    json={
+                        "subject_type": "org",
+                        "subject_id": self.teacher_user.organization_id,
+                        "balance": amount,
+                    },
+                    user=self.teacher_user,
+                    correlation_id=self.correlation_id,
+                )
+                logger.info(f"💳 Provisioned {amount} credits to org {self.teacher_user.organization_id}")
+            except Exception as e:
+                logger.warning(f"Could not provision org credits: {e}")
+
+        # Always provision to user as fallback
+        try:
+            await self.service_manager.make_request(
+                method="POST",
+                service="entitlements_service",
+                path="/v1/admin/credits/set",
+                json={
+                    "subject_type": "user",
+                    "subject_id": self.teacher_user.user_id,
+                    "balance": amount,
+                },
+                user=self.teacher_user,
+                correlation_id=self.correlation_id,
+            )
+            logger.info(f"💳 Provisioned {amount} credits to user {self.teacher_user.user_id}")
+        except Exception as e:
+            logger.warning(f"Could not provision user credits: {e}")
+            logger.warning("⚠️ Tests may fail with 402 insufficient credits errors")
