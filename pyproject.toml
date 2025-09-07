@@ -310,6 +310,8 @@ filterwarnings = [
 distribution = false
 
 [tool.pdm.scripts]
+# Monorepo: verify outbox indexes across curated services (disposable Postgres per service)
+db-verify-outbox-all = "python scripts/verify_outbox_all_services.py"
 # Monorepo-wide scripts
 format-all = "ruff format --force-exclude ."
 check-imports = "python scripts/check_import_patterns.py"

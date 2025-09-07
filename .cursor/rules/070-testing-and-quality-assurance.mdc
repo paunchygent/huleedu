@@ -20,6 +20,7 @@ alwaysApply: true
 - **Debug**: add `-s` to the runner, e.g. `pdm run pytest-root -s <path>`
 - **FORBIDDEN**: Mixing abstraction levels in same test
 - **FORBIDDEN**: Simplifying tests to make them pass - fix underlying issues
+- **Timeouts**: Individual test timeouts MUST be ≤ 60 seconds. For event-driven flows, default to 30 seconds and synchronize via Kafka events (no polling). If a test needs more, split it or improve determinism instead of increasing the timeout.
 
 ## 3. DI/Protocol Testing Patterns
 - **MUST** override Dishka providers in tests to inject mocks for protocol dependencies

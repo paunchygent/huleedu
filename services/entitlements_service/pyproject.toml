@@ -61,3 +61,6 @@ migrate-history = "alembic history"
 migrate-current = "alembic current"
 migrate-revision = "alembic revision --autogenerate"
 migrate-stamp = "alembic stamp head"
+
+# Local migration + outbox index verification (disposable Postgres via testcontainers)
+db-verify-outbox-local = "python services/entitlements_service/scripts/local_migrate_and_verify.py"

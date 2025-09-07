@@ -58,10 +58,14 @@ class TestCreditPreflightDenial402:
                     enable_cj_assessment=True,
                 )
 
+                long_text = (
+                    b"This is a valid test essay content used for functional testing. "
+                    b"It exceeds the minimum content length required by validation."
+                )
                 files = [
-                    {"name": "essay1.txt", "content": b"A"},
-                    {"name": "essay2.txt", "content": b"B"},
-                    {"name": "essay3.txt", "content": b"C"},
+                    {"name": "essay1.txt", "content": long_text},
+                    {"name": "essay2.txt", "content": long_text},
+                    {"name": "essay3.txt", "content": long_text},
                 ]
                 await service_manager.upload_files(
                     batch_id=batch_id,
@@ -135,9 +139,13 @@ class TestCreditPreflightDenial402:
                     enable_cj_assessment=True,
                 )
 
+                long_text = (
+                    b"This is a valid test essay content used for functional testing. "
+                    b"It exceeds the minimum content length required by validation."
+                )
                 files = [
-                    {"name": "essay1.txt", "content": b"A"},
-                    {"name": "essay2.txt", "content": b"B"},
+                    {"name": "essay1.txt", "content": long_text},
+                    {"name": "essay2.txt", "content": long_text},
                 ]
                 await service_manager.upload_files(
                     batch_id=batch_id,
@@ -203,15 +211,22 @@ class TestCreditPreflightDenial402:
             topics = ["huleedu.batch.content.provisioning.completed.v1"]
 
             async with kafka_manager.consumer("credit_denial_swedish_identity", topics) as consumer:
-                # Create GUEST batch with 1 essay and upload a file
+                # Create GUEST batch with 2 essays (ensures non-zero credit requirement)
                 batch_id, correlation_id = await service_manager.create_batch_via_agw(
-                    expected_essay_count=1,
+                    expected_essay_count=2,
                     user=test_user,
                     class_id=None,
                     enable_cj_assessment=True,
                 )
 
-                files = [{"name": "essay1.txt", "content": b"Hej"}]
+                long_text_sv = (
+                    "Detta är ett giltigt svenskt testinnehåll med ÅÄÖ som överskrider "
+                    "minimilängd för validering och bevarar svenska tecken."
+                ).encode("utf-8")
+                files = [
+                    {"name": "ens_1.txt", "content": long_text_sv},
+                    {"name": "ens_2.txt", "content": long_text_sv},
+                ]
                 await service_manager.upload_files(
                     batch_id=batch_id,
                     files=files,

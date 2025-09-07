@@ -11,7 +11,6 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    JSON,
     DateTime,
     Index,
     Integer,
@@ -77,9 +76,8 @@ class CreditBalance(Base):
         DateTime(timezone=True), nullable=False, server_default=text("NOW()"), onupdate=func.now()
     )
 
-    # Indexes for efficient queries
+    # Indexes for efficient queries (avoid duplicate index for balance)
     __table_args__ = (
-        Index("ix_credit_balances_balance", "balance"),
         Index("ix_credit_balances_updated", "updated_at"),
     )
 
@@ -166,42 +164,5 @@ class RateLimitBucket(Base):
     )
 
 
-class EventOutbox(Base):
-    """Outbox pattern for reliable event publishing.
-
-    Ensures events are published reliably using transactional outbox pattern.
-    Events are persisted in the same transaction as business operations.
-    """
-
-    __tablename__ = "event_outbox"
-
-    # Primary key
-    id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
-
-    # Event identification
-    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    aggregate_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    event_type: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-
-    # Event data
-    event_data: Mapped[dict] = mapped_column(JSON, nullable=False)
-    topic: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-
-    # Publishing status
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("NOW()"), index=True
-    )
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    # Critical index for outbox processing
-    __table_args__ = (
-        Index(
-            "ix_outbox_unpublished",
-            "published_at",
-            "topic",
-            "created_at",
-            postgresql_where=text("published_at IS NULL"),
-        ),
-        Index("ix_outbox_aggregate", "aggregate_type", "aggregate_id"),
-        Index("ix_outbox_cleanup", "published_at", "created_at"),  # For cleanup
-    )
+## NOTE: Local EventOutbox model removed. Use shared model from
+## libs/huleedu_service_libs.outbox.models.EventOutbox instead.

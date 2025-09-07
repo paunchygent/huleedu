@@ -23,11 +23,11 @@ import pytest
 from services.entitlements_service.models_db import (
     CreditBalance,
     CreditOperation,
-    EventOutbox,
     OperationStatus,
     RateLimitBucket,
     SubjectType,
 )
+from huleedu_service_libs.outbox.models import EventOutbox
 
 
 class TestEnumBehavior:
