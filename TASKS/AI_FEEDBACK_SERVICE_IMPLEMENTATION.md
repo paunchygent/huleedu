@@ -7,6 +7,7 @@ The AI Feedback Service is an intelligent prompt curator and orchestrator that c
 ## Architectural Overview
 
 ### Service Classification
+
 - **Type**: Pure Kafka Worker Service (no client-facing APIs)
 - **Pattern**: Event-driven consumer with batch processing
 - **Template**: Based on CJ Assessment Service architecture
@@ -17,6 +18,7 @@ The AI Feedback Service is an intelligent prompt curator and orchestrator that c
 **AI Feedback Service = Data Collector + Prompt Curator + LLM Orchestrator**
 
 The service:
+
 1. Collects pre-analyzed data from Result Aggregator
 2. Builds rich context from upstream analyses (grammar, spelling, rankings)
 3. Curates optimal prompts using this context
@@ -26,6 +28,7 @@ The service:
 ### Key Architectural Decisions
 
 1. **Sequential Pipeline Dependencies**:
+
    ```
    Required Upstream Completion:
    1. Spellchecker Service → spelling errors & corrected text
@@ -49,6 +52,7 @@ The service:
    - **LLM API Management**: Delegated to LLM Provider Service
 
 3. **Event Flow**:
+
    ```
    ELS → Publishes BatchAIFeedbackRequestedV1 (after upstream completion)
    AI Feedback → Consumes request
@@ -190,6 +194,7 @@ services/ai_feedback_service/
 ```
 
 **Note the removals:**
+
 - ❌ `class_management_client_impl.py` - Student associations come via Result Aggregator
 - ❌ `text_utils.py` - Text preprocessing done by upstream services
 - ❌ `result_curation.py` - Grammar curation done by NLP Service
@@ -1712,19 +1717,22 @@ ai_feedback_service:
 
 ## Key Architectural Insights
 
-### What This Service IS:
+### What This Service IS
+
 - **Data Collector**: Gathers all upstream analyses via Result Aggregator
 - **Context Builder**: Creates rich context from multiple analysis sources
 - **Prompt Curator**: Selects and customizes prompts based on course and context
 - **LLM Orchestrator**: Manages feedback and editing generation via LLM Provider
 
-### What This Service IS NOT:
+### What This Service IS NOT
+
 - **NOT a Grammar Analyzer**: NLP Service owns grammar analysis
 - **NOT a Spellchecker**: Spellchecker Service owns spelling correction
 - **NOT a Text Processor**: Upstream services handle text preprocessing
 - **NOT an LLM Manager**: LLM Provider Service manages API interactions
 
-### Dependencies and Data Flow:
+### Dependencies and Data Flow
+
 ```
 1. Spellchecker Service → Completes spelling correction
 2. NLP Service → Completes grammar and linguistic analysis
@@ -1738,7 +1746,8 @@ ai_feedback_service:
 6. ELS → Receives AI feedback results
 ```
 
-### Key Design Benefits:
+### Key Design Benefits
+
 - **Single Responsibility**: Only responsible for prompt curation and orchestration
 - **No Duplication**: Leverages existing analyses from upstream services
 - **Rich Context**: Can provide comprehensive feedback using all available data

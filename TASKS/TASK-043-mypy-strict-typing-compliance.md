@@ -1,6 +1,7 @@
 # TASK-043: MyPy Strict Typing Compliance - Full Clean Refactor
 
 ## Status: IN PROGRESS
+
 **Created**: 2025-01-30
 **Priority**: HIGH
 **Type**: REFACTOR / COMPLIANCE
@@ -8,12 +9,14 @@
 ## Problem Statement
 
 The HuleEdu service libraries currently violate strict MyPy typing standards (Rules 050 & 086):
+
 - Multiple `cast()` usages (FORBIDDEN per Rule 050)
 - `# type: ignore` comments (FORBIDDEN)
 - Dynamic proxy pattern `make_resilient()` that requires cast() to maintain type safety
 - Incomplete type annotations in various modules
 
 **Current Violations**:
+
 1. `content_service_client.py:181` - Unnecessary cast(str, storage_id)
 2. `logging_utils.py:94` - type: ignore[arg-type] on processors
 3. `resilient_client.py:105` - cast(T, wrapper) for dynamic proxy
@@ -28,19 +31,24 @@ This enables a CLEAN REFACTOR without migration paths, deprecation notices, or i
 ## Solution Architecture
 
 ### Core Principle
+
 Replace the generic dynamic proxy pattern with explicit, typed resilient wrappers for each protocol. Every resilient component is explicitly typed with no magic, no cast(), no Any, no type: ignore.
 
 ### Dependency Direction Rule
+
 **CRITICAL ARCHITECTURAL PRINCIPLE**:
+
 - Dependency flow: `Services → Shared Libraries → Common Core`
 - **NEVER**: `Shared Libraries → Services` (circular dependency anti-pattern)
 - **Consequence**: Service-specific protocols require service-specific resilient wrappers
 
 This means:
+
 - **Shared protocols** (HttpClient, ContentService) → Resilient wrappers in shared library ✅
 - **Service-specific protocols** (LLMProvider, BatchConductor) → Resilient wrappers in the service itself ✅
 
 ### Pattern
+
 ```python
 # BEFORE (Dynamic Proxy - FORBIDDEN)
 def make_resilient(impl: T, circuit_breaker: CircuitBreaker) -> T:
@@ -61,6 +69,7 @@ class ResilientHttpClient(HttpClientProtocol):
 ### Phase 1: Fix Existing Type Issues
 
 #### 1.1 Fix logging_utils.py Processor Import
+
 ```python
 # Fix name collision with conditional import
 try:
@@ -75,6 +84,7 @@ processors: list[Processor] = [...]  # No type: ignore needed
 ```
 
 #### 1.2 CircuitBreaker Overloads (ALREADY APPLIED)
+
 ```python
 @overload
 async def call(self, func: Callable[..., Awaitable[T]], *args, **kwargs) -> T: ...
@@ -87,6 +97,7 @@ async def call(self, func: Callable[..., Any], *args, **kwargs) -> Any:
 ```
 
 #### 1.3 Fix content_service_client.py Type Narrowing (ALREADY APPLIED)
+
 ```python
 # Extract with explicit type
 storage_id_obj: Any = result.get("storage_id")
@@ -101,6 +112,7 @@ return storage_id  # No cast needed
 #### 2.1 File Structure
 
 **Shared Library** (for shared protocols only):
+
 ```
 libs/huleedu_service_libs/src/huleedu_service_libs/resilience/
 ├── __init__.py              # Export typed wrappers
@@ -114,6 +126,7 @@ libs/huleedu_service_libs/src/huleedu_service_libs/resilience/
 ```
 
 **Service-Specific Wrappers** (respect service boundaries):
+
 ```
 services/llm_provider_service/implementations/
 ├── resilient_llm_provider.py  # NEW: Service-specific resilient wrapper
@@ -125,6 +138,7 @@ services/batch_orchestrator_service/implementations/
 **CRITICAL**: Shared libraries MUST NOT import from services. Service-specific protocols get service-specific resilient wrappers.
 
 #### 2.2 ResilientHttpClient Implementation
+
 ```python
 # resilience/http_client.py
 from typing import Any
@@ -168,6 +182,7 @@ class ResilientHttpClient(HttpClientProtocol):
 ```
 
 #### 2.3 ResilientContentServiceClient Implementation
+
 ```python
 # resilience/content_service.py
 from uuid import UUID
@@ -207,6 +222,7 @@ class ResilientContentServiceClient(ContentServiceClientProtocol):
 ```
 
 #### 2.4 Service-Specific Resilient Wrapper Example
+
 ```python
 # services/llm_provider_service/implementations/resilient_llm_provider.py
 from uuid import UUID
@@ -255,6 +271,7 @@ class ResilientLLMProvider(LLMProviderProtocol):
 ### Phase 3: Update All DI Providers
 
 #### 3.1 api_gateway_service/di.py
+
 ```python
 # BEFORE
 from huleedu_service_libs.resilience.resilient_client import make_resilient
@@ -266,6 +283,7 @@ yield ResilientHttpClient(client, circuit_breaker)
 ```
 
 #### 3.2 libs/huleedu_service_libs/http_client/di_providers.py
+
 ```python
 # BEFORE
 from huleedu_service_libs.resilience.resilient_client import make_resilient
@@ -277,6 +295,7 @@ return ResilientContentServiceClient(client, breaker)
 ```
 
 #### 3.3 batch_orchestrator_service/di.py
+
 ```python
 # BEFORE
 from huleedu_service_libs.resilience.resilient_client import make_resilient
@@ -288,6 +307,7 @@ return ResilientContentServiceClient(base_client, circuit_breaker)
 ```
 
 #### 3.4 llm_provider_service/di.py (4 locations)
+
 ```python
 # BEFORE (all 4 providers)
 from huleedu_service_libs.resilience.resilient_client import make_resilient
@@ -302,6 +322,7 @@ return ResilientLLMProvider(base_provider, circuit_breaker)
 
 1. **DELETE** `libs/huleedu_service_libs/src/huleedu_service_libs/resilience/resilient_client.py`
 2. **UPDATE** `libs/huleedu_service_libs/src/huleedu_service_libs/resilience/__init__.py`:
+
    ```python
    # REMOVE
    from .resilient_client import make_resilient, ResilientClientWrapper
@@ -315,6 +336,7 @@ return ResilientLLMProvider(base_provider, circuit_breaker)
 ### Phase 5: Update Tests
 
 #### 5.1 Rename/Split test_resilient_client.py
+
 ```
 # FROM
 libs/huleedu_service_libs/tests/test_resilient_client.py
@@ -326,6 +348,7 @@ libs/huleedu_service_libs/tests/test_resilient_llm_provider.py
 ```
 
 #### 5.2 Update Test Implementations
+
 ```python
 # BEFORE
 resilient_service = make_resilient(mock_service, circuit_breaker)
@@ -335,12 +358,14 @@ resilient_service = ResilientHttpClient(mock_service, circuit_breaker)
 ```
 
 #### 5.3 Update Integration Tests
+
 - batch_orchestrator_service/tests/integration/test_circuit_breaker_integration.py
 - Replace all `make_resilient()` calls with appropriate typed wrappers
 
 ### Phase 6: Documentation Updates
 
 Remove `make_resilient` references from:
+
 - `.cursor/rules/020.11-service-libraries-architecture.mdc`
 - `.cursor/rules/040-service-implementation-guidelines.mdc`
 - `.windsurf/rules/` (parallel copies)
@@ -348,12 +373,14 @@ Remove `make_resilient` references from:
 ## Acceptance Criteria
 
 ### Type Safety
+
 - ✅ ZERO `cast()` usage in resilience modules
 - ✅ ZERO `# type: ignore` comments  
 - ✅ ZERO `Any` returns from resilient wrappers
 - ✅ All functions have complete type annotations
 
 ### MyPy Compliance
+
 ```bash
 # Library check - MUST PASS with zero errors
 cd libs/huleedu_service_libs
@@ -364,12 +391,14 @@ pdm run typecheck-all
 ```
 
 ### Functional Requirements
+
 - ✅ All existing tests pass with typed wrappers
 - ✅ Circuit breaker behavior unchanged
 - ✅ Correlation ID and context propagation preserved
 - ✅ All services start and run correctly
 
 ### Code Quality
+
 - ✅ Each wrapper has clear docstrings
 - ✅ Consistent naming: `ResilientXxxClient`, `ResilientXxxProvider`
 - ✅ No backwards compatibility code
@@ -399,7 +428,7 @@ pdm run test-unit
 
 1. Fix logging_utils.py Processor import collision
 2. Create three typed wrapper modules
-3. Update resilience/__init__.py exports
+3. Update resilience/**init**.py exports
 4. Update all DI providers (compile-time breaks expected)
 5. Delete resilient_client.py
 6. Update and split tests

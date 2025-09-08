@@ -43,6 +43,7 @@ Based on dev team analysis, our current event publishing lacks critical producti
 **File:** `libs/huleedu_service_libs/src/huleedu_service_libs/kafka_client.py`
 
 **Changes:**
+
 ```python
 async def publish(
     self,
@@ -66,6 +67,7 @@ async def publish(
 ```
 
 **Standard Headers to Include:**
+
 - `event_id`: UUID for deduplication  
 - `trace_id`: For distributed tracing
 - `schema_version`: For schema evolution  
@@ -77,12 +79,14 @@ async def publish(
 **New File:** `libs/huleedu_service_libs/src/huleedu_service_libs/outbox/manager.py`
 
 **Capabilities:**
+
 - Accept headers and message_key parameters
 - Store headers in outbox for relay worker
 - Deterministic partition key resolution
 - Proper error handling with correlation context
 
 **Interface:**
+
 ```python
 class OutboxManager:
     async def publish_to_outbox(
@@ -102,6 +106,7 @@ class OutboxManager:
 **File:** `libs/huleedu_service_libs/src/huleedu_service_libs/outbox/relay.py`
 
 **Changes:**
+
 - Read headers from outbox storage
 - Propagate headers to KafkaPublisher
 - Add header-based metrics and logging
@@ -111,6 +116,7 @@ class OutboxManager:
 #### 2.1 Replace Duplicate OutboxManager Implementations
 
 **Services to Update (12 total):**
+
 - class_management_service
 - essay_lifecycle_service  
 - batch_orchestrator_service
@@ -124,7 +130,8 @@ class OutboxManager:
 - file_service
 
 **Pattern:**
-1. Delete local `implementations/outbox_manager.py` 
+
+1. Delete local `implementations/outbox_manager.py`
 2. Import shared version
 3. Update DI providers to use shared implementation
 4. Verify protocol compliance
@@ -132,12 +139,14 @@ class OutboxManager:
 #### 2.2 Deterministic Partition Keys
 
 **Key Assignment Strategy:**
+
 - **CJ Assessment Results**: `cj_assessment_job_id`
-- **Spellcheck/NLP Results**: `batch_id` 
+- **Spellcheck/NLP Results**: `batch_id`
 - **Student Matching**: `batch_id`
 - **ELS State Events**: `entity_ref` or `essay_id`
 
 **Implementation in each service's event publisher:**
+
 ```python
 # Determine partition key based on event type
 partition_key = resolve_partition_key(
@@ -156,10 +165,12 @@ await self.outbox_manager.publish_to_outbox(
 #### 2.3 Fix Topic Naming Inconsistency  
 
 **Current Issue:**
+
 - Event: `ASSESSMENT_RESULT_PUBLISHED = "assessment.result.published"`
 - Maps to: `"huleedu.assessment.results.v1"` (plural)
 
 **Fix:**
+
 ```python
 # In libs/common_core/src/common_core/event_enums.py
 ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED = "assessment.result.published"
@@ -173,11 +184,13 @@ _TOPIC_MAPPING[ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED] = "huleedu.assessmen
 **File:** `libs/common_core/src/common_core/events/cj_assessment_events.py`
 
 **Replace:**
+
 ```python
 essay_results: list[dict[str, Any]]  # Current
 ```
 
 **With:**
+
 ```python  
 class EssayResultV1(BaseModel):
     essay_id: str
@@ -200,12 +213,14 @@ class AssessmentResultV1(BaseEventData):
 The EssayResultV1 model establishes a foundational pattern for all assessment-type results across HuleEdu services. This is NOT a one-off improvement but the beginning of a systematic architectural shift toward typed, validated assessment results.
 
 **Future Reuse Targets (Phase 4):**
+
 1. **NLP Service**: Migrate `essay.nlp.completed` events to use NLPResultV1
 2. **Spellcheck Service**: Standardize spellcheck results using similar typed models
 3. **AI Feedback Service**: Adopt AIResultV1 pattern for feedback results
 4. **Result Aggregator**: Consume all assessment results through unified typed interfaces
 
 **Benefits of Systematic Reuse:**
+
 - Single source of truth for assessment result structure
 - Consistent validation across all assessment services
 - Simplified consumer code in Result Aggregator Service
@@ -213,6 +228,7 @@ The EssayResultV1 model establishes a foundational pattern for all assessment-ty
 - Reduced cognitive load for developers
 
 **Implementation Strategy:**
+
 - Phase 3: Create EssayResultV1 in common_core as shared model
 - Phase 4: Create service-specific extensions (NLPResultV1 extends EssayResultV1)
 - Phase 5: Migrate all assessment services to typed models
@@ -242,6 +258,7 @@ class AssessmentResultV1(BaseEventData):
 **New File:** `libs/huleedu_service_libs/src/huleedu_service_libs/event_publishing/`
 
 **DualEventPublisher for Phase 2 services:**
+
 ```python
 class DualEventPublisher:
     """Standardized dual event publishing pattern."""
@@ -270,12 +287,14 @@ class DualEventPublisher:
 ### Topic Configuration  
 
 **Assessment Result Topics:**
+
 ```
 cleanup.policy=compact,delete
 retention.ms=604800000  # 7 days
 ```
 
 **Phase Completion Topics:**
+
 ```  
 cleanup.policy=delete
 retention.ms=86400000   # 24 hours
@@ -284,6 +303,7 @@ retention.ms=86400000   # 24 hours
 ### Monitoring & Alerting
 
 **New Metrics:**
+
 ```python
 event_headers_missing_total = Counter(
     "kafka_event_headers_missing_total", 
@@ -304,18 +324,21 @@ duplicate_event_detection_total = Counter(
 ## Testing Strategy
 
 ### Unit Tests
+
 - Header propagation through all layers
 - Partition key determination logic  
 - Typed model validation edge cases
 - Outbox storage with headers
 
 ### Integration Tests  
+
 - End-to-end header flow
 - Cross-partition ordering validation
 - Schema evolution compatibility
 - Dual event publishing atomicity
 
 ### Performance Tests
+
 - Header serialization overhead
 - Partition key lookup performance  
 - Memory usage with typed models
@@ -324,16 +347,19 @@ duplicate_event_detection_total = Counter(
 ## Migration Path
 
 ### Phase 1: Backwards Compatible
+
 - Add header support (optional parameters)
 - Deploy shared OutboxManager alongside existing
 - No breaking changes to existing events
 
 ### Phase 2: Gradual Rollout
+
 - Service-by-service migration to shared components
 - Monitor for regressions at each step
 - Verify header propagation before proceeding
 
 ### Phase 3: Schema Updates
+
 - Deploy typed models with backwards compatibility
 - Update consumers to expect new schema
 - Remove old untyped event handling
@@ -341,12 +367,14 @@ duplicate_event_detection_total = Counter(
 ## Success Metrics
 
 ### Technical Metrics
+
 - **Deduplication**: 99%+ events deduplicated via event_id header
 - **Tracing Coverage**: 100% events traceable via correlation_id
 - **Code Reduction**: Remove 11 duplicate OutboxManager implementations
 - **Type Safety**: Zero `dict[str, Any]` in event payloads
 
 ### Operational Metrics  
+
 - **Debugging Time**: 50% reduction in event troubleshooting
 - **Schema Errors**: Zero production schema validation failures
 - **Maintenance**: Single location for outbox bug fixes
@@ -354,49 +382,58 @@ duplicate_event_detection_total = Counter(
 ## Risk Mitigation
 
 ### High Risk: Breaking Changes
+
 - **Mitigation**: Backwards compatible parameters, gradual rollout
 - **Rollback**: Feature flags for header inclusion
 
 ### Medium Risk: Performance Impact
+
 - **Mitigation**: Performance testing in staging
 - **Monitoring**: Header serialization metrics
 
 ### Low Risk: Consumer Compatibility
+
 - **Mitigation**: Headers are optional metadata
 - **Testing**: Consumer integration tests
 
 ## Dependencies
 
 ### Internal  
+
 - All services must adopt shared OutboxManager
 - Common event models updated with typing
 - Integration tests updated for headers
 
 ### External
+
 - None (internal improvement only)
 - Kafka supports headers natively
 
 ## Acceptance Criteria
 
 ### Phase 1 Complete
+
 - [x] KafkaPublisher accepts headers parameter
 - [x] Shared OutboxManager implemented in library
 - [x] EventRelayWorker propagates headers  
 - [x] Unit tests pass for all components
 
 ### Phase 2 Complete  
+
 - [ ] All 11 service OutboxManager implementations removed (5/11 migrated)
 - [ ] Deterministic partition keys implemented (infrastructure ready, logic pending)
 - [x] Topic naming consistency fixed
 - [ ] Integration tests pass (infrastructure tests pass, service migration pending)
 
 ### Phase 3 Complete
+
 - [x] Typed payload models replace dict[str, Any] (EssayResultV1 created)
 - [ ] Schema validation prevents malformed events (partial - Pydantic validation)
 - [ ] Performance benchmarks meet targets
 - [ ] Monitoring dashboards operational
 
 ### Production Ready
+
 - [ ] Zero duplicate events in production logs
 - [ ] 100% trace coverage on critical event flows  
 - [ ] Documentation updated for new event patterns
@@ -434,30 +471,35 @@ duplicate_event_detection_total = Counter(
 **Achievement**: Implemented zero-parse idempotency optimization for high-performance message processing.
 
 **Implementation Details**:
+
 - **Location**: `libs/huleedu_service_libs/src/huleedu_service_libs/idempotency_v2.py` (lines 155-196)
 - **Optimization**: When headers contain `event_id` + `event_type`, JSON parsing is skipped entirely
 - **Fallback**: Incomplete headers automatically fall back to JSON parsing
 - **Compatibility**: 100% backward compatible with header-less messages
 
 **Performance Benefits**:
+
 - Zero JSON parsing overhead for header-complete messages
 - Faster duplicate detection through header-based hashing
 - Reduced CPU usage for high-volume services
 - Lower memory allocation during idempotency checking
 
 **Header Mapping**:
+
 - `event_id`: Direct header mapping for duplicate detection
 - `event_type`: Direct header mapping for event routing
 - `trace_id`: Header field mapping to `correlation_id` for tracing
 - `source_service`: Service identification for debugging
 
 **Validation Results**:
+
 - ✅ 18 comprehensive tests covering all optimization scenarios
 - ✅ Header optimization specifically tested in `test_idempotent_consumer_header_optimization.py`
 - ✅ Performance benefits validated through log analysis showing `headers_used: True, json_parsed: False`
 - ✅ Backward compatibility confirmed with existing header-less messages
 
 **Integration Status**:
+
 - ✅ OutboxManager automatically adds standard headers to all published events
 - ✅ EventRelayWorker propagates headers to Kafka for consumer optimization
 - ✅ All services using shared OutboxManager benefit from header-first optimization
@@ -467,7 +509,7 @@ duplicate_event_detection_total = Counter(
 
 During test failure investigation, discovered and fixed critical business logic issues:
 
-1. **CJ Assessment Workflow Continuation**: 
+1. **CJ Assessment Workflow Continuation**:
    - Changed from 100% completion requirement to periodic (every 5) + threshold-based triggers
    - Enables progressive monitoring essential for async LLM processing
 
@@ -486,6 +528,7 @@ These fixes were essential for production readiness and revealed important archi
 ### Final Achievement: 100% Test Success Rate (18/18 tests passing)
 
 **Phase 3 Business Logic Fixes Completed:**
+
 - ✅ **CJ Assessment Workflow Continuation Logic**: Fixed periodic workflow triggers (every 5 completions)
 - ✅ **CJ Assessment Outbox Pattern Timeouts**: Resolved through headers mock fix and fast polling
 - ✅ **Batch Conductor Kafka Consumer Routing**: Fixed event type mappings for dual event pattern
@@ -493,12 +536,16 @@ These fixes were essential for production readiness and revealed important archi
 ### Key Architectural Insights Discovered
 
 #### 1. Dual Event Pattern Architecture
+
 **Discovery**: Batch Conductor intentionally uses thin events (`SPELLCHECK_PHASE_COMPLETED`) for state coordination while services publish rich events (`ESSAY_SPELLCHECK_COMPLETED`) for business data.
+
 - **Impact**: This separation is architectural, not a bug - enables clean separation of concerns
 - **Recommendation**: Document this pattern in architectural standards
 
 #### 2. Environment-Aware Outbox Performance  
+
 **Discovery**: OutboxProvider automatically configures polling intervals based on ENVIRONMENT variable:
+
 - `testing`: 0.1s polling (100x faster)
 - `development`: 1.0s polling  
 - `production`: 5.0s polling (conservative)
@@ -506,14 +553,18 @@ These fixes were essential for production readiness and revealed important archi
 - **Recommendation**: Always set `ENVIRONMENT=testing` in integration tests
 
 #### 3. Headers Support Throughout Stack
+
 **Discovery**: Complete 4-parameter signature now consistent across all layers:
+
 - `kafka_bus.publish(topic, envelope, key, headers)`
 - EventRelayWorker extracts and propagates headers from outbox storage
 - **Impact**: End-to-end tracing and idempotency support now available
 - **Recommendation**: Begin using headers for correlation tracking
 
 #### 4. TRUE OUTBOX PATTERN Integrity Maintained
+
 **Discovery**: All fixes preserved transactional safety:
+
 - Events → OutboxManager → Database → EventRelayWorker → Kafka
 - No direct Kafka publishing bypasses introduced
 - **Impact**: ACID compliance maintained throughout event publishing
@@ -547,6 +598,7 @@ These fixes were essential for production readiness and revealed important archi
 **Achievement**: Successfully migrated class_management_service to shared OutboxManager with automatic migration pattern.
 
 **Key Changes**:
+
 1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
 2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter
 3. **PDM Composite Pattern**: Added `start-dev = {composite = ["migrate", "start"]}` for automatic migrations
@@ -554,6 +606,7 @@ These fixes were essential for production readiness and revealed important archi
 5. **Migration State Fixed**: Resolved broken alembic tracking with proper `alembic upgrade heads`
 
 **Pattern Established**:
+
 ```toml
 [tool.pdm.scripts]
 migrate = "alembic upgrade heads"
@@ -561,7 +614,8 @@ start = "python app.py"
 start-dev = {composite = ["migrate", "start"]}
 ```
 
-**Validation**: 
+**Validation**:
+
 - ✅ Functional test passes (class creation with course "ENG5")
 - ✅ Event publishing through shared OutboxManager works
 - ✅ Automatic migrations apply on container startup
@@ -572,6 +626,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Achievement**: Successfully migrated cj_assessment_service to shared OutboxManager, confirming the replicable migration pattern.
 
 **Key Changes**:
+
 1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
 2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter
 3. **PDM Composite Pattern**: Added `migrate = "alembic upgrade heads"` and `start-dev = {composite = ["migrate", "start"]}`
@@ -579,6 +634,7 @@ start-dev = {composite = ["migrate", "start"]}
 5. **Local Implementation Cleanup**: Removed `services/cj_assessment_service/implementations/outbox_manager.py`
 
 **Validation**:
+
 - ✅ Service starts correctly with shared OutboxManager
 - ✅ All 7 event publisher unit tests pass
 - ✅ All 10 outbox reliability tests pass
@@ -592,6 +648,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Achievement**: Successfully migrated entitlements_service to shared OutboxManager, including database schema updates for full compatibility.
 
 **Key Changes**:
+
 1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
 2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter pattern
 3. **Database Schema Migration**: Added missing columns (`event_key`, `retry_count`, `last_error`) for shared OutboxManager compatibility
@@ -602,10 +659,11 @@ start-dev = {composite = ["migrate", "start"]}
 8. **Cross-Service Cleanup**: Fixed lingering import issues in class_management_service and cj_assessment_service
 
 **Validation**:
+
 - ✅ Service builds and starts with shared OutboxManager
 - ✅ All 3 entitlements service tests pass (100% pass rate)
 - ✅ Database schema migrated successfully with new columns
-- ✅ Event relay worker functional: logs show "Retrieved 0 unpublished events from outbox" 
+- ✅ Event relay worker functional: logs show "Retrieved 0 unpublished events from outbox"
 - ✅ Redis wake notifications working: "Redis BLPOP by 'entitlements_service-redis': keys=['outbox:wake:entitlements_service']"
 - ✅ Type checking passes completely: "Success: no issues found in 1052 source files"
 - ✅ Business logic preserved: Credit operations and rate limiting workflows fully operational
@@ -616,6 +674,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Achievement**: Successfully migrated email_service to shared OutboxManager, confirming the proven migration pattern is fully replicable.
 
 **Key Changes**:
+
 1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
 2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter
 3. **PDM Composite Pattern**: Added `migrate = "alembic upgrade heads"` and `start-dev = {composite = ["migrate", "start"]}`
@@ -625,6 +684,7 @@ start-dev = {composite = ["migrate", "start"]}
 7. **Local Implementation Cleanup**: Removed `services/email_service/implementations/outbox_manager.py`
 
 **Validation**:
+
 - ✅ Service builds and starts with shared OutboxManager
 - ✅ All 13 OutboxManager unit tests pass (100% pass rate)
 - ✅ All 13 EventProcessor unit tests pass (100% pass rate)  
@@ -639,6 +699,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Achievement**: Successfully migrated identity_service to shared OutboxManager, completing Phase 2 consolidation at 100% (11/11 services).
 
 **Key Changes**:
+
 1. **Shared OutboxManager Integration**: Replaced local implementation with `from huleedu_service_libs.outbox.manager import OutboxManager`
 2. **DI Configuration Update**: Modified provider to use `service_name=settings.SERVICE_NAME` parameter pattern
 3. **Development Infrastructure**: Added dev dependencies and PDM composite pattern (`start-dev = {composite = ["migrate", "start"]}`)
@@ -649,6 +710,7 @@ start-dev = {composite = ["migrate", "start"]}
 8. **Import Ordering Fixes**: Auto-fixed Ruff import sorting issues in test files
 
 **Validation**:
+
 - ✅ Service builds and starts with shared OutboxManager
 - ✅ All 637 identity_service tests pass (100% pass rate)
 - ✅ Type checking passes completely: "Success: no issues found in 1049 source files"
@@ -661,9 +723,10 @@ start-dev = {composite = ["migrate", "start"]}
 **Critical Achievement**: This marks the completion of Phase 2 OutboxManager consolidation across all 11 HuleEdu services, providing unified event publishing infrastructure for production scalability and operational excellence.
 
 **Services Migrated (11/11)** - PHASE 2 COMPLETE ✅:
+
 - batch_orchestrator_service (already using shared)
 - nlp_service (already using shared)
-- result_aggregator_service (already using shared) 
+- result_aggregator_service (already using shared)
 - spellchecker_service (already using shared)
 - **class_management_service** (✅ migrated August 28, 2025)
 - **cj_assessment_service** (✅ migrated August 28, 2025)
@@ -686,6 +749,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Background**: With all services now using shared OutboxManager, we can implement consistent monitoring across the entire event publishing pipeline.
 
 **Tasks**:
+
 1. Add Prometheus metrics for outbox processing (publish rates, failure rates, lag time)
 2. Create Grafana dashboards for event flow visualization across all services
 3. Implement distributed tracing with headers for end-to-end visibility
@@ -703,6 +767,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Background**: With consolidated event publishing, we can now implement schema management across all services for long-term maintainability.
 
 **Tasks**:
+
 1. Set up Confluent Schema Registry integration
 2. Convert event models to Avro schemas with backward compatibility
 3. Implement schema compatibility checking in CI/CD
@@ -720,6 +785,7 @@ start-dev = {composite = ["migrate", "start"]}
 **Background**: With consolidated infrastructure, we can now optimize performance across all services uniformly.
 
 **Tasks**:
+
 1. Implement outbox processing optimization (batch processing, connection pooling)
 2. Create load testing scenarios for event publishing pipeline
 3. Profile and optimize database queries for outbox operations
