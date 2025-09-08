@@ -7,6 +7,9 @@ following Single Responsibility Principle for better maintainability.
 from tests.functional.pipeline_harness_helpers.batch_setup import (
     BatchSetupHelper,
 )
+from tests.functional.pipeline_harness_helpers.bcs_integration import (
+    BCSIntegrationHelper,
+)
 from tests.functional.pipeline_harness_helpers.credit_provisioning import (
     CreditProvisioningHelper,
 )
@@ -27,11 +30,12 @@ from tests.functional.pipeline_harness_helpers.validation import (
 )
 
 __all__ = [
+    "BatchSetupHelper",
+    "BCSIntegrationHelper",
     "CreditProvisioningHelper",
     "EntitlementsMonitorHelper",
+    "EventWaitingHelper",
+    "KafkaMonitorHelper",
     "PipelineValidationHelper",
     "StudentManagementHelper",
-    "EventWaitingHelper",
-    "BatchSetupHelper",
-    "KafkaMonitorHelper",
 ]

@@ -15,24 +15,14 @@ from typing import Any
 
 import pytest
 
-from tests.functional.client_pipeline_test_setup import (
-    create_multiple_test_batches,
-    create_test_batch_with_essays,
-    get_concurrent_monitoring_topics,
-    get_pipeline_monitoring_topics,
-    get_state_aware_monitoring_topics,
+from tests.functional.comprehensive_pipeline_utils import load_real_test_essays
+from tests.functional.pipeline_harness_helpers import (
+    BCSIntegrationHelper,
+    KafkaMonitorHelper,
 )
-from tests.functional.client_pipeline_test_utils import publish_client_pipeline_request
-from tests.functional.comprehensive_pipeline_utils import create_comprehensive_kafka_manager
-from tests.functional.pipeline_validation_utils import (
-    validate_batch_pipeline_state,
-    validate_bcs_dependency_resolution,
-    validate_bcs_integration_occurred,
-)
-from tests.functional.workflow_monitoring_utils import (
-    is_related_to_batch,
-    monitor_pipeline_resolution_workflow,
-)
+from tests.functional.pipeline_harness_helpers.kafka_monitor import PipelineExecutionTracker
+from tests.functional.pipeline_test_harness import PipelineTestHarness
+from tests.functional.pipeline_validation_utils import validate_batch_pipeline_state
 from tests.utils.auth_manager import AuthTestManager
 from tests.utils.distributed_state_manager import distributed_state_manager
 from tests.utils.kafka_test_manager import KafkaTestManager
@@ -56,6 +46,7 @@ class TestClientPipelineResolutionWorkflow:
     @pytest.fixture
     async def kafka_manager(self) -> KafkaTestManager:
         """Initialize KafkaTestManager for event workflow testing."""
+        from tests.functional.comprehensive_pipeline_utils import create_comprehensive_kafka_manager
         return create_comprehensive_kafka_manager()
 
     @pytest.fixture
@@ -104,19 +95,25 @@ class TestClientPipelineResolutionWorkflow:
 
         print("\n🚀 Starting complete client pipeline resolution workflow test")
 
-        try:
-            # 1. Setup: Create batch with real essays
-            batch_id, correlation_id = await create_test_batch_with_essays(
-                service_manager, 3, test_teacher=test_teacher
-            )
+        # Setup harness for batch creation WITH CREDIT PROVISIONING
+        auth_manager = AuthTestManager()
+        harness = PipelineTestHarness(service_manager, kafka_manager, auth_manager)
 
-            # 2. Verify batch is ready for client-triggered processing
+        try:
+            # STEP 1: Create batch using harness (includes credit provisioning!)
+            essay_files = await load_real_test_essays(max_essays=3)
+            batch_id, correlation_id = await harness.setup_guest_batch(
+                essay_files=essay_files,
+                user=test_teacher
+            )
+            print(f"📦 Created test batch: {batch_id} with credits provisioned")
+
+            # STEP 2: Verify batch is ready for client-triggered processing
             print("📊 Verifying batch is ready for client-triggered processing...")
             batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
             pipeline_state = batch_state.get("pipeline_state", {}) if batch_state else {}
 
             # Handle the case where pipeline_state might not have cj_assessment initialized yet
-            # or might be an empty dict if no pipeline state exists
             if not pipeline_state:
                 print("⚠️ No pipeline state found yet - batch may not be fully initialized")
                 cj_assessment_status = "not_initialized"
@@ -128,111 +125,85 @@ class TestClientPipelineResolutionWorkflow:
                 elif isinstance(cj_assessment_data, dict):
                     cj_assessment_status = cj_assessment_data.get("status", "unknown")
                 else:
-                    # Handle case where it might not be a dictionary
                     print(f"⚠️ Unexpected cj_assessment data type: {type(cj_assessment_data)}")
                     cj_assessment_status = "unknown"
 
             print(f"📋 CJ Assessment status: {cj_assessment_status}")
             print(f"📊 Full pipeline state: {pipeline_state}")
 
-            # With our new simplified architecture, pipelines should be pending_dependencies
-            # (waiting for client trigger) or not yet initialized if batch is very new
-            if cj_assessment_status not in ["pending_dependencies", "not_initialized", "not_found"]:
-                print(
-                    f"⚠️ Unexpected status {cj_assessment_status}, "
-                    f"continuing test to see actual behavior"
-                )
-
-            # Verify the system is correctly waiting for client trigger (not auto-starting)
-            # Accept both pending_dependencies (ideal) and not_initialized (batch very new)
+            # Verify the system is correctly waiting for client trigger
             expected_statuses = ["pending_dependencies", "not_initialized", "not_found"]
             assert cj_assessment_status in expected_statuses, (
                 f"Expected cj_assessment to be one of {expected_statuses} "
-                f"(waiting for client trigger), "
-                f"but got: {cj_assessment_status}"
+                f"(waiting for client trigger), but got: {cj_assessment_status}"
             )
             print("✅ Batch is ready and correctly waiting for client-triggered processing")
 
-            # 3. Setup pipeline monitoring for the client-initiated request (start at latest offset)
-            pipeline_topics = get_pipeline_monitoring_topics()
+            # STEP 3: Start consumer for monitoring
+            await harness.start_consumer()
 
-            async with kafka_manager.consumer(
-                "client_pipeline_resolution_e2e",
-                pipeline_topics,
-                auto_offset_reset="latest",
-            ) as consumer:
-                # 4. Publish ClientBatchPipelineRequestV1 event to trigger cj_assessment
-                request_correlation_id = await publish_client_pipeline_request(
-                    kafka_manager,
-                    batch_id,
-                    "cj_assessment",  # Use cj_assessment pipeline which is enabled
-                    correlation_id,
-                )
+            # STEP 4: Trigger pipeline via Kafka using BCS integration helper
+            request_correlation_id = await BCSIntegrationHelper.trigger_pipeline_via_kafka(
+                kafka_manager=kafka_manager,
+                batch_id=batch_id,
+                pipeline_name="cj_assessment"
+            )
+            print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
 
-                print(
-                    "📡 Published cj_assessment pipeline request with "
-                    f"correlation: {request_correlation_id}",
-                )
+            # STEP 5: Monitor pipeline execution using harness infrastructure
+            tracker = PipelineExecutionTracker()
+            completion_event = await KafkaMonitorHelper.monitor_pipeline_execution(
+                consumer=harness.consumer,
+                request_correlation_id=request_correlation_id,
+                batch_correlation_id=correlation_id,
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="huleedu.batch.cj_assessment.completed.v1",
+                tracker=tracker,
+                timeout_seconds=180  # 3 minutes for complete workflow
+            )
 
-                # 5. Monitor complete pipeline resolution workflow
-                workflow_results = await monitor_pipeline_resolution_workflow(
-                    consumer,
-                    batch_id,
-                    request_correlation_id,
-                    timeout_seconds=180,  # 3 minutes for complete workflow
-                )
+            # STEP 6: Validate results
+            print("\n📋 Workflow Results:")
+            print(f"  Initiated phases: {tracker.initiated_phases}")
+            print(f"  Completed phases: {tracker.completed_phases}")
+            print(f"  Pipeline completed: {completion_event is not None}")
 
-                # 6. Validate workflow completion
-                print("\n📋 Workflow Results:")
-                print(
-                    f"  Specialized services triggered: "
-                    f"{workflow_results['specialized_services_triggered']}",
-                )
-                print(f"  Pipeline initiated: {workflow_results['pipeline_initiated']}")
-                print(f"  Completion events: {len(workflow_results['completion_events'])}")
+            # Validate that pipeline resolution triggered services
+            assert completion_event is not None, "Pipeline resolution should trigger service execution"
+            assert len(tracker.completed_phases) > 0, "Pipeline should have executed phases"
 
-                # Validate that pipeline resolution triggered services
-                assert workflow_results["pipeline_initiated"], (
-                    "Pipeline resolution should trigger service execution"
-                )
+            # STEP 7: Validate batch state was updated
+            batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
+            print(f"📊 Final batch state: {batch_state}")
 
-                # 7. Validate batch state was updated
-                batch_state = await validate_batch_pipeline_state(service_manager, batch_id)
-                print(f"📊 Final batch state: {batch_state}")
+            # STEP 8: CRITICAL: Validate BCS ↔ BOS integration actually occurred
+            integration_evidence = await BCSIntegrationHelper.validate_bcs_integration(
+                service_manager, batch_id, "cj_assessment"
+            )
 
-                # 8. CRITICAL: Validate BCS ↔ BOS integration actually occurred
-                integration_evidence = await validate_bcs_integration_occurred(
-                    service_manager,
-                    batch_id,
-                    "cj_assessment",  # Changed from cj_assessment to cj_assessment
-                )
+            # STEP 9: Assert integration-specific validations
+            assert integration_evidence["bcs_http_requests"] > 0, (
+                "BCS should have received HTTP requests from BOS"
+            )
 
-                # 9. Validate BCS performed dependency resolution
-                bcs_resolution_validated = await validate_bcs_dependency_resolution(
-                    integration_evidence,
-                )
+            assert integration_evidence["pipeline_resolution_occurred"], (
+                "BCS should have resolved a pipeline"
+            )
 
-                # 10. Assert integration-specific validations
-                assert integration_evidence["bcs_http_requests"] > 0, (
-                    "BCS should have received HTTP requests from BOS"
-                )
+            assert integration_evidence["dependency_resolution_validated"], (
+                "BCS should have performed intelligent dependency resolution"
+            )
 
-                assert integration_evidence["pipeline_resolution_occurred"], (
-                    "BCS should have resolved a pipeline"
-                )
-
-                assert bcs_resolution_validated, (
-                    "BCS should have performed intelligent dependency resolution"
-                )
-
-                print("🎯 BCS ↔ BOS Integration VALIDATED!")
-                print(f"  ✅ HTTP calls to BCS: {integration_evidence['bcs_http_requests']}")
-                print(f"  ✅ Pipeline resolved: {integration_evidence['resolved_pipeline']}")
-                print(f"  ✅ Dependency analysis: {bcs_resolution_validated}")
+            print("🎯 BCS ↔ BOS Integration VALIDATED!")
+            print(f"  ✅ HTTP calls to BCS: {integration_evidence['bcs_http_requests']}")
+            print(f"  ✅ Pipeline resolved: {integration_evidence['resolved_pipeline']}")
+            print(f"  ✅ Dependency analysis: {integration_evidence['dependency_resolution_validated']}")
 
         except Exception as e:
             print(f"❌ Test failed with error: {e}")
             raise
+        finally:
+            await harness.cleanup()
 
         print("🎉 Complete client pipeline resolution workflow test PASSED!")
 
@@ -258,61 +229,57 @@ class TestClientPipelineResolutionWorkflow:
 
         print("\n🧠 Starting state-aware pipeline optimization test")
 
+        # Setup harness for batch creation WITH CREDIT PROVISIONING
+        auth_manager = AuthTestManager()
+        harness = PipelineTestHarness(service_manager, kafka_manager, auth_manager)
+
         try:
-            # Setup monitoring FIRST to catch all events from batch creation
-            pipeline_topics = get_state_aware_monitoring_topics()
+            # Create batch with harness (includes credits!)
+            essay_files = await load_real_test_essays(max_essays=2)
+            batch_id, correlation_id = await harness.setup_guest_batch(
+                essay_files=essay_files,
+                user=test_teacher
+            )
+            print(f"📦 Created batch {batch_id} for state-aware testing with credits")
 
-            async with kafka_manager.consumer(
-                "state_aware_pipeline_e2e",
-                pipeline_topics,
-            ) as consumer:
-                # Create batch with minimal essays - essays are now stored but
-                # don't auto-trigger pipeline
-                batch_id, correlation_id = await create_test_batch_with_essays(
-                    service_manager, 2, test_teacher=test_teacher
-                )
+            # Start monitoring
+            await harness.start_consumer()
 
-                print(f"📦 Created batch {batch_id} for state-aware testing")
+            # Trigger pipeline via Kafka using BCS integration helper
+            request_correlation_id = await BCSIntegrationHelper.trigger_pipeline_via_kafka(
+                kafka_manager=kafka_manager,
+                batch_id=batch_id,
+                pipeline_name="cj_assessment"
+            )
+            print(f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}")
 
-                # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
-                # This follows the new client-controlled architecture where
-                # pipelines require explicit triggers
-                request_correlation_id = await publish_client_pipeline_request(
-                    kafka_manager,
-                    batch_id,
-                    # Use cj_assessment pipeline which enables
-                    # dependency resolution
-                    "cj_assessment",
-                    correlation_id,
-                )
+            # Monitor execution using harness infrastructure
+            tracker = PipelineExecutionTracker()
+            completion_event = await KafkaMonitorHelper.monitor_pipeline_execution(
+                consumer=harness.consumer,
+                request_correlation_id=request_correlation_id,
+                batch_correlation_id=correlation_id,
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="huleedu.batch.cj_assessment.completed.v1",
+                tracker=tracker,
+                timeout_seconds=60
+            )
 
-                print(
-                    "📡 Published cj_assessment pipeline request with "
-                    f"correlation: {request_correlation_id}",
-                )
+            # Validate state-aware optimization occurred
+            print(f"🧠 State-aware workflow results:")
+            print(f"  Initiated phases: {tracker.initiated_phases}")
+            print(f"  Completed phases: {tracker.completed_phases}")
 
-                # Monitor for the client-triggered pipeline execution
-                workflow_results = await monitor_pipeline_resolution_workflow(
-                    consumer,
-                    batch_id,
-                    request_correlation_id,  # Use the request correlation ID for monitoring
-                    timeout_seconds=60,  # Pipeline should execute after client trigger
-                )
+            assert completion_event is not None, "State-aware pipeline should initiate correctly"
+            assert len(tracker.completed_phases) > 0, "Pipeline should execute phases"
 
-                # Validate state-aware optimization occurred
-                print(f"🧠 State-aware workflow results: {workflow_results}")
-
-                # For fresh essays requesting AI feedback, BCS should determine
-                # that spellcheck is a prerequisite
-                assert workflow_results["pipeline_initiated"], (
-                    "State-aware pipeline should initiate correctly"
-                )
-
-                print("✅ State-aware pipeline optimization validated")
+            print("✅ State-aware pipeline optimization validated")
 
         except Exception as e:
             print(f"❌ State-aware test failed: {e}")
             raise
+        finally:
+            await harness.cleanup()
 
         print("🎉 State-aware pipeline optimization test PASSED!")
 
@@ -338,72 +305,70 @@ class TestClientPipelineResolutionWorkflow:
 
         print("\n🔄 Starting concurrent client pipeline requests test")
 
+        auth_manager = AuthTestManager()
+        
+        # Create multiple harnesses for concurrent testing
+        harnesses = []
+        batch_configs = []
+
         try:
-            # Create multiple batches for concurrent testing
-            batch_ids, correlation_ids = await create_multiple_test_batches(
-                service_manager, 2, 2, test_teacher=test_teacher
+            # Create multiple batches with credits using harness
+            for i in range(2):
+                harness = PipelineTestHarness(service_manager, kafka_manager, auth_manager)
+                essay_files = await load_real_test_essays(max_essays=2)
+                
+                batch_id, correlation_id = await harness.setup_guest_batch(
+                    essay_files=essay_files,
+                    user=test_teacher
+                )
+                
+                harnesses.append(harness)
+                batch_configs.append((batch_id, correlation_id))
+                print(f"📦 Created test batch {i + 1}: {batch_id} with credits")
+
+            # Start consumers for all harnesses
+            for harness in harnesses:
+                await harness.start_consumer()
+
+            # Trigger concurrent pipelines via Kafka
+            tasks = []
+            for batch_id, _ in batch_configs:
+                task = BCSIntegrationHelper.trigger_pipeline_via_kafka(
+                    kafka_manager=kafka_manager,
+                    batch_id=batch_id,
+                    pipeline_name="cj_assessment"
+                )
+                tasks.append(task)
+
+            # Execute all requests concurrently
+            request_correlation_ids = await asyncio.gather(*tasks)
+            print(f"📡 Published {len(tasks)} concurrent pipeline requests")
+
+            # Monitor at least one completion to validate concurrent handling
+            tracker = PipelineExecutionTracker()
+            completion_event = await KafkaMonitorHelper.monitor_pipeline_execution(
+                consumer=harnesses[0].consumer,
+                request_correlation_id=request_correlation_ids[0],
+                batch_correlation_id=batch_configs[0][1],
+                expected_steps=["spellcheck", "cj_assessment"],
+                expected_completion_event="huleedu.batch.cj_assessment.completed.v1",
+                tracker=tracker,
+                timeout_seconds=150  # 2.5 minutes
             )
 
-            # Setup monitoring for concurrent requests
-            pipeline_topics = get_concurrent_monitoring_topics()
+            # Validate at least one request was processed
+            print(f"🔄 Concurrent request monitoring results:")
+            print(f"  First batch completed: {completion_event is not None}")
+            print(f"  Completed phases: {tracker.completed_phases}")
 
-            async with kafka_manager.consumer(
-                "concurrent_pipeline_e2e",
-                pipeline_topics,
-            ) as consumer:
-                # Publish concurrent pipeline requests
-                tasks = []
-                for batch_id, correlation_id in zip(batch_ids, correlation_ids, strict=False):
-                    task = publish_client_pipeline_request(
-                        kafka_manager,
-                        batch_id,
-                        "cj_assessment",
-                        correlation_id,
-                    )
-                    tasks.append(task)
-
-                # Execute all requests concurrently
-                await asyncio.gather(*tasks)
-                print(f"📡 Published {len(tasks)} concurrent pipeline requests")
-
-                # Monitor for successful processing of all requests
-                processed_batches = set()
-                start_time = asyncio.get_event_loop().time()
-                timeout = 150  # 2.5 minutes
-
-                async for message in consumer:
-                    if asyncio.get_event_loop().time() - start_time > timeout:
-                        break
-
-                    try:
-                        if hasattr(message, "value"):
-                            import json
-
-                            event_data = json.loads(message.value.decode("utf-8"))
-
-                            # Check which batch this event belongs to
-                            for batch_id in batch_ids:
-                                if is_related_to_batch(event_data, batch_id, ""):
-                                    processed_batches.add(batch_id)
-                                    print(f"📥 Event received for batch {batch_id}")
-
-                            # Check if all batches have been processed
-                            if len(processed_batches) >= len(batch_ids):
-                                print("✅ All concurrent requests processed")
-                                break
-
-                    except Exception as e:
-                        print(f"⚠️ Error processing concurrent event: {e}")
-                        continue
-
-                # Validate all requests were processed
-                print(f"🔄 Processed batches: {len(processed_batches)}/{len(batch_ids)}")
-                assert len(processed_batches) >= 1, (
-                    "At least one concurrent request should be processed"
-                )
+            assert completion_event is not None, "At least one concurrent request should be processed"
 
         except Exception as e:
             print(f"❌ Concurrent test failed: {e}")
             raise
+        finally:
+            # Cleanup all harnesses
+            for harness in harnesses:
+                await harness.cleanup()
 
         print("🎉 Concurrent client pipeline requests test PASSED!")
