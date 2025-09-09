@@ -147,7 +147,7 @@ class TestEntitlementsRepositoryImplCreditBalance:
     async def test_update_credit_balance_creates_new_record_for_positive_delta(
         self, repository: EntitlementsRepositoryImpl, mock_session: AsyncMock
     ) -> None:
-        """Test update_credit_balance creates new balance record for positive delta on nonexistent subject."""
+        """Test update_credit_balance creates new balance record for positive delta."""
         # Arrange
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None  # No existing balance
@@ -195,7 +195,7 @@ class TestEntitlementsRepositoryImplCreditBalance:
     async def test_update_credit_balance_raises_error_for_negative_delta_on_nonexistent_subject(
         self, repository: EntitlementsRepositoryImpl, mock_session: AsyncMock
     ) -> None:
-        """Test update_credit_balance raises ValueError for negative delta on nonexistent subject."""
+        """Test update_credit_balance raises ValueError for negative delta on nonexistent."""
         # Arrange
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None  # No existing balance

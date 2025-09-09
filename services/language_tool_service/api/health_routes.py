@@ -30,7 +30,7 @@ async def health_check(
 
         # Check Language Tool wrapper health
         try:
-            wrapper_health = await language_tool_wrapper.get_health_status(corr.uuid)
+            wrapper_health = await language_tool_wrapper.get_health_status(corr)
             dependencies["language_tool_wrapper"] = {
                 "status": "healthy",
                 **wrapper_health,

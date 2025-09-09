@@ -147,7 +147,8 @@ class TestClientPipelineResolutionWorkflow:
                 kafka_manager=kafka_manager, batch_id=batch_id, pipeline_name="cj_assessment"
             )
             print(
-                f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}"
+                f"📡 Published cj_assessment pipeline request with correlation: "
+                f"{request_correlation_id}"
             )
 
             # STEP 5: Monitor pipeline execution using harness infrastructure
@@ -200,7 +201,8 @@ class TestClientPipelineResolutionWorkflow:
             print(f"  ✅ HTTP calls to BCS: {integration_evidence['bcs_http_requests']}")
             print(f"  ✅ Pipeline resolved: {integration_evidence['resolved_pipeline']}")
             print(
-                f"  ✅ Dependency analysis: {integration_evidence['dependency_resolution_validated']}"
+                f"  ✅ Dependency analysis: "
+                f"{integration_evidence['dependency_resolution_validated']}"
             )
 
         except Exception as e:
@@ -253,7 +255,8 @@ class TestClientPipelineResolutionWorkflow:
                 kafka_manager=kafka_manager, batch_id=batch_id, pipeline_name="cj_assessment"
             )
             print(
-                f"📡 Published cj_assessment pipeline request with correlation: {request_correlation_id}"
+                f"📡 Published cj_assessment pipeline request with correlation: "
+                f"{request_correlation_id}"
             )
 
             # Monitor execution using harness infrastructure

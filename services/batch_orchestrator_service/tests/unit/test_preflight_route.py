@@ -27,6 +27,7 @@ from services.batch_orchestrator_service.domain.pipeline_credit_guard import (
 from services.batch_orchestrator_service.protocols import (
     BatchConductorClientProtocol,
     BatchRepositoryProtocol,
+    EntitlementsServiceProtocol,
 )
 
 
@@ -121,9 +122,6 @@ class _MockBCS(BatchConductorClientProtocol):
         self, batch_id: str, completed_phase: PhaseName, success: bool = True
     ) -> None:  # pragma: no cover
         return None
-
-
-from services.batch_orchestrator_service.protocols import EntitlementsServiceProtocol
 
 
 class _StubEntitlements(EntitlementsServiceProtocol):

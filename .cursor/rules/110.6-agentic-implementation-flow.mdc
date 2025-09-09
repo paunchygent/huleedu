@@ -46,6 +46,8 @@ For each subtask or phase, execute this exact sequence:
 
 ### 2.5 Test Creation Agent (test-engineer)
 - Follow established test creation methodology (Rule 075)
+- If several tests needed, launch multiple test-engineer agents in parallel according to rule 075.1
+- Ensure all tests are reviewed by lead-architect-planner
 - Study battle-tested patterns from similar components
 - Create comprehensive test coverage using project standards
 - Run tests and ensure 100% pass rate

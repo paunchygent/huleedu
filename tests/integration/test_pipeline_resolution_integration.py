@@ -258,7 +258,7 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.assert_called_once_with(
             "test-batch-integration-001",
         )
-        # Note: get_processing_pipeline_state is called twice - once in handler, once in credit_guard
+        # Note: get_processing_pipeline_state is called twice - handler and credit_guard
         mock_batch_repository.get_processing_pipeline_state.assert_called_with(
             "test-batch-integration-001",
         )

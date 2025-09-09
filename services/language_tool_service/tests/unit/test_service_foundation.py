@@ -114,15 +114,19 @@ class TestServiceFoundation:
             wrapper = await request_container.get(LanguageToolWrapperProtocol)
 
             # Test health status
-            correlation_id = uuid.uuid4()
-            health = await wrapper.get_health_status(correlation_id)
+            correlation_context = CorrelationContext(
+                original="test-id",
+                uuid=uuid.uuid4(),
+                source="generated",
+            )
+            health = await wrapper.get_health_status(correlation_context)
             assert health is not None
             assert health["implementation"] == "stub"
             assert health["status"] == "healthy"
 
             # Test grammar analysis
             text = "This is a test text with there mistake."
-            errors = await wrapper.check_text(text, correlation_id=correlation_id)
+            errors = await wrapper.check_text(text, correlation_context=correlation_context)
             assert isinstance(errors, list)
             # Should detect the "there/their" confusion
             assert len(errors) >= 1

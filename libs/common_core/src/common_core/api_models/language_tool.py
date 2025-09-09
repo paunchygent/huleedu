@@ -10,7 +10,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ====================================================================
 # Request Models
 # ====================================================================
@@ -18,7 +17,7 @@ from pydantic import BaseModel, Field
 
 class GrammarCheckRequest(BaseModel):
     """Request model for Language Tool Service grammar check endpoint.
-    
+
     Used by NLP Service when requesting grammar analysis.
     """
 
@@ -42,7 +41,7 @@ class GrammarCheckRequest(BaseModel):
 
 class GrammarCheckResponse(BaseModel):
     """Response model from Language Tool Service grammar check endpoint.
-    
+
     Returns grammar analysis results to the NLP Service.
     Note: The errors field contains serialized GrammarError objects from
     common_core.events.nlp_events for consistency with event-driven architecture.

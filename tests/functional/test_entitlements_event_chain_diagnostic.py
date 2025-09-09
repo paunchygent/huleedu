@@ -212,7 +212,8 @@ class TestEntitlementsEventChainDiagnostic:
                                 # Check if we have both
                                 if found_balance_changed and found_usage_recorded:
                                     logger.info(
-                                        f"✅ Both Entitlements events found in {time.time() - start_time:.2f}s"
+                                        f"✅ Both Entitlements events found in "
+                                        f"{time.time() - start_time:.2f}s"
                                     )
                                     break
                         except Exception as e:

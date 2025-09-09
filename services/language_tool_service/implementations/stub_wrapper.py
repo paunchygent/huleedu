@@ -9,8 +9,8 @@ integration in future iterations.
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
 
+from huleedu_service_libs.error_handling.correlation import CorrelationContext
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.language_tool_service.config import Settings
@@ -38,7 +38,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
         logger.info("StubLanguageToolWrapper initialized")
 
     async def check_text(
-        self, text: str, correlation_id: UUID, language: str = "en-US"
+        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
     ) -> list[dict[str, Any]]:
         """
         Simulate text checking for grammar and spelling errors.
@@ -47,7 +47,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
 
         Args:
             text: The text to analyze for grammar errors
-            correlation_id: Request correlation ID for tracing
+            correlation_context: Request correlation context for tracing
             language: Language code for analysis (default: en-US)
 
         Returns:
@@ -55,7 +55,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
         """
         logger.debug(
             "Analyzing text for grammar errors (stub mode)",
-            correlation_id=str(correlation_id),
+            correlation_id=str(correlation_context.uuid),
             text_length=len(text),
         )
 
@@ -69,7 +69,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
             context_start = max(0, offset - 20)
             context_end = min(len(text), offset + 25)
             context = text[context_start:context_end]
-            
+
             errors.append(
                 {
                     # Original GrammarError fields
@@ -94,7 +94,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
             context_start = max(0, offset - 20)
             context_end = min(len(text), offset + 25)
             context = text[context_start:context_end]
-            
+
             errors.append(
                 {
                     # Original GrammarError fields
@@ -116,23 +116,26 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
 
         logger.info(
             "Grammar analysis completed (stub mode)",
-            correlation_id=str(correlation_id),
+            correlation_id=str(correlation_context.uuid),
             error_count=len(errors),
         )
 
         return errors
 
-    async def get_health_status(self, correlation_id: UUID) -> dict[str, Any]:
+    async def get_health_status(self, correlation_context: CorrelationContext) -> dict[str, Any]:
         """
         Return stub health status.
 
         Args:
-            correlation_id: Request correlation ID for tracing
+            correlation_context: Request correlation context for tracing
 
         Returns:
             Health status information for stub implementation
         """
-        logger.debug("Health check requested (stub mode)", correlation_id=str(correlation_id))
+        logger.debug(
+            "Health check requested (stub mode)",
+            correlation_id=str(correlation_context.uuid)
+        )
 
         return {
             "implementation": "stub",

@@ -4,7 +4,7 @@
 
 Expose a POST `/v1/check` endpoint that accepts spellchecked text and returns grammar‑only categorization with full context and summary counts.
 
-## Request/Response Models
+## Request/Response Models in common_core
 
 ```python
 class GrammarCheckRequest(BaseModel):

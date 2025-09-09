@@ -188,7 +188,7 @@ async def test_consume_credits_user_success(app_client: QuartTestClient) -> None
     assert ops_resp.status_code == 200
     ops = await ops_resp.get_json()
     assert ops["count"] >= 2
-    # Find the latest operation for our correlation (not returned in list items) so check metric/amount
+    # Find the latest operation for our correlation (not returned in list items)
     found = False
     for op in ops["operations"]:
         if op["metric"] == "cj_comparisons" and op["amount"] == 50:

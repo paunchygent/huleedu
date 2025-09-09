@@ -22,10 +22,10 @@ from dataclasses import dataclass
 from subprocess import TimeoutExpired
 from typing import Iterable
 
+from testcontainers.postgres import PostgresContainer
+
 # Make testcontainers and our own prints visible immediately
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-
-from testcontainers.postgres import PostgresContainer
 
 
 @dataclass

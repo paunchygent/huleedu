@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from dishka import Provider, Scope, provide
@@ -13,6 +16,12 @@ from prometheus_client import REGISTRY, CollectorRegistry
 from quart import g, request
 
 from services.language_tool_service.config import Settings, settings
+from services.language_tool_service.implementations.language_tool_manager import (
+    LanguageToolManager,
+)
+from services.language_tool_service.implementations.language_tool_wrapper import (
+    LanguageToolWrapper,
+)
 from services.language_tool_service.implementations.stub_wrapper import (
     StubLanguageToolWrapper,
 )
@@ -58,9 +67,59 @@ class ServiceImplementationsProvider(Provider):
     """Provider for service implementation dependencies."""
 
     @provide(scope=Scope.APP)
+    async def provide_language_tool_manager(
+        self,
+        settings: Settings,
+    ) -> AsyncIterator[LanguageToolManager]:
+        """Provide Language Tool process manager with lifecycle management."""
+        # Check if we should use the stub implementation
+        use_stub = os.getenv("USE_STUB_LANGUAGE_TOOL", "false").lower() == "true"
+
+        if use_stub:
+            # Return a dummy manager for stub mode
+            manager = LanguageToolManager(settings)
+            yield manager
+        else:
+            # Check if JAR exists before starting
+            jar_path = Path(settings.LANGUAGE_TOOL_JAR_PATH)
+            if not jar_path.exists():
+                # If JAR doesn't exist, fall back to stub mode
+                from huleedu_service_libs.logging_utils import create_service_logger
+
+                logger = create_service_logger("language_tool_service.di")
+                logger.warning(
+                    f"LanguageTool JAR not found at {jar_path}, using stub implementation"
+                )
+                manager = LanguageToolManager(settings)
+                yield manager
+            else:
+                # Production mode: start and manage the server
+                manager = LanguageToolManager(settings)
+                await manager.start()
+                try:
+                    yield manager
+                finally:
+                    await manager.stop()
+
+    @provide(scope=Scope.APP)
     def provide_language_tool_wrapper(
         self,
         settings: Settings,
+        manager: LanguageToolManager,
     ) -> LanguageToolWrapperProtocol:
         """Provide Language Tool wrapper implementation."""
-        return StubLanguageToolWrapper(settings)
+        # Check if we should use the stub implementation
+        use_stub = os.getenv("USE_STUB_LANGUAGE_TOOL", "false").lower() == "true"
+
+        if use_stub:
+            # Use stub implementation for development/testing
+            return StubLanguageToolWrapper(settings)
+
+        # Check if JAR exists
+        jar_path = Path(settings.LANGUAGE_TOOL_JAR_PATH)
+        if not jar_path.exists():
+            # Fall back to stub if JAR is not available
+            return StubLanguageToolWrapper(settings)
+
+        # Use production implementation
+        return LanguageToolWrapper(settings, manager)

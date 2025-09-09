@@ -32,11 +32,11 @@ class LanguageToolRawResponse(BaseModel):
         description="Detected/used language information from LanguageTool",
     )
     software: dict[str, Any] = Field(
-        default=None,
+        default_factory=dict,
         description="LanguageTool software version information",
     )
     warnings: dict[str, Any] = Field(
-        default=None,
+        default_factory=dict,
         description="Any warnings from LanguageTool processing",
     )
 

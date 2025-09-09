@@ -611,7 +611,7 @@ class ClientPipelineRequestHandler:
                 correlation_id=correlation_id,
             )
 
-            # Publish event via outbox publisher if available; else fall back to KafkaBus in settings
+            # Publish event via outbox publisher if available; else fall back to KafkaBus
             topic = topic_name(ProcessingEvent.PIPELINE_DENIED)
             if self.event_publisher is not None:
                 await self.event_publisher.publish_batch_event(envelope)

@@ -255,7 +255,7 @@ class TestApplicationSetup:
 
         @simple_test_app.route("/test-validation-error")
         async def _test_validation_error_route() -> Any:
-            # Simulate a validation error by creating a simple Pydantic model with validation failure
+            # Simulate a validation error by creating a Pydantic model with validation failure
             from pydantic import BaseModel, Field
 
             class TestModel(BaseModel):

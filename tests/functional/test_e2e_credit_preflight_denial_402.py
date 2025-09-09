@@ -258,7 +258,7 @@ class TestCreditPreflightDenial402:
                     ):
                         break
 
-                # Attempt pipeline; expect 402/429, and validate Swedish identity strings remain intact
+                # Attempt pipeline; expect 402/429, validate Swedish identity strings intact
                 try:
                     await service_manager.make_request(
                         method="POST",

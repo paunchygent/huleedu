@@ -85,10 +85,11 @@ class TestE2EIdentityThreading:
                 logger.info(f"✅ CJ pipeline completed in {result.execution_time_seconds:.2f}s")
 
                 # Collect ResourceConsumptionV1 events using the PIPELINE REQUEST correlation ID
-                # The resource consumption events are published with the pipeline request correlation ID
+                # Resource consumption events use the pipeline request correlation ID
                 request_corr_id = result.request_correlation_id
                 logger.info(
-                    f"🔍 Collecting ResourceConsumptionV1 events for pipeline request correlation: {request_corr_id}"
+                    f"🔍 Collecting ResourceConsumptionV1 events for pipeline request: "
+                    f"{request_corr_id}"
                 )
                 resource_events = await kafka_mgr.collect_events(
                     consumer,

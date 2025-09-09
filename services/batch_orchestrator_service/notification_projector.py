@@ -198,7 +198,7 @@ class NotificationProjector:
                 "credit_deficit": max(0, event.required_credits - event.available_credits),
                 "next_steps": self._get_denial_next_steps(event),
             },
-            action_required=True,  # Teacher needs to take action (purchase credits, wait for rate limit)
+            action_required=True,  # Teacher needs to take action (purchase credits, wait)
             correlation_id=correlation_id or "",
             batch_id=event.batch_id,
         )

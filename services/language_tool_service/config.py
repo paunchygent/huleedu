@@ -43,6 +43,44 @@ class Settings(SecureServiceSettings):
         default=3, description="Maximum retries for Language Tool API calls"
     )
 
+    # Java and LanguageTool server configuration
+    LANGUAGE_TOOL_PORT: int = Field(
+        default=8081, description="Internal port for LanguageTool server"
+    )
+    LANGUAGE_TOOL_HEAP_SIZE: str = Field(
+        default="512m", description="JVM heap size for LanguageTool"
+    )
+    LANGUAGE_TOOL_JAR_PATH: str = Field(
+        default="/app/languagetool/languagetool-server.jar",
+        description="Path to LanguageTool server JAR file",
+    )
+    LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS: int = Field(
+        default=10, description="Maximum concurrent requests to LanguageTool"
+    )
+    LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS: int = Field(
+        default=30, description="Timeout for individual LanguageTool requests"
+    )
+    LANGUAGE_TOOL_HEALTH_CHECK_INTERVAL: int = Field(
+        default=30, description="Interval between health checks in seconds"
+    )
+
+    # Category filtering configuration
+    GRAMMAR_CATEGORIES_ALLOWED: list[str] = Field(
+        default_factory=lambda: [
+            "GRAMMAR",
+            "CONFUSED_WORDS",
+            "AGREEMENT",
+            "PUNCTUATION",
+            "REDUNDANCY",
+            "STYLE",
+        ],
+        description="Grammar categories to include in results",
+    )
+    GRAMMAR_CATEGORIES_BLOCKED: list[str] = Field(
+        default_factory=lambda: ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"],
+        description="Grammar categories to filter out from results",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

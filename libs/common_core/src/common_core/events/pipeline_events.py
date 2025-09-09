@@ -29,7 +29,10 @@ class PipelineDeniedV1(BaseEventData):
     available_credits: int = Field(..., description="Credits currently available")
     resource_breakdown: Optional[dict[str, int]] = Field(
         None,
-        description="Breakdown of required resources by type (e.g., {'cj_comparison': 45, 'ai_feedback': 10})",
+        description=(
+            "Breakdown of required resources by type "
+            "(e.g., {'cj_comparison': 45, 'ai_feedback': 10})"
+        ),
     )
     denied_at: datetime = Field(
         default_factory=datetime.utcnow, description="When the denial occurred"

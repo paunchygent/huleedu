@@ -180,7 +180,7 @@ class TestEntitlementsServiceSettings:
             assert database_url == expected_url
 
     def test_database_url_production_environment_with_default_port(self) -> None:
-        """Test production environment uses default port 5432 when HULEEDU_PROD_DB_PORT is not specified."""
+        """Test production environment uses default port 5432 when port is not specified."""
         env_vars = {
             "ENVIRONMENT": "production",
             "HULEEDU_PROD_DB_HOST": "prod.entitlements.example.com",
@@ -196,7 +196,7 @@ class TestEntitlementsServiceSettings:
             assert database_url == expected_url
 
     def test_database_url_service_specific_override(self) -> None:
-        """Test that ENTITLEMENTS_SERVICE_DATABASE_URL environment variable overrides database URL generation."""
+        """Test that ENTITLEMENTS_SERVICE_DATABASE_URL overrides database URL generation."""
         override_url = "postgresql+asyncpg://override_user:override_pass@override.host:5555/override_entitlements"
         env_vars = {
             "ENTITLEMENTS_SERVICE_DATABASE_URL": override_url,

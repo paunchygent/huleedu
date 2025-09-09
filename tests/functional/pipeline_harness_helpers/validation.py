@@ -34,7 +34,7 @@ class PipelineValidationHelper:
             assert phase not in executed_steps, f"Phase {phase} should not have been executed"
             if phase in reused_storage_ids:
                 logger.info(
-                    f"✅ Phase {phase} properly pruned, reused storage ID: {reused_storage_ids[phase]}"
+                    f"✅ Phase {phase} properly pruned, reused storage: {reused_storage_ids[phase]}"
                 )
             else:
                 logger.warning(f"⚠️ Phase {phase} was pruned but no storage ID was reused")

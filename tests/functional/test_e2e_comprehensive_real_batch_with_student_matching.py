@@ -88,7 +88,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
         "file_service",
         "essay_lifecycle_api",  # Note: ServiceTestManager uses 'essay_lifecycle_api' as key
         "class_management_service",
-        "spellchecker_service",  # Note: ServiceTestManager uses 'spellchecker_service' not 'spell_checker_service'
+        "spellchecker_service",  # Note: ServiceTestManager uses 'spellchecker_service'
         "cj_assessment_service",
         "api_gateway_service",
         "entitlements_service",
@@ -116,7 +116,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
         result = await harness.execute_pipeline(
             pipeline_name="cj_assessment",
             expected_steps=["spellcheck", "cj_assessment"],
-            expected_completion_event="batch.cj_assessment.completed",  # Specific CJ completion event
+            expected_completion_event="batch.cj_assessment.completed",  # CJ completion event
             validate_phase_pruning=False,  # First run, no pruning
             timeout_seconds=120,
         )

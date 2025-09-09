@@ -291,7 +291,7 @@ class PipelineTestHarness:
             ras_result_event=tracker.ras_result_event,
             execution_time_seconds=time.time() - start_time,
             entitlements_events=tracker.entitlements_events,  # Include Entitlements tracking
-            request_correlation_id=request_correlation_id,  # Store the pipeline request correlation ID
+            request_correlation_id=request_correlation_id,  # Store the pipeline request ID
         )
 
         # Update harness state
