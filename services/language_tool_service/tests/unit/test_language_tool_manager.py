@@ -182,11 +182,11 @@ class TestLanguageToolManagerStatus:
     @pytest.mark.parametrize(
         "pid, returncode, restart_count, expected_running",
         [
-            (12345, None, 0, True),     # Running process
-            (12345, 0, 1, False),       # Clean exit
-            (12345, 1, 2, False),       # Error exit
-            (12345, -9, 3, False),      # Killed
-            (None, None, 0, False),     # No process
+            (12345, None, 0, True),  # Running process
+            (12345, 0, 1, False),  # Clean exit
+            (12345, 1, 2, False),  # Error exit
+            (12345, -9, 3, False),  # Killed
+            (None, None, 0, False),  # No process
         ],
     )
     def test_get_status_various_process_states(
@@ -220,11 +220,11 @@ class TestLanguageToolManagerHealthCheck:
     @pytest.mark.parametrize(
         "process_state,session_exists,health_result,expected_result",
         [
-            (None, True, True, False),          # No process
-            ("running", False, True, False),    # No HTTP session
-            ("running", True, True, True),      # Healthy
-            ("running", True, False, False),    # Health check fails
-            ("dead", True, True, False),        # Process died
+            (None, True, True, False),  # No process
+            ("running", False, True, False),  # No HTTP session
+            ("running", True, True, True),  # Healthy
+            ("running", True, False, False),  # Health check fails
+            ("dead", True, True, False),  # Process died
         ],
     )
     async def test_health_check_logic(

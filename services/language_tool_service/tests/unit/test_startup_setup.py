@@ -83,9 +83,7 @@ class TestInitializeServicesFunction:
         tracer = mock_app.extensions["tracer"]
         assert tracer is not None
 
-    async def test_initialize_services_swedish_service_contexts(
-        self, mock_app: Quart
-    ) -> None:
+    async def test_initialize_services_swedish_service_contexts(self, mock_app: Quart) -> None:
         """Test initialization with Swedish service naming contexts."""
         # Given
         mock_settings = Mock(spec=Settings)
@@ -98,13 +96,13 @@ class TestInitializeServicesFunction:
         assert "metrics" in mock_app.extensions
         assert "tracer" in mock_app.extensions
 
-    async def test_initialize_services_error_handling(
-        self, mock_settings: Settings
-    ) -> None:
+    async def test_initialize_services_error_handling(self, mock_settings: Settings) -> None:
         """Test error handling during service initialization."""
+
         # Given - Create an app that will cause AttributeError
         class FailingApp:
             """Mock app that fails when accessing extensions."""
+
             @property
             def extensions(self) -> None:
                 raise AttributeError("Simulated failure")
@@ -119,9 +117,7 @@ class TestInitializeServicesFunction:
         with pytest.raises(Exception):
             await initialize_services(mock_app, mock_settings)  # type: ignore[arg-type]
 
-    async def test_initialize_services_extension_handling(
-        self, mock_settings: Settings
-    ) -> None:
+    async def test_initialize_services_extension_handling(self, mock_settings: Settings) -> None:
         """Test extension handling with existing components."""
         # Given
         mock_app = Mock(spec=Quart)
@@ -237,9 +233,7 @@ class TestMetricsInitialization:
             "language_tool_health_checks_total",
         ],
     )
-    async def test_expected_metrics_availability(
-        self, expected_metric_name: str
-    ) -> None:
+    async def test_expected_metrics_availability(self, expected_metric_name: str) -> None:
         """Test expected metrics are available in the metrics dictionary."""
         # Given
         mock_app = Mock(spec=Quart)
@@ -293,9 +287,11 @@ class TestErrorHandlingScenarios:
 
     async def test_initialization_error_propagation(self) -> None:
         """Test errors during initialization are properly propagated."""
+
         # Given - Create an app that will cause failure
         class FailingApp:
             """Mock app that fails when accessing extensions."""
+
             @property
             def extensions(self) -> None:
                 raise AttributeError("Simulated failure")
@@ -327,6 +323,7 @@ class TestErrorHandlingScenarios:
                 @property
                 def extensions(self) -> None:
                     raise AttributeError("Extensions failure")
+
             failing_app: Any = MetricsFailingApp()
         elif error_scenario == "tracer_initialization_error":
             # Test with minimal app setup
@@ -338,6 +335,7 @@ class TestErrorHandlingScenarios:
                 @property
                 def extensions(self) -> None:
                     raise AttributeError("Dishka failure")
+
             failing_app = DishkaFailingApp()
 
         # When/Then - Should handle or propagate errors appropriately
@@ -375,9 +373,7 @@ class TestConfigurationIntegration:
             {"SERVICE_NAME": "grammatik-service", "LOG_LEVEL": "WARNING"},
         ],
     )
-    async def test_various_settings_configurations(
-        self, settings_scenario: dict[str, str]
-    ) -> None:
+    async def test_various_settings_configurations(self, settings_scenario: dict[str, str]) -> None:
         """Test startup with various settings configurations."""
         # Given
         mock_app = Mock(spec=Quart)

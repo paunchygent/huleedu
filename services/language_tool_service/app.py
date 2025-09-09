@@ -14,6 +14,7 @@ from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware imp
 )
 from quart import Quart
 
+from services.language_tool_service.api.grammar_routes import grammar_bp
 from services.language_tool_service.api.health_routes import health_bp
 from services.language_tool_service.config import settings
 from services.language_tool_service.startup_setup import initialize_services, shutdown_services
@@ -42,3 +43,4 @@ async def shutdown() -> None:
 
 # Register Blueprints
 app.register_blueprint(health_bp)
+app.register_blueprint(grammar_bp)

@@ -254,7 +254,9 @@ class TestHealthCheckLogic:
         )
 
         # Verify wrapper was called with correlation context
-        mock_language_tool_wrapper.get_health_status.assert_called_once_with(mock_correlation_context)
+        mock_language_tool_wrapper.get_health_status.assert_called_once_with(
+            mock_correlation_context
+        )
 
         # Verify correlation ID in response
         assert data["correlation_id"] == "test-correlation-id"
@@ -266,7 +268,7 @@ class TestHealthCheckLogic:
         # Mock settings that will cause an exception when SERVICE_NAME is accessed
         mock_settings = MagicMock()
         # Make SERVICE_NAME property raise an exception
-        type(mock_settings).SERVICE_NAME = property(lambda self: 1/0)  # Trigger ZeroDivisionError
+        type(mock_settings).SERVICE_NAME = property(lambda self: 1 / 0)  # Trigger ZeroDivisionError
 
         # Act
         data, status_code = await self._health_check_logic(
