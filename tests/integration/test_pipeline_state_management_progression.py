@@ -132,7 +132,7 @@ class TestPipelineProgressionScenarios:
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck", "cj_assessment"],
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
             cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
@@ -188,7 +188,7 @@ class TestPipelineProgressionScenarios:
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck"],  # CJ assessment disabled, only spellcheck
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
             cj_assessment=PipelineStateDetail(status=PipelineExecutionStatus.PENDING_DEPENDENCIES),
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)

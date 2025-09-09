@@ -12,6 +12,7 @@ Uses real services, mocks only external boundaries.
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import aiohttp
@@ -61,7 +62,11 @@ class TestBCSBOSHttpIntegration:
         - Returns properly structured response
         - HTTP status codes are correct
         """
-        request_data = {"batch_id": "test-batch-http-001", "requested_pipeline": "ai_feedback"}
+        request_data = {
+            "batch_id": "test-batch-http-001",
+            "requested_pipeline": "ai_feedback",
+            "correlation_id": str(uuid.uuid4()),  # Required field for tracing
+        }
 
         async with aiohttp.ClientSession() as session:
             try:
@@ -160,7 +165,11 @@ class TestBCSBOSHttpIntegration:
         - Connection errors are handled gracefully
         - Proper error propagation for network issues
         """
-        request_data = {"batch_id": "test-batch-timeout-001", "requested_pipeline": "ai_feedback"}
+        request_data = {
+            "batch_id": "test-batch-timeout-001",
+            "requested_pipeline": "ai_feedback",
+            "correlation_id": str(uuid.uuid4()),
+        }
 
         # Test with very short timeout to validate timeout handling
         async with aiohttp.ClientSession() as session:
@@ -223,7 +232,11 @@ class TestBCSBOSHttpIntegration:
 
         async def make_request(session: aiohttp.ClientSession, batch_id: str) -> dict[str, Any]:
             """Make a single HTTP request to BCS."""
-            request_data = {**request_data_template, "batch_id": batch_id}
+            request_data = {
+                **request_data_template,
+                "batch_id": batch_id,
+                "correlation_id": str(uuid.uuid4()),
+            }
 
             async with session.post(
                 bcs_endpoint_url,
@@ -290,15 +303,28 @@ class TestBCSBOSHttpIntegration:
         - Data types match expected schema
         - Optional fields are handled correctly
         """
-        # Test various pipeline types
+        # Test various pipeline types (all must be valid pipelines from pipelines.yaml)
         test_cases = [
-            {"batch_id": "test-batch-contract-001", "requested_pipeline": "ai_feedback"},
-            {"batch_id": "test-batch-contract-002", "requested_pipeline": "cj_assessment"},
-            {"batch_id": "test-batch-contract-003", "requested_pipeline": "spellcheck"},
+            {
+                "batch_id": "test-batch-contract-001",
+                "requested_pipeline": "ai_feedback",
+                "correlation_id": str(uuid.uuid4()),
+            },
+            {
+                "batch_id": "test-batch-contract-002",
+                "requested_pipeline": "cj_assessment",
+                "correlation_id": str(uuid.uuid4()),
+            },
+            {
+                "batch_id": "test-batch-contract-003",
+                "requested_pipeline": "nlp",  # Changed from invalid "spellcheck" to valid "nlp"
+                "correlation_id": str(uuid.uuid4()),
+            },
         ]
 
-        async with aiohttp.ClientSession() as session:
-            for i, request_data in enumerate(test_cases):
+        for i, request_data in enumerate(test_cases):
+            # Create a fresh session for each request to avoid connection pool issues
+            async with aiohttp.ClientSession() as session:
                 try:
                     async with session.post(
                         bcs_endpoint_url,

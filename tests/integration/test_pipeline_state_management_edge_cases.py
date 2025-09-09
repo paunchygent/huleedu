@@ -127,11 +127,11 @@ class TestPipelineEdgeCases:
         )
         batch_repository.batch_contexts[batch_id] = batch_context
 
-        # Setup pipeline state with spellcheck in progress and CJ assessment already initiated
+        # Setup pipeline state with spellcheck initiated and CJ assessment already initiated
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck", "cj_assessment"],
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
             cj_assessment=PipelineStateDetail(
                 status=PipelineExecutionStatus.DISPATCH_INITIATED
             ),  # Already initiated
@@ -168,7 +168,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck"],
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -243,7 +243,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck"],
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 
@@ -287,7 +287,7 @@ class TestPipelineEdgeCases:
         initial_pipeline_state = ProcessingPipelineState(
             batch_id=batch_id,
             requested_pipelines=["spellcheck"],
-            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+            spellcheck=PipelineStateDetail(status=PipelineExecutionStatus.DISPATCH_INITIATED),
         )
         await batch_repository.save_processing_pipeline_state(batch_id, initial_pipeline_state)
 

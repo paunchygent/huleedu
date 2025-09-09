@@ -24,7 +24,7 @@ Client Request → BOS → ELS → Services → BOS → Client Response
 ```
 
 ### Service Processing Order
-1. **Spellcheck Service**: Grammar and spelling analysis
+1. **Spellcheck Service**: spell correction to improve downstream NLP processing.
 2. **CJ Assessment Service**: Comparative judgment scoring  
 3. **NLP Service**: Text analysis and feature extraction
 4. **AI Feedback Service**: Automated feedback generation (not implemented)
@@ -74,8 +74,8 @@ Each service follows the pattern:
 ### Processing Services
 
 #### Spellcheck Service
-- **Grammar Analysis**: Spelling, grammar, and style checking
-- **Error Categorization**: Structured error classification
+- **Spell correction**: Spell correction only + records number of errors
+- **Error Categorization**: Structured error report (L2 + pyspellchecker)
 - **Batch Processing**: Parallel processing of all essays
 
 #### CJ Assessment Service  

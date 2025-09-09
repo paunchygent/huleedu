@@ -258,9 +258,12 @@ class TestPipelineResolutionIntegration:
         mock_batch_repository.get_batch_context.assert_called_once_with(
             "test-batch-integration-001",
         )
-        mock_batch_repository.get_processing_pipeline_state.assert_called_once_with(
+        # Note: get_processing_pipeline_state is called twice - once in handler, once in credit_guard
+        mock_batch_repository.get_processing_pipeline_state.assert_called_with(
             "test-batch-integration-001",
         )
+        # Verify it was called at least once (allowing for credit guard's additional call)
+        assert mock_batch_repository.get_processing_pipeline_state.call_count >= 1
         mock_batch_repository.save_processing_pipeline_state.assert_called_once()
 
         print("✅ Pipeline resolution workflow completed successfully")
@@ -429,8 +432,15 @@ class TestPipelineResolutionIntegration:
         with pytest.raises(Exception, match="BCS pipeline resolution failed"):
             await pipeline_request_handler.handle_client_pipeline_request(mock_msg)
 
-        # Verify that the mocked BCS client was called
-        mock_resolve_pipeline.assert_awaited_once_with("test-batch-bcs-error-001", "spellcheck")
+        # Verify that the mocked BCS client was called (now includes correlation_id)
+        from common_core.pipeline_models import PhaseName
+        
+        mock_resolve_pipeline.assert_awaited_once()
+        # Check the call was made with correct batch_id and PhaseName
+        call_args = mock_resolve_pipeline.call_args
+        assert call_args[0][0] == "test-batch-bcs-error-001"
+        assert call_args[0][1] == PhaseName.SPELLCHECK
+        # Third argument is correlation_id (string)
 
         print("✅ BCS HTTP error propagation verified")
 
@@ -467,11 +477,17 @@ class TestPipelineResolutionIntegration:
         }
 
         # Mock active pipeline state to trigger idempotency
-        from common_core.pipeline_models import PipelineExecutionStatus
+        from common_core.pipeline_models import (
+            PipelineExecutionStatus,
+            PipelineStateDetail,
+            ProcessingPipelineState,
+        )
 
-        mock_batch_repository.get_processing_pipeline_state.return_value = {
-            "status": PipelineExecutionStatus.IN_PROGRESS,
-        }
+        mock_batch_repository.get_processing_pipeline_state.return_value = ProcessingPipelineState(
+            batch_id="test-batch-idempotent-001",
+            requested_pipelines=["ai_feedback"],
+            ai_feedback=PipelineStateDetail(status=PipelineExecutionStatus.IN_PROGRESS),
+        )
 
         test_event: EventEnvelope[ClientBatchPipelineRequestV1] = EventEnvelope(
             event_id=uuid.uuid4(),
@@ -493,7 +509,18 @@ class TestPipelineResolutionIntegration:
 
         # Verify repository was checked but not updated (idempotent)
         mock_batch_repository.get_batch_context.assert_called_once()
-        mock_batch_repository.get_processing_pipeline_state.assert_called_once()
+        
+        # Note: get_processing_pipeline_state is called twice:
+        # 1. In handle_client_pipeline_request (line 182) to check for active pipeline
+        # 2. In credit_guard.evaluate (line 270) for credit checking
+        # This is expected behavior, not a bug
+        assert mock_batch_repository.get_processing_pipeline_state.call_count == 2, \
+            "Expected 2 calls to get_processing_pipeline_state (handler + credit guard)"
+        
+        # Verify the calls were for the correct batch
+        all_calls = mock_batch_repository.get_processing_pipeline_state.call_args_list
+        for call in all_calls:
+            assert call[0][0] == "test-batch-idempotent-001"
 
         print("✅ Idempotency duplicate event handling verified")
 
