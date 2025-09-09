@@ -133,8 +133,7 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
             Health status information for stub implementation
         """
         logger.debug(
-            "Health check requested (stub mode)",
-            correlation_id=str(correlation_context.uuid)
+            "Health check requested (stub mode)", correlation_id=str(correlation_context.uuid)
         )
 
         return {

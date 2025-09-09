@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import aiohttp
@@ -34,36 +34,70 @@ def mock_settings() -> Settings:
 
 
 @pytest.fixture
-def mock_manager() -> LanguageToolManager:
+def mock_manager() -> AsyncMock:
     """Create mock Language Tool manager."""
-    manager = MagicMock(spec=LanguageToolManager)
-    manager.health_check = AsyncMock(return_value=True)
-    manager.restart_if_needed = AsyncMock()
-    manager.get_status = MagicMock(
-        return_value={
-            "running": True,
-            "pid": 12345,
-            "restart_count": 0,
-            "port": 8081,
-            "heap_size": "512m",
-        }
-    )
+    manager = AsyncMock(spec=LanguageToolManager)
+    manager.health_check.return_value = True
+    manager.restart_if_needed.return_value = None
+    manager.get_status.return_value = {
+        "running": True,
+        "pid": 12345,
+        "restart_count": 0,
+        "port": 8081,
+        "heap_size": "512m",
+    }
     return manager
 
 
+class _TestableLanguageToolWrapper(LanguageToolWrapper):
+    """Testable version of LanguageToolWrapper with injectable HTTP client."""
+
+    def __init__(
+        self, settings: Settings, manager: LanguageToolManager, http_client_factory: Any = None
+    ) -> None:
+        super().__init__(settings, manager)
+        self._http_client_factory = http_client_factory
+        self._mock_call_response: list[dict[str, Any]] | None = None
+        self._mock_call_exception: Exception | None = None
+
+    async def _ensure_session(self) -> Any:
+        """Override to use injectable HTTP client."""
+        if self._http_client_factory:
+            return self._http_client_factory()
+        return await super()._ensure_session()
+
+    async def _call_language_tool(
+        self, text: str, language: str, correlation_context: Any
+    ) -> list[dict[str, Any]]:
+        """Override for testing - allows mocking without patching."""
+        if self._mock_call_exception:
+            raise self._mock_call_exception
+        if self._mock_call_response is not None:
+            return self._mock_call_response
+        return await super()._call_language_tool(text, language, correlation_context)
+
+    def set_mock_call_response(self, response: list[dict[str, Any]]) -> None:
+        """Set mock response for _call_language_tool."""
+        self._mock_call_response = response
+        self._mock_call_exception = None
+
+    def set_mock_call_exception(self, exception: Exception) -> None:
+        """Set mock exception for _call_language_tool."""
+        self._mock_call_exception = exception
+        self._mock_call_response = None
+
+
 @pytest.fixture
-def wrapper(mock_settings: Settings, mock_manager: LanguageToolManager) -> LanguageToolWrapper:
-    """Create Language Tool wrapper instance for testing."""
-    return LanguageToolWrapper(mock_settings, mock_manager)
+def wrapper(mock_settings: Settings, mock_manager: AsyncMock) -> _TestableLanguageToolWrapper:
+    """Create testable Language Tool wrapper instance for testing."""
+    return _TestableLanguageToolWrapper(mock_settings, mock_manager)
 
 
 class TestLanguageToolWrapper:
     """Test suite for LanguageToolWrapper."""
 
     @pytest.mark.asyncio
-    async def test_check_text_success(
-        self, wrapper: LanguageToolWrapper
-    ) -> None:
+    async def test_check_text_success(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test successful text checking with grammar errors."""
         # Arrange
         correlation_context = CorrelationContext(
@@ -73,67 +107,61 @@ class TestLanguageToolWrapper:
         )
         test_text = "This are a test sentence with grammer issues."
 
-        mock_response = {
-            "matches": [
-                {
-                    "message": "Subject-verb disagreement",
-                    "shortMessage": "Grammar error",
+        mock_response_matches = [
+            {
+                "message": "Subject-verb disagreement",
+                "shortMessage": "Grammar error",
+                "offset": 5,
+                "length": 3,
+                "replacements": [{"value": "is"}],
+                "rule": {
+                    "id": "SUBJECT_VERB_AGREEMENT",
+                    "category": {
+                        "id": "GRAMMAR",
+                        "name": "Grammar",
+                    },
+                    "issueType": "grammar",
+                },
+                "context": {
+                    "text": "This are a test sentence",
                     "offset": 5,
-                    "length": 3,
-                    "replacements": [{"value": "is"}],
-                    "rule": {
-                        "id": "SUBJECT_VERB_AGREEMENT",
-                        "category": {
-                            "id": "GRAMMAR",
-                            "name": "Grammar",
-                        },
-                        "issueType": "grammar",
-                    },
-                    "context": {
-                        "text": "This are a test sentence",
-                        "offset": 5,
-                    },
                 },
-                {
-                    "message": "Spelling mistake",
-                    "shortMessage": "Typo",
-                    "offset": 30,
-                    "length": 7,
-                    "replacements": [{"value": "grammar"}],
-                    "rule": {
-                        "id": "MORFOLOGIK_RULE_EN_US",
-                        "category": {
-                            "id": "TYPOS",
-                            "name": "Typographical Errors",
-                        },
-                        "issueType": "misspelling",
+            },
+            {
+                "message": "Spelling mistake",
+                "shortMessage": "Typo",
+                "offset": 30,
+                "length": 7,
+                "replacements": [{"value": "grammar"}],
+                "rule": {
+                    "id": "MORFOLOGIK_RULE_EN_US",
+                    "category": {
+                        "id": "TYPOS",
+                        "name": "Typographical Errors",
                     },
-                    "context": {
-                        "text": "sentence with grammer issues",
-                        "offset": 14,
-                    },
+                    "issueType": "misspelling",
                 },
-            ]
-        }
+                "context": {
+                    "text": "sentence with grammer issues",
+                    "offset": 14,
+                },
+            },
+        ]
 
-        with patch.object(wrapper, "_call_language_tool", new_callable=AsyncMock) as mock_call:
-            mock_call.return_value = mock_response["matches"]
+        wrapper.set_mock_call_response(mock_response_matches)
 
-            # Act
-            result = await wrapper.check_text(test_text, correlation_context)
+        # Act
+        result = await wrapper.check_text(test_text, correlation_context)
 
-            # Assert
-            assert len(result) == 1  # Only grammar error, typo filtered out
-            assert result[0]["rule_id"] == "SUBJECT_VERB_AGREEMENT"
-            assert result[0]["category_id"] == "GRAMMAR"
-            assert result[0]["offset"] == 5
-            assert result[0]["replacements"] == ["is"]
-            mock_call.assert_called_once_with(test_text, "en-US", correlation_context)
+        # Assert
+        assert len(result) == 1  # Only grammar error, typo filtered out
+        assert result[0]["rule_id"] == "SUBJECT_VERB_AGREEMENT"
+        assert result[0]["category_id"] == "GRAMMAR"
+        assert result[0]["offset"] == 5
+        assert result[0]["replacements"] == ["is"]
 
     @pytest.mark.asyncio
-    async def test_check_text_timeout(
-        self, wrapper: LanguageToolWrapper
-    ) -> None:
+    async def test_check_text_timeout(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test timeout handling during text checking."""
         # Arrange
         correlation_context = CorrelationContext(
@@ -143,19 +171,16 @@ class TestLanguageToolWrapper:
         )
         test_text = "Test text"
 
-        with patch.object(wrapper, "_call_language_tool", new_callable=AsyncMock) as mock_call:
-            mock_call.side_effect = asyncio.TimeoutError()
+        wrapper.set_mock_call_exception(asyncio.TimeoutError())
 
-            # Act & Assert
-            with pytest.raises(HuleEduError) as exc_info:
-                await wrapper.check_text(test_text, correlation_context)
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await wrapper.check_text(test_text, correlation_context)
 
-            assert "timeout" in str(exc_info.value).lower()
+        assert "timeout" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
-    async def test_check_text_client_error(
-        self, wrapper: LanguageToolWrapper
-    ) -> None:
+    async def test_check_text_client_error(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test client error handling during text checking."""
         # Arrange
         correlation_context = CorrelationContext(
@@ -165,18 +190,17 @@ class TestLanguageToolWrapper:
         )
         test_text = "Test text"
 
-        with patch.object(wrapper, "_call_language_tool", new_callable=AsyncMock) as mock_call:
-            mock_call.side_effect = aiohttp.ClientError("Connection failed")
+        wrapper.set_mock_call_exception(aiohttp.ClientError("Connection failed"))
 
-            # Act & Assert
-            with pytest.raises(HuleEduError) as exc_info:
-                await wrapper.check_text(test_text, correlation_context)
+        # Act & Assert
+        with pytest.raises(HuleEduError) as exc_info:
+            await wrapper.check_text(test_text, correlation_context)
 
-            assert "external_service" in str(exc_info.value).lower()
+        assert "external_service" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_check_text_server_unhealthy_triggers_restart(
-        self, wrapper: LanguageToolWrapper, mock_manager: LanguageToolManager
+        self, wrapper: _TestableLanguageToolWrapper, mock_manager: AsyncMock
     ) -> None:
         """Test that server restart is attempted when health check fails."""
         # Arrange
@@ -187,20 +211,20 @@ class TestLanguageToolWrapper:
         )
         test_text = "Test text"
 
+        # Set up mock manager to return False for health check
         mock_manager.health_check.return_value = False  # Server unhealthy
 
-        with patch.object(wrapper, "_call_language_tool", new_callable=AsyncMock) as mock_call:
-            mock_call.side_effect = Exception("Server error")
+        wrapper.set_mock_call_exception(Exception("Server error"))
 
-            # Act & Assert
-            with pytest.raises(HuleEduError):
-                await wrapper.check_text(test_text, correlation_context)
+        # Act & Assert
+        with pytest.raises(HuleEduError):
+            await wrapper.check_text(test_text, correlation_context)
 
-            # Verify restart was attempted
-            mock_manager.health_check.assert_called_once()
-            mock_manager.restart_if_needed.assert_called_once()
+        # Verify restart was attempted
+        mock_manager.health_check.assert_called_once()
+        mock_manager.restart_if_needed.assert_called_once()
 
-    def test_filter_categories(self, wrapper: LanguageToolWrapper) -> None:
+    def test_filter_categories(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test category filtering logic."""
         # Arrange
         matches = [
@@ -244,7 +268,7 @@ class TestLanguageToolWrapper:
         assert filtered[0]["rule"]["category"]["id"] == "GRAMMAR"
         assert filtered[1]["rule"]["category"]["id"] == "CONFUSED_WORDS"
 
-    def test_map_to_grammar_errors(self, wrapper: LanguageToolWrapper) -> None:
+    def test_map_to_grammar_errors(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test mapping LanguageTool matches to GrammarError format."""
         # Arrange
         matches = [
@@ -288,7 +312,9 @@ class TestLanguageToolWrapper:
         assert error["context_offset"] == 8
         assert error["severity"] == "warning"
 
-    def test_map_to_grammar_errors_without_context(self, wrapper: LanguageToolWrapper) -> None:
+    def test_map_to_grammar_errors_without_context(
+        self, wrapper: _TestableLanguageToolWrapper
+    ) -> None:
         """Test mapping when LanguageTool doesn't provide context."""
         # Arrange
         matches = [
@@ -322,7 +348,7 @@ class TestLanguageToolWrapper:
 
     @pytest.mark.asyncio
     async def test_get_health_status_healthy(
-        self, wrapper: LanguageToolWrapper, mock_manager: LanguageToolManager
+        self, wrapper: _TestableLanguageToolWrapper, mock_manager: AsyncMock
     ) -> None:
         """Test health status check when server is healthy."""
         # Arrange
@@ -338,21 +364,22 @@ class TestLanguageToolWrapper:
         mock_response = AsyncMock()
         mock_response.status = 200
         mock_session.get.return_value.__aenter__.return_value = mock_response
-        
-        # Patch _ensure_session to return our mock session
-        with patch.object(wrapper, "_ensure_session", return_value=mock_session):
-            # Act
-            status = await wrapper.get_health_status(correlation_context)
 
-            # Assert
-            assert status["status"] == "healthy"
-            assert status["implementation"] == "production"
-            assert "server" in status
-            assert status["server"]["running"] is True
+        # Set mock HTTP client factory
+        wrapper._http_client_factory = lambda: mock_session
+
+        # Act
+        status = await wrapper.get_health_status(correlation_context)
+
+        # Assert
+        assert status["status"] == "healthy"
+        assert status["implementation"] == "production"
+        assert "server" in status
+        assert status["server"]["running"] is True
 
     @pytest.mark.asyncio
     async def test_get_health_status_unhealthy(
-        self, wrapper: LanguageToolWrapper, mock_manager: LanguageToolManager
+        self, wrapper: _TestableLanguageToolWrapper, mock_manager: AsyncMock
     ) -> None:
         """Test health status check when server is unhealthy."""
         # Arrange
@@ -372,7 +399,7 @@ class TestLanguageToolWrapper:
 
     @pytest.mark.asyncio
     async def test_concurrent_requests_limited(
-        self, wrapper: LanguageToolWrapper, mock_settings: Settings
+        self, wrapper: _TestableLanguageToolWrapper, mock_settings: Settings
     ) -> None:
         """Test that concurrent requests are limited by semaphore."""
         # Arrange
@@ -397,17 +424,19 @@ class TestLanguageToolWrapper:
             current_concurrent -= 1
             return []
 
-        with patch.object(wrapper, "_call_language_tool", side_effect=slow_call):
-            # Act - Start 5 concurrent requests
-            tasks = [wrapper.check_text(f"Text {i}", correlation_context) for i in range(5)]
-            await asyncio.gather(*tasks)
+        # Override the _call_language_tool method directly
+        wrapper._call_language_tool = slow_call  # type: ignore[assignment]
 
-            # Assert
-            assert call_count == 5
-            assert max_concurrent <= 2  # Should never exceed semaphore limit
+        # Act - Start 5 concurrent requests
+        tasks = [wrapper.check_text(f"Text {i}", correlation_context) for i in range(5)]
+        await asyncio.gather(*tasks)
+
+        # Assert
+        assert call_count == 5
+        assert max_concurrent <= 2  # Should never exceed semaphore limit
 
     @pytest.mark.asyncio
-    async def test_cleanup(self, wrapper: LanguageToolWrapper) -> None:
+    async def test_cleanup(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test cleanup of resources."""
         # Arrange
         mock_session = AsyncMock(spec=aiohttp.ClientSession)

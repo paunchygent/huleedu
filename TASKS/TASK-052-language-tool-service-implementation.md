@@ -7,10 +7,11 @@
 
 ## Current Status
 
-**Completed (2/7 subtasks)**:
+**Completed (3/7 subtasks)**:
 
 - ✅ **TASK-052A**: GrammarError enhanced with 4 context fields (`category_id`, `category_name`, `context`, `context_offset`)
 - ✅ **TASK-052B**: Service foundation scaffolded (port 8085, Quart, DI, health endpoints, correlation middleware)
+- ✅ **TASK-052C**: Java wrapper & filtering implemented (process lifecycle, grammar filtering, 299 unit tests)
 
 **Critical Architectural Decisions**:
 
@@ -87,12 +88,9 @@ Spellchecker → Corrected Text → NLP Service
 - Inter-service contracts in `common_core/api_models/language_tool.py`
 - 6 unit tests passing; stub wrapper provides predictable responses
 
-### Phase 3 — Java Wrapper & Filtering (Subtask C)
+### Phase 3 — Java Wrapper & Filtering (Subtask C) ✅ COMPLETED
 
-- Objective: Implement LanguageTool Java process wrapper.
-- Behavior: start/stop lifecycle, per‑request timeouts (≤30s), concurrency limits, OOM restart, and grammar‑only filtering (exclude TYPOS/MISSPELLING/SPELLING; optionally STYLE/TYPOGRAPHY if desired).
-- Outputs: native LanguageTool matches mapped to enhanced GrammarError, plus counts (category/rule).
-- Tests: wrapper happy‑path, timeout, OOM restart, filter correctness.
+Implemented `LanguageToolManager` (subprocess lifecycle, health checks, exponential backoff), `LanguageToolWrapper` (grammar filtering, category exclusion), `StubWrapper` (JAR-absent fallback). 299 unit tests, Rule 075 compliant (no @patch, <500 LoC/file). Integration tests documented for subprocess/signal handling.
 
 ### Phase 4 — HTTP API `/v1/check` (Subtask D)
 
@@ -149,4 +147,4 @@ Spellchecker → Corrected Text → NLP Service
 - Templates: services/file_service/*
 - Integration: services/nlp_service/implementations/language_tool_client_impl.py, command_handlers/batch_nlp_analysis_handler.py
 
-Status: IN PROGRESS (2/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team
+Status: IN PROGRESS (3/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team

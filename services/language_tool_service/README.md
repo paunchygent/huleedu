@@ -37,13 +37,16 @@ This service does not produce or consume Kafka events. It operates as a synchron
 
 ```bash
 # Service Configuration
-LANGUAGE_TOOL_SERVICE_HTTP_PORT=8085        # HTTP server port
-LANGUAGE_TOOL_SERVICE_LOG_LEVEL=INFO        # Logging level
+LANGUAGE_TOOL_SERVICE_HTTP_PORT=8085                    # HTTP server port
+LANGUAGE_TOOL_SERVICE_LOG_LEVEL=INFO                    # Logging level
 
-# LanguageTool Configuration (Future)
-LANGUAGE_TOOL_SERVICE_JAVA_HEAP_SIZE=2G     # JVM heap size
-LANGUAGE_TOOL_SERVICE_LANGUAGETOOL_TIMEOUT=30  # Request timeout in seconds
-LANGUAGE_TOOL_SERVICE_LANGUAGETOOL_MODE=embedded  # embedded|external
+# LanguageTool Configuration
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_JAR_PATH=/app/languagetool/languagetool-server.jar
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_PORT=8081           # Internal Java server port
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEAP_SIZE=512m      # JVM heap size
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS=30
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS=10
+LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_CATEGORIES_BLOCKED=["TYPOS","MISSPELLING","SPELLING"]
 ```
 
 ## Local Development
@@ -68,8 +71,13 @@ pdm run python -m quart run --host 0.0.0.0 --port 8085
 ### Testing
 
 ```bash
-# Run unit tests
+# Run all unit tests (299 tests)
 pdm run pytest services/language_tool_service/tests/unit/ -v
+
+# Run specific test suites
+pdm run pytest services/language_tool_service/tests/unit/test_api_models.py -v  # 69 tests
+pdm run pytest services/language_tool_service/tests/unit/test_config.py -v      # 71 tests
+pdm run pytest services/language_tool_service/tests/unit/test_metrics.py -v     # 57 tests
 
 # Test health endpoint
 curl http://localhost:8085/healthz
@@ -83,11 +91,21 @@ curl http://localhost:8085/metrics
 - ✅ Service foundation (Quart app, DI, health endpoints)
 - ✅ Contract definitions in `common_core`
 - ✅ Stub implementation for development
-- ⏳ Java LanguageTool wrapper integration
-- ⏳ Grammar check API endpoint
+- ✅ Java LanguageTool wrapper integration (LanguageToolManager, LanguageToolWrapper)
+- ✅ Process lifecycle management with health checks and exponential backoff
+- ✅ Grammar-only filtering (excludes TYPOS, MISSPELLING, SPELLING categories)
+- ✅ Comprehensive test coverage (299 unit tests, 100% passing, Rule 075 compliant)
+- ⏳ Grammar check API endpoint (`POST /v1/check`)
 - ⏳ NLP Service integration
-- ⏳ Docker containerization
+- ⏳ Docker containerization with JAR bundling
 - ⏳ Production observability
+
+### Test Coverage Details
+
+- **Total**: 299 unit tests (all passing)
+- **No @patch usage**: Full Rule 075 compliance
+- **Type safety**: Zero mypy errors
+- **Integration tests needed**: Process management, signal handling, real JAR execution
 
 ## Integration with Other Services
 
