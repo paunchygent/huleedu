@@ -16,17 +16,11 @@ Tests both phases with real orchestration and real student essays.
 
 import pytest
 
-from tests.functional.client_pipeline_test_utils import publish_client_pipeline_request
-from tests.functional.comprehensive_pipeline_utils import (
-    create_comprehensive_kafka_manager,
-    load_real_test_essays,
-    register_comprehensive_batch,
-    upload_real_essays,
-    watch_pipeline_progression_with_consumer,
-)
+from tests.functional.comprehensive_pipeline_utils import load_real_test_essays
+from tests.functional.pipeline_test_harness import PipelineTestHarness
 from tests.utils.auth_manager import AuthTestManager
 from tests.utils.distributed_state_manager import distributed_state_manager
-from tests.utils.event_factory import reset_test_event_factory
+from tests.utils.kafka_test_manager import KafkaTestManager
 from tests.utils.service_test_manager import ServiceTestManager
 
 
@@ -48,161 +42,66 @@ async def test_comprehensive_real_batch_pipeline():
 
     Uses real student essays and follows actual event orchestration.
     Uses mock LLM for fast, cost-effective testing.
+    Now using PipelineTestHarness for proper credit provisioning.
     """
     # Ensure clean distributed state for test isolation
     await distributed_state_manager.quick_redis_cleanup()
 
-    # Initialize unique event factory for this test run
-    event_factory = reset_test_event_factory()
-
     # Validate real test essays are available
     test_essays = await load_real_test_essays(max_essays=25)
 
-    # Step 1: Initialize authentication and service manager
+    # Initialize managers
     auth_manager = AuthTestManager()
     service_manager = ServiceTestManager(auth_manager=auth_manager)
+    kafka_manager = KafkaTestManager()
+    
+    # Create test teacher for the batch
     test_teacher = auth_manager.create_teacher_user("Comprehensive Test Teacher")
 
-    # Validate all services are healthy using modern utility
+    # Validate all services are healthy
     endpoints = await service_manager.get_validated_endpoints()
     assert len(endpoints) >= 4, f"Expected at least 4 services, got {len(endpoints)}"
     print(f"✅ {len(endpoints)} services validated healthy")
 
-    # Step 2: Set up Kafka manager for pipeline events FIRST (before any actions)
-    kafka_manager = create_comprehensive_kafka_manager()
-    print("✅ Kafka manager configured for comprehensive pipeline")
+    # Initialize PipelineTestHarness with proper credit provisioning
+    harness = PipelineTestHarness(service_manager, kafka_manager, auth_manager)
 
-    # Step 3: Generate unique correlation ID using event factory
-    test_correlation_id = str(event_factory.create_unique_correlation_id())
-    print(f"🔍 Test correlation ID: {test_correlation_id}")
-
-    # Step 4: Set up consumer FIRST before any actions (critical timing fix)
-    print("🔧 Setting up pipeline event monitoring FIRST...")
-
-    # Get the pipeline topics for monitoring
-    from tests.functional.comprehensive_pipeline_utils import PIPELINE_TOPICS
-
-    pipeline_topics = list(PIPELINE_TOPICS.values())
-
-    # Use KafkaTestManager (modern framework) with raw bytes (production fidelity)
-    async with kafka_manager.consumer("comprehensive_real_batch", pipeline_topics) as consumer:
-        print("✅ Pipeline monitoring consumer ready and positioned")
-
-        # Step 5: Register batch with BOS using modern utility
-        print("📝 Registering batch with BOS to create essay slots...")
-        batch_id, actual_correlation_id = await register_comprehensive_batch(
-            service_manager,
-            len(test_essays),
-            test_correlation_id,
-            test_teacher,  # Pass authenticated user
+    try:
+        # Setup guest batch with credit provisioning (harness does this automatically)
+        print("📝 Setting up GUEST batch with credit provisioning...")
+        batch_id, correlation_id = await harness.setup_guest_batch(
+            essay_files=test_essays,
+            user=test_teacher
         )
-        print(f"✅ Batch registered with BOS: {batch_id}")
-        print(f"🔗 Monitoring events with correlation ID: {actual_correlation_id}")
+        print(f"✅ Batch {batch_id} created with credits provisioned")
+        print(f"🔗 Batch correlation ID: {correlation_id}")
 
-        # Step 6: Upload files to trigger the pipeline using modern utility
-        print("🚀 Uploading real student essays to trigger pipeline...")
-        upload_response = await upload_real_essays(
-            service_manager,
-            batch_id,
-            test_essays,
-            actual_correlation_id,
-            test_teacher,  # Pass authenticated user
-        )
-        print(f"✅ File upload successful: {upload_response}")
-
-        # TIMING FIX: Wait for essays to be processed by ELS before requesting pipeline
-        # The workflow is: Upload → File Processing → ELS processes and stores
-        # essays → ELS BatchEssaysReady → BOS ready to orchestrate
-        # We need to wait for ELS processing to complete before the client can
-        # request pipeline execution
-        print("⏳ Waiting for essays to be processed by ELS...")
-
-        import asyncio
-
-        batch_ready_received = False
-
-        # Monitor for batch readiness event based on Phase 1 flow
-        # GUEST batches (no class_id) use BatchContentProvisioningCompleted
-        # REGULAR batches (with class_id) use BatchEssaysReady after student matching
-        async for message in consumer:
-            try:
-                if hasattr(message, "value"):
-                    import json
-
-                    if isinstance(message.value, bytes):
-                        raw_message = message.value.decode("utf-8")
-                    else:
-                        raw_message = message.value
-
-                    envelope_data = json.loads(raw_message)
-                    event_data = envelope_data.get("data", {})
-                    event_correlation_id = envelope_data.get("correlation_id")
-
-                    # Check for BatchContentProvisioningCompleted (Phase 1 GUEST batch flow)
-                    if (
-                        message.topic == "huleedu.batch.content.provisioning.completed.v1"
-                        and event_correlation_id == actual_correlation_id
-                        and event_data.get("batch_id") == batch_id
-                    ):
-                        ready_count = event_data.get("provisioned_count", 0)
-                        print(
-                            f"📨 BatchContentProvisioningCompleted received: {ready_count} essays "
-                            "ready for processing (GUEST batch flow)",
-                        )
-                        batch_ready_received = True
-                        break
-
-                    # Also check for BatchEssaysReady (in case this is a REGULAR batch)
-                    if (
-                        message.topic == "huleedu.els.batch.essays.ready.v1"
-                        and event_correlation_id == actual_correlation_id
-                        and event_data.get("batch_id") == batch_id
-                    ):
-                        ready_count = len(event_data.get("ready_essays", []))
-                        print(
-                            f"📨 BatchEssaysReady received: {ready_count} essays "
-                            "ready for processing (REGULAR batch flow)",
-                        )
-                        batch_ready_received = True
-                        break
-
-            except Exception as e:
-                print(f"⚠️ Error waiting for batch ready: {e}")
-                continue
-
-        if not batch_ready_received:
-            raise Exception(
-                "Neither BatchContentProvisioningCompleted nor BatchEssaysReady event was "
-                "received - essays may not be processed by ELS",
-            )
-
-        # Give BOS a moment to process the batch readiness event
-        await asyncio.sleep(2)
-        print("✅ Essays confirmed processed by ELS, BOS ready for client pipeline request")
-
-        # ARCHITECTURAL FIX: Explicitly trigger pipeline execution via client request
-        # Essays are now stored persistently and BOS is ready to process client requests
-        # This follows the new client-controlled architecture
-        request_correlation_id = await publish_client_pipeline_request(
-            kafka_manager,
-            batch_id,
-            "cj_assessment",  # Use cj_assessment pipeline for comprehensive testing
-            actual_correlation_id,
-        )
-        print(
-            "📡 Published cj_assessment pipeline request with "
-            f"correlation: {request_correlation_id}"
+        # Execute the pipeline using harness (which triggers via API Gateway)
+        print("🚀 Executing cj_assessment pipeline...")
+        result = await harness.execute_pipeline(
+            pipeline_name="cj_assessment",
+            expected_steps=["spellcheck", "cj_assessment"],
+            expected_completion_event="cj_assessment.completed",
+            validate_phase_pruning=False,
+            timeout_seconds=120  # Increased timeout for 25 essays
         )
 
-        # Step 7: Watch pipeline progression with pre-positioned consumer
-        print("⏳ Watching pipeline progression...")
-        result, entitlements_events = await watch_pipeline_progression_with_consumer(
-            consumer,
-            batch_id,
-            request_correlation_id,
-            len(test_essays),
-            50,  # 50 seconds timeout for faster debugging
-        )
+        # Validate pipeline completed successfully
+        assert result.all_steps_completed, "Pipeline did not complete all steps"
+        assert "spellcheck" in result.executed_steps, "Spellcheck phase not executed"
+        assert "cj_assessment" in result.executed_steps, "CJ assessment phase not executed"
+        
+        # Check that we got RAS results
+        assert result.ras_result_event is not None, "No RAS result event received"
+        ras_data = result.ras_result_event["data"]
+        assert ras_data["batch_id"] == batch_id, "RAS result batch_id mismatch"
+        assert ras_data["total_essays"] == len(test_essays), "Essay count mismatch"
+        
+        print(f"✅ Complete pipeline success! All {len(test_essays)} essays processed")
+        print(f"   Execution time: {result.execution_time_seconds:.2f}s")
+        print(f"   Phases executed: {result.executed_steps}")
+        print(f"   Overall status: {ras_data.get('overall_status')}")
 
-        assert result is not None, "Pipeline did not complete"
-        print(f"✅ Complete pipeline success! Pipeline completed with result: {result}")
+    finally:
+        # Cleanup harness resources
+        await harness.cleanup()

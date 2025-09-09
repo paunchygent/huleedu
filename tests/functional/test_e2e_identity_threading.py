@@ -84,18 +84,20 @@ class TestE2EIdentityThreading:
                 assert "cj_assessment" in result.executed_steps
                 logger.info(f"✅ CJ pipeline completed in {result.execution_time_seconds:.2f}s")
 
-                # Collect ResourceConsumptionV1 events
-                logger.info(f"🔍 Collecting ResourceConsumptionV1 events for correlation: {corr}")
+                # Collect ResourceConsumptionV1 events using the PIPELINE REQUEST correlation ID
+                # The resource consumption events are published with the pipeline request correlation ID
+                request_corr_id = result.request_correlation_id
+                logger.info(f"🔍 Collecting ResourceConsumptionV1 events for pipeline request correlation: {request_corr_id}")
                 resource_events = await kafka_mgr.collect_events(
                     consumer,
                     expected_count=1,
                     timeout_seconds=10,
-                    event_filter=lambda event: event.get("correlation_id") == str(corr),
+                    event_filter=lambda event: event.get("correlation_id") == str(request_corr_id),
                 )
 
                 # Validate ResourceConsumptionV1 event was published
                 assert len(resource_events) > 0, (
-                    f"No ResourceConsumptionV1 events for correlation {corr}"
+                    f"No ResourceConsumptionV1 events for correlation {request_corr_id}"
                 )
 
                 resource_event = resource_events[0]["data"]
