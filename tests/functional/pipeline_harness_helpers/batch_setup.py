@@ -1,12 +1,12 @@
 """Batch setup helper for pipeline tests."""
 
 import asyncio
-from huleedu_service_libs.logging_utils import create_service_logger
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 from common_core.domain_enums import CourseCode
+from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
     from tests.utils.auth_manager import AuthTestManager, AuthTestUser

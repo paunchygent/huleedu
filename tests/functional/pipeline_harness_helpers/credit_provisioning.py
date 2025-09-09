@@ -1,7 +1,8 @@
 """Credit provisioning helper for pipeline tests."""
 
-from huleedu_service_libs.logging_utils import create_service_logger
 from typing import TYPE_CHECKING
+
+from huleedu_service_libs.logging_utils import create_service_logger
 
 if TYPE_CHECKING:
     from tests.utils.auth_manager import AuthTestUser

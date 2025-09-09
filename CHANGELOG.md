@@ -5,6 +5,18 @@ All notable changes to the HuleEdu microservices platform will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### **GrammarError Contract Enhancement**
+
+- **Enhanced GrammarError model** with context fields for improved error analysis
+  - Added `category_id` and `category_name` for detailed grammar categorization
+  - Added `context` and `context_offset` for surrounding text visibility
+  - Enables richer AI feedback generation and analytics
+  - Part of Language Tool Service integration (TASK-052A)
+
 ## [0.3.0] - 2025-01-31
 
 ### 🎉 BCS Integration Complete - Intelligent Pipeline Orchestration

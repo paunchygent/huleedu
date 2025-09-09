@@ -434,7 +434,7 @@ class TestPipelineResolutionIntegration:
 
         # Verify that the mocked BCS client was called (now includes correlation_id)
         from common_core.pipeline_models import PhaseName
-        
+
         mock_resolve_pipeline.assert_awaited_once()
         # Check the call was made with correct batch_id and PhaseName
         call_args = mock_resolve_pipeline.call_args
@@ -509,14 +509,15 @@ class TestPipelineResolutionIntegration:
 
         # Verify repository was checked but not updated (idempotent)
         mock_batch_repository.get_batch_context.assert_called_once()
-        
+
         # Note: get_processing_pipeline_state is called twice:
         # 1. In handle_client_pipeline_request (line 182) to check for active pipeline
         # 2. In credit_guard.evaluate (line 270) for credit checking
         # This is expected behavior, not a bug
-        assert mock_batch_repository.get_processing_pipeline_state.call_count == 2, \
+        assert mock_batch_repository.get_processing_pipeline_state.call_count == 2, (
             "Expected 2 calls to get_processing_pipeline_state (handler + credit guard)"
-        
+        )
+
         # Verify the calls were for the correct batch
         all_calls = mock_batch_repository.get_processing_pipeline_state.call_args_list
         for call in all_calls:

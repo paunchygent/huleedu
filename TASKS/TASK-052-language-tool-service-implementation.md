@@ -1,9 +1,22 @@
-# 🧠 ULTRATHINK: TASK-052 — Language Tool Service (Revised)
+# 🧠 ULTRATHINK: TASK-052 — Language Tool Service (IN PROGRESS)
 
 ## Executive Summary
 
 - Purpose: Implement a stateless HTTP Language Tool Service that provides fine‑grained grammar categorization for NLP Phase 2. The service analyzes grammar only (spellchecked text in), returns categorized errors with full context for downstream analytics and feedback, and integrates with NLP via synchronous HTTP.
 - Scope: Service scaffolding, Java LanguageTool wrapper, HTTP API, NLP client integration, observability, and containerization. Includes an explicit common_core event contract enhancement for richer grammar context.
+
+## Current Status
+
+**Completed (2/7 subtasks)**:
+
+- ✅ **TASK-052A**: GrammarError enhanced with 4 context fields (`category_id`, `category_name`, `context`, `context_offset`)
+- ✅ **TASK-052B**: Service foundation scaffolded (port 8085, Quart, DI, health endpoints, correlation middleware)
+
+**Critical Architectural Decisions**:
+
+- Inter-service contracts in `common_core/api_models/language_tool.py` (prevents service coupling)
+- Plain Quart (not HuleEduApp) - no database requirement
+- Stub implementation ready for Java wrapper replacement
 
 ## Linked Subtasks (split for independent teams)
 
@@ -57,32 +70,32 @@ Spellchecker → Corrected Text → NLP Service
 
 ## Phased Plan (Rule 090 compliant)
 
-### Phase 0 — Architecture Study (read‑only)
-- Goals: Align design with File Service and HTTP blueprint; confirm NLP touch‑points.
-- References: 000-rule-index.mdc, 041, 042, 043.2, 084, services/file_service/*, services/nlp_service/*.
-- Deliverable: Agreement on this doc and subtasks split.
+### Phase 0 — Architecture Study ✅ COMPLETED
 
-### Phase 1 — Contracts Update (Subtask A)
-- Objective: Enhance `GrammarError` with required fields to carry full error context.
-- Changes (libs/common_core):
-  - GrammarError: add `category_id: str`, `category_name: str`, `context: str`, `context_offset: int` (required; prototyping accepted).
-  - Update model tests and any consumer serialization logic.
-- Compatibility: NLP mapping updated in Subtask E; other services unaffected.
-- Tests: Unit tests in common_core; contract tests where used.
+- Analyzed File Service patterns, DI architecture, correlation middleware integration
+- Confirmed plain Quart pattern (no HuleEduApp) for stateless services
 
-### Phase 2 — Service Foundation & DI (Subtask B)
-- Objective: Scaffold `services/language_tool_service` per 041.
-- Structure: `app.py`, `api/health_routes.py`, `config.py`, `di.py`, `protocols.py`, `metrics.py`, `validation_models.py`.
-- DI: APP scope wrapper provider; correlation middleware per 043.2.
-- Tests: App startup, health endpoint, DI wiring.
+### Phase 1 — Contracts Update (Subtask A) ✅ COMPLETED  
+
+- Enhanced `GrammarError` with 4 required fields in `libs/common_core/src/common_core/events/nlp_events.py:192-199`
+- 7 unit tests passing in `test_grammar_models.py`
+- NLP mocks updated with context extraction logic
+
+### Phase 2 — Service Foundation & DI (Subtask B) ✅ COMPLETED
+
+- Service scaffolded at port 8085 with Quart, Dishka DI, correlation middleware
+- Inter-service contracts in `common_core/api_models/language_tool.py`
+- 6 unit tests passing; stub wrapper provides predictable responses
 
 ### Phase 3 — Java Wrapper & Filtering (Subtask C)
+
 - Objective: Implement LanguageTool Java process wrapper.
 - Behavior: start/stop lifecycle, per‑request timeouts (≤30s), concurrency limits, OOM restart, and grammar‑only filtering (exclude TYPOS/MISSPELLING/SPELLING; optionally STYLE/TYPOGRAPHY if desired).
 - Outputs: native LanguageTool matches mapped to enhanced GrammarError, plus counts (category/rule).
 - Tests: wrapper happy‑path, timeout, OOM restart, filter correctness.
 
 ### Phase 4 — HTTP API `/v1/check` (Subtask D)
+
 - Objective: Implement the grammar checking endpoint.
 - Request model: `GrammarCheckRequest(text, language)`; validate length and language.
 - Response model: `GrammarCheckResponse(errors, category/rule counts, language, processing_time_ms)`.
@@ -90,18 +103,21 @@ Spellchecker → Corrected Text → NLP Service
 - Tests: contract tests, error mapping, correlation propagation.
 
 ### Phase 5 — NLP Integration & Resilience (Subtask E)
+
 - Objective: Replace NLP `LanguageToolServiceClient` skeleton with real HTTP client.
 - Behavior: POST `/v1/check`, map response to enhanced GrammarError/GrammarAnalysis; add circuit breaker and retry (044.1), timeouts, graceful degradations.
 - Publishing: Continue sending EssayNlpCompletedV1; optionally include summarized counts in `processing_metadata` for analytics.
 - Tests: integration test for BatchNlpAnalysisHandler calling service; resilience tests.
 
 ### Phase 6 — Docker & Compose (Subtask F)
+
 - Objective: Production‑ready container with Java + Python.
 - Pattern: 084-docker-containerization-standards.mdc; `PYTHONPATH=/app`, non‑root, PDM install; include LanguageTool artifacts or JRE install.
 - Compose: Service definition, ports, env vars; no DB; health checks.
 - Tests: build/run validation via `docker compose` and `/healthz`.
 
 ### Phase 7 — Observability & Health (Subtask G)
+
 - Objective: Health endpoints, Prometheus metrics, structured logging, tracing context.
 - Metrics: HTTP request totals, duration, downstream call metrics; wrapper latency.
 - Health: `/healthz` includes JVM status + memory; `/metrics` exposed.
@@ -133,5 +149,4 @@ Spellchecker → Corrected Text → NLP Service
 - Templates: services/file_service/*
 - Integration: services/nlp_service/implementations/language_tool_client_impl.py, command_handlers/batch_nlp_analysis_handler.py
 
-Status: READY FOR IMPLEMENTATION  • Priority: HIGH  • Owner: NLP Platform Team
-
+Status: IN PROGRESS (2/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team

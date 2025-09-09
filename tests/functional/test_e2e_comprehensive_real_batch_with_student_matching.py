@@ -159,6 +159,7 @@ async def test_comprehensive_real_batch_with_student_matching() -> None:
 
         # Get the teacher user from harness
         teacher_user = harness.teacher_user
+        assert teacher_user is not None, "Teacher user must be initialized before credit validation"
         # Use the pipeline request correlation ID (not the completion event's correlation ID)
         request_correlation_id = result.request_correlation_id
 

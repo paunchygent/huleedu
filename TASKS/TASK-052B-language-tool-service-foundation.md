@@ -1,50 +1,29 @@
-# TASK-052B — Language Tool Service Foundation & DI
+# TASK-052B — Language Tool Service Foundation ✅ COMPLETED
 
-## Objective
+## Implementation Summary
 
-Scaffold `services/language_tool_service` as a pure HTTP microservice per 041, with DI, correlation middleware, and health endpoint.
+Scaffolded HTTP service at port 8085 with Quart (not HuleEduApp - no DB requirement):
 
-## Directory Structure
+```python
+# app.py (45 LoC < 150 limit)
+app = Quart(__name__)
+register_error_handlers(app)  # Rule 048
+setup_correlation_middleware(app)  # Rule 043.2
 
+# di.py - Dishka providers
+CoreInfrastructureProvider: APP[Settings, CollectorRegistry, METRICS]
+ServiceImplementationsProvider: APP[LanguageToolWrapperProtocol->StubLanguageToolWrapper]
+RequestScopeProvider: REQUEST[CorrelationContext] from g.correlation_context
+
+# protocols.py
+async def check_text(text: str, correlation_id: UUID, language: str = "en-US") -> list[dict[str, Any]]
 ```
-services/language_tool_service/
-├── app.py                 # Quart app (<150 LoC)
-├── config.py              # Pydantic settings (env_prefix)
-├── di.py                  # Dishka providers (APP scope wrapper)
-├── protocols.py           # LanguageToolWrapperProtocol
-├── metrics.py             # Prometheus registry/metrics
-├── validation_models.py   # Request/response pydantic models
-└── api/
-    ├── __init__.py
-    └── health_routes.py   # /healthz & /metrics
-```
 
-## Boundary Objects & Contracts
+**Contract Separation (Critical Fix)**:
 
-- Protocols: `LanguageToolWrapperProtocol.check_text(text: str, language: str) -> list[GrammarError]`
-- HTTP: `GET /healthz` JSON; `GET /metrics` Prometheus exposition
-- DI scopes: APP (wrapper, metrics); REQUEST (correlation context)
+- **Inter-service**: `common_core/api_models/language_tool.py` - `GrammarCheckRequest/Response`
+- **Intra-service**: `services/language_tool_service/api_models.py` - `LanguageToolRawResponse/Match`
 
-## Shared Libraries
+**Tests**: 6 unit tests in `test_service_foundation.py` (all passing)
 
-- `huleedu_service_libs.middleware.frameworks.quart_correlation_middleware`
-- `prometheus_client` (Rule 071.x)
-- `dishka` (Rule 042)
-
-## Implementation Steps
-
-1. Create `app.py` and register health blueprint.
-2. Configure correlation middleware early (Rule 043.2).
-3. Provide DI container in `di.py` with APP scope providers (metrics, wrapper placeholder).
-4. Implement `config.py` with `env_prefix`, `HTTP_PORT` (8085) and wrapper config (heap, timeouts, mode).
-5. Implement `health_routes.py` returning service up + JVM status placeholder.
-
-## Acceptance Tests
-
-- App boots; `/healthz` returns 200 JSON; `/metrics` scrapes.
-- DI resolves providers; correlation context available in request scope.
-
-## Deliverables
-
-- Service skeleton in repo; running health endpoint locally.
-
+**Remaining**: Replace `StubLanguageToolWrapper` with Java integration (TASK-052C).

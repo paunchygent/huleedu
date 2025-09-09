@@ -87,7 +87,9 @@ class TestE2EIdentityThreading:
                 # Collect ResourceConsumptionV1 events using the PIPELINE REQUEST correlation ID
                 # The resource consumption events are published with the pipeline request correlation ID
                 request_corr_id = result.request_correlation_id
-                logger.info(f"🔍 Collecting ResourceConsumptionV1 events for pipeline request correlation: {request_corr_id}")
+                logger.info(
+                    f"🔍 Collecting ResourceConsumptionV1 events for pipeline request correlation: {request_corr_id}"
+                )
                 resource_events = await kafka_mgr.collect_events(
                     consumer,
                     expected_count=1,

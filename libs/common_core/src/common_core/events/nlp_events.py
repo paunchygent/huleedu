@@ -189,6 +189,14 @@ class GrammarError(BaseModel):
     replacements: list[str] = Field(default_factory=list, description="Suggested corrections")
     category: str = Field(description="Error category (grammar, spelling, style, etc.)")
     severity: str = Field(default="info", description="Error severity (error, warning, info)")
+    category_id: str = Field(
+        description="Language Tool category identifier (e.g., 'GRAMMAR', 'PUNCTUATION')"
+    )
+    category_name: str = Field(
+        description="Human-readable category name (e.g., 'Grammar', 'Punctuation')"
+    )
+    context: str = Field(description="Surrounding text snippet for error context")
+    context_offset: int = Field(description="Character offset of error within the context snippet")
 
 
 class GrammarAnalysis(BaseModel):

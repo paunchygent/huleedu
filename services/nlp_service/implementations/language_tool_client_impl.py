@@ -138,31 +138,51 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
 
         if "their" in text_lower and "there" in text_lower:
             # Mock a their/there confusion error
+            their_offset = text_lower.index("their")
+            # Create context window around the error (20 chars before/after)
+            context_start = max(0, their_offset - 20)
+            context_end = min(len(text), their_offset + 25)
+            context_snippet = text[context_start:context_end]
+            context_offset = their_offset - context_start
             mock_errors.append(
                 GrammarError(
                     rule_id="CONFUSION_RULE",
                     message="Possible confusion between 'their' and 'there'",
                     short_message="Word confusion",
-                    offset=text_lower.index("their"),
+                    offset=their_offset,
                     length=5,
                     replacements=["there"],
                     category="grammar",
                     severity="warning",
+                    category_id="GRAMMAR",
+                    category_name="Grammar",
+                    context=context_snippet,
+                    context_offset=context_offset,
                 )
             )
 
         if "  " in text:
             # Mock a double space error
+            double_space_offset = text.index("  ")
+            # Create context window around the error (15 chars before/after)
+            context_start = max(0, double_space_offset - 15)
+            context_end = min(len(text), double_space_offset + 17)
+            context_snippet = text[context_start:context_end]
+            context_offset = double_space_offset - context_start
             mock_errors.append(
                 GrammarError(
                     rule_id="DOUBLE_SPACE",
                     message="Double space detected",
                     short_message="Extra space",
-                    offset=text.index("  "),
+                    offset=double_space_offset,
                     length=2,
                     replacements=[" "],
                     category="typography",
                     severity="info",
+                    category_id="PUNCTUATION",
+                    category_name="Punctuation",
+                    context=context_snippet,
+                    context_offset=context_offset,
                 )
             )
 

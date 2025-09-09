@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 if TYPE_CHECKING:
     from tests.utils.kafka_test_manager import KafkaTestManager
 
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from tests.functional.pipeline_harness_helpers.entitlements_monitor import (
     EntitlementsMonitorHelper,
 )
-from huleedu_service_libs.logging_utils import create_service_logger
 
 logger = create_service_logger("test.kafka_monitor")
 

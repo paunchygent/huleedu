@@ -54,7 +54,7 @@ async def test_comprehensive_real_batch_pipeline():
     auth_manager = AuthTestManager()
     service_manager = ServiceTestManager(auth_manager=auth_manager)
     kafka_manager = KafkaTestManager()
-    
+
     # Create test teacher for the batch
     test_teacher = auth_manager.create_teacher_user("Comprehensive Test Teacher")
 
@@ -70,8 +70,7 @@ async def test_comprehensive_real_batch_pipeline():
         # Setup guest batch with credit provisioning (harness does this automatically)
         print("📝 Setting up GUEST batch with credit provisioning...")
         batch_id, correlation_id = await harness.setup_guest_batch(
-            essay_files=test_essays,
-            user=test_teacher
+            essay_files=test_essays, user=test_teacher
         )
         print(f"✅ Batch {batch_id} created with credits provisioned")
         print(f"🔗 Batch correlation ID: {correlation_id}")
@@ -83,20 +82,20 @@ async def test_comprehensive_real_batch_pipeline():
             expected_steps=["spellcheck", "cj_assessment"],
             expected_completion_event="cj_assessment.completed",
             validate_phase_pruning=False,
-            timeout_seconds=120  # Increased timeout for 25 essays
+            timeout_seconds=120,  # Increased timeout for 25 essays
         )
 
         # Validate pipeline completed successfully
         assert result.all_steps_completed, "Pipeline did not complete all steps"
         assert "spellcheck" in result.executed_steps, "Spellcheck phase not executed"
         assert "cj_assessment" in result.executed_steps, "CJ assessment phase not executed"
-        
+
         # Check that we got RAS results
         assert result.ras_result_event is not None, "No RAS result event received"
         ras_data = result.ras_result_event["data"]
         assert ras_data["batch_id"] == batch_id, "RAS result batch_id mismatch"
         assert ras_data["total_essays"] == len(test_essays), "Essay count mismatch"
-        
+
         print(f"✅ Complete pipeline success! All {len(test_essays)} essays processed")
         print(f"   Execution time: {result.execution_time_seconds:.2f}s")
         print(f"   Phases executed: {result.executed_steps}")
