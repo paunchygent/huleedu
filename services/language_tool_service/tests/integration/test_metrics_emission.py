@@ -9,192 +9,27 @@ All tests use real Quart application with actual DI container and Prometheus col
 
 from __future__ import annotations
 
-import os
-from collections.abc import AsyncGenerator, Generator
 from typing import Any
-from uuid import UUID
 
 import pytest
-from dishka import Provider, Scope, make_async_container, provide
-from huleedu_service_libs.error_handling.correlation import CorrelationContext
-from huleedu_service_libs.error_handling.quart import register_error_handlers
-from prometheus_client import REGISTRY, CollectorRegistry
 from prometheus_client.parser import text_string_to_metric_families
-from quart import Quart
-from quart_dishka import QuartDishka
 
-from services.language_tool_service.api.grammar_routes import grammar_bp
-from services.language_tool_service.api.health_routes import health_bp
-from services.language_tool_service.config import Settings
-from services.language_tool_service.implementations.stub_wrapper import StubLanguageToolWrapper
-from services.language_tool_service.metrics import METRICS
-from services.language_tool_service.protocols import (
-    LanguageToolManagerProtocol,
-    LanguageToolWrapperProtocol,
-)
+# MetricsAwareStubWrapper is now defined in conftest.py to be shared across all integration tests
 
 
-class MetricsAwareStubWrapper(StubLanguageToolWrapper):
-    """Test-specific stub wrapper that emits metrics like the real wrapper."""
-
-    def __init__(self, settings: Settings, metrics: dict[str, Any] | None = None) -> None:
-        """Initialize with metrics support."""
-        super().__init__(settings)
-        self.metrics = metrics
-
-    async def check_text(
-        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
-    ) -> list[dict[str, Any]]:
-        """Check text and emit wrapper duration metrics like real wrapper."""
-        import time
-
-        # Start timing like real wrapper
-        wrapper_start = time.perf_counter()
-
-        # Call the actual stub implementation
-        result = await super().check_text(text, correlation_context, language)
-
-        # Emit metrics like real wrapper
-        wrapper_duration = time.perf_counter() - wrapper_start
-        if self.metrics and "wrapper_duration_seconds" in self.metrics:
-            self.metrics["wrapper_duration_seconds"].labels(language=language).observe(
-                wrapper_duration
-            )
-
-        return result
+# Registry clearing functionality is handled by the shared fixture in conftest.py
 
 
-def _clear_prometheus_registry() -> None:
-    """Clear Prometheus registry to prevent metric conflicts between tests."""
-    collectors = list(REGISTRY._collector_to_names.keys())
-    for collector in collectors:
-        try:
-            REGISTRY.unregister(collector)
-        except KeyError:
-            # Collector already unregistered
-            pass
+# The MetricsAwareStubWrapper is now in conftest.py for use by all integration tests
 
 
-class IntegrationTestProvider(Provider):
-    """Test provider for integration testing with real metrics but stubbed LanguageTool."""
-
-    scope = Scope.APP
-
-    @provide
-    def provide_settings(self) -> Settings:
-        """Provide test settings configured for integration testing."""
-        # Use environment variables or defaults for integration testing
-        return Settings(
-            SERVICE_NAME="language-tool-service",
-            ENVIRONMENT="testing",
-            LOG_LEVEL="INFO",
-            HOST="127.0.0.1",
-            PORT=8085,
-            LANGUAGE_TOOL_JAR_PATH="/nonexistent/path/to/test.jar",  # Forces stub mode
-            LANGUAGE_TOOL_HOST="localhost",
-            LANGUAGE_TOOL_PORT=8081,
-            LANGUAGE_TOOL_HEAP_SIZE="1g",
-        )
-
-    @provide
-    def provide_metrics_registry(self) -> CollectorRegistry:
-        """Provide the real Prometheus metrics registry."""
-        return REGISTRY
-
-    @provide
-    def provide_metrics(self) -> dict[str, Any]:
-        """Provide the real Prometheus metrics dictionary."""
-        return METRICS
-
-    @provide
-    def provide_language_tool_wrapper(
-        self, settings: Settings, metrics: dict[str, Any]
-    ) -> LanguageToolWrapperProtocol:
-        """Provide metrics-aware stub Language Tool wrapper for integration testing."""
-        return MetricsAwareStubWrapper(settings, metrics)
-
-    @provide
-    def provide_language_tool_manager(self, settings: Settings) -> LanguageToolManagerProtocol:
-        """Provide a mock Language Tool manager for integration testing."""
-        from unittest.mock import AsyncMock
-
-        mock_manager = AsyncMock(spec=LanguageToolManagerProtocol)
-        mock_manager.get_jvm_heap_usage.return_value = 128.0  # Mock heap usage
-        return mock_manager
-
-    @provide(scope=Scope.REQUEST)
-    def provide_correlation_context(self) -> CorrelationContext:
-        """Provide correlation context for request tracking."""
-        return CorrelationContext(
-            original="integration-test-correlation-id",
-            uuid=UUID("12345678-1234-1234-1234-123456789012"),
-            source="generated",
-        )
+# Registry cleanup is now handled by the shared clear_prometheus_registry fixture in conftest.py
 
 
-@pytest.fixture
-def clear_registry() -> Generator[None, None, None]:
-    """Clear Prometheus registry before each test to prevent conflicts."""
-    _clear_prometheus_registry()
-    yield
-    _clear_prometheus_registry()
+# Use the shared integration_app fixture from conftest.py to avoid conflicts
 
 
-@pytest.fixture
-async def integration_app() -> AsyncGenerator[Quart, None]:
-    """Create real Quart application with actual DI container for integration testing.
-
-    This fixture creates a real application instance with:
-    - Actual Prometheus metrics collection
-    - Real DI container with test providers
-    - Real HTTP routes and error handling
-    - Stubbed LanguageTool implementation for reliability
-    """
-    # Force stub mode for reliable integration testing
-    os.environ["USE_STUB_LANGUAGE_TOOL"] = "true"
-
-    app = Quart(__name__)
-    app.config.update({"TESTING": True})
-
-    # Register actual blueprints
-    app.register_blueprint(grammar_bp)
-    app.register_blueprint(health_bp)
-
-    # Register real error handlers
-    register_error_handlers(app)
-
-    # Set up real DI container with integration test providers
-    container = make_async_container(IntegrationTestProvider())
-    QuartDishka(app=app, container=container)
-
-    # Store real metrics in app extensions (like production)
-    app.extensions = getattr(app, "extensions", {})
-    app.extensions["metrics"] = METRICS
-
-    # Setup HTTP metrics middleware like in production
-    from huleedu_service_libs.metrics_middleware import setup_metrics_middleware
-
-    setup_metrics_middleware(
-        app=app,
-        request_count_metric_name="request_count",
-        request_duration_metric_name="request_duration",
-        status_label_name="status",
-        logger_name="language_tool_service.metrics",
-    )
-
-    try:
-        yield app
-    finally:
-        await container.close()
-        # Clean up environment
-        os.environ.pop("USE_STUB_LANGUAGE_TOOL", None)
-
-
-@pytest.fixture
-async def client(integration_app: Quart) -> AsyncGenerator[Any, None]:
-    """Create test client for real HTTP requests."""
-    async with integration_app.test_client() as test_client:
-        yield test_client
+# Use the shared client fixture from conftest.py to avoid conflicts
 
 
 async def _parse_metrics_from_endpoint(client: Any) -> list[Any]:

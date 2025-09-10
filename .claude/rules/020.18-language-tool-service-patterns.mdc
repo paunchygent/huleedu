@@ -1,0 +1,127 @@
+---
+description: Language Tool Service - HTTP grammar checking service with Java subprocess management and dual-mode operation (stub/real)
+alwaysApply: false
+---
+# 020.18: Language Tool Service Architecture
+
+## Service Identity
+- **Package**: `huleedu-language-tool-service`
+- **Ports**: 8085 (HTTP API), 8081 (internal LanguageTool Java server)
+- **Stack**: Quart, Java subprocess, Dishka DI, Prometheus
+- **Purpose**: Grammar and style checking via managed LanguageTool Java process
+- **Database**: None (stateless)
+
+## Service Structure
+
+```
+services/language_tool_service/
+├── app.py                                  # Quart app (<150 LoC)
+├── startup_setup.py                        # DI and lifecycle hooks
+├── api/
+│   ├── grammar_routes.py                  # POST /v1/check endpoint
+│   └── health_routes.py                   # /healthz, /metrics, /health/jvm
+├── implementations/
+│   ├── language_tool_manager.py           # Java process lifecycle
+│   ├── language_tool_wrapper.py           # Real LanguageTool HTTP client
+│   └── stub_wrapper.py                    # Development/test stub
+├── protocols.py                           # Service contracts
+├── di.py                                  # Dishka providers with dual-mode
+└── config.py                              # Settings with JAR path
+```
+
+## Critical Design Decisions
+
+### Dual-Mode Operation
+```python
+# Automatic fallback chain:
+if USE_STUB_LANGUAGE_TOOL == "true":
+    return StubLanguageToolWrapper()  # Test mode
+elif not Path(JAR_PATH).exists():
+    return StubLanguageToolWrapper()  # Fallback
+else:
+    return LanguageToolWrapper()      # Production
+```
+
+### Java Process Management
+- **Startup**: Async subprocess with configurable heap (default 512m)
+- **Health checks**: Every 30s, restart on failure (max 5 in 5 min)
+- **Shutdown**: SIGTERM → wait 10s → SIGKILL
+- **Resource cleanup**: Automatic via async context managers
+
+### Category Filtering
+```python
+GRAMMAR_CATEGORIES_ALLOWED = ["GRAMMAR", "CONFUSED_WORDS", "AGREEMENT", 
+                              "PUNCTUATION", "REDUNDANCY", "STYLE"]
+GRAMMAR_CATEGORIES_BLOCKED = ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"]
+```
+
+## API Contract
+
+### POST /v1/check
+**Request**:
+```json
+{
+    "text": "Text to check for grammar errors",
+    "language": "en-US"  # or sv-SE
+}
+```
+
+**Response** (200 OK):
+```json
+{
+    "errors": [
+        {
+            "rule_id": "CONFUSION_RULE",
+            "message": "Possible confusion of 'there' and 'their'",
+            "offset": 10,
+            "length": 5,
+            "replacements": ["their"]
+        }
+    ],
+    "total_grammar_errors": 1,
+    "grammar_category_counts": {"CONFUSED_WORDS": 1},
+    "language": "en-US",
+    "processing_time_ms": 42
+}
+```
+
+## Service Protocols
+
+```python
+class LanguageToolWrapperProtocol(Protocol):
+    async def check_text(text: str, correlation_context, language="en-US") -> list[dict]
+    async def get_health_status(correlation_context) -> dict
+
+class LanguageToolManagerProtocol(Protocol):
+    async def start() -> None
+    async def stop() -> None
+    async def health_check() -> bool
+    async def restart_if_needed() -> None
+    def get_status() -> dict
+    async def get_jvm_heap_usage() -> float | None
+```
+
+## Critical Settings
+
+```python
+# Environment variables (LANGUAGE_TOOL_SERVICE_ prefix)
+HTTP_PORT = 8085
+LANGUAGE_TOOL_PORT = 8081
+LANGUAGE_TOOL_JAR_PATH = "/app/languagetool/languagetool-server.jar"
+LANGUAGE_TOOL_HEAP_SIZE = "512m"  # JVM -Xmx
+LANGUAGE_TOOL_HEALTH_CHECK_INTERVAL = 30  # seconds
+LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS = 30
+USE_STUB_LANGUAGE_TOOL = "false"  # Force stub mode for testing
+```
+
+## Metrics
+- `wrapper_duration_seconds{language}`: Processing time histogram
+- `api_errors_total{endpoint,error_type}`: Error counter
+- JVM heap usage exposed at `/health/jvm`
+
+## Production Requirements
+- **JAR acquisition**: Downloaded in Dockerfile build stage
+- **Java runtime**: OpenJDK 21+ required
+- **Memory**: 1GB minimum (512MB heap + overhead)
+- **CPU**: 1 core minimum, benefits from multi-core
+- **Health monitoring**: Kubernetes readiness probe on /healthz
