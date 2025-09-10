@@ -7,12 +7,13 @@
 
 ## Current Status
 
-**Completed (4/7 subtasks)**:
+**Completed (5/7 subtasks)**:
 
 - ✅ **TASK-052A**: GrammarError enhanced with 4 context fields (`category_id`, `category_name`, `context`, `context_offset`)
 - ✅ **TASK-052B**: Service foundation scaffolded (port 8085, Quart, DI, health endpoints, correlation middleware)
 - ✅ **TASK-052C**: Java wrapper & filtering implemented (process lifecycle, grammar filtering, 299 unit tests)
 - ✅ **TASK-052D**: HTTP API `/v1/check` implemented (word-based metrics, 366 tests passing, 100% coverage)
+- ✅ **TASK-052F (Part 1)**: Docker & Service Startup - containerization files created (Dockerfile, docker-compose entries)
 
 **Critical Architectural Decisions**:
 
@@ -101,19 +102,15 @@ Implemented `LanguageToolManager` (subprocess lifecycle, health checks, exponent
 - 366 unit tests passing; reorganized into 6 focused test files (<300 LoC each, Rule 075 compliant)
 - Fixed: language pattern to accept "auto", test infrastructure for Dishka mocking, processing time calculation
 
-### Phase 5 — Docker & Service Startup (Subtask F - Part 1) IN PROGRESS
+### Phase 5 — Docker & Service Startup (Subtask F - Part 1) ✅ COMPLETED
 
-Pattern validation required:
-- Verify pyproject.toml structure (no version pins)
-- Verify hypercorn_config.py pattern (not main.py)
-- Verify Dockerfile multi-stage build
-
-Files to create:
-- `pyproject.toml`
-- `hypercorn_config.py` 
-- `Dockerfile` (Java 17 + Python 3.11)
-- `Dockerfile.dev`
-- docker-compose.yml entries
+Created containerization files following established patterns:
+- `pyproject.toml` - PDM configuration without version pinning
+- `hypercorn_config.py` - Service startup configuration (port 8085)
+- `Dockerfile` - Multi-stage build with Java 17 + Python 3.11
+- `Dockerfile.dev` - Development image with hot-reload support
+- `docker-compose.services.yml` - Added language_tool_service entry
+- `docker-compose.dev.yml` - Added development overrides
 
 ### Phase 6 — NLP Integration & Resilience (Subtask E)
 
@@ -157,7 +154,7 @@ Files to create:
 - Templates: services/file_service/*
 - Integration: services/nlp_service/implementations/language_tool_client_impl.py, command_handlers/batch_nlp_analysis_handler.py
 
-Status: IN PROGRESS (4/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team
+Status: IN PROGRESS (5/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team
 
 ## Pattern Requirements
 

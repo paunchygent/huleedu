@@ -1,0 +1,68 @@
+[project]
+name = "huleedu-language-tool-service"
+version = "0.1.0"
+description = "HuleEdu Language Tool Service for grammar analysis and categorization"
+authors = [
+    {name = "HuleEdu Team", email = "dev@huledu.com"},
+]
+requires-python = ">=3.11"
+dependencies = [
+    "quart",
+    "hypercorn",
+    "aiohttp",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "prometheus-client",
+    "dishka",
+    "quart-dishka",
+    "huleedu-common-core",
+    "huleedu-service-libs",
+]
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock",
+    "faker",
+]
+
+[tool.pdm.scripts]
+start = "hypercorn app:app --config python:hypercorn_config"
+dev = "quart --app app:app --debug run -p 8085"
+test = "pytest tests/"
+test-unit = "pytest tests/unit/"
+test-integration = "pytest tests/integration/"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# Ignore missing imports for external libraries without stubs
+[[tool.mypy.overrides]]
+module = [
+    "aiohttp.*",
+    "dishka.*",
+    "quart_dishka.*",
+    "prometheus_client.*",
+]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

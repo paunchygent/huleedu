@@ -826,3 +826,46 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  language_tool_service:
+    build:
+      context: .
+      dockerfile: services/language_tool_service/Dockerfile
+    container_name: huleedu_language_tool_service
+    restart: unless-stopped
+    depends_on:
+      kafka_topic_setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - huleedu_internal_network
+    ports:
+      - "8085:8085"
+    environment:
+      # Core environment
+      - ENV_TYPE=docker
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      # Service configuration
+      - LANGUAGE_TOOL_SERVICE_PORT=8085
+      - LANGUAGE_TOOL_SERVICE_HOST=0.0.0.0
+      - LANGUAGE_TOOL_SERVICE_LOG_LEVEL=INFO
+      - LANGUAGE_TOOL_SERVICE_REDIS_URL=redis://redis:6379
+      # LanguageTool configuration
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_PORT=8081
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEAP_SIZE=512m
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_JAR_PATH=/app/languagetool/languagetool-server.jar
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS=10
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS=30
+      - LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEALTH_CHECK_INTERVAL=30
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=language_tool_service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
