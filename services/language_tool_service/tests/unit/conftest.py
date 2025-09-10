@@ -59,11 +59,22 @@ def mock_metrics() -> dict[str, Any]:
         "request_duration", "Request duration", ["method", "endpoint"], registry=test_registry
     )
 
+    # New metrics for wrapper duration and API errors
+    wrapper_duration_seconds = Histogram(
+        "wrapper_duration_seconds", "Wrapper call duration", ["language"], registry=test_registry
+    )
+
+    api_errors_total = Counter(
+        "api_errors_total", "API errors", ["endpoint", "error_type"], registry=test_registry
+    )
+
     return {
         "request_count": request_count,
         "grammar_analysis_total": grammar_analysis_total,
         "grammar_analysis_duration_seconds": grammar_analysis_duration_seconds,
         "request_duration": request_duration,
+        "wrapper_duration_seconds": wrapper_duration_seconds,
+        "api_errors_total": api_errors_total,
     }
 
 

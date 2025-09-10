@@ -7,6 +7,8 @@ The service provides grammar categorization functionality via HTTP endpoints.
 
 from __future__ import annotations
 
+import time
+
 from huleedu_service_libs.error_handling.quart import register_error_handlers
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
 from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware import (
@@ -25,6 +27,9 @@ logger = create_service_logger("language_tool_service.app")
 
 app = Quart(__name__)
 
+# Track service startup time for uptime calculation
+SERVICE_START_TIME = time.time()
+
 
 @app.before_serving
 async def startup() -> None:
@@ -32,6 +37,11 @@ async def startup() -> None:
     setup_correlation_middleware(app)  # Early setup per Rule 043.2
     register_error_handlers(app)  # Register structured error handlers per Rule 048
     await initialize_services(app, settings)
+
+    # Store start time in app extensions for access in health checks
+    app.extensions = getattr(app, "extensions", {})
+    app.extensions["service_start_time"] = SERVICE_START_TIME
+
     logger.info("Language Tool Service startup completed successfully")
 
 

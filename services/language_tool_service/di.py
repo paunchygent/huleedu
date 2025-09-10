@@ -26,7 +26,10 @@ from services.language_tool_service.implementations.stub_wrapper import (
     StubLanguageToolWrapper,
 )
 from services.language_tool_service.metrics import METRICS
-from services.language_tool_service.protocols import LanguageToolWrapperProtocol
+from services.language_tool_service.protocols import (
+    LanguageToolManagerProtocol,
+    LanguageToolWrapperProtocol,
+)
 
 
 class CoreInfrastructureProvider(Provider):
@@ -106,6 +109,7 @@ class ServiceImplementationsProvider(Provider):
         self,
         settings: Settings,
         manager: LanguageToolManager,
+        metrics: dict[str, Any],
     ) -> LanguageToolWrapperProtocol:
         """Provide Language Tool wrapper implementation."""
         # Check if we should use the stub implementation
@@ -121,5 +125,12 @@ class ServiceImplementationsProvider(Provider):
             # Fall back to stub if JAR is not available
             return StubLanguageToolWrapper(settings)
 
-        # Use production implementation
-        return LanguageToolWrapper(settings, manager)
+        # Use production implementation with metrics
+        return LanguageToolWrapper(settings, manager, metrics)
+
+    @provide(scope=Scope.APP)
+    def provide_language_tool_manager_protocol(
+        self, manager: LanguageToolManager
+    ) -> LanguageToolManagerProtocol:
+        """Provide Language Tool manager as protocol interface."""
+        return manager

@@ -10,7 +10,10 @@ from quart import Blueprint, Response, jsonify
 from quart_dishka import inject
 
 from services.language_tool_service.config import Settings
-from services.language_tool_service.protocols import LanguageToolWrapperProtocol
+from services.language_tool_service.protocols import (
+    LanguageToolManagerProtocol,
+    LanguageToolWrapperProtocol,
+)
 
 logger = create_service_logger("language_tool_service.api.health")
 health_bp = Blueprint("health_routes", __name__)
@@ -22,6 +25,7 @@ async def health_check(
     settings: FromDishka[Settings],
     corr: FromDishka[CorrelationContext],
     language_tool_wrapper: FromDishka[LanguageToolWrapperProtocol],
+    language_tool_manager: FromDishka[LanguageToolManagerProtocol],
 ) -> Response | tuple[Response, int]:
     """Standardized health check endpoint with dependency status."""
     try:
@@ -48,11 +52,48 @@ async def health_check(
 
         overall_status = "healthy" if all(checks.values()) else "degraded"
 
+        # Get JVM status (TASK-052G requirement)
+        jvm_running = False
+        heap_used_mb = 0
+        
+        if "language_tool_wrapper" in dependencies and dependencies["language_tool_wrapper"]["status"] == "healthy":
+            server_info = dependencies["language_tool_wrapper"].get("server", {})
+            jvm_running = server_info.get("running", False)
+            
+            # Get actual heap usage if JVM is running
+            if jvm_running:
+                try:
+                    heap_used = await language_tool_manager.get_jvm_heap_usage()
+                    if heap_used is not None:
+                        heap_used_mb = heap_used
+                except Exception:
+                    # Fallback to 0 if unable to get heap usage
+                    pass
+
+        # Calculate service uptime (TASK-052G requirement)
+        uptime_seconds = 0.0
+        try:
+            from quart import current_app
+            import time
+            
+            start_time = current_app.extensions.get("service_start_time")
+            if start_time:
+                uptime_seconds = time.time() - start_time
+        except Exception:
+            # Fallback to 0 if unable to calculate uptime
+            pass
+
+        # TASK-052G format: Include jvm and uptime_seconds at top level
         health_response = {
             "service": settings.SERVICE_NAME,
             "status": overall_status,
             "message": f"Language Tool Service is {overall_status}",
             "version": "1.0.0",
+            "jvm": {
+                "running": jvm_running,
+                "heap_used_mb": heap_used_mb,
+            },
+            "uptime_seconds": uptime_seconds,
             "checks": checks,
             "dependencies": dependencies,
             "environment": settings.ENVIRONMENT.value,
@@ -70,6 +111,11 @@ async def health_check(
                 "status": "unhealthy",
                 "message": "Health check failed",
                 "version": "1.0.0",
+                "jvm": {
+                    "running": False,
+                    "heap_used_mb": 0,
+                },
+                "uptime_seconds": 0.0,
                 "error": str(e),
                 "correlation_id": corr.original,
             }

@@ -50,6 +50,20 @@ def _create_metrics() -> dict[str, Any]:
             ["status"],
             registry=REGISTRY,
         ),
+        # Language Tool wrapper performance metrics
+        "wrapper_duration_seconds": Histogram(
+            "language_tool_service_wrapper_duration_seconds",
+            "Time spent in Language Tool wrapper calls",
+            ["language"],
+            registry=REGISTRY,
+        ),
+        # API error tracking metrics
+        "api_errors_total": Counter(
+            "language_tool_service_api_errors_total",
+            "Total API errors by endpoint and error type",
+            ["endpoint", "error_type"],
+            registry=REGISTRY,
+        ),
     }
 
 

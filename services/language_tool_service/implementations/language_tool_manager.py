@@ -305,3 +305,48 @@ class LanguageToolManager:
             "port": self.settings.LANGUAGE_TOOL_PORT,
             "heap_size": self.settings.LANGUAGE_TOOL_HEAP_SIZE,
         }
+
+    async def get_jvm_heap_usage(self) -> int | None:
+        """
+        Get current JVM heap usage in MB.
+        
+        Returns:
+            Heap usage in MB, or None if unable to retrieve
+        """
+        if not self.process or self.process.returncode is not None:
+            return None
+            
+        try:
+            # Use jstat to get heap information
+            result = await asyncio.create_subprocess_exec(
+                "jstat", "-gc", str(self.process.pid),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await result.communicate()
+            
+            if result.returncode != 0:
+                return None
+                
+            # Parse jstat output
+            # Format: S0C S1C S0U S1U EC EU OC OU MC MU CCSC CCSU YGC YGCT FGC FGCT GCT
+            lines = stdout.decode().strip().split('\n')
+            if len(lines) < 2:
+                return None
+                
+            data = lines[1].split()
+            if len(data) < 8:
+                return None
+                
+            # Calculate total heap usage: Eden Used + Old Used + Survivor Used
+            eden_used = float(data[5])  # EU - Eden space used (KB)
+            old_used = float(data[7])   # OU - Old space used (KB) 
+            survivor_used = float(data[2]) + float(data[3])  # S0U + S1U (KB)
+            
+            # Convert KB to MB
+            heap_used_mb = int((eden_used + old_used + survivor_used) / 1024)
+            return heap_used_mb
+            
+        except Exception as e:
+            logger.debug(f"Failed to get JVM heap usage: {e}")
+            return None

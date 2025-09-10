@@ -38,16 +38,23 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
     for grammar analysis, with category filtering and proper error handling.
     """
 
-    def __init__(self, settings: Settings, manager: LanguageToolManager) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        manager: LanguageToolManager,
+        metrics: dict[str, Any] | None = None,
+    ) -> None:
         """
         Initialize the Language Tool wrapper.
 
         Args:
             settings: Service configuration settings
             manager: LanguageTool process manager
+            metrics: Prometheus metrics dictionary for instrumentation
         """
         self.settings = settings
         self.manager = manager
+        self.metrics = metrics
         self.semaphore = asyncio.Semaphore(settings.LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS)
         self.server_url = f"http://localhost:{settings.LANGUAGE_TOOL_PORT}"
 
@@ -97,6 +104,9 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                 },
             )
 
+            # Start wrapper timing for metrics
+            wrapper_start = time.perf_counter()
+
             try:
                 # Apply timeout to the entire operation
                 async with asyncio.timeout(self.settings.LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS):
@@ -108,6 +118,13 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
 
                     # Map to GrammarError format
                     grammar_errors = self._map_to_grammar_errors(filtered_matches, text)
+
+                    # Record successful wrapper duration
+                    wrapper_duration = time.perf_counter() - wrapper_start
+                    if self.metrics and "wrapper_duration_seconds" in self.metrics:
+                        self.metrics["wrapper_duration_seconds"].labels(language=language).observe(
+                            wrapper_duration
+                        )
 
                     logger.info(
                         "Grammar analysis completed",
@@ -122,6 +139,13 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                     return grammar_errors
 
             except asyncio.TimeoutError:
+                # Record failed wrapper duration for timeout
+                wrapper_duration = time.perf_counter() - wrapper_start
+                if self.metrics and "wrapper_duration_seconds" in self.metrics:
+                    self.metrics["wrapper_duration_seconds"].labels(language=language).observe(
+                        wrapper_duration
+                    )
+
                 logger.error(
                     "LanguageTool request timed out",
                     extra={
@@ -137,6 +161,13 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                     correlation_id=correlation_context.uuid,
                 )
             except aiohttp.ClientError as e:
+                # Record failed wrapper duration for client error
+                wrapper_duration = time.perf_counter() - wrapper_start
+                if self.metrics and "wrapper_duration_seconds" in self.metrics:
+                    self.metrics["wrapper_duration_seconds"].labels(language=language).observe(
+                        wrapper_duration
+                    )
+
                 logger.error(
                     f"HTTP client error communicating with LanguageTool: {e}",
                     extra={"correlation_id": str(correlation_context.uuid)},
@@ -150,6 +181,13 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                     correlation_id=correlation_context.uuid,
                 )
             except Exception as e:
+                # Record failed wrapper duration for general error
+                wrapper_duration = time.perf_counter() - wrapper_start
+                if self.metrics and "wrapper_duration_seconds" in self.metrics:
+                    self.metrics["wrapper_duration_seconds"].labels(language=language).observe(
+                        wrapper_duration
+                    )
+
                 logger.error(
                     f"Unexpected error during grammar analysis: {e}",
                     extra={"correlation_id": str(correlation_context.uuid)},

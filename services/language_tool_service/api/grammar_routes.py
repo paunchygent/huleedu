@@ -87,6 +87,9 @@ async def check_grammar(
             metrics["grammar_analysis_total"].labels(
                 status="validation_error", text_length_range="unknown"
             ).inc()
+            metrics["api_errors_total"].labels(
+                endpoint="/v1/check", error_type="validation_error"
+            ).inc()
 
             raise_validation_error(
                 service="language-tool-service",
@@ -104,6 +107,9 @@ async def check_grammar(
             metrics["request_count"].labels(method="POST", endpoint="/v1/check", status="400").inc()
             metrics["grammar_analysis_total"].labels(
                 status="parsing_error", text_length_range="unknown"
+            ).inc()
+            metrics["api_errors_total"].labels(
+                endpoint="/v1/check", error_type="parsing_error"
             ).inc()
 
             raise_validation_error(
@@ -197,6 +203,9 @@ async def check_grammar(
                 status="processing_error", text_length_range=text_length_range
             ).inc()
             metrics["grammar_analysis_duration_seconds"].observe(analysis_duration)
+            metrics["api_errors_total"].labels(
+                endpoint="/v1/check", error_type="processing_error"
+            ).inc()
 
             raise_processing_error(
                 service="language-tool-service",
