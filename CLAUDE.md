@@ -5,25 +5,25 @@
 ### 1. Initial Setup
 
 ```markdown
-- Read `.cursor/rules/015-project-structure-standards.mdc` first
+- Read `.claude/rules/015-project-structure-standards.mdc` first
 - Review key architectural documents in this order:
-  1. `.cursor/rules/080-repository-workflow-and-tooling.mdc`
-  2. `.cursor/rules/010-foundational-principles.mdc`
-  3. `.cursor/rules/020-architectural-mandates.mdc`
-  4. `.cursor/rules/030-event-driven-architecture-eda-standards.mdc`
-  5. `.cursor/rules/042-async-patterns-and-di.mdc`
-  6. `.cursor/rules/050-python-coding-standards.mdc`
-  7. `.cursor/rules/100-terminology-and-definitions.mdc`
-  8. `.cursor/rules/110.1-planning-mode.mdc`
-  9. `.cursor/rules/110.2-coding-mode.mdc`
-  10. `.cursor/rules/048-structured-error-handling-standards.mdc`
+  1. `.claude/rules/080-repository-workflow-and-tooling.mdc`
+  2. `.claude/rules/010-foundational-principles.mdc`
+  3. `.claude/rules/020-architectural-mandates.mdc`
+  4. `.claude/rules/030-event-driven-architecture-eda-standards.mdc`
+  5. `.claude/rules/042-async-patterns-and-di.mdc`
+  6. `.claude/rules/050-python-coding-standards.mdc`
+  7. `.claude/rules/100-terminology-and-definitions.mdc`
+  8. `.claude/rules/110.1-planning-mode.mdc`
+  9. `.claude/rules/110.2-coding-mode.mdc`
+  10. `.claude/rules/048-structured-error-handling-standards.mdc`
 ```
 
 ### 2. Task Execution
 
 ```markdown
-1. **Select Mode**: Use `.cursor/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
-2. **Rule Reference**: Consult `.cursor/rules/000-rule-index.mdc` for relevant rules
+1. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
+2. **Rule Reference**: Consult `.claude/rules/000-rule-index.mdc` for relevant rules
 3. **Task Analysis**: Read full task from `TASKS/` directory
 ```
 
@@ -38,7 +38,7 @@
 ### 4. Documentation & Testing
 
 ```markdown
-- Update relevant task documents per `.cursor/rules/090-documentation-standards.mdc`
+- Update relevant task documents per `.claude/rules/090-documentation-standards.mdc`
 - Never create files in root - follow folder patterns
 - All code changes require tests (run and verified)
 - Never lint style issues manually before having run format-all and/or lint-fix --unsafe-fixes
@@ -51,7 +51,7 @@
 
 ### Architectural Overview
 
-### Architecture (Rules 010, 020)
+### Architecture (.claude/rules/010-foundational-principles.mdc)
 
 ```markdown
 - **Pattern**: Event-driven microservices with DDD
@@ -62,7 +62,7 @@
   - Container: Docker, Docker Compose
 ```
 
-### Service Communication (Rule 020)
+### Service Communication (.claude/rules/020-architectural-mandates.mdc)
 
 ```markdown
 - **Primary**: Asynchronous via Kafka
@@ -70,15 +70,15 @@
 - **Strict**: No direct DB access between services
 ```
 
-### Database & Persistence
+### Database & Persistence (.claude/rules/085-database-migration-standards.md)
 
 ```markdown
 - **ORM**: SQLAlchemy async with `asyncpg`
 - **Isolation**: Each service has its own PostgreSQL database
-- **Migrations**: See `.windsurf/rules/085-database-migration-standards.md`
+- **Migrations**: see .claude/rules/085-database-migration-standards.md
 ```
 
-### HTTP Services (Rule 042)
+### HTTP Services (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - **app.py**: Setup only (<150 LoC)
@@ -86,7 +86,7 @@
 - **Example**: `@services/file_service/` structure
 ```
 
-### Worker Services (Rule 042)
+### Worker Services (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - `worker_main.py`: Service lifecycle and DI
@@ -94,7 +94,7 @@
 - **Example**: `@services/spell_checker_service/`
 ```
 
-### Dependency Injection (Rule 042)
+### Dependency Injection (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - **Interfaces**: Define with `typing.Protocol` in `protocols.py`
@@ -104,7 +104,7 @@
   - `REQUEST`: Per-operation instances (DB sessions)
 ```
 
-### Event System (Rules 051, 052)
+### Event System (.claude/rules/051-event-contract-standards.mdc)
 
 ```markdown
 - **Envelope**: All Kafka events use `EventEnvelope`
@@ -114,7 +114,7 @@
 
 ## Testing & Quality
 
-### Testing (Rule 070)
+### Testing (.claude/rules/070-test-creation-methodology.mdc)
 
 #### Test Types
 
@@ -181,7 +181,7 @@ pytest-root services/... -k 'expr'
 - `@pytest.mark.kafka`: Requires Kafka
 ```
 
-## Development Workflow (Rule 080)
+## Development Workflow (.claude/rules/080-repository-workflow-and-tooling.mdc)
 
 ### Subagents
 
@@ -279,7 +279,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Database Migrations
 
-### Standards (.windsurf/rules/085-database-migration-standards.md)
+### Standards (.claude/rules/085-database-migration-standards.md)
 
 ```markdown
 - Always create migrations from service directory
@@ -300,7 +300,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Documentation
 
-### Standards (.windsurf/rules/090-documentation-standards.md)
+### Standards (.claude/rules/090-documentation-standards.md)
 
 ```markdown
 - Keep documentation in sync with code changes

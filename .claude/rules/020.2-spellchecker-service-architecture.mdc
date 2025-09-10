@@ -1,0 +1,131 @@
+---
+description: Defines the Spell Checker Service. A dual-pattern service with a Kafka consumer for batch jobs and a FastAPI API for synchronous requests. Uses clean architecture and DI.
+globs: 
+alwaysApply: false
+---
+# 020.2: Spell Checker Service Architecture
+
+## Service Snapshot (2025-06-30)
+- Combined worker + health API (Quart) on port 8002
+- Async PostgreSQL persistence via `PostgreSQLSpellcheckRepository`
+- DI with Dishka; `QuartDishka` called before blueprint registration
+- Kafka topics: consume `huleedu.essay.spellcheck.requested.v1`, publish dual events: `huleedu.batch.spellcheck.phase.completed.v1` (thin) and `huleedu.essay.spellcheck.results.v1` (rich)
+- Observability: OTEL env vars + `/metrics` endpoint
+- Container: non-root UID 1000, writable `data/` dir; Postgres sidecar `spellchecker_db` (pg_trgm enabled)
+
+## Key Rules for Agents
+1. Create `pg_trgm` before building GIN indexes.
+2. Call `initialize_db_schema()` once after engine connect.
+3. Always invoke `QuartDishka(app, container)` before registering blueprints.
+4. Integration tests must use Testcontainers-Postgres and patch settings.
+5. Dockerfile must chown writable paths to UID 1000.
+
+- **Package**: `huleedu-spell-checker-service`
+- **Type**: Combined Service (Kafka Consumer Worker + HTTP Health API)
+- **Stack**: aiokafka, aiohttp, quart, quart-dishka, Python asyncio, Dishka (for DI)
+- **Purpose**: Event-driven spell checking service with health monitoring
+
+## 2. Internal Structure (✅ Refactored - Clean Architecture + Combined Service Pattern)
+
+### 2.1. Integrated Application Architecture
+- **`app.py`**: Single Quart application entrypoint managing both HTTP API and Kafka consumer
+- **Lifecycle Management**: @app.before_serving/@app.after_serving hooks for consumer lifecycle
+- **Pattern**: Integrated Quart application following Rule 042 HTTP Service Pattern
+- **Blueprint Registration**: Single health_bp with shared DI container
+- **`api/health_routes.py`**: Health (`/healthz`) and metrics (`/metrics`) endpoints using Blueprint pattern
+- **`startup_setup.py`**: Metrics initialization and service setup utilities
+- **`kafka_consumer.py`**: Dedicated Kafka consumer with lifecycle management
+
+### 2.2. Core Components
+- **`event_processor.py`**: Clean message processing logic that depends ONLY on injected protocol interfaces. Contains `process_single_message()` which handles incoming `ConsumerRecord`, deserializes `EventEnvelope[EssayLifecycleSpellcheckRequestV1]`, and orchestrates the fetch-spellcheck-store-publish flow with language parameter extraction.
+- **`protocols.py`**: Defines `typing.Protocol` interfaces for internal dependencies:
+    - `ContentClientProtocol`
+    - `SpellLogicProtocol` (enhanced with language parameter support)
+    - `ResultStoreProtocol`
+    - `SpellcheckEventPublisherProtocol`
+- **`core_logic.py`**: Fundamental, reusable business logic functions:
+    - `default_fetch_content_impl()`: Fetches content via HTTP
+    - `default_store_content_impl()`: Stores content via HTTP  
+    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
+- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
+
+### 2.3. Protocol Implementations (Clean Architecture)
+- **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+    - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
+    - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
+    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+    - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
+
+### 2.4. Architecture Benefits
+- ✅ **Single Responsibility**: Each file has one clear purpose
+- ✅ **Dependency Injection**: All business logic depends on abstractions, not concrete implementations  
+- ✅ **No Code Duplication**: Single canonical source for each protocol implementation
+- ✅ **Clean Separation**: Message processing ↔ Protocol implementations ↔ Business logic
+
+## 3. Event-Driven Architecture
+
+**Consumes**: `huleedu.essay_lifecycle.spellcheck.request.v1` (`EssayLifecycleSpellcheckRequestV1`)
+**Publishes**: Dual events via `DefaultSpellcheckEventPublisherImpl`:
+- `huleedu.batch.spellcheck.phase.completed.v1` (`SpellcheckPhaseCompletedV1` - thin event for ELS/BCS)
+- `huleedu.essay.spellcheck.results.v1` (`SpellcheckResultV1` - rich event for RAS)
+**Consumer Group**: `spellchecker-service-group-v1.1` (from settings)
+
+**Integration**: Receives spellcheck requests from Essay Lifecycle Service (ELS) after essay slot assignment coordination with Batch Orchestrator Service (BOS).
+
+**Flow**: `kafka_consumer.py` consumes message ➜ `process_single_message` in `event_processor.py` orchestrates: `ContentClientProtocol.fetch_content` ➜ `SpellLogicProtocol.perform_spell_check` (with language parameter & metrics extraction) ➜ `ResultStoreProtocol.store_content` ➜ `SpellcheckEventPublisherProtocol.publish_dual_events` (thin + rich) ➜ `kafka_consumer.py` commits offset.
+
+## 4. Integration Points
+
+- **Content Service**: HTTP REST API via aiohttp.ClientSession (injected into protocol implementations)
+- **Kafka**: AIOKafkaConsumer/Producer with manual offset management
+- **Health API**: Quart HTTP server with `/healthz` and `/metrics` endpoints on port 8002
+- **Metrics**: Prometheus metrics via `/metrics` endpoint and service-specific counters/histograms
+
+## 5. Spell Checking Implementation
+
+**Current**: L2 + pyspellchecker dual-algorithm approach:
+- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+- **PySpellChecker**: General English spell checking with contextual suggestions
+- **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
+
+## 6. Configuration
+
+**Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`, `KAFKA_CONSUMER_GROUP_ID`
+**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs
+
+## 7. Error Handling
+
+**Scenarios**: Content Service unavailable, invalid event format, spell check failure, Kafka producer errors
+**Pattern**: Comprehensive error handling with failure event publishing and correlation ID tracking
+**Resilience**: Service continues processing after individual message failures
+
+## 8. Data Models
+
+**Input**: `EssayLifecycleSpellcheckRequestV1` with entity_ref, system_metadata, text_storage_id, language (for multilingual support)
+**Output**: Dual events:
+- `SpellcheckPhaseCompletedV1`: Thin event with entity_id, batch_id, status, corrected_text_storage_id, processing_duration_ms
+- `SpellcheckResultV1`: Rich event with complete metrics, correction details, word counts, L2 vs spelling corrections
+
+## 9. Deployment
+
+**Docker**: `python:3.11-slim` base, PDM, entry point: `pdm run start`
+**Port**: 8002 (Health API with `/healthz` and `/metrics` endpoints)
+**Health**: HTTP health check via `/healthz` endpoint + Kafka consumer monitoring
+**Architecture**: Integrated Quart application managing both HTTP API and Kafka consumer lifecycle
+
+## 10. Testing
+
+**Coverage**: 71 tests covering all architectural components
+- Unit tests for core logic and protocol implementations
+- Contract compliance tests for event schemas
+- Integration tests for end-to-end message processing
+- All tests pass with architectural refactoring
+
+## 11. Production Implementation Standards
+
+### 11.1. Mandatory Production Patterns
+- **MUST** implement graceful shutdown with proper async resource cleanup
+- **MUST** use DI-managed `aiohttp.ClientSession` with configured timeouts
+- **MUST** use manual Kafka commits with error boundaries (no auto-commit)
+- **MUST** implement `/healthz` with consistent JSON response format
+- **MUST** fail fast on startup errors with `logger.critical()` and `raise`

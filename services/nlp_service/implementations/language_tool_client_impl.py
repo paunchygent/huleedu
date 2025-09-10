@@ -1,40 +1,249 @@
-"""Language Tool Service client implementation - SKELETON."""
+"""Language Tool Service client implementation."""
 
 from __future__ import annotations
 
+import asyncio
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import aiohttp
 from common_core.events.nlp_events import GrammarAnalysis, GrammarError
+from huleedu_service_libs.error_handling.factories import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreakerError
 
 from services.nlp_service.protocols import LanguageToolClientProtocol
 
 if TYPE_CHECKING:
-    pass
+    from services.nlp_service.config import Settings
 
 logger = create_service_logger("nlp_service.implementations.language_tool_client")
 
 
 class LanguageToolServiceClient(LanguageToolClientProtocol):
-    """Client for Language Tool Service integration - SKELETON implementation.
+    """Client for Language Tool Service integration with retry and circuit breaker support."""
 
-    This skeleton provides mock responses for development and testing.
-    Will be replaced with actual HTTP client implementation when Language Tool Service is ready.
-    """
-
-    def __init__(self, language_tool_service_url: str) -> None:
-        """Initialize client with service URL.
+    def __init__(self, settings: Settings) -> None:
+        """Initialize client with settings.
 
         Args:
-            language_tool_service_url: Base URL for Language Tool Service
+            settings: Service settings containing LanguageTool configuration
         """
-        self.service_url = language_tool_service_url.rstrip("/")
+        self.service_url = settings.LANGUAGE_TOOL_SERVICE_URL.rstrip("/")
+        self.request_timeout = settings.LANGUAGE_TOOL_REQUEST_TIMEOUT
+        self.max_retries = settings.LANGUAGE_TOOL_MAX_RETRIES
+        self.retry_delay = settings.LANGUAGE_TOOL_RETRY_DELAY
+
         logger.info(
-            f"LanguageToolServiceClient initialized (skeleton) with URL: {self.service_url}"
+            f"LanguageToolServiceClient initialized with URL: {self.service_url}",
+            extra={
+                "timeout": self.request_timeout,
+                "max_retries": self.max_retries,
+                "retry_delay": self.retry_delay,
+            }
         )
+
+    def _map_language_code(self, language: str) -> str:
+        """Map language codes to LanguageTool expected format.
+
+        Args:
+            language: Input language code ("en", "sv", "auto")
+
+        Returns:
+            Mapped language code for LanguageTool API
+        """
+        mapping = {
+            "en": "en-US",
+            "sv": "sv-SE",
+            "auto": "auto"
+        }
+        return mapping.get(language, language)
+
+    def _is_retryable_error(self, status_code: int) -> bool:
+        """Determine if HTTP error should be retried.
+
+        Args:
+            status_code: HTTP response status code
+
+        Returns:
+            True if error should be retried (5xx), False otherwise (4xx)
+        """
+        return status_code >= 500
+
+    async def _make_request_with_retry(
+        self,
+        http_session: aiohttp.ClientSession,
+        url: str,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+        correlation_id: UUID,
+    ) -> dict[str, Any]:
+        """Make HTTP request with retry logic and exponential backoff.
+
+        Args:
+            http_session: HTTP client session
+            url: Request URL
+            payload: JSON payload
+            headers: Request headers
+            correlation_id: Request correlation ID
+
+        Returns:
+            Response JSON data
+
+        Raises:
+            HuleEduError: On all failures after retries exhausted
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(self.max_retries + 1):  # +1 for initial attempt
+            try:
+                timeout = aiohttp.ClientTimeout(total=self.request_timeout)
+
+                logger.debug(
+                    f"Making HTTP POST request (attempt {attempt + 1}/{self.max_retries + 1})",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "url": url,
+                        "attempt": attempt + 1,
+                        "max_attempts": self.max_retries + 1,
+                    }
+                )
+
+                async with http_session.post(
+                    url, json=payload, headers=headers, timeout=timeout
+                ) as response:
+                    if response.status == 200:
+                        return cast(dict[str, Any], await response.json())
+
+                    # Handle non-200 responses
+                    response_text = await response.text()
+
+                    # Check if this is a retryable error
+                    if not self._is_retryable_error(response.status):
+                        # 4xx errors - don't retry
+                        raise_external_service_error(
+                            service="nlp_service",
+                            operation="check_grammar",
+                            external_service="language_tool_service",
+                            message=f"Language Tool Service returned {response.status}: {response_text}",  # noqa: E501
+                            correlation_id=correlation_id,
+                            status_code=response.status,
+                            response_text=response_text[:500],
+                        )
+
+                    # 5xx errors - will retry if attempts remaining
+                    if attempt == self.max_retries:
+                        # Final attempt failed
+                        raise_external_service_error(
+                            service="nlp_service",
+                            operation="check_grammar",
+                            external_service="language_tool_service",
+                            message=f"Language Tool Service returned {response.status} after {self.max_retries + 1} attempts: {response_text}",  # noqa: E501
+                            correlation_id=correlation_id,
+                            status_code=response.status,
+                            response_text=response_text[:500],
+                            attempts_made=self.max_retries + 1,
+                        )
+
+                    logger.warning(
+                        f"HTTP {response.status} error, will retry (attempt {attempt + 1}/{self.max_retries + 1})",  # noqa: E501
+                        extra={
+                            "correlation_id": str(correlation_id),
+                            "status_code": response.status,
+                            "attempt": attempt + 1,
+                        }
+                    )
+
+            except aiohttp.ClientError as e:
+                last_exception = e
+
+                if attempt == self.max_retries:
+                    # Final attempt failed with client error
+                    raise_external_service_error(
+                        service="nlp_service",
+                        operation="check_grammar",
+                        external_service="language_tool_service",
+                        message=f"Failed to connect to Language Tool Service after {self.max_retries + 1} attempts: {str(e)}",  # noqa: E501
+                        correlation_id=correlation_id,
+                        error_type=type(e).__name__,
+                        attempts_made=self.max_retries + 1,
+                    )
+
+                logger.warning(
+                    f"HTTP client error, will retry (attempt {attempt + 1}/{self.max_retries + 1}): {e}",  # noqa: E501
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "error_type": type(e).__name__,
+                        "attempt": attempt + 1,
+                    }
+                )
+
+            # Calculate exponential backoff delay
+            if attempt < self.max_retries:
+                delay = self.retry_delay * (2 ** attempt)
+                logger.debug(
+                    f"Waiting {delay:.2f}s before retry",
+                    extra={"correlation_id": str(correlation_id), "delay_seconds": delay}
+                )
+                await asyncio.sleep(delay)
+
+        # Should never reach here, but safety fallback
+        raise_external_service_error(
+            service="nlp_service",
+            operation="check_grammar",
+            external_service="language_tool_service",
+            message=f"Unexpected failure after retry loop: {last_exception}",
+            correlation_id=correlation_id,
+            error_type=type(last_exception).__name__ if last_exception else "Unknown",
+        )
+
+    def _parse_response_to_grammar_errors(  # noqa: E501
+        self, response_data: dict[str, Any]
+    ) -> list[GrammarError]:
+        """Parse LanguageTool response into GrammarError objects.
+
+        Args:
+            response_data: JSON response from LanguageTool service
+
+        Returns:
+            List of GrammarError objects
+        """
+        errors = []
+
+        for match in response_data.get("matches", []):
+            rule = match.get("rule", {})
+            category = rule.get("category", {})
+            context = match.get("context", {})
+
+            # Extract replacements
+            replacements = []
+            for replacement in match.get("replacements", []):
+                if isinstance(replacement, dict):
+                    replacements.append(replacement.get("value", ""))
+                else:
+                    replacements.append(str(replacement))
+
+            grammar_error = GrammarError(
+                rule_id=rule.get("id", "UNKNOWN_RULE"),
+                message=match.get("message", ""),
+                short_message=match.get("shortMessage", ""),
+                offset=match.get("offset", 0),
+                length=match.get("length", 0),
+                replacements=replacements,
+                category=category.get("id", "unknown").lower(),
+                severity=match.get("type", {}).get("typeName", "info").lower()
+                if isinstance(match.get("type"), dict)
+                else "info",
+                category_id=category.get("id", "UNKNOWN"),
+                category_name=category.get("name", "Unknown"),
+                context=context.get("text", ""),
+                context_offset=context.get("offset", 0),
+            )
+
+            errors.append(grammar_error)
+
+        return errors
 
     async def check_grammar(
         self,
@@ -43,9 +252,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
         correlation_id: UUID,
         language: str = "auto",
     ) -> GrammarAnalysis:
-        """Check grammar using Language Tool Service - SKELETON implementation.
-
-        This skeleton returns mock data for testing the flow.
+        """Check grammar using Language Tool Service with retry and circuit breaker support.
 
         Args:
             text: The text to check for grammar errors
@@ -54,12 +261,12 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
             language: Language code ("en", "sv") or "auto"
 
         Returns:
-            GrammarAnalysis with mock errors for testing
+            GrammarAnalysis with errors from LanguageTool service
         """
         start_time = time.time()
 
         logger.debug(
-            "Checking grammar for text (skeleton mode)",
+            "Checking grammar for text",
             extra={
                 "correlation_id": str(correlation_id),
                 "text_length": len(text),
@@ -67,144 +274,87 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
             },
         )
 
-        # TODO: Implement actual HTTP call to Language Tool Service
-        # Expected implementation:
-        # 1. Prepare request payload with text and language
-        # 2. Make POST request to language_tool_service_url/check endpoint
-        # 3. Parse response into GrammarError objects
-        # 4. Handle various error cases with structured error handling
-
-        # Example of what the real implementation would look like:
-        """
-        try:
-            url = f"{self.service_url}/v1/check"
-            payload = {
-                "text": text,
-                "language": language if language != "auto" else None,
-            }
-            headers = {
-                "X-Correlation-ID": str(correlation_id),
-                "Content-Type": "application/json",
-            }
-
-            async with http_session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise_external_service_error(
-                        service="nlp_service",
-                        operation="check_grammar",
-                        external_service="language_tool_service",
-                        message=f"Language Tool Service returned {response.status}: {error_text}",
-                        correlation_id=correlation_id,
-                        status_code=response.status,
-                    )
-
-                result = await response.json()
-                # Parse result into GrammarError objects
-                errors = [
-                    GrammarError(
-                        rule_id=error["ruleId"],
-                        message=error["message"],
-                        short_message=error.get("shortMessage", ""),
-                        offset=error["offset"],
-                        length=error["length"],
-                        replacements=error.get("replacements", []),
-                        category=error.get("category", "unknown"),
-                        severity=error.get("severity", "info"),
-                    )
-                    for error in result.get("matches", [])
-                ]
-
-        except aiohttp.ClientError as e:
-            raise_external_service_error(
-                service="nlp_service",
-                operation="check_grammar",
-                external_service="language_tool_service",
-                message=f"Failed to connect to Language Tool Service: {str(e)}",
-                correlation_id=correlation_id,
-            )
-        """
-
-        # SKELETON: Generate mock grammar errors for testing
-        mock_errors = []
-
-        # Add a mock error if text contains common issues (for testing)
-        text_lower = text.lower()
-
-        if "their" in text_lower and "there" in text_lower:
-            # Mock a their/there confusion error
-            their_offset = text_lower.index("their")
-            # Create context window around the error (20 chars before/after)
-            context_start = max(0, their_offset - 20)
-            context_end = min(len(text), their_offset + 25)
-            context_snippet = text[context_start:context_end]
-            context_offset = their_offset - context_start
-            mock_errors.append(
-                GrammarError(
-                    rule_id="CONFUSION_RULE",
-                    message="Possible confusion between 'their' and 'there'",
-                    short_message="Word confusion",
-                    offset=their_offset,
-                    length=5,
-                    replacements=["there"],
-                    category="grammar",
-                    severity="warning",
-                    category_id="GRAMMAR",
-                    category_name="Grammar",
-                    context=context_snippet,
-                    context_offset=context_offset,
+        # Check if circuit breaker is available and open
+        if hasattr(self, "_circuit_breaker"):
+            try:
+                # Use circuit breaker if available
+                response_data = await self._circuit_breaker.call(
+                    self._make_request_with_retry,
+                    http_session,
+                    f"{self.service_url}/v1/check",
+                    {
+                        "text": text,
+                        "language": self._map_language_code(language),
+                    },
+                    {
+                        "X-Correlation-ID": str(correlation_id),
+                        "Content-Type": "application/json",
+                    },
+                    correlation_id,
                 )
+            except CircuitBreakerError as e:
+                # Circuit is open - return graceful degradation
+                processing_time_ms = int((time.time() - start_time) * 1000)
+
+                logger.warning(
+                    "Circuit breaker is open, returning empty grammar analysis",
+                    extra={
+                        "correlation_id": str(correlation_id),
+                        "circuit_breaker_error": str(e),
+                        "processing_time_ms": processing_time_ms,
+                    }
+                )
+
+                return GrammarAnalysis(
+                    error_count=0,
+                    errors=[],
+                    language=language if language != "auto" else "en",
+                    processing_time_ms=processing_time_ms,
+                )
+        else:
+            # No circuit breaker - direct call
+            response_data = await self._make_request_with_retry(
+                http_session,
+                f"{self.service_url}/v1/check",
+                {
+                    "text": text,
+                    "language": self._map_language_code(language),
+                },
+                {
+                    "X-Correlation-ID": str(correlation_id),
+                    "Content-Type": "application/json",
+                },
+                correlation_id,
             )
 
-        if "  " in text:
-            # Mock a double space error
-            double_space_offset = text.index("  ")
-            # Create context window around the error (15 chars before/after)
-            context_start = max(0, double_space_offset - 15)
-            context_end = min(len(text), double_space_offset + 17)
-            context_snippet = text[context_start:context_end]
-            context_offset = double_space_offset - context_start
-            mock_errors.append(
-                GrammarError(
-                    rule_id="DOUBLE_SPACE",
-                    message="Double space detected",
-                    short_message="Extra space",
-                    offset=double_space_offset,
-                    length=2,
-                    replacements=[" "],
-                    category="typography",
-                    severity="info",
-                    category_id="PUNCTUATION",
-                    category_name="Punctuation",
-                    context=context_snippet,
-                    context_offset=context_offset,
-                )
-            )
+        # Parse response into GrammarError objects
+        errors = self._parse_response_to_grammar_errors(response_data)
 
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
 
-        # Determine actual language (mock detection)
-        detected_language = language if language != "auto" else "en"
+        # Determine detected language from response or use input
+        detected_language = (
+            response_data.get("language", {}).get("detectedLanguage", {}).get("code", language)
+        )
+        if detected_language == "auto":
+            detected_language = "en"  # Default fallback
 
         logger.info(
-            f"Grammar check completed (skeleton): {len(mock_errors)} errors found",
+            f"Grammar check completed: {len(errors)} errors found",
             extra={
                 "correlation_id": str(correlation_id),
-                "error_count": len(mock_errors),
+                "error_count": len(errors),
                 "language": detected_language,
                 "processing_time_ms": processing_time_ms,
             },
         )
 
         return GrammarAnalysis(
-            error_count=len(mock_errors),
-            errors=mock_errors,
+            error_count=len(errors),
+            errors=errors,
             language=detected_language,
             processing_time_ms=processing_time_ms,
+            grammar_category_counts=response_data.get("grammar_category_counts"),
+            grammar_rule_counts=response_data.get("grammar_rule_counts"),
         )

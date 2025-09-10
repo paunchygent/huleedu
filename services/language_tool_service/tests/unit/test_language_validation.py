@@ -81,9 +81,7 @@ class TestLanguageValidation:
             "es-ES",
         ],
     )
-    async def test_language_preserved_in_response(
-        self, test_client, language: str
-    ) -> None:
+    async def test_language_preserved_in_response(self, test_client, language: str) -> None:
         """Test that the language from request is preserved in response."""
         # Arrange
         request_body = {

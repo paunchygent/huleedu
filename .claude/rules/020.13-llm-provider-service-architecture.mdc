@@ -1,0 +1,158 @@
+---
+description: LLM Provider Service critical patterns - queue-based resilience, 200/202 response handling, and client integration patterns
+globs: 
+  - "services/llm_provider_service/**"
+alwaysApply: false
+---
+
+# 020.13: LLM Provider Service Architecture
+
+## 1. Service Identity
+- **Package**: `huleedu-llm-provider-service`
+- **Folders**: `services/llm_provider_service/`
+- **Port**: 8080, **Stack**: Quart + Redis + Circuit Breakers + OpenTelemetry + Connection Pools
+- **Purpose**: Centralized LLM provider abstraction with queue-based resilience and connection optimization
+- **Critical**: NO response caching - preserves psychometric validity
+
+## 2. Response Pattern (200/202)
+
+### 2.1. Request Flow
+```text
+POST /api/v1/comparison → Provider Available?
+├─ YES → Fresh LLM call → 200 + result
+└─ NO → Queue request → 202 + queue_id
+```
+
+### 2.2. Queue Endpoints
+- **Status**: `GET /api/v1/status/{queue_id}` → processing state
+- **Results**: `GET /api/v1/results/{queue_id}` → completed result or 410 expired
+
+## 3. Queue Resilience Architecture
+
+### 3.1. Resilient Queue Manager
+```text
+Redis Queue (persistent) → Local Queue (fallback) → 503 Rejection
+ResilientQueueManagerImpl: Automatic failover with migration tracking
+```
+
+### 3.2. Queue Implementation Details
+- **Primary**: `RedisQueueRepositoryImpl` with persistent storage
+- **Fallback**: `LocalQueueManagerImpl` with 100MB memory limit  
+- **Health Monitoring**: Automatic queue health checks and failover
+- **Migration Tracking**: Request transfer between queue implementations
+
+### 3.3. Circuit Breaker Integration
+- **Provider Check**: Circuit breaker state checked BEFORE processing
+- **Queue Trigger**: Unavailable providers → automatic queuing
+- **Recovery**: Background `QueueProcessorImpl` handles queued requests when providers recover
+- **Metrics**: Circuit breaker metrics bridge with observability integration
+
+## 4. Client Integration Pattern
+
+### 4.1. Polling Implementation (Required for Consumers)
+```python
+async def generate_comparison(self, request):
+    response = await self.session.post(url, json=request)
+    
+    if response.status == 200:
+        return await self._handle_immediate_response(response_text)
+    elif response.status == 202:
+        return await self._handle_queued_response(response_text)  # Polls until complete
+    else:
+        return await self._handle_error_response(response.status, response_text)
+```
+
+### 4.2. Polling Configuration (Client-Side)
+```python
+LLM_QUEUE_POLLING_ENABLED: bool = True
+LLM_QUEUE_POLLING_INITIAL_DELAY_SECONDS: float = 2.0
+LLM_QUEUE_POLLING_MAX_DELAY_SECONDS: float = 60.0
+LLM_QUEUE_POLLING_EXPONENTIAL_BASE: float = 1.5
+LLM_QUEUE_POLLING_MAX_ATTEMPTS: int = 30
+LLM_QUEUE_TOTAL_TIMEOUT_SECONDS: int = 900  # 15 minutes
+```
+
+## 5. Provider Protocol Requirements
+
+### 5.1. Structured Output (ALL Providers)
+```python
+# Required response format
+{
+    "winner": "Essay A" | "Essay B",  
+    "justification": "string (50-500 chars)",
+    "confidence": 1.0-5.0  # float, not integer
+}
+```
+
+### 5.2. Provider Implementation Pattern
+- **Anthropic**: Tool use/function calling for structured responses
+- **OpenAI**: `response_format={"type": "json_object"}` with schema
+- **Google**: `response_mime_type="application/json"` with generation config
+- **OpenRouter**: Conditional logic based on model capabilities
+
+## 6. Critical Configuration
+
+### 6.1. Queue Settings
+```bash
+LLM_PROVIDER_SERVICE_QUEUE_MAX_SIZE=1000
+LLM_PROVIDER_SERVICE_QUEUE_MAX_MEMORY_MB=100
+LLM_PROVIDER_SERVICE_QUEUE_REQUEST_TTL_HOURS=4
+```
+
+### 6.2. Development Settings
+```bash
+LLM_PROVIDER_SERVICE_USE_MOCK_LLM=false
+LLM_PROVIDER_SERVICE_RECORD_LLM_RESPONSES=false  # Dev only, never cache
+```
+
+## 7. Performance Optimization
+
+### 7.1. Connection Pool Management
+```python
+# ConnectionPoolManagerImpl provides optimized HTTP sessions
+- Provider-specific connection pools with keep-alive
+- Automatic connection cleanup and resource management
+- Concurrent request limits per provider
+- Session-level retry and timeout configuration
+```
+
+### 7.2. OpenTelemetry Tracing
+- **Span Creation**: Full span tracking for LLM requests and queue operations
+- **Trace Context**: Preserves trace context across queue processing
+- **Queue Tracing**: Request journey tracking from queue to completion
+- **Provider Tracing**: Individual provider call instrumentation
+
+## 8. Key Implementation Rules
+
+### 8.1. File Structure (Critical)
+- **API Models**: `api_models.py`
+- **Internal Models**: `internal_models.py`
+- **Blueprints**: `health_routes.py`, `llm_routes.py`
+- **Implementations**: Provider-specific classes in `implementations/`
+
+### 8.2. NO Caching Policy
+- **FORBIDDEN**: Response caching that returns identical results
+- **Required**: Fresh LLM response for every request
+- **Development**: Use response recorder for API validation, not caching
+
+### 8.3. Queue Processing
+- **TTL Enforcement**: 4-hour expiration with automatic cleanup
+- **Retry Logic**: Up to 3 attempts with exponential backoff
+- **Status Tracking**: QUEUED → PROCESSING → COMPLETED/FAILED/EXPIRED
+- **Watermarks**: High 80%, Low 60% for memory management
+
+### 8.4. Error Handling
+- **503**: Queue at capacity or service unavailable
+- **410**: Queue result expired
+- **404**: Queue ID not found
+- **202**: Request queued (from comparison) or not ready (from results)
+
+---
+
+**CRITICAL IMPLEMENTATION NOTES**
+- **Port**: Service runs on 8080
+- **Connection Pools**: `ConnectionPoolManagerImpl` provides provider-specific optimized sessions
+- **Queue Resilience**: `ResilientQueueManagerImpl` automatically handles Redis/Local queue failover
+- **202 Pattern**: All consumers MUST implement polling logic with exponential backoff
+- **NO Caching**: Service preserves psychometric validity by never caching LLM responses
+- **Tracing**: Full OpenTelemetry integration maintains trace context across queue operations

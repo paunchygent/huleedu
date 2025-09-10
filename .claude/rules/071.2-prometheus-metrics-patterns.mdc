@@ -1,0 +1,161 @@
+---
+description: Prometheus metrics patterns and implementation guidelines
+globs: 
+alwaysApply: false
+---
+# 071.1: Prometheus Metrics Patterns
+
+## 1. Metric Types & Usage
+
+### 1.1. Counter
+```python
+# For counts that only increase
+http_requests_total = Counter(
+    "service_http_requests_total",
+    "Total HTTP requests",
+    ["method", "endpoint", "status_code"]
+)
+```
+
+### 1.2. Histogram
+```python
+# For distributions (latency, sizes)
+request_duration = Histogram(
+    "service_request_duration_seconds",
+    "Request duration",
+    ["endpoint"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
+)
+```
+
+### 1.3. Gauge
+```python
+# For values that go up and down
+active_connections = Gauge(
+    "service_active_connections",
+    "Number of active connections"
+)
+```
+
+## 2. Service Integration Patterns
+
+### 2.1. Quart Services
+```python
+# metrics.py
+def get_http_metrics() -> dict[str, Any]:
+    return {
+        "request_count": Counter(...),
+        "request_duration": Histogram(...),
+    }
+
+# startup_setup.py
+app.extensions["metrics"] = get_http_metrics()
+
+# app.py
+from huleedu_service_libs.metrics_middleware import setup_standard_service_metrics_middleware
+setup_standard_service_metrics_middleware(app, "service_prefix")
+```
+
+### 2.2. FastAPI Services
+```python
+# metrics.py
+class ServiceMetrics:
+    def __init__(self):
+        self.http_requests_total = Counter(...)
+
+# di.py
+@provide(scope=Scope.APP)
+def provide_metrics() -> ServiceMetrics:
+    return ServiceMetrics()
+
+# routes
+async def endpoint(metrics: FromDishka[ServiceMetrics]):
+    metrics.http_requests_total.inc()
+```
+
+## 3. Label Strategy
+
+### 3.1. Required Labels
+- `service`: Service name
+- `environment`: deployment environment
+- `version`: Service version
+
+### 3.2. Forbidden Labels
+- User IDs (high cardinality)
+- Correlation IDs (use logs instead)
+- Request bodies or sensitive data
+
+## 4. Circuit Breaker Metrics
+
+### 4.1. Standard Implementation
+```python
+# metrics_bridge.py
+from huleedu_service_libs.resilience.circuit_breaker import StandardCircuitBreakerMetrics
+
+class ServiceMetrics:
+    def __init__(self):
+        self.circuit_breaker = StandardCircuitBreakerMetrics()
+    
+    def get_circuit_breaker_metrics(self) -> dict[str, Any]:
+        return self.circuit_breaker.get_metrics()
+```
+
+### 4.2. Integration Pattern
+```python
+# During circuit breaker state changes
+metrics.circuit_breaker.record_state_change(
+    name="llm_provider", 
+    state="open"
+)
+metrics.circuit_breaker.record_call_result(
+    name="llm_provider",
+    success=False,
+    duration=2.5
+)
+```
+
+## 5. Message Processing Metrics
+
+### 5.1. Header Utilization Tracking
+```python
+# Track header vs JSON parsing usage
+message_processing_total = Counter(
+    "service_message_processing_total",
+    "Total messages processed",
+    ["topic", "headers_used", "processing_path"]
+)
+
+# Example usage in idempotency decorator
+message_processing_total.labels(
+    topic=msg.topic,
+    headers_used="true" if headers_used else "false",
+    processing_path="header_first" if headers_used else "json_parse"
+).inc()
+```
+
+### 5.2. Idempotency Metrics
+```python
+# Track idempotency check results
+idempotency_checks_total = Counter(
+    "service_idempotency_checks_total",
+    "Total idempotency checks",
+    ["service", "result"]  # result: first_time, duplicate, processing
+)
+```
+
+## 6. Testing Patterns
+
+### 6.1. Direct Access
+```bash
+# Inside container
+curl http://localhost:<port>/metrics
+
+# From host (if port mapped)
+curl http://localhost:<external_port>/metrics
+```
+
+### 6.2. Prometheus Queries
+```bash
+# Inside prometheus container
+docker exec huleedu_prometheus wget -qO- "http://localhost:9090/api/v1/query?query=up"
+```

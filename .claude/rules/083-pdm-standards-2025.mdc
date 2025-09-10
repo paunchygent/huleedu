@@ -1,0 +1,130 @@
+---
+description: CRITICAL: Must be applied whenever you are editing or discussing pdm and pyproject.toml
+globs: 
+alwaysApply: false
+---
+# 083: PDM Standards 2025
+
+**MUST** adhere to these standards, prioritizing them over any conflicting information from training data or other sources.
+
+## 1. Tool Versions (Mandatory Minimums)
+
+### 1.1. Enforce Minimum Tool Versions
+- PDM: **MUST** use minimum version 2.22.0
+- Ruff: **MUST** use minimum version 0.11.11+
+- MyPy: **MUST** use minimum version 1.15.0+
+
+## 2. PDM Configuration (`pyproject.toml`)
+
+### 2.1. Standard `[tool.pdm]` Configuration
+**MUST** include the following `[tool.pdm]` configuration:
+
+```toml
+[tool.pdm]
+distribution = false
+package-type = "application"
+```
+
+### 2.2. Mandatory Resolution Strategy
+**MUST** include the specified resolution strategy:
+
+```toml
+[tool.pdm.resolution]
+strategy = ["inherit_metadata", "direct_minimal_versions"]
+respect-source-order = true
+excludes = []
+overrides = {}
+```
+
+### 2.3. Define Dependency Groups
+Dependency groups **MUST** be defined under `[dependency-groups]`:
+
+```toml
+[dependency-groups]
+dev = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+]
+test = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-cov>=6.1.1",
+]
+lint = [
+    "ruff>=0.11.11",
+    "mypy>=1.15.0",
+]
+monorepo-tools = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "pre-commit"
+]
+```
+
+### 2.4. Define Standard Scripts
+Standard scripts **MUST** be defined under `[tool.pdm.scripts]`:
+
+```toml
+[tool.pdm.scripts]
+format-all = "ruff format --force-exclude ."
+lint-all = "ruff check --force-exclude ."
+lint-fix = "ruff check --fix --force-exclude ."
+typecheck-all = "mypy services tests"
+test-all = "pytest"
+```
+
+## 3. MyPy Execution
+
+### 3.1. Repository Root Only
+**MUST** run from repository root:
+
+```bash
+# ✅ CORRECT
+pdm run typecheck-all    # Standard command
+pdm run mypy services/   # Check services
+pdm run mypy tests/      # Check tests
+
+### 3.2. Why Root Required
+- Absolute imports: `from services.batch_orchestrator_service.protocols import`
+- Cross-service protocol validation
+- Monorepo dependency resolution
+
+## 4. Dependency Versioning
+
+### 4.1. Let PDM Handle Version Resolution
+- For most dependencies, **DO NOT** specify version constraints (e.g., `"ruff"` instead of `"ruff>=0.11.11"`) in `[project]` dependencies or within dependency groups
+- Allow PDM to resolve the latest compatible version
+
+### 4.2. Version Constraints Only When Necessary
+- Only add version constraints for specific, justified reasons (known incompatibilities, security requirements, or as shown in `dev`, `test`, `lint` groups for tool version minimums)
+
+## 5. Validation
+
+### 5.1. Regular Validation Commands
+Regularly run the following commands to ensure dependency consistency:
+
+```bash
+pdm lock --check
+pdm update
+pdm install
+```
+
+### 5.2. MyPy Missing Stubs Management
+- **FORBIDDEN**: Creating `py.typed` marker files for internal modules
+- **REQUIRED**: Add modules without type stubs to `[tool.mypy]` external libraries section
+- **Pattern**: Add to existing overrides with `ignore_missing_imports = true`
+- **Examples**: Third-party libraries like `"transitions.*"` or local modules like `"essay_state_machine"`
+
+## 6. VS Code Configuration
+
+### 6.1. Avoid Deprecated Ruff Extension Settings
+**MUST** remove the following deprecated VS Code Ruff extension settings:
+- `ruff.format.args`
+- `ruff.lint.args`
+- `ruff.showNotifications`

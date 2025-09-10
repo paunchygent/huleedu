@@ -1,0 +1,117 @@
+---
+description: WebSocket Service - Pure notification router for teacher-facing real-time updates via notification projection pattern
+alwaysApply: false
+---
+# 020.14: WebSocket Service Architecture
+
+## Service Identity
+- **Package**: `huleedu-websocket-service`
+- **Port**: 8081 (external), 8080 (internal Docker)
+- **Stack**: FastAPI, Uvicorn, Redis pub/sub, PyJWT
+- **Purpose**: Pure notification router - forwards TeacherNotificationRequestedV1 events to connected teachers
+
+## Core Architecture: Notification Router Pattern
+
+### Design Principle
+WebSocket service is a **pure router** - it has NO business logic, NO event interpretation, NO data transformation. It simply forwards teacher notifications from Kafka to connected clients via Redis pub/sub.
+
+### Notification Flow
+```
+Services → TeacherNotificationRequestedV1 → Kafka → WebSocket → Redis → Teacher Browser
+```
+
+## Notification Projection Pattern
+
+### How Services Communicate with WebSocket
+
+Services NEVER communicate directly with WebSocket. Instead, they use the **notification projection pattern**:
+
+1. **Service emits domain event** (e.g., ClassCreatedV1, BatchEssaysReady)
+2. **Service's notification projector** decides if teacher notification needed
+3. **Projector publishes TeacherNotificationRequestedV1** to Kafka
+4. **WebSocket service consumes and routes** to teacher via Redis
+
+### Implementation References
+
+**Notification Projectors** (direct invocation pattern):
+- `/services/class_management_service/notification_projector.py` - 4 notifications
+- `/services/file_service/notification_projector.py` - 3 notifications  
+- `/services/essay_lifecycle_service/notification_projector.py` - 2 notifications
+- `/services/batch_orchestrator_service/notification_projector.py` - 1 notification
+
+**WebSocket Consumer**:
+- `/services/websocket_service/kafka_consumer.py` - Routes TeacherNotificationRequestedV1
+- `/services/websocket_service/websocket_handler.py` - Manages client connections
+
+## TeacherNotificationRequestedV1 Contract
+
+**Source**: `/libs/common_core/src/common_core/events/notification_events.py`
+
+```python
+class TeacherNotificationRequestedV1:
+    teacher_id: str              # Target teacher
+    notification_type: str       # e.g., "class_created", "batch_processing_started"
+    category: WebSocketEventCategory  # For filtering/grouping
+    priority: NotificationPriority    # LOW/STANDARD/HIGH/IMMEDIATE
+    payload: dict[str, Any]      # Notification-specific data
+    action_required: bool        # UI hint for teacher action needed
+    correlation_id: str          # Tracing
+    # Optional context:
+    batch_id: str | None
+    class_id: str | None
+    student_id: str | None
+```
+
+## WebSocket Service Components
+
+### 1. Kafka Consumer (`kafka_consumer.py`)
+- Subscribes to: `huleedu.teacher.notification.requested.v1`
+- Processes: TeacherNotificationRequestedV1 events ONLY
+- Routes to: Redis channel `teacher:{teacher_id}:notifications`
+
+### 2. WebSocket Handler (`websocket_handler.py`)
+- Endpoint: `ws://localhost:8081/ws/v1/notifications?token={jwt}`
+- Auth: JWT validation extracts teacher_id
+- Subscribe: Redis channel for authenticated teacher
+- Forward: All notifications to connected client
+
+### 3. Redis Integration
+- Channel Pattern: `teacher:{teacher_id}:notifications`
+- Pub/Sub: Decouples Kafka consumption from WebSocket connections
+- TTL: Messages expire after 5 minutes if not delivered
+
+## Connection Lifecycle
+
+1. **Connect**: Teacher browser → WebSocket with JWT
+2. **Authenticate**: Validate JWT, extract teacher_id
+3. **Subscribe**: Start Redis listener for teacher's channel
+4. **Receive**: Forward notifications from Redis to WebSocket
+5. **Disconnect**: Clean up Redis subscription
+
+## Testing
+
+**E2E Test**: `/tests/functional/test_e2e_websocket_integration.py`
+- Tests all 10 notification types
+- Validates complete pipeline: Kafka → WebSocket → Redis
+- 13/13 tests passing
+
+## Key Principles
+
+✅ **DO**:
+- Route TeacherNotificationRequestedV1 events unchanged
+- Maintain teacher_id isolation (security boundary)
+- Use Redis pub/sub for scalability
+- Keep WebSocket service stateless
+
+❌ **DON'T**:
+- Add business logic to WebSocket service
+- Transform or interpret notifications
+- Consume internal domain events directly
+- Store any persistent state
+
+## Scalability
+
+- **Horizontal**: Multiple instances behind load balancer
+- **Sticky Sessions**: Required for WebSocket connections
+- **Redis Cluster**: Supported for high availability
+- **Connection Limits**: Configurable per instance

@@ -41,9 +41,18 @@ class Settings(SecureServiceSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8000"
     CLASS_MANAGEMENT_SERVICE_URL: str = "http://class_management_service:5002"
     LANGUAGE_TOOL_SERVICE_URL: str = Field(
-        default="http://language_tool_service:8080",
+        default="http://language_tool_service:8085",
         description="Language Tool Service URL for grammar checking",
     )
+
+    # Language Tool Client Configuration
+    LANGUAGE_TOOL_CIRCUIT_BREAKER_ENABLED: bool = True
+    LANGUAGE_TOOL_CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
+    LANGUAGE_TOOL_CIRCUIT_BREAKER_RECOVERY_TIMEOUT: int = 30
+    LANGUAGE_TOOL_CIRCUIT_BREAKER_SUCCESS_THRESHOLD: int = 2
+    LANGUAGE_TOOL_REQUEST_TIMEOUT: int = 30
+    LANGUAGE_TOOL_MAX_RETRIES: int = 3
+    LANGUAGE_TOOL_RETRY_DELAY: float = 0.5
 
     # Redis Configuration
     REDIS_URL: str = Field(

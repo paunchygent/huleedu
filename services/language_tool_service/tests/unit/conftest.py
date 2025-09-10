@@ -73,15 +73,15 @@ async def test_app(
     mock_metrics: dict[str, Any],
 ) -> AsyncGenerator[Quart, None]:
     """Create test Quart application with DI setup.
-    
+
     Args:
         mock_language_tool_wrapper: Mock Language Tool wrapper to inject
         mock_metrics: Mock metrics dictionary to inject
-        
+
     Returns:
         Configured Quart test application
     """
-    
+
     class TestProvider(Provider):
         """Test provider for dependency injection with mocked dependencies."""
 
@@ -113,7 +113,7 @@ async def test_app(
                 uuid=UUID("12345678-1234-1234-1234-123456789012"),
                 source="generated",
             )
-    
+
     app = Quart(__name__)
     app.config.update({"TESTING": True})
     app.register_blueprint(grammar_bp)

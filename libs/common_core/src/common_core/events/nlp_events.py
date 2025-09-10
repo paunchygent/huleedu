@@ -7,7 +7,7 @@ Phase 1 student matching and Phase 2 text analysis.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -207,6 +207,12 @@ class GrammarAnalysis(BaseModel):
     language: str = Field(description="Language used for analysis")
     processing_time_ms: int = Field(
         default=0, description="Time taken for grammar check in milliseconds"
+    )
+    grammar_category_counts: Optional[dict[str, int]] = Field(
+        default=None, description="Count of errors per category for analytics"
+    )
+    grammar_rule_counts: Optional[dict[str, int]] = Field(
+        default=None, description="Count of errors per rule for analytics"
     )
 
 

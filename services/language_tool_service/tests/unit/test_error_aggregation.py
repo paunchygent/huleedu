@@ -5,12 +5,6 @@ Tests focus on category and rule counting, error structure handling.
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock
-
-import pytest
-
-from services.language_tool_service.protocols import LanguageToolWrapperProtocol
 from services.language_tool_service.tests.unit.conftest import create_mock_grammar_error
 
 
@@ -38,7 +32,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 3
         assert len(response_data["grammar_category_counts"]) == 1
 
@@ -65,7 +59,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 2
         assert response_data["grammar_category_counts"]["SPELLING"] == 2
         assert response_data["grammar_category_counts"]["STYLE"] == 1
@@ -93,7 +87,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert response_data["grammar_rule_counts"]["AGREEMENT"] == 3
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
         assert len(response_data["grammar_rule_counts"]) == 2
@@ -123,7 +117,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         # Missing type should default to "UNKNOWN"
         assert response_data["grammar_category_counts"]["UNKNOWN"] == 1
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 1
@@ -153,7 +147,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         # Missing rule should default to "UNKNOWN_RULE"
         assert response_data["grammar_rule_counts"]["UNKNOWN_RULE"] == 1
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
@@ -183,13 +177,11 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         # Non-dict type should default to "UNKNOWN"
         assert response_data["grammar_category_counts"]["UNKNOWN"] == 1
 
-    async def test_empty_error_list(
-        self, test_client, mock_language_tool_wrapper
-    ) -> None:
+    async def test_empty_error_list(self, test_client, mock_language_tool_wrapper) -> None:
         """Test that empty error list produces empty counts."""
         # Arrange
         request_body = {"text": "Perfect text with no errors.", "language": "en-US"}
@@ -203,7 +195,7 @@ class TestErrorAggregation:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert response_data["total_grammar_errors"] == 0
         assert response_data["grammar_category_counts"] == {}
         assert response_data["grammar_rule_counts"] == {}

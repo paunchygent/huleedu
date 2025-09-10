@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from common_core.event_enums import ProcessingEvent, topic_name
+from huleedu_service_libs.error_handling import HuleEduError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.manager import OutboxManager
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol, KafkaPublisherProtocol
 from huleedu_service_libs.redis_client import RedisClient
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
 from opentelemetry.trace import Tracer
 from prometheus_client import CollectorRegistry
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -296,9 +299,29 @@ class NlpServiceProvider(Provider):
     def provide_language_tool_client(
         self,
         settings: Settings,
+        tracer: Tracer,
     ) -> LanguageToolClientProtocol:
-        """Provide Language Tool Service client."""
-        return LanguageToolServiceClient(settings.LANGUAGE_TOOL_SERVICE_URL)
+        """Provide Language Tool Service client with optional circuit breaker protection."""
+        # Create base client with settings
+        client = LanguageToolServiceClient(settings)
+
+        # Add circuit breaker if enabled
+        if settings.LANGUAGE_TOOL_CIRCUIT_BREAKER_ENABLED:
+            circuit_breaker = CircuitBreaker(
+                name="language_tool_service",
+                failure_threshold=settings.LANGUAGE_TOOL_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+                recovery_timeout=timedelta(
+                    seconds=settings.LANGUAGE_TOOL_CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+                ),
+                success_threshold=settings.LANGUAGE_TOOL_CIRCUIT_BREAKER_SUCCESS_THRESHOLD,
+                expected_exception=HuleEduError,
+                tracer=tracer,
+                service_name=settings.SERVICE_NAME,
+            )
+            # Attach circuit breaker to client for conditional use
+            client._circuit_breaker = circuit_breaker  # type: ignore[attr-defined]
+
+        return client
 
     @provide(scope=Scope.APP)
     def provide_batch_nlp_handler(

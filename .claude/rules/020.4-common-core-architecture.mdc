@@ -1,0 +1,225 @@
+---
+description: Defines the 'common-core' library for shared data contracts. Provides Pydantic models, enums, and the canonical EventEnvelope to ensure inter-service consistency.
+globs: 
+alwaysApply: false
+---
+# 020.4: Common Core Architecture
+
+## 1. Purpose
+
+Defines HuleEdu's Common Core package with shared models, enums, and event schemas.
+
+## 2. Package Overview
+
+### 2.1. Package Identity
+
+- **Name**: `huleedu-common-core`
+- **Type**: Shared library (Pydantic, Python typing)
+- **Context**: Single source of truth for data contracts
+
+### 2.2. Module Structure
+
+```
+libs/common_core/src/common_core/
+├── __init__.py
+├── config_enums.py             # Configuration-related enumerations
+├── domain_enums.py             # Core business domain enumerations
+├── error_enums.py              # Standardized error codes
+├── event_enums.py              # Enumerations for event types
+├── status_enums.py             # Enumerations for status tracking (e.g., BatchStatus, EssayStatus)
+├── observability_enums.py      # Enums for metrics and tracing
+├── metadata_models.py          # Metadata and reference data models
+├── pipeline_models.py          # Models for pipeline state and configuration
+├── api_models/                 # HTTP inter-service contracts (request/response)
+│   ├── __init__.py
+│   └── batch_registration.py   # BatchRegistrationRequestV1 HTTP contract
+└── events/
+    ├── __init__.py
+    ├── envelope.py             # Canonical EventEnvelope schema
+    ├── base_event_models.py    # Base classes for event data payloads
+    ├── utils.py                # Utility functions for events
+    ├── ai_feedback_events.py   # Events related to AI feedback generation
+    ├── batch_coordination_events.py # Events for coordinating batch processing
+    ├── cj_assessment_events.py # Events for Comparative Judgement assessments
+    ├── class_events.py         # Events related to class and student management
+    ├── client_commands.py      # Inbound commands from clients/gateways
+    ├── els_bos_events.py       # Events for ELS-BOS interaction
+    ├── file_events.py          # Core file service domain events
+    ├── file_management_events.py # Events for adding or removing files from a already existing batch
+    ├── spellcheck_models.py    # Events and models for spell-checking
+    └── validation_events.py    # Events related to data validation
+```
+
+## 3. Contract Types
+
+### 3.1. HTTP Contracts (api_models)
+- Purpose: Request/response bodies for service-to-service HTTP calls
+- Versioning: Versioned by model suffix (e.g., V1, V2) independent of events
+- Transport: REST/HTTP only (NOT Kafka)
+- Example: `BatchRegistrationRequestV1`
+
+### 3.2. Event Contracts (events)
+- Purpose: Kafka event payloads, thin by design (Thin Events)
+- Transport: Always wrapped in `EventEnvelope` and published to Kafka topics
+- Versioning: Encoded in event name (e.g., `.v1`)
+
+## 4. Core Enums
+
+### 3.1. ProcessingStage
+
+`PENDING`, `INITIALIZED`, `PROCESSING`, `CONCLUDED`, `FAILED`, `CANCELLED`
+
+- **Terminal States**: `CONCLUDED`, `FAILED`, `CANCELLED`
+- **Active States**: `CONCLUDED`, `INITIALIZED`, `PROCESSING`
+
+### 3.2. ProcessingEvent
+
+- **Batch Orchestration**: `BATCH_PIPELINE_REQUESTED`, `BATCH_PHASE_INITIATED`, `BATCH_PIPELINE_PROGRESS_UPDATED`, `BATCH_PHASE_CONCLUDED`
+- **Batch Coordination**: `BATCH_ESSAYS_REGISTERED`, `BATCH_ESSAYS_READY`
+- **Essay Lifecycle**: `ESSAY_PHASE_INITIATION_REQUESTED`, `ESSAY_LIFECYCLE_STATE_UPDATED`
+- **Essay Content**: `ESSAY_CONTENT_PROVISIONED`, `EXCESS_CONTENT_PROVISIONED`
+- **Service Commands**: `BATCH_SPELLCHECK_INITIATE_COMMAND`
+- **Specialized Services**: `ESSAY_SPELLCHECK_REQUESTED`, `SPELLCHECK_PHASE_COMPLETED`, `SPELLCHECK_RESULTS`, `ESSAY_NLP_COMPLETED`, `ESSAY_AIFEEDBACK_COMPLETED`, etc.
+- **Generic**: `PROCESSING_STARTED`, `PROCESSING_CONCLUDED`, `PROCESSING_FAILED`
+
+### 3.3. EssayStatus
+
+- **File Service**: `UPLOADED`, `TEXT_EXTRACTED`, `CONTENT_INGESTING`, `CONTENT_INGESTION_FAILED`
+- **ELS Pipeline**: `READY_FOR_PROCESSING`
+- **Spellcheck**: `AWAITING_SPELLCHECK`, `SPELLCHECKING_IN_PROGRESS`, `SPELLCHECKED_SUCCESS`, `SPELLCHECK_FAILED`
+- **NLP**: `AWAITING_NLP`, `NLP_IN_PROGRESS`, `NLP_SUCCESS`, `NLP_FAILED`
+- **AI Feedback**: `AWAITING_AI_FEEDBACK`, `AI_FEEDBACK_IN_PROGRESS`, `AI_FEEDBACK_SUCCESS`, `AI_FEEDBACK_FAILED`
+- **System**: `ESSAY_CRITICAL_FAILURE`
+
+### 3.4. BatchStatus
+
+- **Ingestion**: `AWAITING_CONTENT_VALIDATION`, `CONTENT_INGESTION_FAILED`, `AWAITING_PIPELINE_CONFIGURATION`
+- **Processing**: `READY_FOR_PIPELINE_EXECUTION`, `PROCESSING_PIPELINES`
+- **Terminal**: `COMPLETED_SUCCESSFULLY`, `COMPLETED_WITH_FAILURES`, `FAILED_CRITICALLY`, `CANCELLED`
+
+### 3.5. ContentType
+
+`ORIGINAL_ESSAY`, `CORRECTED_TEXT`, `PROCESSING_LOG`, `NLP_METRICS_JSON`, `STUDENT_FACING_AI_FEEDBACK_TEXT`, `AI_EDITOR_REVISION_TEXT`, `AI_DETAILED_ANALYSIS_JSON`, `GRAMMAR_ANALYSIS_JSON`, `CJ_RESULTS_JSON`
+
+### 3.6. Topic Mapping Function
+
+```python
+def topic_name(event: ProcessingEvent) -> str:
+    """Convert ProcessingEvent to Kafka topic name with explicit mapping."""
+```
+
+**Current Mappings**:
+- `ESSAY_SPELLCHECK_REQUESTED` → `"huleedu.essay.spellcheck.requested.v1"`
+- `SPELLCHECK_PHASE_COMPLETED` → `"huleedu.batch.spellcheck.phase.completed.v1"`
+- `SPELLCHECK_RESULTS` → `"huleedu.essay.spellcheck.results.v1"`
+- `BATCH_ESSAYS_REGISTERED` → `"huleedu.batch.essays.registered.v1"`
+- `BATCH_ESSAYS_READY` → `"huleedu.els.batch.essays.ready.v1"`
+- `ESSAY_CONTENT_PROVISIONED` → `"huleedu.file.essay.content.provisioned.v1"`
+- `EXCESS_CONTENT_PROVISIONED` → `"huleedu.els.excess.content.provisioned.v1"`
+- `BATCH_SPELLCHECK_INITIATE_COMMAND` → `"huleedu.els.spellcheck.initiate.command.v1"`
+
+## 5. Models
+
+### 4.1. SystemProcessingMetadata
+
+**Note**: EntityReference model has been eliminated and replaced with primitive parameters for better performance and clarity.
+
+```python
+entity_id: str
+entity_type: str  
+parent_id: str | None = None
+timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+processing_stage: ProcessingStage | None = None
+started_at: datetime | None = None
+completed_at: datetime | None = None
+event: str | None = None
+error_info: dict[str, Any] = Field(default_factory=dict)
+```
+
+### 4.2. StorageReferenceMetadata
+
+```python
+references: dict[ContentType, dict[str, str]] = Field(default_factory=dict)
+
+def add_reference(self, ctype: ContentType, storage_id: str, path_hint: str | None = None) -> None
+```
+
+### 4.3. EssayProcessingInputRefV1
+
+```python
+essay_id: str
+text_storage_id: str
+student_name: str | None = None
+```
+
+## 6. Event System
+
+### 5.1. EventEnvelope
+
+```python
+event_id: UUID = Field(default_factory=uuid4)
+event_type: str  # e.g., "huleedu.essay.spellcheck_completed.v1"
+event_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+source_service: str
+schema_version: int = 1
+correlation_id: UUID | None = None
+data_schema_uri: str | None = None
+data: T_EventData
+```
+
+### 5.2. Base Event Models
+
+**BaseEventData**: Foundation for all event payloads
+**ProcessingUpdate**: Extends BaseEventData with status and metadata
+**EventTracker**: Event tracking capabilities
+
+### 5.3. Event Domain Models
+
+**file_events.py**: `EssayContentProvisionedV1` (File Service → ELS)
+**batch_coordination_events.py**: `BatchEssaysRegistered`, `BatchEssaysReady` (BOS ↔ ELS), `ExcessContentProvisionedV1` (ELS → BOS)
+**nlp_events.py**: `BatchAuthorMatchesSuggestedV1` (NLP Service → Class Management), `StudentMatchSuggestion`, `EssayMatchResult`
+**cj_assessment_events.py**: `BatchCJAssessmentInitiatedV1`, `BatchCJAssessmentCompletedV1` (CJ Assessment Service events)
+
+### 5.4. Service Models
+
+**essay_service_models.py**: Request models from ELS to Specialized Services
+**batch_service_models.py**: Command models from BOS to ELS
+
+## 7. Implementation
+
+### 6.1. Pydantic
+
+- All models inherit `BaseModel`
+- Type hints required with `from __future__ import annotations`
+- Custom validators as needed
+- Frozen models where immutability required
+
+### 6.2. Type Checking
+
+- MyPy with strict mode
+- No untyped definitions
+- No `Any` returns where avoidable
+- Generic TypeVar for EventEnvelope
+
+### 6.3. Dependencies
+
+- Core: `pydantic[email]>=2.0`
+- Dev: MyPy, Pytest, Ruff
+
+## 8. Versioning
+
+- Semantic versioning (0.1.0)
+- Breaking changes = major version
+- Event models use V1, V2 suffixes
+- EventEnvelope includes schema_version field
+- Backward compatibility within major versions
+
+## 9. Error Handling
+
+### 8.1. ErrorCode Enum
+
+`UNKNOWN_ERROR`, `VALIDATION_ERROR`, `RESOURCE_NOT_FOUND`, `CONFIGURATION_ERROR`, `EXTERNAL_SERVICE_ERROR`, `KAFKA_PUBLISH_ERROR`, service-specific errors
+
+## 10. Extension Points
+
+Additional specialized service event models can be added to `common_core/events/` as new services are developed, following the established patterns for event definitions, versioning, and service boundaries.

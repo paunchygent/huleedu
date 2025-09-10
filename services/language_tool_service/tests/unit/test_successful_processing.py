@@ -5,12 +5,8 @@ Tests focus on successful grammar check scenarios and response validation.
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock
-
 import pytest
 
-from services.language_tool_service.protocols import LanguageToolWrapperProtocol
 from services.language_tool_service.tests.unit.conftest import (
     create_mock_grammar_error,
     generate_text_with_words,
@@ -36,7 +32,7 @@ class TestSuccessfulProcessing:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         # Verify response structure
         assert response_data["total_grammar_errors"] == 0
         assert response_data["errors"] == []
@@ -65,7 +61,7 @@ class TestSuccessfulProcessing:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert response_data["total_grammar_errors"] == 2
         assert len(response_data["errors"]) == 2
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 1
@@ -77,9 +73,7 @@ class TestSuccessfulProcessing:
         "word_count",
         [50, 150, 400, 750, 1500, 2500],
     )
-    async def test_different_text_sizes(
-        self, test_client, word_count: int
-    ) -> None:
+    async def test_different_text_sizes(self, test_client, word_count: int) -> None:
         """Test successful processing with different text sizes."""
         # Arrange
         text = generate_text_with_words(word_count)
@@ -91,7 +85,7 @@ class TestSuccessfulProcessing:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert "errors" in response_data
         assert "total_grammar_errors" in response_data
         assert "processing_time_ms" in response_data
@@ -101,9 +95,7 @@ class TestSuccessfulProcessing:
         "language",
         ["en-US", "sv-SE", "de-DE", "fr-FR", "auto"],
     )
-    async def test_different_languages(
-        self, test_client, language: str
-    ) -> None:
+    async def test_different_languages(self, test_client, language: str) -> None:
         """Test successful processing with different language codes."""
         # Arrange
         request_body = {
@@ -133,7 +125,7 @@ class TestSuccessfulProcessing:
         # Assert
         assert response.status_code == 200
         response_data = await response.get_json()
-        
+
         assert "processing_time_ms" in response_data
         assert isinstance(response_data["processing_time_ms"], int)
         assert response_data["processing_time_ms"] >= 0

@@ -1,0 +1,132 @@
+---
+description: Read before implementing ANY code. Must be requested if user does not tell you otherwise
+globs: 
+alwaysApply: false
+---
+# 110.2: Coding Mode
+
+## 1. Core Standards
+- **MUST** follow [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc)
+- **MUST** use Pydantic models from `common/models/`
+- **MUST** adhere to [020-architectural-mandates.mdc](mdc:020-architectural-mandates.mdc)
+- **MUST** follow [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc)
+
+## 2. HTTP Service Implementation **MANDATORY**
+
+### 2.1. Blueprint Pattern Requirements
+**ALL HTTP services (Quart-based) MUST follow Blueprint architecture:**
+
+- **FORBIDDEN**: Direct route definitions in app.py
+- **REQUIRED**: api/ directory with Blueprint route files
+- **REQUIRED**: health_routes.py with /healthz and /metrics endpoints
+- **app.py MUST** be lean (< 150 lines) focused on setup and Blueprint registration
+
+### 2.2. Service Creation Pattern
+When creating new HTTP services:
+
+1. **Create api/ directory structure**:
+   ```
+   services/<service_name>/
+   ├── app.py                 # Lean setup only
+   ├── api/
+   │   ├── __init__.py
+   │   ├── health_routes.py   # Standard endpoints
+   │   └── <domain>_routes.py # Service-specific routes
+   ```
+
+2. **Implement required health_routes.py**:
+   ```python
+   """Health and metrics routes for [Service Name]."""
+   from quart import Blueprint, Response, jsonify
+   from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+   
+   health_bp = Blueprint('health_routes', __name__)
+   
+   @health_bp.route("/healthz")
+   async def health_check() -> Response:
+       return jsonify({"status": "ok", "message": "[Service] is healthy"}), 200
+   
+   @health_bp.route("/metrics")
+   async def metrics() -> Response:
+       metrics_data = generate_latest()
+       return Response(metrics_data, content_type=CONTENT_TYPE_LATEST)
+   ```
+
+3. **Register Blueprints in app.py**:
+   ```python
+   from .api.health_routes import health_bp
+   from .api.<domain>_routes import <domain>_bp
+   
+   app.register_blueprint(health_bp)
+   app.register_blueprint(<domain>_bp)
+   ```
+
+## 3. Enum Usage **MANDATORY**
+
+### 3.1. Status Parameters
+**ALL status-related parameters MUST use enum types, never string literals:**
+Examples: (common_core contains enums for all status fields)
+- **REQUIRED**: Use `BatchStatus` enum for batch status operations
+- **REQUIRED**: Use `EssayStatus` enum for essay status operations  
+- **REQUIRED**: Use appropriate enums from `common_core.config_enums.py, libs/common_core/src/common_core/domain_enums.py, libs/common_core/src/common_core/error_enums.py, common_core/essay_service_models.py, common_core/event_enums.py` for all status fields
+- **FORBIDDEN**: String literals for status values in protocol signatures
+
+**Examples:**
+```python
+# ✅ CORRECT - Use enum types
+async def update_batch_status(self, batch_id: str, new_status: BatchStatus) -> bool:
+    pass
+
+async def handle_phase_concluded(self, phase_status: BatchStatus) -> None:
+    pass
+
+# ❌ FORBIDDEN - String literals
+async def update_batch_status(self, batch_id: str, new_status: str) -> bool:
+    pass
+```
+
+### 3.2. Boundary Conversion Pattern
+**At serialization boundaries (API endpoints, event handlers):**
+
+- Accept enum objects in internal business logic
+- Convert strings to enums only at true boundaries
+- Validate enum values using Pydantic enum fields
+- Use enum `.value` property only for logging/serialization
+
+### 3.3. Test Implementation
+**Tests MUST pass enum objects to business logic methods:**
+
+```python
+# ✅ CORRECT - Pass enum objects
+await coordinator.handle_phase_concluded(
+    phase_status=BatchStatus.COMPLETED_SUCCESSFULLY
+)
+
+# ❌ FORBIDDEN - Pass string literals
+await coordinator.handle_phase_concluded(
+    phase_status="completed_successfully"
+)
+```
+
+## 4. Event-Driven Code
+- **MUST** follow [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc)
+- Use `EventEnvelope`, correct event naming, Thin Events principle
+
+## 4. Code Quality
+- Write testable code per [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc)
+- **FORBIDDEN**: "Vibe coding" - code must be based on explicit requirements
+- Update documentation as part of coding tasks
+- **Blueprint routes MUST** be focused on HTTP handling, delegate business logic to protocols
+
+## 5. Tool Usage
+- **MUST** use `edit_file` tool for all modifications
+- **MUST** use `// ... existing code ...` markers correctly
+- Include only modified lines in `code_edit` field
+
+## 6. API Endpoint Creation Guidelines
+When adding new API endpoints:
+- **MUST** add to appropriate Blueprint file in api/ directory
+- **MUST** use Pydantic models for request/response validation
+- **MUST** implement proper error handling
+- **MUST** delegate business logic to protocol implementations
+- **MUST** include appropriate logging with correlation IDs

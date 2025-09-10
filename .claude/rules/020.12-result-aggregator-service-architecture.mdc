@@ -1,0 +1,138 @@
+---
+description: Result Aggregator Service (RAS) - Event-driven aggregator with publishing capabilities
+globs:
+  - services/result_aggregator_service/**
+---
+
+# 020.12: Result Aggregator Service Architecture
+
+## Service Identity
+
+- **Type**: Hybrid (Kafka Consumer + Publisher + HTTP API)
+- **Pattern**: Event aggregation, enrichment, and republishing
+- **Persistence**: PostgreSQL with transactional outbox
+- **Cache**: Redis for query optimization and idempotency
+
+## Core Responsibilities
+
+1. **Event Aggregation**: Consume and aggregate results from processing services
+2. **Event Publishing**: Publish batch completion and assessment events
+3. **Teacher Notifications**: Project result events to teacher notifications
+4. **Query API**: Provide optimized access to batch and essay results
+
+## Event Contracts
+
+### Consumes
+
+```python
+ProcessingEvent.BATCH_ESSAYS_REGISTERED    # Initialize batch records
+ProcessingEvent.BATCH_PHASE_OUTCOME        # Phase completion tracking
+ProcessingEvent.SPELLCHECK_RESULTS         # Rich spellcheck results with metrics
+ProcessingEvent.CJ_ASSESSMENT_COMPLETED    # CJ rankings
+```
+
+### Produces
+
+```python
+ProcessingEvent.BATCH_RESULTS_READY        # All phases complete (HIGH priority notification)
+ProcessingEvent.BATCH_ASSESSMENT_COMPLETED # CJ assessment done (STANDARD priority)
+ProcessingEvent.TEACHER_NOTIFICATION_REQUESTED # Via notification projector
+```
+
+## API Contracts
+
+### Internal Endpoints
+
+```python
+# Batch status query
+GET /internal/v1/batches/{batch_id}/status
+Response: BatchStatusResponse (includes user_id for security validation)
+
+# User batches query  
+GET /internal/v1/batches/user/{user_id}?limit=20&offset=0&status=COMPLETED
+Response: Paginated list of BatchStatusResponse
+```
+
+### Authentication
+
+- Service-to-service via `X-Internal-API-Key` and `X-Service-ID` headers
+- Whitelist: API Gateway Service, Admin Dashboard Service
+
+## Database Schema
+
+### Tables
+
+1. **batch_results**: Batch aggregation with user_id
+2. **essay_results**: Phase-specific results per essay
+3. **event_outbox**: Transactional outbox for reliable publishing
+
+### Publishing Infrastructure
+
+```python
+# TRUE OUTBOX PATTERN
+OutboxManager -> PostgreSQLOutboxRepository -> event_outbox table
+EventPublisher -> ResultEventPublisher with notification projector
+NotificationProjector -> TeacherNotificationRequestedV1 events
+
+# CANONICAL PATTERN: Direct projector invocation
+async def publish_batch_results_ready(event, correlation_id):
+    await self.outbox_manager.publish_to_outbox(...)  # Store first
+    if self.notification_projector:  # Direct invocation, no Kafka round-trip
+        await self.notification_projector.handle_batch_results_ready(event, correlation_id)
+```
+
+## Architectural Patterns
+
+### Event Processing
+
+```python
+# Idempotent consumer with 24-hour TTL
+@idempotent_consumer(redis_client=redis_client, ttl_seconds=86400)
+async def process_message_idempotently(msg: ConsumerRecord) -> bool:
+    # Process with automatic deduplication
+```
+
+### Caching Abstraction
+
+```python
+class CacheManagerProtocol(Protocol):
+    # Single-entity caching
+    async def get_batch_status_json(self, batch_id: str) -> Optional[str]: ...
+    async def set_batch_status_json(self, batch_id: str, status_json: str, ttl: int) -> None: ...
+    
+    # List/pagination caching with active invalidation
+    async def get_user_batches_json(
+        self, user_id: str, limit: int, offset: int, status: Optional[str]
+    ) -> Optional[str]: ...
+    async def set_user_batches_json(
+        self, user_id: str, limit: int, offset: int, status: Optional[str], 
+        data_json: str, ttl: int
+    ) -> None: ...
+    
+    # Active cache invalidation
+    async def invalidate_user_batches(self, user_id: str) -> None: ...
+    async def invalidate_batch(self, batch_id: str) -> None: ...
+```
+
+### Repository Pattern
+
+All database operations through `BatchRepositoryProtocol`:
+- `create_batch()`: Initialize from registration event
+- `update_essay_*_result()`: Update phase-specific results
+- `get_batch()`: Retrieve with eager-loaded essays
+
+## Critical Patterns
+
+1. **Import Pattern**: Full module paths for ALL imports (see rule 055)
+2. **Event Publishing**: Outbox pattern with direct notification projection
+3. **Notification Priority**: HIGH for batch completion, STANDARD for assessment
+4. **Cache Invalidation**: Active invalidation via Redis SETs
+5. **Idempotency**: 24-hour TTL on consumer deduplication
+
+## Integration Points
+
+- **Upstream**: Consumes from ELS, Spellchecker, CJ Assessment
+- **Downstream**: AI Feedback Service consumes BatchResultsReadyV1
+- **WebSocket**: Teacher notifications via projection pattern
+- **API Gateway**: Query interface for batch/essay results
+- **Future**: CJ Assessment API for enriched grade projections

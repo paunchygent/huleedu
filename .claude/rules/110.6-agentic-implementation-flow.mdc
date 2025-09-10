@@ -1,0 +1,180 @@
+---
+description: Enhanced Phased Agentic Implementation Flow for Complex Tasks
+globs: 
+alwaysApply: true
+---
+===
+# 110.6: Agentic Implementation Flow
+
+## 1. Overview
+
+This rule defines a rigorous 6-agent cycle methodology for implementing complex tasks that require multiple phases and comprehensive quality assurance. The flow ensures systematic execution with proper delegation, review, and validation at each step.
+
+## 2. The 6-Agent Cycle
+
+**CRITICAL REQUIREMENT**: All agents MUST be instructed to ULTRATHINK when given instructions. This ensures deep analytical processing and comprehensive consideration of all factors before action.
+
+For each subtask or phase, execute this exact sequence:
+
+### 2.1 Analysis & Delegation - NO AGENT 
+- Read the full task specification and requirements
+- Study referenced patterns and existing implementations
+- Analyze boundary objects, contracts, and dependencies
+- Create detailed implementation specification with acceptance criteria
+- **Output**: Precise implementation plan with clear deliverables and file references (including plan)
+
+### 2.2 Implementation Agent (code-implementation-specialist)
+- Receive specification from Analysis Agent
+- Implement code following project standards and architectural patterns
+- Follow established patterns from similar existing components
+- **CRITICAL**: DO NOT write tests (testing is delegated to test-engineer)
+- **Output**: Complete implementation WITHOUT tests
+
+### 2.3 Review Agent (new-file-code-reviewer)
+- Review ALL created/modified files against:
+  - Task specifications and acceptance criteria
+  - Project architectural rules and standards
+  - Design patterns and service boundaries
+  - Code quality and compliance requirements
+- **Output**: JSON report with findings and recommendations
+
+### 2.4 Fix Agent (auto-fix-new-file) [Only if issues found]
+- Apply targeted fixes based on review report
+- Ensure minimal changes to resolve identified issues
+- Maintain architectural consistency and patterns
+- **Output**: Fixed implementation addressing review findings
+
+### 2.5 Test Creation Agent (test-engineer)
+- Follow established test creation methodology (Rule 075)
+- If several tests needed, launch multiple test-engineer agents in parallel 
+according to .cursor/rules/075-test-creation-methodology.mdc
+and .cursor/rules/075.1-parallel-test-creation-methodology.mdc
+- Ensure all tests are reviewed by lead-architect-planner
+- Study battle-tested patterns from similar components
+- Create comprehensive test coverage using project standards
+- Run tests and ensure 100% pass rate
+- **Output**: Complete test suite following project methodology
+
+
+### 2.6 Final Architect Review (lead-architect-planner)
+- Validate implementation matches original specification
+- Review test quality per established requirements
+- Perform compliance checks (DI patterns, type safety, etc.)
+- Confirm all tests pass and quality gates are met
+- **Output**: Final approval with quality report OR rejection with specific issues
+
+## 3. Implementation Phases Structure
+
+### Phase 0: Architecture Study (Read-only)
+- **Agent**: lead-architect-planner
+- **Purpose**: Study relevant rules, existing patterns, and architectural constraints
+- **Output**: Architectural understanding document
+
+### Phase N: Task-Specific Implementation
+- **Cycle**: Analyze → Implement → Review → Fix → Test → Verify
+- **Files**: Component-specific files and their locations
+- **Tests**: Corresponding test files following project structure
+
+## 4. Testing Standards Integration
+
+The test-engineer agent MUST:
+
+### 4.1 Pre-Implementation Study
+- Read architectural rules and project standards
+- Study battle-tested patterns from similar components
+- Run type checking and linting before writing tests
+
+### 4.2 Test Creation Standards
+- Follow project-specific test methodology (e.g., Rule 075)
+- Keep test files within established size limits
+- Use parametrized testing for comprehensive coverage
+- Follow project DI patterns (avoid mocking frameworks if specified)
+- Test locale-specific scenarios where applicable
+
+### 4.3 Batch Execution (for multiple test files)
+- Create manageable batches of test files
+- Launch parallel test-engineer agents when appropriate
+- Require architect review after each batch
+
+### 4.4 Quality Gates
+- 100% test pass rate required
+- Zero violations of project patterns
+- Type checking must pass
+- Implementation bugs identified and documented
+
+## 5. Critical Constraints
+
+### 5.1 Execution Rules
+- **NO SHORTCUTS**: Every phase MUST complete the full 6-agent cycle
+- **NO ASSUMPTIONS**: Agents must read actual files, not assume patterns
+- **STRICT ALIGNMENT**: Follow established project templates and patterns
+- **TEST DELEGATION**: Implementation agent does NOT write tests
+- **DOCUMENT UPDATES**: Update task documentation after each phase completion
+
+### 5.2 Quality Requirements
+- Tests must follow project methodology without exception
+- All quality gates must be satisfied before proceeding
+- Maintain architectural consistency throughout
+
+## 6. Quality Gates Checklist
+
+Each phase must satisfy before proceeding:
+- [ ] Implementation code complete and reviewed
+- [ ] Review agent findings addressed
+- [ ] Test-engineer has created comprehensive tests
+- [ ] All tests pass (100% rate)
+- [ ] No violations of project patterns
+- [ ] Type checking passes
+- [ ] Linting clean
+- [ ] Architect confirms specification compliance
+
+## 7. Execution Protocol
+
+### 7.1 Agent Activation Announcements
+Start each phase by announcing agent activation:
+- "Launching lead-architect-planner for analysis..."
+- "Launching code-implementation-specialist for implementation..."
+- "Launching new-file-code-reviewer for review..."
+- "Launching auto-fix-new-file for fixes..." (if needed)
+- "Launching test-engineer for test creation..."
+- "Launching lead-architect-planner for final validation..."
+
+### 7.2 Parallel Execution
+When appropriate, launch multiple agents in parallel:
+- Multiple test-engineer agents for related test files (recommended max 3)
+- Always use single tool call for parallel execution
+- Maintain coordination and avoid conflicts
+
+## 8. Failure Protocol
+
+If any agent reports failure:
+1. **STOP** immediately
+2. Document the failure in the task documentation
+3. Request user guidance for resolution
+4. **DO NOT** proceed to next phase until resolved
+
+## 9. Adaptation Guidelines
+
+### 9.1 Task-Specific Customization
+- Replace "TASK-052" references with actual task identifier
+- Adapt phase descriptions to match specific task requirements
+- Modify file paths and component names as appropriate
+- Adjust quality gates to match project-specific requirements
+
+### 9.2 Project Pattern Integration
+- Reference project-specific architectural rules
+- Use established service templates and patterns
+- Follow project-specific testing methodologies
+- Integrate with project-specific tooling and workflows
+
+## 10. Benefits
+
+This methodology ensures:
+- **Systematic Quality**: Multiple validation checkpoints prevent defects
+- **Clear Responsibility**: Each agent has specific, focused responsibilities
+- **Comprehensive Testing**: Dedicated test creation with proper methodology
+- **Architectural Consistency**: Multiple reviews ensure pattern compliance
+- **Traceable Progress**: Clear phase boundaries and documentation updates
+- **Risk Mitigation**: Early detection and resolution of issues
+
+===

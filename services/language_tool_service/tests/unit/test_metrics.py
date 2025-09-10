@@ -5,14 +5,9 @@ Tests focus on verifying correct metrics are emitted with proper labels.
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock
-
 import pytest
-from prometheus_client import CollectorRegistry
 
 from services.language_tool_service.api.grammar_routes import _get_text_length_range
-from services.language_tool_service.protocols import LanguageToolWrapperProtocol
 
 
 class TestMetricsEmission:
@@ -28,7 +23,7 @@ class TestMetricsEmission:
 
         # Assert
         assert response.status_code == 200
-        
+
         response_data = await response.get_json()
         # Verify request_count metric was called (mock validation would go here)
         # In a real test, we'd check mock_metrics was called with correct labels
@@ -67,7 +62,7 @@ class TestMetricsEmission:
         """Test that text length ranges are correctly categorized in metrics."""
         # Arrange
         from services.language_tool_service.tests.unit.conftest import generate_text_with_words
-        
+
         text = generate_text_with_words(word_count)
         request_body = {"text": text, "language": "en-US"}
 
@@ -105,9 +100,7 @@ class TestTextLengthRangeCategorization:
             (10000, "2000+_words"),
         ],
     )
-    def test_word_count_range_boundaries(
-        self, word_count: int, expected_range: str
-    ) -> None:
+    def test_word_count_range_boundaries(self, word_count: int, expected_range: str) -> None:
         """Test word count range categorization at boundaries."""
         assert _get_text_length_range(word_count) == expected_range
 
@@ -115,10 +108,10 @@ class TestTextLengthRangeCategorization:
         """Test that word count ranges don't overlap."""
         test_values = [50, 150, 300, 750, 1500, 2500]
         ranges = [_get_text_length_range(v) for v in test_values]
-        
+
         # All ranges should be different
         assert len(set(ranges)) == len(ranges)
-        
+
         # Verify expected ranges
         assert ranges == [
             "0-100_words",

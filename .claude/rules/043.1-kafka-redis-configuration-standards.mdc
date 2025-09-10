@@ -1,0 +1,62 @@
+---
+description: Kafka and Redis configuration standards - localhost defaults with Docker overrides
+globs: 
+  - "services/*/config.py"
+alwaysApply: false
+---
+# 043.1: Kafka and Redis Configuration Standards
+
+## Mandatory Pattern
+
+```python
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # ALWAYS localhost defaults with Field()
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(
+        default="localhost:9092",
+        description="Kafka bootstrap servers"
+    )
+    
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379",
+        description="Redis URL"
+    )
+```
+
+## Environment Override Hierarchy
+
+1. **Defaults**: `localhost:9092` (local development)
+2. **Docker Compose**: `kafka:9092` (container networking)
+3. **Production**: Explicit `.env` values
+
+## Docker Compose Override
+
+```yaml
+# docker-compose.services.yml
+environment:
+  - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+  - REDIS_URL=redis://redis:6379
+  # Service prefixes when needed
+  - BCS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+```
+
+## Anti-Patterns (FORBIDDEN)
+
+```python
+# ❌ Hardcoded container names
+KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
+
+# ❌ Direct assignment without Field()
+KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+
+# ❌ Mixed patterns across services
+```
+
+## Rationale
+
+- Services remain environment-agnostic
+- Can run locally without Docker
+- Docker Compose handles container networking
+- Field() provides inline documentation
