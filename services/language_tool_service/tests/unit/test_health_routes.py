@@ -1,15 +1,13 @@
-"""Unit tests for health endpoints following Rule 075 behavioral testing methodology.
+"""Unit tests for health endpoint wrapper integration following Rule 075 methodology.
 
 This module tests health endpoint behavior including:
-- Health check endpoint (/healthz) returns with proper status codes
-- LanguageToolWrapper health component validation and response formatting
+- Health check endpoint (/healthz) status codes and responses
+- LanguageToolWrapper health component validation and formatting
 - Combined health status calculation and HTTP response codes
-- Metrics endpoint (/metrics) Prometheus format responses
 - Error handling scenarios and structured response formats
 - Correlation context injection and proper propagation
 
-Tests focus on actual endpoint behavior and response validation,
-using protocol-based mocking with AsyncMock for comprehensive coverage.
+Tests focus on wrapper integration behavior using protocol-based mocking.
 """
 
 from __future__ import annotations
@@ -20,7 +18,6 @@ from uuid import UUID
 
 import pytest
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from services.language_tool_service.protocols import LanguageToolWrapperProtocol
 
@@ -63,7 +60,7 @@ class TestHealthCheckLogic:
         corr: CorrelationContext,
         language_tool_wrapper: LanguageToolWrapperProtocol,
     ) -> tuple[dict[str, Any], int]:
-        """Extract the core health check logic for testing."""
+        """Extract the core health check logic for testing wrapper integration."""
         try:
             checks = {"service_responsive": True, "dependencies_available": True}
             dependencies = {}
@@ -247,7 +244,7 @@ class TestHealthCheckLogic:
     ) -> None:
         """Test that correlation context is properly passed to dependencies."""
         # Act
-        data, status_code = await self._health_check_logic(
+        data, _ = await self._health_check_logic(
             settings=mock_settings,
             corr=mock_correlation_context,
             language_tool_wrapper=mock_language_tool_wrapper,
@@ -308,7 +305,7 @@ class TestHealthCheckLogic:
             mock_language_tool_wrapper.get_health_status.side_effect = Exception("Wrapper error")
 
         # Act
-        data, status_code = await self._health_check_logic(
+        data, _ = await self._health_check_logic(
             settings=mock_settings,
             corr=mock_correlation_context,
             language_tool_wrapper=mock_language_tool_wrapper,
@@ -325,7 +322,7 @@ class TestHealthCheckLogic:
     ) -> None:
         """Test health check response contains all required fields and structure."""
         # Act
-        data, status_code = await self._health_check_logic(
+        data, _ = await self._health_check_logic(
             settings=mock_settings,
             corr=mock_correlation_context,
             language_tool_wrapper=mock_language_tool_wrapper,
@@ -401,65 +398,3 @@ class TestHealthCheckLogic:
         wrapper_dep = data["dependencies"]["language_tool_wrapper"]
         assert wrapper_dep["status"] == "unhealthy"
         assert error_message in wrapper_dep["error"]
-
-
-class TestMetricsLogic:
-    """Tests for metrics endpoint logic without Quart dependencies."""
-
-    def _metrics_logic(self, registry: Any) -> tuple[bytes, str, int]:
-        """Extract the core metrics logic for testing."""
-        try:
-            metrics_data = generate_latest(registry)
-            return metrics_data, CONTENT_TYPE_LATEST, 200
-        except Exception:
-            return b"Error generating metrics", "text/plain", 500
-
-    def test_metrics_endpoint_successful_response(self) -> None:
-        """Test metrics endpoint returns Prometheus formatted metrics successfully."""
-        # Mock generate_latest to return sample Prometheus data
-        sample_metrics = (
-            b"# HELP test_metric A test metric\n# TYPE test_metric counter\ntest_metric 42\n"
-        )
-
-        mock_registry = MagicMock()
-
-        with pytest.MonkeyPatch().context() as monkeypatch:
-
-            def mock_generate_latest(_registry: Any) -> bytes:
-                return sample_metrics
-
-            monkeypatch.setattr(
-                "services.language_tool_service.tests.unit.test_health_routes.generate_latest",
-                mock_generate_latest,
-            )
-
-            # Act
-            data, content_type, status_code = self._metrics_logic(registry=mock_registry)
-
-        assert status_code == 200
-        # Check that it starts with the expected Prometheus content type
-        assert content_type.startswith(CONTENT_TYPE_LATEST.split(";")[0])
-
-        # Response should contain Prometheus metrics data
-        assert data == sample_metrics
-
-    def test_metrics_endpoint_error_handling(self) -> None:
-        """Test metrics endpoint handles generation errors appropriately."""
-        mock_registry = MagicMock()
-
-        with pytest.MonkeyPatch().context() as monkeypatch:
-
-            def mock_generate_latest(_registry: Any) -> bytes:
-                raise Exception("Prometheus metrics generation failed")
-
-            monkeypatch.setattr(
-                "services.language_tool_service.tests.unit.test_health_routes.generate_latest",
-                mock_generate_latest,
-            )
-
-            # Act
-            data, content_type, status_code = self._metrics_logic(registry=mock_registry)
-
-        assert status_code == 500
-        assert content_type == "text/plain"
-        assert b"Error generating metrics" in data

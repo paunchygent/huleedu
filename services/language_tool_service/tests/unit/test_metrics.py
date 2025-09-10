@@ -115,9 +115,7 @@ class TestApiErrorMetricsBehavior:
 
         # Act
         response = await test_client.post(
-            "/v1/check",
-            data=invalid_json,
-            headers={"Content-Type": "application/json"}
+            "/v1/check", data=invalid_json, headers={"Content-Type": "application/json"}
         )
 
         # Assert - Behavioral outcome: parsing error occurred

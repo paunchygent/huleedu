@@ -11,6 +11,7 @@ import time
 
 from huleedu_service_libs.error_handling.quart import register_error_handlers
 from huleedu_service_libs.logging_utils import configure_service_logging, create_service_logger
+from huleedu_service_libs.metrics_middleware import setup_metrics_middleware
 from huleedu_service_libs.middleware.frameworks.quart_correlation_middleware import (
     setup_correlation_middleware,
 )
@@ -41,6 +42,16 @@ async def startup() -> None:
     # Store start time in app extensions for access in health checks
     app.extensions = getattr(app, "extensions", {})
     app.extensions["service_start_time"] = SERVICE_START_TIME
+
+    # Setup HTTP metrics middleware per Rule 071.2
+    # Uses "status" label to match existing metrics definition
+    setup_metrics_middleware(
+        app=app,
+        request_count_metric_name="request_count",
+        request_duration_metric_name="request_duration",
+        status_label_name="status",  # Match label name used in metrics.py
+        logger_name="language_tool_service.metrics",
+    )
 
     logger.info("Language Tool Service startup completed successfully")
 

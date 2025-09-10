@@ -55,11 +55,14 @@ async def health_check(
         # Get JVM status (TASK-052G requirement)
         jvm_running = False
         heap_used_mb = 0
-        
-        if "language_tool_wrapper" in dependencies and dependencies["language_tool_wrapper"]["status"] == "healthy":
+
+        if (
+            "language_tool_wrapper" in dependencies
+            and dependencies["language_tool_wrapper"]["status"] == "healthy"
+        ):
             server_info = dependencies["language_tool_wrapper"].get("server", {})
             jvm_running = server_info.get("running", False)
-            
+
             # Get actual heap usage if JVM is running
             if jvm_running:
                 try:
@@ -73,9 +76,10 @@ async def health_check(
         # Calculate service uptime (TASK-052G requirement)
         uptime_seconds = 0.0
         try:
-            from quart import current_app
             import time
-            
+
+            from quart import current_app
+
             start_time = current_app.extensions.get("service_start_time")
             if start_time:
                 uptime_seconds = time.time() - start_time

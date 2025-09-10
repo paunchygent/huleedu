@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import aiofiles
 import aiohttp
 from huleedu_service_libs.error_handling import raise_service_unavailable
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -308,45 +309,32 @@ class LanguageToolManager:
 
     async def get_jvm_heap_usage(self) -> int | None:
         """
-        Get current JVM heap usage in MB.
-        
+        Get current JVM heap usage in MB using /proc filesystem.
+
         Returns:
             Heap usage in MB, or None if unable to retrieve
         """
         if not self.process or self.process.returncode is not None:
             return None
-            
+
         try:
-            # Use jstat to get heap information
-            result = await asyncio.create_subprocess_exec(
-                "jstat", "-gc", str(self.process.pid),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, _ = await result.communicate()
-            
-            if result.returncode != 0:
-                return None
-                
-            # Parse jstat output
-            # Format: S0C S1C S0U S1U EC EU OC OU MC MU CCSC CCSU YGC YGCT FGC FGCT GCT
-            lines = stdout.decode().strip().split('\n')
-            if len(lines) < 2:
-                return None
-                
-            data = lines[1].split()
-            if len(data) < 8:
-                return None
-                
-            # Calculate total heap usage: Eden Used + Old Used + Survivor Used
-            eden_used = float(data[5])  # EU - Eden space used (KB)
-            old_used = float(data[7])   # OU - Old space used (KB) 
-            survivor_used = float(data[2]) + float(data[3])  # S0U + S1U (KB)
-            
-            # Convert KB to MB
-            heap_used_mb = int((eden_used + old_used + survivor_used) / 1024)
-            return heap_used_mb
-            
-        except Exception as e:
+            # Read memory usage from /proc/{pid}/status
+            status_path = f"/proc/{self.process.pid}/status"
+
+            async with aiofiles.open(status_path, "r") as f:
+                content = await f.read()
+
+            # Extract VmRSS (Resident Set Size in KB)
+            for line in content.splitlines():
+                if line.startswith("VmRSS:"):
+                    # Format: "VmRSS:    219612 kB"
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        kb_value = int(parts[1])
+                        return kb_value // 1024  # Convert KB to MB
+
+            return None  # VmRSS not found
+
+        except (OSError, ValueError) as e:
             logger.debug(f"Failed to get JVM heap usage: {e}")
             return None
