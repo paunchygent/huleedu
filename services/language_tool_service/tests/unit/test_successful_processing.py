@@ -20,15 +20,15 @@ from services.language_tool_service.tests.unit.conftest import (
 class TestSuccessfulProcessing:
     """Tests for successful grammar check processing."""
 
-    async def test_successful_grammar_check_no_errors(self, test_client, test_app) -> None:
+    async def test_successful_grammar_check_no_errors(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test successful grammar check with no errors found."""
         # Arrange
         request_body = {"text": "This is a perfectly valid sentence.", "language": "en-US"}
 
         # Mock wrapper to return no errors
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
-        wrapper.check_text.return_value = []
+        mock_language_tool_wrapper.check_text.return_value = []
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -45,19 +45,19 @@ class TestSuccessfulProcessing:
         assert response_data["language"] == "en-US"
         assert response_data["processing_time_ms"] > 0
 
-    async def test_successful_grammar_check_with_errors(self, test_client, test_app) -> None:
+    async def test_successful_grammar_check_with_errors(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test successful grammar check with errors found."""
         # Arrange
         request_body = {"text": "This are a incorrect sentence.", "language": "en-US"}
 
         # Mock wrapper to return errors
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             create_mock_grammar_error("GRAMMAR", "AGREEMENT_ERROR", "Subject-verb disagreement"),
             create_mock_grammar_error("SPELLING", "TYPO", "Possible typo"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -78,7 +78,7 @@ class TestSuccessfulProcessing:
         [50, 150, 400, 750, 1500, 2500],
     )
     async def test_different_text_sizes(
-        self, test_client, test_app, word_count: int
+        self, test_client, word_count: int
     ) -> None:
         """Test successful processing with different text sizes."""
         # Arrange

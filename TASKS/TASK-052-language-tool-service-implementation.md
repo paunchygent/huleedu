@@ -7,11 +7,12 @@
 
 ## Current Status
 
-**Completed (3/7 subtasks)**:
+**Completed (4/7 subtasks)**:
 
 - ✅ **TASK-052A**: GrammarError enhanced with 4 context fields (`category_id`, `category_name`, `context`, `context_offset`)
 - ✅ **TASK-052B**: Service foundation scaffolded (port 8085, Quart, DI, health endpoints, correlation middleware)
 - ✅ **TASK-052C**: Java wrapper & filtering implemented (process lifecycle, grammar filtering, 299 unit tests)
+- ✅ **TASK-052D**: HTTP API `/v1/check` implemented (word-based metrics, 366 tests passing, 100% coverage)
 
 **Critical Architectural Decisions**:
 
@@ -92,27 +93,36 @@ Spellchecker → Corrected Text → NLP Service
 
 Implemented `LanguageToolManager` (subprocess lifecycle, health checks, exponential backoff), `LanguageToolWrapper` (grammar filtering, category exclusion), `StubWrapper` (JAR-absent fallback). 299 unit tests, Rule 075 compliant (no @patch, <500 LoC/file). Integration tests documented for subprocess/signal handling.
 
-### Phase 4 — HTTP API `/v1/check` (Subtask D)
+### Phase 4 — HTTP API `/v1/check` (Subtask D) ✅ COMPLETED
 
-- Objective: Implement the grammar checking endpoint.
-- Request model: `GrammarCheckRequest(text, language)`; validate length and language.
-- Response model: `GrammarCheckResponse(errors, category/rule counts, language, processing_time_ms)`.
-- Observability: `X-Correlation-ID` propagation; metrics for request/processing.
-- Tests: contract tests, error mapping, correlation propagation.
+- Implemented `/v1/check` endpoint with full DI integration (Dishka)
+- Request validation with `GrammarCheckRequest(text, language)` - accepts "en-US", "sv-SE", "auto"
+- Response includes categorized errors, word-based metrics (0-100, 101-250, 251-500, 501-1000, 1001-2000, 2000+ words)
+- 366 unit tests passing; reorganized into 6 focused test files (<300 LoC each, Rule 075 compliant)
+- Fixed: language pattern to accept "auto", test infrastructure for Dishka mocking, processing time calculation
 
-### Phase 5 — NLP Integration & Resilience (Subtask E)
+### Phase 5 — Docker & Service Startup (Subtask F - Part 1) IN PROGRESS
 
-- Objective: Replace NLP `LanguageToolServiceClient` skeleton with real HTTP client.
-- Behavior: POST `/v1/check`, map response to enhanced GrammarError/GrammarAnalysis; add circuit breaker and retry (044.1), timeouts, graceful degradations.
-- Publishing: Continue sending EssayNlpCompletedV1; optionally include summarized counts in `processing_metadata` for analytics.
-- Tests: integration test for BatchNlpAnalysisHandler calling service; resilience tests.
+Pattern validation required:
+- Verify pyproject.toml structure (no version pins)
+- Verify hypercorn_config.py pattern (not main.py)
+- Verify Dockerfile multi-stage build
 
-### Phase 6 — Docker & Compose (Subtask F)
+Files to create:
+- `pyproject.toml`
+- `hypercorn_config.py` 
+- `Dockerfile` (Java 17 + Python 3.11)
+- `Dockerfile.dev`
+- docker-compose.yml entries
 
-- Objective: Production‑ready container with Java + Python.
-- Pattern: 084-docker-containerization-standards.mdc; `PYTHONPATH=/app`, non‑root, PDM install; include LanguageTool artifacts or JRE install.
-- Compose: Service definition, ports, env vars; no DB; health checks.
-- Tests: build/run validation via `docker compose` and `/healthz`.
+### Phase 6 — NLP Integration & Resilience (Subtask E)
+
+### Phase 6 — Docker & Compose (Subtask F - Part 2)
+
+- Complete docker-compose integration
+- Verify health checks and service discovery
+- Test container networking and Kafka connectivity
+- Validate JAR loading and Java process management
 
 ### Phase 7 — Observability & Health (Subtask G)
 
@@ -147,4 +157,12 @@ Implemented `LanguageToolManager` (subprocess lifecycle, health checks, exponent
 - Templates: services/file_service/*
 - Integration: services/nlp_service/implementations/language_tool_client_impl.py, command_handlers/batch_nlp_analysis_handler.py
 
-Status: IN PROGRESS (3/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team
+Status: IN PROGRESS (4/7 subtasks complete)  • Priority: HIGH  • Owner: NLP Platform Team
+
+## Pattern Requirements
+
+Validated patterns from existing services:
+- Use `hypercorn_config.py` (not main.py)
+- No version pinning in dependencies
+- Multi-stage Docker builds
+- Java 17 required in Docker image

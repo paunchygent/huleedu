@@ -2,32 +2,51 @@
 
 ## Objective
 
-Produce a production‑ready container for the Language Tool Service that bundles Python + Java and adheres to repository containerization standards.
+Create production and development containers for Language Tool Service with Java 17 + Python 3.11.
 
-## Dockerfile Requirements (Rule 084)
+## Required Files (Pattern Validated)
 
-- Base: `python:3.11-slim`; set `PYTHONPATH=/app`, non‑root `appuser`, install PDM.
-- Copy `libs/common_core` and `libs/huleedu_service_libs` before service code for caching.
-- Install LanguageTool JRE dependency or copy LT artifacts from a builder stage.
-- `CMD ["pdm", "run", "start"]` for HTTP mode.
+### 1. pyproject.toml
+- No version pinning (except dev tools like `ruff>=0.11.11`)
+- Scripts: `start = "hypercorn app:app --config python:hypercorn_config"`
+- Resolution overrides for local libs: `file:///app/libs/...`
 
-## Compose Integration
+### 2. hypercorn_config.py
+- Service configuration (not main.py)
+- Port from env: `LANGUAGE_TOOL_SERVICE_PORT`
+- Standard workers, graceful timeout settings
 
-- Service: `language_tool_service`
-- Port: internal `8085`; mapped externally as needed
-- Environment:
-  - `ENV_TYPE=docker`
-  - `{PREFIX}_HTTP_PORT=8085`
-  - Wrapper config: heap size, timeouts
+### 3. Dockerfile (Multi-stage)
+- Builder stage: Install build deps, PDM, download LanguageTool JAR
+- Runtime stage: Java 17 JRE, Python 3.11, non-root user
+- Copy from builder, use PDM with `--frozen-lockfile`
 
-## Health & Validation
+### 4. Dockerfile.dev
+- Single stage for development
+- Java 17 + build tools
+- Volume mounts for hot-reload
+- PDM install with `--dev`
 
-- Health check: `curl -f http://localhost:8085/healthz`
-- Metrics: `curl -f http://localhost:8085/metrics`
-- Compose: `docker compose build --no-cache language_tool_service && docker compose up -d language_tool_service`
+### 5. docker-compose.yml entries
+- Both `language_tool_service` and `language_tool_service_dev`
+- Port 8085, health checks, env vars
+- Network: huleedu_network
 
-## Deliverables
+## Validation
 
-- `Dockerfile` and optional `Dockerfile.dev` with hot‑reload support.
-- Compose stanza and docs.
+```bash
+# Build and test locally
+pdm lock
+docker build -t language-tool-service .
+docker run -p 8085:8085 language-tool-service
 
+# Health check
+curl http://localhost:8085/health
+curl http://localhost:8085/metrics
+```
+
+## Pattern Sources
+
+- Reference: services/nlp_service/Dockerfile (multi-stage)
+- Reference: services/file_service/pyproject.toml (no pinning)
+- Reference: services/file_service/hypercorn_config.py

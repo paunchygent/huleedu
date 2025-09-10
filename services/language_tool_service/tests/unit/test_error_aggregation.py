@@ -17,20 +17,20 @@ from services.language_tool_service.tests.unit.conftest import create_mock_gramm
 class TestErrorAggregation:
     """Tests for error aggregation and counting logic."""
 
-    async def test_category_aggregation_single_category(self, test_client, test_app) -> None:
+    async def test_category_aggregation_single_category(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test category counting with single category."""
         # Arrange
         request_body = {"text": "Test text with errors.", "language": "en-US"}
 
         # Mock wrapper to return errors of same category
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             create_mock_grammar_error("GRAMMAR", "RULE1", "Error 1"),
             create_mock_grammar_error("GRAMMAR", "RULE2", "Error 2"),
             create_mock_grammar_error("GRAMMAR", "RULE3", "Error 3"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -42,14 +42,14 @@ class TestErrorAggregation:
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 3
         assert len(response_data["grammar_category_counts"]) == 1
 
-    async def test_category_aggregation_multiple_categories(self, test_client, test_app) -> None:
+    async def test_category_aggregation_multiple_categories(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test category counting with multiple categories."""
         # Arrange
         request_body = {"text": "Test text with various errors.", "language": "en-US"}
 
         # Mock wrapper to return errors of different categories
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             create_mock_grammar_error("GRAMMAR", "RULE1", "Grammar error"),
             create_mock_grammar_error("SPELLING", "RULE2", "Spelling error"),
@@ -57,7 +57,7 @@ class TestErrorAggregation:
             create_mock_grammar_error("STYLE", "RULE4", "Style issue"),
             create_mock_grammar_error("SPELLING", "RULE5", "Another spelling error"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -71,21 +71,21 @@ class TestErrorAggregation:
         assert response_data["grammar_category_counts"]["STYLE"] == 1
         assert len(response_data["grammar_category_counts"]) == 3
 
-    async def test_rule_aggregation_with_duplicates(self, test_client, test_app) -> None:
+    async def test_rule_aggregation_with_duplicates(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test rule counting with duplicate rule IDs."""
         # Arrange
         request_body = {"text": "Text with repeated rule violations.", "language": "en-US"}
 
         # Mock wrapper to return errors with same rule IDs
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             create_mock_grammar_error("GRAMMAR", "AGREEMENT", "Error 1"),
             create_mock_grammar_error("GRAMMAR", "AGREEMENT", "Error 2"),
             create_mock_grammar_error("SPELLING", "TYPO", "Error 3"),
             create_mock_grammar_error("GRAMMAR", "AGREEMENT", "Error 4"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -98,14 +98,14 @@ class TestErrorAggregation:
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
         assert len(response_data["grammar_rule_counts"]) == 2
 
-    async def test_error_with_missing_type_field(self, test_client, test_app) -> None:
+    async def test_error_with_missing_type_field(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test handling of errors with missing type field."""
         # Arrange
         request_body = {"text": "Text with malformed errors.", "language": "en-US"}
 
         # Mock wrapper to return errors with missing fields
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             {
                 "rule": {"id": "RULE1"},
@@ -115,7 +115,7 @@ class TestErrorAggregation:
             },
             create_mock_grammar_error("GRAMMAR", "RULE2", "Normal error"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -128,14 +128,14 @@ class TestErrorAggregation:
         assert response_data["grammar_category_counts"]["UNKNOWN"] == 1
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 1
 
-    async def test_error_with_missing_rule_field(self, test_client, test_app) -> None:
+    async def test_error_with_missing_rule_field(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test handling of errors with missing rule field."""
         # Arrange
         request_body = {"text": "Text with incomplete errors.", "language": "en-US"}
 
         # Mock wrapper to return errors with missing rule
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             {
                 "type": {"typeName": "GRAMMAR"},
@@ -145,7 +145,7 @@ class TestErrorAggregation:
             },
             create_mock_grammar_error("SPELLING", "TYPO", "Normal error"),
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -158,14 +158,14 @@ class TestErrorAggregation:
         assert response_data["grammar_rule_counts"]["UNKNOWN_RULE"] == 1
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
 
-    async def test_error_with_non_dict_type_field(self, test_client, test_app) -> None:
+    async def test_error_with_non_dict_type_field(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test handling of errors where type field is not a dict."""
         # Arrange
         request_body = {"text": "Text with invalid error structure.", "language": "en-US"}
 
         # Mock wrapper to return errors with non-dict type
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
         mock_errors = [
             {
                 "type": "STRING_TYPE",  # Not a dict
@@ -175,7 +175,7 @@ class TestErrorAggregation:
                 "length": 5,
             },
         ]
-        wrapper.check_text.return_value = mock_errors
+        mock_language_tool_wrapper.check_text.return_value = mock_errors
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)
@@ -187,15 +187,15 @@ class TestErrorAggregation:
         # Non-dict type should default to "UNKNOWN"
         assert response_data["grammar_category_counts"]["UNKNOWN"] == 1
 
-    async def test_empty_error_list(self, test_client, test_app) -> None:
+    async def test_empty_error_list(
+        self, test_client, mock_language_tool_wrapper
+    ) -> None:
         """Test that empty error list produces empty counts."""
         # Arrange
         request_body = {"text": "Perfect text with no errors.", "language": "en-US"}
 
         # Mock wrapper to return empty list
-        container = test_app.extensions["dishka_app"]
-        wrapper = await container.get(LanguageToolWrapperProtocol)
-        wrapper.check_text.return_value = []
+        mock_language_tool_wrapper.check_text.return_value = []
 
         # Act
         response = await test_client.post("/v1/check", json=request_body)

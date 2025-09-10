@@ -137,7 +137,7 @@ async def check_grammar(
             # Process analysis results
             analysis_end = time.perf_counter()
             analysis_duration = analysis_end - analysis_start
-            processing_time_ms = int((analysis_end - request_start) * 1000)
+            processing_time_ms = max(1, int((analysis_end - request_start) * 1000))
 
             # Calculate aggregated statistics
             total_errors = len(raw_errors)
@@ -146,12 +146,14 @@ async def check_grammar(
 
             for error in raw_errors:
                 # Extract category from error type or rule with safe access
-                error_type = error.get("type") if isinstance(error.get("type"), dict) else {}
+                error_type_raw = error.get("type") if error else None
+                error_type = error_type_raw if isinstance(error_type_raw, dict) else {}
                 category = error_type.get("typeName", "UNKNOWN")
                 category_counts[category] = category_counts.get(category, 0) + 1
 
                 # Extract rule ID for rule counts with safe access
-                error_rule = error.get("rule") if isinstance(error.get("rule"), dict) else {}
+                error_rule_raw = error.get("rule") if error else None
+                error_rule = error_rule_raw if isinstance(error_rule_raw, dict) else {}
                 rule_id = error_rule.get("id", "UNKNOWN_RULE")
                 rule_counts[rule_id] = rule_counts.get(rule_id, 0) + 1
 

@@ -29,8 +29,8 @@ class GrammarCheckRequest(BaseModel):
     )
     language: str = Field(
         default="en-US",
-        pattern="^[a-z]{2}(-[A-Z]{2})?$",
-        description="Language code for grammar checking (e.g., en-US, sv-SE)",
+        pattern="^([a-z]{2}-[A-Z]{2}|auto)$",
+        description="Language code for grammar checking (e.g., en-US, sv-SE, auto)",
     )
 
 

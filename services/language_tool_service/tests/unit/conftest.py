@@ -23,74 +23,97 @@ from services.language_tool_service.config import Settings
 from services.language_tool_service.protocols import LanguageToolWrapperProtocol
 
 
-class TestProvider(Provider):
-    """Test provider for dependency injection with mocked dependencies."""
-
-    scope = Scope.APP
-
-    @provide
-    def provide_settings(self) -> Settings:
-        """Provide mock settings for testing."""
-        mock_settings = MagicMock(spec=Settings)
-        mock_settings.SERVICE_NAME = "language-tool-service"
-        mock_settings.ENVIRONMENT.value = "test"
-        return mock_settings
-
-    @provide
-    def provide_language_tool_wrapper(self) -> LanguageToolWrapperProtocol:
-        """Provide mock Language Tool wrapper for testing."""
-        mock = AsyncMock(spec=LanguageToolWrapperProtocol)
-        mock.check_text.return_value = []
-        return mock
-
-    @provide
-    def provide_metrics(self) -> dict[str, Any]:
-        """Provide test metrics registry for isolation."""
-        test_registry = CollectorRegistry()
-
-        # Create metrics with test registry
-        request_count = Counter(
-            "request_count",
-            "Total requests",
-            ["method", "endpoint", "status"],
-            registry=test_registry,
-        )
-
-        grammar_analysis_total = Counter(
-            "grammar_analysis_total",
-            "Total grammar analyses",
-            ["status", "text_length_range"],
-            registry=test_registry,
-        )
-
-        grammar_analysis_duration_seconds = Histogram(
-            "grammar_analysis_duration_seconds", "Grammar analysis duration", registry=test_registry
-        )
-
-        request_duration = Histogram(
-            "request_duration", "Request duration", ["method", "endpoint"], registry=test_registry
-        )
-
-        return {
-            "request_count": request_count,
-            "grammar_analysis_total": grammar_analysis_total,
-            "grammar_analysis_duration_seconds": grammar_analysis_duration_seconds,
-            "request_duration": request_duration,
-        }
-
-    @provide(scope=Scope.REQUEST)
-    def provide_correlation_context(self) -> CorrelationContext:
-        """Provide mock correlation context for testing."""
-        return CorrelationContext(
-            original="test-correlation-id",
-            uuid=UUID("12345678-1234-1234-1234-123456789012"),
-            source="generated",
-        )
+@pytest.fixture
+def mock_language_tool_wrapper() -> AsyncMock:
+    """Create mock Language Tool wrapper for testing."""
+    mock = AsyncMock(spec=LanguageToolWrapperProtocol)
+    mock.check_text.return_value = []
+    return mock
 
 
 @pytest.fixture
-async def test_app() -> AsyncGenerator[Quart, None]:
-    """Create test Quart application with DI setup."""
+def mock_metrics() -> dict[str, Any]:
+    """Create test metrics registry for isolation."""
+    test_registry = CollectorRegistry()
+
+    # Create metrics with test registry
+    request_count = Counter(
+        "request_count",
+        "Total requests",
+        ["method", "endpoint", "status"],
+        registry=test_registry,
+    )
+
+    grammar_analysis_total = Counter(
+        "grammar_analysis_total",
+        "Total grammar analyses",
+        ["status", "text_length_range"],
+        registry=test_registry,
+    )
+
+    grammar_analysis_duration_seconds = Histogram(
+        "grammar_analysis_duration_seconds", "Grammar analysis duration", registry=test_registry
+    )
+
+    request_duration = Histogram(
+        "request_duration", "Request duration", ["method", "endpoint"], registry=test_registry
+    )
+
+    return {
+        "request_count": request_count,
+        "grammar_analysis_total": grammar_analysis_total,
+        "grammar_analysis_duration_seconds": grammar_analysis_duration_seconds,
+        "request_duration": request_duration,
+    }
+
+
+@pytest.fixture
+async def test_app(
+    mock_language_tool_wrapper: AsyncMock,
+    mock_metrics: dict[str, Any],
+) -> AsyncGenerator[Quart, None]:
+    """Create test Quart application with DI setup.
+    
+    Args:
+        mock_language_tool_wrapper: Mock Language Tool wrapper to inject
+        mock_metrics: Mock metrics dictionary to inject
+        
+    Returns:
+        Configured Quart test application
+    """
+    
+    class TestProvider(Provider):
+        """Test provider for dependency injection with mocked dependencies."""
+
+        scope = Scope.APP
+
+        @provide
+        def provide_settings(self) -> Settings:
+            """Provide mock settings for testing."""
+            mock_settings = MagicMock(spec=Settings)
+            mock_settings.SERVICE_NAME = "language-tool-service"
+            mock_settings.ENVIRONMENT.value = "test"
+            return mock_settings
+
+        @provide
+        def provide_language_tool_wrapper(self) -> LanguageToolWrapperProtocol:
+            """Provide the injected mock Language Tool wrapper."""
+            return mock_language_tool_wrapper
+
+        @provide
+        def provide_metrics(self) -> dict[str, Any]:
+            """Provide the injected mock metrics."""
+            return mock_metrics
+
+        @provide(scope=Scope.REQUEST)
+        def provide_correlation_context(self) -> CorrelationContext:
+            """Provide mock correlation context for testing."""
+            return CorrelationContext(
+                original="test-correlation-id",
+                uuid=UUID("12345678-1234-1234-1234-123456789012"),
+                source="generated",
+            )
+    
     app = Quart(__name__)
     app.config.update({"TESTING": True})
     app.register_blueprint(grammar_bp)
