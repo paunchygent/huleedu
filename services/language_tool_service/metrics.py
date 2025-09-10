@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from prometheus_client import REGISTRY, Counter, Histogram
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 
 
 def _create_metrics() -> dict[str, Any]:
@@ -62,6 +62,24 @@ def _create_metrics() -> dict[str, Any]:
             "language_tool_service_api_errors_total",
             "Total API errors by endpoint and error type",
             ["endpoint", "error_type"],
+            registry=REGISTRY,
+        ),
+        # Process manager restart metrics
+        "manager_restarts_total": Counter(
+            "language_tool_service_manager_restarts_total",
+            "Total LanguageTool manager restarts attempted by outcome",
+            ["outcome"],  # outcome: success|failure
+            registry=REGISTRY,
+        ),
+        "manager_restart_skipped_total": Counter(
+            "language_tool_service_manager_restart_skipped_total",
+            "Total restart attempts skipped due to backoff",
+            registry=REGISTRY,
+        ),
+        # Manager last restart timestamp (unix seconds)
+        "manager_last_restart_timestamp_seconds": Gauge(
+            "language_tool_service_manager_last_restart_timestamp_seconds",
+            "Unix timestamp of the last successful manager restart",
             registry=REGISTRY,
         ),
     }

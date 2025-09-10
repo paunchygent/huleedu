@@ -183,7 +183,7 @@ class TestHealthCheckTask052G:
         mock_language_tool_manager: AsyncMock,
         mock_current_app: MagicMock,
     ) -> None:
-        """Test that TASK-052G required fields (jvm, uptime_seconds) are present and correctly typed."""
+        """Test that TASK-052G required fields are present and correctly typed."""
         # Act
         data, status_code = await self._health_check_logic(
             settings=mock_settings,

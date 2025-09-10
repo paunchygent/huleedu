@@ -94,6 +94,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
 
     # Optional service-specific attributes
     app.consumer_task = None
+    app.consumer_monitor_task = None
+    app._consumer_shutdown_requested = False
     app.kafka_consumer = None
     app.relay_worker = None
 
@@ -156,6 +158,9 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
                 await app.relay_worker.stop()
                 logger.info("EventRelayWorker stopped")
 
+            # Signal monitor to stop
+            app._consumer_shutdown_requested = True
+
             # Stop Kafka consumer if configured
             if app.kafka_consumer:
                 logger.info("Stopping Kafka consumer...")
@@ -165,6 +170,14 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
                 app.consumer_task.cancel()
                 try:
                     await app.consumer_task
+                except Exception:
+                    pass
+            # Stop monitor task
+            if app.consumer_monitor_task and not app.consumer_monitor_task.done():
+                logger.info("Cancelling Kafka consumer monitor task...")
+                app.consumer_monitor_task.cancel()
+                try:
+                    await app.consumer_monitor_task
                 except Exception:
                     pass
 

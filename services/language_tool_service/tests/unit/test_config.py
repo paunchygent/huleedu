@@ -127,7 +127,7 @@ class TestLanguageToolServiceSettings:
         expected: str | int,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test that environment variables are loaded correctly with LANGUAGE_TOOL_SERVICE_ prefix."""
+        """Test that environment variables are loaded correctly with prefix."""
         monkeypatch.setenv(env_var, value)
         settings = Settings()
         actual_value = getattr(settings, field_name)

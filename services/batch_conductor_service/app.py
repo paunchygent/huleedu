@@ -51,6 +51,7 @@ async def _start_kafka_consumer_with_monitoring(app) -> None:
 
 async def _monitor_kafka_consumer(app) -> None:
     """Monitor Kafka consumer and restart if it fails."""
+    restart_lock = asyncio.Lock()
     restart_count = 0
     max_restart_attempts = 20  # Allow many restarts over time
     restart_delay = 10.0  # Start with 10 seconds between restarts
@@ -88,18 +89,21 @@ async def _monitor_kafka_consumer(app) -> None:
                             break
 
                         try:
-                            # Create new consumer task
-                            async def start_consumer_task():
-                                try:
-                                    await app.kafka_consumer.start_consuming()
-                                except Exception as e:
-                                    logger.error(f"Kafka consumer task failed: {e}", exc_info=True)
+                            async with restart_lock:
+                                # Create new consumer task
+                                async def start_consumer_task():
+                                    try:
+                                        await app.kafka_consumer.start_consuming()
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Kafka consumer task failed: {e}", exc_info=True
+                                        )
 
-                            app.consumer_task = asyncio.create_task(start_consumer_task())
-                            logger.info(f"Kafka consumer restarted (attempt #{restart_count})")
+                                app.consumer_task = asyncio.create_task(start_consumer_task())
+                                logger.info(f"Kafka consumer restarted (attempt #{restart_count})")
 
-                            # Increase restart delay for next time (exponential backoff)
-                            restart_delay = min(restart_delay * 1.2, max_restart_delay)
+                                # Increase restart delay for next time (exponential backoff)
+                                restart_delay = min(restart_delay * 1.2, max_restart_delay)
 
                         except Exception as restart_error:
                             logger.error(

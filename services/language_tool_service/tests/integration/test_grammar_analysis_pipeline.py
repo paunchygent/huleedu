@@ -34,7 +34,7 @@ MALFORMED_TEXT = "\x00\x01\x02" * 1000  # Triggers Java exception
 TYPO_TEXT = (
     "I will recieve the package tomorrow."  # Contains typo that should be filtered (stub pattern)
 )
-GRAMMAR_ONLY_TEXT = "I went there to their house."  # Should not trigger grammar error (has both "there" and "their")
+GRAMMAR_ONLY_TEXT = "I went there to their house."  # Should not trigger grammar error
 
 # Large text for concurrent testing
 LARGE_TEXT = "I went there to see what happened. " * 50  # Multiplies the stub pattern

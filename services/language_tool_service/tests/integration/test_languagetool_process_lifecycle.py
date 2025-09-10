@@ -109,10 +109,10 @@ async def real_language_tool_manager(
     not test doubles or mocks. When the JAR is present, this spawns
     a real Java process. Tests using this fixture will automatically
     skip if the LanguageTool JAR is not found at the configured path.
-    
+
     The fixture ensures proper cleanup by stopping the manager both
     before yielding (clean state) and after the test completes.
-    
+
     Note:
         In local development without Docker, tests will skip.
         In Docker containers or CI with the JAR, tests will run.
@@ -272,7 +272,8 @@ class TestProcessLifecycle:
 
         process_found = any(proc.pid == process_pid for proc in java_processes)
         assert process_found, (
-            f"Java process with PID {process_pid} should be listening on port {manager.settings.LANGUAGE_TOOL_PORT}"
+            f"Java process with PID {process_pid} should be listening on port "
+            f"{manager.settings.LANGUAGE_TOOL_PORT}"
         )
 
         # Verify health check passes (real HTTP interaction)

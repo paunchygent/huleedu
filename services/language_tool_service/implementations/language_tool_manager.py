@@ -21,6 +21,7 @@ from huleedu_service_libs.error_handling import raise_service_unavailable
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.language_tool_service.config import Settings
+from services.language_tool_service.metrics import METRICS
 
 logger = create_service_logger("language_tool_service.implementations.language_tool_manager")
 
@@ -237,7 +238,8 @@ class LanguageToolManager:
                 # Process has terminated - no need for health check
                 needs_restart = True
                 logger.debug(
-                    f"restart_if_needed: Process terminated with returncode {self.process.returncode}, restart needed"
+                    f"restart_if_needed: Process terminated with returncode "
+                    f"{self.process.returncode}, restart needed"
                 )
             else:
                 # Process exists and hasn't terminated, check health
@@ -261,13 +263,17 @@ class LanguageToolManager:
                 logger.debug(
                     f"Skipping restart, waiting {min_wait_time - time_since_last_restart:.1f}s more"
                 )
+                # Record skipped restart due to backoff
+                METRICS["manager_restart_skipped_total"].inc()
                 return
 
             # Record the time at which we attempt a restart (regardless of outcome)
             self.last_restart_time = current_time
 
             logger.warning(
-                f"Restarting LanguageTool server (attempt {self.restart_count + 1}), process state: PID={self.process.pid if self.process else None}, returncode={self.process.returncode if self.process else None}"
+                f"Restarting LanguageTool server (attempt {self.restart_count + 1}), "
+                f"process state: PID={self.process.pid if self.process else None}, "
+                f"returncode={self.process.returncode if self.process else None}"
             )
 
             # Stop the current process
@@ -277,10 +283,14 @@ class LanguageToolManager:
             try:
                 await self.start()
                 self.restart_count = 0  # Reset on successful restart
+                METRICS["manager_restarts_total"].labels(outcome="success").inc()
+                # Record last successful restart timestamp
+                METRICS["manager_last_restart_timestamp_seconds"].set(time.time())
             except Exception as e:
                 logger.error(f"Failed to restart LanguageTool server: {e}")
                 self.restart_count += 1
                 # last_restart_time already set at attempt
+                METRICS["manager_restarts_total"].labels(outcome="failure").inc()
                 raise
 
     async def _wait_for_server_ready(self, timeout: float = 30.0) -> None:
