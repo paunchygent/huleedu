@@ -202,7 +202,7 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
 
         try:
             async with session.post(
-                f"{self.server_url}/v1/check",
+                f"{self.server_url}/v2/check",
                 data=data,  # LanguageTool expects form data, not JSON
                 timeout=aiohttp.ClientTimeout(
                     total=self.settings.LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS - 1
@@ -372,7 +372,7 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                 start = time.time()
                 session = await self._ensure_session()
                 async with session.get(
-                    f"{self.server_url}/v1/languages",
+                    f"{self.server_url}/v2/languages",
                     timeout=aiohttp.ClientTimeout(total=2),
                 ) as response:
                     if response.status == 200:

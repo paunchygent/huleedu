@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     QUART_APP=app:app \
     QUART_ENV=development
 
-# Install system dependencies including Java 17 (rarely change - good cache layer)
+# Install system dependencies including Java 21 (rarely change - good cache layer)
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     curl \
@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     build-essential \
     python3-dev \
-    openjdk-17-jre-headless \
+    openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PDM (rarely changes - good cache layer)
@@ -30,7 +30,7 @@ RUN mkdir -p /app/languagetool && \
     cd /app/languagetool && \
     wget -q https://languagetool.org/download/LanguageTool-stable.zip && \
     unzip -q LanguageTool-stable.zip && \
-    mv LanguageTool-*/*.jar . && \
+    mv LanguageTool-*/* . && \
     rm -rf LanguageTool-* LanguageTool-stable.zip
 
 WORKDIR /app

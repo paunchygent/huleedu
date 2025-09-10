@@ -5,6 +5,8 @@ Tests focus on language field validation and format requirements.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 
@@ -40,7 +42,7 @@ class TestLanguageValidation:
         ],
     )
     async def test_language_code_validation(
-        self, test_client, language: str, expected_status: int
+        self, test_client: Any, language: str, expected_status: int
     ) -> None:
         """Test grammar check endpoint validates language codes properly."""
         # Arrange
@@ -58,7 +60,7 @@ class TestLanguageValidation:
             assert response_data["error"]["code"] == "VALIDATION_ERROR"
             assert "String should match pattern" in response_data["error"]["message"]
 
-    async def test_missing_language_defaults_to_en_us(self, test_client) -> None:
+    async def test_missing_language_defaults_to_en_us(self, test_client: Any) -> None:
         """Test that missing language field defaults to en-US."""
         # Arrange
         request_body = {"text": "Test text without language field."}
@@ -81,7 +83,7 @@ class TestLanguageValidation:
             "es-ES",
         ],
     )
-    async def test_language_preserved_in_response(self, test_client, language: str) -> None:
+    async def test_language_preserved_in_response(self, test_client: Any, language: str) -> None:
         """Test that the language from request is preserved in response."""
         # Arrange
         request_body = {
@@ -97,7 +99,7 @@ class TestLanguageValidation:
         response_data = await response.get_json()
         assert response_data["language"] == language
 
-    async def test_auto_language_detection(self, test_client) -> None:
+    async def test_auto_language_detection(self, test_client: Any) -> None:
         """Test that 'auto' language code is accepted for automatic detection."""
         # Arrange
         request_body = {
@@ -124,7 +126,7 @@ class TestLanguageValidation:
         ],
     )
     async def test_language_specific_text_processing(
-        self, test_client, text: str, language: str
+        self, test_client: Any, text: str, language: str
     ) -> None:
         """Test that different languages are processed correctly."""
         # Arrange

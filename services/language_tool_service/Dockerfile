@@ -54,10 +54,10 @@ ENV PYTHONUNBUFFERED=1 \
     LANGUAGE_TOOL_SERVICE_HOST=0.0.0.0 \
     PDM_USE_VENV=false
 
-# Install Java 17 JRE and other runtime dependencies
+# Install Java 21 JRE and other runtime dependencies
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
-    openjdk-17-jre-headless \
+    openjdk-21-jre-headless \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

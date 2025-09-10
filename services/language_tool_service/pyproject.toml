@@ -41,7 +41,7 @@ dev = [
 
 [tool.pdm.scripts]
 start = "hypercorn app:app --config python:hypercorn_config"
-dev = "quart --app app:app --debug run -p 8085"
+dev = "quart --app app:app --debug run --host 0.0.0.0 -p 8085"
 test = "pytest tests/"
 test-unit = "pytest tests/unit/"
 test-integration = "pytest tests/integration/"

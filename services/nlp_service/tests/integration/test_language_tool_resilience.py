@@ -10,12 +10,12 @@ import asyncio
 import time
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock
+from typing import AsyncGenerator
 
 import aiohttp
 import pytest
 from aioresponses import aioresponses
-from common_core.events.nlp_events import GrammarAnalysis, GrammarError
+from common_core.events.nlp_events import GrammarAnalysis
 from common_core.status_enums import CircuitBreakerState
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker
@@ -74,7 +74,7 @@ class TestLanguageToolServiceClientResilience:
         return LanguageToolServiceClient(test_settings)
 
     @pytest.fixture
-    async def http_session(self) -> aiohttp.ClientSession:
+    async def http_session(self) -> AsyncGenerator[aiohttp.ClientSession, None]:
         """Provide real HTTP session for testing."""
         async with aiohttp.ClientSession() as session:
             yield session
@@ -90,7 +90,10 @@ class TestLanguageToolServiceClientResilience:
                     "offset": 10,
                     "length": 7,
                     "replacements": [{"value": "correct"}],
-                    "rule": {"id": "MORFOLOGIK_RULE_EN_US", "category": {"id": "TYPOS", "name": "Spelling"}},
+                    "rule": {
+                        "id": "MORFOLOGIK_RULE_EN_US",
+                        "category": {"id": "TYPOS", "name": "Spelling"},
+                    },
                     "type": {"typeName": "misspelling"},
                     "context": {"text": "This is incorect text", "offset": 8},
                 }
@@ -132,6 +135,7 @@ class TestLanguageToolServiceClientResilience:
             assert result.processing_time_ms > 0
 
             # Verify circuit breaker stayed closed
+            assert client_with_circuit_breaker._circuit_breaker is not None
             assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.CLOSED
 
     @pytest.mark.asyncio
@@ -145,6 +149,7 @@ class TestLanguageToolServiceClientResilience:
         text = "Test text"
 
         # Circuit should be closed initially
+        assert client_with_circuit_breaker._circuit_breaker is not None
         assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.CLOSED
 
         with aioresponses() as m:
@@ -162,10 +167,18 @@ class TestLanguageToolServiceClientResilience:
 
                 # Circuit should still be closed until we hit the threshold
                 if i < 4:
-                    assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.CLOSED
+                    assert client_with_circuit_breaker._circuit_breaker is not None
+                    assert (
+                        client_with_circuit_breaker._circuit_breaker.state
+                        == CircuitBreakerState.CLOSED
+                    )
                 else:
                     # After 5th failure, circuit should be OPEN
-                    assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.OPEN
+                    assert client_with_circuit_breaker._circuit_breaker is not None
+                    assert (
+                        client_with_circuit_breaker._circuit_breaker.state
+                        == CircuitBreakerState.OPEN
+                    )
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_recovery_cycle(
@@ -179,6 +192,7 @@ class TestLanguageToolServiceClientResilience:
         text = "Test text"
 
         # Force circuit to OPEN by simulating failures
+        assert client_with_circuit_breaker._circuit_breaker is not None
         client_with_circuit_breaker._circuit_breaker.failure_count = 5
         client_with_circuit_breaker._circuit_breaker._transition_to_open()
         assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.OPEN
@@ -203,7 +217,10 @@ class TestLanguageToolServiceClientResilience:
 
             # Verify successful call and circuit is HALF_OPEN
             assert isinstance(result, GrammarAnalysis)
-            assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.HALF_OPEN
+            assert client_with_circuit_breaker._circuit_breaker is not None
+            assert (
+                client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.HALF_OPEN
+            )
             assert client_with_circuit_breaker._circuit_breaker.success_count == 1
 
             # Second successful call should close the circuit
@@ -219,6 +236,7 @@ class TestLanguageToolServiceClientResilience:
             )
 
             # Circuit should now be CLOSED
+            assert client_with_circuit_breaker._circuit_breaker is not None
             assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.CLOSED
             assert client_with_circuit_breaker._circuit_breaker.success_count == 0  # Reset on close
 
@@ -230,6 +248,7 @@ class TestLanguageToolServiceClientResilience:
     ) -> None:
         """Test multiple concurrent requests are blocked when circuit is open."""
         # Force circuit to OPEN by setting failure time properly
+        assert client_with_circuit_breaker._circuit_breaker is not None
         client_with_circuit_breaker._circuit_breaker._transition_to_open()
         client_with_circuit_breaker._circuit_breaker.last_failure_time = datetime.utcnow()
         assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.OPEN
@@ -254,6 +273,7 @@ class TestLanguageToolServiceClientResilience:
                 # If it's still an exception, the circuit breaker didn't work as expected
                 print(f"Unexpected exception: {result}")
                 # For debugging, let's check the circuit state
+                assert client_with_circuit_breaker._circuit_breaker is not None
                 print(f"Circuit state: {client_with_circuit_breaker._circuit_breaker.get_state()}")
                 raise result
             assert isinstance(result, GrammarAnalysis)
@@ -262,6 +282,7 @@ class TestLanguageToolServiceClientResilience:
             assert result.language == "en"  # Default fallback
 
         # Circuit should still be OPEN
+        assert client_with_circuit_breaker._circuit_breaker is not None
         assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.OPEN
 
     @pytest.mark.asyncio
@@ -272,10 +293,11 @@ class TestLanguageToolServiceClientResilience:
     ) -> None:
         """Test handler continues processing when circuit is open (graceful degradation)."""
         # Force circuit to OPEN with proper failure time
+        assert client_with_circuit_breaker._circuit_breaker is not None
         client_with_circuit_breaker._circuit_breaker._transition_to_open()
         client_with_circuit_breaker._circuit_breaker.last_failure_time = datetime.utcnow()
         assert client_with_circuit_breaker._circuit_breaker.state == CircuitBreakerState.OPEN
-        
+
         correlation_id = uuid.uuid4()
         text = "Swedish text: Hej världen med åäö!"
 
@@ -333,7 +355,11 @@ class TestLanguageToolServiceClientResilience:
 
         with aioresponses() as m:
             # Mock 400 error - should not retry
-            m.post("http://language-tool-test:8085/v1/check", status=400, payload={"error": "Bad request"})
+            m.post(
+                "http://language-tool-test:8085/v1/check",
+                status=400,
+                payload={"error": "Bad request"},
+            )
 
             start_time = time.time()
 
@@ -376,7 +402,7 @@ class TestLanguageToolServiceClientResilience:
             request_key = list(m.requests.keys())[0]
             request_call = m.requests[request_key][0]
             # Access the actual request from kwargs
-            headers = request_call.kwargs.get('headers', {})
+            headers = request_call.kwargs.get("headers", {})
             assert "X-Correlation-ID" in headers
             assert headers["X-Correlation-ID"] == str(correlation_id)
 
@@ -406,8 +432,10 @@ class TestLanguageToolServiceClientResilience:
                 )
 
                 await client_with_circuit_breaker.check_grammar(
-                    text="Test text åäö", http_session=http_session, 
-                    correlation_id=correlation_id, language=input_lang
+                    text="Test text åäö",
+                    http_session=http_session,
+                    correlation_id=correlation_id,
+                    language=input_lang,
                 )
 
                 # Verify mapped language was sent in request payload
@@ -415,7 +443,7 @@ class TestLanguageToolServiceClientResilience:
                 request_key = list(m.requests.keys())[0]
                 request_call = m.requests[request_key][0]
                 # Access the json data from kwargs
-                json_data = request_call.kwargs.get('json', {})
+                json_data = request_call.kwargs.get("json", {})
                 assert json_data["language"] == expected_lang
                 assert "åäö" in json_data["text"]  # Swedish characters preserved
 
@@ -427,6 +455,7 @@ class TestLanguageToolServiceClientResilience:
     ) -> None:
         """Test circuit breaker state transitions are properly tracked."""
         # Verify initial state
+        assert client_with_circuit_breaker._circuit_breaker is not None
         state = client_with_circuit_breaker._circuit_breaker.get_state()
         assert state["state"] == "closed"
         assert state["failure_count"] == 0

@@ -27,7 +27,7 @@ class TestRequestBodyValidation:
     )
     async def test_missing_request_body_scenarios(
         self,
-        test_client,
+        test_client: Any,
         request_body: dict[str, Any] | None,
         expected_status: int,
         expected_error_field: str,
@@ -49,7 +49,7 @@ class TestRequestBodyValidation:
         assert response_data["error"]["code"] == "VALIDATION_ERROR"
         assert "correlation_id" in response_data["error"]
 
-    async def test_invalid_json_body(self, test_client) -> None:
+    async def test_invalid_json_body(self, test_client: Any) -> None:
         """Test grammar check endpoint handles malformed JSON."""
         # Act
         response = await test_client.post(
@@ -72,7 +72,9 @@ class TestRequestBodyValidation:
             {"extra1": "test", "extra2": [1, 2, 3], "extra3": {"nested": "object"}},
         ],
     )
-    async def test_ignores_extra_fields(self, test_client, extra_fields: dict[str, Any]) -> None:
+    async def test_ignores_extra_fields(
+        self, test_client: Any, extra_fields: dict[str, Any]
+    ) -> None:
         """Test grammar check endpoint ignores unexpected extra fields."""
         # Arrange
         request_body = {
@@ -112,7 +114,7 @@ class TestFieldTypeValidation:
     )
     async def test_invalid_field_types(
         self,
-        test_client,
+        test_client: Any,
         invalid_body: dict[str, Any],
         expected_error: str,
     ) -> None:
@@ -128,7 +130,7 @@ class TestFieldTypeValidation:
         assert response_data["error"]["code"] == "VALIDATION_ERROR"
         assert expected_error in response_data["error"]["message"]
 
-    async def test_null_text_field_rejected(self, test_client) -> None:
+    async def test_null_text_field_rejected(self, test_client: Any) -> None:
         """Test that null text field is properly rejected."""
         # Arrange
         request_body = {"text": None, "language": "en-US"}
@@ -146,7 +148,7 @@ class TestFieldTypeValidation:
 class TestRequestStructureValidation:
     """Tests for overall request structure validation."""
 
-    async def test_nested_json_structure_rejected(self, test_client) -> None:
+    async def test_nested_json_structure_rejected(self, test_client: Any) -> None:
         """Test that incorrectly nested JSON structures are rejected."""
         # Arrange
         request_body = {"data": {"text": "This is nested incorrectly", "language": "en-US"}}
@@ -160,7 +162,7 @@ class TestRequestStructureValidation:
         assert "error" in response_data
         assert response_data["error"]["code"] == "VALIDATION_ERROR"
 
-    async def test_array_instead_of_object_rejected(self, test_client) -> None:
+    async def test_array_instead_of_object_rejected(self, test_client: Any) -> None:
         """Test that arrays are rejected when object is expected."""
         # Arrange
         request_array = ["text", "en-US"]
@@ -183,7 +185,9 @@ class TestRequestStructureValidation:
             "application/x-www-form-urlencoded",
         ],
     )
-    async def test_non_json_content_types_rejected(self, test_client, content_type: str) -> None:
+    async def test_non_json_content_types_rejected(
+        self, test_client: Any, content_type: str
+    ) -> None:
         """Test that non-JSON content types are properly rejected."""
         # Act
         response = await test_client.post(

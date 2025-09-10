@@ -5,6 +5,8 @@ Tests focus on successful grammar check scenarios and response validation.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from services.language_tool_service.tests.unit.conftest import (
@@ -17,7 +19,7 @@ class TestSuccessfulProcessing:
     """Tests for successful grammar check processing."""
 
     async def test_successful_grammar_check_no_errors(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: Any
     ) -> None:
         """Test successful grammar check with no errors found."""
         # Arrange
@@ -42,7 +44,7 @@ class TestSuccessfulProcessing:
         assert response_data["processing_time_ms"] > 0
 
     async def test_successful_grammar_check_with_errors(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: Any
     ) -> None:
         """Test successful grammar check with errors found."""
         # Arrange
@@ -73,7 +75,7 @@ class TestSuccessfulProcessing:
         "word_count",
         [50, 150, 400, 750, 1500, 2500],
     )
-    async def test_different_text_sizes(self, test_client, word_count: int) -> None:
+    async def test_different_text_sizes(self, test_client: Any, word_count: int) -> None:
         """Test successful processing with different text sizes."""
         # Arrange
         text = generate_text_with_words(word_count)
@@ -95,7 +97,7 @@ class TestSuccessfulProcessing:
         "language",
         ["en-US", "sv-SE", "de-DE", "fr-FR", "auto"],
     )
-    async def test_different_languages(self, test_client, language: str) -> None:
+    async def test_different_languages(self, test_client: Any, language: str) -> None:
         """Test successful processing with different language codes."""
         # Arrange
         request_body = {
@@ -111,7 +113,7 @@ class TestSuccessfulProcessing:
         response_data = await response.get_json()
         assert response_data["language"] == language
 
-    async def test_processing_time_calculation(self, test_client) -> None:
+    async def test_processing_time_calculation(self, test_client: Any) -> None:
         """Test that processing time is calculated and included in response."""
         # Arrange
         request_body = {
@@ -132,7 +134,7 @@ class TestSuccessfulProcessing:
         # Processing should take at least some time
         assert response_data["processing_time_ms"] < 10000  # Less than 10 seconds
 
-    async def test_correlation_id_in_response_headers(self, test_client) -> None:
+    async def test_correlation_id_in_response_headers(self, test_client: Any) -> None:
         """Test that correlation ID is included in response headers."""
         # Arrange
         request_body = {

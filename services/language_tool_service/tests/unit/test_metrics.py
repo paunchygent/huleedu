@@ -5,6 +5,8 @@ Tests focus on verifying correct metrics are emitted with proper labels.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from services.language_tool_service.api.grammar_routes import _get_text_length_range
@@ -13,7 +15,9 @@ from services.language_tool_service.api.grammar_routes import _get_text_length_r
 class TestMetricsEmission:
     """Tests for metrics emission during request processing."""
 
-    async def test_successful_request_metrics(self, test_client, mock_metrics) -> None:
+    async def test_successful_request_metrics(
+        self, test_client: Any, mock_metrics: dict[str, Any]
+    ) -> None:
         """Test that successful requests emit correct metrics."""
         # Arrange
         request_body = {"text": "Test text for metrics validation.", "language": "en-US"}
@@ -29,7 +33,9 @@ class TestMetricsEmission:
         # In a real test, we'd check mock_metrics was called with correct labels
         assert response_data["total_grammar_errors"] >= 0
 
-    async def test_validation_error_metrics(self, test_client, mock_metrics) -> None:
+    async def test_validation_error_metrics(
+        self, test_client: Any, mock_metrics: dict[str, Any]
+    ) -> None:
         """Test that validation errors emit correct metrics."""
         # Arrange
         request_body = {"text": ""}  # Empty text triggers validation error
@@ -57,7 +63,7 @@ class TestMetricsEmission:
         ],
     )
     async def test_text_length_range_metrics(
-        self, test_client, word_count: int, expected_range: str
+        self, test_client: Any, word_count: int, expected_range: str
     ) -> None:
         """Test that text length ranges are correctly categorized in metrics."""
         # Arrange

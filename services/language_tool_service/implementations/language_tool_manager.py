@@ -181,7 +181,7 @@ class LanguageToolManager:
         try:
             # Check the languages endpoint as a health check
             async with self.http_session.get(
-                f"{self.server_url}/v1/languages",
+                f"{self.server_url}/v2/languages",
                 timeout=aiohttp.ClientTimeout(total=5),
             ) as response:
                 return response.status == 200

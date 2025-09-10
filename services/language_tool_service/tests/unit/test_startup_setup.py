@@ -8,7 +8,6 @@ metrics initialization, and error recovery scenarios following Rule 075 standard
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -99,23 +98,15 @@ class TestInitializeServicesFunction:
     async def test_initialize_services_error_handling(self, mock_settings: Settings) -> None:
         """Test error handling during service initialization."""
 
-        # Given - Create an app that will cause AttributeError
-        class FailingApp:
-            """Mock app that fails when accessing extensions."""
-
-            @property
-            def extensions(self) -> None:
-                raise AttributeError("Simulated failure")
-
-            @extensions.setter
-            def extensions(self, value: Any) -> None:
-                raise AttributeError("Simulated failure")
-
-        mock_app = FailingApp()
+        # Given - Create a mock app that will cause AttributeError
+        mock_app = Mock(spec=Quart)
+        type(mock_app).extensions = property(
+            lambda self: (_ for _ in ()).throw(AttributeError("Simulated failure"))
+        )
 
         # When/Then - Should raise exception
         with pytest.raises(Exception):
-            await initialize_services(mock_app, mock_settings)  # type: ignore[arg-type]
+            await initialize_services(mock_app, mock_settings)
 
     async def test_initialize_services_extension_handling(self, mock_settings: Settings) -> None:
         """Test extension handling with existing components."""
@@ -288,20 +279,16 @@ class TestErrorHandlingScenarios:
     async def test_initialization_error_propagation(self) -> None:
         """Test errors during initialization are properly propagated."""
 
-        # Given - Create an app that will cause failure
-        class FailingApp:
-            """Mock app that fails when accessing extensions."""
-
-            @property
-            def extensions(self) -> None:
-                raise AttributeError("Simulated failure")
-
-        mock_app = FailingApp()
+        # Given - Create a mock app that will cause failure
+        mock_app = Mock(spec=Quart)
+        type(mock_app).extensions = property(
+            lambda self: (_ for _ in ()).throw(AttributeError("Simulated failure"))
+        )
         mock_settings = Mock(spec=Settings)
 
         # When/Then
         with pytest.raises(Exception):
-            await initialize_services(mock_app, mock_settings)  # type: ignore[arg-type]
+            await initialize_services(mock_app, mock_settings)
 
     @pytest.mark.parametrize(
         "error_scenario",
@@ -319,29 +306,25 @@ class TestErrorHandlingScenarios:
 
         if error_scenario == "metrics_import_error":
             # Test with app that can't handle extensions
-            class MetricsFailingApp:
-                @property
-                def extensions(self) -> None:
-                    raise AttributeError("Extensions failure")
-
-            failing_app: Any = MetricsFailingApp()
+            failing_app = Mock(spec=Quart)
+            type(failing_app).extensions = property(
+                lambda self: (_ for _ in ()).throw(AttributeError("Extensions failure"))
+            )
         elif error_scenario == "tracer_initialization_error":
             # Test with minimal app setup
             mock_app.extensions = {}
             failing_app = mock_app
         elif error_scenario == "dishka_setup_error":
             # Test with app setup issues
-            class DishkaFailingApp:
-                @property
-                def extensions(self) -> None:
-                    raise AttributeError("Dishka failure")
-
-            failing_app = DishkaFailingApp()
+            failing_app = Mock(spec=Quart)
+            type(failing_app).extensions = property(
+                lambda self: (_ for _ in ()).throw(AttributeError("Dishka failure"))
+            )
 
         # When/Then - Should handle or propagate errors appropriately
         if error_scenario in ["metrics_import_error", "dishka_setup_error"]:
             with pytest.raises(Exception):
-                await initialize_services(failing_app, mock_settings)  # type: ignore[arg-type]
+                await initialize_services(failing_app, mock_settings)
         else:
             # Some scenarios may complete with degraded functionality
             await initialize_services(failing_app, mock_settings)

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import aiohttp
 from common_core.events.nlp_events import GrammarAnalysis, GrammarError
 from huleedu_service_libs.error_handling.factories import raise_external_service_error
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.resilience.circuit_breaker import CircuitBreakerError
+from huleedu_service_libs.resilience.circuit_breaker import CircuitBreaker, CircuitBreakerError
 
 from services.nlp_service.protocols import LanguageToolClientProtocol
 
@@ -34,6 +34,8 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
         self.request_timeout = settings.LANGUAGE_TOOL_REQUEST_TIMEOUT
         self.max_retries = settings.LANGUAGE_TOOL_MAX_RETRIES
         self.retry_delay = settings.LANGUAGE_TOOL_RETRY_DELAY
+        # Circuit breaker is optionally attached by DI provider
+        self._circuit_breaker: CircuitBreaker | None = None
 
         logger.info(
             f"LanguageToolServiceClient initialized with URL: {self.service_url}",
@@ -41,7 +43,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                 "timeout": self.request_timeout,
                 "max_retries": self.max_retries,
                 "retry_delay": self.retry_delay,
-            }
+            },
         )
 
     def _map_language_code(self, language: str) -> str:
@@ -53,11 +55,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
         Returns:
             Mapped language code for LanguageTool API
         """
-        mapping = {
-            "en": "en-US",
-            "sv": "sv-SE",
-            "auto": "auto"
-        }
+        mapping = {"en": "en-US", "sv": "sv-SE", "auto": "auto"}
         return mapping.get(language, language)
 
     def _is_retryable_error(self, status_code: int) -> bool:
@@ -107,14 +105,15 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                         "url": url,
                         "attempt": attempt + 1,
                         "max_attempts": self.max_retries + 1,
-                    }
+                    },
                 )
 
                 async with http_session.post(
                     url, json=payload, headers=headers, timeout=timeout
                 ) as response:
                     if response.status == 200:
-                        return cast(dict[str, Any], await response.json())
+                        result: dict[str, Any] = await response.json()
+                        return result
 
                     # Handle non-200 responses
                     response_text = await response.text()
@@ -152,7 +151,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                             "correlation_id": str(correlation_id),
                             "status_code": response.status,
                             "attempt": attempt + 1,
-                        }
+                        },
                     )
 
             except aiohttp.ClientError as e:
@@ -176,15 +175,15 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                         "correlation_id": str(correlation_id),
                         "error_type": type(e).__name__,
                         "attempt": attempt + 1,
-                    }
+                    },
                 )
 
             # Calculate exponential backoff delay
             if attempt < self.max_retries:
-                delay = self.retry_delay * (2 ** attempt)
+                delay = self.retry_delay * (2**attempt)
                 logger.debug(
                     f"Waiting {delay:.2f}s before retry",
-                    extra={"correlation_id": str(correlation_id), "delay_seconds": delay}
+                    extra={"correlation_id": str(correlation_id), "delay_seconds": delay},
                 )
                 await asyncio.sleep(delay)
 
@@ -275,7 +274,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
         )
 
         # Check if circuit breaker is available and open
-        if hasattr(self, "_circuit_breaker"):
+        if self._circuit_breaker is not None:
             try:
                 # Use circuit breaker if available
                 response_data = await self._circuit_breaker.call(
@@ -302,7 +301,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                         "correlation_id": str(correlation_id),
                         "circuit_breaker_error": str(e),
                         "processing_time_ms": processing_time_ms,
-                    }
+                    },
                 )
 
                 return GrammarAnalysis(

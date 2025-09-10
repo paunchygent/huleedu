@@ -5,6 +5,9 @@ Tests focus on category and rule counting, error structure handling.
 
 from __future__ import annotations
 
+from typing import Any
+from unittest.mock import AsyncMock
+
 from services.language_tool_service.tests.unit.conftest import create_mock_grammar_error
 
 
@@ -12,7 +15,7 @@ class TestErrorAggregation:
     """Tests for error aggregation and counting logic."""
 
     async def test_category_aggregation_single_category(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test category counting with single category."""
         # Arrange
@@ -37,7 +40,7 @@ class TestErrorAggregation:
         assert len(response_data["grammar_category_counts"]) == 1
 
     async def test_category_aggregation_multiple_categories(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test category counting with multiple categories."""
         # Arrange
@@ -66,7 +69,7 @@ class TestErrorAggregation:
         assert len(response_data["grammar_category_counts"]) == 3
 
     async def test_rule_aggregation_with_duplicates(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test rule counting with duplicate rule IDs."""
         # Arrange
@@ -93,7 +96,7 @@ class TestErrorAggregation:
         assert len(response_data["grammar_rule_counts"]) == 2
 
     async def test_error_with_missing_type_field(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test handling of errors with missing type field."""
         # Arrange
@@ -123,7 +126,7 @@ class TestErrorAggregation:
         assert response_data["grammar_category_counts"]["GRAMMAR"] == 1
 
     async def test_error_with_missing_rule_field(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test handling of errors with missing rule field."""
         # Arrange
@@ -153,7 +156,7 @@ class TestErrorAggregation:
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
 
     async def test_error_with_non_dict_type_field(
-        self, test_client, mock_language_tool_wrapper
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
     ) -> None:
         """Test handling of errors where type field is not a dict."""
         # Arrange
@@ -181,7 +184,9 @@ class TestErrorAggregation:
         # Non-dict type should default to "UNKNOWN"
         assert response_data["grammar_category_counts"]["UNKNOWN"] == 1
 
-    async def test_empty_error_list(self, test_client, mock_language_tool_wrapper) -> None:
+    async def test_empty_error_list(
+        self, test_client: Any, mock_language_tool_wrapper: AsyncMock
+    ) -> None:
         """Test that empty error list produces empty counts."""
         # Arrange
         request_body = {"text": "Perfect text with no errors.", "language": "en-US"}

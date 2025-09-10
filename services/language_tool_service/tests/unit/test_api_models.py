@@ -137,7 +137,7 @@ class TestLanguageToolRawResponseModel:
     def test_languagetool_raw_response_required_language_field(self) -> None:
         """Test LanguageToolRawResponse requires language field."""
         with pytest.raises(ValidationError) as exc_info:
-            LanguageToolRawResponse()  # type: ignore[call-arg]
+            LanguageToolRawResponse(**{})  # Intentionally empty to test validation
 
         assert "language" in str(exc_info.value)
         assert "Field required" in str(exc_info.value)
@@ -257,7 +257,7 @@ class TestLanguageToolMatchModel:
     def test_languagetool_match_required_fields_validation(self) -> None:
         """Test LanguageToolMatch validates required fields."""
         with pytest.raises(ValidationError) as exc_info:
-            LanguageToolMatch()  # type: ignore[call-arg]
+            LanguageToolMatch(**{})  # Intentionally empty to test validation
 
         error_fields = str(exc_info.value)
         required_fields = ["message", "offset", "length", "context", "sentence", "type", "rule"]
@@ -517,7 +517,7 @@ class TestGrammarCheckResponseModel:
     def test_grammar_check_response_required_fields_validation(self) -> None:
         """Test GrammarCheckResponse validates all required fields."""
         with pytest.raises(ValidationError) as exc_info:
-            GrammarCheckResponse()  # type: ignore[call-arg]
+            GrammarCheckResponse(**{})  # Intentionally empty to test validation
 
         error_msg = str(exc_info.value)
         required_fields = ["total_grammar_errors", "language", "processing_time_ms"]

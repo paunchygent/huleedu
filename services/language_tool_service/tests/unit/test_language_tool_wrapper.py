@@ -415,7 +415,11 @@ class TestLanguageToolWrapper:
         max_concurrent = 0
         current_concurrent = 0
 
-        async def slow_call(*_args: Any) -> list[dict[str, Any]]:
+        async def slow_call(
+            self: Any, text: str, language: str, correlation_context: Any
+        ) -> list[dict[str, Any]]:
+            # Parameters are required for method signature but not used in test
+            _ = (self, text, language, correlation_context)
             nonlocal call_count, max_concurrent, current_concurrent
             current_concurrent += 1
             max_concurrent = max(max_concurrent, current_concurrent)
@@ -424,8 +428,8 @@ class TestLanguageToolWrapper:
             current_concurrent -= 1
             return []
 
-        # Override the _call_language_tool method directly
-        wrapper._call_language_tool = slow_call  # type: ignore[assignment]
+        # Override the _call_language_tool method directly - use setattr for dynamic assignment
+        setattr(wrapper, "_call_language_tool", slow_call.__get__(wrapper, type(wrapper)))
 
         # Act - Start 5 concurrent requests
         tasks = [wrapper.check_text(f"Text {i}", correlation_context) for i in range(5)]

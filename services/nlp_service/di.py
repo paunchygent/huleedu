@@ -6,8 +6,8 @@ from datetime import timedelta
 from typing import Any
 
 from common_core.event_enums import ProcessingEvent, topic_name
-from huleedu_service_libs.error_handling import HuleEduError
 from dishka import Provider, Scope, provide
+from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from huleedu_service_libs.outbox.manager import OutboxManager
@@ -319,7 +319,7 @@ class NlpServiceProvider(Provider):
                 service_name=settings.SERVICE_NAME,
             )
             # Attach circuit breaker to client for conditional use
-            client._circuit_breaker = circuit_breaker  # type: ignore[attr-defined]
+            client._circuit_breaker = circuit_breaker
 
         return client
 
