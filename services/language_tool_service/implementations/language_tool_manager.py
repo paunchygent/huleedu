@@ -47,6 +47,7 @@ class LanguageToolManager:
         self.restart_count = 0
         self.last_restart_time = 0.0
         self.is_shutting_down = False
+        self._restart_lock = asyncio.Lock()
 
         # Build server URL for health checks
         self.server_url = f"http://localhost:{settings.LANGUAGE_TOOL_PORT}"
@@ -67,6 +68,10 @@ class LanguageToolManager:
         Raises:
             HuleEduError: If the server fails to start
         """
+        # Reset shutdown flag when (re)starting the server
+        # Without this, restart_if_needed() will early-return
+        # if stop() was called earlier in the lifecycle.
+        self.is_shutting_down = False
         if self.process and self.process.returncode is None:
             logger.warning("LanguageTool server already running")
             return
@@ -173,7 +178,11 @@ class LanguageToolManager:
         Returns:
             True if the server is responsive, False otherwise
         """
-        if not self.process or self.process.returncode is not None:
+        if not self.process:
+            return False
+
+        # Check if process has terminated
+        if self.process.returncode is not None:
             return False
 
         if not self.http_session:
@@ -188,6 +197,20 @@ class LanguageToolManager:
                 return response.status == 200
         except Exception as e:
             logger.debug(f"Health check failed: {e}")
+            # If we can't connect, the process might be dead
+            # Check if it's still running
+            if self.process and self.process.returncode is None:
+                # Try to see if process is actually dead
+                try:
+                    # Send signal 0 to check if process exists
+                    os.kill(self.process.pid, 0)
+                except ProcessLookupError:
+                    # Process is dead but we haven't waited on it
+                    # Update returncode by waiting with a short timeout
+                    try:
+                        await asyncio.wait_for(self.process.wait(), timeout=0.1)
+                    except asyncio.TimeoutError:
+                        pass
             return False
 
     async def restart_if_needed(self) -> None:
@@ -199,32 +222,66 @@ class LanguageToolManager:
         if self.is_shutting_down:
             return
 
-        current_time = time.time()
-        time_since_last_restart = current_time - self.last_restart_time
+        async with self._restart_lock:
+            if self.is_shutting_down:
+                return
 
-        # Exponential backoff: wait 2^restart_count seconds, max 60 seconds
-        min_wait_time = min(2**self.restart_count, 60)
+            # Check if restart is actually needed
+            needs_restart = False
 
-        if time_since_last_restart < min_wait_time:
-            logger.debug(
-                f"Skipping restart, waiting {min_wait_time - time_since_last_restart:.1f}s more"
-            )
-            return
+            # First, check if process exists and is alive
+            if not self.process:
+                needs_restart = True
+                logger.debug("restart_if_needed: No process exists, restart needed")
+            elif self.process.returncode is not None:
+                # Process has terminated - no need for health check
+                needs_restart = True
+                logger.debug(
+                    f"restart_if_needed: Process terminated with returncode {self.process.returncode}, restart needed"
+                )
+            else:
+                # Process exists and hasn't terminated, check health
+                is_healthy = await self.health_check()
+                logger.debug(f"restart_if_needed: health_check returned {is_healthy}")
+                if is_healthy:
+                    # Server is healthy, no restart needed
+                    return
+                needs_restart = True
 
-        logger.warning(f"Restarting LanguageTool server (attempt {self.restart_count + 1})")
+            if not needs_restart:
+                return
 
-        # Stop the current process
-        await self._cleanup_process()
+            current_time = time.time()
+            time_since_last_restart = current_time - self.last_restart_time
 
-        # Start a new process
-        try:
-            await self.start()
-            self.restart_count = 0  # Reset on successful restart
-        except Exception as e:
-            logger.error(f"Failed to restart LanguageTool server: {e}")
-            self.restart_count += 1
+            # Exponential backoff: wait 2^restart_count seconds, max 60 seconds
+            min_wait_time = min(2**self.restart_count, 60)
+
+            if time_since_last_restart < min_wait_time:
+                logger.debug(
+                    f"Skipping restart, waiting {min_wait_time - time_since_last_restart:.1f}s more"
+                )
+                return
+
+            # Record the time at which we attempt a restart (regardless of outcome)
             self.last_restart_time = current_time
-            raise
+
+            logger.warning(
+                f"Restarting LanguageTool server (attempt {self.restart_count + 1}), process state: PID={self.process.pid if self.process else None}, returncode={self.process.returncode if self.process else None}"
+            )
+
+            # Stop the current process
+            await self._cleanup_process()
+
+            # Start a new process
+            try:
+                await self.start()
+                self.restart_count = 0  # Reset on successful restart
+            except Exception as e:
+                logger.error(f"Failed to restart LanguageTool server: {e}")
+                self.restart_count += 1
+                # last_restart_time already set at attempt
+                raise
 
     async def _wait_for_server_ready(self, timeout: float = 30.0) -> None:
         """
@@ -277,18 +334,27 @@ class LanguageToolManager:
             return
 
         if self.process.returncode is None:
-            # Try graceful shutdown first
+            # Check if process is actually still alive
             try:
+                os.kill(self.process.pid, 0)  # Signal 0 = check if process exists
+                # Process is alive, try graceful shutdown
                 self.process.send_signal(signal.SIGTERM)
                 await asyncio.wait_for(self.process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                # Force kill if graceful shutdown fails
-                logger.warning("Graceful shutdown timed out, forcing kill")
-                self.process.send_signal(signal.SIGKILL)
-                await self.process.wait()
             except ProcessLookupError:
-                # Process already dead
-                pass
+                # Process is already dead, just wait to update returncode
+                try:
+                    await asyncio.wait_for(self.process.wait(), timeout=0.1)
+                except asyncio.TimeoutError:
+                    pass  # Process was already waited on
+            except asyncio.TimeoutError:
+                # Graceful shutdown timed out, force kill
+                logger.warning("Graceful shutdown timed out, forcing kill")
+                try:
+                    self.process.send_signal(signal.SIGKILL)
+                    await self.process.wait()
+                except ProcessLookupError:
+                    # Process died between SIGTERM and SIGKILL
+                    pass
 
         self.process = None
 

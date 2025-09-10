@@ -37,6 +37,7 @@ dev = [
     "pytest-cov>=6.1.1",
     "pytest-mock",
     "faker",
+    "psutil>=6.1.1",
 ]
 
 [tool.pdm.scripts]
@@ -45,6 +46,26 @@ dev = "quart --app app:app --debug run --host 0.0.0.0 -p 8085"
 test = "pytest tests/"
 test-unit = "pytest tests/unit/"
 test-integration = "pytest tests/integration/"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests"
+]
+pythonpath = [
+    "."
+]
+python_files = "test_*.py *_test.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests requiring external services like Kafka",
+    "slow: marks tests as slow running",
+    "docker: marks tests that need docker-compose setup",
+    "kafka: marks tests requiring a Kafka instance",
+    "timeout: marks tests with specific timeout requirements",
+    "unit: marks tests as unit tests for isolated component testing",
+]
 
 [tool.mypy]
 python_version = "3.11"

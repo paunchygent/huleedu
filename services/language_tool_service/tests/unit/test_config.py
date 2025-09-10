@@ -18,8 +18,10 @@ from services.language_tool_service.config import Settings
 class TestLanguageToolServiceSettings:
     """Tests for language tool service configuration validation."""
 
-    def test_settings_loads_default_values(self) -> None:
+    def test_settings_loads_default_values(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that Settings loads correct default values when no environment variables are set."""
+        # Ensure container-provided env vars don't override defaults
+        monkeypatch.delenv("LANGUAGE_TOOL_SERVICE_LOG_LEVEL", raising=False)
         # Create settings instance with defaults (no environment overrides)
         settings = Settings()
 

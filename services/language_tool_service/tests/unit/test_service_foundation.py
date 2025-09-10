@@ -73,8 +73,10 @@ class TestServiceFoundation:
             assert correlation_context is not None
             assert correlation_context.original == "test-correlation-id"
 
-    async def test_configuration_loading(self) -> None:
+    async def test_configuration_loading(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that configuration loads properly."""
+        # Ensure container-provided env vars don't override defaults for this test
+        monkeypatch.delenv("LANGUAGE_TOOL_SERVICE_LOG_LEVEL", raising=False)
         settings = Settings()
 
         # Test default values
@@ -103,8 +105,10 @@ class TestServiceFoundation:
         assert METRICS["request_count"]._name == "language_tool_service_http_requests"
         assert METRICS["grammar_analysis_total"]._name == "language_tool_service_grammar_analysis"
 
-    async def test_stub_wrapper_functionality(self) -> None:
+    async def test_stub_wrapper_functionality(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that stub Language Tool wrapper works correctly."""
+        # Force stub implementation regardless of environment/JAR availability
+        monkeypatch.setenv("USE_STUB_LANGUAGE_TOOL", "true")
         container = make_async_container(
             CoreInfrastructureProvider(),
             ServiceImplementationsProvider(),

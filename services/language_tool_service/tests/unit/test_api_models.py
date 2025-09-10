@@ -233,7 +233,7 @@ class TestLanguageToolMatchModel:
     def test_languagetool_match_field_combinations_with_swedish_content(
         self, replacements: list[dict[str, str]], ignore_incomplete: bool, context_confidence: int
     ) -> None:
-        """Test LanguageToolMatch handles various field combinations including Swedish corrections."""
+        """Test LanguageToolMatch handles various field combinations inc. Swedish corrections."""
         match = LanguageToolMatch(
             message="Test grammar error",
             offset=5,

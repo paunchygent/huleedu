@@ -42,10 +42,8 @@ class TestMetricsEndpoint:
             def mock_generate_latest(_registry: Any) -> bytes:
                 return sample_metrics
 
-            monkeypatch.setattr(
-                "services.language_tool_service.tests.unit.test_metrics_routes.generate_latest",
-                mock_generate_latest,
-            )
+            # Patch the function reference used in this module, independent of import path
+            monkeypatch.setattr(f"{__name__}.generate_latest", mock_generate_latest)
 
             # Act
             data, content_type, status_code = self._metrics_logic(registry=mock_registry)
@@ -67,10 +65,8 @@ class TestMetricsEndpoint:
             def mock_generate_latest(_registry: Any) -> bytes:
                 raise Exception("Prometheus metrics generation failed")
 
-            monkeypatch.setattr(
-                "services.language_tool_service.tests.unit.test_metrics_routes.generate_latest",
-                mock_generate_latest,
-            )
+            # Patch the function reference used in this module
+            monkeypatch.setattr(f"{__name__}.generate_latest", mock_generate_latest)
 
             # Act
             data, content_type, status_code = self._metrics_logic(registry=mock_registry)
@@ -99,10 +95,8 @@ class TestMetricsEndpoint:
             def mock_generate_latest(_registry: Any) -> bytes:
                 return metrics_content
 
-            monkeypatch.setattr(
-                "services.language_tool_service.tests.unit.test_metrics_routes.generate_latest",
-                mock_generate_latest,
-            )
+            # Patch the function reference used in this module
+            monkeypatch.setattr(f"{__name__}.generate_latest", mock_generate_latest)
 
             # Act
             data, content_type, status_code = self._metrics_logic(registry=mock_registry)

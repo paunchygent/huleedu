@@ -29,6 +29,7 @@ from typing import Any
 import aiohttp
 import psutil
 import pytest
+import pytest_asyncio
 from dishka import make_async_container
 from quart import Quart
 from quart_dishka import QuartDishka
@@ -68,7 +69,7 @@ def integration_settings() -> Settings:
     return settings
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def real_app(integration_settings: Settings) -> Quart:
     """
     Create real Quart application with full DI container for integration testing.
@@ -91,13 +92,13 @@ async def real_app(integration_settings: Settings) -> Quart:
     return app
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(real_app: Quart) -> Any:
     """Create test client for real HTTP requests to the application."""
     return real_app.test_client()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def real_language_tool_manager(
     integration_settings: Settings,
 ) -> AsyncIterator[LanguageToolManager]:
@@ -105,7 +106,16 @@ async def real_language_tool_manager(
     Create real LanguageToolManager instance for direct testing.
 
     This manager uses actual subprocess management and HTTP clients,
-    not test doubles or mocks.
+    not test doubles or mocks. When the JAR is present, this spawns
+    a real Java process. Tests using this fixture will automatically
+    skip if the LanguageTool JAR is not found at the configured path.
+    
+    The fixture ensures proper cleanup by stopping the manager both
+    before yielding (clean state) and after the test completes.
+    
+    Note:
+        In local development without Docker, tests will skip.
+        In Docker containers or CI with the JAR, tests will run.
     """
     manager = LanguageToolManager(integration_settings)
 
@@ -167,7 +177,7 @@ def find_java_processes_by_port(port: int) -> list[psutil.Process]:
             if proc.info["name"] and "java" in proc.info["name"].lower():
                 # Check if process has connections on the target port
                 try:
-                    connections = proc.connections()
+                    connections = proc.net_connections()
                     for conn in connections:
                         if conn.laddr.port == port:
                             java_processes.append(proc)
@@ -231,6 +241,7 @@ class TestProcessLifecycle:
     """Integration tests for Language Tool Java process management."""
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     @pytest.mark.timeout(INTEGRATION_TEST_TIMEOUT)
     async def test_java_process_starts_successfully(
         self, real_language_tool_manager: LanguageToolManager
@@ -274,6 +285,7 @@ class TestProcessLifecycle:
         assert status["pid"] == process_pid, "Status should report correct PID"
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     @pytest.mark.timeout(INTEGRATION_TEST_TIMEOUT)
     async def test_health_check_reports_jvm_status(
         self, real_language_tool_manager: LanguageToolManager
@@ -330,6 +342,7 @@ class TestProcessLifecycle:
             pytest.fail(f"Real HTTP health check failed: {e}")
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     @pytest.mark.timeout(INTEGRATION_TEST_TIMEOUT * 2)  # Allow more time for restart scenarios
     async def test_process_restart_on_failure(
         self, real_language_tool_manager: LanguageToolManager
@@ -365,39 +378,37 @@ class TestProcessLifecycle:
             # Process might have already died, that's okay for this test
             pass
 
-        # Wait a moment for process death to be detected
-        await asyncio.sleep(2)
+        # Give health check a moment to detect the dead process
+        await asyncio.sleep(0.5)
 
-        # Verify health check now fails
+        # Verify health check now fails (process is dead)
         health_after_kill = await manager.health_check()
         assert health_after_kill is False, "Health check should fail after process is killed"
 
-        # Trigger restart manually (in real scenarios this happens automatically via health check loop)
         # Reset restart timing to allow immediate restart
         manager.last_restart_time = 0.0
         manager.restart_count = 0
 
-        # Attempt restart
+        # Now test the actual restart_if_needed() method
+        # This should detect the unhealthy state and restart automatically
         await manager.restart_if_needed()
 
-        # Wait for restart to complete
-        restart_ready = await wait_for_process_startup(
-            manager, timeout=JAVA_PROCESS_STARTUP_TIMEOUT
-        )
-        assert restart_ready, "Process should restart successfully after failure"
+        # Verify the restart succeeded by checking process state directly
+        assert manager.process is not None, "Process should exist after restart"
+        assert manager.process.returncode is None, "Process should be running after restart"
+
+        # Verify health check passes on the restarted process
+        health_after_restart = await manager.health_check()
+        assert health_after_restart, "Health check should pass after successful restart"
 
         # Verify new process has different PID
-        assert manager.process is not None, "New process should exist after restart"
         new_pid = manager.process.pid
         assert new_pid != original_pid, (
             f"New process PID {new_pid} should differ from original {original_pid}"
         )
 
-        # Verify new process is healthy
-        health_after_restart = await manager.health_check()
-        assert health_after_restart, "Health check should pass after successful restart"
-
     @pytest.mark.integration
+    @pytest.mark.asyncio
     @pytest.mark.timeout(INTEGRATION_TEST_TIMEOUT)
     async def test_graceful_shutdown_cleanup(
         self, real_language_tool_manager: LanguageToolManager
@@ -463,6 +474,7 @@ class TestProcessLifecycle:
         )
 
     @pytest.mark.integration
+    @pytest.mark.asyncio
     @pytest.mark.timeout(INTEGRATION_TEST_TIMEOUT)
     async def test_fallback_to_stub_when_jar_missing(
         self, integration_settings: Settings, temporary_jar_path: Path

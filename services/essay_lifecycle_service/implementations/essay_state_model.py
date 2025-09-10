@@ -12,7 +12,7 @@ from typing import Any
 
 from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EssayState(BaseModel):
@@ -33,12 +33,12 @@ class EssayState(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_encoders = {
+    # Pydantic v2 configuration (replaces class Config)
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat(),
         }
+    )
 
     def update_status(
         self, new_status: EssayStatus, metadata: dict[str, Any] | None = None

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from common_core.event_enums import ProcessingEvent
 
@@ -38,9 +38,9 @@ class PipelineDeniedV1(BaseEventData):
         default_factory=datetime.utcnow, description="When the denial occurred"
     )
 
-    class Config:
-        # Pydantic v2 configuration
-        json_schema_extra = {
+    # Pydantic v2 configuration using ConfigDict (replaces class Config)
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "event_name": "pipeline.denied",
@@ -72,3 +72,4 @@ class PipelineDeniedV1(BaseEventData):
                 },
             ]
         }
+    )
