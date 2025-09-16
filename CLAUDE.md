@@ -5,8 +5,9 @@
 ### 1. Initial Setup
 
 ```markdown
-- Read `.claude/rules/015-project-structure-standards.mdc` first
-- Review key architectural documents in this order:
+- Read `.cursor/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards.
+- Use the user's task description to read and review all rule files related to the task at hand.
+- Key architectural documents in this order:
   1. `.claude/rules/080-repository-workflow-and-tooling.mdc`
   2. `.claude/rules/010-foundational-principles.mdc`
   3. `.claude/rules/020-architectural-mandates.mdc`
@@ -14,9 +15,7 @@
   5. `.claude/rules/042-async-patterns-and-di.mdc`
   6. `.claude/rules/050-python-coding-standards.mdc`
   7. `.claude/rules/100-terminology-and-definitions.mdc`
-  8. `.claude/rules/110.1-planning-mode.mdc`
-  9. `.claude/rules/110.2-coding-mode.mdc`
-  10. `.claude/rules/048-structured-error-handling-standards.mdc`
+  8. `.claude/rules/048-structured-error-handling-standards.mdc`
 ```
 
 ### 2. Task Execution
@@ -150,28 +149,6 @@ pdmr pytest-root <path-or-nodeid> [args]
 pdmr pytest-root <path-or-nodeid> [args]
 ```
 
-Suite shortcuts
-
-```bash
-# From repository root
-pdm run test-all           # Full test suite
-pdm run test-unit          # Unit tests only
-pdm run test-integration   # Integration tests
-pdm run test-cov           # With coverage report
-```
-
-Optional global shim for convenience
-
-```bash
-mkdir -p "$HOME/.local/bin"
-ln -sf "$(git rev-parse --show-toplevel)/scripts/pytest-root.sh" "$HOME/.local/bin/pytest-root"
-chmod +x "$HOME/.local/bin/pytest-root"
-export PATH="$HOME/.local/bin:$PATH"   # add to shell rc if missing
-
-# Then from anywhere
-pytest-root services/... -k 'expr'
-```
-
 #### Common Markers
 
 ```markdown
@@ -180,8 +157,6 @@ pytest-root services/... -k 'expr'
 - `@pytest.mark.docker`: Needs Docker Compose
 - `@pytest.mark.kafka`: Requires Kafka
 ```
-
-## Development Workflow (.claude/rules/080-repository-workflow-and-tooling.mdc)
 
 ### Subagents
 
@@ -203,12 +178,12 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 
 #### Development
 
+Always use development builds and services unless explicitly asked to use production builds.
+
 ```bash
 # Main development workflow
 pdm run dev <command> [service]     # Use main dev script
 
-# Building services
-pdm run dev build                   # Build production images with cache
 pdm run dev build clean             # Clean build (no cache) for production
 pdm run dev build dev               # Build ALL dev images with hot-reload support
 pdm run dev build dev nlp_service   # Build specific dev image
@@ -308,5 +283,6 @@ pdm run prod-migrate               # Run production migrations
 - Document all environment variables
 - Include examples in documentation
 ```
+
 - ALWAYS USE   1. restart - for restarting specific services
   2. restart-all - for restarting all services

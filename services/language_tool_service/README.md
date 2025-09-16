@@ -12,6 +12,7 @@ HTTP service providing grammar and style checking via managed LanguageTool Java 
 ## API
 
 ### POST /v1/check
+
 ```json
 // Request
 {
@@ -42,6 +43,7 @@ HTTP service providing grammar and style checking via managed LanguageTool Java 
 ## Development
 
 ### Running Locally
+
 ```bash
 # Stub mode (no JAR required)
 USE_STUB_LANGUAGE_TOOL=true pdm run dev
@@ -51,6 +53,7 @@ pdm run dev
 ```
 
 ### Testing
+
 ```bash
 # Run all tests (213 total: 167 unit + 46 integration)
 pdm run test-all
@@ -63,6 +66,7 @@ pdm run test-integration
 ```
 
 ### Test Structure
+
 ```
 tests/
 ├── unit/                     # 167 tests - mock Java process
@@ -82,6 +86,7 @@ tests/
 ## Docker
 
 ### Building
+
 ```bash
 # Development (with hot-reload)
 pdm run dev build dev language_tool_service
@@ -91,7 +96,9 @@ docker compose build language_tool_service
 ```
 
 ### JAR Acquisition
+
 The LanguageTool JAR is downloaded during Docker build:
+
 ```dockerfile
 RUN wget https://languagetool.org/download/LanguageTool-6.3.zip && \
     unzip LanguageTool-6.3.zip && \
@@ -105,6 +112,7 @@ RUN wget https://languagetool.org/download/LanguageTool-6.3.zip && \
 - **JVM Health**: GET /health/jvm
 
 ### Key Metrics
+
 - `wrapper_duration_seconds{language}`: Processing time
 - `api_errors_total{endpoint,error_type}`: Error counts
 

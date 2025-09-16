@@ -5,8 +5,9 @@
 ### 1. Initial Setup
 
 ```markdown
-- Read `.claude/rules/015-project-structure-standards.mdc` first
-- Review key architectural documents in this order:
+- Read `.cursor/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards.
+- Use the user's task description to read and review all rule files related to the task at hand.
+- Key architectural documents in this order:
   1. `.claude/rules/080-repository-workflow-and-tooling.mdc`
   2. `.claude/rules/010-foundational-principles.mdc`
   3. `.claude/rules/020-architectural-mandates.mdc`
@@ -14,9 +15,7 @@
   5. `.claude/rules/042-async-patterns-and-di.mdc`
   6. `.claude/rules/050-python-coding-standards.mdc`
   7. `.claude/rules/100-terminology-and-definitions.mdc`
-  8. `.claude/rules/110.1-planning-mode.mdc`
-  9. `.claude/rules/110.2-coding-mode.mdc`
-  10. `.claude/rules/048-structured-error-handling-standards.mdc`
+  8. `.claude/rules/048-structured-error-handling-standards.mdc`
 ```
 
 ### 2. Task Execution
@@ -51,7 +50,7 @@
 
 ### Architectural Overview
 
-### Architecture (Rules 010, 020)
+### Architecture (.claude/rules/010-foundational-principles.mdc)
 
 ```markdown
 - **Pattern**: Event-driven microservices with DDD
@@ -62,7 +61,7 @@
   - Container: Docker, Docker Compose
 ```
 
-### Service Communication (Rule 020)
+### Service Communication (.claude/rules/020-architectural-mandates.mdc)
 
 ```markdown
 - **Primary**: Asynchronous via Kafka
@@ -70,15 +69,15 @@
 - **Strict**: No direct DB access between services
 ```
 
-### Database & Persistence
+### Database & Persistence (.claude/rules/085-database-migration-standards.md)
 
 ```markdown
 - **ORM**: SQLAlchemy async with `asyncpg`
 - **Isolation**: Each service has its own PostgreSQL database
-- **Migrations**: See `.claude/rules/085-database-migration-standards.mdc`
+- **Migrations**: see .claude/rules/085-database-migration-standards.md
 ```
 
-### HTTP Services (Rule 042)
+### HTTP Services (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - **app.py**: Setup only (<150 LoC)
@@ -86,7 +85,7 @@
 - **Example**: `@services/file_service/` structure
 ```
 
-### Worker Services (Rule 042)
+### Worker Services (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - `worker_main.py`: Service lifecycle and DI
@@ -94,7 +93,7 @@
 - **Example**: `@services/spell_checker_service/`
 ```
 
-### Dependency Injection (Rule 042)
+### Dependency Injection (.claude/rules/042-async-patterns-and-di.mdc)
 
 ```markdown
 - **Interfaces**: Define with `typing.Protocol` in `protocols.py`
@@ -104,7 +103,7 @@
   - `REQUEST`: Per-operation instances (DB sessions)
 ```
 
-### Event System (Rules 051, 052)
+### Event System (.claude/rules/051-event-contract-standards.mdc)
 
 ```markdown
 - **Envelope**: All Kafka events use `EventEnvelope`
@@ -114,7 +113,7 @@
 
 ## Testing & Quality
 
-### Testing (Rule 070)
+### Testing (.claude/rules/070-test-creation-methodology.mdc)
 
 #### Test Types
 
@@ -126,18 +125,28 @@
 
 #### Test Execution
 
+Preferred (root-aware runner)
+
 ```bash
-# From repository root
-pdm run test-all           # Full test suite
-pdm run test-unit         # Unit tests only
-pdm run test-integration  # Integration tests
-pdm run test-cov          # With coverage report
+# Go-to method (resolves paths relative to repo root)
+pdm run pytest-root <path-or-nodeid> [pytest args]
 
-# Specific test files
-pdm run pytest path/to/test_file.py
+# Examples (from repo root):
+pdm run pytest-root services/class_management_service/tests/test_core_logic.py
+pdm run pytest-root 'services/.../test_file.py::TestClass::test_case'
+pdm run pytest-root services/... -k 'expr'          # selection with -k
+pdm run pytest-root services/... -m 'unit'          # override markers
 
-# Test markers
-pdm run pytest -m "not (slow or integration)"  # Fast tests only
+# From any subdirectory
+bash "$(git rev-parse --show-toplevel)"/scripts/pytest-root.sh <path-or-nodeid> [args]
+
+# Optional: enable alias and use `pyp` or `pdmr`
+source scripts/dev-aliases.sh
+pyp <path-or-nodeid> [args]
+pdmr pytest-root <path-or-nodeid> [args]
+
+# Force root project from any dir (PDM)
+pdmr pytest-root <path-or-nodeid> [args]
 ```
 
 #### Common Markers
@@ -149,7 +158,9 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 - `@pytest.mark.kafka`: Requires Kafka
 ```
 
-## Development Workflow (Rule 080)
+### Subagents
+
+When asked to launch two or more agents in parallel: launch all agents in a single tool call for parallel execution
 
 ### Code Quality
 
@@ -167,12 +178,12 @@ pdm run pytest -m "not (slow or integration)"  # Fast tests only
 
 #### Development
 
+Always use development builds and services unless explicitly asked to use production builds.
+
 ```bash
 # Main development workflow
 pdm run dev <command> [service]     # Use main dev script
 
-# Building services
-pdm run dev build                   # Build production images with cache
 pdm run dev build clean             # Clean build (no cache) for production
 pdm run dev build dev               # Build ALL dev images with hot-reload support
 pdm run dev build dev nlp_service   # Build specific dev image
@@ -243,7 +254,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Database Migrations
 
-### Standards (.claude/rules/085-database-migration-standards.mdc)
+### Standards (.claude/rules/085-database-migration-standards.md)
 
 ```markdown
 - Always create migrations from service directory
@@ -264,7 +275,7 @@ pdm run prod-migrate               # Run production migrations
 
 ## Documentation
 
-### Standards (.claude/rules/090-documentation-standards.mdc)
+### Standards (.claude/rules/090-documentation-standards.md)
 
 ```markdown
 - Keep documentation in sync with code changes

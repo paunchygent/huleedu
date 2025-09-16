@@ -17,6 +17,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ### 1. LanguageTool Process Lifecycle (`test_languagetool_process_lifecycle.py`)
 
 **Behavioral Outcomes to Validate**:
+
 - Java process starts successfully with real JAR file
 - Health checks return accurate JVM status (running, heap usage)
 - Process restart behavior when LanguageTool becomes unresponsive
@@ -24,6 +25,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 - Fallback to stub mode when JAR is missing
 
 **Test Infrastructure**:
+
 - Real LanguageTool JAR in test resources
 - Process isolation using TestContainers or subprocess management
 - Timeout handling for slow startup/shutdown
@@ -31,6 +33,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ### 2. Grammar Analysis Pipeline (`test_grammar_analysis_pipeline.py`)
 
 **Behavioral Outcomes to Validate**:
+
 - End-to-end grammar analysis with real LanguageTool responses
 - Category filtering excludes TYPOS/MISSPELLING/SPELLING as configured
 - Multiple language support (en-US, sv-SE) produces different results
@@ -38,6 +41,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 - Error propagation from Java exceptions to structured HTTP errors
 
 **Test Data**:
+
 - Text samples with known grammar errors for each supported language
 - Malformed text that triggers LanguageTool exceptions
 - Large text samples to test timeout behavior
@@ -45,6 +49,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ### 3. Metrics Emission Validation (`test_metrics_emission.py`)
 
 **Behavioral Outcomes to Validate**:
+
 - `wrapper_duration_seconds{language}` metrics appear in `/metrics` endpoint
 - `api_errors_total{endpoint,error_type}` increments on real error conditions
 - Metrics persist across multiple requests
@@ -52,6 +57,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 - Metric labels contain expected values from real operations
 
 **Verification Method**:
+
 - Parse actual Prometheus metrics from `/metrics` endpoint
 - Validate metric values increase with real requests
 - No mocking of metrics collection infrastructure
@@ -59,12 +65,14 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ### 4. Configuration Integration (`test_configuration_integration.py`)
 
 **Behavioral Outcomes to Validate**:
+
 - Environment variables correctly configure LanguageTool JAR path
 - Port binding works for both HTTP (8085) and LanguageTool (8081)
 - Invalid configuration triggers appropriate fallback behavior
 - Settings validation prevents startup with incompatible values
 
 **Test Scenarios**:
+
 - Missing JAR file triggers stub mode
 - Port conflicts are detected and reported
 - Invalid heap size settings are rejected
@@ -73,6 +81,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ### 5. Dishka DI Container Integration (`test_di_container_integration.py`)
 
 **Behavioral Outcomes to Validate**:
+
 - Full container lifecycle with real providers (not test mocks)
 - Protocol compliance: `LanguageToolWrapperProtocol` implementations work
 - Dependency resolution provides correct implementations based on environment
@@ -80,6 +89,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 - Container cleanup releases resources properly
 
 **Validation Approach**:
+
 - Use real DI container with actual providers
 - Verify protocol implementations through behavioral contracts
 - No mocking of Dishka infrastructure
@@ -87,6 +97,7 @@ Implement behavioral integration tests for Language Tool Service to validate rea
 ## Implementation Guidelines
 
 ### Test Structure
+
 ```
 tests/integration/
 ├── conftest.py                           # TestContainers setup, real JAR management
@@ -98,6 +109,7 @@ tests/integration/
 ```
 
 ### Rule 070 Compliance
+
 - **NO @patch usage**: Test real implementations, not mocks
 - **Behavioral focus**: Validate what the system does, not how it does it
 - **Real infrastructure**: Use actual LanguageTool JAR, real HTTP clients, real metrics
@@ -105,6 +117,7 @@ tests/integration/
 - **Timeouts**: ≤ 60 seconds per test, default to 30 seconds for event-driven flows
 
 ### Test Infrastructure Requirements
+
 - **TestContainers**: For isolated Java process testing
 - **Real LanguageTool JAR**: Bundle in `tests/integration/resources/`
 - **HTTP Test Client**: Real Quart test client, not mocked responses
