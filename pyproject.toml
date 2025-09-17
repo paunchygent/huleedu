@@ -21,7 +21,9 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "PyJWT",  # For test authentication
-    "psutil>=7.0.0",
+    "psutil",
+    "pyarrow",
+    "fastparquet",
 ]
 
 [dependency-groups]

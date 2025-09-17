@@ -288,6 +288,7 @@ class TestEventContractCompliance:
         assert isinstance(rich_data, SpellcheckResultV1)
         assert rich_data.entity_id == sample_essay_id
         assert rich_data.entity_type == "essay"
+        assert rich_data.batch_id is not None  # Should have explicit batch_id field
         assert rich_data.corrections_made > 0  # Should have real corrections from spell logic
         assert rich_data.correction_metrics is not None
         assert rich_data.original_text_storage_id is not None

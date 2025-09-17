@@ -145,17 +145,17 @@ class SpellcheckEventHandler:
                 total_corrections=data.corrections_made,
             )
 
-            # Extract essay_id and batch_id
+            # Extract essay_id and batch_id (now explicit field, no fallback)
             essay_id = data.entity_id
-            batch_id = data.parent_id
+            batch_id = data.batch_id  # Use explicit batch_id field
 
             if not essay_id:
                 logger.error("Missing essay_id in spellcheck result")
                 raise ValueError("Missing essay_id in entity reference")
 
             if not batch_id:
-                logger.error("Missing batch_id in spellcheck result")
-                raise ValueError("Missing batch_id in entity reference")
+                logger.error("Missing batch_id in spellcheck result - no fallback to parent_id")
+                raise ValueError("Missing batch_id field in SpellcheckResultV1")
 
             # Determine status
             status = (

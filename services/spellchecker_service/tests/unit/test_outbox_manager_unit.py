@@ -493,6 +493,7 @@ class TestOutboxManagerErrorHandling:
             entity_id=entity_id,
             entity_type="essay",
             parent_id=batch_id,
+            batch_id=batch_id,  # Explicit batch_id field
             timestamp=datetime.now(timezone.utc),
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=rich_system_metadata,

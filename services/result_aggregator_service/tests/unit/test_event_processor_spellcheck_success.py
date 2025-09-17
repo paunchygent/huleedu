@@ -101,6 +101,7 @@ def create_successful_spellcheck_event(
         entity_id=essay_id,
         entity_type="essay",
         parent_id=batch_id,
+        batch_id=batch_id,  # Explicit batch_id field
         timestamp=kwargs.get("timestamp", datetime.now(UTC)),
         status=EssayStatus.SPELLCHECKED_SUCCESS,
         system_metadata=system_metadata,

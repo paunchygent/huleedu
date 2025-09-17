@@ -72,9 +72,10 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
         ):
             error_code = str(event_data.system_metadata.error_info)[:100]  # Limit error code length
 
+        # No fallback - parent_id must be validated before this point
         return SpellcheckPhaseCompletedV1(
             entity_id=event_data.entity_id,
-            batch_id=event_data.parent_id or "",
+            batch_id=event_data.parent_id,  # No fallback to empty string
             correlation_id=str(correlation_id),
             status=status,
             corrected_text_storage_id=corrected_text_storage_id,
@@ -125,10 +126,12 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
             if corrected_refs:
                 corrected_text_storage_id = next(iter(corrected_refs.values()), None)
 
+        # parent_id already validated in publish_spellcheck_result
         return SpellcheckResultV1(
             entity_id=event_data.entity_id,
             entity_type=event_data.entity_type,
             parent_id=event_data.parent_id,
+            batch_id=event_data.parent_id,  # Explicit batch_id field
             timestamp=datetime.now(UTC),
             status=event_data.status,
             system_metadata=event_data.system_metadata,
@@ -155,8 +158,15 @@ class DefaultSpellcheckEventPublisher(SpellcheckEventPublisherProtocol):
             correlation_id: Request correlation ID for tracing
 
         Raises:
+            ValueError: If batch_id (parent_id) is missing or empty
             HuleEduError: On any failure to store event in outbox
         """
+        # Validate batch_id FIRST before any event creation or publishing
+        if not event_data.parent_id:
+            raise ValueError(
+                "batch_id (parent_id) is required for spellcheck events - no fallback allowed"
+            )
+
         entity_id = event_data.entity_id
         processing_start_time = event_data.timestamp or datetime.now(UTC)
 

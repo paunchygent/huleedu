@@ -138,6 +138,7 @@ class TestDefaultSpellcheckEventPublisher:
         assert rich_envelope.correlation_id == sample_correlation_id
         assert isinstance(rich_envelope.data, SpellcheckResultV1)
         assert rich_envelope.data.entity_id == sample_entity_id
+        assert rich_envelope.data.batch_id == "batch-456"  # Verify batch_id is populated
         assert rich_envelope.data.corrections_made == 3
         assert rich_envelope.data.corrected_text_storage_id == "corrected-text-456"
 
@@ -155,7 +156,7 @@ class TestDefaultSpellcheckEventPublisher:
         system_metadata = SystemProcessingMetadata(
             entity_id=sample_entity_id,
             entity_type="essay",
-            parent_id=None,
+            parent_id="batch-456",  # Valid parent_id
             timestamp=datetime.now(timezone.utc),
             processing_stage=ProcessingStage.COMPLETED,
             event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -165,7 +166,7 @@ class TestDefaultSpellcheckEventPublisher:
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
             entity_id=sample_entity_id,
             entity_type="essay",
-            parent_id=None,
+            parent_id="batch-456",  # Valid parent_id
             timestamp=datetime.now(timezone.utc),
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=system_metadata,
@@ -303,6 +304,44 @@ class TestDefaultSpellcheckEventPublisher:
         json_rich = json.dumps(rich_envelope_data)
         assert json_rich  # Should not raise exception
 
+    async def test_missing_batch_id_raises_error(
+        self,
+        event_publisher: DefaultSpellcheckEventPublisher,
+        mock_outbox_manager: AsyncMock,
+        sample_correlation_id: UUID,
+        sample_entity_id: str,
+    ) -> None:
+        """Verify that missing parent_id (batch_id) raises ValueError for rich event."""
+        # Given - Event data with no parent_id (which becomes batch_id)
+        system_metadata = SystemProcessingMetadata(
+            entity_id=sample_entity_id,
+            entity_type="essay",
+            parent_id=None,  # No parent_id
+            timestamp=datetime.now(timezone.utc),
+            processing_stage=ProcessingStage.COMPLETED,
+            event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
+        )
+
+        event_data = SpellcheckResultDataV1(
+            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+            entity_id=sample_entity_id,
+            entity_type="essay",
+            parent_id=None,  # No parent_id means no batch_id
+            timestamp=datetime.now(timezone.utc),
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=system_metadata,
+            original_text_storage_id="original-text-no-batch",
+            storage_metadata=None,
+            corrections_made=5,
+        )
+
+        # When/Then - Should raise ValueError before ANY publishing
+        with pytest.raises(ValueError, match="batch_id.*required for spellcheck events"):
+            await event_publisher.publish_spellcheck_result(event_data, sample_correlation_id)
+
+        # No events should have been published - validation fails upfront
+        mock_outbox_manager.publish_to_outbox.assert_not_called()
+
     async def test_partition_key_added_to_metadata(
         self,
         event_publisher: DefaultSpellcheckEventPublisher,
@@ -404,5 +443,6 @@ class TestDefaultSpellcheckEventPublisher:
         rich_envelope = rich_call.kwargs["event_data"]
         assert isinstance(rich_envelope.data, SpellcheckResultV1)
         assert rich_envelope.data.status == EssayStatus.SPELLCHECK_FAILED
+        assert rich_envelope.data.batch_id == "batch-fail"  # Verify batch_id is populated even on failure
         assert rich_envelope.data.corrections_made == 0
         assert rich_envelope.data.corrected_text_storage_id is None

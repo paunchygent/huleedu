@@ -112,6 +112,7 @@ class TestKafkaConsumerRouting:
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
+            batch_id=batch_id,  # Explicit batch_id field
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=SystemProcessingMetadata(
                 entity_id=essay_id, entity_type="essay", parent_id=batch_id

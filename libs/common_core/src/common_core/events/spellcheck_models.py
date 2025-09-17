@@ -98,6 +98,7 @@ class SpellcheckResultV1(ProcessingUpdate):
     """
 
     # Identifiers (inherited entity_id, entity_type, parent_id from ProcessingUpdate)
+    batch_id: str = Field(description="Batch identifier for explicit context")
     correlation_id: str = Field(description="Correlation ID for tracing")
     user_id: str | None = Field(default=None, description="User ID if available")
 

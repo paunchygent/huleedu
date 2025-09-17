@@ -190,6 +190,7 @@ class TestKafkaConsumerErrorHandling:
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id2,
+            batch_id=batch_id2,  # Explicit batch_id field
             status=EssayStatus.SPELLCHECKED_SUCCESS,
             system_metadata=SystemProcessingMetadata(
                 entity_id=essay_id,
