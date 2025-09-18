@@ -287,20 +287,11 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
         filtered = []
 
         for match in matches:
-            # Get category information
-            category = match.get("rule", {}).get("category", {})
-            category_id = category.get("id", "")
-            category_name = category.get("name", "")
-
-            # Check if category should be blocked
-            if category_id in self.settings.GRAMMAR_CATEGORIES_BLOCKED:
-                logger.debug(f"Filtering out category: {category_id} ({category_name})")
-                continue
-
-            # Also check issue type for additional filtering
+            # Allow all categories through so spelling data can be aggregated downstream.
+            # Only drop irrelevant whitespace-only findings to avoid noisy responses.
             issue_type = match.get("rule", {}).get("issueType", "")
-            if issue_type in ["misspelling", "typographical", "whitespace"]:
-                logger.debug(f"Filtering out issue type: {issue_type}")
+            if isinstance(issue_type, str) and issue_type.lower() == "whitespace":
+                logger.debug("Filtering out whitespace-only issue")
                 continue
 
             filtered.append(match)
@@ -418,13 +409,18 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
             except Exception:
                 is_healthy = False
 
-        return {
+        health_payload = {
             "implementation": "production",
             "status": "healthy" if is_healthy else "unhealthy",
             "response_time_ms": response_time_ms,
             "server": manager_status,
             "note": "LanguageTool server with grammar filtering",
         }
+
+        if not is_healthy:
+            health_payload["recent_output"] = self.manager.get_recent_output()
+
+        return health_payload
 
     async def cleanup(self) -> None:
         """Clean up resources."""

@@ -140,14 +140,13 @@ class TestLanguageToolManagerStatus:
 
         status = manager.get_status()
 
-        expected = {
-            "running": True,
-            "pid": 12345,
-            "restart_count": 2,
-            "port": mock_settings.LANGUAGE_TOOL_PORT,
-            "heap_size": mock_settings.LANGUAGE_TOOL_HEAP_SIZE,
-        }
-        assert status == expected
+        assert status["running"] is True
+        assert status["pid"] == 12345
+        assert status["restart_count"] == 2
+        assert status["returncode"] is None
+        assert status["port"] == mock_settings.LANGUAGE_TOOL_PORT
+        assert status["heap_size"] == mock_settings.LANGUAGE_TOOL_HEAP_SIZE
+        assert status["last_restart_time"] == 0.0
 
     def test_get_status_no_process(self, mock_settings: Settings) -> None:
         """Test status report when no process is running."""
@@ -156,14 +155,13 @@ class TestLanguageToolManagerStatus:
 
         status = manager.get_status()
 
-        expected = {
-            "running": False,
-            "pid": None,
-            "restart_count": 1,
-            "port": mock_settings.LANGUAGE_TOOL_PORT,
-            "heap_size": mock_settings.LANGUAGE_TOOL_HEAP_SIZE,
-        }
-        assert status == expected
+        assert status["running"] is False
+        assert status["pid"] is None
+        assert status["restart_count"] == 1
+        assert status["returncode"] is None
+        assert status["port"] == mock_settings.LANGUAGE_TOOL_PORT
+        assert status["heap_size"] == mock_settings.LANGUAGE_TOOL_HEAP_SIZE
+        assert status["last_restart_time"] == 0.0
 
     def test_get_status_dead_process(self, mock_settings: Settings) -> None:
         """Test status report for dead process."""

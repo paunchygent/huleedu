@@ -35,10 +35,10 @@ async def health_check(
         # Check Language Tool wrapper health
         try:
             wrapper_health = await language_tool_wrapper.get_health_status(corr)
-            dependencies["language_tool_wrapper"] = {
-                "status": "healthy",
-                **wrapper_health,
-            }
+            dependencies["language_tool_wrapper"] = wrapper_health
+
+            if wrapper_health.get("status") != "healthy":
+                checks["dependencies_available"] = False
         except Exception as e:
             logger.warning(
                 f"Language Tool wrapper health check failed: {e}",

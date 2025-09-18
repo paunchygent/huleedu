@@ -153,12 +153,18 @@ class TestLanguageToolWrapper:
         # Act
         result = await wrapper.check_text(test_text, correlation_context)
 
-        # Assert
-        assert len(result) == 1  # Only grammar error, typo filtered out
-        assert result[0]["rule_id"] == "SUBJECT_VERB_AGREEMENT"
-        assert result[0]["category_id"] == "GRAMMAR"
-        assert result[0]["offset"] == 5
-        assert result[0]["replacements"] == ["is"]
+        # Assert grammar and spelling insights are both returned
+        assert len(result) == 2
+
+        grammar_error = next(error for error in result if error["category_id"] == "GRAMMAR")
+        spelling_error = next(error for error in result if error["category_id"] == "TYPOS")
+
+        assert grammar_error["rule_id"] == "SUBJECT_VERB_AGREEMENT"
+        assert grammar_error["offset"] == 5
+        assert grammar_error["replacements"] == ["is"]
+
+        assert spelling_error["rule_id"] == "MORFOLOGIK_RULE_EN_US"
+        assert spelling_error["replacements"] == ["grammar"]
 
     @pytest.mark.asyncio
     async def test_check_text_timeout(self, wrapper: _TestableLanguageToolWrapper) -> None:
@@ -254,6 +260,12 @@ class TestLanguageToolWrapper:
             },
             {
                 "rule": {
+                    "category": {"id": "WHITESPACE", "name": "Whitespace"},
+                    "issueType": "whitespace",
+                }
+            },
+            {
+                "rule": {
                     "category": {"id": "TYPOGRAPHY", "name": "Typography"},
                     "issueType": "typographical",
                 }
@@ -264,9 +276,18 @@ class TestLanguageToolWrapper:
         filtered = wrapper._filter_categories(matches)
 
         # Assert
-        assert len(filtered) == 2
-        assert filtered[0]["rule"]["category"]["id"] == "GRAMMAR"
-        assert filtered[1]["rule"]["category"]["id"] == "CONFUSED_WORDS"
+        assert len(filtered) == len(matches) - 1  # Only whitespace dropped
+        category_ids = {
+            match["rule"]["category"]["id"]
+            for match in filtered
+            if "rule" in match and "category" in match["rule"]
+        }
+
+        assert "TYPOS" in category_ids
+        assert "SPELLING" in category_ids
+        assert "TYPOGRAPHY" in category_ids
+        assert "CONFUSED_WORDS" in category_ids
+        assert "WHITESPACE" not in category_ids
 
     def test_map_to_grammar_errors(self, wrapper: _TestableLanguageToolWrapper) -> None:
         """Test mapping LanguageTool matches to GrammarError format."""

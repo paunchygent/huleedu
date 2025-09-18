@@ -11,6 +11,7 @@ import asyncio
 import os
 import signal
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -49,6 +50,10 @@ class LanguageToolManager:
         self.last_restart_time = 0.0
         self.is_shutting_down = False
         self._restart_lock = asyncio.Lock()
+        self._stdout_task: asyncio.Task[None] | None = None
+        self._stderr_task: asyncio.Task[None] | None = None
+        self._stdout_buffer: deque[str] = deque(maxlen=50)
+        self._stderr_buffer: deque[str] = deque(maxlen=50)
 
         # Build server URL for health checks
         self.server_url = f"http://localhost:{settings.LANGUAGE_TOOL_PORT}"
@@ -111,6 +116,8 @@ class LanguageToolManager:
 
         try:
             # Start the subprocess
+            await self._cancel_process_log_consumers()
+            self._reset_process_logs()
             self.process = await asyncio.create_subprocess_exec(
                 *java_cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -118,6 +125,8 @@ class LanguageToolManager:
                 # Set environment to ensure UTF-8 encoding
                 env={**os.environ, "JAVA_TOOL_OPTIONS": "-Dfile.encoding=UTF-8"},
             )
+
+            self._start_process_log_consumers()
 
             # Initialize HTTP session for health checks
             if not self.http_session:
@@ -311,9 +320,12 @@ class LanguageToolManager:
 
             # Check if process has died
             if self.process and self.process.returncode is not None:
-                _, stderr = await self.process.communicate()
-                error_msg = stderr.decode() if stderr else "Unknown error"
-                raise RuntimeError(f"LanguageTool process died during startup: {error_msg}")
+                recent_logs = self.get_recent_output()
+                error_lines = recent_logs["stderr"] or recent_logs["stdout"]
+                error_msg = "\n".join(error_lines) if error_lines else "Unknown error"
+                raise RuntimeError(
+                    f"LanguageTool process died during startup (code={self.process.returncode}): {error_msg}"
+                )
 
             await asyncio.sleep(0.5)
 
@@ -367,6 +379,7 @@ class LanguageToolManager:
                     pass
 
         self.process = None
+        await self._cancel_process_log_consumers()
 
     def get_status(self) -> dict[str, Any]:
         """
@@ -379,8 +392,10 @@ class LanguageToolManager:
             "running": self.process is not None and self.process.returncode is None,
             "pid": self.process.pid if self.process else None,
             "restart_count": self.restart_count,
+            "returncode": self.process.returncode if self.process else None,
             "port": self.settings.LANGUAGE_TOOL_PORT,
             "heap_size": self.settings.LANGUAGE_TOOL_HEAP_SIZE,
+            "last_restart_time": self.last_restart_time,
         }
 
     async def get_jvm_heap_usage(self) -> int | None:
@@ -414,3 +429,77 @@ class LanguageToolManager:
         except (OSError, ValueError) as e:
             logger.debug(f"Failed to get JVM heap usage: {e}")
             return None
+
+    def get_recent_output(self, max_lines: int = 10) -> dict[str, list[str]]:
+        """Return recent stdout/stderr lines from the LanguageTool process."""
+        stdout_tail = list(self._stdout_buffer)[-max_lines:]
+        stderr_tail = list(self._stderr_buffer)[-max_lines:]
+        return {
+            "stdout": stdout_tail,
+            "stderr": stderr_tail,
+        }
+
+    def _reset_process_logs(self) -> None:
+        """Clear cached process log buffers."""
+        self._stdout_buffer.clear()
+        self._stderr_buffer.clear()
+
+    def _start_process_log_consumers(self) -> None:
+        """Begin streaming stdout/stderr from the managed process."""
+        if not self.process:
+            return
+
+        if self.process.stdout:
+            self._stdout_task = asyncio.create_task(
+                self._stream_process_output(self.process.stdout, self._stdout_buffer, "stdout")
+            )
+
+        if self.process.stderr:
+            self._stderr_task = asyncio.create_task(
+                self._stream_process_output(self.process.stderr, self._stderr_buffer, "stderr")
+            )
+
+    async def _cancel_process_log_consumers(self) -> None:
+        """Cancel log streaming tasks if they are active."""
+        tasks = [self._stdout_task, self._stderr_task]
+        self._stdout_task = None
+        self._stderr_task = None
+
+        for task in tasks:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    async def _stream_process_output(
+        self,
+        stream: asyncio.StreamReader,
+        buffer: deque[str],
+        stream_name: str,
+    ) -> None:
+        """Stream output from the process and retain recent lines for diagnostics."""
+        log_method = logger.debug if stream_name == "stdout" else logger.warning
+
+        try:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+
+                text = line.decode("utf-8", errors="replace").rstrip()
+                if not text:
+                    continue
+
+                buffer.append(text)
+                log_method("LanguageTool %s: %s", stream_name, text)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # pragma: no cover - diagnostic safeguard
+            logger.error(
+                "Failed while reading LanguageTool %s stream: %s",
+                stream_name,
+                exc,
+                exc_info=True,
+            )

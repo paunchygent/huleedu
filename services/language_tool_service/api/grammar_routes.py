@@ -146,17 +146,40 @@ async def check_grammar(
         rule_counts: dict[str, int] = {}
 
         for error in raw_errors:
-            # Extract category from error type or rule with safe access
-            error_type_raw = error.get("type") if error else None
-            error_type = error_type_raw if isinstance(error_type_raw, dict) else {}
-            category = error_type.get("typeName", "UNKNOWN")
-            category_counts[category] = category_counts.get(category, 0) + 1
+            if not isinstance(error, dict):
+                continue
 
-            # Extract rule ID for rule counts with safe access
-            error_rule_raw = error.get("rule") if error else None
-            error_rule = error_rule_raw if isinstance(error_rule_raw, dict) else {}
-            rule_id = error_rule.get("id", "UNKNOWN_RULE")
-            rule_counts[rule_id] = rule_counts.get(rule_id, 0) + 1
+            category_key: str | None = None
+
+            category_id_value = error.get("category_id")
+            if isinstance(category_id_value, str) and category_id_value:
+                category_key = category_id_value
+            else:
+                error_type_raw = error.get("type")
+                if isinstance(error_type_raw, dict):
+                    type_name = error_type_raw.get("typeName")
+                    if isinstance(type_name, str) and type_name:
+                        category_key = type_name
+                elif isinstance(error.get("category_name"), str):
+                    category_key = error["category_name"]
+                elif isinstance(error.get("category"), str):
+                    category_key = error["category"]
+
+            if not category_key:
+                category_key = "UNKNOWN"
+
+            category_counts[category_key] = category_counts.get(category_key, 0) + 1
+
+            rule_id_value = error.get("rule_id")
+            if not isinstance(rule_id_value, str) or not rule_id_value:
+                rule_info = error.get("rule")
+                if isinstance(rule_info, dict):
+                    fallback_rule = rule_info.get("id")
+                    if isinstance(fallback_rule, str) and fallback_rule:
+                        rule_id_value = fallback_rule
+
+            rule_key = rule_id_value if isinstance(rule_id_value, str) and rule_id_value else "UNKNOWN_RULE"
+            rule_counts[rule_key] = rule_counts.get(rule_key, 0) + 1
 
         # Create response
         response = GrammarCheckResponse(

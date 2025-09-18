@@ -32,7 +32,7 @@ MALFORMED_TEXT = "\x00\x01\x02" * 1000  # Triggers Java exception
 
 # Test data for category filtering validation
 TYPO_TEXT = (
-    "I will recieve the package tomorrow."  # Contains typo that should be filtered (stub pattern)
+    "I will recieve the package tomorrow."  # Contains typo captured for analytics (stub pattern)
 )
 GRAMMAR_ONLY_TEXT = "I went there to their house."  # Should not trigger grammar error
 
@@ -159,45 +159,27 @@ class TestGrammarAnalysisPipeline:
 
     @pytest.mark.integration
     @pytest.mark.timeout(30)
-    async def test_category_filtering_excludes_typos(self, client: Any) -> None:
-        """Test that TYPOS/SPELLING categories are filtered out as configured.
+    async def test_typo_categories_included_for_analytics(self, client: Any) -> None:
+        """Ensure spelling/typo categories are preserved for downstream aggregation."""
 
-        Validates that the category filtering configuration correctly excludes
-        spelling and typo errors while preserving grammar errors.
-        """
         # Arrange: Use text with both typos and grammar errors
         request_data = {"text": TYPO_TEXT, "language": "en-US"}
 
         # Act: Send request and get response
         response = await client.post("/v1/check", json=request_data)
 
-        # Assert: Verify filtering behavior
+        # Assert: Verify response includes spelling/typo categories for analytics
         assert response.status_code == 200
         response_data = await response.get_json()
 
-        # Verify no blocked categories appear in results
-        blocked_categories = ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"]
         category_counts = response_data.get("grammar_category_counts", {})
 
-        for blocked_category in blocked_categories:
-            assert blocked_category not in category_counts, (
-                f"Blocked category {blocked_category} found in results: {category_counts}"
-            )
+        assert "TYPOS" in category_counts, "Expected TYPOS category to be present for aggregation"
+        assert category_counts["TYPOS"] >= 1
 
-        # Verify that if errors exist, they are from allowed categories
-        allowed_categories = [
-            "GRAMMAR",
-            "CONFUSED_WORDS",
-            "AGREEMENT",
-            "PUNCTUATION",
-            "REDUNDANCY",
-            "STYLE",
-        ]
-
-        for category in category_counts.keys():
-            assert category in allowed_categories or category.upper() == "UNKNOWN", (
-                f"Unexpected category {category} found in results"
-            )
+        # Grammar categories should still be represented when present
+        error_categories = {error.get("category_id") or error.get("category") for error in response_data["errors"]}
+        assert "TYPOS" in {cat.upper() for cat in error_categories if isinstance(cat, str)}
 
     @pytest.mark.integration
     @pytest.mark.timeout(45)
