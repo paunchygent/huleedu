@@ -98,7 +98,7 @@ class TestLanguageToolServiceClientResilience:
                     "context": {"text": "This is incorect text", "offset": 8},
                 }
             ],
-            "language": {"detectedLanguage": {"code": "en"}},
+            "language": "en-US",
             "grammar_category_counts": {"TYPOS": 1},
             "grammar_rule_counts": {"MORFOLOGIK_RULE_EN_US": 1},
         }
@@ -131,7 +131,7 @@ class TestLanguageToolServiceClientResilience:
             assert len(result.errors) == 1
             assert result.errors[0].rule_id == "MORFOLOGIK_RULE_EN_US"
             assert result.errors[0].message == "Possible spelling mistake"
-            assert result.language == "en"
+            assert result.language == "en-US"
             assert result.processing_time_ms > 0
 
             # Verify circuit breaker stayed closed
@@ -279,7 +279,7 @@ class TestLanguageToolServiceClientResilience:
             assert isinstance(result, GrammarAnalysis)
             assert result.error_count == 0
             assert len(result.errors) == 0
-            assert result.language == "en"  # Default fallback
+            assert result.language == "en-US"  # Default fallback
 
         # Circuit should still be OPEN
         assert client_with_circuit_breaker._circuit_breaker is not None
@@ -310,7 +310,7 @@ class TestLanguageToolServiceClientResilience:
         assert isinstance(result, GrammarAnalysis)
         assert result.error_count == 0
         assert len(result.errors) == 0
-        assert result.language == "sv"  # Should preserve input language
+        assert result.language == "sv-SE"  # Mapped from "sv" by _map_language_code
         assert result.processing_time_ms >= 0  # May be 0 when circuit is open
 
     @pytest.mark.asyncio

@@ -60,7 +60,7 @@ def create_mock_language_tool_response(
     if matches is None:
         matches = []
 
-    response = {"matches": matches, "language": {"detectedLanguage": {"code": language}}}
+    response = {"matches": matches, "language": language}
 
     if grammar_category_counts is not None:
         response["grammar_category_counts"] = grammar_category_counts
@@ -213,7 +213,7 @@ class TestGrammarCheckSuccess:
         assert result.error_count == 1
         assert len(result.errors) == 1
         assert result.language == "en-US"
-        assert result.processing_time_ms > 0
+        assert result.processing_time_ms >= 0  # Fast mocked responses can be 0ms
         assert result.grammar_category_counts == {"PUNCTUATION": 1}
         assert result.grammar_rule_counts == {"COMMA_RULE": 1}
 
@@ -503,7 +503,7 @@ class TestCircuitBreakerIntegration:
         assert isinstance(result, GrammarAnalysis)
         assert result.error_count == 0
         assert len(result.errors) == 0
-        assert result.language == "en"  # Default from input since not "auto"
+        assert result.language == "en-US"  # Mapped from "en" by _map_language_code
         assert result.processing_time_ms >= 0  # Allow 0 for circuit breaker case
         assert result.grammar_category_counts is None
         assert result.grammar_rule_counts is None

@@ -4,7 +4,7 @@
 Establish the shared abstractions and dependency injection plumbing required to compute NLP features across both runtime and offline contexts.
 
 ## Requirements
-1. Create `feature_context.py` with a typed context object encapsulating prompt, essay text, identifiers, CEFR helpers, `NlpMetrics`, `GrammarAnalysis`, token caches, and correlation metadata.
+1. Create `feature_context.py` within `libs/huleedu_nlp_shared/feature_pipeline/` with a typed context object encapsulating prompt, essay text, identifiers, CEFR helpers, `NlpMetrics`, `GrammarAnalysis`, token caches, and correlation metadata.
 2. Define `FeatureExtractorProtocol` (async, returns mapping of `{feature_name: float | int | str}`) and a `FeaturePipelineProtocol` that orchestrates multiple extractors and emits both ordered vectors and keyed dicts.
 3. Implement `pipeline.py` with a configurable registry of extractor instances, deterministic ordering, and memoisation hooks for expensive shared computations.
 4. Extend Dishka providers (`di_nlp_dependencies.py` or new module) to expose the feature pipeline at `Scope.APP`, enabling reuse in `BatchNlpAnalysisHandler` and external scripts.
@@ -24,6 +24,7 @@ Establish the shared abstractions and dependency injection plumbing required to 
 - Keep each file <500 LoC; prefer small helper modules under `services/nlp_service/features/helpers/` for common utilities.
 - Do not bypass existing Language Tool client; grammar metrics arrive via the injected pipeline context.
 - Preserve current batch processing semantics—scaffolding should not yet change storage formats or event contracts.
+- Registry should support feature toggles (e.g., via config or CLI flags) so experiments can enable subsets of bundles without code changes.
 
 ## Acceptance Criteria
 - New context/pipeline modules committed with full type hints and docstrings.

@@ -12,6 +12,16 @@ This master ticket tracks three tightly coupled workstreams:
 2. Feature bundle implementation with comprehensive unit/integration tests.
 3. Offline CLI + early real-world validation against the processed IELTS dataset.
 
+### Execution Footprint
+- Core NLP logic (spell normaliser, feature pipeline) lives in shared libraries under `libs/` (`huleedu_nlp_shared`) so production services and tooling use identical algorithms.
+- Offline tooling consists of lightweight scripts under `scripts/ml/` that import from `huleedu_nlp_shared`; no new root-level module is created.
+- NLP Service imports the shared libs only; it does **not** depend on CLI scripts. CLI and future notebooks consume the same libs to guarantee parity while keeping platform code lean.
+
+### Incremental Delivery Strategy
+1. **Spell Normaliser Extraction** – First milestone is extracting and packaging the three-stage spell correction helper so both services and tooling share it.
+2. **CLI Prototyping with Selectable Bundles** – Bring up the CLI quickly with feature toggles (per-dimension enable/disable) so we can generate datasets, inspect correlations, and prune redundant metrics before committing to the full feature list.
+3. **Iterative Feature Hardening** – Implement and promote feature bundles into shared libs as they prove useful during experiments. Only register “production ready” extractors in NLP Service once validated.
+
 ### Spell Normalisation Strategy
 - Adopt a **single canonical text** for downstream NLP: all spaCy, RoBERTa, and Language Tool calls operate on spell-normalised text produced by the Spellchecker algorithm.
 - Grammar features remain accurate by augmenting Language Tool counts with Spellchecker error tallies (no recomputation on raw text).
@@ -106,6 +116,7 @@ All teams must implement and persist the following six dimensions. Naming shown 
 - TASK-052K (model integration plan) for downstream requirements.
 
 ## Subtasks
+- `TASK-052L.0-spell-normalizer-shared-helper.md`
 - `TASK-052L.1-feature-pipeline-scaffolding.md`
 - `TASK-052L.2-feature-bundles-and-tests.md`
 - `TASK-052L.3-offline-cli-and-validation.md`

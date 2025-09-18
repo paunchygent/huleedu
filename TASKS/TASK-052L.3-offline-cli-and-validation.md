@@ -7,18 +7,18 @@ Ship an async CLI that reuses the production feature pipeline to generate traini
 1. Implement `scripts/ml/build_nlp_features.py` (naming flexible) with:
    - Async Dishka container reuse (NLP dependencies + feature pipeline + Language Tool client).
    - Support for reading `processed/train.parquet` and `processed/test.parquet` via `pyarrow.dataset` streaming.
-   - CLI options: `--dataset-dir`, `--output-path`, `--format {parquet,csv}`, `--max-tasks`, `--sample <int>` for subset runs, `--skip-grammar` for diagnostics.
+   - CLI options: `--dataset-dir`, `--output-path`, `--format {parquet,csv}`, `--max-tasks`, `--sample <int>` for subset runs, `--skip-grammar` for diagnostics, **and bundle toggles** (e.g., `--enable-dimension grammar,readability`) so experiments can run with partial feature sets.
    - Output schema capturing identifiers, prompt/essay metadata, IELTS band, derived CEFR label/code, and flatten feature map.
    - Integrate the shared spell-normalisation helper so CLI generates the corrected text + error counts before invoking the feature pipeline.
 2. Add orchestration glue in `BatchNlpAnalysisHandler` to call the pipeline and include features in the rich event payload (guarded by feature flag if necessary).
 3. Develop integration tests:
    - CLI smoke test using a trimmed fixture dataset (≤5 essays) to ensure end-to-end execution.
    - Handler-level test confirming features are produced when analyzer + grammar data are present.
-4. Execute an early real-world run locally:
+4. Execute incremental real-world runs locally:
    ```bash
-   pdm run python scripts/ml/build_nlp_features.py --dataset-dir data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation --output-path data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation/processed/features.parquet --max-tasks 6 --sample 200
+   pdm run python scripts/ml/build_nlp_features.py --dataset-dir data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation --output-path data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation/processed/features.parquet --max-tasks 6 --sample 200 --enable-dimension grammar,readability
    ```
-   Capture runtime, resource usage, and sample output statistics in the ticket notes.
+   Iterate with additional dimensions as they mature; capture runtime, resource usage, and sample output statistics in the ticket notes for each configuration.
 5. Document CLI usage, expected outputs, and troubleshooting tips (Language Tool availability, performance tuning).
 
 ### Feature Integrity Requirements

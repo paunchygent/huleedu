@@ -290,10 +290,11 @@ class TestSpellcheckerOutboxPatternIntegration:
                 session = await request_container.get(AsyncSession)
 
                 # Create test event data
+                batch_id = f"batch-{uuid4()}"
                 system_metadata = SystemProcessingMetadata(
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -309,7 +310,7 @@ class TestSpellcheckerOutboxPatternIntegration:
                     event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     status=EssayStatus.SPELLCHECKED_SUCCESS,
                     system_metadata=system_metadata,
@@ -384,10 +385,11 @@ class TestSpellcheckerOutboxPatternIntegration:
                 session = await request_container.get(AsyncSession)
 
                 # Store event in outbox
+                batch_id = f"batch-{uuid4()}"
                 system_metadata = SystemProcessingMetadata(
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -397,7 +399,7 @@ class TestSpellcheckerOutboxPatternIntegration:
                     event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     status=EssayStatus.SPELLCHECKED_SUCCESS,
                     system_metadata=system_metadata,
@@ -467,10 +469,11 @@ class TestSpellcheckerOutboxPatternIntegration:
                 # Start transaction
                 async with session.begin():
                     # Create event
+                    batch_id = f"batch-{uuid4()}"
                     system_metadata = SystemProcessingMetadata(
                         entity_id=essay_id,
                         entity_type="essay",
-                        parent_id=None,
+                        parent_id=batch_id,
                         timestamp=datetime.now(timezone.utc),
                         processing_stage=ProcessingStage.COMPLETED,
                         event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -480,7 +483,7 @@ class TestSpellcheckerOutboxPatternIntegration:
                         event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                         entity_id=essay_id,
                         entity_type="essay",
-                        parent_id=None,
+                        parent_id=batch_id,
                         timestamp=datetime.now(timezone.utc),
                         status=EssayStatus.SPELLCHECKED_SUCCESS,
                         system_metadata=system_metadata,
@@ -533,12 +536,13 @@ class TestSpellcheckerOutboxPatternIntegration:
 
                 # Create multiple events
                 essay_ids = [f"essay-{uuid4()}" for _ in range(3)]
+                batch_id = f"batch-{uuid4()}"
 
                 for i, essay_id in enumerate(essay_ids):
                     system_metadata = SystemProcessingMetadata(
                         entity_id=essay_id,
                         entity_type="essay",
-                        parent_id=None,
+                        parent_id=batch_id,
                         timestamp=datetime.now(timezone.utc),
                         processing_stage=ProcessingStage.COMPLETED,
                         event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -548,7 +552,7 @@ class TestSpellcheckerOutboxPatternIntegration:
                         event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                         entity_id=essay_id,
                         entity_type="essay",
-                        parent_id=None,
+                        parent_id=batch_id,
                         timestamp=datetime.now(timezone.utc),
                         status=EssayStatus.SPELLCHECKED_SUCCESS,
                         system_metadata=system_metadata,
@@ -605,10 +609,11 @@ class TestSpellcheckerOutboxPatternIntegration:
                 session = await request_container.get(AsyncSession)
 
                 # Create event with custom metadata
+                batch_id = f"batch-{uuid4()}"
                 system_metadata = SystemProcessingMetadata(
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     processing_stage=ProcessingStage.COMPLETED,
                     event=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED.value,
@@ -618,7 +623,7 @@ class TestSpellcheckerOutboxPatternIntegration:
                     event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
                     entity_id=essay_id,
                     entity_type="essay",
-                    parent_id=None,
+                    parent_id=batch_id,
                     timestamp=datetime.now(timezone.utc),
                     status=EssayStatus.SPELLCHECKED_SUCCESS,
                     system_metadata=system_metadata,

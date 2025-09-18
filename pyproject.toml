@@ -309,6 +309,10 @@ filterwarnings = [
     "ignore:Importing 'parser.split_arg_string' is deprecated:DeprecationWarning:weasel.util.config",
     # Suppress lexical_diversity's internal pkg_resources usage (library issue, not our code)
     "ignore:pkg_resources is deprecated as an API:UserWarning:lexical_diversity.lex_div",
+    # Suppress testcontainers internal decorator deprecation (library issue, not our code)
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning:testcontainers.*",
+    # Suppress testcontainers wait_for_logs deprecation (library issue, not our code)
+    "ignore:The wait_for_logs function with string or callable predicates is deprecated:DeprecationWarning:testcontainers.kafka.*",
 ]
 
 

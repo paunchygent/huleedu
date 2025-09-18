@@ -4,7 +4,7 @@
 Implement the 50-signal specification as cohesive extractor bundles with exhaustive automated coverage.
 
 ## Deliverables
-1. Bundle layout under `services/nlp_service/features/` (each module <500 LoC):
+1. Bundle layout under `libs/huleedu_nlp_shared/feature_pipeline/` (each module <500 LoC), exposed to both services and CLI, with ability to register/unregister bundles individually for experimentation:
    - `lexical_diversity.py`
    - `syntax_complexity.py`
    - `cohesion.py`
@@ -15,7 +15,7 @@ Implement the 50-signal specification as cohesive extractor bundles with exhaust
    - Additional files as needed to keep each module <500 LoC.
 2. Each bundle exports one or more concrete `FeatureExtractorProtocol` implementations registered via the pipeline registry.
 3. Shared helpers (token filters, n-gram stats, normalization utilities) live in `features/helpers/` and include unit coverage.
-4. Feature names follow a consistent naming convention (`nlp_<group>_<metric>`), documented centrally.
+4. Feature names follow a consistent naming convention (`nlp_<group>_<metric>`), documented centrally; provide lightweight stubs (returning `None` or `0.0`) for bundles still under evaluation so CLI can emit complete schemas while experiments are in-progress.
 
 ### Spell-Normalised Text Usage
 - All bundles consume the spell-normalised text provided by the shared helper. Store the reference in the feature context once to avoid duplicated corrections.
@@ -46,6 +46,7 @@ Deprecated metrics (`transition_count`, `stance_modality_index`, `nli_neutrality
 - Integration test for the pipeline that loads a minimal mock context (real analyzer outputs captured from dev run) and asserts combined feature map ordering and values.
 - Property-style test where applicable (e.g., monotonicity of ratios) to catch regressions.
 - Dataset-backed smoke test: run pipeline against a handful of rows sampled from `processed/train.parquet` to ensure real essays exercise every signal.
+- For features still flagged as experimental, ensure tests assert graceful disabling (e.g., pipeline returns empty map when bundle is skipped).
 
 ## Acceptance Criteria
 - All feature modules implemented with docstrings and type hints.

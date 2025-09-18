@@ -307,7 +307,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                 return GrammarAnalysis(
                     error_count=0,
                     errors=[],
-                    language=language if language != "auto" else "en",
+                    language=self._map_language_code(language) if language != "auto" else "en",
                     processing_time_ms=processing_time_ms,
                 )
         else:
@@ -326,6 +326,20 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                 correlation_id,
             )
 
+        # Log the actual response for visibility
+        logger.debug(
+            "Language Tool Service raw response received",
+            extra={
+                "correlation_id": str(correlation_id),
+                "response_type": type(response_data).__name__,
+                "response_keys": list(response_data.keys()) if isinstance(response_data, dict) else None,
+                "language_field": response_data.get("language") if isinstance(response_data, dict) else None,
+                "language_field_type": type(response_data.get("language")).__name__ if isinstance(response_data, dict) else None,
+                "total_errors": response_data.get("total_grammar_errors") if isinstance(response_data, dict) else None,
+                "has_matches": bool(response_data.get("matches")) if isinstance(response_data, dict) else None,
+            },
+        )
+
         # Parse response into GrammarError objects
         errors = self._parse_response_to_grammar_errors(response_data)
 
@@ -333,9 +347,8 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
         processing_time_ms = int((time.time() - start_time) * 1000)
 
         # Determine detected language from response or use input
-        detected_language = (
-            response_data.get("language", {}).get("detectedLanguage", {}).get("code", language)
-        )
+        # Language Tool Service returns flat structure: {"language": "en-US"}
+        detected_language = response_data.get("language", language)
         if detected_language == "auto":
             detected_language = "en"  # Default fallback
 

@@ -102,6 +102,7 @@ class TestE2ESpellcheckWorkflows:
         service_manager = ServiceTestManager()
         correlation_id = str(uuid.uuid4())
         essay_id = f"e2e-test-essay-{uuid.uuid4()}"
+        batch_id = f"e2e-test-batch-{uuid.uuid4()}"
 
         # Test essay content with deliberate spelling errors
         test_essay_content = """
@@ -132,6 +133,7 @@ class TestE2ESpellcheckWorkflows:
                 essay_id=essay_id,
                 text_storage_id=original_storage_id,
                 correlation_id=correlation_id,
+                batch_id=batch_id,
                 language="en",
             )
 
@@ -231,6 +233,7 @@ class TestE2ESpellcheckWorkflows:
         service_manager = ServiceTestManager()
         correlation_id = str(uuid.uuid4())
         essay_id = f"e2e-test-perfect-essay-{uuid.uuid4()}"
+        batch_id = f"e2e-test-perfect-batch-{uuid.uuid4()}"
 
         # Perfect essay content with no spelling errors
         perfect_essay_content = """
@@ -261,6 +264,7 @@ class TestE2ESpellcheckWorkflows:
                 essay_id=essay_id,
                 text_storage_id=original_storage_id,
                 correlation_id=correlation_id,
+                batch_id=batch_id,
                 language="en",
             )
 
@@ -324,6 +328,7 @@ class TestE2ESpellcheckWorkflows:
         essay_id: str,
         text_storage_id: str,
         correlation_id: str,
+        batch_id: str,
         language: str = "en",
     ) -> dict[str, Any]:
         """
@@ -337,6 +342,7 @@ class TestE2ESpellcheckWorkflows:
         system_metadata = SystemProcessingMetadata(
             entity_id=essay_id,
             entity_type="essay",
+            parent_id=batch_id,
             timestamp=datetime.now(UTC),
             started_at=datetime.now(UTC),
             processing_stage=ProcessingStage.PROCESSING,
@@ -348,6 +354,7 @@ class TestE2ESpellcheckWorkflows:
             event_name=ProcessingEvent.ESSAY_SPELLCHECK_REQUESTED,
             entity_id=essay_id,
             entity_type="essay",
+            parent_id=batch_id,
             timestamp=datetime.now(UTC),
             status=EssayStatus.AWAITING_SPELLCHECK,
             text_storage_id=text_storage_id,
