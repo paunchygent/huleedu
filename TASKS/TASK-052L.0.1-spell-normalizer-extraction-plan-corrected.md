@@ -7,6 +7,7 @@ Extract the existing spell correction pipeline from `services/spellchecker_servi
 ## Critical Corrections from Review
 
 This plan has been corrected based on code review findings:
+
 - ✅ Fixed non-existent file references (adaptive_distance.py doesn't exist)
 - ✅ Corrected all line numbers to match actual code
 - ✅ Fixed constructor signatures (DefaultWhitelist takes Settings, not path)
@@ -16,6 +17,7 @@ This plan has been corrected based on code review findings:
 ## Phase 1: Create Shared Library Structure
 
 ### 1.1 Create Package Structure
+
 ```bash
 # Create directories
 mkdir -p libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization
@@ -28,6 +30,7 @@ touch libs/huleedu_nlp_shared/src/huleedu_nlp_shared/py.typed
 ```
 
 ### 1.2 Package Configuration
+
 ```toml
 # libs/huleedu_nlp_shared/pyproject.toml
 [project]
@@ -55,33 +58,39 @@ build-backend = "pdm.backend"
 
 ### 2.1 Files to Extract From (CORRECTED LINE NUMBERS)
 
-#### VERIFIED SOURCE FILES:
+#### VERIFIED SOURCE FILES
+
 1. **`services/spellchecker_service/core_logic.py`**
    - Function: `default_perform_spell_check_algorithm` (lines 44-551)
    - Global: `_spellchecker_cache` (line 41)
 
 2. **`services/spellchecker_service/spell_logic/l2_dictionary_loader.py`**
-   - Function: `load_l2_errors` (lines 37-100)
-   - Function: `filter_l2_entries` (lines 11-34)
+   - Function: `load_l2_errors` (lines 37-102)
 
-3. **`services/spellchecker_service/implementations/whitelist_impl.py`**
+3. **`services/spellchecker_service/spell_logic/l2_filter.py`**
+   - Function: `filter_l2_entries` (line 94 onwards)
+   - Class: `L2CorrectionFilter` (line 22 onwards)
+
+4. **`services/spellchecker_service/implementations/whitelist_impl.py`**
    - Class: `DefaultWhitelist` (entire file)
    - **NOTE**: Constructor takes Settings object, not path
 
-4. **`services/spellchecker_service/implementations/parallel_processor_impl.py`**
+5. **`services/spellchecker_service/implementations/parallel_processor_impl.py`**
    - Class: `DefaultParallelProcessor` (entire file)
-   - Function: `get_adaptive_edit_distance` (lines 18-35)
-   - **NOTE**: No constructor parameters, uses imported settings
+   - Function: `get_adaptive_edit_distance` (lines 18-36)
+   - Constructor: `__init__` (lines 41-45) - initializes from settings
+   - Method: `process_corrections_parallel` (lines 46-145)
 
-5. **`services/spellchecker_service/protocols.py`**
-   - Protocol: `WhitelistProtocol` (lines 69-74)
-   - Protocol: `ParallelProcessorProtocol` (lines 77-88)
+6. **`services/spellchecker_service/protocols.py`**
+   - Protocol: `WhitelistProtocol` (lines 69-81)
+   - Protocol: `ParallelProcessorProtocol` (lines 84 onwards)
 
 ### 2.2 Core Algorithm Migration Strategy
 
 Since components use singleton settings pattern, we need to refactor carefully:
 
 #### Option A: Minimal Change (RECOMMENDED)
+
 Keep singleton pattern in shared library, pass settings at module level:
 
 ```python
@@ -94,8 +103,12 @@ class NormalizationSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SPELLCHECK_")
 
     # From existing spellchecker service config
+    # NOTE: These paths will need to be adjusted based on deployment environment
+    # The original service uses absolute paths - shared lib needs configurable paths
     L2_DICT_PATH: str = Field(default="./data/l2_errors.txt")
-    WHITELIST_DIR: str = Field(default="./data/whitelist")
+    # NOTE: Whitelist path is hardcoded in original implementation, not configured
+    # For shared library, we make it configurable
+    WHITELIST_PATH: str = Field(default="./data/whitelist/combined_whitelist.txt")
     ENABLE_PARALLEL_PROCESSING: bool = Field(default=True)
     MAX_CONCURRENT_CORRECTIONS: int = Field(default=10)
     SPELLCHECK_BATCH_SIZE: int = Field(default=100)
@@ -103,10 +116,14 @@ class NormalizationSettings(BaseSettings):
     PARALLEL_PROCESSING_MIN_WORDS: int = Field(default=5)
 
 # Singleton instance
+# WARNING: This follows the original pattern but may cause issues if multiple services
+# import this library with different environment configurations. Consider refactoring
+# to pass settings explicitly in production use.
 normalization_settings = NormalizationSettings()
 ```
 
 ### 2.3 Create Models
+
 ```python
 # libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/models.py
 from pydantic import BaseModel, Field
@@ -130,6 +147,7 @@ class SpellNormalizationResult(BaseModel):
 ```
 
 ### 2.4 Extract L2 Dictionary Loader
+
 ```python
 # libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/l2_dictionary.py
 # Copy EXACTLY from services/spellchecker_service/spell_logic/l2_dictionary_loader.py
@@ -140,18 +158,19 @@ import os
 
 logger = logging.getLogger(__name__)
 
-def filter_l2_entries(l2_errors: dict[str, str]) -> dict[str, str]:
+def filter_l2_entries(l2_errors: dict[str, str], logger: Logger | None = None) -> dict[str, str]:
     """Filter L2 entries to remove problematic corrections."""
-    # Lines 11-34 from original
+    # Copy from services/spellchecker_service/spell_logic/l2_filter.py line 94+
     ...
 
 def load_l2_errors(filename: str, filter_entries: bool = True) -> dict[str, str]:
     """Load L2 errors and their corrections from a file."""
-    # Lines 37-100 from original
+    # Copy from services/spellchecker_service/spell_logic/l2_dictionary_loader.py lines 37-102
     ...
 ```
 
 ### 2.5 Extract Whitelist (MAINTAINING SETTINGS PATTERN)
+
 ```python
 # libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/whitelist.py
 import logging
@@ -164,10 +183,11 @@ class DefaultWhitelist:
     """Default whitelist implementation using settings."""
 
     def __init__(self):
-        """Initialize whitelist from configured directory."""
+        """Initialize whitelist from configured file."""
         # Adapt from lines 24-44 of whitelist_impl.py
-        # Use normalization_settings.WHITELIST_DIR instead of settings.WHITELIST_DIR
-        self.whitelist_dir = Path(normalization_settings.WHITELIST_DIR)
+        # CRITICAL: Original has hardcoded absolute path at line 35
+        # Must use normalization_settings.WHITELIST_PATH for flexibility
+        self.whitelist_path = Path(normalization_settings.WHITELIST_PATH)
         self.whitelisted_words = self._load_whitelist()
 
     def _load_whitelist(self) -> set[str]:
@@ -182,6 +202,7 @@ class DefaultWhitelist:
 ```
 
 ### 2.6 Extract Parallel Processor
+
 ```python
 # libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/parallel_processor.py
 # Copy from services/spellchecker_service/implementations/parallel_processor_impl.py
@@ -196,11 +217,17 @@ logger = logging.getLogger(__name__)
 
 def get_adaptive_edit_distance(word: str) -> int:
     """Determine optimal edit distance based on word length."""
-    # Copy lines 18-35 from parallel_processor_impl.py
+    # Copy lines 18-36 from parallel_processor_impl.py
     ...
 
 class DefaultParallelProcessor:
     """Default implementation of parallel word correction."""
+
+    def __init__(self) -> None:
+        """Initialize with configuration settings."""
+        # Adapt from lines 41-45 - use normalization_settings instead of settings
+        self.max_concurrent = normalization_settings.MAX_CONCURRENT_CORRECTIONS
+        self.timeout_seconds = normalization_settings.PARALLEL_TIMEOUT_SECONDS
 
     async def process_corrections_parallel(
         self,
@@ -210,11 +237,14 @@ class DefaultParallelProcessor:
         essay_id: str | None = None,
     ) -> dict[int, tuple[str | None, float]]:
         """Process word corrections in parallel."""
-        # Copy implementation from lines 39-134
+        # Copy implementation from lines 46-145
+        # IMPORTANT: Replace create_service_logger with standard logging.getLogger
+        # IMPORTANT: Adapt extra dict in logger calls to work with standard logger
         ...
 ```
 
 ### 2.7 Create Main Normalizer
+
 ```python
 # libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/spell_normalizer.py
 import logging
@@ -272,6 +302,7 @@ async def normalize_text(
 ## Phase 3: Update Spellchecker Service (CORRECTED)
 
 ### 3.1 Add Feature Flag
+
 ```python
 # services/spellchecker_service/config.py
 # Add to existing Settings class (after line 90):
@@ -283,6 +314,7 @@ USE_SHARED_NORMALIZER: bool = Field(
 ```
 
 ### 3.2 Update DefaultSpellLogic (CORRECTED)
+
 ```python
 # services/spellchecker_service/implementations/spell_logic_impl.py
 # Modify __init__ method (lines 42-58):
@@ -342,6 +374,7 @@ async def perform_spell_check(self, ...):
 ```
 
 ### 3.3 Add to pyproject.toml
+
 ```toml
 # services/spellchecker_service/pyproject.toml
 # Add to dependencies:
@@ -354,6 +387,7 @@ dependencies = [
 ## Phase 4: Testing & Validation
 
 ### 4.1 Regression Test
+
 ```python
 # services/spellchecker_service/tests/test_shared_normalizer_regression.py
 import pytest
@@ -370,8 +404,8 @@ async def test_normalizer_produces_identical_results():
 
     # Original implementation
     l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
-    whitelist = DefaultWhitelist(settings)
-    parallel_processor = DefaultParallelProcessor()
+    whitelist = DefaultWhitelist(settings)  # Pass settings object
+    parallel_processor = DefaultParallelProcessor()  # Uses settings internally
 
     original_result = await default_perform_spell_check_algorithm(
         text=test_text,
@@ -403,21 +437,24 @@ async def test_normalizer_produces_identical_results():
 
 ## Critical Implementation Checklist
 
-### BEFORE Starting:
+### BEFORE Starting
+
 - [ ] Verify `services/spellchecker_service/core_logic.py` lines 44-551
 - [ ] Verify `services/spellchecker_service/spell_logic/l2_dictionary_loader.py` exists
 - [ ] Verify `services/spellchecker_service/implementations/whitelist_impl.py` exists
 - [ ] Verify `services/spellchecker_service/implementations/parallel_processor_impl.py` exists
 - [ ] Confirm whitelist directory path in deployment environment
 
-### MUST PRESERVE:
+### MUST PRESERVE
+
 - [ ] Global `_spellchecker_cache` dictionary
 - [ ] Singleton pattern for settings
 - [ ] Exact algorithm implementation (no optimizations)
 - [ ] All existing logging statements
 - [ ] Error handling patterns
 
-### MUST NOT:
+### MUST NOT
+
 - [ ] Change any algorithm logic
 - [ ] Add new features or optimizations
 - [ ] Modify error messages
@@ -434,7 +471,8 @@ async def test_normalizer_produces_identical_results():
 
 ## Files Summary (CORRECTED)
 
-### New Files Created:
+### New Files Created
+
 - `libs/huleedu_nlp_shared/pyproject.toml`
 - `libs/huleedu_nlp_shared/src/huleedu_nlp_shared/__init__.py`
 - `libs/huleedu_nlp_shared/src/huleedu_nlp_shared/py.typed`
@@ -446,7 +484,8 @@ async def test_normalizer_produces_identical_results():
 - `libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/whitelist.py`
 - `libs/huleedu_nlp_shared/src/huleedu_nlp_shared/normalization/parallel_processor.py`
 
-### Files Modified:
+### Files Modified
+
 - `services/spellchecker_service/config.py` - Add USE_SHARED_NORMALIZER flag
 - `services/spellchecker_service/implementations/spell_logic_impl.py` - Conditional normalizer use
 - `services/spellchecker_service/pyproject.toml` - Add dependency
