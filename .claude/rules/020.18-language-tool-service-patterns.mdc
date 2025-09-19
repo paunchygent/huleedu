@@ -46,14 +46,13 @@ else:
 - **Startup**: Async subprocess with configurable heap (default 512m)
 - **Health checks**: Every 30s, restart on failure (max 5 in 5 min)
 - **Shutdown**: SIGTERM → wait 10s → SIGKILL
+- **Process output capture**: stdout/stderr tailed in-memory and surfaced when restarts fail or health degrades
 - **Resource cleanup**: Automatic via async context managers
 
-### Category Filtering
-```python
-GRAMMAR_CATEGORIES_ALLOWED = ["GRAMMAR", "CONFUSED_WORDS", "AGREEMENT", 
-                              "PUNCTUATION", "REDUNDANCY", "STYLE"]
-GRAMMAR_CATEGORIES_BLOCKED = ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"]
-```
+### Rule & Category Handling
+- Spelling/typo matches are preserved (for downstream analytics) with only whitespace-only issues filtered client-side.
+- Requesters can opt into stricter checks via optional parameters (see API Contract) without altering defaults for existing callers.
+- When the wrapper detects an unhealthy server, `/healthz` reports `status=degraded` and includes recent stdout/stderr snippets to speed diagnosis.
 
 ## API Contract
 
@@ -62,7 +61,10 @@ GRAMMAR_CATEGORIES_BLOCKED = ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"]
 ```json
 {
     "text": "Text to check for grammar errors",
-    "language": "en-US"  # or sv-SE
+    "language": "en-US",            // or sv-SE / auto
+    "level": "picky",               // optional: LanguageTool rule level (default/picky)
+    "enabledCategories": ["GRAMMAR", "PUNCTUATION"],  // optional
+    "enabledOnly": true              // optional
 }
 ```
 
@@ -89,7 +91,12 @@ GRAMMAR_CATEGORIES_BLOCKED = ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"]
 
 ```python
 class LanguageToolWrapperProtocol(Protocol):
-    async def check_text(text: str, correlation_context, language="en-US") -> list[dict]
+    async def check_text(
+        text: str,
+        correlation_context,
+        language="en-US",
+        request_options: dict[str, str] | None = None,
+    ) -> list[dict]
     async def get_health_status(correlation_context) -> dict
 
 class LanguageToolManagerProtocol(Protocol):

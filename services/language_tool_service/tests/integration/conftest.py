@@ -56,7 +56,11 @@ class MetricsAwareStubWrapper(StubLanguageToolWrapper):
         self.metrics = metrics
 
     async def check_text(
-        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
+        self,
+        text: str,
+        correlation_context: CorrelationContext,
+        language: str = "en-US",
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """Check text and emit wrapper duration metrics like real wrapper."""
         import time
@@ -65,7 +69,7 @@ class MetricsAwareStubWrapper(StubLanguageToolWrapper):
         wrapper_start = time.perf_counter()
 
         # Call the actual stub implementation
-        result = await super().check_text(text, correlation_context, language)
+        result = await super().check_text(text, correlation_context, language, request_options)
 
         # Emit metrics like real wrapper
         wrapper_duration = time.perf_counter() - wrapper_start

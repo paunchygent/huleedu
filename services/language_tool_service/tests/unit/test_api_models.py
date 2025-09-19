@@ -327,6 +327,41 @@ class TestGrammarCheckRequestModel:
         assert request.text == "Test text without language specified."
         assert request.language == "en-US"
 
+    def test_grammar_check_request_accepts_alias_input(self) -> None:
+        """Ensure camelCase API fields populate model attributes."""
+        request = GrammarCheckRequest.model_validate(
+            {
+                "text": "Alias field input",
+                "language": "en-US",
+                "enabledCategories": ["GRAMMAR"],
+                "enabledRules": ["RULE_1"],
+            }
+        )
+
+        assert request.enabled_categories == ["GRAMMAR"]
+        assert request.enabled_rules == ["RULE_1"]
+
+    def test_grammar_check_request_alias_and_payload_conversion(self) -> None:
+        """Ensure optional request settings are accepted and serialized for LanguageTool."""
+        request = GrammarCheckRequest(
+            text="Intro clause should trigger comma rule.",
+            language="en-US",
+            level="picky",
+            enabledCategories=["GRAMMAR", "PUNCTUATION"],
+            disabledRules=["SOME_RULE"],
+            enabledOnly=True,
+        )
+
+        payload = request.to_languagetool_payload()
+
+        assert request.level == "picky"
+        assert request.enabled_categories == ["GRAMMAR", "PUNCTUATION"]
+        assert request.disabled_rules == ["SOME_RULE"]
+        assert payload["level"] == "picky"
+        assert payload["enabledCategories"] == "GRAMMAR,PUNCTUATION"
+        assert payload["disabledRules"] == "SOME_RULE"
+        assert payload["enabledOnly"] == "true"
+
     @pytest.mark.parametrize(
         "invalid_text, error_type",
         [

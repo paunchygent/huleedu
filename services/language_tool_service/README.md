@@ -5,7 +5,7 @@ HTTP service providing grammar and style checking via managed LanguageTool Java 
 ## Service Overview
 
 - **Port**: 8085 (HTTP), 8081 (internal LanguageTool)
-- **Purpose**: Grammar checking with category filtering (excludes spelling/typos)
+- **Purpose**: Grammar + spelling insights with optional rule tuning (picky mode, category filters)
 - **Architecture**: Quart HTTP + Java subprocess management
 - **Mode**: Dual-mode (stub for dev/test, real for production)
 
@@ -16,19 +16,24 @@ HTTP service providing grammar and style checking via managed LanguageTool Java 
 ```json
 // Request
 {
-    "text": "Text to check",
-    "language": "en-US"  // or sv-SE
+    "text": "Intro clause missing comma should be caught.",
+    "language": "en-US",
+    "level": "picky",                     // optional: enable stricter rules
+    "enabledCategories": ["GRAMMAR", "PUNCTUATION"],
+    "enabledOnly": true                    // optional: run only listed categories
 }
 
 // Response (200 OK)
 {
     "errors": [...],
-    "total_grammar_errors": 1,
-    "grammar_category_counts": {"CONFUSED_WORDS": 1},
+    "total_grammar_errors": 2,
+    "grammar_category_counts": {"GRAMMAR": 1, "PUNCTUATION": 1},
     "language": "en-US",
-    "processing_time_ms": 42
+    "processing_time_ms": 120
 }
 ```
+
+> Typo categories are preserved so downstream services can reconcile spelling coverage with the Spellchecker Service. Only whitespace-only findings are filtered out.
 
 ## Configuration
 
@@ -116,10 +121,26 @@ RUN wget https://languagetool.org/download/LanguageTool-6.3.zip && \
 - `wrapper_duration_seconds{language}`: Processing time
 - `api_errors_total{endpoint,error_type}`: Error counts
 
+## Known Limitations
+
+### Apostrophe Detection
+- **Detects**: Misplaced apostrophes (e.g., "two week's time" → "two weeks' time")
+- **Does NOT detect**: Missing apostrophes (e.g., "weeks time" is not flagged)
+- **Works**: Common contractions (e.g., "its" → "it's")
+
+### Comma Detection
+- Introductory phrases of 4 words or fewer may not trigger comma rules
+- Example: "In a week's time" may not suggest a comma
+
+### Configuration Note
+- Category filtering has been removed (previously blocked TYPOS category)
+- All LanguageTool categories are now passed through
+- Only whitespace-only issues are filtered at the wrapper level
+
 ## Architecture Decisions
 
 1. **Dual-mode operation**: Automatic fallback from real → stub when JAR missing
-2. **Category filtering**: Focus on grammar, exclude spelling/typos
+2. **Category filtering**: No categories blocked, only whitespace issues filtered
 3. **Process management**: Health checks, auto-restart, graceful shutdown
 4. **Resource cleanup**: Async context managers prevent leaks
 5. **Stub mode**: Full functionality for testing without Java dependency

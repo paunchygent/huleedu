@@ -81,21 +81,22 @@ class TestLanguageToolServiceClientResilience:
 
     @pytest.fixture
     def sample_language_tool_response(self) -> dict:
-        """Sample Language Tool API response."""
+        """Sample Language Tool Service API response with flat format."""
         return {
-            "matches": [
+            "errors": [
                 {
+                    "rule_id": "MORFOLOGIK_RULE_EN_US",
                     "message": "Possible spelling mistake",
-                    "shortMessage": "Spelling mistake",
+                    "short_message": "Spelling mistake",
                     "offset": 10,
                     "length": 7,
-                    "replacements": [{"value": "correct"}],
-                    "rule": {
-                        "id": "MORFOLOGIK_RULE_EN_US",
-                        "category": {"id": "TYPOS", "name": "Spelling"},
-                    },
-                    "type": {"typeName": "misspelling"},
-                    "context": {"text": "This is incorect text", "offset": 8},
+                    "replacements": ["correct"],
+                    "category": "typos",
+                    "severity": "error",
+                    "category_id": "TYPOS",
+                    "category_name": "Spelling",
+                    "context": "This is incorect text",
+                    "context_offset": 8,
                 }
             ],
             "language": "en-US",

@@ -21,15 +21,13 @@ dependencies = [
     "asyncpg",
     "alembic",
     "rapidfuzz",
-    "python-docx",  # For testing with real .docx essays
-    # Advanced NLP metrics dependencies
-    "spacy>=3.7.0",  # Core NLP framework
-    "wordfreq>=3.0.0",  # Zipf frequency calculations for lexical sophistication
-    "lexical-diversity>=0.1.1",  # MTLD/HDD metrics for lexical diversity
-    "textdescriptives>=2.8.0",  # Dependency distance and coherence metrics
-    "langdetect>=1.0.9",  # Language detection
-    "gensim>=4.3.0",  # For phraseology metrics (PMI/NPMI calculations)
-    # SpaCy language models - required for NLP analysis
+    "python-docx",
+    "spacy>=3.7.0",
+    "wordfreq",
+    "lexical-diversity",
+    "textdescriptives",
+    "langdetect",
+    "gensim",
     "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "sv-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/sv_core_news_sm-3.8.0/sv_core_news_sm-3.8.0-py3-none-any.whl",
 ]

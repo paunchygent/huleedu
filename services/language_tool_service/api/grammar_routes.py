@@ -133,6 +133,7 @@ async def check_grammar(
             text=grammar_request.text,
             correlation_context=corr,
             language=grammar_request.language,
+            request_options=grammar_request.to_languagetool_payload(),
         )
 
         # Process analysis results

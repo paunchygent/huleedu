@@ -38,7 +38,11 @@ class StubLanguageToolWrapper(LanguageToolWrapperProtocol):
         logger.info("StubLanguageToolWrapper initialized")
 
     async def check_text(
-        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
+        self,
+        text: str,
+        correlation_context: CorrelationContext,
+        language: str = "en-US",
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Simulate text checking for grammar and spelling errors.

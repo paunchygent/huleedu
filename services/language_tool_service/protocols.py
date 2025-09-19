@@ -16,7 +16,11 @@ class LanguageToolWrapperProtocol(Protocol):
     """Protocol for Language Tool grammar categorization service."""
 
     async def check_text(
-        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
+        self,
+        text: str,
+        correlation_context: CorrelationContext,
+        language: str = "en-US",
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Check text for grammar and spelling errors.
@@ -25,6 +29,7 @@ class LanguageToolWrapperProtocol(Protocol):
             text: The text to analyze for grammar errors
             correlation_context: Request correlation context for tracing
             language: Language code for analysis (default: en-US)
+            request_options: Optional LanguageTool HTTP parameters (level, rule filters, etc.)
 
         Returns:
             List of grammar error objects with categorization information

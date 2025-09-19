@@ -71,6 +71,27 @@ class TestSuccessfulProcessing:
         assert response_data["grammar_rule_counts"]["AGREEMENT_ERROR"] == 1
         assert response_data["grammar_rule_counts"]["TYPO"] == 1
 
+    async def test_request_options_forwarded_to_wrapper(
+        self, test_client: Any, mock_language_tool_wrapper: Any
+    ) -> None:
+        """Ensure optional LanguageTool parameters are forwarded to the wrapper."""
+
+        request_body = {
+            "text": "Intro clause missing comma should be caught.",
+            "language": "en-US",
+            "level": "picky",
+            "enabledCategories": ["GRAMMAR", "PUNCTUATION"],
+            "enabledOnly": True,
+        }
+
+        await test_client.post("/v1/check", json=request_body)
+
+        mock_language_tool_wrapper.check_text.assert_awaited_once()
+        _, kwargs = mock_language_tool_wrapper.check_text.await_args
+        assert kwargs["request_options"]["level"] == "picky"
+        assert kwargs["request_options"]["enabledCategories"] == "GRAMMAR,PUNCTUATION"
+        assert kwargs["request_options"]["enabledOnly"] == "true"
+
     @pytest.mark.parametrize(
         "word_count",
         [50, 150, 400, 750, 1500, 2500],

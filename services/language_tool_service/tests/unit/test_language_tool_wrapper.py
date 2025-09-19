@@ -45,6 +45,8 @@ def mock_manager() -> AsyncMock:
         "restart_count": 0,
         "port": 8081,
         "heap_size": "512m",
+        "returncode": None,
+        "last_restart_time": 0.0,
     }
     return manager
 
@@ -67,14 +69,20 @@ class _TestableLanguageToolWrapper(LanguageToolWrapper):
         return await super()._ensure_session()
 
     async def _call_language_tool(
-        self, text: str, language: str, correlation_context: Any
+        self,
+        text: str,
+        language: str,
+        correlation_context: Any,
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """Override for testing - allows mocking without patching."""
         if self._mock_call_exception:
             raise self._mock_call_exception
         if self._mock_call_response is not None:
             return self._mock_call_response
-        return await super()._call_language_tool(text, language, correlation_context)
+        return await super()._call_language_tool(
+            text, language, correlation_context, request_options=request_options
+        )
 
     def set_mock_call_response(self, response: list[dict[str, Any]]) -> None:
         """Set mock response for _call_language_tool."""
@@ -437,10 +445,14 @@ class TestLanguageToolWrapper:
         current_concurrent = 0
 
         async def slow_call(
-            self: Any, text: str, language: str, correlation_context: Any
+            self: Any,
+            text: str,
+            language: str,
+            correlation_context: Any,
+            request_options: dict[str, str] | None = None,
         ) -> list[dict[str, Any]]:
             # Parameters are required for method signature but not used in test
-            _ = (self, text, language, correlation_context)
+            _ = (self, text, language, correlation_context, request_options)
             nonlocal call_count, max_concurrent, current_concurrent
             current_concurrent += 1
             max_concurrent = max(max_concurrent, current_concurrent)

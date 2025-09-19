@@ -200,44 +200,35 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
     def _parse_response_to_grammar_errors(  # noqa: E501
         self, response_data: dict[str, Any]
     ) -> list[GrammarError]:
-        """Parse LanguageTool response into GrammarError objects.
+        """Parse Language Tool Service response into GrammarError objects.
+
+        Language Tool Service provides a flat structure that already matches
+        the GrammarError model from common_core.events.nlp_events.
 
         Args:
-            response_data: JSON response from LanguageTool service
+            response_data: JSON response from Language Tool Service
 
         Returns:
             List of GrammarError objects
         """
         errors = []
 
-        for match in response_data.get("matches", []):
-            rule = match.get("rule", {})
-            category = rule.get("category", {})
-            context = match.get("context", {})
-
-            # Extract replacements
-            replacements = []
-            for replacement in match.get("replacements", []):
-                if isinstance(replacement, dict):
-                    replacements.append(replacement.get("value", ""))
-                else:
-                    replacements.append(str(replacement))
-
+        # Changed: "matches" → "errors" to match Language Tool Service's flat domain format
+        for error_dict in response_data.get("errors", []):
+            # Direct field mapping - already in correct format from Language Tool Service
             grammar_error = GrammarError(
-                rule_id=rule.get("id", "UNKNOWN_RULE"),
-                message=match.get("message", ""),
-                short_message=match.get("shortMessage", ""),
-                offset=match.get("offset", 0),
-                length=match.get("length", 0),
-                replacements=replacements,
-                category=category.get("id", "unknown").lower(),
-                severity=match.get("type", {}).get("typeName", "info").lower()
-                if isinstance(match.get("type"), dict)
-                else "info",
-                category_id=category.get("id", "UNKNOWN"),
-                category_name=category.get("name", "Unknown"),
-                context=context.get("text", ""),
-                context_offset=context.get("offset", 0),
+                rule_id=error_dict.get("rule_id", "UNKNOWN_RULE"),
+                message=error_dict.get("message", ""),
+                short_message=error_dict.get("short_message", ""),
+                offset=error_dict.get("offset", 0),
+                length=error_dict.get("length", 0),
+                replacements=error_dict.get("replacements", []),
+                category=error_dict.get("category", "unknown"),
+                severity=error_dict.get("severity", "info"),
+                category_id=error_dict.get("category_id", "UNKNOWN"),
+                category_name=error_dict.get("category_name", "Unknown"),
+                context=error_dict.get("context", ""),
+                context_offset=error_dict.get("context_offset", 0),
             )
 
             errors.append(grammar_error)
@@ -336,7 +327,7 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
                 "language_field": response_data.get("language") if isinstance(response_data, dict) else None,
                 "language_field_type": type(response_data.get("language")).__name__ if isinstance(response_data, dict) else None,
                 "total_errors": response_data.get("total_grammar_errors") if isinstance(response_data, dict) else None,
-                "has_matches": bool(response_data.get("matches")) if isinstance(response_data, dict) else None,
+                "has_errors": bool(response_data.get("errors")) if isinstance(response_data, dict) else None,
             },
         )
 

@@ -16,7 +16,7 @@ from uuid import UUID
 import aiohttp
 import pytest
 from aioresponses import aioresponses
-from common_core.events.nlp_events import GrammarAnalysis
+from common_core.events.nlp_events import GrammarAnalysis, GrammarError
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.resilience.circuit_breaker import CircuitBreakerError
 
@@ -41,15 +41,15 @@ def create_mock_settings() -> Settings:
 
 
 def create_mock_language_tool_response(
-    matches: list[dict[str, Any]] | None = None,
+    errors: list[dict[str, Any]] | None = None,
     language: str = "en-US",
     grammar_category_counts: dict[str, int] | None = None,
     grammar_rule_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Create mock LanguageTool service response.
+    """Create mock Language Tool Service response.
 
     Args:
-        matches: List of grammar errors
+        errors: List of grammar errors in flat format
         language: Detected language
         grammar_category_counts: Analytics by category
         grammar_rule_counts: Analytics by rule
@@ -57,10 +57,10 @@ def create_mock_language_tool_response(
     Returns:
         Mock response dictionary
     """
-    if matches is None:
-        matches = []
+    if errors is None:
+        errors = []
 
-    response = {"matches": matches, "language": language}
+    response: dict[str, Any] = {"errors": errors, "language": language}
 
     if grammar_category_counts is not None:
         response["grammar_category_counts"] = grammar_category_counts
@@ -71,21 +71,25 @@ def create_mock_language_tool_response(
     return response
 
 
-def create_sample_grammar_error_match() -> dict[str, Any]:
-    """Create sample grammar error match from LanguageTool response.
+def create_sample_grammar_error() -> dict[str, Any]:
+    """Create sample grammar error from Language Tool Service response.
 
     Returns:
-        Mock match dictionary with all required fields
+        Mock error dictionary with all required fields in flat format
     """
     return {
-        "rule": {"id": "COMMA_RULE", "category": {"id": "PUNCTUATION", "name": "Punctuation"}},
+        "rule_id": "COMMA_RULE",
         "message": "Add comma before 'and' in compound sentence",
-        "shortMessage": "Missing comma",
+        "short_message": "Missing comma",
         "offset": 15,
         "length": 3,
-        "replacements": [{"value": ", and"}],
-        "type": {"typeName": "error"},
-        "context": {"text": "The quick brown fox and the lazy dog", "offset": 12},
+        "replacements": [", and"],
+        "category": "punctuation",
+        "severity": "error",
+        "category_id": "PUNCTUATION",
+        "category_name": "Punctuation",
+        "context": "The quick brown fox and the lazy dog",
+        "context_offset": 12,
     }
 
 
@@ -191,9 +195,9 @@ class TestGrammarCheckSuccess:
         client = LanguageToolServiceClient(create_mock_settings())
         correlation_id = UUID("12345678-1234-5678-1234-567812345678")
 
-        match = create_sample_grammar_error_match()
+        sample_error = create_sample_grammar_error()
         response = create_mock_language_tool_response(
-            matches=[match],
+            errors=[sample_error],
             language="en-US",
             grammar_category_counts={"PUNCTUATION": 1},
             grammar_rule_counts={"COMMA_RULE": 1},
@@ -218,19 +222,19 @@ class TestGrammarCheckSuccess:
         assert result.grammar_rule_counts == {"COMMA_RULE": 1}
 
         # Verify grammar error mapping
-        error = result.errors[0]
-        assert error.rule_id == "COMMA_RULE"
-        assert error.message == "Add comma before 'and' in compound sentence"
-        assert error.short_message == "Missing comma"
-        assert error.offset == 15
-        assert error.length == 3
-        assert error.replacements == [", and"]
-        assert error.category == "punctuation"
-        assert error.severity == "error"
-        assert error.category_id == "PUNCTUATION"
-        assert error.category_name == "Punctuation"
-        assert error.context == "The quick brown fox and the lazy dog"
-        assert error.context_offset == 12
+        result_error: GrammarError = result.errors[0]
+        assert result_error.rule_id == "COMMA_RULE"
+        assert result_error.message == "Add comma before 'and' in compound sentence"
+        assert result_error.short_message == "Missing comma"
+        assert result_error.offset == 15
+        assert result_error.length == 3
+        assert result_error.replacements == [", and"]
+        assert result_error.category == "punctuation"
+        assert result_error.severity == "error"
+        assert result_error.category_id == "PUNCTUATION"
+        assert result_error.category_name == "Punctuation"
+        assert result_error.context == "The quick brown fox and the lazy dog"
+        assert result_error.context_offset == 12
 
     @pytest.mark.asyncio
     async def test_empty_text_handling(self) -> None:
@@ -239,7 +243,7 @@ class TestGrammarCheckSuccess:
         client = LanguageToolServiceClient(create_mock_settings())
         correlation_id = UUID("12345678-1234-5678-1234-567812345678")
 
-        response = create_mock_language_tool_response(matches=[], language="en-US")
+        response = create_mock_language_tool_response(errors=[], language="en-US")
 
         with aioresponses() as m:
             m.post("http://language-tool-service:8085/v1/check", payload=response, status=200)
@@ -261,23 +265,24 @@ class TestGrammarCheckSuccess:
         client = LanguageToolServiceClient(create_mock_settings())
         correlation_id = UUID("12345678-1234-5678-1234-567812345678")
 
-        # Complex match with all possible fields
-        complex_match = {
-            "rule": {
-                "id": "CONFUSION_RULE",
-                "category": {"id": "GRAMMAR", "name": "Grammar and Style"},
-            },
+        # Complex error with all possible fields in flat format
+        complex_error = {
+            "rule_id": "CONFUSION_RULE",
             "message": "Did you mean 'their' instead of 'there'?",
-            "shortMessage": "Wrong word",
+            "short_message": "Wrong word",
             "offset": 20,
             "length": 5,
-            "replacements": [{"value": "their"}, {"value": "they're"}],
-            "type": {"typeName": "warning"},
-            "context": {"text": "The students put there books on the table", "offset": 17},
+            "replacements": ["their", "they're"],
+            "category": "grammar",
+            "severity": "warning",
+            "category_id": "GRAMMAR",
+            "category_name": "Grammar and Style",
+            "context": "The students put there books on the table",
+            "context_offset": 17,
         }
 
         response = create_mock_language_tool_response(
-            matches=[complex_match],
+            errors=[complex_error],
             language="en-US",
             grammar_category_counts={"GRAMMAR": 1, "PUNCTUATION": 0},
             grammar_rule_counts={"CONFUSION_RULE": 1, "COMMA_RULE": 0},
@@ -294,7 +299,7 @@ class TestGrammarCheckSuccess:
 
         # Assert - Complete field mapping
         assert result.error_count == 1
-        error = result.errors[0]
+        error: GrammarError = result.errors[0]
         assert error.rule_id == "CONFUSION_RULE"
         assert error.message == "Did you mean 'their' instead of 'there'?"
         assert error.short_message == "Wrong word"
@@ -323,7 +328,7 @@ class TestGrammarCheckSuccess:
         rule_counts = {"COMMA_RULE": 2, "CONFUSION_RULE": 3, "STYLE_RULE": 1}
 
         response = create_mock_language_tool_response(
-            matches=[],  # Focus on analytics, not individual errors
+            errors=[],  # Focus on analytics, not individual errors
             language="en-US",
             grammar_category_counts=analytics_counts,
             grammar_rule_counts=rule_counts,
@@ -353,7 +358,7 @@ class TestGrammarCheckSuccess:
         swedish_text = "Hej på dig! Jag heter Åsa Hägerström från Göteborg."
 
         response = create_mock_language_tool_response(
-            matches=[],
+            errors=[],
             language="sv-SE",
             grammar_category_counts={"GRAMMAR": 0},
             grammar_rule_counts={},

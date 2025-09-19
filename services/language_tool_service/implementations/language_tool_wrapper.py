@@ -77,7 +77,11 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
         return self.http_session
 
     async def check_text(
-        self, text: str, correlation_context: CorrelationContext, language: str = "en-US"
+        self,
+        text: str,
+        correlation_context: CorrelationContext,
+        language: str = "en-US",
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Check text for grammar errors using LanguageTool server.
@@ -111,7 +115,9 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                 # Apply timeout to the entire operation
                 async with asyncio.timeout(self.settings.LANGUAGE_TOOL_REQUEST_TIMEOUT_SECONDS):
                     # Call LanguageTool server
-                    matches = await self._call_language_tool(text, language, correlation_context)
+                    matches = await self._call_language_tool(
+                        text, language, correlation_context, request_options=request_options
+                    )
 
                     # Filter out spelling/typo categories
                     filtered_matches = self._filter_categories(matches)
@@ -210,7 +216,11 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
                 )
 
     async def _call_language_tool(
-        self, text: str, language: str, correlation_context: CorrelationContext
+        self,
+        text: str,
+        language: str,
+        correlation_context: CorrelationContext,
+        request_options: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Make HTTP request to LanguageTool server.
@@ -232,11 +242,17 @@ class LanguageToolWrapper(LanguageToolWrapperProtocol):
             language = "sv"
 
         # Prepare request data
-        data = {
+        data: dict[str, str] = {
             "text": text,
             "language": language,
-            "enabledOnly": "false",  # Get all rules
         }
+
+        # Apply optional request overrides
+        if request_options:
+            data.update({k: v for k, v in request_options.items() if v is not None})
+
+        # Default to all rules unless caller explicitly overrides enabledOnly
+        data.setdefault("enabledOnly", "false")
 
         try:
             async with session.post(

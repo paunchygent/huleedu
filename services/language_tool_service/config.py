@@ -77,7 +77,7 @@ class Settings(SecureServiceSettings):
         description="Grammar categories to include in results",
     )
     GRAMMAR_CATEGORIES_BLOCKED: list[str] = Field(
-        default_factory=lambda: ["TYPOS", "MISSPELLING", "SPELLING", "TYPOGRAPHY"],
+        default_factory=lambda: [],
         description="Grammar categories to filter out from results",
     )
 

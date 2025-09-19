@@ -6,9 +6,9 @@ These models are used by the NLP Service when calling the Language Tool Service.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ====================================================================
 # Request Models
@@ -32,6 +32,62 @@ class GrammarCheckRequest(BaseModel):
         pattern="^([a-z]{2}-[A-Z]{2}|auto)$",
         description="Language code for grammar checking (e.g., en-US, sv-SE, auto)",
     )
+    level: Literal["default", "picky"] | None = Field(
+        default=None,
+        description="LanguageTool rule activation level. Use 'picky' for stricter checks.",
+    )
+    enabled_categories: list[str] | None = Field(
+        default=None,
+        alias="enabledCategories",
+        description="LanguageTool categories to explicitly enable (e.g., GRAMMAR,STYLE)",
+    )
+    disabled_categories: list[str] | None = Field(
+        default=None,
+        alias="disabledCategories",
+        description="LanguageTool categories to disable.",
+    )
+    enabled_rules: list[str] | None = Field(
+        default=None,
+        alias="enabledRules",
+        description="Specific LanguageTool rule IDs to enable.",
+    )
+    disabled_rules: list[str] | None = Field(
+        default=None,
+        alias="disabledRules",
+        description="Specific LanguageTool rule IDs to disable.",
+    )
+    enabled_only: bool | None = Field(
+        default=None,
+        alias="enabledOnly",
+        description="If true, only the explicitly enabled categories/rules are applied.",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    def to_languagetool_payload(self) -> dict[str, str]:
+        """Convert request options into LanguageTool HTTP API parameters."""
+
+        payload: dict[str, str] = {}
+
+        if self.level:
+            payload["level"] = self.level
+
+        if self.enabled_categories:
+            payload["enabledCategories"] = ",".join(self.enabled_categories)
+
+        if self.disabled_categories:
+            payload["disabledCategories"] = ",".join(self.disabled_categories)
+
+        if self.enabled_rules:
+            payload["enabledRules"] = ",".join(self.enabled_rules)
+
+        if self.disabled_rules:
+            payload["disabledRules"] = ",".join(self.disabled_rules)
+
+        if self.enabled_only is not None:
+            payload["enabledOnly"] = "true" if self.enabled_only else "false"
+
+        return payload
 
 
 # ====================================================================
