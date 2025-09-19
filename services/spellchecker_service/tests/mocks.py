@@ -49,16 +49,28 @@ def create_mock_parallel_processor() -> ParallelProcessorProtocol:
 def create_spell_normalizer_for_tests(
     whitelist: WhitelistProtocol | None = None,
     parallel_processor: ParallelProcessorProtocol | None = None,
+    *,
+    l2_errors: dict[str, str] | None = None,
 ) -> SpellNormalizer:
-    """Construct a SpellNormalizer instance with real dictionaries for tests."""
+    """Construct a SpellNormalizer instance for tests.
+
+    Args:
+        whitelist: Optional whitelist implementation override.
+        parallel_processor: Optional parallel processor override.
+        l2_errors: Optional L2 dictionary to use instead of the service default.
+    """
 
     whitelist_impl = whitelist or MockWhitelist()
     parallel_impl = parallel_processor or create_mock_parallel_processor()
-    l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
+    l2_error_map = (
+        l2_errors
+        if l2_errors is not None
+        else load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
+    )
     test_logger = create_service_logger("spellchecker_service.tests.spell_normalizer")
 
     return SpellNormalizer(
-        l2_errors=l2_errors,
+        l2_errors=l2_error_map,
         whitelist=whitelist_impl,
         parallel_processor=parallel_impl,
         settings=settings,

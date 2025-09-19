@@ -15,10 +15,15 @@ from unittest.mock import MagicMock
 import pytest
 from docx import Document
 
+from huleedu_nlp_shared.normalization import SpellNormalizer
+from huleedu_service_libs.logging_utils import create_service_logger
+
 from services.spellchecker_service.config import settings
-from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.implementations.whitelist_impl import DefaultWhitelist
 from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
+from services.spellchecker_service.implementations.parallel_processor_impl import (
+    DefaultParallelProcessor,
+)
 
 
 def extract_text_from_docx(file_path: Path) -> str:
@@ -122,25 +127,40 @@ class TestWhitelistIntegration:
             print(f"\nProcessing essay from: {student_name}")
             print(f"Essay length: {len(essay_text)} characters, {len(essay_text.split())} words")
 
+            processor = DefaultParallelProcessor()
+            logger = create_service_logger("spellchecker_service.tests.whitelist")
+            normalizer_with_whitelist = SpellNormalizer(
+                l2_errors=l2_dictionary,
+                whitelist=whitelist,
+                parallel_processor=processor,
+                settings=settings,
+                logger_override=logger,
+            )
+            normalizer_without_whitelist = SpellNormalizer(
+                l2_errors=l2_dictionary,
+                whitelist=None,
+                parallel_processor=DefaultParallelProcessor(),
+                settings=settings,
+                logger_override=logger,
+            )
+
             # Process WITH whitelist
             start_time = time.time()
-            result_with_wl = await default_perform_spell_check_algorithm(
-                essay_text,
-                l2_dictionary,
+            result_with_wl = await normalizer_with_whitelist.normalize_text(
+                text=essay_text,
                 essay_id=f"{student_name}_with_whitelist",
                 language="en",
-                whitelist=whitelist,
+                enable_parallel=True,
             )
             time_with_whitelist = time.time() - start_time
 
             # Process WITHOUT whitelist (for comparison)
             start_time = time.time()
-            result_no_wl = await default_perform_spell_check_algorithm(
-                essay_text,
-                l2_dictionary,
+            result_no_wl = await normalizer_without_whitelist.normalize_text(
+                text=essay_text,
                 essay_id=f"{student_name}_no_whitelist",
                 language="en",
-                whitelist=None,
+                enable_parallel=True,
             )
             time_without_whitelist = time.time() - start_time
 

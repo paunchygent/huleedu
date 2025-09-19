@@ -4,37 +4,51 @@
 
 Extract the three-stage spell correction pipeline (word filter → Swedish L2 lookup → PySpellChecker) into a shared library so both runtime services and offline tooling use identical logic before feature experimentation begins.
 
-## Deliverables
+## Status: ✅ PARTIAL COMPLETION
 
-- New shared package `libs/huleedu_nlp_shared/` providing a `SpellNormalizer` facade and typed `SpellNormalizationResult` output.
-- L2 dictionary loader, whitelist helper, and PySpell caching logic migrated from Spellchecker Service into the shared module.
-- Spellchecker Service refactored to consume the shared helper without changing public behaviour.
-- CLI scaffolding (to be built in later phases) prepared to import the same helper for dataset normalisation.
-- Comprehensive unit tests for the helper and regression tests confirming service parity.
-- Documentation updates describing usage and configuration.
+### Completed Components
 
-## Work Breakdown
+1. **Library Scaffold** ✅ COMPLETED
+   - Created `libs/huleedu_nlp_shared/` with `normalization/` sub-package containing:
+     - `SpellNormalizer` class with preserved algorithm and `_spellchecker_cache` singleton
+     - `SpellNormalizationResult` model with metrics (corrected_text, total_corrections, l2_dictionary_corrections, spellchecker_corrections, word_count, correction_density)
+     - Protocol definitions for `WhitelistProtocol`, `ParallelProcessorProtocol`, `SpellcheckerSettingsProtocol`
+   - L2 dictionary loaded once via DI in service layer, passed to normalizer constructor
+   - Async normalization with full parameter support (essay_id, language, correlation_id, parallel settings)
 
-1. **Library Scaffold**
-   - Create shared package `libs/huleedu_nlp_shared/` with `normalization/` sub-package (facade, models, L2 logic, whitelist, spellchecker wrappers, config dataclass with env overrides).
-   - Implement `SpellNormalizationResult` dataclass (corrected text, per-stage counts, detailed corrections, word count, density, stage timings) plus helpers (e.g., `to_feature_dict`).
-   - Migrate `load_l2_errors`, `apply_l2_corrections`, whitelist loader, and adaptive SpellChecker cache into this package; parameterise paths via `NormalizationConfig` / environment variables.
-   - Provide `SpellNormalizer` facade supporting dependency injection (dictionary loader, whitelist manager, spell checker factory) and async normalisation.
-2. **Service Integration**
-   - Update `services/spellchecker_service/implementations/spell_logic_impl.py` to instantiate the shared normaliser (APP scope) and rely on it for corrections.
-   - Preserve logging, metrics, and event payload shapes; ensure parallel processor hooks still function.
-3. **CLI Preparation**
-   - Under `scripts/ml/`, add `normalize_dataset.py` that imports the shared normaliser, normalises essays, and outputs corrected text + correction stats (foundation for later feature extraction). Ensure CLI supports env-configurable resource paths and bundle toggles in later phases.
-4. **Testing**
-   - Add unit tests in the shared module for dictionary replacement edge cases, whitelist behaviour, and SpellChecker corrections.
-   - Add regression test comparing old vs. new normaliser outputs on fixture essays within the Spellchecker Service test suite.
-   - Optional CLI smoke test normalising a tiny dataset slice.
-5. **Documentation**
-   - Update relevant task docs/READMEs describing how to configure and use the shared normaliser (paths, language settings, whitelist handling).
+2. **Service Integration** ✅ COMPLETED
+   - `DefaultSpellLogic` in `services/spellchecker_service/implementations/spell_logic_impl.py` uses injected `SpellNormalizer`
+   - DI container provides APP-scoped instance via `SpellCheckerServiceProvider.provide_spell_normalizer()`
+   - All service tests passing with new implementation
+   - **Deviation**: `core_logic.py` deleted entirely (no backward compatibility wrapper retained)
 
-## Acceptance Criteria
+### Pending Components
 
-- Spellchecker Service passes all existing tests using the shared normaliser; a feature flag allows reverting to the legacy pipeline during rollout.
-- Shared package achieves ≥90% test coverage (dictionary/whitelist logic, spell corrections, configuration) and includes a regression benchmark showing <5% performance regression versus the current implementation on a 100-essay sample.
-- CLI groundwork verified by running `scripts/ml/normalize_dataset.py` over a sample dataset (e.g., 100 essays) within <30 seconds, using the shared normaliser and resource paths resolved correctly in Docker/dev environments.
-- Task documentation reflects the new shared architecture, configuration (including env overrides), and usage guidance.
+3. **CLI Preparation** ❌ NOT STARTED
+   - `scripts/ml/normalize_dataset.py` not created
+   - Note: `scripts/data_preparation/prepare_ielts_task2_dataset.py` exists but only does CSV→Parquet conversion
+   - Directory structure `scripts/ml/` not created
+
+4. **Testing** ⚠️ PARTIAL
+   - Basic unit tests in `libs/huleedu_nlp_shared/tests/normalization/test_spell_normalizer.py`
+   - Service integration tests updated and passing
+   - Missing: Comprehensive edge case coverage, regression benchmarks
+
+5. **Documentation** ❌ NOT STARTED
+   - `libs/huleedu_nlp_shared/README.md` missing (violates rule 090)
+   - Service README not updated with migration notes
+
+## Acceptance Criteria Status
+
+- ✅ **DONE**: Spellchecker Service passes all existing tests using the shared normaliser
+- ❌ **NO FLAG**: Feature flag for reverting to legacy pipeline not implemented (core_logic.py deleted)
+- ⚠️ **PARTIAL**: Shared package has basic tests but not ≥90% coverage or regression benchmarks
+- ❌ **NOT STARTED**: CLI `scripts/ml/normalize_dataset.py` not created
+- ❌ **NOT STARTED**: Documentation incomplete (missing library README, migration guide)
+
+## Remaining Work
+
+1. Create `scripts/ml/normalize_dataset.py` CLI tool
+2. Add comprehensive test coverage with regression benchmarks
+3. Create `libs/huleedu_nlp_shared/README.md` per rule 090
+4. Update service documentation with migration notes

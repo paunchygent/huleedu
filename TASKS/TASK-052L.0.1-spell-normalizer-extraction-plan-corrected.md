@@ -1,4 +1,14 @@
-# TASK-052L.0.2 — Spell Normalizer Extraction Implementation Plan (Lean Revision)
+# TASK-052L.0.2 — Spell Normalizer Extraction Implementation Plan (Lean Revision) ✅ COMPLETED
+
+## Status: COMPLETED (2025-09-19)
+
+### Implementation Summary
+Successfully extracted spell correction pipeline to `libs/huleedu_nlp_shared/normalization/`. Service integration via DI working with all tests passing.
+
+### Key Deviations from Plan:
+- **`core_logic.py` deleted**: No backward compatibility wrapper retained
+- **L2 dictionary loading**: Remains in service DI layer, not moved to shared lib
+- **No feature flag**: Legacy pipeline completely removed, no rollback option
 
 ## Objective
 

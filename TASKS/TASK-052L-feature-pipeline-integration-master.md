@@ -1,5 +1,11 @@
 # TASK-052L — NLP Feature Pipeline Integration Master Plan
 
+## Status: IN PROGRESS (Updated 2025-09-19)
+
+### Progress Summary
+- **Phase 1**: ✅ PARTIAL - Spell Normalizer extracted, CLI tooling pending
+- **Phase 2-3**: ❌ NOT STARTED - Feature pipeline and CLI validation
+
 ## Objective
 
 Coordinate the end-to-end rollout of the modular NLP feature pipeline so that:
@@ -126,11 +132,33 @@ All teams must implement and persist the following six dimensions. Naming shown 
 - Language Tool Service client for grammar metrics (existing implementation).
 - TASK-052K (model integration plan) for downstream requirements.
 
-## Subtasks
+## Subtasks Status
 
-- `TASK-052L.0-spell-normalizer-shared-helper.md`
-- `TASK-052L.1-feature-pipeline-scaffolding.md`
-- `TASK-052L.2-feature-bundles-and-tests.md`
-- `TASK-052L.3-offline-cli-and-validation.md`
+- `TASK-052L.0-spell-normalizer-shared-helper.md` ✅ **PARTIAL**
+  - Library extraction complete, service integration working
+  - CLI tooling (`scripts/ml/normalize_dataset.py`) not started
+  - Documentation incomplete (missing README)
 
-Coordinate sequencing so scaffolding lands first, feature bundles follow, and CLI wiring/validation closes the loop.
+- `TASK-052L.1-feature-pipeline-scaffolding.md` ❌ **NOT STARTED**
+  - Feature pipeline abstraction not created
+  - DI wiring not implemented
+
+- `TASK-052L.2-feature-bundles-and-tests.md` ❌ **NOT STARTED**
+  - No feature extractors implemented
+  - 50-feature set not built
+
+- `TASK-052L.3-offline-cli-and-validation.md` ❌ **NOT STARTED**
+  - `scripts/ml/build_nlp_features.py` not created
+  - Note: `scripts/data_preparation/prepare_ielts_task2_dataset.py` exists for CSV→Parquet only
+
+## Critical Path Issues
+
+1. **Directory Structure Mismatch**: Data prep script in `scripts/data_preparation/` instead of planned `scripts/ml/`
+2. **Missing Normalization CLI**: `normalize_dataset.py` blocks feature pipeline development
+3. **Documentation Gap**: `libs/huleedu_nlp_shared/README.md` violates rule 090 requirements
+
+## Next Steps
+
+1. Complete TASK-052L.0 by creating CLI normalization tool
+2. Create comprehensive library documentation
+3. Proceed with feature pipeline scaffolding (TASK-052L.1)

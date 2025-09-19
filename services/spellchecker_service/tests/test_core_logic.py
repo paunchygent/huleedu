@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from huleedu_nlp_shared.normalization import SpellNormalizer
-
-from ..config import settings
-from ..core_logic import default_perform_spell_check_algorithm
-from .mocks import MockWhitelist, create_mock_parallel_processor
+from .mocks import (
+    MockWhitelist,
+    create_mock_parallel_processor,
+    create_spell_normalizer_for_tests,
+)
 
 # Removed HTTP implementation tests - they were testing internal details
 
@@ -32,10 +32,14 @@ class TestDefaultImplementations:
 
         # Act
         test_l2_errors = {"teh": "the", "recieve": "receive"}  # Simple test dictionary
-        result = await default_perform_spell_check_algorithm(
-            text_with_errors,
-            test_l2_errors,
-            sample_essay_id,
+        normalizer = create_spell_normalizer_for_tests(
+            whitelist=MockWhitelist(),
+            parallel_processor=create_mock_parallel_processor(),
+            l2_errors=test_l2_errors,
+        )
+        result = await normalizer.normalize_text(
+            text=text_with_errors,
+            essay_id=sample_essay_id,
         )
 
         # Assert - The real L2 + pyspellchecker implementation corrects multiple errors
@@ -50,26 +54,20 @@ class TestDefaultImplementations:
         # Note: Exact count may vary based on pyspellchecker behavior and L2 dictionary availability
 
     @pytest.mark.asyncio
-    async def test_shared_normalizer_matches_legacy_wrapper(self) -> None:
-        """Ensure the shared normalizer stays in lockstep with the legacy wrapper."""
+    async def test_spell_normalizer_outputs_are_deterministic(self) -> None:
+        """Ensure repeated runs of the normalizer produce consistent results."""
         text = "teh wrng word"
         l2_errors = {"wrng": "wrong"}
         whitelist = MockWhitelist()
         parallel_processor = create_mock_parallel_processor()
 
-        shared = SpellNormalizer(
+        normalizer = create_spell_normalizer_for_tests(
+            whitelist=whitelist,
+            parallel_processor=parallel_processor,
             l2_errors=l2_errors,
-            whitelist=whitelist,
-            parallel_processor=parallel_processor,
-            settings=settings,
         )
 
-        shared_result = await shared.normalize_text(text=text)
-        legacy_result = await default_perform_spell_check_algorithm(
-            text,
-            l2_errors,
-            whitelist=whitelist,
-            parallel_processor=parallel_processor,
-        )
+        first_result = await normalizer.normalize_text(text=text)
+        second_result = await normalizer.normalize_text(text=text)
 
-        assert shared_result.model_dump() == legacy_result.model_dump()
+        assert first_result.model_dump() == second_result.model_dump()

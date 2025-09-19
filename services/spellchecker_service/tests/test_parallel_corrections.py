@@ -7,9 +7,12 @@ from uuid import uuid4
 
 import pytest
 
-from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
+)
+from services.spellchecker_service.tests.mocks import (
+    MockWhitelist,
+    create_spell_normalizer_for_tests,
 )
 
 
@@ -55,11 +58,16 @@ class TestParallelCorrections:
         mock_whitelist = MagicMock()
         mock_whitelist.is_whitelisted.return_value = False
 
-        with patch("services.spellchecker_service.core_logic._spellchecker_cache", {}):
+        with patch(
+            "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
+            {},
+        ):
             # Initialize spell checker cache
             from spellchecker import SpellChecker
 
-            from services.spellchecker_service.core_logic import _spellchecker_cache
+            from huleedu_nlp_shared.normalization.spell_normalizer import (
+                _spellchecker_cache,
+            )
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -70,15 +78,18 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            # Test with parallel processing enabled
-            result_parallel = await default_perform_spell_check_algorithm(
-                text=text,
+            normalizer = create_spell_normalizer_for_tests(
+                whitelist=mock_whitelist,
+                parallel_processor=parallel_processor,
                 l2_errors=l2_errors,
+            )
+
+            # Test with parallel processing enabled
+            result_parallel = await normalizer.normalize_text(
+                text=text,
                 essay_id="test_parallel",
                 language="en",
                 correlation_id=uuid4(),
-                whitelist=mock_whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=True,
                 max_concurrent=5,
                 batch_size=100,
@@ -89,14 +100,11 @@ class TestParallelCorrections:
             count_parallel = result_parallel.total_corrections
 
             # Test with parallel processing disabled
-            result_sequential = await default_perform_spell_check_algorithm(
+            result_sequential = await normalizer.normalize_text(
                 text=text,
-                l2_errors=l2_errors,
                 essay_id="test_sequential",
                 language="en",
                 correlation_id=uuid4(),
-                whitelist=mock_whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=False,
                 max_concurrent=5,
                 batch_size=100,
@@ -121,10 +129,15 @@ class TestParallelCorrections:
         mock_whitelist = MagicMock()
         mock_whitelist.is_whitelisted.return_value = False
 
-        with patch("services.spellchecker_service.core_logic._spellchecker_cache", {}):
+        with patch(
+            "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
+            {},
+        ):
             from spellchecker import SpellChecker
 
-            from services.spellchecker_service.core_logic import _spellchecker_cache
+            from huleedu_nlp_shared.normalization.spell_normalizer import (
+                _spellchecker_cache,
+            )
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -135,14 +148,17 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            result = await default_perform_spell_check_algorithm(
-                text=text,
+            normalizer = create_spell_normalizer_for_tests(
+                whitelist=mock_whitelist,
+                parallel_processor=parallel_processor,
                 l2_errors=l2_errors,
+            )
+
+            result = await normalizer.normalize_text(
+                text=text,
                 essay_id="test_batch",
                 language="en",
                 correlation_id=uuid4(),
-                whitelist=mock_whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=True,
                 max_concurrent=10,
                 batch_size=50,  # Process in batches of 50
@@ -166,10 +182,15 @@ class TestParallelCorrections:
         mock_whitelist = MagicMock()
         mock_whitelist.is_whitelisted.return_value = False
 
-        with patch("services.spellchecker_service.core_logic._spellchecker_cache", {}):
+        with patch(
+            "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
+            {},
+        ):
             from spellchecker import SpellChecker
 
-            from services.spellchecker_service.core_logic import _spellchecker_cache
+            from huleedu_nlp_shared.normalization.spell_normalizer import (
+                _spellchecker_cache,
+            )
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -180,15 +201,18 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            # Test with high threshold (should use sequential)
-            result = await default_perform_spell_check_algorithm(
-                text=text,
+            normalizer = create_spell_normalizer_for_tests(
+                whitelist=mock_whitelist,
+                parallel_processor=parallel_processor,
                 l2_errors=l2_errors,
+            )
+
+            # Test with high threshold (should use sequential)
+            result = await normalizer.normalize_text(
+                text=text,
                 essay_id="test_threshold",
                 language="en",
                 correlation_id=uuid4(),
-                whitelist=mock_whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=True,
                 min_words_for_parallel=10,  # High threshold, should use sequential
             )
@@ -207,10 +231,15 @@ class TestParallelCorrections:
         mock_whitelist = MagicMock()
         mock_whitelist.is_whitelisted.side_effect = lambda w: w in ["Microsoft", "Excel"]
 
-        with patch("services.spellchecker_service.core_logic._spellchecker_cache", {}):
+        with patch(
+            "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
+            {},
+        ):
             from spellchecker import SpellChecker
 
-            from services.spellchecker_service.core_logic import _spellchecker_cache
+            from huleedu_nlp_shared.normalization.spell_normalizer import (
+                _spellchecker_cache,
+            )
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -221,14 +250,17 @@ class TestParallelCorrections:
             # Create parallel processor
             parallel_processor = DefaultParallelProcessor()
 
-            result = await default_perform_spell_check_algorithm(
-                text=text,
+            normalizer = create_spell_normalizer_for_tests(
+                whitelist=mock_whitelist,
+                parallel_processor=parallel_processor,
                 l2_errors=l2_errors,
+            )
+
+            result = await normalizer.normalize_text(
+                text=text,
                 essay_id="test_whitelist",
                 language="en",
                 correlation_id=uuid4(),
-                whitelist=mock_whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=True,
                 min_words_for_parallel=1,
             )

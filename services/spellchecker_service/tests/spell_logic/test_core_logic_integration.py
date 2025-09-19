@@ -9,7 +9,46 @@ from __future__ import annotations
 
 import pytest
 
-from ...core_logic import default_perform_spell_check_algorithm
+from huleedu_nlp_shared.normalization import SpellNormalizationResult, SpellNormalizer
+from huleedu_service_libs.logging_utils import create_service_logger
+
+from ...config import settings
+from ...implementations.parallel_processor_impl import DefaultParallelProcessor
+from ...tests.mocks import MockWhitelist
+
+_DEFAULT = object()
+
+
+async def normalize_text(
+    *,
+    text: str,
+    l2_errors: dict[str, str],
+    essay_id: str,
+    language: str = "en",
+    whitelist: object = _DEFAULT,
+    **kwargs,
+) -> SpellNormalizationResult:
+    """Helper to run the shared SpellNormalizer with test-friendly defaults."""
+
+    if whitelist is _DEFAULT:
+        whitelist_impl = MockWhitelist()
+    else:
+        whitelist_impl = whitelist  # type: ignore[assignment]
+
+    normalizer = SpellNormalizer(
+        l2_errors=l2_errors,
+        whitelist=whitelist_impl,  # type: ignore[arg-type]
+        parallel_processor=DefaultParallelProcessor(),
+        settings=settings,
+        logger_override=create_service_logger("spellchecker_service.tests.core_logic"),
+    )
+
+    return await normalizer.normalize_text(
+        text=text,
+        essay_id=essay_id,
+        language=language,
+        **kwargs,
+    )
 
 
 class TestCoreLogicIntegration:
@@ -23,10 +62,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-simple-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for pure pyspellchecker test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for pure pyspellchecker test
+            essay_id=essay_id,
             language="en",
         )
 
@@ -50,10 +89,10 @@ class TestCoreLogicIntegration:
 
         # Act
         l2_errors = {"recieve": "receive", "becouse": "because"}  # L2 errors for comprehensive test
-        result = await default_perform_spell_check_algorithm(
-            text,
-            l2_errors,
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors=l2_errors,
+            essay_id=essay_id,
             language="en",
         )
 
@@ -76,10 +115,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-punct-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for punctuation test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for punctuation test
+            essay_id=essay_id,
             language="en",
         )
 
@@ -105,10 +144,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-hyphen-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for hyphenation test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for hyphenation test
+            essay_id=essay_id,
             language="en",
         )
 
@@ -134,10 +173,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-perfect-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for no-corrections test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for no-corrections test
+            essay_id=essay_id,
             language="en",
         )
 
@@ -154,9 +193,15 @@ class TestCoreLogicIntegration:
         essay_id = "test-empty-001"
 
         # Act
-        result_empty = await default_perform_spell_check_algorithm(empty_text, {}, essay_id)
-        result_whitespace = await default_perform_spell_check_algorithm(
-            whitespace_text, {}, essay_id
+        result_empty = await normalize_text(
+            text=empty_text,
+            l2_errors={},
+            essay_id=essay_id,
+        )
+        result_whitespace = await normalize_text(
+            text=whitespace_text,
+            l2_errors={},
+            essay_id=essay_id,
         )
 
         # Assert
@@ -174,10 +219,20 @@ class TestCoreLogicIntegration:
         essay_id = "test-lang-001"
 
         # Act - Test with English (default)
-        result_en = await default_perform_spell_check_algorithm(text, {}, essay_id, language="en")
+        result_en = await normalize_text(
+            text=text,
+            l2_errors={},
+            essay_id=essay_id,
+            language="en",
+        )
 
         # Test with Spanish (should still work, though corrections may differ)
-        result_es = await default_perform_spell_check_algorithm(text, {}, essay_id, language="es")
+        result_es = await normalize_text(
+            text=text,
+            l2_errors={},
+            essay_id=essay_id,
+            language="es",
+        )
 
         # Assert
         # Both should make some corrections (though results may differ)
@@ -203,10 +258,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-long-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for performance test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for performance test
+            essay_id=essay_id,
             language="en",
         )
 
@@ -236,10 +291,10 @@ class TestCoreLogicIntegration:
 
         # Act
         l2_errors = {"recieve": "receive"}  # L2 error for case preservation test
-        result = await default_perform_spell_check_algorithm(
-            text,
-            l2_errors,
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors=l2_errors,
+            essay_id=essay_id,
             language="en",
         )
 
@@ -258,10 +313,10 @@ class TestCoreLogicIntegration:
         essay_id = "test-uppercase-norm-001"
 
         # Act
-        result = await default_perform_spell_check_algorithm(
-            text,
-            {},  # Empty L2 errors for uppercase normalization test
-            essay_id,
+        result = await normalize_text(
+            text=text,
+            l2_errors={},  # Empty L2 errors for uppercase normalization test
+            essay_id=essay_id,
             language="en",
         )
 

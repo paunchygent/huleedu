@@ -43,17 +43,16 @@ alwaysApply: false
     - `SpellLogicProtocol` (enhanced with language parameter support)
     - `ResultStoreProtocol`
     - `SpellcheckEventPublisherProtocol`
-- **`core_logic.py`**: Fundamental, reusable business logic functions:
-    - `default_fetch_content_impl()`: Fetches content via HTTP
-    - `default_store_content_impl()`: Stores content via HTTP  
-    - `default_perform_spell_check_algorithm()`: Core L2 + pyspellchecker spell checking algorithm
-- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies
+- **`spell_logic/`**: L2 dictionary loader and whitelist implementations
+    - `l2_dictionary_loader.py`: Loads L2 error corrections from JSON
+    - `l2_filter.py`: Filters L2 entries for production use
+- **`di.py`**: Dishka dependency injection providers that import implementations from `protocol_implementations/` and configure them with constructor dependencies, including `SpellNormalizer` from `huleedu_nlp_shared`
 
 ### 2.3. Protocol Implementations (Clean Architecture)
-- **`protocol_implementations/`**: Directory containing canonical protocol implementations:
+- **`implementations/`**: Directory containing canonical protocol implementations:
     - **`content_client_impl.py`**: `DefaultContentClientImpl` - HTTP content fetching with constructor-injected dependencies
     - **`result_store_impl.py`**: `DefaultResultStoreImpl` - HTTP content storage with constructor-injected dependencies
-    - **`spell_logic_impl.py`**: `DefaultSpellLogicImpl` - Spell checking orchestration using `core_logic` functions
+    - **`spell_logic_impl.py`**: `DefaultSpellLogic` - Spell checking orchestration using injected `SpellNormalizer` from `huleedu_nlp_shared`
     - **`event_publisher_impl.py`**: `DefaultSpellcheckEventPublisherImpl` - Kafka event publishing with constructor-injected producer
 
 ### 2.4. Architecture Benefits
@@ -83,15 +82,16 @@ alwaysApply: false
 
 ## 5. Spell Checking Implementation
 
-**Current**: L2 + pyspellchecker dual-algorithm approach:
-- **L2 Error Dictionary**: 4886 common ESL learner corrections 
+**Delegated to Shared Library**: Uses `SpellNormalizer` from `huleedu_nlp_shared`:
+- **L2 Error Dictionary**: 4886 common ESL learner corrections loaded via DI
 - **PySpellChecker**: General English spell checking with contextual suggestions
 - **Correction Logging**: Detailed correction logs saved to `data/corrected_essays/`
+- **Shared Implementation**: Algorithm extracted to `libs/huleedu_nlp_shared/normalization/`
 
 ## 6. Configuration
 
 **Environment**: `KAFKA_BOOTSTRAP_SERVERS`, `CONTENT_SERVICE_URL`, `LOG_LEVEL`, `KAFKA_CONSUMER_GROUP_ID`
-**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs
+**Dependencies**: aiokafka, aiohttp, pyspellchecker, huleedu-common-core, huleedu-service-libs, huleedu-nlp-shared
 
 ## 7. Error Handling
 

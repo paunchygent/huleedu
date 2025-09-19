@@ -1,11 +1,13 @@
 # TASK-053: Event Architecture Refinement
 
 ## Overview
+
 Standardize and optimize the HuleEdu event-driven architecture to fix critical gaps in our 71-event system before scaling to ~150 events for AI feedback, analytics, and payments in 2025.
 
 ## Current State Analysis
 
 ### Event System Statistics
+
 - **71 events** defined in `ProcessingEvent` enum (`libs/common_core/src/common_core/event_enums.py`)
 - **69 mapped** to Kafka topics in `_TOPIC_MAPPING`
 - **2 unmapped** (violating YAGNI principle)
@@ -14,6 +16,7 @@ Standardize and optimize the HuleEdu event-driven architecture to fix critical g
 ### Critical Issues Found
 
 #### 1. Unmapped Events (Delete These)
+
 ```python
 ESSAY_AIFEEDBACK_COMPLETED      # No topic, no service implementation
 ESSAY_EDITOR_REVISION_COMPLETED  # No topic, no service implementation
@@ -22,6 +25,7 @@ ESSAY_EDITOR_REVISION_COMPLETED  # No topic, no service implementation
 #### 2. Naming Inconsistencies
 
 **Commands - Mixed Patterns:**
+
 ```
 Current:  huleedu.els.spellcheck.initiate.command.v1
           huleedu.commands.batch.pipeline.v1
@@ -29,6 +33,7 @@ Standard: huleedu.{domain}.{action}.command.v1
 ```
 
 **Segments - Underscore vs Dots:**
+
 ```
 Current:  huleedu.email.delivery_failed.v1
           huleedu.llm_provider.request_started.v1
@@ -37,6 +42,7 @@ Standard: huleedu.email.delivery.failed.v1
 ```
 
 #### 3. Missing Infrastructure
+
 - No DLQ (Dead Letter Queue) implementation
 - No standardized retry headers
 - Inconsistent partition key usage
@@ -47,13 +53,16 @@ Standard: huleedu.email.delivery.failed.v1
 ### Phase 1: Clean & Standardize
 
 #### Task 1.1: Remove Unmapped Events
+
 **File:** `libs/common_core/src/common_core/event_enums.py`
 
 Remove these lines from ProcessingEvent enum:
+
 - Line containing `ESSAY_AIFEEDBACK_COMPLETED`
 - Line containing `ESSAY_EDITOR_REVISION_COMPLETED`
 
 #### Task 1.2: Fix Topic Naming
+
 **File:** `libs/common_core/src/common_core/event_enums.py`
 
 Update `_TOPIC_MAPPING` dictionary:
@@ -78,6 +87,7 @@ ProcessingEvent.ENTITLEMENTS_RATE_LIMIT_EXCEEDED: "huleedu.entitlements.rate.lim
 ### Phase 2: Contract Enforcement
 
 #### Task 2.1: Add Header Standards
+
 **File:** `libs/huleedu_service_libs/src/huleedu_service_libs/outbox/manager.py`
 
 Enhance `_create_standard_headers()` method:
@@ -117,6 +127,7 @@ def _create_standard_headers(
 ```
 
 #### Task 2.2: Partition Key Validation
+
 **File:** Create `libs/common_core/src/common_core/events/partition_contracts.py`
 
 ```python
@@ -152,6 +163,7 @@ def validate_partition_key(topic: str, event_data: dict[str, Any]) -> str:
 ```
 
 #### Task 2.3: DLQ Implementation
+
 **File:** Create `libs/huleedu_service_libs/src/huleedu_service_libs/dlq.py`
 
 ```python
@@ -192,6 +204,7 @@ class DLQManager:
 ### Phase 3: Testing & Validation
 
 #### Task 3.1: Contract Tests
+
 **File:** Create `libs/common_core/tests/test_event_contracts.py`
 
 ```python
@@ -238,6 +251,7 @@ class TestEventContracts:
 ```
 
 #### Task 3.2: CI Validation
+
 **File:** Create `.github/workflows/event-contracts.yml`
 
 ```yaml
@@ -264,9 +278,11 @@ jobs:
 ### Phase 4: Documentation
 
 #### Task 4.1: Event Catalog
+
 **File:** Create `docs/event-catalog.md`
 
 Generate from code with script that produces:
+
 ```markdown
 # Event Catalog
 
@@ -283,6 +299,7 @@ Generate from code with script that produces:
 ```
 
 ## Success Criteria
+
 - [ ] All 71 events have topic mappings (no unmapped events)
 - [ ] Zero underscores in topic segments
 - [ ] All command topics follow `huleedu.{domain}.{action}.command.v1`
@@ -293,6 +310,7 @@ Generate from code with script that produces:
 - [ ] Event catalog auto-generated
 
 ## Testing Checklist
+
 ```bash
 # Run after implementation
 pdm run pytest libs/common_core/tests/test_event_contracts.py -v
@@ -301,12 +319,14 @@ pdm run python scripts/validate_event_mappings.py
 ```
 
 ## Rollback Plan
+
 - All changes are backward compatible
 - Old topic names remain functional during transition
 - Consumers subscribe to both old and new topics
 - After 30 days, remove old topic subscriptions
 
 ## Notes
+
 - This refactoring is REQUIRED before adding new events for AI feedback, advanced analytics, or payments
 - Maintains backward compatibility during 30-day transition period
 - No database migrations required

@@ -9,7 +9,10 @@ from uuid import uuid4
 
 import pytest
 
-from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
+from huleedu_nlp_shared.normalization import SpellNormalizer
+from huleedu_service_libs.logging_utils import create_service_logger
+
+from services.spellchecker_service.config import settings
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
 )
@@ -64,14 +67,20 @@ class TestParallelPerformanceVerification:
             essay_id = f"test_essay_{i}"
             correlation_id = uuid4()
 
-            # Sequential processing
-            sequential_result_obj = await default_perform_spell_check_algorithm(
-                text=text,
+            logger = create_service_logger("spellchecker_service.tests.parallel")
+            normalizer = SpellNormalizer(
                 l2_errors=l2_errors,
-                essay_id=essay_id,
-                correlation_id=correlation_id,
                 whitelist=whitelist,
                 parallel_processor=parallel_processor,
+                settings=settings,
+                logger_override=logger,
+            )
+
+            # Sequential processing
+            sequential_result_obj = await normalizer.normalize_text(
+                text=text,
+                essay_id=essay_id,
+                correlation_id=correlation_id,
                 enable_parallel=False,  # Force sequential
                 min_words_for_parallel=999,  # Ensure sequential mode
             )
@@ -79,13 +88,10 @@ class TestParallelPerformanceVerification:
             sequential_count = sequential_result_obj.total_corrections
 
             # Parallel processing
-            parallel_result_obj = await default_perform_spell_check_algorithm(
+            parallel_result_obj = await normalizer.normalize_text(
                 text=text,
-                l2_errors=l2_errors,
                 essay_id=essay_id,
                 correlation_id=correlation_id,
-                whitelist=whitelist,
-                parallel_processor=parallel_processor,
                 enable_parallel=True,
                 min_words_for_parallel=1,  # Force parallel mode
             )
@@ -129,14 +135,20 @@ class TestParallelPerformanceVerification:
         correlation_id = uuid4()
 
         # Measure sequential processing time
-        start_time = time.time()
-        sequential_result_obj = await default_perform_spell_check_algorithm(
-            text=long_text,
+        logger = create_service_logger("spellchecker_service.tests.parallel")
+        normalizer = SpellNormalizer(
             l2_errors=l2_errors,
-            essay_id="performance_test_sequential",
-            correlation_id=correlation_id,
             whitelist=whitelist,
             parallel_processor=parallel_processor,
+            settings=settings,
+            logger_override=logger,
+        )
+
+        start_time = time.time()
+        sequential_result_obj = await normalizer.normalize_text(
+            text=long_text,
+            essay_id="performance_test_sequential",
+            correlation_id=correlation_id,
             enable_parallel=False,
             min_words_for_parallel=999,
         )
@@ -146,13 +158,10 @@ class TestParallelPerformanceVerification:
 
         # Measure parallel processing time
         start_time = time.time()
-        parallel_result_obj = await default_perform_spell_check_algorithm(
+        parallel_result_obj = await normalizer.normalize_text(
             text=long_text,
-            l2_errors=l2_errors,
             essay_id="performance_test_parallel",
             correlation_id=correlation_id,
-            whitelist=whitelist,
-            parallel_processor=parallel_processor,
             enable_parallel=True,
             min_words_for_parallel=1,
             max_concurrent=10,
@@ -203,13 +212,19 @@ class TestParallelPerformanceVerification:
             "Stockholm and Copenhagen are beautiful cities."
         )
 
-        result_obj = await default_perform_spell_check_algorithm(
-            text=test_text,
+        logger = create_service_logger("spellchecker_service.tests.parallel")
+        normalizer = SpellNormalizer(
             l2_errors=l2_errors,
-            essay_id="whitelist_test",
-            correlation_id=uuid4(),
             whitelist=whitelist,
             parallel_processor=parallel_processor,
+            settings=settings,
+            logger_override=logger,
+        )
+
+        result_obj = await normalizer.normalize_text(
+            text=test_text,
+            essay_id="whitelist_test",
+            correlation_id=uuid4(),
             enable_parallel=True,
             min_words_for_parallel=1,
         )

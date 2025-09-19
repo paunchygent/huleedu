@@ -27,14 +27,14 @@ The module provides utilities for loading L2 dictionaries, applying these correc
   * `filter_l2_entries()`: Applies the `L2CorrectionFilter` to a dictionary of L2 errors.
   * `create_filtered_l2_dictionary()`: Writes a filtered L2 dictionary to a file.
 
-### 2. Core Spell Checking Algorithm Orchestration (within `spellchecker_service.core_logic.py`)
+### 2. Core Spell Checking Algorithm Orchestration
 
-The function `default_perform_spell_check_algorithm()` in the parent service's `core_logic.py` orchestrates the use of this `spell_logic` module:
+Runtime orchestration now lives in the shared `SpellNormalizer` (defined in `libs/huleedu_nlp_shared/normalization/spell_normalizer.py`). The service constructs a singleton normalizer via dependency injection and reuses it for every request:
 
-1. Loads the (typically pre-filtered) L2 error dictionary using `load_l2_errors()` from `l2_dictionary_loader.py`.
+1. Loads the (typically pre-filtered) L2 error dictionary using `load_l2_errors()` from `l2_dictionary_loader.py` (at service startup).
 2. Applies these L2 corrections to the input text using `apply_l2_corrections()` from `l2_dictionary_loader.py`.
-3. Initializes and runs `pyspellchecker` on the L2-corrected text.
-4. If enabled, logs detailed correction information using `log_essay_corrections()` from `correction_logger.py`.
+3. Initializes and runs `pyspellchecker` on the L2-corrected text (respecting whitelist exclusions and adaptive edit distance).
+4. Optionally logs detailed correction information via `correction_logger.py`.
 
 ### 3. Correction Logging
 
@@ -57,7 +57,7 @@ The function `default_perform_spell_check_algorithm()` in the parent service's `
 
 ## Integration with Spell Checker Service
 
-This `spell_logic` module provides the core algorithms and data handling capabilities that are orchestrated by the main components of the `spellchecker_service` (specifically `core_logic.py` and `event_router.py`). Configuration for dictionary paths, logging, and spell checker language is typically sourced from the service's main `config.py`.
+This `spell_logic` module provides the core algorithms and data handling capabilities that are orchestrated by the `SpellNormalizer` and the service's event processor. Configuration for dictionary paths, logging, and spell checker language is sourced from the service's main `config.py`.
 
 ---
 
