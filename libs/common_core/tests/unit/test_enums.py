@@ -151,7 +151,7 @@ class TestTopicNameFunction:
     def test_unmapped_event_raises_error(self) -> None:
         """Test that unmapped events raise ValueError with helpful message."""
         # Use an event that should not have a mapping
-        unmapped_event = ProcessingEvent.PROCESSING_STARTED
+        unmapped_event = ProcessingEvent.ESSAY_AIFEEDBACK_COMPLETED
 
         with pytest.raises(ValueError) as exc_info:
             topic_name(unmapped_event)

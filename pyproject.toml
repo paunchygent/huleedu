@@ -370,6 +370,7 @@ obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertman
 dev = [
     "-e file:///${PROJECT_ROOT}/libs/common_core",
     "-e file:///${PROJECT_ROOT}/libs/huleedu_service_libs",
+    "-e file:///${PROJECT_ROOT}/libs/huleedu_nlp_shared",
     "-e file:///${PROJECT_ROOT}/services/content_service",
     "-e file:///${PROJECT_ROOT}/services/spellchecker_service",
     "-e file:///${PROJECT_ROOT}/services/batch_orchestrator_service",

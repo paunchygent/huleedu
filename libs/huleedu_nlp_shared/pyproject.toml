@@ -1,0 +1,15 @@
+[project]
+name = "huleedu-nlp-shared"
+version = "0.1.0"
+description = "Shared NLP utilities for HuleEdu runtime and tooling"
+requires-python = ">=3.11"
+authors = [
+    { name = "Olof Larsson", email = "paunchygent@gmail.com" },
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true

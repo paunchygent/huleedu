@@ -371,7 +371,7 @@ def idempotent_consumer(
                 except Exception as processing_error:
                     # Processing failed - release idempotency lock for retry
                     logger.error(
-                        "PROCESSING_FAILED: Releasing idempotency lock for retry",
+                        "Processing failed: Releasing idempotency lock for retry",
                         extra={
                             **log_context,
                             "action": "failed_releasing_lock",

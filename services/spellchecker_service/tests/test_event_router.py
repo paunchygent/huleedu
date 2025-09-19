@@ -29,7 +29,11 @@ from services.spellchecker_service.protocols import (
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
-from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
+from services.spellchecker_service.tests.mocks import (
+    MockWhitelist,
+    create_default_spell_logic_for_tests,
+    create_mock_parallel_processor,
+)
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
@@ -64,11 +68,7 @@ class TestProcessSingleMessage:
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
         # Use REAL spell logic implementation, not a mock
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,
             http_session=mock_http_session,
             whitelist=MockWhitelist(),
@@ -216,11 +216,7 @@ class TestProcessSingleMessage:
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
         # Use REAL spell logic implementation that will encounter the storage error
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,  # This will fail
             http_session=mock_http_session,
             whitelist=MockWhitelist(),
@@ -375,11 +371,7 @@ class TestProcessSingleMessage:
         )
 
         # Use REAL spell logic implementation
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,
             http_session=mock_http_session,
             whitelist=MockWhitelist(),

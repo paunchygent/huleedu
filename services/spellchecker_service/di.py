@@ -8,9 +8,11 @@ from typing import AsyncGenerator
 from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
+from huleedu_nlp_shared.normalization import SpellNormalizer
 from huleedu_service_libs.database import DatabaseMetrics
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.outbox import (
     EventRelayWorker,
     OutboxRepositoryProtocol,
@@ -62,6 +64,7 @@ from services.spellchecker_service.protocols import (
     WhitelistProtocol,
 )
 from services.spellchecker_service.repository_protocol import SpellcheckRepositoryProtocol
+from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
 
 
 class SpellCheckerServiceProvider(Provider):
@@ -100,6 +103,33 @@ class SpellCheckerServiceProvider(Provider):
     def provide_parallel_processor(self) -> ParallelProcessorProtocol:
         """Provide parallel processor for word corrections."""
         return DefaultParallelProcessor()
+
+    @provide(scope=Scope.APP)
+    def provide_l2_errors(self, settings: Settings) -> dict[str, str]:
+        """Load L2 dictionary once for the process."""
+        logger = create_service_logger("spellchecker_service.l2_loader")
+        logger.info("Loading L2 dictionary for shared spell normalizer")
+        entries = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
+        logger.info("L2 dictionary cached in DI context", extra={"entry_count": len(entries)})
+        return entries
+
+    @provide(scope=Scope.APP)
+    def provide_spell_normalizer(
+        self,
+        l2_errors: dict[str, str],
+        whitelist: WhitelistProtocol,
+        parallel_processor: ParallelProcessorProtocol,
+        settings: Settings,
+    ) -> SpellNormalizer:
+        """Provide shared spell normalizer instance."""
+        normalizer_logger = create_service_logger("spellchecker_service.spell_normalizer")
+        return SpellNormalizer(
+            l2_errors=l2_errors,
+            whitelist=whitelist,
+            parallel_processor=parallel_processor,
+            settings=settings,
+            logger_override=normalizer_logger,
+        )
 
     @provide(scope=Scope.APP)
     def provide_circuit_breaker_registry(self, settings: Settings) -> CircuitBreakerRegistry:
@@ -231,15 +261,13 @@ class SpellCheckerServiceProvider(Provider):
         self,
         result_store: ResultStoreProtocol,
         http_session: ClientSession,
-        whitelist: WhitelistProtocol,
-        parallel_processor: ParallelProcessorProtocol,
+        spell_normalizer: SpellNormalizer,
     ) -> SpellLogicProtocol:
         """Provide spell logic implementation."""
         return DefaultSpellLogic(
             result_store=result_store,
             http_session=http_session,
-            whitelist=whitelist,
-            parallel_processor=parallel_processor,
+            spell_normalizer=spell_normalizer,
         )
 
     @provide(scope=Scope.APP)

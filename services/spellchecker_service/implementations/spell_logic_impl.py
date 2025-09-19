@@ -17,21 +17,17 @@ from common_core.metadata_models import (
     SystemProcessingMetadata,
 )
 from common_core.status_enums import EssayStatus, ProcessingStage
+from huleedu_nlp_shared.normalization import SpellNormalizer
 from huleedu_service_libs.error_handling import (
     raise_content_service_error,
     raise_processing_error,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
 
-from services.spellchecker_service.config import settings
-from services.spellchecker_service.core_logic import default_perform_spell_check_algorithm
 from services.spellchecker_service.protocols import (
-    ParallelProcessorProtocol,
     ResultStoreProtocol,
     SpellLogicProtocol,
-    WhitelistProtocol,
 )
-from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
 
 logger = create_service_logger("spellchecker_service.spell_logic_impl")
 
@@ -43,19 +39,11 @@ class DefaultSpellLogic(SpellLogicProtocol):
         self,
         result_store: ResultStoreProtocol,
         http_session: aiohttp.ClientSession,
-        whitelist: WhitelistProtocol,
-        parallel_processor: ParallelProcessorProtocol,
+        spell_normalizer: SpellNormalizer,
     ):
         self.result_store = result_store
         self.http_session = http_session
-        self.whitelist = whitelist
-        self.parallel_processor = parallel_processor
-
-        # Cache L2 dictionary at service startup (APP scope)
-        # Load dictionary once during initialization to eliminate per-essay file I/O
-        logger.info("Loading L2 dictionary at service startup...")
-        self.l2_errors = load_l2_errors(settings.effective_filtered_dict_path, filter_entries=False)
-        logger.info(f"L2 dictionary cached at startup: {len(self.l2_errors)} entries")
+        self.spell_normalizer = spell_normalizer
 
     async def perform_spell_check(
         self,
@@ -93,19 +81,11 @@ class DefaultSpellLogic(SpellLogicProtocol):
 
         # Perform spell check algorithm
         try:
-            metrics = await default_perform_spell_check_algorithm(
-                text,
-                self.l2_errors,  # Pass cached dictionary
-                essay_id,
+            metrics = await self.spell_normalizer.normalize_text(
+                text=text,
+                essay_id=essay_id,
                 language=language,
                 correlation_id=correlation_id,
-                whitelist=self.whitelist,  # Pass whitelist for proper name handling
-                parallel_processor=self.parallel_processor,  # Pass injected parallel processor
-                enable_parallel=settings.ENABLE_PARALLEL_PROCESSING,
-                max_concurrent=settings.MAX_CONCURRENT_CORRECTIONS,
-                batch_size=settings.SPELLCHECK_BATCH_SIZE,
-                parallel_timeout=settings.PARALLEL_TIMEOUT_SECONDS,
-                min_words_for_parallel=settings.PARALLEL_PROCESSING_MIN_WORDS,
             )
             corrected_text = metrics.corrected_text
             corrections_count = metrics.total_corrections

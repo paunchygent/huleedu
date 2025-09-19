@@ -13,6 +13,7 @@ dependencies = [
     # For common_core as a local path dependency:
     "huleedu-common-core",
     "huleedu-service-libs",
+    "huleedu-nlp-shared",
     "pydantic",
     "pydantic-settings",
     "prometheus-client",
@@ -48,6 +49,7 @@ test = [
 [tool.pdm.resolution.overrides]
 huleedu-common-core = "file:///app/libs/common_core"
 huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
+huleedu-nlp-shared = "file:///app/libs/huleedu_nlp_shared"
 
 [tool.pdm.scripts]
 start = "python app.py"

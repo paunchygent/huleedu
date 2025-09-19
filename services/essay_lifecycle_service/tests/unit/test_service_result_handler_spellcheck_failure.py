@@ -386,7 +386,7 @@ class TestServiceResultHandlerSpellcheckFailure:
             batch_id="batch-456",
             status=EssayStatus.SPELLCHECK_FAILED,
             corrected_text_storage_id=None,
-            error_code="PROCESSING_FAILED",
+            error_code="SPELLCHECK_FAILED",
             correlation_id=test_correlation_id,
         )
 

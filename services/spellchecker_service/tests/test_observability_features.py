@@ -40,7 +40,11 @@ from services.spellchecker_service.protocols import (
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
 )
-from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
+from services.spellchecker_service.tests.mocks import (
+    MockWhitelist,
+    create_default_spell_logic_for_tests,
+    create_mock_parallel_processor,
+)
 
 
 class TestObservabilityFeatures:
@@ -66,7 +70,7 @@ class TestObservabilityFeatures:
     @pytest.fixture
     def real_spell_logic(self, boundary_mocks: dict[str, AsyncMock]) -> DefaultSpellLogic:
         """Create real spell logic with mocked boundaries."""
-        return DefaultSpellLogic(
+        return create_default_spell_logic_for_tests(
             result_store=boundary_mocks["result_store"],
             http_session=boundary_mocks["http_session"],
             whitelist=MockWhitelist(),

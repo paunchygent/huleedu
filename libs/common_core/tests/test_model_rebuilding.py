@@ -89,7 +89,7 @@ class TestEventEnvelopeSchemaVersion:
 
         # Dummy data for the envelope
         dummy_data = BaseEventData(
-            event_name=ProcessingEvent.PROCESSING_STARTED,
+            event_name=ProcessingEvent.BATCH_PIPELINE_COMPLETED,
             entity_id="test_entity",
             entity_type="test",
         )

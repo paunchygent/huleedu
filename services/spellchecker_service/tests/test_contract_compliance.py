@@ -28,7 +28,11 @@ from services.spellchecker_service.protocols import (
     ResultStoreProtocol,
     SpellcheckEventPublisherProtocol,
 )
-from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
+from services.spellchecker_service.tests.mocks import (
+    MockWhitelist,
+    create_default_spell_logic_for_tests,
+    create_mock_parallel_processor,
+)
 
 # Constants for frequently referenced values
 ESSAY_RESULT_EVENT = ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED
@@ -65,12 +69,8 @@ class TestEventContractCompliance:
 
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
-        # Use REAL spell logic implementation
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        # Use REAL spell logic implementation backed by shared normalizer
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,
             http_session=mock_http_session,
             whitelist=MockWhitelist(),
@@ -136,12 +136,8 @@ class TestEventContractCompliance:
 
         mock_event_publisher = AsyncMock(spec=SpellcheckEventPublisherProtocol)
 
-        # Use REAL spell logic implementation
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        # Use REAL spell logic implementation backed by shared normalizer
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,
             http_session=mock_http_session,
             whitelist=MockWhitelist(),
@@ -221,12 +217,8 @@ class TestEventContractCompliance:
             outbox_manager=mock_outbox_manager,
         )
 
-        # Use REAL spell logic implementation
-        from services.spellchecker_service.implementations.spell_logic_impl import (
-            DefaultSpellLogic,
-        )
-
-        real_spell_logic = DefaultSpellLogic(
+        # Use REAL spell logic implementation backed by shared normalizer
+        real_spell_logic = create_default_spell_logic_for_tests(
             result_store=mock_result_store,
             http_session=mock_http_session,
             whitelist=MockWhitelist(),

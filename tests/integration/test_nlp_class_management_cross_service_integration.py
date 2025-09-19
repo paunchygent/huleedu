@@ -80,7 +80,7 @@ class TestNLPClassManagementCrossServiceIntegration:
     @pytest.fixture(scope="class")
     def kafka_container(self) -> Generator[KafkaContainer, None, None]:
         """Kafka container for event communication."""
-        with KafkaContainer("confluentinc/cp-kafka:7.4.0") as container:
+        with KafkaContainer() as container:
             yield container
 
     @pytest.fixture(scope="class")

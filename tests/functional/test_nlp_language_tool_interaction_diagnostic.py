@@ -189,15 +189,13 @@ class TestNLPLanguageToolInteractionDiagnostic:
 
         # Setup Kafka monitoring for NLP responses
         nlp_response_topic = topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED)
-        # Note: Using generic processing failed topic since specific NLP failed event may not exist
-        nlp_error_topic = topic_name(ProcessingEvent.PROCESSING_FAILED)
+        # Note: No specific NLP error topic available - monitoring success topic only
 
         consumer_group = f"diagnostic-nlp-{uuid.uuid4().hex[:8]}"
         logger.info(f"📡 Setting up Kafka consumer: group={consumer_group}")
 
         consumer = AIOKafkaConsumer(
             nlp_response_topic,
-            nlp_error_topic,
             bootstrap_servers=kafka_manager.config.bootstrap_servers,
             group_id=consumer_group,
             auto_offset_reset="latest",  # Only get new events

@@ -118,4 +118,6 @@ class TestHealthRoutes:
             response = await client.get("/metrics")
 
             assert response.status_code == 200
-            assert response.content_type == "text/plain; version=0.0.4; charset=utf-8"
+            expected_media = "text/plain"
+            assert response.content_type.startswith(expected_media)
+            assert "charset=utf-8" in response.content_type

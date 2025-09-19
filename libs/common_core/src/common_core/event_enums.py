@@ -14,8 +14,6 @@ class ProcessingEvent(str, Enum):
     BATCH_PIPELINE_COMPLETED = "batch.pipeline.completed"
     BATCH_PHASE_SKIPPED = "batch.phase.skipped"
     # -------------  Essay lifecycle  -------------#
-    ESSAY_PHASE_INITIATION_REQUESTED = "essay.phase.initiation.requested"
-    ESSAY_LIFECYCLE_STATE_UPDATED = "essay.lifecycle.state.updated"
     ESSAY_SLOT_ASSIGNED = "essay.slot.assigned"
     # -------------  Essay content readiness  -------------#
     ESSAY_CONTENT_PROVISIONED = "essay.content.provisioned"
@@ -50,7 +48,6 @@ class ProcessingEvent(str, Enum):
     BATCH_AUTHOR_MATCHES_SUGGESTED = "batch.author.matches.suggested"
     ESSAY_AIFEEDBACK_COMPLETED = "essay.aifeedback.completed"
     ESSAY_EDITOR_REVISION_COMPLETED = "essay.editor_revision.completed"
-    ESSAY_GRAMMAR_COMPLETED = "essay.grammar.completed"
     # -------------  Enhanced file and class management events  -------------#
     ESSAY_STUDENT_ASSOCIATION_UPDATED = "essay.student.association.updated"
     BATCH_FILE_ADDED = "batch.file.added"
@@ -68,10 +65,7 @@ class ProcessingEvent(str, Enum):
     BATCH_RESULTS_READY = "batch.results.ready"
     BATCH_ASSESSMENT_COMPLETED = "batch.assessment.completed"
     ASSESSMENT_RESULT_PUBLISHED = "assessment.result.published"
-    # -------------  Generic -------------#
-    PROCESSING_STARTED = "processing.started"
-    PROCESSING_CONCLUDED = "processing.concluded"
-    PROCESSING_FAILED = "processing.failed"
+    # -------------  Resource tracking -------------#
     RESOURCE_CONSUMPTION_REPORTED = "resource.consumption.reported"
     # -------------  LLM Provider events  -------------#
     LLM_REQUEST_STARTED = "llm_provider.request.started"

@@ -20,7 +20,11 @@ from services.spellchecker_service.protocols import (
     SpellcheckEventPublisherProtocol,
     SpellLogicProtocol,
 )
-from services.spellchecker_service.tests.mocks import MockWhitelist, create_mock_parallel_processor
+from services.spellchecker_service.tests.mocks import (
+    MockWhitelist,
+    create_default_spell_logic_for_tests,
+    create_mock_parallel_processor,
+)
 
 
 class MockRedisClient:
@@ -148,11 +152,7 @@ def real_spell_logic(
 ) -> SpellLogicProtocol:
     """Create real spell logic implementation for testing business logic."""
     _, _, result_store, _, _ = mock_boundary_services
-    from services.spellchecker_service.implementations.spell_logic_impl import (
-        DefaultSpellLogic,
-    )
-
-    return DefaultSpellLogic(
+    return create_default_spell_logic_for_tests(
         result_store=result_store,
         http_session=mock_boundary_services[0],
         whitelist=MockWhitelist(),
