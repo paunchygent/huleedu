@@ -403,6 +403,8 @@ RUN apt-get update && apt-get install -y openjdk-11-jre-headless
 4. **Cohesion**: first/second-order sentence similarity (TextDescriptives)
 5. **Grammar accuracy**: From Language Tool Service
 6. **Phraseology**: avg PMI/npmi of essay bigrams/trigrams (gensim/textacy)
+   - Temporary limitation: metrics return `0.0` until corpus-backed frequency
+     tables are shipped (documented in `PhraseologyCalculator`).
 
 ### Dependencies to Add
 

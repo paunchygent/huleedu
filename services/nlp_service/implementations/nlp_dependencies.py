@@ -62,10 +62,20 @@ class SpacyModelLoader(SpacyModelLoaderProtocol):
 
                 # Try to add TextDescriptives for advanced metrics
                 try:
-                    model.add_pipe("textdescriptives/all")
-                    logger.info(f"Added TextDescriptives to {language} model")
+                    from textdescriptives import load_components as td_load_components
+
+                    _ = td_load_components  # Import ensures factory decorators register
+                    if "textdescriptives/all" not in model.pipe_names:
+                        model.add_pipe("textdescriptives/all")
+                        logger.info(f"Added TextDescriptives to {language} model")
+                except ImportError as import_error:
+                    logger.critical(
+                        "TextDescriptives dependency missing; cannot compute cohesion metrics"
+                    )
+                    raise RuntimeError("TextDescriptives dependency missing") from import_error
                 except Exception as e:
-                    logger.warning(f"Could not add TextDescriptives: {e}")
+                    logger.critical(f"Failed to register TextDescriptives components: {e}")
+                    raise RuntimeError("TextDescriptives registration failed") from e
 
                 self._models[language] = model
                 return model
@@ -221,6 +231,11 @@ class PhraseologyCalculator(PhraseologyCalculatorProtocol):
     def calculate_pmi_scores(self, tokens: list[str]) -> tuple[float, float, float, float]:
         """Calculate PMI/NPMI scores for bigrams and trigrams.
 
+        Note:
+            Returns zeros until we ship corpus-backed frequency tables. PMI requires
+            baseline distributions derived from a large external corpus, which the
+            current implementation does not yet provide.
+
         Args:
             tokens: List of word tokens
 
@@ -317,14 +332,22 @@ class SyntacticComplexityCalculator(SyntacticComplexityCalculatorProtocol):
         first_order = 0.0
         second_order = 0.0
 
-        # Check if TextDescriptives provided metrics
-        if hasattr(doc._, "first_order_coherence_scores"):
-            scores = doc._.first_order_coherence_scores
+        coherence_data = getattr(doc._, "coherence", None)
+        if isinstance(coherence_data, dict):
+            first_value = coherence_data.get("first_order_coherence")
+            second_value = coherence_data.get("second_order_coherence")
+            if first_value is not None:
+                first_order = float(first_value)
+            if second_value is not None:
+                second_order = float(second_value)
+
+        if first_order == 0.0 and hasattr(doc._, "first_order_coherence_values"):
+            scores = doc._.first_order_coherence_values
             if scores:
                 first_order = float(np.mean(scores))
 
-        if hasattr(doc._, "second_order_coherence_scores"):
-            scores = doc._.second_order_coherence_scores
+        if second_order == 0.0 and hasattr(doc._, "second_order_coherence_values"):
+            scores = doc._.second_order_coherence_values
             if scores:
                 second_order = float(np.mean(scores))
 

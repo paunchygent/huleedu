@@ -1,9 +1,11 @@
 # TASK-052L.2 — Feature Bundles & Comprehensive Testing
 
 ## Objective
+
 Implement the 50-signal specification as cohesive extractor bundles with exhaustive automated coverage.
 
 ## Deliverables
+
 1. Bundle layout under `libs/huleedu_nlp_shared/feature_pipeline/` (each module <500 LoC), exposed to both services and CLI, with ability to register/unregister bundles individually for experimentation:
    - `lexical_diversity.py`
    - `syntax_complexity.py`
@@ -18,11 +20,13 @@ Implement the 50-signal specification as cohesive extractor bundles with exhaust
 4. Feature names follow a consistent naming convention (`nlp_<group>_<metric>`), documented centrally; provide lightweight stubs (returning `None` or `0.0`) for bundles still under evaluation so CLI can emit complete schemas while experiments are in-progress.
 
 ### Spell-Normalised Text Usage
+
 - All bundles consume the spell-normalised text provided by the shared helper. Store the reference in the feature context once to avoid duplicated corrections.
 - Grammar bundle combines Language Tool rates with Spellchecker error counts (per 100 words) rather than re-running detection on raw text.
 - Tests must include fixtures for: raw text, normalised text, and error count metadata to ensure helper parity across environments.
 
 ## Target Feature Set (must match master plan)
+
 - **Grammar & Mechanics (10)** — `grammar_quality.py`
   - `grammar_error_rate_p100w`, `spelling_error_rate_p100w`, `punctuation_error_rate_p100w`, `capitalization_error_rate_p100w`, `agreement_error_rate_p100w`, `tense_misuse_rate_p100w`, `sentence_fragment_rate`, `run_on_rate`, `quote_mismatch_count`, `non_alnum_symbol_rate`
 - **Vocabulary Range (8)** — `lexical_diversity.py`
@@ -39,6 +43,7 @@ Implement the 50-signal specification as cohesive extractor bundles with exhaust
 Deprecated metrics (`transition_count`, `stance_modality_index`, `nli_neutrality_to_prompt`, etc.) must remain removed.
 
 ## Testing Strategy
+
 - Unit tests per bundle verifying:
   - Correct handling of typical vs. edge cases (empty essay, short essay, non-English text).
   - Deterministic output given fixed analyzer/grammar fixtures.
@@ -49,6 +54,7 @@ Deprecated metrics (`transition_count`, `stance_modality_index`, `nli_neutrality
 - For features still flagged as experimental, ensure tests assert graceful disabling (e.g., pipeline returns empty map when bundle is skipped).
 
 ## Acceptance Criteria
+
 - All feature modules implemented with docstrings and type hints.
 - New tests pass via `pdm run pytest-root services/nlp_service/tests/features` (create directory if needed).
 - Coverage demonstrates every feature is exercised; add snapshot / golden-file assertions if numeric stability is critical.

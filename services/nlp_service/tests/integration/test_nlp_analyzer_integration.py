@@ -236,3 +236,47 @@ class TestNlpAnalyzerIntegration:
         assert result.sentence_count == 150
         # Processing time should be reasonable even for large text
         assert result.processing_time_ms < 30000  # Less than 30 seconds
+
+    @pytest.mark.asyncio
+    async def test_spacy_loader_registers_textdescriptives(self) -> None:
+        """Ensure TextDescriptives pipeline is attached when available."""
+        pytest.importorskip("textdescriptives")
+
+        loader = SpacyModelLoader()
+        model = await loader.load_model("en")
+
+        assert "textdescriptives/coherence" in model.pipe_names
+
+        doc = model("The cat sat. The cat was happy. Both were content.")
+        coherence_attr = getattr(doc._, "coherence", None)
+        if coherence_attr is None:
+            pytest.skip("TextDescriptives coherence attribute missing")
+
+        assert isinstance(coherence_attr, dict)
+        assert "first_order_coherence" in coherence_attr
+        assert "second_order_coherence" in coherence_attr
+
+    @pytest.mark.asyncio
+    async def test_cohesion_scores_align_with_textdescriptives(self) -> None:
+        """Validate cohesion calculations mirror TextDescriptives values."""
+        pytest.importorskip("textdescriptives")
+
+        loader = SpacyModelLoader()
+        model = await loader.load_model("en")
+        doc = model("The cat sat. The cat was happy. Both were content.")
+
+        coherence_attr = getattr(doc._, "coherence", None)
+        if not coherence_attr:
+            pytest.skip("TextDescriptives coherence attribute missing")
+
+        calculator = SyntacticComplexityCalculator()
+        first, second = calculator.calculate_cohesion_scores(doc)
+
+        expected_first = coherence_attr.get("first_order_coherence")
+        expected_second = coherence_attr.get("second_order_coherence")
+
+        if expected_first is None or expected_second is None:
+            pytest.skip("Coherence values unavailable")
+
+        assert first == pytest.approx(float(expected_first))
+        assert second == pytest.approx(float(expected_second))

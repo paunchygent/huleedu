@@ -1,9 +1,11 @@
 # TASK-052L.0 — Shared Spell Normaliser Extraction
 
 ## Objective
+
 Extract the three-stage spell correction pipeline (word filter → Swedish L2 lookup → PySpellChecker) into a shared library so both runtime services and offline tooling use identical logic before feature experimentation begins.
 
 ## Deliverables
+
 - New shared package `libs/huleedu_nlp_shared/` providing a `SpellNormalizer` facade and typed `SpellNormalizationResult` output.
 - L2 dictionary loader, whitelist helper, and PySpell caching logic migrated from Spellchecker Service into the shared module.
 - Spellchecker Service refactored to consume the shared helper without changing public behaviour.
@@ -12,6 +14,7 @@ Extract the three-stage spell correction pipeline (word filter → Swedish L2 lo
 - Documentation updates describing usage and configuration.
 
 ## Work Breakdown
+
 1. **Library Scaffold**
    - Create shared package `libs/huleedu_nlp_shared/` with `normalization/` sub-package (facade, models, L2 logic, whitelist, spellchecker wrappers, config dataclass with env overrides).
    - Implement `SpellNormalizationResult` dataclass (corrected text, per-stage counts, detailed corrections, word count, density, stage timings) plus helpers (e.g., `to_feature_dict`).
@@ -30,6 +33,7 @@ Extract the three-stage spell correction pipeline (word filter → Swedish L2 lo
    - Update relevant task docs/READMEs describing how to configure and use the shared normaliser (paths, language settings, whitelist handling).
 
 ## Acceptance Criteria
+
 - Spellchecker Service passes all existing tests using the shared normaliser; a feature flag allows reverting to the legacy pipeline during rollout.
 - Shared package achieves ≥90% test coverage (dictionary/whitelist logic, spell corrections, configuration) and includes a regression benchmark showing <5% performance regression versus the current implementation on a 100-essay sample.
 - CLI groundwork verified by running `scripts/ml/normalize_dataset.py` over a sample dataset (e.g., 100 essays) within <30 seconds, using the shared normaliser and resource paths resolved correctly in Docker/dev environments.

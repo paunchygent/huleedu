@@ -112,7 +112,7 @@ if settings.LANGUAGE_TOOL_LANGUAGE_MODEL_DIR:
 
 #### 4.1 Directory Structure
 
-```
+``` text
 /ngrams/
 ├── en/
 │   ├── 1grams/
