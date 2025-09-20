@@ -22,6 +22,8 @@ from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
+from common_core.events.spellcheck_models import SpellcheckMetricsV1
+from huleedu_nlp_shared.feature_pipeline import FeaturePipelineProtocol
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_external_service_error,
@@ -35,8 +37,6 @@ from pydantic import ValidationError
 from services.nlp_service.protocols import (
     CommandHandlerProtocol,
     ContentClientProtocol,
-    LanguageToolClientProtocol,
-    NlpAnalyzerProtocol,
     NlpEventPublisherProtocol,
 )
 
@@ -51,8 +51,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         content_client: ContentClientProtocol,
         event_publisher: NlpEventPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
-        nlp_analyzer: NlpAnalyzerProtocol,
-        language_tool_client: LanguageToolClientProtocol,
+        feature_pipeline: FeaturePipelineProtocol,
         tracer: "Tracer | None" = None,
     ) -> None:
         """Initialize with NLP analysis dependencies.
@@ -61,8 +60,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
             content_client: Client for fetching essay content
             event_publisher: Publisher for NLP analysis results (uses outbox internally)
             outbox_repository: Outbox repository for transactional publishing
-            nlp_analyzer: spaCy-based text analyzer
-            language_tool_client: Client for grammar checking service
+            feature_pipeline: Shared feature pipeline orchestrating analysis
             tracer: Optional tracer for distributed tracing
 
         Note: No kafka_bus parameter - all event publishing uses outbox pattern
@@ -70,8 +68,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         self.content_client = content_client
         self.event_publisher = event_publisher
         self.outbox_repository = outbox_repository
-        self.nlp_analyzer = nlp_analyzer
-        self.language_tool_client = language_tool_client
+        self.feature_pipeline = feature_pipeline
         self.tracer = tracer
 
     async def can_handle(self, event_type: str) -> bool:
@@ -184,51 +181,97 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         )
                         continue
 
-                    # Step 2: Perform spaCy text analysis
-                    # Determine language (use provided or auto-detect)
+                    # Step 2: Run feature pipeline using normalized text and spell metrics
                     language = getattr(command_data, "language", "auto")
 
-                    nlp_metrics = await self.nlp_analyzer.analyze_text(
-                        text=essay_text,
-                        language=language,
-                    )
+                    spellcheck_metrics = getattr(essay_ref, "spellcheck_metrics", None)
+                    if spellcheck_metrics is None:
+                        logger.warning(
+                            "Spellcheck metrics missing for essay; defaulting to zero values",
+                            extra={
+                                "essay_id": essay_ref.essay_id,
+                                "batch_id": batch_id,
+                                "correlation_id": str(correlation_id),
+                            },
+                        )
+                        approximate_word_count = len(essay_text.split())
+                        spellcheck_metrics = SpellcheckMetricsV1(
+                            total_corrections=0,
+                            l2_dictionary_corrections=0,
+                            spellchecker_corrections=0,
+                            word_count=approximate_word_count,
+                            correction_density=0.0,
+                        )
 
-                    logger.debug(
-                        f"Completed spaCy analysis for essay {essay_ref.essay_id}",
-                        extra={
-                            "essay_id": essay_ref.essay_id,
-                            "word_count": nlp_metrics.word_count,
-                            "sentence_count": nlp_metrics.sentence_count,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-
-                    # Step 3: Perform grammar analysis
                     try:
-                        grammar_analysis = await self.language_tool_client.check_grammar(
-                            text=essay_text,
+                        pipeline_result = await self.feature_pipeline.extract_features(
+                            normalized_text=essay_text,
+                            spellcheck_metrics=spellcheck_metrics,
+                            essay_id=essay_ref.essay_id,
+                            batch_id=batch_id,
                             language=language,
                             http_session=http_session,
                             correlation_id=correlation_id,
                         )
+                    except HuleEduError:
+                        raise
                     except aiohttp.ClientError as e:
                         raise_external_service_error(
                             service="nlp_service",
-                            operation="check_grammar",
+                            operation="feature_pipeline",
                             external_service="language_tool_service",
                             message=(
-                                f"Grammar check failed for essay {essay_ref.essay_id}: {str(e)}"
+                                f"Language Tool request failed for essay {essay_ref.essay_id}: {str(e)}"
+                            ),
+                            correlation_id=correlation_id,
+                            essay_id=essay_ref.essay_id,
+                            batch_id=batch_id,
+                        )
+                    except Exception as e:
+                        raise_processing_error(
+                            service="nlp_service",
+                            operation="feature_pipeline",
+                            stage="extract_features",
+                            message=(
+                                f"Unexpected error running feature pipeline for essay {essay_ref.essay_id}: {str(e)}"
                             ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
                         )
 
+                    context = pipeline_result.context
+                    nlp_metrics = context.nlp_metrics
+                    grammar_analysis = context.grammar_analysis
+
+                    if nlp_metrics is None:
+                        raise_processing_error(
+                            service="nlp_service",
+                            operation="feature_pipeline",
+                            stage="nlp_metrics_missing",
+                            message="Feature pipeline did not produce NLP metrics",
+                            correlation_id=correlation_id,
+                            essay_id=essay_ref.essay_id,
+                            batch_id=batch_id,
+                        )
+
+                    if grammar_analysis is None:
+                        raise_processing_error(
+                            service="nlp_service",
+                            operation="feature_pipeline",
+                            stage="grammar_analysis_missing",
+                            message="Feature pipeline did not produce grammar analysis",
+                            correlation_id=correlation_id,
+                            essay_id=essay_ref.essay_id,
+                            batch_id=batch_id,
+                        )
+
                     logger.debug(
-                        f"Completed grammar analysis for essay {essay_ref.essay_id}",
+                        f"Completed feature pipeline for essay {essay_ref.essay_id}",
                         extra={
                             "essay_id": essay_ref.essay_id,
-                            "error_count": grammar_analysis.error_count,
+                            "word_count": nlp_metrics.word_count,
+                            "grammar_error_count": grammar_analysis.error_count,
                             "correlation_id": str(correlation_id),
                         },
                     )
@@ -241,6 +284,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         nlp_metrics=nlp_metrics,
                         grammar_analysis=grammar_analysis,
                         correlation_id=correlation_id,
+                        feature_outputs=pipeline_result.features,
                     )
 
                     processed_count += 1

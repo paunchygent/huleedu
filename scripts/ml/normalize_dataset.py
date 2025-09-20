@@ -12,11 +12,10 @@ from typing import Any
 from uuid import uuid4
 
 import pandas as pd  # type: ignore[import-untyped]
-from huleedu_nlp_shared.normalization import SpellNormalizer
-from huleedu_nlp_shared.normalization.protocols import (
-    SpellcheckerSettingsProtocol,
-    WhitelistProtocol,
-)
+from huleedu_nlp_shared.feature_pipeline import FeaturePipeline
+from huleedu_nlp_shared.feature_pipeline.extractors import NormalizationFeaturesExtractor
+from huleedu_nlp_shared.normalization import FileWhitelist, SpellNormalizer
+from huleedu_nlp_shared.normalization.protocols import SpellcheckerSettingsProtocol
 from huleedu_service_libs.error_handling import (
     HuleEduError,
     raise_configuration_error,
@@ -29,64 +28,6 @@ from huleedu_service_libs.error_handling import (
 # Import L2 loader from service - need sys.path for scripts
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
-
-
-class SimpleWhitelist(WhitelistProtocol):
-    """Minimal whitelist implementation for CLI usage.
-
-    This implementation loads a whitelist from a text file and provides
-    case-insensitive word checking functionality.
-
-    Args:
-        path: Path to the whitelist file containing one word per line.
-
-    Raises:
-        HuleEduError: If the whitelist file cannot be loaded or is invalid.
-    """
-
-    def __init__(self, path: str) -> None:
-        """Initialize the whitelist from a file.
-
-        Args:
-            path: Path to the whitelist file.
-
-        Raises:
-            HuleEduError: If the file cannot be read or parsed.
-        """
-        try:
-            self.words: set[str] = set()
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    word = line.strip().lower()
-                    if word:
-                        self.words.add(word)
-        except FileNotFoundError:
-            raise_resource_not_found(
-                service="normalize_dataset",
-                operation="load_whitelist",
-                resource_type="whitelist_file",
-                resource_id=path,
-                correlation_id=uuid4(),
-            )
-        except Exception as e:
-            raise_configuration_error(
-                service="normalize_dataset",
-                operation="load_whitelist",
-                config_key="whitelist_file",
-                message=f"Failed to load whitelist: {e}",
-                correlation_id=uuid4(),
-            )
-
-    def is_whitelisted(self, word: str) -> bool:
-        """Check if a word is in the whitelist.
-
-        Args:
-            word: The word to check.
-
-        Returns:
-            True if the word should bypass correction, False otherwise.
-        """
-        return word.lower() in self.words
 
 
 class CLISettings(SpellcheckerSettingsProtocol):
@@ -113,12 +54,17 @@ class CLISettings(SpellcheckerSettingsProtocol):
         return "/tmp/spell_corrections"
 
 
-async def normalize_essay(text: str, normalizer: SpellNormalizer) -> dict[str, Any]:
-    """Normalize a single essay text.
+async def normalize_essay(
+    text: str,
+    pipeline: FeaturePipeline,
+    essay_id: str | None = None,
+) -> dict[str, Any]:
+    """Normalize a single essay text using the shared feature pipeline.
 
     Args:
         text: The essay text to normalize.
-        normalizer: The spell normalizer instance.
+        pipeline: Feature pipeline instance with SpellNormalizer dependency.
+        essay_id: Optional essay identifier for tracing.
 
     Returns:
         Dictionary containing normalization results with keys:
@@ -132,14 +78,21 @@ async def normalize_essay(text: str, normalizer: SpellNormalizer) -> dict[str, A
         HuleEduError: If normalization fails.
     """
     try:
-        result = await normalizer.normalize_text(text=text)
-        return {
-            "corrected_text": result.corrected_text,
-            "total_corrections": result.total_corrections,
-            "l2_corrections": result.l2_dictionary_corrections,
-            "spell_corrections": result.spellchecker_corrections,
-            "correction_density": result.correction_density,
+        pipeline_result = await pipeline.extract_features(
+            raw_text=text,
+            essay_id=essay_id,
+        )
+        context = pipeline_result.context
+        metrics = context.spellcheck_metrics
+        output: dict[str, Any] = {
+            "corrected_text": context.normalized_text,
+            "total_corrections": metrics.total_corrections,
+            "l2_corrections": metrics.l2_dictionary_corrections,
+            "spell_corrections": metrics.spellchecker_corrections,
+            "correction_density": metrics.correction_density,
         }
+        output.update(pipeline_result.features)
+        return output
     except Exception as e:
         raise_processing_error(
             service="normalize_dataset",
@@ -150,7 +103,7 @@ async def normalize_essay(text: str, normalizer: SpellNormalizer) -> dict[str, A
 
 
 async def process_batch(
-    essays: list[tuple[int, str]], normalizer: SpellNormalizer
+    essays: list[tuple[int, str]], pipeline: FeaturePipeline
 ) -> list[tuple[int, dict[str, Any]]]:
     """Process a batch of essays concurrently.
 
@@ -166,7 +119,7 @@ async def process_batch(
     """
     try:
         # Create concurrent tasks for the batch
-        tasks = [normalize_essay(essay_text, normalizer) for _, essay_text in essays]
+        tasks = [normalize_essay(essay_text, pipeline) for _, essay_text in essays]
 
         # Process concurrently with timeout protection
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -261,8 +214,25 @@ async def main() -> None:
         print(f"Loaded {len(l2_errors)} L2 corrections")
 
         print(f"Loading whitelist from {args.whitelist}")
-        whitelist = SimpleWhitelist(str(args.whitelist))
-        print(f"Loaded {len(whitelist.words)} whitelist entries")
+        try:
+            whitelist = FileWhitelist(args.whitelist)
+        except FileNotFoundError:
+            raise_resource_not_found(
+                service="normalize_dataset",
+                operation="load_whitelist",
+                resource_type="whitelist_file",
+                resource_id=str(args.whitelist),
+                correlation_id=uuid4(),
+            )
+        except Exception as e:
+            raise_configuration_error(
+                service="normalize_dataset",
+                operation="load_whitelist",
+                config_key="whitelist_file",
+                message=f"Failed to load whitelist: {e}",
+                correlation_id=uuid4(),
+            )
+        print(f"Loaded {whitelist.size:,} whitelist entries")
 
         # Create normalizer
         normalizer = SpellNormalizer(
@@ -270,6 +240,13 @@ async def main() -> None:
             whitelist=whitelist,
             parallel_processor=None,
             settings=CLISettings(),
+        )
+
+        pipeline = FeaturePipeline(
+            spell_normalizer=normalizer,
+            language_tool_client=None,
+            nlp_analyzer=None,
+            extractors=[NormalizationFeaturesExtractor()],
         )
 
         # Process dataframe
@@ -300,7 +277,7 @@ async def main() -> None:
 
             print(f"Processing batch {i // args.batch_size + 1}: essays {i}-{batch_end - 1}")
 
-            batch_results = await process_batch(batch, normalizer)
+            batch_results = await process_batch(batch, pipeline)
             for idx, result in batch_results:
                 all_results[idx] = result
 

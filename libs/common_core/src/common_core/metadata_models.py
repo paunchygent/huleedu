@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, model_validator
 
 from .domain_enums import ContentType
 from .status_enums import ProcessingStage
+
+if TYPE_CHECKING:  # pragma: no cover - import for typing only
+    from .events.spellcheck_models import SpellcheckMetricsV1
+else:  # pragma: no cover - runtime placeholder to avoid circular imports
+    SpellcheckMetricsV1 = Any  # type: ignore[assignment]
 
 __all__ = [
     "EssayProcessingInputRefV1",
@@ -57,6 +62,10 @@ class EssayProcessingInputRefV1(BaseModel):
 
     essay_id: str
     text_storage_id: str
+    spellcheck_metrics: "SpellcheckMetricsV1 | None" = Field(
+        default=None,
+        description="Optional spellcheck metrics computed during previous phase",
+    )
 
 
 class PersonNameV1(BaseModel):

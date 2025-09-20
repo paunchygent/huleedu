@@ -30,6 +30,7 @@ secrets/
 # Service data directories
 scripts/utils/md-to-html-converter
 services/spellchecker_service/data/corrected_essays
+services/spellchecker_service/data/whitelist/
 data/corrected_essays
 test_uploads/
 

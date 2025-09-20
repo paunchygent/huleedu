@@ -7,6 +7,11 @@ from typing import Any
 
 from common_core.event_enums import ProcessingEvent, topic_name
 from dishka import Provider, Scope, provide
+from huleedu_nlp_shared.feature_pipeline import FeaturePipeline, FeaturePipelineProtocol
+from huleedu_nlp_shared.feature_pipeline.extractors import (
+    GrammarOverviewExtractor,
+    NormalizationFeaturesExtractor,
+)
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -324,13 +329,30 @@ class NlpServiceProvider(Provider):
         return client
 
     @provide(scope=Scope.APP)
+    def provide_feature_pipeline(
+        self,
+        language_tool_client: LanguageToolClientProtocol,
+        nlp_analyzer: NlpAnalyzerProtocol,
+    ) -> FeaturePipelineProtocol:
+        """Provide shared feature pipeline instance reused across requests."""
+
+        return FeaturePipeline(
+            spell_normalizer=None,
+            language_tool_client=language_tool_client,
+            nlp_analyzer=nlp_analyzer,
+            extractors=[
+                NormalizationFeaturesExtractor(),
+                GrammarOverviewExtractor(),
+            ],
+        )
+
+    @provide(scope=Scope.APP)
     def provide_batch_nlp_handler(
         self,
         content_client: ContentClientProtocol,
         event_publisher: NlpEventPublisherProtocol,
         outbox_repository: OutboxRepositoryProtocol,
-        nlp_analyzer: NlpAnalyzerProtocol,
-        language_tool_client: LanguageToolClientProtocol,
+        feature_pipeline: FeaturePipelineProtocol,
         tracer: Tracer,
     ) -> BatchNlpAnalysisHandler:
         """Provide Phase 2 batch NLP command handler."""
@@ -338,8 +360,7 @@ class NlpServiceProvider(Provider):
             content_client=content_client,
             event_publisher=event_publisher,
             outbox_repository=outbox_repository,
-            nlp_analyzer=nlp_analyzer,
-            language_tool_client=language_tool_client,
+            feature_pipeline=feature_pipeline,
             tracer=tracer,
         )
 

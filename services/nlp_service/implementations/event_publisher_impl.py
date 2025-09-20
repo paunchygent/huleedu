@@ -206,6 +206,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         nlp_metrics: NlpMetrics,
         grammar_analysis: GrammarAnalysis,
         correlation_id: UUID,
+        feature_outputs: dict[str, Any] | None = None,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
 
@@ -229,6 +230,13 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         )
 
         # Create the event data
+        processing_metadata: dict[str, Any] = {
+            "source": "nlp_service",
+            "phase": "phase_2_analysis",
+        }
+        if feature_outputs:
+            processing_metadata["feature_outputs"] = feature_outputs
+
         event_data = EssayNlpCompletedV1(
             event_name=ProcessingEvent.ESSAY_NLP_COMPLETED,
             entity_id=essay_id,
@@ -238,10 +246,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             text_storage_id=text_storage_id,
             nlp_metrics=nlp_metrics,
             grammar_analysis=grammar_analysis,
-            processing_metadata={
-                "source": "nlp_service",
-                "phase": "phase_2_analysis",
-            },
+            processing_metadata=processing_metadata,
         )
 
         # Create event envelope
