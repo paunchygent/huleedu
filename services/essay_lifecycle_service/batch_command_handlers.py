@@ -319,6 +319,26 @@ async def _route_event(
             return True
 
         # Handle specialized service result events
+        elif event_type == topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED):
+            from common_core.events.spellcheck_models import SpellcheckResultDataV1
+
+            spellcheck_result = SpellcheckResultDataV1.model_validate(envelope.data)
+
+            return await service_result_handler.handle_spellcheck_result(
+                spellcheck_result,
+                correlation_id=correlation_id,
+            )
+
+        elif event_type == topic_name(ProcessingEvent.SPELLCHECK_RESULTS):
+            from common_core.events.spellcheck_models import SpellcheckResultV1
+
+            rich_result = SpellcheckResultV1.model_validate(envelope.data)
+
+            return await service_result_handler.handle_spellcheck_rich_result(
+                rich_result,
+                correlation_id=correlation_id,
+            )
+
         elif event_type == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED):
             from common_core.events.spellcheck_models import SpellcheckPhaseCompletedV1
             from common_core.status_enums import EssayStatus, ProcessingStatus

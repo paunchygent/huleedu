@@ -26,9 +26,10 @@ The NLP Service is a dual-phase Kafka worker service responsible for natural lan
 - **Caching**: Rosters cached in Redis (5 minute TTL)
 
 ### Phase 2: Text Analysis (Post-Readiness)
-- Essay metrics (readability, complexity) - Future implementation
-- Advanced NLP features - Future implementation
-- Language analysis - Future implementation
+- **Feature Pipeline**: Shared `FeaturePipeline` abstraction normalises text, aggregates spell/grammar metrics, and produces the canonical 50-feature vector consumed by both runtime and offline tooling.
+- **Spell Metrics Propagation**: Essay Lifecycle Service forwards `SpellcheckResultV1.correction_metrics`, allowing the NLP handler to reuse Spellchecker totals without re-running the normaliser.
+- **Language Tool Integration**: Grammar analysis runs on the spell-normalised text and feeds grammar-related feature extractors.
+- **Outputs**: `EssayNlpCompletedV1` rich events include the feature map in `processing_metadata["feature_outputs"]`; thin batch completion events remain unchanged.
 
 ### Performance Optimizations
 - **Header-First Message Processing**: Benefits from zero-parse idempotency when processing events with complete Kafka headers (event_id, event_type, trace_id)

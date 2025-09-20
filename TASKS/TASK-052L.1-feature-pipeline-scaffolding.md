@@ -23,6 +23,13 @@ Establish the shared abstractions and dependency injection plumbing required to 
 6. **Tooling alignment** – Update `scripts/ml/normalize_dataset.py` (or rename to `prepare_normalized_dataset.py`) and create `scripts/ml/build_nlp_features.py` so both boot the Dishka container, resolve the shared pipeline, and write normalized text + features. Maintain the established CLI error-handling pattern and ensure Language Tool runs on normalized text only once per essay.
 7. **Documentation & verification** – Document the pipeline architecture, data flow, and feature ownership in `services/nlp_service/README.md` (diagram + ULTRATHINK references). Add unit tests for pipeline registration, context lazy-loading, and spelling aggregation; plan broader bundle and CLI tests for TASK-052L.2/3. Validate changes with `pdm run typecheck-all` and targeted `pdm run pytest-root` suites before requesting review.
 
+## Progress Update (2025‑10‑07)
+
+- Shared pipeline scaffolding is in place (`feature_context`, `protocols`, `pipeline`, extractors) with unit coverage.
+- NLP DI wiring, handler integration, and CLI tooling now consume the pipeline, and `EssayNlpCompletedV1` carries the aggregated feature map.
+- ELS propagates `SpellcheckResultV1` metrics into `EssayProcessingInputRefV1`, so Phase 2 receives canonical spell correction counts without recomputation.
+- Documentation refreshed in `services/nlp_service/README.md`; further architectural diagrams will follow once the remaining feature bundles (TASK‑052L.2) are implemented.
+
 ### Context Data Requirements (supports 50-signal spec)
 
 - Cached spaCy `Doc`, sentences, lemma/token lists, and counts.

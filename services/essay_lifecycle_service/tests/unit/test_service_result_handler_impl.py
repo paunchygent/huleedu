@@ -7,12 +7,15 @@ and batch phase coordination for Task 2.2.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType
-from common_core.metadata_models import StorageReferenceMetadata
+from common_core.event_enums import ProcessingEvent
+from common_core.events.spellcheck_models import SpellcheckMetricsV1, SpellcheckResultV1
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 
@@ -191,6 +194,67 @@ class TestDefaultServiceResultHandler:
         }
 
         mock_batch_coordinator.check_batch_completion.assert_called_once()
+
+    async def test_handle_spellcheck_rich_result_updates_metrics(
+        self,
+        handler: DefaultServiceResultHandler,
+        mock_essay_repository: AsyncMock,
+        mock_batch_coordinator: AsyncMock,
+    ) -> None:
+        """Rich spellcheck event should persist correction metrics in metadata."""
+
+        correlation_id = uuid4()
+
+        existing_state = MagicMock()
+        existing_state.processing_metadata = {
+            "spellcheck_result": {
+                "success": True,
+                "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
+                "corrected_text_storage_id": "corrected-456",
+            }
+        }
+        mock_essay_repository.get_essay_state.return_value = existing_state
+
+        metrics = SpellcheckMetricsV1(
+            total_corrections=4,
+            l2_dictionary_corrections=1,
+            spellchecker_corrections=3,
+            word_count=200,
+            correction_density=2.0,
+        )
+
+        rich_result = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
+            entity_id="test-essay-1",
+            entity_type="essay",
+            parent_id="batch-1",
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=SystemProcessingMetadata(
+                entity_id="test-essay-1",
+                entity_type="essay",
+                parent_id="batch-1",
+                timestamp=datetime.now(UTC),
+            ),
+            batch_id="batch-1",
+            correlation_id=str(correlation_id),
+            corrections_made=4,
+            correction_metrics=metrics,
+            original_text_storage_id="orig-123",
+            corrected_text_storage_id="corrected-456",
+            processing_duration_ms=1200,
+        )
+
+        result = await handler.handle_spellcheck_rich_result(rich_result, correlation_id)
+
+        assert result is True
+        mock_essay_repository.update_essay_processing_metadata.assert_called_once()
+        metadata_updates = (
+            mock_essay_repository.update_essay_processing_metadata.call_args.kwargs["metadata_updates"]
+        )
+        spellcheck_metadata = metadata_updates["spellcheck_result"]
+        assert spellcheck_metadata["metrics"]["total_corrections"] == 4
+        assert spellcheck_metadata["metrics"]["correction_density"] == 2.0
+        assert spellcheck_metadata["corrections_made"] == 4
 
     async def test_handle_spellcheck_result_essay_not_found(
         self,

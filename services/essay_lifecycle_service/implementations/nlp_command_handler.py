@@ -8,7 +8,10 @@ from uuid import UUID
 
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
 from common_core.domain_enums import Language
+from common_core.events.spellcheck_models import SpellcheckMetricsV1
+from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from services.essay_lifecycle_service.constants import MetadataKey
@@ -101,7 +104,33 @@ class NlpCommandHandler:
                                     correlation_id=correlation_id,
                                 )
 
-                                successfully_transitioned.append(essay_ref)
+                                metrics_dict = (
+                                    essay_state.processing_metadata.get("spellcheck_result", {})
+                                ).get("metrics")
+
+                                spellcheck_metrics = None
+                                if metrics_dict:
+                                    try:
+                                        spellcheck_metrics = SpellcheckMetricsV1.model_validate(
+                                            metrics_dict
+                                        )
+                                    except ValidationError as exc:
+                                        logger.warning(
+                                            "Failed to validate spellcheck metrics for essay",
+                                            extra={
+                                                "essay_id": essay_ref.essay_id,
+                                                "error": str(exc),
+                                                "correlation_id": str(correlation_id),
+                                            },
+                                        )
+
+                                successfully_transitioned.append(
+                                    EssayProcessingInputRefV1(
+                                        essay_id=essay_ref.essay_id,
+                                        text_storage_id=essay_ref.text_storage_id,
+                                        spellcheck_metrics=spellcheck_metrics,
+                                    )
+                                )
 
                                 logger.info(
                                     f"Transitioned essay {essay_ref.essay_id} to {essay_machine.current_status.value} for NLP phase",

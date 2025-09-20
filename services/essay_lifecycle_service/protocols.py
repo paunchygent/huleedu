@@ -321,6 +321,14 @@ class ServiceResultHandler(Protocol):
         """Handle spellcheck result from Spell Checker Service."""
         ...
 
+    async def handle_spellcheck_rich_result(
+        self,
+        result_data: Any,  # SpellcheckResultV1
+        correlation_id: UUID,
+    ) -> bool:
+        """Handle rich spellcheck metrics event."""
+        ...
+
     async def handle_spellcheck_phase_completed(
         self,
         essay_id: str,
