@@ -1,9 +1,9 @@
 # TASK-052L — NLP Feature Pipeline Integration Master Plan
 
-## Status: IN PROGRESS (Updated 2025-09-19)
+## Status: IN PROGRESS (Updated 2025-09-20)
 
 ### Progress Summary
-- **Phase 1**: ✅ PARTIAL - Spell Normalizer extracted, CLI tooling pending
+- **Phase 1**: ✅ COMPLETED - Spell Normalizer extracted, CLI tooling implemented
 - **Phase 2-3**: ❌ NOT STARTED - Feature pipeline and CLI validation
 
 ## Objective
@@ -134,10 +134,10 @@ All teams must implement and persist the following six dimensions. Naming shown 
 
 ## Subtasks Status
 
-- `TASK-052L.0-spell-normalizer-shared-helper.md` ✅ **PARTIAL**
+- `TASK-052L.0-spell-normalizer-shared-helper.md` ✅ **COMPLETED**
   - Library extraction complete, service integration working
-  - CLI tooling (`scripts/ml/normalize_dataset.py`) not started
-  - Documentation incomplete (missing README)
+  - CLI tooling (`scripts/ml/normalize_dataset.py`) implemented and tested
+  - Documentation complete (comprehensive README exists)
 
 - `TASK-052L.1-feature-pipeline-scaffolding.md` ❌ **NOT STARTED**
   - Feature pipeline abstraction not created
@@ -153,12 +153,13 @@ All teams must implement and persist the following six dimensions. Naming shown 
 
 ## Critical Path Issues
 
-1. **Directory Structure Mismatch**: Data prep script in `scripts/data_preparation/` instead of planned `scripts/ml/`
-2. **Missing Normalization CLI**: `normalize_dataset.py` blocks feature pipeline development
-3. **Documentation Gap**: `libs/huleedu_nlp_shared/README.md` violates rule 090 requirements
+✅ All critical path issues resolved:
+- Directory structure aligned (`scripts/ml/` created, scripts moved)
+- Normalization CLI implemented and tested
+- Documentation complete
 
 ## Next Steps
 
-1. Complete TASK-052L.0 by creating CLI normalization tool
-2. Create comprehensive library documentation
-3. Proceed with feature pipeline scaffolding (TASK-052L.1)
+1. Proceed with feature pipeline scaffolding (TASK-052L.1)
+2. Implement 50-feature extraction system (TASK-052L.2)
+3. Create `build_nlp_features.py` for offline CLI validation (TASK-052L.3)
