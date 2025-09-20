@@ -75,12 +75,6 @@ from services.essay_lifecycle_service.implementations.nlp_command_handler import
 from services.essay_lifecycle_service.implementations.noop_slot_operations import (
     NoopSlotOperations,
 )
-from services.essay_lifecycle_service.implementations.redis_batch_queries import RedisBatchQueries
-from services.essay_lifecycle_service.implementations.redis_batch_state import RedisBatchState
-from services.essay_lifecycle_service.implementations.redis_script_manager import RedisScriptManager
-from services.essay_lifecycle_service.implementations.redis_slot_operations import (
-    RedisSlotOperations,
-)
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
 )
@@ -509,20 +503,6 @@ class BatchCoordinationProvider(Provider):
         return BatchTrackerPersistence(engine)
 
     @provide(scope=Scope.APP)
-    def provide_redis_script_manager(
-        self, redis_client: AtomicRedisClientProtocol
-    ) -> RedisScriptManager:
-        """Provide Redis script manager for Lua script operations."""
-        return RedisScriptManager(redis_client)
-
-    @provide(scope=Scope.APP)
-    def provide_redis_slot_operations(
-        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
-    ) -> RedisSlotOperations:
-        """Provide Redis slot operations for atomic slot assignment."""
-        return RedisSlotOperations(redis_client, script_manager)
-
-    @provide(scope=Scope.APP)
     def provide_noop_slot_operations(self) -> NoopSlotOperations:
         """Provide no-op slot operations for Option B architecture.
 
@@ -530,24 +510,6 @@ class BatchCoordinationProvider(Provider):
         This provider satisfies SlotOperationsProtocol dependencies without operations.
         """
         return NoopSlotOperations()
-
-    @provide(scope=Scope.APP)
-    def provide_redis_batch_state(
-        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
-    ) -> RedisBatchState:
-        """Provide Redis batch state management."""
-        return RedisBatchState(
-            redis_client,
-            script_manager,
-            default_timeout=86400,  # 24 hours
-        )
-
-    @provide(scope=Scope.APP)
-    def provide_redis_batch_queries(
-        self, redis_client: AtomicRedisClientProtocol, script_manager: RedisScriptManager
-    ) -> RedisBatchQueries:
-        """Provide Redis batch query operations."""
-        return RedisBatchQueries(redis_client, script_manager)
 
     @provide(scope=Scope.APP)
     def provide_db_failure_tracker(self, session_factory: async_sessionmaker) -> DBFailureTracker:

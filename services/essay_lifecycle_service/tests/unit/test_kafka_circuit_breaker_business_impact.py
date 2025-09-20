@@ -35,8 +35,8 @@ from services.essay_lifecycle_service.domain_services import ContentAssignmentSe
 from services.essay_lifecycle_service.implementations.batch_coordination_handler_impl import (
     DefaultBatchCoordinationHandler,
 )
-from services.essay_lifecycle_service.implementations.redis_pending_content_ops import (
-    RedisPendingContentOperations,
+from services.essay_lifecycle_service.implementations.db_pending_content_ops import (
+    DBPendingContentOperations,
 )
 from services.essay_lifecycle_service.implementations.service_request_dispatcher import (
     DefaultSpecializedServiceRequestDispatcher,
@@ -152,8 +152,8 @@ def mock_session_factory() -> Mock:
 
 @pytest.fixture
 def mock_pending_content_ops() -> AsyncMock:
-    """Mock RedisPendingContentOperations for business logic testing."""
-    return AsyncMock(spec=RedisPendingContentOperations)
+    """Mock DBPendingContentOperations for business logic testing."""
+    return AsyncMock(spec=DBPendingContentOperations)
 
 
 @pytest.fixture

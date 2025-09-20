@@ -37,6 +37,7 @@ test_uploads/
 # Large data files
 services/spellchecker_service/data/cross-verified-database.csv.gz
 services/spellchecker_service/data/*.csv.gz
+services/spellchecker_service/data/whitelist/combined_whitelist.txt
 
 # Local development stores and caches
 .local_*
@@ -60,3 +61,5 @@ services/*/tmp/
 llm_response_logs/
 
 .DS_Store
+services/spellchecker_service/data/whitelist/combined_whitelist.txt
+.gitignore
