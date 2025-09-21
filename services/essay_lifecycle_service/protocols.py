@@ -312,15 +312,6 @@ class BatchCoordinationHandler(Protocol):
 class ServiceResultHandler(Protocol):
     """Protocol for handling specialized service result events."""
 
-    async def handle_spellcheck_result(
-        self,
-        result_data: Any,  # SpellcheckResultDataV1
-        correlation_id: UUID,
-        confirm_idempotency: Any = None,
-    ) -> bool:
-        """Handle spellcheck result from Spell Checker Service."""
-        ...
-
     async def handle_spellcheck_rich_result(
         self,
         result_data: Any,  # SpellcheckResultV1

@@ -1,29 +1,23 @@
 """Spellcheck result handler for Essay Lifecycle Service.
 
-Handles:
-- `SpellcheckResultDataV1` (legacy rich result used for state transitions)
-- `SpellcheckResultV1` (new rich result carrying aggregated metrics)
-- `SpellcheckPhaseCompletedV1` (thin event for state machine updates)
+Handles dual-event pattern:
+- `SpellcheckPhaseCompletedV1` (thin event for state machine transitions)
+- `SpellcheckResultV1` (rich event carrying aggregated metrics and business data)
 """
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from common_core.domain_enums import ContentType
 from common_core.events.spellcheck_models import (
     SpellcheckMetricsV1,
-    SpellcheckResultDataV1,
     SpellcheckResultV1,
 )
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
-from huleedu_service_libs.observability import get_current_trace_id, trace_operation
-from opentelemetry import trace
-from quart import current_app, has_app_context
 
 # Import event constants from state machine to ensure consistency
 from services.essay_lifecycle_service.constants import MetadataKey
@@ -57,168 +51,6 @@ class SpellcheckResultHandler:
         self.batch_coordinator = batch_coordinator
         self.session_factory = session_factory
 
-    async def handle_spellcheck_result(
-        self,
-        result_data: SpellcheckResultDataV1,
-        correlation_id: UUID,
-        confirm_idempotency: Any = None,
-    ) -> bool:
-        """Handle legacy rich spellcheck result emitted alongside thin event."""
-
-        try:
-            is_success = result_data.status == EssayStatus.SPELLCHECKED_SUCCESS
-
-            logger.info(
-                "Processing spellcheck result",
-                extra={
-                    "essay_id": result_data.entity_id,
-                    "status": result_data.status.value,
-                    "success": is_success,
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
-            if not result_data.entity_id:
-                logger.error("Missing entity_id in spellcheck result")
-                return False
-
-            async with self.session_factory() as session:
-                async with session.begin():
-                    essay_state = await self.repository.get_essay_state(
-                        result_data.entity_id, session
-                    )
-                    if essay_state is None:
-                        logger.error(
-                            "Essay not found for spellcheck result",
-                            extra={
-                                "essay_id": result_data.entity_id,
-                                "correlation_id": str(correlation_id),
-                            },
-                        )
-                        return False
-
-                    state_machine = EssayStateMachine(
-                        essay_id=result_data.entity_id,
-                        initial_status=essay_state.current_status,
-                    )
-
-                    trigger = EVT_SPELLCHECK_SUCCEEDED if is_success else EVT_SPELLCHECK_FAILED
-                    transition_logged = logger.info if is_success else logger.warning
-                    transition_logged(
-                        "Spellcheck %s, transitioning state",
-                        "succeeded" if is_success else "failed",
-                        extra={
-                            "essay_id": result_data.entity_id,
-                            "current_status": essay_state.current_status.value,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-
-                    if not state_machine.trigger_event(trigger):
-                        logger.error(
-                            "State machine trigger '%s' failed for essay %s from status %s.",
-                            trigger,
-                            result_data.entity_id,
-                            essay_state.current_status.value,
-                            extra={"correlation_id": str(correlation_id)},
-                        )
-                        return False
-
-                    storage_ref_to_add = None
-                    if is_success and result_data.storage_metadata:
-                        spellchecked_ref = result_data.storage_metadata.references.get(
-                            ContentType.CORRECTED_TEXT
-                        )
-                        if spellchecked_ref:
-                            storage_id = spellchecked_ref.get("default")
-                            if storage_id:
-                                storage_ref_to_add = (ContentType.CORRECTED_TEXT, storage_id)
-                                logger.info(
-                                    "Extracted storage reference",
-                                    extra={
-                                        "storage_id": storage_id,
-                                        "content_type": ContentType.CORRECTED_TEXT.value,
-                                        "trace_id": get_current_trace_id(),
-                                    },
-                                )
-
-                    spellcheck_metadata: dict[str, Any] = {
-                        "success": is_success,
-                        "status": result_data.status.value,
-                        "original_text_storage_id": result_data.original_text_storage_id,
-                        "storage_metadata": result_data.storage_metadata.model_dump()
-                        if result_data.storage_metadata
-                        else None,
-                        "corrections_made": result_data.corrections_made,
-                        "error_info": result_data.system_metadata.error_info
-                        if result_data.system_metadata
-                        else None,
-                    }
-
-                    metrics = getattr(result_data, "correction_metrics", None)
-                    if metrics is not None:
-                        spellcheck_metadata["metrics"] = metrics.model_dump()
-
-                    metadata_update = {
-                        "spellcheck_result": spellcheck_metadata,
-                        "current_phase": "spellcheck",
-                        "phase_outcome_status": result_data.status.value,
-                    }
-
-                    await self.repository.update_essay_status_via_machine(
-                        result_data.entity_id,
-                        state_machine.current_status,
-                        metadata_update,
-                        session,
-                        storage_reference=storage_ref_to_add,
-                        correlation_id=correlation_id,
-                    )
-
-                    logger.info(
-                        "Successfully updated essay status via state machine",
-                        extra={
-                            "essay_id": result_data.entity_id,
-                            "new_status": state_machine.current_status.value,
-                            "correlation_id": str(correlation_id),
-                        },
-                    )
-
-                    updated_essay_state = await self.repository.get_essay_state(
-                        result_data.entity_id, session
-                    )
-                    if updated_essay_state:
-                        await self.batch_coordinator.check_batch_completion(
-                            essay_state=updated_essay_state,
-                            phase_name=PhaseName.SPELLCHECK,
-                            correlation_id=correlation_id,
-                            session=session,
-                        )
-
-            if confirm_idempotency is not None:
-                await confirm_idempotency()
-
-            logger.info(
-                "Successfully processed spellcheck result",
-                extra={
-                    "essay_id": result_data.entity_id,
-                    "new_status": state_machine.current_status.value,
-                    "correlation_id": str(correlation_id),
-                },
-            )
-
-            return True
-
-        except Exception as e:
-            logger.error(
-                "Error handling spellcheck result",
-                extra={
-                    "essay_id": getattr(result_data, "entity_id", "unknown"),
-                    "error": str(e),
-                    "correlation_id": str(correlation_id),
-                },
-            )
-            return False
-
     async def handle_spellcheck_rich_result(
         self,
         rich_result: SpellcheckResultV1,
@@ -227,6 +59,10 @@ class SpellcheckResultHandler:
         """Persist spellcheck metrics from the SpellcheckResultV1 event."""
 
         try:
+            if not rich_result.entity_id:
+                logger.error("Missing entity_id in rich spellcheck result")
+                return False
+
             metrics: SpellcheckMetricsV1 = rich_result.correction_metrics
 
             async with self.session_factory() as session:

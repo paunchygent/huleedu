@@ -178,7 +178,9 @@ class TestGrammarAnalysisPipeline:
         assert category_counts["TYPOS"] >= 1
 
         # Grammar categories should still be represented when present
-        error_categories = {error.get("category_id") or error.get("category") for error in response_data["errors"]}
+        error_categories = {
+            error.get("category_id") or error.get("category") for error in response_data["errors"]
+        }
         assert "TYPOS" in {cat.upper() for cat in error_categories if isinstance(cat, str)}
 
     @pytest.mark.integration

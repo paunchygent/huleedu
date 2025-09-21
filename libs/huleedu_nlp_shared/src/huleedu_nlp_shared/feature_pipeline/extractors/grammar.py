@@ -21,7 +21,9 @@ class GrammarOverviewExtractor(FeatureExtractorProtocol):
                 "grammar_total_error_count": 0,
             }
 
-        non_spelling_errors = sum(1 for error in analysis.errors if error.category.upper() != "SPELLING")
+        non_spelling_errors = sum(
+            1 for error in analysis.errors if error.category.upper() != "SPELLING"
+        )
         rate = (non_spelling_errors / context.word_count) * 100 if context.word_count > 0 else 0.0
 
         return {

@@ -10,9 +10,7 @@ class SpellNormalizationResult(BaseModel):
 
     corrected_text: str = Field(description="Text after all spellcheck operations")
     total_corrections: int = Field(description="Total number of corrections applied")
-    l2_dictionary_corrections: int = Field(
-        description="Number of L2 learner corrections"
-    )
+    l2_dictionary_corrections: int = Field(description="Number of L2 learner corrections")
     spellchecker_corrections: int = Field(
         description="Number of corrections performed by PySpellChecker"
     )

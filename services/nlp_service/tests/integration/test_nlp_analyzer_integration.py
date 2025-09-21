@@ -7,7 +7,7 @@ wordfreq, lexical-diversity, gensim, and langdetect libraries.
 import pytest
 from common_core.events.nlp_events import NlpMetrics
 
-from services.nlp_service.implementations.nlp_analyzer_impl import NlpAnalyzerRefactored
+from services.nlp_service.implementations.nlp_analyzer_impl import NlpAnalyzer
 from services.nlp_service.implementations.nlp_dependencies import (
     LanguageDetector,
     LexicalDiversityCalculator,
@@ -23,9 +23,9 @@ class TestNlpAnalyzerIntegration:
     """Integration tests for NLP analyzer with real dependencies."""
 
     @pytest.fixture
-    def analyzer(self) -> NlpAnalyzerRefactored:
+    def analyzer(self) -> NlpAnalyzer:
         """Create analyzer with real dependencies."""
-        return NlpAnalyzerRefactored(
+        return NlpAnalyzer(
             model_loader=SpacyModelLoader(),
             language_detector=LanguageDetector(),
             zipf_calculator=ZipfCalculator(),
@@ -36,7 +36,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_analyze_english_text_with_real_spacy(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test full analysis pipeline with real English spaCy model."""
         text = """The quick brown fox jumps over the lazy dog.
@@ -62,7 +62,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_analyze_swedish_text_with_real_spacy(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test full analysis pipeline with real Swedish spaCy model."""
         text = """Detta är en svensk text med åäö.
@@ -78,7 +78,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_language_autodetection_with_langdetect(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test automatic language detection with real langdetect library."""
         swedish_text = "Detta är definitivt svensk text med många svenska ord och bokstäver som åäö"
@@ -94,7 +94,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_zipf_frequency_calculation_with_wordfreq(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test Zipf frequency metrics with real wordfreq library."""
         # Mix of common and rare words
@@ -112,7 +112,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_lexical_diversity_with_sufficient_text(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test lexical diversity metrics with real lexical-diversity library."""
         # Create text with at least 50 tokens for MTLD/HDD calculation
@@ -136,7 +136,7 @@ class TestNlpAnalyzerIntegration:
             assert 0 < result.hdd_score < 1.0
 
     @pytest.mark.asyncio
-    async def test_phraseology_metrics_with_gensim(self, analyzer: NlpAnalyzerRefactored) -> None:
+    async def test_phraseology_metrics_with_gensim(self, analyzer: NlpAnalyzer) -> None:
         """Test PMI/NPMI calculation with real gensim library."""
         # Text with common bigrams and trigrams
         text = (
@@ -158,7 +158,7 @@ class TestNlpAnalyzerIntegration:
         assert result.avg_trigram_npmi >= 0
 
     @pytest.mark.asyncio
-    async def test_syntactic_complexity_with_spacy(self, analyzer: NlpAnalyzerRefactored) -> None:
+    async def test_syntactic_complexity_with_spacy(self, analyzer: NlpAnalyzer) -> None:
         """Test syntactic complexity metrics with real spaCy parsing."""
         # Text with varying syntactic complexity
         text = """
@@ -178,7 +178,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     async def test_fallback_to_skeleton_mode_on_import_error(
-        self, analyzer: NlpAnalyzerRefactored
+        self, analyzer: NlpAnalyzer
     ) -> None:
         """Test that analyzer falls back gracefully when dependencies fail."""
         # This test verifies the analyzer still works even if some
@@ -210,7 +210,7 @@ class TestNlpAnalyzerIntegration:
     )
     async def test_basic_metrics_always_calculated(
         self,
-        analyzer: NlpAnalyzerRefactored,
+        analyzer: NlpAnalyzer,
         text: str,
         language: str,
         min_words: int,
@@ -225,7 +225,7 @@ class TestNlpAnalyzerIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_large_text_processing(self, analyzer: NlpAnalyzerRefactored) -> None:
+    async def test_large_text_processing(self, analyzer: NlpAnalyzer) -> None:
         """Test processing of large text documents."""
         # Generate a large text (1000+ words)
         large_text = " ".join(["The quick brown fox jumps over the lazy dog." for _ in range(150)])

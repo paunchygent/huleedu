@@ -293,12 +293,12 @@ class NlpAnalyzerTestFixture:
         return self
 
     def build(self) -> Any:
-        """Build the NlpAnalyzerRefactored with configured dependencies."""
+        """Build the NlpAnalyzer with configured dependencies."""
         from services.nlp_service.implementations.nlp_analyzer_impl import (
-            NlpAnalyzerRefactored,
+            NlpAnalyzer,
         )
 
-        return NlpAnalyzerRefactored(
+        return NlpAnalyzer(
             model_loader=self.model_loader,
             language_detector=self.language_detector,
             zipf_calculator=self.zipf_calculator,

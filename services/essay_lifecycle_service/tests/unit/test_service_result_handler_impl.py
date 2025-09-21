@@ -8,15 +8,13 @@ and batch phase coordination for Task 2.2.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import ANY, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckMetricsV1, SpellcheckResultV1
-from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
-from common_core.pipeline_models import PhaseName
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.implementations.service_result_handler_impl import (
@@ -70,136 +68,10 @@ class TestDefaultServiceResultHandler:
         }
         return essay_state
 
-    @pytest.fixture
-    def mock_spellcheck_result_success(self) -> MagicMock:
-        """Create successful spellcheck result data."""
-        result = MagicMock()
-        result.entity_id = "test-essay-1"
-        result.entity_type = "essay"
-        result.parent_id = None
-        result.status = EssayStatus.SPELLCHECKED_SUCCESS
-        result.original_text_storage_id = "original-123"
-
-        # Mock the storage_metadata with the expected nested structure
-        mock_storage_meta = MagicMock(spec=StorageReferenceMetadata)
-        mock_storage_meta.references = {ContentType.CORRECTED_TEXT: {"default": "corrected-456"}}
-        mock_storage_meta.model_dump.return_value = {
-            "references": {ContentType.CORRECTED_TEXT.value: {"default": "corrected-456"}}
-        }
-        result.storage_metadata = mock_storage_meta
-        result.corrections_made = 5
-        result.system_metadata = None
-        return result
-
-    @pytest.fixture
-    def mock_spellcheck_result_failure(self) -> MagicMock:
-        """Create failed spellcheck result data."""
-        result = MagicMock()
-        result.entity_id = "test-essay-1"
-        result.entity_type = "essay"
-        result.parent_id = None
-        result.status = EssayStatus.SPELLCHECK_FAILED
-        result.original_text_storage_id = "original-123"
-        result.storage_metadata = {}
-        result.corrections_made = 0
-        system_metadata = MagicMock()
-        system_metadata.error_info = {"error": "Spell checker timeout"}
-        result.system_metadata = system_metadata
-        return result
-
-    async def test_handle_spellcheck_result_success(
-        self,
-        handler: DefaultServiceResultHandler,
-        mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
-        mock_essay_state: MagicMock,
-        mock_spellcheck_result_success: MagicMock,
-    ) -> None:
-        """Test successful spellcheck result handling."""
-        # Setup
-        correlation_id = uuid4()
-        mock_essay_repository.get_essay_state.return_value = mock_essay_state
-        mock_essay_repository.update_essay_status_via_machine.return_value = None
-
-        # Create updated essay state for batch coordinator
-        updated_essay_state = MagicMock()
-        updated_essay_state.essay_id = "test-essay-1"
-        updated_essay_state.current_status = EssayStatus.SPELLCHECKED_SUCCESS
-        mock_essay_repository.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
-
-        # Execute
-        result = await handler.handle_spellcheck_result(
-            mock_spellcheck_result_success, correlation_id
-        )
-
-        # Verify
-        assert result is True
-        # Check that get_essay_state was called with essay_id (session parameter may be included)
-        call_args = mock_essay_repository.get_essay_state.call_args
-        assert call_args.args[0] == "test-essay-1"
-        mock_essay_repository.update_essay_status_via_machine.assert_called_once()
-
-        # Check the call arguments (positional args)
-        call_args = mock_essay_repository.update_essay_status_via_machine.call_args
-        assert call_args.args[0] == "test-essay-1"  # essay_id (positional 1)
-        assert call_args.args[1] == EssayStatus.SPELLCHECKED_SUCCESS  # new_status (positional 2)
-        assert "spellcheck_result" in call_args.args[2]  # metadata (positional 3)
-        assert call_args.args[2]["current_phase"] == "spellcheck"
-        # session is positional arg 4, storage_reference and correlation_id are keyword args
-        assert call_args.kwargs["storage_reference"] == (
-            ContentType.CORRECTED_TEXT,
-            "corrected-456",
-        )
-
-        mock_batch_coordinator.check_batch_completion.assert_called_once_with(
-            essay_state=updated_essay_state,
-            phase_name=PhaseName.SPELLCHECK,
-            correlation_id=correlation_id,
-            session=ANY,
-        )
-
-    async def test_handle_spellcheck_result_failure(
-        self,
-        handler: DefaultServiceResultHandler,
-        mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
-        mock_essay_state: MagicMock,
-        mock_spellcheck_result_failure: MagicMock,
-    ) -> None:
-        """Test failed spellcheck result handling."""
-        # Setup
-        correlation_id = uuid4()
-        mock_essay_repository.get_essay_state.return_value = mock_essay_state
-        mock_essay_repository.update_essay_status_via_machine.return_value = None
-
-        # Create updated essay state for batch coordinator
-        updated_essay_state = MagicMock()
-        updated_essay_state.current_status = EssayStatus.SPELLCHECK_FAILED
-        mock_essay_repository.get_essay_state.side_effect = [mock_essay_state, updated_essay_state]
-
-        # Execute
-        result = await handler.handle_spellcheck_result(
-            mock_spellcheck_result_failure, correlation_id
-        )
-
-        # Verify
-        assert result is True
-        mock_essay_repository.update_essay_status_via_machine.assert_called_once()
-
-        # Check metadata includes error info
-        call_args = mock_essay_repository.update_essay_status_via_machine.call_args
-        assert call_args.args[1] == EssayStatus.SPELLCHECK_FAILED
-        assert call_args.args[2]["spellcheck_result"]["error_info"] == {
-            "error": "Spell checker timeout"
-        }
-
-        mock_batch_coordinator.check_batch_completion.assert_called_once()
-
     async def test_handle_spellcheck_rich_result_updates_metrics(
         self,
         handler: DefaultServiceResultHandler,
         mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
     ) -> None:
         """Rich spellcheck event should persist correction metrics in metadata."""
 
@@ -248,64 +120,13 @@ class TestDefaultServiceResultHandler:
 
         assert result is True
         mock_essay_repository.update_essay_processing_metadata.assert_called_once()
-        metadata_updates = (
-            mock_essay_repository.update_essay_processing_metadata.call_args.kwargs["metadata_updates"]
-        )
+        metadata_updates = mock_essay_repository.update_essay_processing_metadata.call_args.kwargs[
+            "metadata_updates"
+        ]
         spellcheck_metadata = metadata_updates["spellcheck_result"]
         assert spellcheck_metadata["metrics"]["total_corrections"] == 4
         assert spellcheck_metadata["metrics"]["correction_density"] == 2.0
         assert spellcheck_metadata["corrections_made"] == 4
-
-    async def test_handle_spellcheck_result_essay_not_found(
-        self,
-        handler: DefaultServiceResultHandler,
-        mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
-        mock_spellcheck_result_success: MagicMock,
-    ) -> None:
-        """Test spellcheck result when essay not found."""
-        # Setup
-        correlation_id = uuid4()
-        mock_essay_repository.get_essay_state.return_value = None
-
-        # Execute
-        result = await handler.handle_spellcheck_result(
-            mock_spellcheck_result_success, correlation_id
-        )
-
-        # Verify
-        assert result is False
-        # Check that get_essay_state was called once with essay_id (session parameter may be included)
-        assert mock_essay_repository.get_essay_state.call_count == 1
-        call_args = mock_essay_repository.get_essay_state.call_args
-        assert call_args.args[0] == "test-essay-1"
-        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
-        mock_batch_coordinator.check_batch_completion.assert_not_called()
-
-    async def test_handle_spellcheck_result_state_machine_trigger_fails(
-        self,
-        handler: DefaultServiceResultHandler,
-        mock_essay_repository: AsyncMock,
-        mock_batch_coordinator: AsyncMock,
-        mock_essay_state: MagicMock,
-        mock_spellcheck_result_success: MagicMock,
-    ) -> None:
-        """Test spellcheck result when state machine trigger fails."""
-        # Setup - essay in wrong state for transition
-        correlation_id = uuid4()
-        mock_essay_state.current_status = EssayStatus.READY_FOR_PROCESSING  # Wrong state
-        mock_essay_repository.get_essay_state.return_value = mock_essay_state
-
-        # Execute
-        result = await handler.handle_spellcheck_result(
-            mock_spellcheck_result_success, correlation_id
-        )
-
-        # Verify
-        assert result is False
-        mock_essay_repository.get_essay_state.assert_called_once()
-        mock_essay_repository.update_essay_status_via_machine.assert_not_called()
-        mock_batch_coordinator.check_batch_completion.assert_not_called()
 
     @pytest.fixture
     def mock_cj_assessment_completed(self) -> MagicMock:

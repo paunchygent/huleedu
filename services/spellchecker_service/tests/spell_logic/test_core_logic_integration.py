@@ -7,8 +7,9 @@ verifying end-to-end functionality with realistic scenarios.
 
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
+import pytest
 from huleedu_nlp_shared.normalization import SpellNormalizationResult, SpellNormalizer
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -26,7 +27,7 @@ async def normalize_text(
     essay_id: str,
     language: str = "en",
     whitelist: object = _DEFAULT,
-    **kwargs,
+    **kwargs: Any,
 ) -> SpellNormalizationResult:
     """Helper to run the shared SpellNormalizer with test-friendly defaults."""
 

@@ -1,4 +1,4 @@
-"""Refactored spaCy-based NLP analyzer with proper dependency injection."""
+"""SpaCy-based NLP analyzer with proper dependency injection."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = create_service_logger("nlp_service.implementations.nlp_analyzer")
 
 
-class NlpAnalyzerRefactored(NlpAnalyzerProtocol):
+class NlpAnalyzer(NlpAnalyzerProtocol):
     """Production spaCy-based text analyzer with comprehensive linguistic metrics.
 
     Uses dependency injection for all external dependencies, following

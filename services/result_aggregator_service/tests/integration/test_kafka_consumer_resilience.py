@@ -9,19 +9,19 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import ContentType, CourseCode
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
     EventEnvelope,
-    SpellcheckResultDataV1,
 )
 from common_core.events.cj_assessment_events import AssessmentResultV1
 from common_core.events.essay_lifecycle_events import EssaySlotAssignedV1
-from common_core.metadata_models import (
-    StorageReferenceMetadata,
-    SystemProcessingMetadata,
+from common_core.events.spellcheck_models import (
+    SpellcheckMetricsV1,
+    SpellcheckResultV1,
 )
+from common_core.metadata_models import SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -57,27 +57,39 @@ class TestKafkaConsumerResilience:
         kafka_consumer._process_message_idempotently = mock_idempotent_processor
 
         essay_id = str(uuid4())
-        spellcheck_data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+
+        metrics = SpellcheckMetricsV1(
+            total_corrections=3,
+            l2_dictionary_corrections=2,
+            spellchecker_corrections=1,
+            word_count=100,
+            correction_density=3.0,
+        )
+
+        spellcheck_data = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
             parent_id="pending",  # Old behavior that causes FK violation
+            batch_id="pending",
+            correlation_id=str(uuid4()),
+            user_id=None,
             status=EssayStatus.SPELLCHECKED_SUCCESS,
+            corrections_made=3,
+            correction_metrics=metrics,
+            original_text_storage_id="original-123",
+            corrected_text_storage_id="storage-456",
+            processing_duration_ms=1500,
+            processor_version="pyspellchecker_1.0_L2_swedish",
             system_metadata=SystemProcessingMetadata(
                 entity_id=essay_id,
                 entity_type="essay",
-                parent_id="pending",
-            ),
-            original_text_storage_id="original-123",
-            corrections_made=3,
-            storage_metadata=StorageReferenceMetadata(
-                references={ContentType.CORRECTED_TEXT: {"corrected": "storage-456"}}
             ),
         )
 
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(UTC),
             source_service="spell_checker",
             correlation_id=uuid4(),
@@ -85,7 +97,7 @@ class TestKafkaConsumerResilience:
         )
 
         record = create_kafka_record(
-            topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            topic=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_envelope=envelope,
         )
 

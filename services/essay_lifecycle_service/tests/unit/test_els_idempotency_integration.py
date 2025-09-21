@@ -135,7 +135,6 @@ def mock_handlers() -> tuple[AsyncMock, AsyncMock, AsyncMock]:
     # Configure successful business logic responses
     batch_coordination_handler.handle_batch_essays_registered.return_value = True
     batch_command_handler.process_initiate_spellcheck_command.return_value = None
-    service_result_handler.handle_spellcheck_result.return_value = True
 
     return batch_coordination_handler, batch_command_handler, service_result_handler
 

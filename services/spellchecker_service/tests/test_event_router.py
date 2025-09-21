@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from common_core.domain_enums import ContentType
@@ -180,8 +180,7 @@ class TestProcessSingleMessage:
         # Verify modernized structured error information
         assert "error_code" in published_event_data.system_metadata.error_info
         assert (
-            published_event_data.system_metadata.error_info["error_code"]
-            == "CONTENT_SERVICE_ERROR"
+            published_event_data.system_metadata.error_info["error_code"] == "CONTENT_SERVICE_ERROR"
         )
         assert "error_message" in published_event_data.system_metadata.error_info
         assert (

@@ -6,7 +6,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-
 from huleedu_nlp_shared.normalization import SpellNormalizer
 from huleedu_nlp_shared.normalization.models import SpellNormalizationResult
 from huleedu_nlp_shared.normalization.protocols import (

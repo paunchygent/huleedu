@@ -16,7 +16,6 @@ from uuid import uuid4
 import pytest
 
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.status_enums import EssayStatus
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
 
 
@@ -63,26 +62,19 @@ class TestBCSKafkaConsumerBehavior:
         """Create a sample spellcheck event message that matches the expected structure."""
         return {
             "event_id": "550e8400-e29b-41d4-a716-446655440000",
-            "event_type": topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+            "event_type": topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
             "event_timestamp": "2024-01-01T00:00:00Z",
             "source_service": "spell-checker-service",
             "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
             "data": {
-                "event_name": "essay.spellcheck.completed",
                 "entity_id": "essay-123",
-                "entity_type": "essay",
-                "parent_id": "batch-456",
-                "status": EssayStatus.SPELLCHECKED_SUCCESS.value,
-                "system_metadata": {
-                    "entity_id": "essay-123",
-                    "entity_type": "essay",
-                    "parent_id": "batch-456",
-                    "processing_stage": "completed",
-                    "event": "essay.spellcheck.completed",
-                },
-                "original_text_storage_id": "text-storage-123",
-                "storage_metadata": None,
-                "corrections_made": 5,
+                "batch_id": "batch-456",
+                "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+                "status": "completed",  # ProcessingStatus.COMPLETED (lowercase for enum)
+                "corrected_text_storage_id": "text-storage-123",
+                "error_code": None,
+                "processing_duration_ms": 1500,
+                "timestamp": "2024-01-01T12:00:00Z",
             },
         }
 
@@ -134,10 +126,10 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Act
-        await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
 
         # Assert
         mock_batch_state_repo.record_essay_step_completion.assert_called_once()
@@ -147,7 +139,7 @@ class TestBCSKafkaConsumerBehavior:
         assert call_args[1]["essay_id"] == "essay-123"
         assert call_args[1]["step_name"] == "spellcheck"
         assert call_args[1]["metadata"]["completion_status"] == "success"
-        assert call_args[1]["metadata"]["status"] == EssayStatus.SPELLCHECKED_SUCCESS.value
+        assert call_args[1]["metadata"]["status"] == "completed"  # ProcessingStatus.COMPLETED.value
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -159,13 +151,15 @@ class TestBCSKafkaConsumerBehavior:
     ) -> None:
         """Test processing of spellcheck failure event."""
         # Arrange
-        sample_spellcheck_message_data["data"]["status"] = EssayStatus.SPELLCHECK_FAILED.value
+        sample_spellcheck_message_data["data"]["status"] = (
+            "failed"  # ProcessingStatus.FAILED (lowercase for enum)
+        )
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Act
-        await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
 
         # Assert
         mock_batch_state_repo.record_essay_step_completion.assert_called_once()
@@ -180,20 +174,30 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo: AsyncMock,
         sample_spellcheck_message_data: dict,
     ) -> None:
-        """Test handling of spellcheck event with missing batch_id."""
-        # Arrange - Remove all possible batch_id fields
-        sample_spellcheck_message_data["data"]["parent_id"] = None
-        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = None
+        """Test handling of spellcheck event with missing batch_id.
+
+        The handler should raise a ValidationError when batch_id is None,
+        and no phase completion should be recorded.
+        """
+        # Arrange - Set batch_id to None (invalid)
+        sample_spellcheck_message_data["data"]["batch_id"] = None
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
-        # Act
-        await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        # Act & Assert - The handler should raise ValidationError
+        from pydantic import ValidationError
 
-        # Assert
+        with pytest.raises(ValidationError) as exc_info:
+            await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
+
+        # Verify the error is about the batch_id field
+        assert "batch_id" in str(exc_info.value)
+
+        # Assert - No phase completion should be recorded due to validation error
         mock_batch_state_repo.record_essay_step_completion.assert_not_called()
+        mock_batch_state_repo.record_phase_completion.assert_not_called()
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -203,24 +207,21 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo: AsyncMock,
         sample_spellcheck_message_data: dict,
     ) -> None:
-        """Test batch_id extraction from system_metadata fallback."""
-        # Arrange - Remove batch_id from direct field but keep in system_metadata
-        sample_spellcheck_message_data["data"]["parent_id"] = None
-        sample_spellcheck_message_data["data"]["system_metadata"]["parent_id"] = (
-            "batch-from-metadata"
-        )
+        """Test batch_id extraction and validation."""
+        # Arrange - Ensure batch_id is present in thin event
+        sample_spellcheck_message_data["data"]["batch_id"] = "batch-from-event"
 
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Act
-        await kafka_consumer._handle_spellcheck_completed(mock_msg)
+        await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
 
         # Assert
         mock_batch_state_repo.record_essay_step_completion.assert_called_once()
         call_args = mock_batch_state_repo.record_essay_step_completion.call_args
-        assert call_args[1]["batch_id"] == "batch-from-metadata"
+        assert call_args[1]["batch_id"] == "batch-from-event"
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -231,13 +232,13 @@ class TestBCSKafkaConsumerBehavior:
         # Arrange
         mock_msg = Mock()
         mock_msg.value = b"invalid json"  # Must be bytes for .decode() to work
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Act & Assert - Should raise validation error for invalid JSON structure
         from pydantic import ValidationError
 
         with pytest.raises((json.JSONDecodeError, ValidationError)):
-            await kafka_consumer._handle_spellcheck_completed(mock_msg)
+            await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
 
         mock_batch_state_repo.record_essay_step_completion.assert_not_called()
 
@@ -410,7 +411,7 @@ class TestBCSKafkaConsumerBehavior:
         """Test event type extraction from various topic formats."""
         # Test cases
         test_cases = [
-            (topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED), "spellcheck_completed"),
+            (topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED), "spellcheck_phase_completed"),
             (topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED), "cj_assessment_completed"),
             ("huleedu.ai.feedback.completed.v1", "ai_feedback_completed"),
             ("short.topic", "unknown_event"),
@@ -477,11 +478,11 @@ class TestBCSKafkaConsumerBehavior:
         mock_batch_state_repo.record_essay_step_completion.side_effect = Exception("Database error")
         mock_msg = Mock()
         mock_msg.value = json.dumps(sample_spellcheck_message_data).encode("utf-8")
-        mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+        mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
 
         # Act & Assert
         with pytest.raises(Exception, match="Database error"):
-            await kafka_consumer._handle_spellcheck_completed(mock_msg)
+            await kafka_consumer._handle_spellcheck_phase_completed(mock_msg)
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -584,12 +585,12 @@ class TestBCSKafkaConsumerBehavior:
 
             mock_msg = Mock()
             mock_msg.value = json.dumps(msg_data).encode("utf-8")
-            mock_msg.topic = topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED)
+            mock_msg.topic = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED)
             messages.append(mock_msg)
 
         # Act
         await asyncio.gather(
-            *[kafka_consumer._handle_spellcheck_completed(msg) for msg in messages]
+            *[kafka_consumer._handle_spellcheck_phase_completed(msg) for msg in messages]
         )
 
         # Assert
@@ -615,7 +616,7 @@ class TestBCSKafkaConsumerBehavior:
         cj_msg.topic = "huleedu.cj_assessment.completed"
 
         # Act
-        await kafka_consumer._handle_spellcheck_completed(spellcheck_msg)
+        await kafka_consumer._handle_spellcheck_phase_completed(spellcheck_msg)
         await kafka_consumer._handle_cj_assessment_completed(cj_msg)
 
         # Assert - Should record completions for spellcheck + 3 CJ assessment essays

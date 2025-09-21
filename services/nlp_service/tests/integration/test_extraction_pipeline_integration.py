@@ -16,7 +16,7 @@ import pytest
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 
-from services.nlp_service.di import NlpServiceProvider
+from services.nlp_service.di import NlpServiceInfrastructureProvider
 from services.nlp_service.features.student_matching.extraction.extraction_pipeline import (
     ExtractionPipeline,
 )
@@ -43,10 +43,12 @@ class TestExtractionPipelineIntegration:
         engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
         # Create container with test provider for missing dependencies
-        from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
+        from services.nlp_service.di_nlp_analysis import NlpAnalysisProvider
 
         container = make_async_container(
-            ExtractionTestProvider(), NlpServiceProvider(engine), NlpDependencyProvider()
+            ExtractionTestProvider(),
+            NlpServiceInfrastructureProvider(engine),
+            NlpAnalysisProvider(),
         )
 
         try:

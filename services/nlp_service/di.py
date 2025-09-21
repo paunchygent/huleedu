@@ -1,4 +1,15 @@
-"""Dependency injection configuration for NLP Service."""
+"""
+NLP Service Infrastructure Provider.
+
+This provider handles core infrastructure components:
+- Kafka/Redis/Database connections
+- HTTP clients for external services
+- Command handlers for Phase 1 & 2 processing
+- Event publishing infrastructure
+
+DEPENDENCIES: Requires NlpAnalysisProvider for NlpAnalyzerProtocol
+              which is used in provide_feature_pipeline method.
+"""
 
 from __future__ import annotations
 
@@ -71,8 +82,12 @@ from services.nlp_service.protocols import (
 from services.nlp_service.repositories.nlp_repository import NlpRepository
 
 
-class NlpServiceProvider(Provider):
-    """Provider for NLP Service dependencies."""
+class NlpServiceInfrastructureProvider(Provider):
+    """Provider for NLP Service infrastructure and command handlers.
+
+    Note: This provider depends on NlpAnalysisProvider to provide
+    the NlpAnalyzerProtocol implementation needed for the feature pipeline.
+    """
 
     def __init__(self, engine: AsyncEngine) -> None:
         """Initialize provider with database engine."""

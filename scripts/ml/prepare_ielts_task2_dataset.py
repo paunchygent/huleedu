@@ -37,7 +37,6 @@ from typing import Iterable
 
 import pandas as pd
 
-
 # CEFR mapping thresholds are inclusive on the lower bound.
 _CEFR_THRESHOLDS: list[tuple[float, str, int]] = [
     (8.5, "C2", 5),
@@ -73,9 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-dir",
         type=Path,
-        default=Path(
-            "data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation"
-        ),
+        default=Path("data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation"),
         help="Directory containing train.csv and test.csv",
     )
     parser.add_argument(

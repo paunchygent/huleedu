@@ -100,7 +100,9 @@ def create_edge_case_spellcheck_event(
         entity_id=essay_id,
         entity_type="essay",
         parent_id=batch_id,
-        batch_id=batch_id if batch_id else "",  # Explicit batch_id field, empty string for None case
+        batch_id=batch_id
+        if batch_id
+        else "",  # Explicit batch_id field, empty string for None case
         timestamp=kwargs.get("timestamp", datetime.now(UTC)),
         status=status,
         system_metadata=system_metadata,

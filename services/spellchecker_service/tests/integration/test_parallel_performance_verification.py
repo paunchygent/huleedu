@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-
 from huleedu_nlp_shared.normalization import SpellNormalizer
 from huleedu_service_libs.logging_utils import create_service_logger
 

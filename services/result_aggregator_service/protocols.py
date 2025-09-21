@@ -9,7 +9,6 @@ from common_core.events import (
     BatchEssaysRegistered,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckResultDataV1,
     SpellcheckResultV1,
 )
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
@@ -188,12 +187,6 @@ class EventProcessorProtocol(Protocol):
         self, envelope: EventEnvelope[ELSBatchPhaseOutcomeV1], data: ELSBatchPhaseOutcomeV1
     ) -> None:
         """Process batch phase outcome event."""
-        ...
-
-    async def process_spellcheck_completed(
-        self, envelope: EventEnvelope[SpellcheckResultDataV1], data: SpellcheckResultDataV1
-    ) -> None:
-        """Process spellcheck completion event."""
         ...
 
     async def process_spellcheck_result(

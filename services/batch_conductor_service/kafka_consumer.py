@@ -18,8 +18,7 @@ from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1
 from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
-from common_core.status_enums import EssayStatus, OperationStatus
+from common_core.status_enums import OperationStatus
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import RedisClientProtocol
@@ -237,19 +236,27 @@ class BCSKafkaConsumer:
         """Extract event type from Kafka topic name for metrics labeling."""
         # Convert topic name to event type for metrics
         # e.g., "huleedu.essay.spellcheck.completed.v1" -> "spellcheck_completed"
+        # e.g., "huleedu.batch.spellcheck.phase.completed.v1" -> "spellcheck_phase_completed"
         # e.g., "huleedu.cj_assessment.completed.v1" -> "cj_assessment_completed"
         # e.g., "huleedu.ai.feedback.completed.v1" -> "ai_feedback_completed"
         parts = topic.split(".")
         if len(parts) >= 4:
+            # Special handling for batch topics: skip "huleedu.batch"
+            if len(parts) >= 5 and parts[0] == "huleedu" and parts[1] == "batch":
+                # Skip first two parts (huleedu.batch) and last part (v1)
+                # Take everything between batch and v1
+                # e.g., [spellcheck, phase, completed] -> spellcheck_phase_completed
+                service_parts = parts[2:-1]
+                return "_".join(service_parts)
             # Special handling for essay topics: skip "huleedu.essay"
-            if len(parts) >= 5 and parts[0] == "huleedu" and parts[1] == "essay":
+            elif len(parts) >= 5 and parts[0] == "huleedu" and parts[1] == "essay":
                 # Skip first two parts (huleedu.essay) and last two parts (completed.v1)
                 service_parts = parts[2:-2]
+                return f"{'_'.join(service_parts)}_completed"
             else:
                 # Skip first part (huleedu) and last two parts (completed.v1)
                 service_parts = parts[1:-2]
-
-            return f"{'_'.join(service_parts)}_completed"
+                return f"{'_'.join(service_parts)}_completed"
         return "unknown_event"
 
     async def _track_event_success(self, event_type: str) -> None:
@@ -265,58 +272,6 @@ class BCSKafkaConsumer:
             self._metrics["events_processed_total"].labels(
                 event_type=event_type, outcome=failure_reason
             ).inc()
-
-    async def _handle_spellcheck_completed(self, msg: ConsumerRecord) -> None:
-        """Handle spellcheck completion events."""
-        try:
-            raw_message = msg.value  # Already decoded by deserializer
-            envelope = EventEnvelope[SpellcheckResultDataV1].model_validate_json(raw_message)
-
-            spellcheck_data = SpellcheckResultDataV1.model_validate(envelope.data)
-            essay_id = spellcheck_data.entity_id
-            if essay_id is None:
-                logger.error("Cannot process spellcheck result: entity_id (essay_id) is None")
-                return
-
-            # Extract batch_id from parent_id or system_metadata
-            batch_id = spellcheck_data.parent_id
-            if not batch_id:
-                # Fallback: try to get batch_id from system_metadata
-                batch_id = spellcheck_data.system_metadata.parent_id
-
-            if not batch_id:
-                logger.error(
-                    f"Cannot determine batch_id for spellcheck result for essay {essay_id}"
-                )
-                return
-
-            # Determine success based on status
-            is_success = spellcheck_data.status == EssayStatus.SPELLCHECKED_SUCCESS
-
-            # Record completion in batch state
-            success = await self.batch_state_repo.record_essay_step_completion(
-                batch_id=batch_id,
-                essay_id=essay_id,
-                step_name="spellcheck",
-                metadata={
-                    "completion_status": "success" if is_success else "failed",
-                    "status": spellcheck_data.status.value,
-                    "event_id": str(envelope.event_id),
-                    "timestamp": envelope.event_timestamp.isoformat(),
-                },
-            )
-
-            if success:
-                logger.info(
-                    f"Recorded spellcheck completion for essay {essay_id} in batch {batch_id}",
-                    extra={"correlation_id": str(envelope.correlation_id)},
-                )
-            else:
-                logger.error(f"Failed to record spellcheck completion for essay {essay_id}")
-
-        except Exception as e:
-            logger.error(f"Error processing spellcheck completion: {e}", exc_info=True)
-            raise
 
     async def _handle_spellcheck_phase_completed(self, msg: ConsumerRecord) -> None:
         """Handle thin spellcheck phase completion events from dual event pattern."""

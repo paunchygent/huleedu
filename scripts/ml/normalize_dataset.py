@@ -289,7 +289,9 @@ async def main() -> None:
 
         # Calculate statistics before saving
         elapsed_time = time.time() - start_time
-        total_corrections = df["total_corrections"].sum() if "total_corrections" in df.columns else 0
+        total_corrections = (
+            df["total_corrections"].sum() if "total_corrections" in df.columns else 0
+        )
         total_l2 = df["l2_corrections"].sum() if "l2_corrections" in df.columns else 0
         total_spell = df["spell_corrections"].sum() if "spell_corrections" in df.columns else 0
         avg_density = df["correction_density"].mean() if "correction_density" in df.columns else 0.0
@@ -299,17 +301,21 @@ async def main() -> None:
         df.to_parquet(args.output)
 
         # Print comprehensive statistics
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("NORMALIZATION COMPLETE")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Essays processed: {len(df)}")
         print(f"Total corrections: {total_corrections}")
-        print(f"  - L2 dictionary: {total_l2} ({total_l2/max(total_corrections,1)*100:.1f}%)")
-        print(f"  - Spellchecker: {total_spell} ({total_spell/max(total_corrections,1)*100:.1f}%)")
-        print(f"Average corrections per essay: {total_corrections/max(len(df),1):.1f}")
+        print(f"  - L2 dictionary: {total_l2} ({total_l2 / max(total_corrections, 1) * 100:.1f}%)")
+        print(
+            f"  - Spellchecker: {total_spell} ({total_spell / max(total_corrections, 1) * 100:.1f}%)"
+        )
+        print(f"Average corrections per essay: {total_corrections / max(len(df), 1):.1f}")
         print(f"Average correction density: {avg_density:.2f} per 100 words")
-        print(f"Processing time: {elapsed_time:.1f} seconds ({len(df)/max(elapsed_time,0.1):.1f} essays/sec)")
-        print(f"{'='*60}")
+        print(
+            f"Processing time: {elapsed_time:.1f} seconds ({len(df) / max(elapsed_time, 0.1):.1f} essays/sec)"
+        )
+        print(f"{'=' * 60}")
 
     except HuleEduError:
         # Re-raise HuleEdu errors as-is

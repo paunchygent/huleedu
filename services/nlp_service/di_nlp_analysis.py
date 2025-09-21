@@ -1,11 +1,18 @@
-"""Dependency injection configuration for NLP analyzer dependencies.
+"""
+NLP Analysis Components Provider.
 
-Separated from main di.py to avoid monolithic file and maintain clear separation.
+This provider handles NLP analysis components:
+- SpaCy-based NLP analyzer
+- Language detection
+- Linguistic metrics calculators (Zipf, diversity, complexity)
+
+PROVIDES: NlpAnalyzerProtocol implementation used by
+          NlpServiceInfrastructureProvider.provide_feature_pipeline()
 """
 
 from dishka import Provider, Scope, provide
 
-from services.nlp_service.implementations.nlp_analyzer_impl import NlpAnalyzerRefactored
+from services.nlp_service.implementations.nlp_analyzer_impl import NlpAnalyzer
 from services.nlp_service.implementations.nlp_dependencies import (
     LanguageDetector,
     LexicalDiversityCalculator,
@@ -25,11 +32,11 @@ from services.nlp_service.nlp_dependency_protocols import (
 from services.nlp_service.protocols import NlpAnalyzerProtocol
 
 
-class NlpDependencyProvider(Provider):
-    """Provider for NLP analyzer dependencies.
+class NlpAnalysisProvider(Provider):
+    """Provider for NLP analysis components and dependencies.
 
-    This is separate from the main NlpServiceProvider to maintain
-    separation of concerns and avoid a monolithic DI configuration.
+    Provides the NlpAnalyzer implementation that performs linguistic
+    analysis on text, used by the infrastructure provider's feature pipeline.
     """
 
     @provide(scope=Scope.APP)
@@ -73,7 +80,7 @@ class NlpDependencyProvider(Provider):
         complexity_calculator: SyntacticComplexityCalculatorProtocol,
     ) -> NlpAnalyzerProtocol:
         """Provide spaCy-based NLP analyzer with injected dependencies."""
-        return NlpAnalyzerRefactored(
+        return NlpAnalyzer(
             model_loader=model_loader,
             language_detector=language_detector,
             zipf_calculator=zipf_calculator,

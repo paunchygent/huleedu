@@ -16,6 +16,7 @@ services:
       - ./services/nlp_service:/app/services/nlp_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       # Exclude __pycache__ and other build artifacts
       - /app/services/nlp_service/__pycache__
       - /app/services/nlp_service/__pypackages__
@@ -209,6 +210,7 @@ services:
       - ./services/spellchecker_service:/app/services/spellchecker_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       - /app/services/spellchecker_service/__pycache__
       - /app/services/spellchecker_service/__pypackages__
     environment:

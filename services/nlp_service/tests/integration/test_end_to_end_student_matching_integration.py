@@ -17,7 +17,7 @@ import pytest
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 
-from services.nlp_service.di import NlpServiceProvider
+from services.nlp_service.di import NlpServiceInfrastructureProvider
 from services.nlp_service.protocols import StudentMatcherProtocol
 
 
@@ -42,10 +42,10 @@ class TestEndToEndStudentMatchingIntegration:
         engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
         # Create container with test provider for missing dependencies
-        from services.nlp_service.di_nlp_dependencies import NlpDependencyProvider
+        from services.nlp_service.di_nlp_analysis import NlpAnalysisProvider
 
         container = make_async_container(
-            EndToEndTestProvider(), NlpServiceProvider(engine), NlpDependencyProvider()
+            EndToEndTestProvider(), NlpServiceInfrastructureProvider(engine), NlpAnalysisProvider()
         )
 
         try:

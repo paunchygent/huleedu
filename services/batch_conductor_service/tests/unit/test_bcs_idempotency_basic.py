@@ -32,9 +32,9 @@ from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import CJAssessmentCompletedV1, GradeProjectionSummary
 from common_core.events.envelope import EventEnvelope
-from common_core.events.spellcheck_models import SpellcheckResultDataV1
+from common_core.events.spellcheck_models import SpellcheckPhaseCompletedV1
 from common_core.metadata_models import SystemProcessingMetadata
-from common_core.status_enums import EssayStatus, ProcessingStage
+from common_core.status_enums import EssayStatus, ProcessingStage, ProcessingStatus
 from huleedu_service_libs.event_utils import generate_deterministic_event_id
 from huleedu_service_libs.idempotency_v2 import IdempotencyConfig, idempotent_consumer
 from services.batch_conductor_service.kafka_consumer import BCSKafkaConsumer
@@ -181,31 +181,31 @@ def create_mock_kafka_record(
 
 def create_spellcheck_completion_event(
     essay_id: str, batch_id: str, status: EssayStatus = EssayStatus.SPELLCHECKED_SUCCESS
-) -> EventEnvelope[SpellcheckResultDataV1]:
-    """Create a spellcheck completion event envelope."""
-    system_metadata = SystemProcessingMetadata(
-        entity_id=essay_id,
-        entity_type="essay",
-        parent_id=batch_id,
-        timestamp=datetime.now(UTC),
-        processing_stage=ProcessingStage.COMPLETED,
-        event="essay.spellcheck.completed",
+) -> EventEnvelope[SpellcheckPhaseCompletedV1]:
+    """Create a spellcheck phase completion event envelope (thin event)."""
+    # Convert EssayStatus to ProcessingStatus for the thin event
+    processing_status = (
+        ProcessingStatus.COMPLETED
+        if status == EssayStatus.SPELLCHECKED_SUCCESS
+        else ProcessingStatus.FAILED
     )
 
-    spellcheck_data = SpellcheckResultDataV1(
-        event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+    spellcheck_data = SpellcheckPhaseCompletedV1(
         entity_id=essay_id,
-        entity_type="essay",
-        parent_id=batch_id,
-        status=status,
-        system_metadata=system_metadata,
-        original_text_storage_id=f"storage-{essay_id}",
-        corrections_made=5 if status == EssayStatus.SPELLCHECKED_SUCCESS else 0,
+        batch_id=batch_id,
+        correlation_id=str(uuid.uuid4()),
+        status=processing_status,
+        corrected_text_storage_id=f"storage-{essay_id}"
+        if processing_status == ProcessingStatus.COMPLETED
+        else None,
+        error_code="SPELL_CHECK_FAILED" if processing_status == ProcessingStatus.FAILED else None,
+        processing_duration_ms=1500,  # Mock processing time
+        timestamp=datetime.now(UTC),
     )
 
     return EventEnvelope(
         event_id=uuid.uuid4(),
-        event_type="SpellcheckResultDataV1",
+        event_type=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_timestamp=datetime.now(UTC),
         source_service="spell-checker-service",
         correlation_id=uuid.uuid4(),
@@ -302,7 +302,7 @@ async def test_spellcheck_first_time_event_processing_success(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
@@ -310,7 +310,9 @@ async def test_spellcheck_first_time_event_processing_success(
     config = IdempotencyConfig(
         service_name="batch-conductor-service",
         event_type_ttls={
-            "SpellcheckResultDataV1": 86400,  # 24 hours for coordination events
+            topic_name(
+                ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+            ): 86400,  # 24 hours for coordination events
         },
         default_ttl=86400,
         enable_debug_logging=True,
@@ -318,7 +320,7 @@ async def test_spellcheck_first_time_event_processing_success(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -333,7 +335,8 @@ async def test_spellcheck_first_time_event_processing_success(
     # Verify V2 key format and TTL for coordination events
     set_call = mock_redis_client.set_calls[0]
     assert set_call[0].startswith("huleedu:idempotency:v2:batch-conductor-service:")
-    assert "SpellcheckResultDataV1" in set_call[0]
+    # Redis keys replace dots with underscores
+    assert "huleedu_batch_spellcheck_phase_completed_v1" in set_call[0]
     assert set_call[2] == 300  # Initial processing state uses 5 minutes TTL
 
     # Verify V2 stores JSON metadata instead of "1"
@@ -431,15 +434,15 @@ async def test_duplicate_spellcheck_event_skipped(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
     # Pre-populate Redis with existing key to simulate duplicate
     deterministic_id = generate_deterministic_event_id(record.value)
-    existing_key = (
-        f"huleedu:idempotency:v2:batch-conductor-service:SpellcheckResultDataV1:{deterministic_id}"
-    )
+    # Note: Redis keys use underscores, not dots
+    topic_key = topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED).replace(".", "_")
+    existing_key = f"huleedu:idempotency:v2:batch-conductor-service:{topic_key}:{deterministic_id}"
     # Store with transaction-aware format indicating completed status
     mock_redis_client.keys[existing_key] = json.dumps(
         {
@@ -459,7 +462,7 @@ async def test_duplicate_spellcheck_event_skipped(
     async def handle_message_idempotently(
         msg: ConsumerRecord, *, confirm_idempotency
     ) -> bool | None:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -548,7 +551,7 @@ async def test_cross_event_type_idempotency_separation(
     # Create spellcheck event
     spellcheck_envelope = create_spellcheck_completion_event(essay_id, batch_id)
     spellcheck_record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=spellcheck_envelope,
     )
 
@@ -567,7 +570,7 @@ async def test_cross_event_type_idempotency_separation(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_spellcheck_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -591,7 +594,7 @@ async def test_cross_event_type_idempotency_separation(
     cj_key = mock_redis_client.set_calls[1][0]
 
     assert spellcheck_key != cj_key
-    assert "SpellcheckResultDataV1" in spellcheck_key
+    assert topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED) in spellcheck_key
     assert "CJAssessmentCompletedV1" in cj_key
     assert spellcheck_key.startswith("huleedu:idempotency:v2:batch-conductor-service:")
     assert cj_key.startswith("huleedu:idempotency:v2:batch-conductor-service:")
@@ -613,7 +616,7 @@ async def test_redis_key_format_verification(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
@@ -625,7 +628,7 @@ async def test_redis_key_format_verification(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -645,7 +648,8 @@ async def test_redis_key_format_verification(
     assert key_parts[1] == "idempotency"
     assert key_parts[2] == "v2"
     assert key_parts[3] == "batch-conductor-service"
-    assert key_parts[4] == "SpellcheckResultDataV1"
+    # Redis keys use underscores, not dots
+    assert key_parts[4] == topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED).replace(".", "_")
     assert len(key_parts[5]) == 64  # SHA-256 hash is 64 characters
 
 
@@ -662,7 +666,7 @@ async def test_coordination_event_ttl_verification(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
@@ -670,8 +674,10 @@ async def test_coordination_event_ttl_verification(
     config = IdempotencyConfig(
         service_name="batch-conductor-service",
         event_type_ttls={
-            "SpellcheckResultDataV1": 86400,  # 24 hours for coordination events
-            topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED): 86400,
+            topic_name(
+                ProcessingEvent.SPELLCHECK_PHASE_COMPLETED
+            ): 86400,  # 24 hours for coordination events
+            topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED): 86400,
             "CJAssessmentCompletedV1": 86400,
             topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED): 86400,
             # AI feedback not yet implemented - will add when service is ready
@@ -683,7 +689,7 @@ async def test_coordination_event_ttl_verification(
 
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_idempotently(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -716,40 +722,31 @@ async def test_deterministic_event_id_generation_consistency(
     shared_correlation_id = uuid.uuid4()
     shared_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-    # Create system metadata
-    system_metadata = SystemProcessingMetadata(
+    # Create the thin event data
+    spellcheck_data = SpellcheckPhaseCompletedV1(
         entity_id=essay_id,
-        entity_type="essay",
-        parent_id=batch_id,
-        timestamp=shared_timestamp,
-        processing_stage=ProcessingStage.COMPLETED,
-        event="essay.spellcheck.completed",
-    )
-
-    spellcheck_data = SpellcheckResultDataV1(
-        event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-        entity_id=essay_id,
-        entity_type="essay",
-        parent_id=batch_id,
-        status=EssayStatus.SPELLCHECKED_SUCCESS,
-        system_metadata=system_metadata,
-        original_text_storage_id=f"storage-{essay_id}",
-        corrections_made=5,
+        batch_id=batch_id,
+        correlation_id=str(shared_correlation_id),
+        status=ProcessingStatus.COMPLETED,
+        corrected_text_storage_id=f"storage-{essay_id}",
+        error_code=None,
+        processing_duration_ms=1500,
+        timestamp=datetime.now(UTC),
     )
 
     # Create two identical envelopes (true retry scenario)
-    envelope1: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+    envelope1: EventEnvelope[SpellcheckPhaseCompletedV1] = EventEnvelope(
         event_id=shared_event_id,
-        event_type="SpellcheckResultDataV1",
+        event_type=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_timestamp=shared_timestamp,
         source_service="spell-checker-service",
         correlation_id=shared_correlation_id,
         data=spellcheck_data,
     )
 
-    envelope2: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+    envelope2: EventEnvelope[SpellcheckPhaseCompletedV1] = EventEnvelope(
         event_id=shared_event_id,
-        event_type="SpellcheckResultDataV1",
+        event_type=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_timestamp=shared_timestamp,  # Same timestamp for true duplicate
         source_service="spell-checker-service",
         correlation_id=shared_correlation_id,
@@ -757,12 +754,12 @@ async def test_deterministic_event_id_generation_consistency(
     )
 
     record1 = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope1,
     )
 
     record2 = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope2,
     )
 
@@ -776,7 +773,7 @@ async def test_deterministic_event_id_generation_consistency(
     async def handle_message_idempotently(
         msg: ConsumerRecord, *, confirm_idempotency
     ) -> bool | None:
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
         await confirm_idempotency()  # Confirm after successful processing
         return True
 
@@ -794,7 +791,7 @@ async def test_deterministic_event_id_generation_consistency(
     # Verify deterministic key generation by checking the key used
     key1 = mock_redis_client.set_calls[0][0]
     # The key should be consistent for identical event content
-    assert "SpellcheckResultDataV1" in key1
+    assert topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED) in key1
 
     # Verify only one business operation was executed
     assert len(mock_batch_state_repo.recorded_completions) == 1
@@ -819,7 +816,7 @@ async def test_async_confirmation_pattern(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
@@ -836,7 +833,7 @@ async def test_async_confirmation_pattern(
         msg: ConsumerRecord, *, confirm_idempotency: Callable[[], Coroutine[Any, Any, None]]
     ) -> Any:
         return await helper.process_with_controlled_confirmation(
-            bcs_kafka_consumer._handle_spellcheck_completed, msg, confirm_idempotency
+            bcs_kafka_consumer._handle_spellcheck_phase_completed, msg, confirm_idempotency
         )
 
     # Start processing in background
@@ -896,7 +893,7 @@ async def test_crash_before_confirmation(
 
     envelope = create_spellcheck_completion_event(essay_id, batch_id)
     record = create_mock_kafka_record(
-        topic=topic_name(ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED),
+        topic=topic_name(ProcessingEvent.SPELLCHECK_PHASE_COMPLETED),
         event_envelope=envelope,
     )
 
@@ -912,7 +909,7 @@ async def test_crash_before_confirmation(
     @idempotent_consumer(redis_client=mock_redis_client, config=config)
     async def handle_message_that_crashes(msg: ConsumerRecord, *, confirm_idempotency) -> bool:
         # Process successfully
-        await bcs_kafka_consumer._handle_spellcheck_completed(msg)
+        await bcs_kafka_consumer._handle_spellcheck_phase_completed(msg)
 
         # Wait indefinitely (simulating crash)
         await crash_simulation.wait()

@@ -14,6 +14,7 @@ dependencies = [
     "dishka",
     "huleedu-common-core",
     "huleedu-service-libs",
+    "huleedu-nlp-shared",
     "pydantic",
     "pydantic-settings",
     "pypandoc",
@@ -36,19 +37,6 @@ dependencies = [
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
-[tool.pdm]
-distribution = false
-package-type = "application"
-
-[tool.pdm.resolution]
-strategy = ["inherit_metadata", "direct_minimal_versions"]
-respect-source-order = true
-excludes = []
-
-[tool.pdm.resolution.overrides]
-huleedu-common-core = "file:///app/libs/common_core"
-huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
-
 [dependency-groups]
 dev = [
     "ruff>=0.11.11",
@@ -59,18 +47,6 @@ dev = [
     "pytest-mock",
     "faker",
 ]
-
-[tool.pdm.scripts]
-start = "python worker_main.py"
-start-worker = "python worker_main.py"
-
-# Alembic database migration commands
-migrate-upgrade = "alembic upgrade head"
-migrate-downgrade = "alembic downgrade -1"
-migrate-history = "alembic history"
-migrate-current = "alembic current"
-migrate-revision = "alembic revision --autogenerate"
-migrate-stamp = "alembic stamp head"
 
 [tool.mypy]
 python_version = "3.11"
@@ -94,3 +70,30 @@ module = [
     "textdescriptives.*",
 ]
 ignore_missing_imports = true
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.resolution]
+strategy = ["inherit_metadata", "direct_minimal_versions"]
+respect-source-order = true
+excludes = []
+
+[tool.pdm.resolution.overrides]
+huleedu-common-core = "file:///app/libs/common_core"
+huleedu-service-libs = "file:///app/libs/huleedu_service_libs"
+huleedu-nlp-shared = "file:///app/libs/huleedu_nlp_shared"
+
+
+[tool.pdm.scripts]
+start = "python worker_main.py"
+start-worker = "python worker_main.py"
+
+# Alembic database migration commands
+migrate-upgrade = "alembic upgrade head"
+migrate-downgrade = "alembic downgrade -1"
+migrate-history = "alembic history"
+migrate-current = "alembic current"
+migrate-revision = "alembic revision --autogenerate"
+migrate-stamp = "alembic stamp head"
+

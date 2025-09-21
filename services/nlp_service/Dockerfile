@@ -21,6 +21,7 @@ WORKDIR /app
 # Copy shared local dependencies
 COPY libs/common_core/ /app/libs/common_core/
 COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
+COPY libs/huleedu_nlp_shared/ /app/libs/huleedu_nlp_shared/
 
 # Copy service files
 COPY services/nlp_service/ /app/services/nlp_service/

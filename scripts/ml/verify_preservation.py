@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Verify that enhanced whitelist preserves critical abbreviations."""
 
+
 import pandas as pd
-from pathlib import Path
 
 # Load normalized output
-normalized = pd.read_parquet("data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation/processed/test_100_normalized_enhanced.parquet")
+normalized = pd.read_parquet(
+    "data/cefr_ielts_datasets/IELTS-writing-task-2-evaluation/processed/test_100_normalized_enhanced.parquet"
+)
 
 print("=== Verification of Abbreviation Preservation ===\n")
 
@@ -34,7 +36,7 @@ for essay_idx, term, description in test_cases:
             # Find context in corrected text
             pos = corrected.lower().find(term.lower())
             if pos != -1:
-                context = corrected[max(0, pos-20):min(len(corrected), pos+len(term)+20)]
+                context = corrected[max(0, pos - 20) : min(len(corrected), pos + len(term) + 20)]
                 print(f"   Context: ...{context}...")
         else:
             print(f"❌ Essay {essay_idx}: '{term}' was INCORRECTLY CORRECTED")
@@ -58,30 +60,34 @@ print(f"Spell corrections: {normalized['spell_corrections'].sum()}")
 # Find essays with the most reductions in corrections
 print("\n=== Essays with Reduced Corrections ===")
 # We'd need the old data to compare, but we can at least show which had few corrections
-least_corrected = normalized.nsmallest(5, 'total_corrections')[['total_corrections', 'l2_corrections', 'spell_corrections']]
+least_corrected = normalized.nsmallest(5, "total_corrections")[
+    ["total_corrections", "l2_corrections", "spell_corrections"]
+]
 print("Essays with fewest corrections:")
 for idx, row in least_corrected.iterrows():
-    print(f"  Essay {idx}: {int(row['total_corrections'])} total ({int(row['l2_corrections'])} L2, {int(row['spell_corrections'])} spell)")
+    print(
+        f"  Essay {idx}: {int(row['total_corrections'])} total ({int(row['l2_corrections'])} L2, {int(row['spell_corrections'])} spell)"
+    )
 
 # Check for any remaining suspicious corrections
 print("\n=== Checking for Suspicious Corrections ===")
 
 suspicious_patterns = [
-    ('CVs', 'Cos'),
-    ('CV', 'TV'),
-    ('USA', 'US'),
-    ('UK', 'UP'),
-    ('EU', 'en'),
-    ('PhD', 'Phd'),
-    ('MSc', 'Mac'),
+    ("CVs", "Cos"),
+    ("CV", "TV"),
+    ("USA", "US"),
+    ("UK", "UP"),
+    ("EU", "en"),
+    ("PhD", "Phd"),
+    ("MSc", "Mac"),
 ]
 
 for orig, bad_correction in suspicious_patterns:
     found = False
     for idx, row in normalized.iterrows():
-        if bad_correction in row['corrected_text'] and bad_correction not in row['essay']:
+        if bad_correction in row["corrected_text"] and bad_correction not in row["essay"]:
             # Check if this might be our bad correction
-            if orig in row['essay'] or orig.lower() in row['essay'].lower():
+            if orig in row["essay"] or orig.lower() in row["essay"].lower():
                 print(f"⚠️ Essay {idx}: Possible bad correction '{orig}' → '{bad_correction}'")
                 found = True
                 break

@@ -1,6 +1,6 @@
 ---
 description: Docker development patterns - multi-stage builds, layer optimization, workflow commands
-globs: ["Dockerfile*", "docker-compose*.yml", "scripts/dev-workflow.sh"]
+globs: ["Dockerfile*", "docker-compose*.yml", "scripts/dev.sh", "scripts/prod.sh"]
 alwaysApply: true
 ---
 
@@ -93,28 +93,12 @@ CMD ["pdm", "run", "start"]
 
 ## Development Workflow Commands
 
-### Primary Development Commands
+### Development Commands
 ```bash
-# Start development environment with hot-reload
-./scripts/dev-workflow.sh dev <service_name>
-
-# Start multiple services in development mode
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up <service1> <service2>
-
-# Check what services need rebuilding
-./scripts/dev-workflow.sh check
-```
-
-### Build Commands
-```bash
-# Build development version of specific service
-./scripts/dev-workflow.sh build dev <service_name>
-
-# Incremental build using cache optimization (all services)
-./scripts/dev-workflow.sh incremental
-
-# Clean build (only when absolutely necessary)
-./scripts/dev-workflow.sh build clean <service_name>
+pdm run dev-start [service]          # Start with hot-reload
+pdm run dev-logs [service]           # View logs
+pdm run dev-build-clean [service]    # Clean build
+pdm run dev-check                    # Check what needs rebuilding
 ```
 
 ### Monitoring Commands
@@ -278,7 +262,7 @@ docker inspect huleedu_<service_name> | grep -A 10 "Mounts"
 ### Template for Remaining Services
 1. Create `Dockerfile.dev` with multi-stage pattern
 2. Add service to `docker-compose.dev.yml`
-3. Test development build: `./scripts/dev-workflow.sh build dev <service>`
+3. Test development build: `pdm run dev-start <service>`
 4. Verify hot-reload: Make code change and check logs
 5. Validate performance: Measure build times
 

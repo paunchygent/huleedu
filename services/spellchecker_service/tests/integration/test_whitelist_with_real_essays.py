@@ -14,16 +14,15 @@ from unittest.mock import MagicMock
 
 import pytest
 from docx import Document
-
 from huleedu_nlp_shared.normalization import SpellNormalizer
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from services.spellchecker_service.config import settings
-from services.spellchecker_service.implementations.whitelist_impl import DefaultWhitelist
-from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
 from services.spellchecker_service.implementations.parallel_processor_impl import (
     DefaultParallelProcessor,
 )
+from services.spellchecker_service.implementations.whitelist_impl import DefaultWhitelist
+from services.spellchecker_service.spell_logic.l2_dictionary_loader import load_l2_errors
 
 
 def extract_text_from_docx(file_path: Path) -> str:

@@ -78,8 +78,8 @@
 - Observability: Metrics counters for preflight outcomes (allowed/insufficient/rate_limited).
 
 ## Operations
-- Dev: `pdm run dev dev entitlements_service` or `pdm run restart entitlements_service`.
-- Verify: `docker compose ps`, `pdm run logs entitlements_service`.
+- Dev: `pdm run dev-start entitlements_service`
+- Verify: `pdm run dev-logs entitlements_service`
 - Typecheck/tests: `pdm run typecheck-all`, `pdm run pytest-root services/entitlements_service/tests`.
 
 ## Next Steps

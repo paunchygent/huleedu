@@ -30,6 +30,7 @@ WORKDIR /app
 # This layer will only rebuild when dependencies change
 COPY libs/common_core/pyproject.toml /app/libs/common_core/pyproject.toml
 COPY libs/huleedu_service_libs/pyproject.toml /app/libs/huleedu_service_libs/pyproject.toml
+COPY libs/huleedu_nlp_shared/pyproject.toml /app/libs/huleedu_nlp_shared/pyproject.toml
 COPY services/nlp_service/pyproject.toml /app/services/nlp_service/pyproject.toml
 
 # Generate lockfile if it doesn't exist (better than --frozen-lockfile for dev)
@@ -40,6 +41,7 @@ RUN pdm lock --lockfile pdm.lock.docker || echo "Lock generation failed, will in
 # These change more frequently but still less than service code
 COPY libs/common_core/src/ /app/libs/common_core/src/
 COPY libs/huleedu_service_libs/src/ /app/libs/huleedu_service_libs/src/
+COPY libs/huleedu_nlp_shared/src/ /app/libs/huleedu_nlp_shared/src/
 
 # Install dependencies (this layer caches well if pyproject.toml doesn't change)
 # Use lockfile if it exists, otherwise install normally

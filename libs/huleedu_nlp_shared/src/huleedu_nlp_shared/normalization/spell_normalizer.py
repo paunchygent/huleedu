@@ -59,18 +59,17 @@ class SpellNormalizer:
         """Execute the spell normalization pipeline."""
 
         resolved_enable_parallel = (
-            enable_parallel if enable_parallel is not None else self._settings.ENABLE_PARALLEL_PROCESSING
+            enable_parallel
+            if enable_parallel is not None
+            else self._settings.ENABLE_PARALLEL_PROCESSING
         )
         resolved_max_concurrent = (
-            max_concurrent if max_concurrent is not None else self._settings.MAX_CONCURRENT_CORRECTIONS
+            max_concurrent
+            if max_concurrent is not None
+            else self._settings.MAX_CONCURRENT_CORRECTIONS
         )
         resolved_batch_size = (
             batch_size if batch_size is not None else self._settings.SPELLCHECK_BATCH_SIZE
-        )
-        resolved_parallel_timeout = (
-            parallel_timeout
-            if parallel_timeout is not None
-            else self._settings.PARALLEL_TIMEOUT_SECONDS
         )
         resolved_min_words_for_parallel = (
             min_words_for_parallel
@@ -233,7 +232,9 @@ class SpellNormalizer:
 
         if use_parallel:
             if self._parallel_processor is None:
-                raise ValueError("parallel_processor is required when parallel processing is enabled")
+                raise ValueError(
+                    "parallel_processor is required when parallel processing is enabled"
+                )
 
             self._logger.info(
                 f"{log_prefix}Using parallel processing for {len(words_needing_correction)} corrections",
@@ -379,7 +380,9 @@ class SpellNormalizer:
 
         corrections_total_time = time.time() - corrections_start
         max_correction_time = max(correction_times) if correction_times else 0
-        avg_correction_time = sum(correction_times) / len(correction_times) if correction_times else 0
+        avg_correction_time = (
+            sum(correction_times) / len(correction_times) if correction_times else 0
+        )
 
         pyspellchecker_time = time.time() - pyspellchecker_start
 

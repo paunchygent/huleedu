@@ -8,18 +8,20 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.domain_enums import ContentType, CourseCode
-from common_core.event_enums import ProcessingEvent
+from common_core.domain_enums import CourseCode
+from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
     ELSBatchPhaseOutcomeV1,
     EventEnvelope,
-    SpellcheckResultDataV1,
 )
 from common_core.events.cj_assessment_events import AssessmentResultV1, GradeProjectionSummary
+from common_core.events.spellcheck_models import (
+    SpellcheckMetricsV1,
+    SpellcheckResultV1,
+)
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
-    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.models.error_models import ErrorDetail
@@ -480,8 +482,8 @@ class TestProcessBatchPhaseOutcome:
             await event_processor.process_batch_phase_outcome(envelope, data)
 
 
-class TestProcessSpellcheckCompleted:
-    """Tests for process_spellcheck_completed method."""
+class TestProcessSpellcheckResult:
+    """Tests for process_spellcheck_result method (SpellcheckResultV1 processing)."""
 
     @pytest.mark.asyncio
     async def test_successful_spellcheck_with_corrections(
@@ -496,54 +498,59 @@ class TestProcessSpellcheckCompleted:
         batch_id = str(uuid4())
         storage_id = str(uuid4())
 
-        # EntityReference removed - using primitive parameters
-        storage_metadata = StorageReferenceMetadata(
-            references={
-                ContentType.CORRECTED_TEXT: {
-                    "main": storage_id,
-                }
-            }
+        # Create metrics for the rich event
+        metrics = SpellcheckMetricsV1(
+            total_corrections=5,
+            l2_dictionary_corrections=2,
+            spellchecker_corrections=3,
+            word_count=100,
+            correction_density=5.0,
         )
 
-        system_metadata = SystemProcessingMetadata(
+        data = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
-            processing_stage=ProcessingStage.COMPLETED,
-        )
-
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
-            entity_id=essay_id,
-            entity_type="essay",
-            parent_id=batch_id,
-            status=EssayStatus.SPELLCHECKED_SUCCESS,
-            original_text_storage_id="original_text_123",
+            batch_id=batch_id,
+            correlation_id=str(uuid4()),
+            user_id="test-user",
             corrections_made=5,
-            system_metadata=system_metadata,
-            storage_metadata=storage_metadata,
+            correction_metrics=metrics,
+            original_text_storage_id="original_text_123",
+            corrected_text_storage_id=storage_id,
+            processing_duration_ms=1500,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=SystemProcessingMetadata(
+                entity_id=essay_id, entity_type="essay", parent_id=batch_id
+            ),
         )
 
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
             data=data,
         )
 
         # Act
-        await event_processor.process_spellcheck_completed(envelope, data)
+        await event_processor.process_spellcheck_result(envelope, data)
 
         # Assert
         # Check the call was made with correct parameters
-        assert mock_batch_repository.update_essay_spellcheck_result.call_count == 1
-        call_args = mock_batch_repository.update_essay_spellcheck_result.call_args[1]
+        assert mock_batch_repository.update_essay_spellcheck_result_with_metrics.call_count == 1
+        call_args = mock_batch_repository.update_essay_spellcheck_result_with_metrics.call_args[1]
         assert call_args["essay_id"] == essay_id
         assert call_args["batch_id"] == batch_id
         assert call_args["status"] == ProcessingStage.COMPLETED
         assert call_args["correction_count"] == 5
         assert call_args["corrected_text_storage_id"] == storage_id
+        assert call_args["l2_corrections"] == 2
+        assert call_args["spell_corrections"] == 3
+        assert call_args["word_count"] == 100
+        assert call_args["correction_density"] == 5.0
         assert call_args["error_detail"] is None
         assert "correlation_id" in call_args
         mock_state_store.invalidate_batch.assert_called_once_with(batch_id)
@@ -560,30 +567,39 @@ class TestProcessSpellcheckCompleted:
         essay_id = str(uuid4())
         batch_id = str(uuid4())
 
-        # EntityReference removed - using primitive parameters
-        system_metadata = SystemProcessingMetadata(
-            entity_id=essay_id,
-            entity_type="essay",
-            parent_id=batch_id,
-            processing_stage=ProcessingStage.COMPLETED,
+        # Create metrics for the rich event
+        metrics = SpellcheckMetricsV1(
+            total_corrections=0,
+            l2_dictionary_corrections=0,
+            spellchecker_corrections=0,
+            word_count=100,
+            correction_density=0.0,
         )
 
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+        data = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
-            status=EssayStatus.SPELLCHECKED_SUCCESS,
-            original_text_storage_id="original_text_123",
+            batch_id=batch_id,
+            correlation_id=str(uuid4()),
+            user_id=None,
             corrections_made=0,
-            system_metadata=system_metadata,
-            storage_metadata=None,
+            correction_metrics=metrics,
+            original_text_storage_id="original_text_123",
+            corrected_text_storage_id=None,  # No corrections means no corrected text
+            processing_duration_ms=1000,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=SystemProcessingMetadata(
+                entity_id=essay_id, entity_type="essay", parent_id=batch_id
+            ),
         )
 
         test_correlation_id = uuid4()
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
             correlation_id=test_correlation_id,
@@ -591,10 +607,10 @@ class TestProcessSpellcheckCompleted:
         )
 
         # Act
-        await event_processor.process_spellcheck_completed(envelope, data)
+        await event_processor.process_spellcheck_result(envelope, data)
 
         # Assert
-        mock_batch_repository.update_essay_spellcheck_result.assert_called_once_with(
+        mock_batch_repository.update_essay_spellcheck_result_with_metrics.assert_called_once_with(
             essay_id=essay_id,
             batch_id=batch_id,
             status=ProcessingStage.COMPLETED,
@@ -602,6 +618,11 @@ class TestProcessSpellcheckCompleted:
             correction_count=0,
             corrected_text_storage_id=None,
             error_detail=None,
+            l2_corrections=0,
+            spell_corrections=0,
+            word_count=100,
+            correction_density=0.0,
+            processing_duration_ms=1000,
         )
 
     @pytest.mark.asyncio
@@ -616,7 +637,16 @@ class TestProcessSpellcheckCompleted:
         essay_id = str(uuid4())
         batch_id = str(uuid4())
 
-        # EntityReference removed - using primitive parameters
+        # Create metrics for failed spellcheck
+        metrics = SpellcheckMetricsV1(
+            total_corrections=0,
+            l2_dictionary_corrections=0,
+            spellchecker_corrections=0,
+            word_count=50,
+            correction_density=0.0,
+        )
+
+        # Create system metadata for error tracking
         system_metadata = SystemProcessingMetadata(
             entity_id=essay_id,
             entity_type="essay",
@@ -625,22 +655,28 @@ class TestProcessSpellcheckCompleted:
             error_info={"message": "Spellcheck service error", "code": "SC_001"},
         )
 
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+        data = SpellcheckResultV1(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
             parent_id=batch_id,
-            status=EssayStatus.SPELLCHECK_FAILED,
-            original_text_storage_id="original_text_123",
+            batch_id=batch_id,
+            correlation_id=str(uuid4()),
+            user_id=None,
             corrections_made=0,
+            correction_metrics=metrics,
+            original_text_storage_id="original_text_123",
+            corrected_text_storage_id=None,
+            processing_duration_ms=500,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+            status=EssayStatus.SPELLCHECK_FAILED,
             system_metadata=system_metadata,
-            storage_metadata=None,
         )
 
         test_correlation_id = uuid4()
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
             correlation_id=test_correlation_id,
@@ -648,11 +684,11 @@ class TestProcessSpellcheckCompleted:
         )
 
         # Act
-        await event_processor.process_spellcheck_completed(envelope, data)
+        await event_processor.process_spellcheck_result(envelope, data)
 
         # Assert
         # Check that error_detail was created correctly
-        call_args = mock_batch_repository.update_essay_spellcheck_result.call_args
+        call_args = mock_batch_repository.update_essay_spellcheck_result_with_metrics.call_args
         assert call_args.kwargs["essay_id"] == essay_id
         assert call_args.kwargs["batch_id"] == batch_id
         assert call_args.kwargs["status"] == ProcessingStage.FAILED
@@ -660,6 +696,11 @@ class TestProcessSpellcheckCompleted:
         assert call_args.kwargs["corrected_text_storage_id"] is None
         assert call_args.kwargs["error_detail"] is not None
         assert call_args.kwargs["correlation_id"] == test_correlation_id
+        # Check enhanced metrics were passed
+        assert call_args.kwargs["l2_corrections"] == 0
+        assert call_args.kwargs["spell_corrections"] == 0
+        assert call_args.kwargs["word_count"] == 50
+        assert call_args.kwargs["correction_density"] == 0.0
 
         # Verify error_detail structure
         error_detail = call_args.kwargs["error_detail"]
@@ -672,41 +713,49 @@ class TestProcessSpellcheckCompleted:
     ) -> None:
         """Test error when entity information is missing."""
         # Arrange
-        # The test wants to simulate missing entity_id in system_metadata to trigger the error
-        # Code checks: if not data.system_metadata or not data.system_metadata.entity_id
-        # Use model_construct to bypass validation and create invalid data for testing
-
-        # Create a system_metadata with missing entity_id using model_construct
-        # Type ignore needed since we're intentionally bypassing validation for testing
-        system_metadata = SystemProcessingMetadata.model_construct(
-            entity_id=None,  # type: ignore[arg-type]  # This simulates missing entity_id
-            entity_type="essay",
-            parent_id=None,
-            processing_stage=ProcessingStage.COMPLETED,
+        # For SpellcheckResultV1, entity_id is a required field
+        # We'll test with missing batch_id instead
+        metrics = SpellcheckMetricsV1(
+            total_corrections=0,
+            l2_dictionary_corrections=0,
+            spellchecker_corrections=0,
+            word_count=100,
+            correction_density=0.0,
         )
 
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+        # Use model_construct to bypass validation and create data with None batch_id
+        data = SpellcheckResultV1.model_construct(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id="essay1",
             entity_type="essay",
-            parent_id=None,
-            status=EssayStatus.SPELLCHECKED_SUCCESS,
-            original_text_storage_id="original_text_123",
+            parent_id=None,  # Missing parent_id
+            batch_id=None,  # type: ignore[arg-type]  # This simulates missing batch_id
+            correlation_id=str(uuid4()),
+            user_id=None,
             corrections_made=0,
-            system_metadata=system_metadata,
+            correction_metrics=metrics,
+            original_text_storage_id="original_text_123",
+            corrected_text_storage_id=None,
+            processing_duration_ms=1000,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=SystemProcessingMetadata(
+                entity_id="essay1",
+                entity_type="essay",
+            ),
         )
 
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
             data=data,
         )
 
         # Act & Assert
-        with pytest.raises(ValueError, match="Missing entity information"):
-            await event_processor.process_spellcheck_completed(envelope, data)
+        with pytest.raises(ValueError, match="Missing batch_id"):
+            await event_processor.process_spellcheck_result(envelope, data)
 
     @pytest.mark.asyncio
     async def test_spellcheck_missing_batch_id(
@@ -715,37 +764,48 @@ class TestProcessSpellcheckCompleted:
         """Test error when batch_id is missing in entity reference."""
         # Arrange
         essay_id = str(uuid4())
-        # EntityReference removed - testing with missing batch_id (parent_id=None)
 
-        system_metadata = SystemProcessingMetadata(
-            entity_id=essay_id,
-            entity_type="essay",
-            parent_id=None,  # This simulates missing batch_id
-            processing_stage=ProcessingStage.COMPLETED,
+        metrics = SpellcheckMetricsV1(
+            total_corrections=0,
+            l2_dictionary_corrections=0,
+            spellchecker_corrections=0,
+            word_count=100,
+            correction_density=0.0,
         )
 
-        data = SpellcheckResultDataV1(
-            event_name=ProcessingEvent.ESSAY_SPELLCHECK_COMPLETED,
+        # Use model_construct to create data with missing batch_id
+        data = SpellcheckResultV1.model_construct(
+            event_name=ProcessingEvent.SPELLCHECK_RESULTS,
             entity_id=essay_id,
             entity_type="essay",
-            parent_id=None,  # Missing batch_id should cause error
-            status=EssayStatus.SPELLCHECKED_SUCCESS,
-            original_text_storage_id="original_text_123",
+            parent_id=None,  # Missing parent_id
+            batch_id=None,  # type: ignore[arg-type]  # Missing batch_id should cause error
+            correlation_id=str(uuid4()),
+            user_id=None,
             corrections_made=0,
-            system_metadata=system_metadata,
+            correction_metrics=metrics,
+            original_text_storage_id="original_text_123",
+            corrected_text_storage_id=None,
+            processing_duration_ms=1000,
+            processor_version="pyspellchecker_1.0_L2_swedish",
+            status=EssayStatus.SPELLCHECKED_SUCCESS,
+            system_metadata=SystemProcessingMetadata(
+                entity_id=essay_id,
+                entity_type="essay",
+            ),
         )
 
-        envelope: EventEnvelope[SpellcheckResultDataV1] = EventEnvelope(
+        envelope: EventEnvelope[SpellcheckResultV1] = EventEnvelope(
             event_id=uuid4(),
-            event_type="SpellcheckResultDataV1",
+            event_type=topic_name(ProcessingEvent.SPELLCHECK_RESULTS),
             event_timestamp=datetime.now(timezone.utc),
             source_service="spellchecker",
             data=data,
         )
 
         # Act & Assert
-        with pytest.raises(ValueError, match="Missing batch_id in entity reference"):
-            await event_processor.process_spellcheck_completed(envelope, data)
+        with pytest.raises(ValueError, match="Missing batch_id"):
+            await event_processor.process_spellcheck_result(envelope, data)
 
 
 class TestProcessAssessmentResult:

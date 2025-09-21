@@ -443,6 +443,8 @@ class TestDefaultSpellcheckEventPublisher:
         rich_envelope = rich_call.kwargs["event_data"]
         assert isinstance(rich_envelope.data, SpellcheckResultV1)
         assert rich_envelope.data.status == EssayStatus.SPELLCHECK_FAILED
-        assert rich_envelope.data.batch_id == "batch-fail"  # Verify batch_id is populated even on failure
+        assert (
+            rich_envelope.data.batch_id == "batch-fail"
+        )  # Verify batch_id is populated even on failure
         assert rich_envelope.data.corrections_made == 0
         assert rich_envelope.data.corrected_text_storage_id is None

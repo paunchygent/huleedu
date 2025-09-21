@@ -30,11 +30,20 @@ The service implements a dual event pattern optimized for different consumer nee
 - **Separation of Concerns**: State management vs business analytics
 - **Network Efficiency**: Reduces data transfer for state-only consumers
 
+### Internal Architecture Note
+
+#### Legacy Model Usage (Temporary)
+The service internally uses `SpellcheckResultDataV1` for backward compatibility during the transition to the dual-event pattern. This model is converted to the new dual events before publishing:
+- `SpellcheckPhaseCompletedV1` (thin event for state transitions)
+- `SpellcheckResultV1` (rich event with business metrics)
+
+This internal usage will be removed in a future refactoring once all components are verified working with the dual-event pattern.
+
 ### Header Processing
 
 Events from OutboxManager-enabled services include Kafka headers:
 
-- `event_id`, `event_type`, `trace_id`, `source_service` headers  
+- `event_id`, `event_type`, `trace_id`, `source_service` headers
 - Header-complete messages skip JSON parsing during idempotency processing
 - `headers_used` field logged for utilization tracking
 

@@ -22,7 +22,7 @@ from services.essay_lifecycle_service.protocols import (
 
 @pytest.mark.asyncio
 async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
-    mock_session_factory,
+    mock_session_factory: AsyncMock,
 ) -> None:
     repo = AsyncMock(spec=EssayRepositoryProtocol)
     dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)

@@ -11,7 +11,6 @@ from services.spellchecker_service.implementations.parallel_processor_impl impor
     DefaultParallelProcessor,
 )
 from services.spellchecker_service.tests.mocks import (
-    MockWhitelist,
     create_spell_normalizer_for_tests,
 )
 
@@ -63,11 +62,11 @@ class TestParallelCorrections:
             {},
         ):
             # Initialize spell checker cache
-            from spellchecker import SpellChecker
-
             from huleedu_nlp_shared.normalization.spell_normalizer import (
                 _spellchecker_cache,
             )
+            from spellchecker import SpellChecker
+
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -133,11 +132,11 @@ class TestParallelCorrections:
             "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
             {},
         ):
-            from spellchecker import SpellChecker
-
             from huleedu_nlp_shared.normalization.spell_normalizer import (
                 _spellchecker_cache,
             )
+            from spellchecker import SpellChecker
+
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -186,11 +185,11 @@ class TestParallelCorrections:
             "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
             {},
         ):
-            from spellchecker import SpellChecker
-
             from huleedu_nlp_shared.normalization.spell_normalizer import (
                 _spellchecker_cache,
             )
+            from spellchecker import SpellChecker
+
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )
@@ -235,11 +234,11 @@ class TestParallelCorrections:
             "huleedu_nlp_shared.normalization.spell_normalizer._spellchecker_cache",
             {},
         ):
-            from spellchecker import SpellChecker
-
             from huleedu_nlp_shared.normalization.spell_normalizer import (
                 _spellchecker_cache,
             )
+            from spellchecker import SpellChecker
+
             from services.spellchecker_service.implementations.parallel_processor_impl import (
                 DefaultParallelProcessor,
             )

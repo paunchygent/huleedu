@@ -323,11 +323,21 @@ class LanguageToolServiceClient(LanguageToolClientProtocol):
             extra={
                 "correlation_id": str(correlation_id),
                 "response_type": type(response_data).__name__,
-                "response_keys": list(response_data.keys()) if isinstance(response_data, dict) else None,
-                "language_field": response_data.get("language") if isinstance(response_data, dict) else None,
-                "language_field_type": type(response_data.get("language")).__name__ if isinstance(response_data, dict) else None,
-                "total_errors": response_data.get("total_grammar_errors") if isinstance(response_data, dict) else None,
-                "has_errors": bool(response_data.get("errors")) if isinstance(response_data, dict) else None,
+                "response_keys": list(response_data.keys())
+                if isinstance(response_data, dict)
+                else None,
+                "language_field": response_data.get("language")
+                if isinstance(response_data, dict)
+                else None,
+                "language_field_type": type(response_data.get("language")).__name__
+                if isinstance(response_data, dict)
+                else None,
+                "total_errors": response_data.get("total_grammar_errors")
+                if isinstance(response_data, dict)
+                else None,
+                "has_errors": bool(response_data.get("errors"))
+                if isinstance(response_data, dict)
+                else None,
             },
         )
 

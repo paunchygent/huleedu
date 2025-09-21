@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -111,6 +111,7 @@ class NlpEventPublisherProtocol(Protocol):
         nlp_metrics: NlpMetrics,
         grammar_analysis: GrammarAnalysis,
         correlation_id: UUID,
+        feature_outputs: dict[str, Any] | None = None,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
 
@@ -122,6 +123,7 @@ class NlpEventPublisherProtocol(Protocol):
             nlp_metrics: Basic text metrics from spaCy
             grammar_analysis: Grammar analysis from Language Tool
             correlation_id: Correlation ID for tracking
+            feature_outputs: Optional feature outputs from the pipeline
         """
         ...
 

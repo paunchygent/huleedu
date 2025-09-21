@@ -307,6 +307,6 @@ class TestKafkaConsumerRouting:
         assert result is True
         # No processor method should be called
         mock_event_processor.process_batch_registered.assert_not_called()
-        mock_event_processor.process_spellcheck_completed.assert_not_called()
+        # process_spellcheck_completed was removed in dual-event pattern
         mock_event_processor.process_assessment_result.assert_not_called()
         mock_event_processor.process_batch_phase_outcome.assert_not_called()

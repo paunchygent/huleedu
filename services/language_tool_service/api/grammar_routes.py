@@ -179,7 +179,11 @@ async def check_grammar(
                     if isinstance(fallback_rule, str) and fallback_rule:
                         rule_id_value = fallback_rule
 
-            rule_key = rule_id_value if isinstance(rule_id_value, str) and rule_id_value else "UNKNOWN_RULE"
+            rule_key = (
+                rule_id_value
+                if isinstance(rule_id_value, str) and rule_id_value
+                else "UNKNOWN_RULE"
+            )
             rule_counts[rule_key] = rule_counts.get(rule_key, 0) + 1
 
         # Create response

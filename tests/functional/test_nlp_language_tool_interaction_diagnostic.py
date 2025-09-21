@@ -437,7 +437,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
         test_correlation_id = str(uuid.uuid4())
         test_batch_id = f"nlp-e2e-batch-{uuid.uuid4().hex[:8]}"
         test_essay_id = f"nlp-e2e-essay-{uuid.uuid4().hex[:8]}"
-        test_user = auth_manager.create_test_user(role="teacher")
+        auth_manager.create_test_user(role="teacher")
 
         logger.info(
             "🚀 Starting NLP pipeline end-to-end validation",

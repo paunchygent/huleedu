@@ -178,37 +178,15 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 
 #### Development
 
-Always use development builds and services unless explicitly asked to use production builds.
-
 ```bash
-# Main development workflow
-pdm run dev <command> [service]     # Use main dev script
+# Development (hot-reload enabled)
+pdm run dev-start [service]          # Start with hot-reload
+pdm run dev-logs [service]           # View logs
+pdm run dev-build-clean [service]    # Rebuild from scratch
 
-pdm run dev build clean             # Clean build (no cache) for production
-pdm run dev build dev               # Build ALL dev images with hot-reload support
-pdm run dev build dev nlp_service   # Build specific dev image
-
-# Running services
-pdm run dev dev                     # Start ALL services with hot-reload
-pdm run dev dev nlp_service         # Start specific service with hot-reload
-
-# Utilities
-pdm run dev check                   # Check what needs rebuilding
-pdm run dev incremental             # Incremental build using cache
-
-# Quick commands
-pdm run up                          # Start all services 
-pdm run restart essay_lifecycle_worker      # Restart specific service
-pdm run down                        # Stop all services
-pdm run logs nlp_service         # Follow service logs
-```
-
-#### Production
-
-```markdown
-- **Rebuild**: `docker compose build --no-cache <service>`
-- **Start**: `docker compose up -d`
-- **Logs**: `docker compose logs -f <service>`
+# Production (optimized)
+pdm run prod-deploy [service]        # Build + start + verify
+pdm run prod-health                  # Check service health
 ```
 
 ### Database Access (Common Issue)

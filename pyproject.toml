@@ -339,13 +339,33 @@ test-financial = "pytest -m financial -v --tb=short"
 test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
 pytest-root = "scripts/pytest-root.sh"
 
-# Core Development Workflows (use scripts/dev-workflow.sh for most tasks)
-dev = "scripts/dev-workflow.sh"  # Main development script: pdm run dev <command> <service>
-up = "docker compose up -d"  # Start services
-down = "docker compose down --remove-orphans"  # Stop services  
-logs = "docker compose logs -f --tail=50"  # Follow logs: pdm run logs <service>
-restart = {shell = "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate $@"}  # Recreate dev services: pdm run restart <service1> <service2>
-restart-all = "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate"  # Recreate all dev services
+# Development Environment Commands (hot-reload enabled, debug mode)
+dev = "scripts/dev.sh"  # Main dev script - type 'pdm run dev help' for all commands
+dev-build = {shell = "scripts/dev.sh build $@"}  # Build for development with cache
+dev-build-clean = {shell = "scripts/dev.sh build-clean $@"}  # Clean build for development
+dev-start = {shell = "scripts/dev.sh start $@"}  # Start development environment (builds + runs)
+dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers
+dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers
+dev-logs = {shell = "scripts/dev.sh logs $@"}  # Follow development logs
+dev-check = "scripts/dev.sh check"  # Check what needs rebuilding
+
+# Production Environment Commands (optimized, no debug)
+prod = "scripts/prod.sh"  # Main prod script - type 'pdm run prod help' for all commands
+prod-build = {shell = "scripts/prod.sh build $@"}  # Build for production with cache
+prod-build-clean = {shell = "scripts/prod.sh build-clean $@"}  # Clean build for production
+prod-start = {shell = "scripts/prod.sh start $@"}  # Start production containers
+prod-stop = {shell = "scripts/prod.sh stop $@"}  # Stop production containers
+prod-restart = {shell = "scripts/prod.sh restart $@"}  # Restart production containers
+prod-logs = {shell = "scripts/prod.sh logs $@"}  # Follow production logs
+prod-health = "scripts/prod.sh health"  # Check production service health
+prod-deploy = {shell = "scripts/prod.sh deploy $@"}  # Full production deployment
+
+# Legacy shortcuts (kept for backwards compatibility)
+up = {shell = "scripts/dev.sh start $@"}  # Start dev environment (alias for dev-start)
+down = {shell = "scripts/dev.sh stop $@"}  # Stop dev environment (alias for dev-stop)
+logs = {shell = "scripts/dev.sh logs $@"}  # Follow dev logs (alias for dev-logs)
+restart = {shell = "scripts/dev.sh restart $@"}  # Restart dev (alias for dev-restart)
+restart-all = "scripts/dev.sh restart"  # Restart all dev containers
 
 # Database Management
 db-reset = "scripts/reset-dev-databases.sh"  # Reset development databases

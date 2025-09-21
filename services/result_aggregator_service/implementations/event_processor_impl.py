@@ -25,7 +25,6 @@ if TYPE_CHECKING:
         BatchEssaysRegistered,
         ELSBatchPhaseOutcomeV1,
         EventEnvelope,
-        SpellcheckResultDataV1,
         SpellcheckResultV1,
     )
     from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
@@ -106,14 +105,6 @@ class EventProcessorImpl(EventProcessorProtocol):
     ) -> None:
         """Process batch phase outcome event."""
         await self.batch_lifecycle.process_batch_phase_outcome(envelope, data)
-
-    async def process_spellcheck_completed(
-        self,
-        envelope: "EventEnvelope[SpellcheckResultDataV1]",
-        data: "SpellcheckResultDataV1",
-    ) -> None:
-        """Process spellcheck completion event."""
-        await self.spellcheck_handler.process_spellcheck_completed(envelope, data)
 
     async def process_spellcheck_result(
         self,

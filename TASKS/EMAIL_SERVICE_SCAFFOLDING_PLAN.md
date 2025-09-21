@@ -259,7 +259,7 @@ Respect `HULEEDU_ENVIRONMENT` and separate dev/prod config per Rule 080. Combine
 6) Add Alembic migrations for `email_messages` and ensure outbox
 7) Add unit + contract tests; run `typecheck-all` and fast tests
 8) Wire docker compose: add service container, Kafka topic subscriptions, env vars
-9) Validate Identity → Email end‑to‑end in dev (`pdm run dev dev email_service`)
+9) Validate Identity → Email end‑to‑end in dev (`pdm run dev-start email_service`)
 
 ## Risks & Decisions
 

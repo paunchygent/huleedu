@@ -15,7 +15,7 @@ from common_core.events.cj_assessment_events import (
     CJAssessmentFailedV1,
 )
 from common_core.events.nlp_events import BatchNlpAnalysisCompletedV1
-from common_core.events.spellcheck_models import SpellcheckResultDataV1, SpellcheckResultV1
+from common_core.events.spellcheck_models import SpellcheckResultV1
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 
@@ -71,17 +71,6 @@ class DefaultServiceResultHandler(ServiceResultHandler):
         )
         self.cj_handler = CJResultHandler(repository, batch_coordinator, session_factory)
         self.nlp_handler = NLPResultHandler(repository, batch_coordinator, session_factory)
-
-    async def handle_spellcheck_result(
-        self,
-        result_data: SpellcheckResultDataV1,
-        correlation_id: UUID,
-        confirm_idempotency: Any = None,
-    ) -> bool:
-        """Delegate spellcheck result handling to SpellcheckResultHandler."""
-        return await self.spellcheck_handler.handle_spellcheck_result(
-            result_data, correlation_id, confirm_idempotency
-        )
 
     async def handle_spellcheck_rich_result(
         self,
