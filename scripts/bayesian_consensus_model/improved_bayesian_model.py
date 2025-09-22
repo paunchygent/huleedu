@@ -44,6 +44,29 @@ class ModelConfig:
     use_empirical_thresholds: bool = True
     threshold_padding: float = 0.5  # Add padding to empirical thresholds
 
+    # Swedish grade distribution (national statistics for Part C: Writing)
+    swedish_grade_distribution: Dict[str, float] = None  # Will be set in __post_init__
+
+    # Adaptive complexity thresholds
+    sparse_data_threshold: int = 30  # Use simpler model below this (raised for borderline cases)
+    medium_data_threshold: int = 50  # Below this, still boost sampling
+    sparse_tune_multiplier: float = 1.5  # Increase tuning for sparse data
+    sparse_draws_multiplier: float = 1.5  # Increase draws for sparse data
+    medium_tune_multiplier: float = 1.25  # Moderate increase for medium data
+    medium_draws_multiplier: float = 1.25  # Moderate increase for medium data
+
+    def __post_init__(self) -> None:
+        """Initialize Swedish grade distribution after dataclass init."""
+        if self.swedish_grade_distribution is None:
+            self.swedish_grade_distribution = {
+                "F": 0.122,  # 12.2%
+                "E": 0.358,  # 35.8%
+                "D": 0.189,  # 18.9%
+                "C": 0.216,  # 21.6%
+                "B": 0.073,  # 7.3%
+                "A": 0.042,  # 4.2%
+            }
+
 
 @dataclass
 class ConsensusResult:
@@ -114,6 +137,9 @@ class ImprovedBayesianModel:
     def _get_empirical_thresholds(self, grades: np.ndarray) -> np.ndarray:
         """Calculate empirical thresholds from observed grade distribution.
 
+        For sparse data, this creates thresholds that allow the observed
+        grades to be achievable with reasonable probability.
+
         Args:
             grades: Array of numeric grades
 
@@ -121,35 +147,181 @@ class ImprovedBayesianModel:
             Array of threshold values
         """
         n_categories = len(self.SWEDISH_GRADES)
+
+        # Get the range of observed grades
+        min_grade = int(np.min(grades))
+        max_grade = int(np.max(grades))
+
+        # Create thresholds that center the observed range
+        # This ensures observed grades are achievable
+        if max_grade == min_grade:
+            # All same grade - center thresholds around that grade
+            center = min_grade
+            thresholds = []
+            for i in range(n_categories - 1):
+                if i < center - 1:
+                    thresholds.append(-3.0 + i * 0.5)
+                elif i == center - 1:
+                    thresholds.append(-0.5)
+                elif i == center:
+                    thresholds.append(0.5)
+                else:
+                    thresholds.append(3.0 - (n_categories - 2 - i) * 0.5)
+        else:
+            # Multiple grades - space thresholds to make observed grades likely
+            # Put thresholds between observed grades
+            thresholds = []
+            observed_range = max_grade - min_grade
+            spacing = 2.0 / (observed_range + 1)  # Space within [-1, 1] range
+
+            for i in range(n_categories - 1):
+                if i < min_grade:
+                    # Below observed range - use tight spacing
+                    thresholds.append(-2.0 - (min_grade - i - 1) * 0.3)
+                elif i >= max_grade:
+                    # Above observed range - use tight spacing
+                    thresholds.append(1.0 + (i - max_grade + 1) * 0.3)
+                else:
+                    # Within observed range - use wider spacing
+                    position = (i - min_grade + 1) / (observed_range + 1)
+                    thresholds.append(-1.0 + position * 2.0)
+
+        return np.array(thresholds)
+
+    def _get_swedish_informed_thresholds(self) -> np.ndarray:
+        """Get threshold values based on Swedish national grade distribution.
+
+        Returns:
+            Array of threshold values informed by Swedish statistics
+        """
+        # Convert Swedish distribution to cumulative probabilities
+        cumulative_probs = []
+        cumsum = 0.0
+        for grade in self.SWEDISH_GRADES[:-1]:  # All but the last grade
+            cumsum += self.config.swedish_grade_distribution[grade]
+            cumulative_probs.append(cumsum)
+
+        # Convert cumulative probabilities to thresholds on logit scale
+        # Using inverse logit: threshold = log(p / (1 - p))
         thresholds = []
-
-        for i in range(n_categories - 1):
-            # Find empirical quantile between grade i and i+1
-            lower_grades = grades[grades == i] if i > 0 else []
-            upper_grades = grades[grades == i + 1]
-
-            if len(lower_grades) > 0 and len(upper_grades) > 0:
-                # Use midpoint between max of lower and min of upper
-                threshold = 0.0  # On latent scale
-            elif len(upper_grades) > 0:
-                # Use a value slightly below the upper grade
-                threshold = -self.config.threshold_padding
-            else:
-                # Use evenly spaced thresholds as fallback
-                threshold = -2.5 + i * 1.0
-
+        for p in cumulative_probs:
+            # Avoid exact 0 or 1 probabilities
+            p = np.clip(p, 0.001, 0.999)
+            threshold = np.log(p / (1 - p))
             thresholds.append(threshold)
 
-        # Ensure monotonicity and reasonable spacing
-        thresholds_array = np.array(thresholds)
-        for i in range(1, len(thresholds_array)):
-            if thresholds_array[i] <= thresholds_array[i - 1]:
-                thresholds_array[i] = thresholds_array[i - 1] + 0.3
+        return np.array(thresholds)
 
-        return thresholds_array
+    def _calculate_data_sparsity(self, data_df: pd.DataFrame) -> int:
+        """Calculate the effective data sparsity for model selection.
+
+        Args:
+            data_df: Prepared data frame
+
+        Returns:
+            Number of observations (essays × raters)
+        """
+        return len(data_df)
 
     def build_model(self, data_df: pd.DataFrame) -> pm.Model:
-        """Build the PyMC model with improved specification.
+        """Build the PyMC model with adaptive complexity based on data size.
+
+        Args:
+            data_df: Prepared data frame with numeric indices
+
+        Returns:
+            PyMC model object
+        """
+        n_observations = self._calculate_data_sparsity(data_df)
+
+        # Adaptive model selection based on data sparsity
+        if n_observations < self.config.sparse_data_threshold:
+            # Use simpler model for sparse data
+            return self._build_simple_model(data_df)
+        else:
+            # Use complex model for rich data
+            return self._build_complex_model(data_df)
+
+    def _build_simple_model(self, data_df: pd.DataFrame) -> pm.Model:
+        """Build a simplified model for sparse data scenarios.
+
+        Uses fixed thresholds based on Swedish distribution and
+        simpler rater modeling for better convergence.
+
+        Args:
+            data_df: Prepared data frame with numeric indices
+
+        Returns:
+            PyMC model object
+        """
+        n_essays = len(self.essay_map)
+        n_raters = len(self.rater_map)
+        n_categories = len(self.SWEDISH_GRADES)
+
+        essay_idx = data_df["essay_idx"].values
+        rater_idx = data_df["rater_idx"].values
+        grades = data_df["grade_numeric"].values
+
+        with pm.Model() as model:
+            # Essay ability with informative prior based on Swedish distribution
+            # Use tighter prior for sparse data
+            essay_ability = pm.Normal(
+                "essay_ability",
+                mu=0,
+                sigma=0.5,  # Tighter prior for sparse data
+                shape=n_essays
+            )
+
+            # Simple global severity adjustment (no per-rater effects for sparse data)
+            # This reduces parameter count significantly
+            global_severity = pm.Normal(
+                "global_severity",
+                mu=0,
+                sigma=0.2  # Very tight prior
+            )
+
+            # Expand global severity to match rater indices
+            rater_severity = pm.Deterministic(
+                "rater_severity",
+                pt.zeros(n_raters) + global_severity
+            )
+
+            # Use empirical thresholds if we have enough data diversity
+            # Otherwise use conservative evenly-spaced thresholds
+            unique_grades = np.unique(grades)
+            if len(unique_grades) >= 3:
+                # We have some diversity - use empirical estimates
+                empirical_thresholds = self._get_empirical_thresholds(np.array(grades))
+            else:
+                # Very limited diversity - use evenly spaced thresholds
+                # These are more conservative and allow all grades to be achievable
+                empirical_thresholds = np.linspace(-2.0, 2.0, n_categories - 1)
+
+            thresholds = pm.Data("thresholds", empirical_thresholds)
+
+            # Linear predictor
+            eta = essay_ability[essay_idx] - rater_severity[rater_idx]
+
+            # Ordinal likelihood
+            pm.OrderedLogistic(
+                "grade_obs",
+                eta=eta,
+                cutpoints=thresholds,
+                observed=grades,
+                compute_p=False,
+            )
+
+            # Add posterior predictive
+            pm.Deterministic("eta", eta)
+
+        self.model = model
+        return model
+
+    def _build_complex_model(self, data_df: pd.DataFrame) -> pm.Model:
+        """Build the full complex model for rich data scenarios.
+
+        This is the original model with reference rater approach
+        and empirical threshold estimation.
 
         Args:
             data_df: Prepared data frame with numeric indices
@@ -239,7 +411,7 @@ class ImprovedBayesianModel:
         return model
 
     def fit(self, ratings_df: pd.DataFrame) -> None:
-        """Fit the model to rating data.
+        """Fit the model to rating data with adaptive sampling parameters.
 
         Args:
             ratings_df: DataFrame with columns [essay_id, rater_id, grade]
@@ -254,12 +426,30 @@ class ImprovedBayesianModel:
         if self.model is None:
             raise ValueError("Model not built")
 
+        # Adaptive sampling parameters based on data sparsity
+        n_observations = self._calculate_data_sparsity(data_df)
+        if n_observations < self.config.sparse_data_threshold:
+            # Significant increase for sparse data (will use simple model)
+            n_draws = max(1000, int(self.config.n_draws * self.config.sparse_draws_multiplier))
+            n_tune = max(1000, int(self.config.n_tune * self.config.sparse_tune_multiplier))
+            target_accept = min(0.98, self.config.target_accept + 0.03)  # Higher for sparse data
+        elif n_observations < self.config.medium_data_threshold:
+            # Moderate increase for medium data (complex model needs more sampling)
+            n_draws = max(750, int(self.config.n_draws * self.config.medium_draws_multiplier))
+            n_tune = max(750, int(self.config.n_tune * self.config.medium_tune_multiplier))
+            target_accept = min(0.97, self.config.target_accept + 0.02)  # Slightly higher
+        else:
+            # Use standard sampling parameters for rich data
+            n_draws = self.config.n_draws
+            n_tune = self.config.n_tune
+            target_accept = self.config.target_accept
+
         with self.model:
             self.trace = pm.sample(
-                draws=self.config.n_draws,
-                tune=self.config.n_tune,
-                chains=self.config.n_chains,
-                target_accept=self.config.target_accept,
+                draws=n_draws,
+                tune=n_tune,
+                chains=min(self.config.n_chains, 2) if n_observations < 10 else self.config.n_chains,
+                target_accept=target_accept,
                 max_treedepth=self.config.max_treedepth,
                 return_inferencedata=True,
                 progressbar=True,
@@ -284,7 +474,13 @@ class ImprovedBayesianModel:
 
         essay_abilities = self.trace.posterior["essay_ability"].mean(dim=["chain", "draw"]).values
         rater_severities = self.trace.posterior["rater_severity"].mean(dim=["chain", "draw"]).values
-        thresholds = self.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+
+        # Handle thresholds - might be in posterior (complex model) or fixed (simple model)
+        if "thresholds" in self.trace.posterior:
+            thresholds = self.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+        else:
+            # Simple model with fixed thresholds - reconstruct from Swedish distribution
+            thresholds = self._get_swedish_informed_thresholds()
 
         # Reverse mappings
         id_to_essay = {v: k for k, v in self.essay_map.items()}
@@ -293,15 +489,12 @@ class ImprovedBayesianModel:
         for essay_idx, essay_id in id_to_essay.items():
             ability = essay_abilities[essay_idx]
 
-            # Calculate grade probabilities
-            grade_probs = self._calculate_grade_probabilities(ability, thresholds)
+            # Use posterior sampling for better confidence estimates
+            grade_probs, confidence = self._calculate_grade_probabilities_from_posterior(essay_idx, thresholds)
 
             # Get consensus grade (highest probability)
             consensus_idx = np.argmax(grade_probs)
             consensus_grade = self.SWEDISH_GRADES[consensus_idx]
-
-            # Calculate confidence (probability of chosen grade)
-            confidence = grade_probs[consensus_idx]
 
             # Get rater adjustments for this essay
             rater_adjustments = {}
@@ -346,7 +539,7 @@ class ImprovedBayesianModel:
             lower = extended_thresholds[i]
             upper = extended_thresholds[i + 1]
 
-            # Use logistic CDF
+            # Use standard logistic CDF (no artificial temperature scaling)
             p_upper = 1 / (1 + np.exp(-(ability - upper)))
             p_lower = 1 / (1 + np.exp(-(ability - lower)))
             probs[i] = p_upper - p_lower
@@ -355,6 +548,45 @@ class ImprovedBayesianModel:
         probs = probs / probs.sum()
 
         return np.array(probs)
+
+    def _calculate_grade_probabilities_from_posterior(
+        self, essay_idx: int, thresholds: np.ndarray
+    ) -> tuple[np.ndarray, float]:
+        """Calculate grade probabilities using full posterior distribution.
+
+        This method uses the full posterior samples rather than just the mean,
+        naturally incorporating uncertainty into the confidence calculation.
+
+        Args:
+            essay_idx: Index of the essay in the model
+            thresholds: Threshold values for grade boundaries
+
+        Returns:
+            Tuple of (grade_probabilities, confidence)
+        """
+        if self.trace is None:
+            raise ValueError("Model must be fitted first")
+
+        # Get all posterior samples for this essay's ability
+        ability_samples = self.trace.posterior["essay_ability"][:, :, essay_idx].values.flatten()
+
+        # Count how often each grade is selected across samples
+        grade_counts = np.zeros(len(self.SWEDISH_GRADES))
+
+        for ability in ability_samples:
+            # Calculate probabilities for this sample
+            probs = self._calculate_grade_probabilities(ability, thresholds)
+            # The most likely grade for this sample
+            selected_grade = np.argmax(probs)
+            grade_counts[selected_grade] += 1
+
+        # Grade probabilities are the frequency of selection across samples
+        grade_probabilities = grade_counts / len(ability_samples)
+
+        # Confidence is naturally the probability of the most likely grade
+        confidence = float(np.max(grade_probabilities))
+
+        return grade_probabilities, confidence
 
     def get_model_diagnostics(self) -> Dict[str, Any]:
         """Get comprehensive model diagnostics.

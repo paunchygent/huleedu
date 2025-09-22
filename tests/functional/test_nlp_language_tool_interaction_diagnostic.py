@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from common_core import EventEnvelope, ProcessingEvent, topic_name
-from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
+from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 from common_core.metadata_models import EssayProcessingInputRefV1
 from structlog import get_logger
 
@@ -238,19 +238,24 @@ class TestNLPLanguageToolInteractionDiagnostic:
                     for i in range(1)  # Just one essay for diagnostic
                 ]
 
-                nlp_request = BatchNlpProcessingRequestedV1(
-                    event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED,
+                essay_instructions = f"Diagnostic prompt for {test_case['name']}"
+
+                nlp_request = BatchNlpProcessingRequestedV2(
+                    event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
                     batch_id=test_batch_id,
                     entity_type="batch",
                     entity_id=test_batch_id,
                     timestamp=datetime.now(timezone.utc),
                     essays_to_process=essays_to_process,
                     language="en",  # Use simplified language code
+                    essay_instructions=essay_instructions,
                 )
 
-                envelope = EventEnvelope[BatchNlpProcessingRequestedV1](
+                envelope = EventEnvelope[BatchNlpProcessingRequestedV2](
                     event_id=uuid.uuid4(),
-                    event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
+                    event_type=topic_name(
+                        ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2
+                    ),
                     event_timestamp=datetime.now(timezone.utc),
                     source_service="test_diagnostic",
                     correlation_id=uuid.UUID(test_correlation_id),
@@ -259,7 +264,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
 
                 # Send the event
                 await producer.send_and_wait(
-                    topic=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
+                    topic=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2),
                     value=envelope.model_dump(mode="json"),
                     key=test_batch_id.encode("utf-8"),
                 )
@@ -530,7 +535,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
             )
 
             # Send the event
-            request_topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
+            request_topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2)
             await producer.send_and_wait(
                 topic=request_topic,
                 value=envelope.model_dump(mode="json"),

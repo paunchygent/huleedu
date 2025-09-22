@@ -207,6 +207,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         grammar_analysis: GrammarAnalysis,
         correlation_id: UUID,
         feature_outputs: dict[str, Any] | None = None,
+        essay_instructions: str | None = None,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
 
@@ -218,6 +219,8 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             nlp_metrics: Basic text metrics from spaCy
             grammar_analysis: Grammar analysis from Language Tool
             correlation_id: Correlation ID for tracking
+            feature_outputs: Optional feature outputs emitted by the pipeline
+            essay_instructions: Prompt supplied with the batch for context-aware analysis
         """
         logger.debug(
             f"Publishing NLP analysis completed for essay {essay_id} via outbox",
@@ -236,6 +239,8 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         }
         if feature_outputs:
             processing_metadata["feature_outputs"] = feature_outputs
+        if essay_instructions is not None:
+            processing_metadata["essay_instructions"] = essay_instructions
 
         event_data = EssayNlpCompletedV1(
             event_name=ProcessingEvent.ESSAY_NLP_COMPLETED,

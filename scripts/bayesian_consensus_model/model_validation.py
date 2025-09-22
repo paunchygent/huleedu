@@ -258,13 +258,27 @@ class ModelValidator:
                     .mean(dim=["chain", "draw"])
                     .values
                 )
-                thresholds = (
-                    bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
-                )
 
-                bootstrap_estimates["mean_ability"].append(float(abilities.mean()))
-                bootstrap_estimates["mean_severity"].append(float(severities.mean()))
-                bootstrap_estimates["threshold_range"].append(float(thresholds.max() - thresholds.min()))
+                # Handle thresholds - might be fixed or estimated
+                if "thresholds" in bootstrap_model.trace.posterior:
+                    thresholds = (
+                        bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+                    )
+                elif "thresholds_raw" in bootstrap_model.trace.posterior:
+                    # Complex model with sorted thresholds
+                    thresholds = (
+                        bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+                    )
+                else:
+                    # Simple model with fixed thresholds - get from observed data
+                    thresholds = bootstrap_model.model.thresholds.eval() if hasattr(bootstrap_model.model, 'thresholds') else np.array([])
+
+                bootstrap_estimates["mean_ability"].append(float(np.mean(abilities)))
+                bootstrap_estimates["mean_severity"].append(float(np.mean(severities)))
+                if len(thresholds) > 0:
+                    bootstrap_estimates["threshold_range"].append(float(np.max(thresholds) - np.min(thresholds)))
+                else:
+                    bootstrap_estimates["threshold_range"].append(0.0)
             except Exception:
                 continue
 

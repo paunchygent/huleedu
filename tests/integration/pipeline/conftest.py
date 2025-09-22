@@ -85,9 +85,9 @@ async def kafka_consumer_factory():
 async def topic_names() -> dict[str, str]:
     """Map of event names to actual Kafka topic names."""
     return {
-        "batch_nlp_initiate_command": topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
+        "batch_nlp_initiate_command": topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
         "batch_nlp_processing_requested": topic_name(
-            ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED
+            ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2
         ),
         "batch_nlp_analysis_completed": topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
         "essay_nlp_completed": topic_name(ProcessingEvent.ESSAY_NLP_COMPLETED),

@@ -21,7 +21,7 @@ import aiohttp
 from aiokafka import ConsumerRecord
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
+from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
 from huleedu_nlp_shared.feature_pipeline import FeaturePipelineProtocol
 from huleedu_service_libs.error_handling import (
@@ -80,7 +80,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         Returns:
             True if this handler can process Phase 2 batch NLP initiate commands
         """
-        return event_type == topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
+        return event_type == topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2)
 
     async def handle(
         self,
@@ -104,7 +104,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         """
         try:
             # Parse and validate command data
-            command_data = BatchNlpProcessingRequestedV1.model_validate(envelope.data)
+            command_data = BatchNlpProcessingRequestedV2.model_validate(envelope.data)
 
             # Log event processing
             # Get batch_id from command_data
@@ -207,6 +207,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         pipeline_result = await self.feature_pipeline.extract_features(
                             normalized_text=essay_text,
                             spellcheck_metrics=spellcheck_metrics,
+                            prompt_text=command_data.essay_instructions,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
                             language=language,
@@ -285,6 +286,7 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         grammar_analysis=grammar_analysis,
                         correlation_id=correlation_id,
                         feature_outputs=pipeline_result.features,
+                        essay_instructions=command_data.essay_instructions,
                     )
 
                     processed_count += 1

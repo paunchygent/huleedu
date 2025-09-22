@@ -15,7 +15,7 @@ from uuid import uuid4
 import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 from common_core.event_enums import ProcessingEvent
 
 # Import base event models that need rebuilding
@@ -47,7 +47,7 @@ EventTracker.model_rebuild(raise_errors=True)
 EventEnvelope.model_rebuild(raise_errors=True)
 SystemProcessingMetadata.model_rebuild(raise_errors=True)
 EssayProcessingInputRefV1.model_rebuild(raise_errors=True)
-BatchServiceNLPInitiateCommandDataV1.model_rebuild(raise_errors=True)
+BatchServiceNLPInitiateCommandDataV2.model_rebuild(raise_errors=True)
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +91,7 @@ def system_metadata(sample_batch_id: str, sample_parent_id: str) -> SystemProces
         entity_id=sample_batch_id,
         entity_type="batch",
         parent_id=sample_parent_id,
-        event=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+        event=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         processing_stage=ProcessingStage.PENDING,
     )
 
@@ -101,25 +101,26 @@ def nlp_initiate_command(
     sample_batch_id: str,
     sample_parent_id: str,
     system_metadata: SystemProcessingMetadata,
-) -> BatchServiceNLPInitiateCommandDataV1:
-    """Provide sample BatchServiceNLPInitiateCommandDataV1 for testing."""
-    return BatchServiceNLPInitiateCommandDataV1(
-        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+) -> BatchServiceNLPInitiateCommandDataV2:
+    """Provide sample BatchServiceNLPInitiateCommandDataV2 for testing."""
+    return BatchServiceNLPInitiateCommandDataV2(
+        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         entity_id=sample_batch_id,
         entity_type="batch",
         parent_id=sample_parent_id,
         essays_to_process=[],  # Empty list for testing
         language="en",
+        essay_instructions="Test instructions",
     )
 
 
 @pytest.fixture
 def nlp_command_envelope(
-    nlp_initiate_command: BatchServiceNLPInitiateCommandDataV1,
-) -> EventEnvelope[BatchServiceNLPInitiateCommandDataV1]:
-    """Provide sample EventEnvelope with BatchServiceNLPInitiateCommandDataV1 for testing."""
-    return EventEnvelope[BatchServiceNLPInitiateCommandDataV1](
-        event_type="batch.nlp.initiate.command.v1",
+    nlp_initiate_command: BatchServiceNLPInitiateCommandDataV2,
+) -> EventEnvelope[BatchServiceNLPInitiateCommandDataV2]:
+    """Provide sample EventEnvelope with BatchServiceNLPInitiateCommandDataV2 for testing."""
+    return EventEnvelope[BatchServiceNLPInitiateCommandDataV2](
+        event_type="batch.nlp.initiate.command.v2",
         source_service="test-service",
         correlation_id=uuid4(),
         data=nlp_initiate_command,
@@ -128,7 +129,7 @@ def nlp_command_envelope(
 
 @pytest.fixture
 def kafka_message(
-    nlp_command_envelope: EventEnvelope[BatchServiceNLPInitiateCommandDataV1],
+    nlp_command_envelope: EventEnvelope[BatchServiceNLPInitiateCommandDataV2],
     sample_batch_id: str,
 ) -> ConsumerRecord:
     """Provide a mock Kafka ConsumerRecord for testing."""
