@@ -1,0 +1,203 @@
+{
+  "focus_essay": "JA24",
+  "ja24_analysis": {
+    "essay_id": "JA24",
+    "raw_ratings": {
+      "Erik A": "A",
+      "Yvonne R": "B",
+      "Agneta D": "B",
+      "Anna P": "A",
+      "Hanna L": "A",
+      "Jenny P": "A"
+    },
+    "grade_counts": {
+      "A": 4,
+      "B": 2
+    },
+    "n_a_ratings": 4,
+    "n_b_ratings": 2,
+    "model_consensus": "B",
+    "raw_consensus_mean": "B+",
+    "raw_consensus_median": "A",
+    "a_rater_severities": [
+      -1.3816776075522614,
+      -1.0892218902073163,
+      -1.337166928901389,
+      0.0077490398523583
+    ],
+    "b_rater_severities": [
+      -0.2241748894653505,
+      0.3802882625801619
+    ],
+    "avg_a_severity": -0.9500793467021521,
+    "avg_b_severity": 0.0780566865574057,
+    "a_raters_labeled_generous": 3,
+    "problem_summary": "Despite 4 A ratings vs 2 B ratings, model gave B. A-raters had avg severity -0.95 (labeled as generous), causing their ratings to be discounted."
+  },
+  "diagnostic_results": {
+    "threshold_diagnostics": {
+      "is_monotonic": true,
+      "b_to_a_gap": 2.6406226385073435,
+      "mean_gap": 1.1587051162743578,
+      "std_gap": 0.8316469358666748,
+      "extreme_gaps": [],
+      "threshold_range": 9.269640930194862,
+      "relative_gaps": [
+        0.04519360782585728,
+        0.04657046915787458,
+        0.046783448682795596,
+        0.035787518349573014,
+        0.1398012058984665,
+        0.21810313088388072,
+        0.1828927738996056,
+        0.2848678453019467
+      ]
+    },
+    "constraint_diagnostics": {
+      "has_sum_to_zero_constraint": "True",
+      "severity_sum": 8.881784197001252e-16,
+      "n_very_generous": 3,
+      "n_very_strict": 2,
+      "is_bimodal": false,
+      "severity_range": 3.559753482988304,
+      "severity_std": 0.9596961708284624,
+      "forced_balancing_likely": false
+    },
+    "severity_distribution": {
+      "statistics": {
+        "mean": 6.344131569286608e-17,
+        "median": -0.1082129248064961,
+        "std": 0.9596961708284624,
+        "min": -1.3816776075522614,
+        "max": 2.1780758754360425,
+        "skewness": 0.43752856841496535,
+        "kurtosis": -0.23293924017887058
+      },
+      "rater_categories": {
+        "generous": "4",
+        "neutral": "6",
+        "strict": "4"
+      },
+      "severity_experience_correlation": {
+        "correlation": -0.3537688638510276,
+        "p_value": 0.2146470748042042,
+        "significant": "False"
+      }
+    },
+    "identifiability": {
+      "n_parameters": 35,
+      "n_essays": 12,
+      "n_raters": 14,
+      "n_thresholds": 9,
+      "approx_observations": 60.0,
+      "param_obs_ratio": 0.5833333333333334,
+      "is_overparameterized": "True",
+      "recommendation": "Model is overparameterized"
+    }
+  },
+  "consensus_comparison": [
+    {
+      "Method": "Simple Majority",
+      "Consensus Grade": "A",
+      "Confidence": 0.667,
+      "Details": {
+        "grade_counts": {
+          "A": 4,
+          "B": 2
+        },
+        "total_ratings": 6,
+        "majority_count": 4,
+        "tied": false
+      }
+    },
+    {
+      "Method": "Weighted Median",
+      "Consensus Grade": "A",
+      "Confidence": 0.6,
+      "Details": {
+        "numeric_ratings": [
+          14,
+          12,
+          12,
+          14,
+          14,
+          14
+        ],
+        "weights": [
+          0.16666666666666666,
+          0.16666666666666666,
+          0.16666666666666666,
+          0.16666666666666666,
+          0.16666666666666666,
+          0.16666666666666666
+        ],
+        "weighted_median_numeric": 14.0,
+        "weighted_mad": 0.6666666666666666
+      }
+    },
+    {
+      "Method": "Trimmed Mean (20%)",
+      "Consensus Grade": "A",
+      "Confidence": 0.536,
+      "Details": {
+        "trimmed_mean_numeric": 13.5,
+        "trim_proportion": 0.2,
+        "n_trimmed_each_end": 1,
+        "trimmed_low": [
+          "B"
+        ],
+        "trimmed_high": [
+          "A"
+        ],
+        "kept_ratings": [
+          "B",
+          "A",
+          "A",
+          "A"
+        ]
+      }
+    },
+    {
+      "Method": "Rater Adjusted",
+      "Consensus Grade": "A",
+      "Confidence": 0.452,
+      "Details": {
+        "raw_mean_numeric": 13.333333333333334,
+        "adjusted_mean_numeric": 13.637017001141151,
+        "raw_consensus_grade": "B+",
+        "adjustment_impact": 0.3036836678078174,
+        "adjusted_ratings": [
+          14.690838803776131,
+          12.112087444732675,
+          11.809855868709919,
+          14.544610945103658,
+          14.668583464450695,
+          13.996125480073822
+        ],
+        "raw_ratings": [
+          14,
+          12,
+          12,
+          14,
+          14,
+          14
+        ]
+      }
+    }
+  ],
+  "model_issues": {
+    "circular_reasoning_detected": true,
+    "extreme_thresholds": true,
+    "overparameterized": "True",
+    "sum_to_zero_issues": false,
+    "n_parameters": 35
+  },
+  "agreement_metrics": {
+    "Krippendorff_alpha_interval_on_10_cat": 0.562,
+    "Median_ratings_per_essay": 5.0,
+    "Median_spread": 2.0,
+    "Share_essays_range_ge_2": 0.667,
+    "Share_essays_range_ge_3": 0.417,
+    "Share_essays_range_ge_4": 0.167
+  }
+}

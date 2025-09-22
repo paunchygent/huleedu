@@ -56,6 +56,10 @@ monorepo-tools = [
     "tabulate",
     "pandas-stubs",  # Type stubs
     "types-tabulate",  # Type stubs
+    # Bayesian modeling dependencies
+    "pymc",
+    "arviz",
+    "scikit-learn",
 ]
 
 # Install all services and common_core for unified development

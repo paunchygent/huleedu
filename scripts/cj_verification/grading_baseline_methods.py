@@ -4,7 +4,7 @@ Simple consensus methods (majority vote, weighted median, trimmed mean) for
 comparing against complex Bayesian model results.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,9 @@ class ConsensusMethod:
 class SimpleMajorityVote(ConsensusMethod):
     """Simple majority vote - baseline method."""
 
-    def compute_consensus(self, ratings: Dict[str, str], grade_map: Optional[Dict] = None) -> Tuple[str, float, Dict]:
+    def compute_consensus(
+        self, ratings: Dict[str, str], grade_map: Optional[Dict] = None
+    ) -> Tuple[str, float, Dict]:
         """Compute consensus using simple majority vote.
 
         Args:
@@ -66,7 +68,7 @@ class SimpleMajorityVote(ConsensusMethod):
             "grade_counts": grade_counts,
             "total_ratings": total_ratings,
             "majority_count": max_count,
-            "tied": len(modal_grades) > 1
+            "tied": len(modal_grades) > 1,
         }
 
         return consensus_grade, confidence, details
@@ -74,12 +76,21 @@ class SimpleMajorityVote(ConsensusMethod):
     def _grade_to_numeric(self, grade: str) -> float:
         """Convert grade to numeric value."""
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
@@ -88,9 +99,7 @@ class WeightedMedianConsensus(ConsensusMethod):
     """Weighted median consensus - robust to outliers."""
 
     def compute_consensus(
-        self,
-        ratings: Dict[str, str],
-        rater_weights: Optional[Dict[str, float]] = None
+        self, ratings: Dict[str, str], rater_weights: Optional[Dict[str, float]] = None
     ) -> Tuple[str, float, Dict]:
         """Compute consensus using weighted median.
 
@@ -142,7 +151,7 @@ class WeightedMedianConsensus(ConsensusMethod):
             "numeric_ratings": numeric_ratings,
             "weights": weights.tolist(),
             "weighted_median_numeric": float(weighted_median),
-            "weighted_mad": float(weighted_mad)
+            "weighted_mad": float(weighted_mad),
         }
 
         return consensus_grade, confidence, details
@@ -150,24 +159,42 @@ class WeightedMedianConsensus(ConsensusMethod):
     def _grade_to_numeric(self, grade: str) -> float:
         """Convert grade to numeric value."""
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
     def _numeric_to_grade(self, numeric: float) -> str:
         """Convert numeric value to grade."""
         grade_map = {
-            0: "F", 1: "F+",
-            2: "E-", 3: "E", 4: "E+",
-            5: "D-", 6: "D", 7: "D+",
-            8: "C-", 9: "C", 10: "C+",
-            11: "B-", 12: "B", 13: "B+",
-            14: "A"
+            0: "F",
+            1: "F+",
+            2: "E-",
+            3: "E",
+            4: "E+",
+            5: "D-",
+            6: "D",
+            7: "D+",
+            8: "C-",
+            9: "C",
+            10: "C+",
+            11: "B-",
+            12: "B",
+            13: "B+",
+            14: "A",
         }
         rounded = int(round(numeric))
         rounded = max(0, min(14, rounded))
@@ -207,11 +234,15 @@ class TrimmedMeanConsensus(ConsensusMethod):
             consensus_grade = self._numeric_to_grade(mean_value)
             confidence = 1.0 / (1.0 + np.std(numeric_ratings))
 
-            return consensus_grade, confidence, {
-                "method": "mean (too few ratings for trimming)",
-                "numeric_mean": float(mean_value),
-                "n_ratings": len(numeric_ratings)
-            }
+            return (
+                consensus_grade,
+                confidence,
+                {
+                    "method": "mean (too few ratings for trimming)",
+                    "numeric_mean": float(mean_value),
+                    "n_ratings": len(numeric_ratings),
+                },
+            )
 
         # Compute trimmed mean
         trimmed_mean = stats.trim_mean(numeric_ratings, self.trim_proportion)
@@ -243,7 +274,7 @@ class TrimmedMeanConsensus(ConsensusMethod):
             "n_trimmed_each_end": n_trim,
             "trimmed_low": [self._numeric_to_grade(x) for x in trimmed_low],
             "trimmed_high": [self._numeric_to_grade(x) for x in trimmed_high],
-            "kept_ratings": [self._numeric_to_grade(x) for x in kept_ratings]
+            "kept_ratings": [self._numeric_to_grade(x) for x in kept_ratings],
         }
 
         return consensus_grade, confidence, details
@@ -251,24 +282,42 @@ class TrimmedMeanConsensus(ConsensusMethod):
     def _grade_to_numeric(self, grade: str) -> float:
         """Convert grade to numeric value."""
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
     def _numeric_to_grade(self, numeric: float) -> str:
         """Convert numeric value to grade."""
         grade_map = {
-            0: "F", 1: "F+",
-            2: "E-", 3: "E", 4: "E+",
-            5: "D-", 6: "D", 7: "D+",
-            8: "C-", 9: "C", 10: "C+",
-            11: "B-", 12: "B", 13: "B+",
-            14: "A"
+            0: "F",
+            1: "F+",
+            2: "E-",
+            3: "E",
+            4: "E+",
+            5: "D-",
+            6: "D",
+            7: "D+",
+            8: "C-",
+            9: "C",
+            10: "C+",
+            11: "B-",
+            12: "B",
+            13: "B+",
+            14: "A",
         }
         rounded = int(round(numeric))
         rounded = max(0, min(14, rounded))
@@ -279,9 +328,7 @@ class RaterAdjustedConsensus(ConsensusMethod):
     """Consensus with simple rater adjustments (not Bayesian)."""
 
     def compute_consensus(
-        self,
-        ratings: Dict[str, str],
-        rater_severities: Optional[Dict[str, float]] = None
+        self, ratings: Dict[str, str], rater_severities: Optional[Dict[str, float]] = None
     ) -> Tuple[str, float, Dict]:
         """Compute consensus with rater severity adjustments.
 
@@ -333,7 +380,7 @@ class RaterAdjustedConsensus(ConsensusMethod):
             "raw_consensus_grade": raw_consensus,
             "adjustment_impact": float(adjusted_mean - raw_mean),
             "adjusted_ratings": adjusted_ratings,
-            "raw_ratings": raw_ratings
+            "raw_ratings": raw_ratings,
         }
 
         return consensus_grade, confidence, details
@@ -341,24 +388,42 @@ class RaterAdjustedConsensus(ConsensusMethod):
     def _grade_to_numeric(self, grade: str) -> float:
         """Convert grade to numeric value."""
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
     def _numeric_to_grade(self, numeric: float) -> str:
         """Convert numeric value to grade."""
         grade_map = {
-            0: "F", 1: "F+",
-            2: "E-", 3: "E", 4: "E+",
-            5: "D-", 6: "D", 7: "D+",
-            8: "C-", 9: "C", 10: "C+",
-            11: "B-", 12: "B", 13: "B+",
-            14: "A"
+            0: "F",
+            1: "F+",
+            2: "E-",
+            3: "E",
+            4: "E+",
+            5: "D-",
+            6: "D",
+            7: "D+",
+            8: "C-",
+            9: "C",
+            10: "C+",
+            11: "B-",
+            12: "B",
+            13: "B+",
+            14: "A",
         }
         rounded = int(round(numeric))
         rounded = max(0, min(14, rounded))
@@ -368,7 +433,7 @@ class RaterAdjustedConsensus(ConsensusMethod):
 def compare_all_methods(
     ratings: Dict[str, str],
     rater_severities: Optional[Dict[str, float]] = None,
-    rater_weights: Optional[Dict[str, float]] = None
+    rater_weights: Optional[Dict[str, float]] = None,
 ) -> pd.DataFrame:
     """Compare all consensus methods on the same ratings.
 
@@ -384,7 +449,7 @@ def compare_all_methods(
         "Simple Majority": SimpleMajorityVote(),
         "Weighted Median": WeightedMedianConsensus(),
         "Trimmed Mean (20%)": TrimmedMeanConsensus(0.2),
-        "Rater Adjusted": RaterAdjustedConsensus()
+        "Rater Adjusted": RaterAdjustedConsensus(),
     }
 
     results = []
@@ -392,24 +457,32 @@ def compare_all_methods(
     for method_name, method in methods.items():
         try:
             if method_name == "Weighted Median" and rater_weights:
-                grade, confidence, details = method.compute_consensus(ratings, rater_weights=rater_weights)
+                grade, confidence, details = method.compute_consensus(
+                    ratings, rater_weights=rater_weights
+                )
             elif method_name == "Rater Adjusted" and rater_severities:
-                grade, confidence, details = method.compute_consensus(ratings, rater_severities=rater_severities)
+                grade, confidence, details = method.compute_consensus(
+                    ratings, rater_severities=rater_severities
+                )
             else:
                 grade, confidence, details = method.compute_consensus(ratings)
 
-            results.append({
-                "Method": method_name,
-                "Consensus Grade": grade,
-                "Confidence": round(confidence, 3),
-                "Details": details
-            })
+            results.append(
+                {
+                    "Method": method_name,
+                    "Consensus Grade": grade,
+                    "Confidence": round(confidence, 3),
+                    "Details": details,
+                }
+            )
         except Exception as e:
-            results.append({
-                "Method": method_name,
-                "Consensus Grade": "ERROR",
-                "Confidence": 0.0,
-                "Details": {"error": str(e)}
-            })
+            results.append(
+                {
+                    "Method": method_name,
+                    "Consensus Grade": "ERROR",
+                    "Confidence": 0.0,
+                    "Details": {"error": str(e)},
+                }
+            )
 
     return pd.DataFrame(results)

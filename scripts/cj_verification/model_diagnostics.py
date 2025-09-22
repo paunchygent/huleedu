@@ -4,7 +4,7 @@ Diagnoses problems in the Many-Facet Rasch Model including circular reasoning,
 sum-to-zero constraints, extreme thresholds, and overparameterization.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,9 @@ class BayesianModelDiagnostics:
             thresholds_df: DataFrame with grade thresholds
             severity_df: DataFrame with rater severities
         """
-        self.thresholds = thresholds_df["tau_k"].values if "tau_k" in thresholds_df else thresholds_df.values
+        self.thresholds = (
+            thresholds_df["tau_k"].values if "tau_k" in thresholds_df else thresholds_df.values
+        )
         self.severities = severity_df
 
     def diagnose_threshold_issues(self) -> Dict:
@@ -53,7 +55,7 @@ class BayesianModelDiagnostics:
             "std_gap": float(np.std(threshold_gaps)),
             "extreme_gaps": extreme_gaps,
             "threshold_range": float(total_range),
-            "relative_gaps": relative_gaps.tolist()
+            "relative_gaps": relative_gaps.tolist(),
         }
 
     def diagnose_sum_to_zero_constraint(self) -> Dict:
@@ -93,7 +95,7 @@ class BayesianModelDiagnostics:
             "is_bimodal": is_bimodal,
             "severity_range": float(severity_range),
             "severity_std": float(severity_std),
-            "forced_balancing_likely": is_bimodal and has_sum_to_zero
+            "forced_balancing_likely": is_bimodal and has_sum_to_zero,
         }
 
     def analyze_rater_severity_distribution(self) -> Dict:
@@ -113,7 +115,7 @@ class BayesianModelDiagnostics:
             "min": float(np.min(severities)),
             "max": float(np.max(severities)),
             "skewness": float(stats.skew(severities)),
-            "kurtosis": float(stats.kurtosis(severities))
+            "kurtosis": float(stats.kurtosis(severities)),
         }
 
         # Categorize raters
@@ -122,8 +124,10 @@ class BayesianModelDiagnostics:
 
         rater_categories = {
             "generous": np.sum(severities < generous_threshold),
-            "neutral": np.sum((severities >= generous_threshold) & (severities <= strict_threshold)),
-            "strict": np.sum(severities > strict_threshold)
+            "neutral": np.sum(
+                (severities >= generous_threshold) & (severities <= strict_threshold)
+            ),
+            "strict": np.sum(severities > strict_threshold),
         }
 
         # Correlation between severity and number of ratings
@@ -132,19 +136,19 @@ class BayesianModelDiagnostics:
             severity_experience_correlation = {
                 "correlation": float(corr),
                 "p_value": float(p_value),
-                "significant": p_value < 0.05
+                "significant": p_value < 0.05,
             }
         else:
             severity_experience_correlation = {
                 "correlation": 0.0,
                 "p_value": 1.0,
-                "significant": False
+                "significant": False,
             }
 
         return {
             "statistics": stats_dict,
             "rater_categories": rater_categories,
-            "severity_experience_correlation": severity_experience_correlation
+            "severity_experience_correlation": severity_experience_correlation,
         }
 
     def detect_circular_reasoning(self, essay_ratings: Dict[str, str]) -> Dict:
@@ -171,15 +175,17 @@ class BayesianModelDiagnostics:
 
                 # Check for circular pattern:
                 # High grade (A/B) + labeled generous (severity < -0.5)
-                is_circular = (numeric_grade >= 12 and severity < -0.5)
+                is_circular = numeric_grade >= 12 and severity < -0.5
 
-                rater_analysis.append({
-                    "rater": rater,
-                    "grade": grade,
-                    "numeric_grade": numeric_grade,
-                    "severity": severity,
-                    "circular_pattern": is_circular
-                })
+                rater_analysis.append(
+                    {
+                        "rater": rater,
+                        "grade": grade,
+                        "numeric_grade": numeric_grade,
+                        "severity": severity,
+                        "circular_pattern": is_circular,
+                    }
+                )
 
         # Count circular patterns
         circular_count = sum(1 for r in rater_analysis if r["circular_pattern"])
@@ -189,7 +195,7 @@ class BayesianModelDiagnostics:
             "rater_analysis": rater_analysis,
             "circular_count": circular_count,
             "circular_proportion": circular_count / total_raters if total_raters > 0 else 0,
-            "circular_reasoning_detected": circular_count >= total_raters * 0.4
+            "circular_reasoning_detected": circular_count >= total_raters * 0.4,
         }
 
     def compute_identifiability_metrics(self) -> Dict:
@@ -211,7 +217,9 @@ class BayesianModelDiagnostics:
         approx_observations = n_essays * avg_ratings_per_essay
 
         # Parameter to observation ratio
-        param_obs_ratio = n_parameters / approx_observations if approx_observations > 0 else float('inf')
+        param_obs_ratio = (
+            n_parameters / approx_observations if approx_observations > 0 else float("inf")
+        )
 
         # Check for overparameterization
         is_overparameterized = param_obs_ratio > 0.5
@@ -224,7 +232,9 @@ class BayesianModelDiagnostics:
             "approx_observations": approx_observations,
             "param_obs_ratio": param_obs_ratio,
             "is_overparameterized": is_overparameterized,
-            "recommendation": "Model is overparameterized" if is_overparameterized else "Model complexity acceptable"
+            "recommendation": "Model is overparameterized"
+            if is_overparameterized
+            else "Model complexity acceptable",
         }
 
     def _find_peaks(self, density: np.ndarray) -> List[int]:
@@ -245,12 +255,21 @@ class BayesianModelDiagnostics:
     def _grade_to_numeric(self, grade: str) -> float:
         """Convert grade to numeric value."""
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
@@ -259,7 +278,7 @@ def diagnose_ja24_specific_issues(
     raw_ratings: Dict[str, str],
     severity_df: pd.DataFrame,
     consensus_grade: str,
-    thresholds_df: pd.DataFrame
+    thresholds_df: pd.DataFrame,
 ) -> Dict:
     """Specific diagnostics for the JA24 case.
 
@@ -303,9 +322,21 @@ def diagnose_ja24_specific_issues(
     # Calculate what the consensus would be without severity adjustments
     numeric_ratings = []
     grade_to_num = {
-        "F": 0, "F+": 1, "E-": 2, "E": 3, "E+": 4,
-        "D-": 5, "D": 6, "D+": 7, "C-": 8, "C": 9, "C+": 10,
-        "B-": 11, "B": 12, "B+": 13, "A": 14
+        "F": 0,
+        "F+": 1,
+        "E-": 2,
+        "E": 3,
+        "E+": 4,
+        "D-": 5,
+        "D": 6,
+        "D+": 7,
+        "C-": 8,
+        "C": 9,
+        "C+": 10,
+        "B-": 11,
+        "B": 12,
+        "B+": 13,
+        "A": 14,
     }
 
     for grade in raw_ratings.values():
@@ -333,6 +364,6 @@ def diagnose_ja24_specific_issues(
         "avg_b_severity": float(avg_b_severity),
         "a_raters_labeled_generous": a_raters_labeled_generous,
         "problem_summary": f"Despite {n_a_ratings} A ratings vs {n_b_ratings} B ratings, "
-                          f"model gave {consensus_grade}. A-raters had avg severity {avg_a_severity:.2f} "
-                          f"(labeled as generous), causing their ratings to be discounted."
+        f"model gave {consensus_grade}. A-raters had avg severity {avg_a_severity:.2f} "
+        f"(labeled as generous), causing their ratings to be discounted.",
     }

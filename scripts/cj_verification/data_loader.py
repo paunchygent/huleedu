@@ -5,9 +5,8 @@ providing access to raw ratings, rater severities, thresholds, and consensus gra
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
 
-import numpy as np
 import pandas as pd
 
 
@@ -30,7 +29,7 @@ class BayesianDataLoader:
             "ordinal_rater_severity.csv",
             "ordinal_thresholds.csv",
             "ordinal_true_scores_essays.csv",
-            "ordinal_agreement_metrics.txt"
+            "ordinal_agreement_metrics.txt",
         ]
 
         for file in required_files:
@@ -127,13 +126,23 @@ class BayesianDataLoader:
             is_generous = severity < -0.5
             is_strict = severity > 0.5
 
-            analysis_data.append({
-                "rater": rater,
-                "raw_grade": grade,
-                "severity": severity,
-                "rater_type": "generous" if is_generous else "strict" if is_strict else "neutral",
-                "adjustment_impact": "discounted" if is_generous else "amplified" if is_strict else "normal"
-            })
+            analysis_data.append(
+                {
+                    "rater": rater,
+                    "raw_grade": grade,
+                    "severity": severity,
+                    "rater_type": "generous"
+                    if is_generous
+                    else "strict"
+                    if is_strict
+                    else "neutral",
+                    "adjustment_impact": "discounted"
+                    if is_generous
+                    else "amplified"
+                    if is_strict
+                    else "normal",
+                }
+            )
 
         return pd.DataFrame(analysis_data).sort_values("severity")
 
@@ -147,12 +156,21 @@ class BayesianDataLoader:
             Numeric value for comparison
         """
         grade_map = {
-            "F": 0, "F+": 1,
-            "E-": 2, "E": 3, "E+": 4,
-            "D-": 5, "D": 6, "D+": 7,
-            "C-": 8, "C": 9, "C+": 10,
-            "B-": 11, "B": 12, "B+": 13,
-            "A": 14
+            "F": 0,
+            "F+": 1,
+            "E-": 2,
+            "E": 3,
+            "E+": 4,
+            "D-": 5,
+            "D": 6,
+            "D+": 7,
+            "C-": 8,
+            "C": 9,
+            "C+": 10,
+            "B-": 11,
+            "B": 12,
+            "B+": 13,
+            "A": 14,
         }
         return grade_map.get(grade, -1)
 
@@ -166,12 +184,21 @@ class BayesianDataLoader:
             Closest letter grade
         """
         grade_map = {
-            0: "F", 1: "F+",
-            2: "E-", 3: "E", 4: "E+",
-            5: "D-", 6: "D", 7: "D+",
-            8: "C-", 9: "C", 10: "C+",
-            11: "B-", 12: "B", 13: "B+",
-            14: "A"
+            0: "F",
+            1: "F+",
+            2: "E-",
+            3: "E",
+            4: "E+",
+            5: "D-",
+            6: "D",
+            7: "D+",
+            8: "C-",
+            9: "C",
+            10: "C+",
+            11: "B-",
+            12: "B",
+            13: "B+",
+            14: "A",
         }
 
         # Find closest grade
@@ -199,7 +226,7 @@ class BayesianDataLoader:
             "latent_ability": row["latent_ability"],
             "predicted_grade": row["pred_mode_grade"],
             "predicted_category": row["pred_mode_category"],
-            "expected_category": row["expected_category"]
+            "expected_category": row["expected_category"],
         }
 
     def load_agreement_metrics(self) -> Dict[str, float]:
@@ -237,5 +264,5 @@ def load_all_data(data_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
         loader.load_raw_ratings(),
         loader.load_rater_severity(),
         loader.load_thresholds(),
-        loader.load_consensus_grades()
+        loader.load_consensus_grades(),
     )

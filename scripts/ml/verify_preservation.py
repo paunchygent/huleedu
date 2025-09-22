@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Verify that enhanced whitelist preserves critical abbreviations."""
 
-
 import pandas as pd
 
 # Load normalized output

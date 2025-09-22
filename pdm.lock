@@ -5,7 +5,7 @@
 groups = ["default", "dev", "monorepo-tools"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:1afa1a0e5a15f9c79daf31d72d0b51c3ed386aa09199c8618ffe0907f8ad06ff"
+content_hash = "sha256:0c652dc008b5de923f648d5e677a4bf639bf567ed3d9335b6238b7419c388681"
 
 [[metadata.targets]]
 requires_python = ">=3.11,<3.13"
@@ -275,6 +275,29 @@ files = [
 ]
 
 [[package]]
+name = "arviz"
+version = "0.22.0"
+requires_python = ">=3.10"
+summary = "Exploratory analysis of Bayesian models"
+groups = ["monorepo-tools"]
+dependencies = [
+    "h5netcdf>=1.0.2",
+    "matplotlib>=3.8",
+    "numpy>=1.26.0",
+    "packaging",
+    "pandas>=2.1.0",
+    "scipy>=1.11.0",
+    "setuptools>=60.0.0",
+    "typing-extensions>=4.1.0",
+    "xarray-einstats>=0.3",
+    "xarray>=2023.7.0",
+]
+files = [
+    {file = "arviz-0.22.0-py3-none-any.whl", hash = "sha256:336a3a4b1aa981997945f9ca104ca9f827e9c943f13760b18bf645ee5b12d56d"},
+    {file = "arviz-0.22.0.tar.gz", hash = "sha256:d9df7592f1ce77ce69f7504dba13f8d550204c49c23e54849861dbcb2c640954"},
+]
+
+[[package]]
 name = "asgiref"
 version = "3.9.1"
 requires_python = ">=3.9"
@@ -429,7 +452,7 @@ name = "cachetools"
 version = "5.5.2"
 requires_python = ">=3.7"
 summary = "Extensible memoizing collections and decorators"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 files = [
     {file = "cachetools-5.5.2-py3-none-any.whl", hash = "sha256:d26a22bcc62eb95c3beabd9f1ee5e820d3d2704fe2967cbe350e20c8ffcd3f0a"},
     {file = "cachetools-5.5.2.tar.gz", hash = "sha256:1a661caa9175d26759571b2e19580f9d6393969e5dfca11fdb1f947a23e640d4"},
@@ -588,6 +611,17 @@ files = [
 ]
 
 [[package]]
+name = "cloudpickle"
+version = "3.1.1"
+requires_python = ">=3.8"
+summary = "Pickler class to extend the standard pickle.Pickler functionality"
+groups = ["monorepo-tools"]
+files = [
+    {file = "cloudpickle-3.1.1-py3-none-any.whl", hash = "sha256:c8c5a44295039331ee9dad40ba100a9c7297b6f988e50e87ccdf3765a668350e"},
+    {file = "cloudpickle-3.1.1.tar.gz", hash = "sha256:b216fa8ae4019d5482a8ac3c95d8f6346115d8835911fd4aefd1a445e4242c64"},
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
@@ -613,6 +647,20 @@ dependencies = [
 files = [
     {file = "confection-0.1.5-py3-none-any.whl", hash = "sha256:e29d3c3f8eac06b3f77eb9dfb4bf2fc6bcc9622a98ca00a698e3d019c6430b14"},
     {file = "confection-0.1.5.tar.gz", hash = "sha256:8e72dd3ca6bd4f48913cd220f10b8275978e740411654b6e8ca6d7008c590f0e"},
+]
+
+[[package]]
+name = "cons"
+version = "0.4.7"
+requires_python = ">=3.9"
+summary = "An implementation of Lisp/Scheme-like cons in Python."
+groups = ["monorepo-tools"]
+dependencies = [
+    "logical-unification>=0.4.0",
+]
+files = [
+    {file = "cons-0.4.7-py3-none-any.whl", hash = "sha256:e38ee12cf703559ea744c94f725bee0e2329f32daf0249b49db1b0437cc6cb94"},
+    {file = "cons-0.4.7.tar.gz", hash = "sha256:0a96cd2abd6a9f494816c1272cf5583a960041750c2d7a48eeeccd47ce369dfd"},
 ]
 
 [[package]]
@@ -1015,6 +1063,21 @@ summary = "English pipeline optimized for CPU. Components: tok2vec, tagger, pars
 groups = ["dev"]
 files = [
     {file = "en_core_web_sm-3.8.0-py3-none-any.whl", hash = "sha256:1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"},
+]
+
+[[package]]
+name = "etuples"
+version = "0.3.10"
+requires_python = ">=3.9"
+summary = "Python S-expression emulation using tuple-like objects."
+groups = ["monorepo-tools"]
+dependencies = [
+    "cons",
+    "multipledispatch",
+]
+files = [
+    {file = "etuples-0.3.10-py3-none-any.whl", hash = "sha256:4408c7940ef06af52dbbea0954a8a1817ed5750ce905ff48091ac3cd3aeb720b"},
+    {file = "etuples-0.3.10.tar.gz", hash = "sha256:26fde81d7e822837146231bfce4d6ba67eab5d7ed55bc58ba7437c2568051167"},
 ]
 
 [[package]]
@@ -1483,6 +1546,44 @@ dependencies = [
 files = [
     {file = "h2-4.3.0-py3-none-any.whl", hash = "sha256:c438f029a25f7945c69e0ccf0fb951dc3f73a5f6412981daee861431b70e2bdd"},
     {file = "h2-4.3.0.tar.gz", hash = "sha256:6c59efe4323fa18b47a632221a1888bd7fde6249819beda254aeca909f221bf1"},
+]
+
+[[package]]
+name = "h5netcdf"
+version = "1.6.4"
+requires_python = ">=3.9"
+summary = "netCDF4 via h5py"
+groups = ["monorepo-tools"]
+dependencies = [
+    "h5py",
+    "packaging",
+]
+files = [
+    {file = "h5netcdf-1.6.4-py3-none-any.whl", hash = "sha256:e0018e6a918f2bef2a4aa7b470a952b8a0b5d16a5893d59bea56524cc6207fcf"},
+    {file = "h5netcdf-1.6.4.tar.gz", hash = "sha256:83db7e5eb9b822bed2c79050d6cf8f36ecbd1039f4252bd90fab200edcaaf67d"},
+]
+
+[[package]]
+name = "h5py"
+version = "3.14.0"
+requires_python = ">=3.9"
+summary = "Read and write HDF5 files from Python"
+groups = ["monorepo-tools"]
+dependencies = [
+    "numpy>=1.19.3",
+]
+files = [
+    {file = "h5py-3.14.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f30dbc58f2a0efeec6c8836c97f6c94afd769023f44e2bb0ed7b17a16ec46088"},
+    {file = "h5py-3.14.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:543877d7f3d8f8a9828ed5df6a0b78ca3d8846244b9702e99ed0d53610b583a8"},
+    {file = "h5py-3.14.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8c497600c0496548810047257e36360ff551df8b59156d3a4181072eed47d8ad"},
+    {file = "h5py-3.14.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:723a40ee6505bd354bfd26385f2dae7bbfa87655f4e61bab175a49d72ebfc06b"},
+    {file = "h5py-3.14.0-cp311-cp311-win_amd64.whl", hash = "sha256:d2744b520440a996f2dae97f901caa8a953afc055db4673a993f2d87d7f38713"},
+    {file = "h5py-3.14.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:e0045115d83272090b0717c555a31398c2c089b87d212ceba800d3dc5d952e23"},
+    {file = "h5py-3.14.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6da62509b7e1d71a7d110478aa25d245dd32c8d9a1daee9d2a42dba8717b047a"},
+    {file = "h5py-3.14.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:554ef0ced3571366d4d383427c00c966c360e178b5fb5ee5bb31a435c424db0c"},
+    {file = "h5py-3.14.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0cbd41f4e3761f150aa5b662df991868ca533872c95467216f2bec5fcad84882"},
+    {file = "h5py-3.14.0-cp312-cp312-win_amd64.whl", hash = "sha256:bf4897d67e613ecf5bdfbdab39a1158a64df105827da70ea1d90243d796d367f"},
+    {file = "h5py-3.14.0.tar.gz", hash = "sha256:2372116b2e0d5d3e5e705b7f663f7c8d96fa79a4052d250484ef91d24d6a08f4"},
 ]
 
 [[package]]
@@ -2248,7 +2349,7 @@ name = "joblib"
 version = "1.5.2"
 requires_python = ">=3.9"
 summary = "Lightweight pipelining with Python functions"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 files = [
     {file = "joblib-1.5.2-py3-none-any.whl", hash = "sha256:4e1f0bdbb987e6d843c70cf43714cb276623def372df3c22fe5266b2670bc241"},
     {file = "joblib-1.5.2.tar.gz", hash = "sha256:3faa5c39054b2f03ca547da9b2f52fde67c06240c31853f306aea97f13647b55"},
@@ -2382,6 +2483,20 @@ files = [
 ]
 
 [[package]]
+name = "logical-unification"
+version = "0.4.6"
+requires_python = ">=3.6"
+summary = "Logical unification in Python"
+groups = ["monorepo-tools"]
+dependencies = [
+    "multipledispatch",
+    "toolz",
+]
+files = [
+    {file = "logical-unification-0.4.6.tar.gz", hash = "sha256:908435123f8a106fa4dcf9bf1b75c7beb309fa2bbecf277868af8f1c212650a0"},
+]
+
+[[package]]
 name = "lxml"
 version = "6.0.1"
 requires_python = ">=3.8"
@@ -2489,7 +2604,7 @@ name = "markdown-it-py"
 version = "4.0.0"
 requires_python = ">=3.10"
 summary = "Python port of markdown-it. Markdown parsing, done right!"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 dependencies = [
     "mdurl~=0.1",
 ]
@@ -2571,10 +2686,29 @@ name = "mdurl"
 version = "0.1.2"
 requires_python = ">=3.7"
 summary = "Markdown URL utilities"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
+]
+
+[[package]]
+name = "minikanren"
+version = "1.0.5"
+requires_python = ">=3.9"
+summary = "Relational programming in Python"
+groups = ["monorepo-tools"]
+dependencies = [
+    "cons>=0.4.0",
+    "etuples>=0.3.1",
+    "logical-unification>=0.4.1",
+    "multipledispatch",
+    "toolz",
+    "typing-extensions",
+]
+files = [
+    {file = "minikanren-1.0.5-py3-none-any.whl", hash = "sha256:22c24f4fdf009a56e30655787af45c90f0704bcc24e8d3e651378675b4bccb21"},
+    {file = "minikanren-1.0.5.tar.gz", hash = "sha256:c030e3e9a3fa5f372f84b66966776a8dc63b16b98768b78be0401982b892e00d"},
 ]
 
 [[package]]
@@ -2655,6 +2789,16 @@ files = [
     {file = "multidict-6.6.4-cp312-cp312-win_arm64.whl", hash = "sha256:14754eb72feaa1e8ae528468f24250dd997b8e2188c3d2f593f9eba259e4b364"},
     {file = "multidict-6.6.4-py3-none-any.whl", hash = "sha256:27d8f8e125c07cb954e54d75d04905a9bba8a439c1d84aca94949d4d03d8601c"},
     {file = "multidict-6.6.4.tar.gz", hash = "sha256:d2d4e4787672911b48350df02ed3fa3fffdc2f2e8ca06dd6afdf34189b76a9dd"},
+]
+
+[[package]]
+name = "multipledispatch"
+version = "1.0.0"
+summary = "Multiple dispatch"
+groups = ["monorepo-tools"]
+files = [
+    {file = "multipledispatch-1.0.0-py3-none-any.whl", hash = "sha256:0c53cd8b077546da4e48869f49b13164bebafd0c2a5afceb6bb6a316e7fb46e4"},
+    {file = "multipledispatch-1.0.0.tar.gz", hash = "sha256:5c839915465c68206c3e9c473357908216c28383b425361e5d144594bf85a7e0"},
 ]
 
 [[package]]
@@ -3496,6 +3640,29 @@ files = [
 ]
 
 [[package]]
+name = "pymc"
+version = "5.25.1"
+requires_python = ">=3.10"
+summary = "Probabilistic Programming in Python: Bayesian Modeling and Probabilistic Machine Learning with PyTensor"
+groups = ["monorepo-tools"]
+dependencies = [
+    "arviz>=0.13.0",
+    "cachetools>=4.2.1",
+    "cloudpickle",
+    "numpy>=1.25.0",
+    "pandas>=0.24.0",
+    "pytensor<2.32,>=2.31.7",
+    "rich>=13.7.1",
+    "scipy>=1.4.1",
+    "threadpoolctl<4.0.0,>=3.1.0",
+    "typing-extensions>=3.7.4",
+]
+files = [
+    {file = "pymc-5.25.1-py3-none-any.whl", hash = "sha256:4e1185cf20052b9be44f2ac8705dc6c77ff7b8d347d920d5e28719d970d9fa15"},
+    {file = "pymc-5.25.1.tar.gz", hash = "sha256:9e739315c0547336b4c11127aae8b3750145b29cdd8e21609196594aa29c21f8"},
+]
+
+[[package]]
 name = "pypandoc"
 version = "1.15"
 requires_python = ">=3.7"
@@ -3551,6 +3718,37 @@ groups = ["dev"]
 files = [
     {file = "pyspellchecker-0.8.3-py3-none-any.whl", hash = "sha256:e993076e98b0da5a99b7cc31085c3022c77a9dc37c5e95f5cf6304b5dbb8b9d2"},
     {file = "pyspellchecker-0.8.3.tar.gz", hash = "sha256:cb06eeafe124837f321e0d02f8e21deab713e966e28e0360319a28a089c43978"},
+]
+
+[[package]]
+name = "pytensor"
+version = "2.31.7"
+requires_python = "<3.14,>=3.10"
+summary = "Optimizing compiler for evaluating mathematical expressions on CPUs and GPUs."
+groups = ["monorepo-tools"]
+dependencies = [
+    "cons",
+    "etuples",
+    "filelock>=3.15",
+    "logical-unification",
+    "miniKanren",
+    "numpy>=1.17.0",
+    "scipy<2,>=1",
+    "setuptools>=59.0.0",
+]
+files = [
+    {file = "pytensor-2.31.7-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:5983ced37b9c91fe7fb6c8cc44b432e68bfb266ffc0cab145406fba578039acb"},
+    {file = "pytensor-2.31.7-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:81f37c7b0ec42e2f5a0509b1753a0becac029dd902dad59360e24d5270d30d9c"},
+    {file = "pytensor-2.31.7-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:44bf1e2ee2e49cfbc95cc9fbeac4534dc18fc325735ad13ae8ef585cce7b7bf8"},
+    {file = "pytensor-2.31.7-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:9ff160177c7209f5803715e297d9052eff968f4ae50e3ad787ee496bf0fd53af"},
+    {file = "pytensor-2.31.7-cp311-cp311-win_amd64.whl", hash = "sha256:38acc41d2724fad9f87795106754b5e79f9374ec35450a0b3382c5fbe01bc850"},
+    {file = "pytensor-2.31.7-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:c863122dc61638aa87c7277da984fe266eba6cf53e04a0cf5acbeac1fbe4e325"},
+    {file = "pytensor-2.31.7-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1489a55acb192528974f343f8cc67fc53cac0fbeb0bc02d4281f0a207fa506b5"},
+    {file = "pytensor-2.31.7-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:e79aaea8e1a94d115bcd895c82f8a6bf0dd651518a980108ca718ff182afb24b"},
+    {file = "pytensor-2.31.7-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:5aab6ff129ed85910b42965eef4a58b53d072c123200763677b6787a165d1aab"},
+    {file = "pytensor-2.31.7-cp312-cp312-win_amd64.whl", hash = "sha256:ab478a722dedc89e31634f189343a416293e27555be6ea6f4620598f05ecd583"},
+    {file = "pytensor-2.31.7-py2.py3-none-any.whl", hash = "sha256:d7f89c7eaedd8ce4323289602b41be28e8aaee14c73a52c701079f25c4247aa8"},
+    {file = "pytensor-2.31.7.tar.gz", hash = "sha256:0af99e240c95bc0223886eefb4343b0e9dc6fba349b70b107b3a6fbb9cb66409"},
 ]
 
 [[package]]
@@ -4012,7 +4210,7 @@ name = "rich"
 version = "14.1.0"
 requires_python = ">=3.8.0"
 summary = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 dependencies = [
     "markdown-it-py>=2.2.0",
     "pygments<3.0.0,>=2.13.0",
@@ -4069,7 +4267,7 @@ name = "scikit-learn"
 version = "1.7.2"
 requires_python = ">=3.10"
 summary = "A set of python modules for machine learning and data mining"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 dependencies = [
     "joblib>=1.2.0",
     "numpy>=1.22.0",
@@ -4136,7 +4334,7 @@ name = "setuptools"
 version = "80.9.0"
 requires_python = ">=3.9"
 summary = "Easily download, build, install, upgrade, and uninstall Python packages"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 files = [
     {file = "setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"},
     {file = "setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c"},
@@ -4562,10 +4760,21 @@ name = "threadpoolctl"
 version = "3.6.0"
 requires_python = ">=3.9"
 summary = "threadpoolctl"
-groups = ["dev"]
+groups = ["dev", "monorepo-tools"]
 files = [
     {file = "threadpoolctl-3.6.0-py3-none-any.whl", hash = "sha256:43a0b8fd5a2928500110039e43a5eed8480b918967083ea48dc3ab9f13c4a7fb"},
     {file = "threadpoolctl-3.6.0.tar.gz", hash = "sha256:8ab8b4aa3491d812b623328249fab5302a68d2d71745c8a4c719a2fcaba9f44e"},
+]
+
+[[package]]
+name = "toolz"
+version = "1.0.0"
+requires_python = ">=3.8"
+summary = "List processing tools and functional utilities"
+groups = ["monorepo-tools"]
+files = [
+    {file = "toolz-1.0.0-py3-none-any.whl", hash = "sha256:292c8f1c4e7516bf9086f8850935c799a874039c8bcf959d47b600e4c44a6236"},
+    {file = "toolz-1.0.0.tar.gz", hash = "sha256:2c86e3d9a04798ac556793bced838816296a2f085017664e4995cb40a1047a02"},
 ]
 
 [[package]]
@@ -4994,6 +5203,38 @@ dependencies = [
 files = [
     {file = "wsproto-1.2.0-py3-none-any.whl", hash = "sha256:b9acddd652b585d75b20477888c56642fdade28bdfd3579aa24a4d2c037dd736"},
     {file = "wsproto-1.2.0.tar.gz", hash = "sha256:ad565f26ecb92588a3e43bc3d96164de84cd9902482b130d0ddbaa9664a85065"},
+]
+
+[[package]]
+name = "xarray"
+version = "2025.9.0"
+requires_python = ">=3.11"
+summary = "N-D labeled arrays and datasets in Python"
+groups = ["monorepo-tools"]
+dependencies = [
+    "numpy>=1.26",
+    "packaging>=24.1",
+    "pandas>=2.2",
+]
+files = [
+    {file = "xarray-2025.9.0-py3-none-any.whl", hash = "sha256:79f0e25fb39571f612526ee998ee5404d8725a1db3951aabffdb287388885df0"},
+    {file = "xarray-2025.9.0.tar.gz", hash = "sha256:7dd6816fe0062c49c5e9370dd483843bc13e5ed80a47a9ff10baff2b51e070fb"},
+]
+
+[[package]]
+name = "xarray-einstats"
+version = "0.9.1"
+requires_python = ">=3.11"
+summary = "Stats, linear algebra and einops for xarray"
+groups = ["monorepo-tools"]
+dependencies = [
+    "numpy>=1.25",
+    "scipy>=1.11",
+    "xarray>=2023.06.0",
+]
+files = [
+    {file = "xarray_einstats-0.9.1-py3-none-any.whl", hash = "sha256:777339524e85d066f2ef9ed1e3a3fb63aead4c1065fd1406f30dfa4de58ce063"},
+    {file = "xarray_einstats-0.9.1.tar.gz", hash = "sha256:39b373deed43592c41d3fbf8863af62e19e01c1ae553ae5ff059a8df78d995c6"},
 ]
 
 [[package]]

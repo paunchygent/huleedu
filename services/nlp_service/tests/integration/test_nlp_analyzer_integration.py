@@ -35,9 +35,7 @@ class TestNlpAnalyzerIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_analyze_english_text_with_real_spacy(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_analyze_english_text_with_real_spacy(self, analyzer: NlpAnalyzer) -> None:
         """Test full analysis pipeline with real English spaCy model."""
         text = """The quick brown fox jumps over the lazy dog.
         This sentence contains various words with different frequencies.
@@ -61,9 +59,7 @@ class TestNlpAnalyzerIntegration:
             assert 0 < result.hdd_score < 1.0
 
     @pytest.mark.asyncio
-    async def test_analyze_swedish_text_with_real_spacy(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_analyze_swedish_text_with_real_spacy(self, analyzer: NlpAnalyzer) -> None:
         """Test full analysis pipeline with real Swedish spaCy model."""
         text = """Detta är en svensk text med åäö.
         Året har varit händelserikt och fullt av överraskningar.
@@ -77,9 +73,7 @@ class TestNlpAnalyzerIntegration:
         assert result.language_detected == "sv"
 
     @pytest.mark.asyncio
-    async def test_language_autodetection_with_langdetect(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_language_autodetection_with_langdetect(self, analyzer: NlpAnalyzer) -> None:
         """Test automatic language detection with real langdetect library."""
         swedish_text = "Detta är definitivt svensk text med många svenska ord och bokstäver som åäö"
 
@@ -93,9 +87,7 @@ class TestNlpAnalyzerIntegration:
             assert result.word_count > 10
 
     @pytest.mark.asyncio
-    async def test_zipf_frequency_calculation_with_wordfreq(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_zipf_frequency_calculation_with_wordfreq(self, analyzer: NlpAnalyzer) -> None:
         """Test Zipf frequency metrics with real wordfreq library."""
         # Mix of common and rare words
         text = """The cat sat on the mat. Sesquipedalian and
@@ -111,9 +103,7 @@ class TestNlpAnalyzerIntegration:
             assert result.percent_tokens_zipf_below_3 > 0
 
     @pytest.mark.asyncio
-    async def test_lexical_diversity_with_sufficient_text(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_lexical_diversity_with_sufficient_text(self, analyzer: NlpAnalyzer) -> None:
         """Test lexical diversity metrics with real lexical-diversity library."""
         # Create text with at least 50 tokens for MTLD/HDD calculation
         varied_text = (
@@ -177,9 +167,7 @@ class TestNlpAnalyzerIntegration:
             assert result.mean_dependency_distance < 10  # Reasonable upper bound
 
     @pytest.mark.asyncio
-    async def test_fallback_to_skeleton_mode_on_import_error(
-        self, analyzer: NlpAnalyzer
-    ) -> None:
+    async def test_fallback_to_skeleton_mode_on_import_error(self, analyzer: NlpAnalyzer) -> None:
         """Test that analyzer falls back gracefully when dependencies fail."""
         # This test verifies the analyzer still works even if some
         # dependencies fail to load their underlying libraries

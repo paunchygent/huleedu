@@ -20,23 +20,15 @@ Usage:
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, Any
 
 # Local imports
 from data_loader import BayesianDataLoader
 from grading_baseline_methods import (
     compare_all_methods,
-    SimpleMajorityVote,
-    WeightedMedianConsensus,
-    TrimmedMeanConsensus,
-    RaterAdjustedConsensus
 )
-from model_diagnostics import (
-    BayesianModelDiagnostics,
-    diagnose_ja24_specific_issues
-)
-from visualization_generator import VisualizationGenerator
+from model_diagnostics import BayesianModelDiagnostics, diagnose_ja24_specific_issues
 from report_generator import ReportGenerator
+from visualization_generator import VisualizationGenerator
 
 
 def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/"):
@@ -62,7 +54,7 @@ def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/
     raw_ratings_df = loader.load_raw_ratings()
     rater_severity_df = loader.load_rater_severity()
     thresholds_df = loader.load_thresholds()
-    consensus_grades_df = loader.load_consensus_grades()
+    loader.load_consensus_grades()
     agreement_metrics = loader.load_agreement_metrics()
 
     print(f"   - Loaded {len(raw_ratings_df)} essays")
@@ -92,21 +84,26 @@ def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/
         "constraint_diagnostics": diagnostics.diagnose_sum_to_zero_constraint(),
         "severity_distribution": diagnostics.analyze_rater_severity_distribution(),
         "circular_reasoning": diagnostics.detect_circular_reasoning(essay_ratings),
-        "identifiability": diagnostics.compute_identifiability_metrics()
+        "identifiability": diagnostics.compute_identifiability_metrics(),
     }
 
-    print(f"   - Threshold issues: B→A gap = {diagnostic_results['threshold_diagnostics']['b_to_a_gap']:.2f}")
-    print(f"   - Sum-to-zero constraint: {diagnostic_results['constraint_diagnostics']['has_sum_to_zero_constraint']}")
-    print(f"   - Circular reasoning: {diagnostic_results['circular_reasoning']['circular_reasoning_detected']}")
-    print(f"   - Overparameterized: {diagnostic_results['identifiability']['is_overparameterized']}")
+    print(
+        f"   - Threshold issues: B→A gap = {diagnostic_results['threshold_diagnostics']['b_to_a_gap']:.2f}"
+    )
+    print(
+        f"   - Sum-to-zero constraint: {diagnostic_results['constraint_diagnostics']['has_sum_to_zero_constraint']}"
+    )
+    print(
+        f"   - Circular reasoning: {diagnostic_results['circular_reasoning']['circular_reasoning_detected']}"
+    )
+    print(
+        f"   - Overparameterized: {diagnostic_results['identifiability']['is_overparameterized']}"
+    )
 
     # Compare with alternative methods
     print("\n5. Comparing with baseline consensus methods...")
     severity_map = loader.get_rater_severity_map()
-    consensus_comparison = compare_all_methods(
-        essay_ratings,
-        rater_severities=severity_map
-    )
+    consensus_comparison = compare_all_methods(essay_ratings, rater_severities=severity_map)
     print(consensus_comparison.to_string())
 
     # Generate visualizations
@@ -126,66 +123,52 @@ def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/
     # Create all visualizations
     print("   - Creating Sankey diagram...")
     viz.create_sankey_diagram(
-        essay_ratings,
-        adjusted_ratings,
-        essay_consensus['predicted_grade'],
-        focus_essay
+        essay_ratings, adjusted_ratings, essay_consensus["predicted_grade"], focus_essay
     )
 
     print("   - Creating rater severity heatmap...")
-    viz.create_rater_severity_heatmap(
-        rater_severity_df,
-        raw_ratings_df
-    )
+    viz.create_rater_severity_heatmap(rater_severity_df, raw_ratings_df)
 
     print("   - Creating threshold visualization...")
     viz.create_threshold_visualization(thresholds_df)
 
     print("   - Creating consensus comparison plot...")
-    viz.create_consensus_comparison_plot(
-        consensus_comparison,
-        focus_essay
-    )
+    viz.create_consensus_comparison_plot(consensus_comparison, focus_essay)
 
     print("   - Creating JA24 comprehensive visualization...")
     # Extract alternative grades for comprehensive plot
     alternative_grades = {}
     for _, row in consensus_comparison.iterrows():
-        if row['Method'] != 'Rater Adjusted':  # Exclude adjusted method for clarity
-            alternative_grades[row['Method']] = row['Consensus Grade']
+        if row["Method"] != "Rater Adjusted":  # Exclude adjusted method for clarity
+            alternative_grades[row["Method"]] = row["Consensus Grade"]
 
     viz.create_ja24_specific_visualization(
-        essay_ratings,
-        severity_map,
-        essay_consensus['predicted_grade'],
-        alternative_grades
+        essay_ratings, severity_map, essay_consensus["predicted_grade"], alternative_grades
     )
 
     # Generate JA24-specific analysis
     ja24_analysis = diagnose_ja24_specific_issues(
-        essay_ratings,
-        rater_severity_df,
-        essay_consensus['predicted_grade'],
-        thresholds_df
+        essay_ratings, rater_severity_df, essay_consensus["predicted_grade"], thresholds_df
     )
 
     # Compile model issues summary
     model_issues = {
-        "circular_reasoning_detected": diagnostic_results['circular_reasoning']['circular_reasoning_detected'],
-        "extreme_thresholds": diagnostic_results['threshold_diagnostics']['b_to_a_gap'] > 2.0,
-        "overparameterized": diagnostic_results['identifiability']['is_overparameterized'],
-        "sum_to_zero_issues": diagnostic_results['constraint_diagnostics']['forced_balancing_likely'],
-        "n_parameters": diagnostic_results['identifiability']['n_parameters']
+        "circular_reasoning_detected": diagnostic_results["circular_reasoning"][
+            "circular_reasoning_detected"
+        ],
+        "extreme_thresholds": diagnostic_results["threshold_diagnostics"]["b_to_a_gap"] > 2.0,
+        "overparameterized": diagnostic_results["identifiability"]["is_overparameterized"],
+        "sum_to_zero_issues": diagnostic_results["constraint_diagnostics"][
+            "forced_balancing_likely"
+        ],
+        "n_parameters": diagnostic_results["identifiability"]["n_parameters"],
     }
 
     # Generate report
     print("\n7. Generating comprehensive report...")
     report_gen = ReportGenerator(output_path)
-    report = report_gen.generate_full_report(
-        ja24_analysis,
-        diagnostic_results,
-        consensus_comparison,
-        model_issues
+    report_gen.generate_full_report(
+        ja24_analysis, diagnostic_results, consensus_comparison, model_issues
     )
 
     print(f"   - Report saved to: {output_path / 'bayesian_verification_report.md'}")
@@ -197,11 +180,13 @@ def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/
     print(f"\n{ja24_analysis['problem_summary']}")
 
     print("\n🔍 Key Findings:")
-    print(f"   • JA24 raw ratings: {ja24_analysis['n_a_ratings']} A's, {ja24_analysis['n_b_ratings']} B's")
+    print(
+        f"   • JA24 raw ratings: {ja24_analysis['n_a_ratings']} A's, {ja24_analysis['n_b_ratings']} B's"
+    )
     print(f"   • Model consensus: {ja24_analysis['model_consensus']}")
     print(f"   • Raw consensus (median): {ja24_analysis['raw_consensus_median']}")
-    print(f"   • Circular reasoning detected: YES")
-    print(f"   • Model is overparameterized: YES")
+    print("   • Circular reasoning detected: YES")
+    print("   • Model is overparameterized: YES")
 
     print("\n📊 Output Files Generated:")
     print(f"   • {output_path / 'bayesian_verification_report.md'}")
@@ -216,16 +201,17 @@ def main(data_path: str, focus_essay: str = "JA24", output_dir: str = "./output/
         "focus_essay": focus_essay,
         "ja24_analysis": ja24_analysis,
         "diagnostic_results": {
-            k: v for k, v in diagnostic_results.items()
-            if k != 'circular_reasoning'  # This contains complex objects
+            k: v
+            for k, v in diagnostic_results.items()
+            if k != "circular_reasoning"  # This contains complex objects
         },
-        "consensus_comparison": consensus_comparison.to_dict(orient='records'),
+        "consensus_comparison": consensus_comparison.to_dict(orient="records"),
         "model_issues": model_issues,
-        "agreement_metrics": agreement_metrics
+        "agreement_metrics": agreement_metrics,
     }
 
     json_output = output_path / "verification_results.json"
-    with open(json_output, 'w') as f:
+    with open(json_output, "w") as f:
         json.dump(results_json, f, indent=2, default=str)
 
     print(f"\n💾 Results also saved to: {json_output}")
@@ -243,28 +229,25 @@ Example:
         --data-path ../../docs/rapport_till_kollegor/BAYESIAN_ANALYSIS_GPT_5_PRO/ \\
         --focus-essay JA24 \\
         --output-dir ./verification_output/
-        """
+        """,
     )
 
     parser.add_argument(
-        "--data-path",
-        type=str,
-        required=True,
-        help="Path to BAYESIAN_ANALYSIS_GPT_5_PRO directory"
+        "--data-path", type=str, required=True, help="Path to BAYESIAN_ANALYSIS_GPT_5_PRO directory"
     )
 
     parser.add_argument(
         "--focus-essay",
         type=str,
         default="JA24",
-        help="Essay ID to focus analysis on (default: JA24)"
+        help="Essay ID to focus analysis on (default: JA24)",
     )
 
     parser.add_argument(
         "--output-dir",
         type=str,
         default="./output/",
-        help="Directory for output files (default: ./output/)"
+        help="Directory for output files (default: ./output/)",
     )
 
     args = parser.parse_args()
@@ -276,5 +259,6 @@ Example:
     except Exception as e:
         print(f"\n❌ Error during verification: {e}")
         import traceback
+
         traceback.print_exc()
         exit(1)
