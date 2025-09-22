@@ -40,8 +40,9 @@ class ModelConfig:
     n_chains: int = 4
     n_draws: int = 2000
     n_tune: int = 1000
-    target_accept: float = 0.9
+    target_accept: float = 0.97
     max_treedepth: int = 12
+    random_seed: Optional[int] = 42
 
     # Prior parameters
     ability_prior_sd: float = 1.0  # Essay ability prior std dev
@@ -50,12 +51,26 @@ class ModelConfig:
     sparse_severity_prior_sd: float = 0.5  # Mild pooling for sparse-data raters
     majority_override_ratio: float = 0.6  # Minimum vote share before majority override triggers
 
+    # Outlier-robust likelihood parameters
+    use_outlier_mixture: bool = True
+    outlier_prior_strength: float = 20.0  # Concentration for background grade distribution
+    base_slip_logit_mu: float = -2.5  # Prior mean for logit slip probability (~7.5% outliers)
+    base_slip_logit_sigma: float = 0.8
+    rater_slip_sigma: float = 0.5  # Rater-level variability in slip probability
+    essay_slip_sigma: float = 0.3  # Essay-level disagreement variability
+    use_essay_disagreement: bool = False
+
+    # Posterior consensus smoothing
+    majority_dirichlet_strength: float = 2.0
+    majority_smoothing: float = 1e-6
+
     # Reference rater approach
     use_reference_rater: bool = True
     reference_rater_idx: int = 0  # First rater as reference
 
     # Threshold initialization
     use_empirical_thresholds: bool = True
+    estimate_thresholds: bool = False
     threshold_padding: float = 0.5  # Add padding to empirical thresholds
 
     # Swedish grade distribution (national statistics for Part C: Writing)
@@ -77,13 +92,19 @@ class ModelConfig:
     def __post_init__(self) -> None:
         """Initialize Swedish grade distribution after dataclass init."""
         if self.swedish_grade_distribution is None:
+            # Distribution for 10-level Swedish national exam scale
+            # Based on national statistics, distributed across modifier grades
             self.swedish_grade_distribution = {
-                "F": 0.122,  # 12.2%
-                "E": 0.358,  # 35.8%
-                "D": 0.189,  # 18.9%
-                "C": 0.216,  # 21.6%
-                "B": 0.073,  # 7.3%
-                "A": 0.042,  # 4.2%
+                "F": 0.030,   # 3.0% fail
+                "F+": 0.092,  # 9.2% marginal fail (rest of original F)
+                "E-": 0.179,  # 17.9% low pass (half of E)
+                "E+": 0.179,  # 17.9% high pass (half of E)
+                "D-": 0.094,  # 9.4% low satisfactory (half of D)
+                "D+": 0.095,  # 9.5% high satisfactory (half of D)
+                "C-": 0.108,  # 10.8% low good (half of C)
+                "C+": 0.108,  # 10.8% high good (half of C)
+                "B": 0.073,   # 7.3% very good
+                "A": 0.042,   # 4.2% excellent
             }
 
 
@@ -103,7 +124,9 @@ class ConsensusResult:
 class ImprovedBayesianModel:
     """Improved Bayesian ordinal regression model for essay consensus grading."""
 
-    SWEDISH_GRADES = ["F", "E", "D", "C", "B", "A"]
+    # Swedish National Exam grading scale (10 distinct ordinal levels)
+    # Note: E, D, C exist only with modifiers; B and A have no modifiers
+    SWEDISH_GRADES = ["F", "F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]
     GRADE_TO_NUMERIC = {g: i for i, g in enumerate(SWEDISH_GRADES)}
 
     def __init__(self, config: Optional[ModelConfig] = None):
@@ -129,18 +152,17 @@ class ImprovedBayesianModel:
         # Convert grades to numeric
         ratings_df = ratings_df.copy()
 
-        # Handle Swedish grades with +/- modifiers
-        def grade_to_base(grade: str) -> Optional[str]:
-            """Convert grade with modifier to base grade."""
+        # Validate and clean grades
+        def clean_grade(grade: str) -> Optional[str]:
+            """Clean and validate grade."""
             if pd.isna(grade):
                 return None
             grade = str(grade).strip().upper()
-            # Remove +/- modifiers
-            base = grade[0] if grade else None
-            return base if base in self.SWEDISH_GRADES else None
+            # Check if grade is valid in Swedish system
+            return grade if grade in self.SWEDISH_GRADES else None
 
-        ratings_df["base_grade"] = ratings_df["grade"].apply(grade_to_base)
-        ratings_df = ratings_df.dropna(subset=["base_grade"])
+        ratings_df["clean_grade"] = ratings_df["grade"].apply(clean_grade)
+        ratings_df = ratings_df.dropna(subset=["clean_grade"])
 
         # Create mappings
         self.essay_map = {e: i for i, e in enumerate(ratings_df["essay_id"].unique())}
@@ -150,7 +172,7 @@ class ImprovedBayesianModel:
         # Add numeric indices
         ratings_df["essay_idx"] = ratings_df["essay_id"].map(self.essay_map)
         ratings_df["rater_idx"] = ratings_df["rater_id"].map(self.rater_map)
-        ratings_df["grade_numeric"] = ratings_df["base_grade"].map(self.grade_scale)
+        ratings_df["grade_numeric"] = ratings_df["clean_grade"].map(self.grade_scale)
 
         return ratings_df
 
@@ -173,7 +195,8 @@ class ImprovedBayesianModel:
 
         # Use evenly spaced thresholds on the latent scale
         # This is a neutral approach that doesn't bias toward observed data
-        thresholds = np.linspace(-2.5, 2.5, n_categories - 1)
+        # For 10 categories, we need 9 thresholds
+        thresholds = np.linspace(-3.0, 3.0, n_categories - 1)  # Wider range for 10 categories
 
         return thresholds
 
@@ -201,6 +224,13 @@ class ImprovedBayesianModel:
 
         return np.array(thresholds)
 
+    def _get_blended_thresholds(self, blend_weight: float = 0.9) -> np.ndarray:
+        """Blend evenly spaced and Swedish-informed thresholds."""
+
+        evenly_spaced = np.linspace(-3.0, 3.0, len(self.SWEDISH_GRADES) - 1)
+        swedish_thresholds = self._get_swedish_informed_thresholds()
+        return blend_weight * evenly_spaced + (1 - blend_weight) * swedish_thresholds
+
     def _calculate_data_sparsity(self, data_df: pd.DataFrame) -> int:
         """Calculate the effective data sparsity for model selection.
 
@@ -211,6 +241,115 @@ class ImprovedBayesianModel:
             Number of observations (essays × raters)
         """
         return len(data_df)
+
+    def _get_outlier_dirichlet_prior(self) -> np.ndarray:
+        """Construct Dirichlet prior parameters for outlier grade distribution."""
+
+        if self.config.swedish_grade_distribution is None:
+            raise ValueError("Swedish grade distribution must be initialized")
+
+        distribution = np.array(
+            [self.config.swedish_grade_distribution[grade] for grade in self.SWEDISH_GRADES],
+            dtype=float,
+        )
+        strength = float(self.config.outlier_prior_strength)
+        # Ensure minimum concentration to avoid zeros in the Dirichlet prior
+        return np.clip(distribution * strength, 1e-3, None)
+
+    @staticmethod
+    def _compute_signal_probabilities(
+        eta: pt.TensorVariable,
+        thresholds: pt.TensorVariable,
+        n_categories: int,
+    ) -> pt.TensorVariable:
+        """Compute ordered-logit grade probabilities inside the PyMC graph."""
+
+        eta_expanded = eta[:, None]
+        cdf = pm.math.sigmoid(thresholds - eta_expanded)
+
+        lower = cdf[:, :1]
+        upper = 1 - cdf[:, -1:]
+        if n_categories > 2:
+            middle = cdf[:, 1:] - cdf[:, :-1]
+            probabilities = pt.concatenate([lower, middle, upper], axis=1)
+        else:
+            probabilities = pt.concatenate([lower, upper], axis=1)
+
+        probabilities = pt.clip(probabilities, 1e-8, 1 - 1e-8)
+        probabilities = probabilities / probabilities.sum(axis=1, keepdims=True)
+        return probabilities
+
+    def _apply_outlier_mixture(
+        self,
+        signal_probs: pt.TensorVariable,
+        essay_idx: np.ndarray,
+        rater_idx: np.ndarray,
+        n_essays: int,
+        n_raters: int,
+    ) -> pt.TensorVariable:
+        """Blend ordered-logit probabilities with an outlier distribution."""
+
+        config = self.config
+        outlier_alpha = self._get_outlier_dirichlet_prior()
+        outlier_grade_probs = pm.Dirichlet(
+            "outlier_grade_probs",
+            a=outlier_alpha,
+        )
+
+        base_slip_logit = pm.Normal(
+            "base_slip_logit",
+            mu=config.base_slip_logit_mu,
+            sigma=config.base_slip_logit_sigma,
+        )
+
+        if n_raters > 0:
+            rater_slip_raw = pm.Normal(
+                "rater_slip_raw",
+                mu=0.0,
+                sigma=config.rater_slip_sigma,
+                shape=n_raters,
+            )
+            rater_slip_centered = rater_slip_raw - pt.mean(rater_slip_raw)
+        else:
+            rater_slip_centered = pt.zeros((0,), dtype="float64")
+
+        if config.use_essay_disagreement and n_essays > 1:
+            essay_slip_raw = pm.Normal(
+                "essay_slip_raw",
+                mu=0.0,
+                sigma=config.essay_slip_sigma,
+                shape=n_essays,
+            )
+            essay_slip_centered = essay_slip_raw - pt.mean(essay_slip_raw)
+        else:
+            essay_slip_centered = pt.zeros((n_essays,), dtype="float64")
+
+        pm.Deterministic("rater_slip_offsets", rater_slip_centered)
+        if config.use_essay_disagreement and n_essays > 1:
+            pm.Deterministic("essay_slip_offsets", essay_slip_centered)
+
+        base_slip_prob = pm.math.sigmoid(base_slip_logit)
+        pm.Deterministic("base_slip_probability", base_slip_prob)
+
+        slip_logits = base_slip_logit + rater_slip_centered[rater_idx]
+        slip_logits = slip_logits + essay_slip_centered[essay_idx]
+
+        slip_prob = pm.math.sigmoid(slip_logits)
+        slip_prob = pt.clip(slip_prob, 1e-6, 1 - 1e-6)
+
+        slip_prob_expanded = slip_prob[:, None]
+        outlier_probs = outlier_grade_probs[None, :]
+        mix_probs = (1.0 - slip_prob_expanded) * signal_probs + slip_prob_expanded * outlier_probs
+        mix_probs = pt.clip(mix_probs, 1e-6, 1 - 1e-6)
+        mix_probs = mix_probs / mix_probs.sum(axis=1, keepdims=True)
+
+        pm.Deterministic("mix_reliability", 1.0 - slip_prob)
+        pm.Deterministic(
+            "rater_reliability",
+            1.0 - pm.math.sigmoid(base_slip_logit + rater_slip_centered),
+        )
+
+        return mix_probs
 
     def build_model(self, data_df: pd.DataFrame) -> pm.Model:
         """Build the PyMC model with adaptive complexity based on data size.
@@ -260,10 +399,8 @@ class ImprovedBayesianModel:
         grades = data_df["grade_numeric"].values
 
         # Pre-compute fixed thresholds and essay-specific prior means on the latent scale
-        evenly_spaced_thresholds = np.linspace(-2.5, 2.5, len(self.SWEDISH_GRADES) - 1)
-        swedish_thresholds = self._get_swedish_informed_thresholds()
-        blend_weight = 0.9
-        blended_thresholds = blend_weight * evenly_spaced_thresholds + (1 - blend_weight) * swedish_thresholds
+        evenly_spaced_thresholds = np.linspace(-3.0, 3.0, len(self.SWEDISH_GRADES) - 1)
+        blended_thresholds = self._get_blended_thresholds()
         self._fixed_thresholds = blended_thresholds
 
         # Map each grade category to the midpoint between adjacent thresholds (latent location)
@@ -344,17 +481,38 @@ class ImprovedBayesianModel:
 
             # Linear predictor
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
-
-            # Ordinal likelihood
-            pm.OrderedLogistic(
-                "grade_obs",
+            n_categories = len(self.SWEDISH_GRADES)
+            signal_probs = self._compute_signal_probabilities(
                 eta=eta,
-                cutpoints=thresholds_data,
-                observed=grades,
-                compute_p=False,
+                thresholds=thresholds_data,
+                n_categories=n_categories,
             )
 
-            # Add posterior predictive
+            if self.config.use_outlier_mixture:
+                mix_probs = self._apply_outlier_mixture(
+                    signal_probs=signal_probs,
+                    essay_idx=essay_idx,
+                    rater_idx=rater_idx,
+                    n_essays=n_essays,
+                    n_raters=n_raters,
+                )
+                pm.Categorical(
+                    "grade_obs",
+                    p=mix_probs,
+                    observed=grades,
+                )
+                pm.Deterministic("signal_probs", signal_probs)
+                pm.Deterministic("mix_probs", mix_probs)
+            else:
+                pm.OrderedLogistic(
+                    "grade_obs",
+                    eta=eta,
+                    cutpoints=thresholds_data,
+                    observed=grades,
+                    compute_p=False,
+                )
+
+            # Add posterior predictive helper for diagnostics
             pm.Deterministic("eta", eta)
 
         self.model = model
@@ -419,35 +577,54 @@ class ImprovedBayesianModel:
                 )
 
             # Threshold parameters
-            if self.config.use_empirical_thresholds:
-                # Initialize from observed grade distribution
-                empirical_thresholds = self._get_empirical_thresholds(np.array(grades))
-
-                # Use normal priors centered on empirical values
-                thresholds_raw = pm.Normal(
-                    "thresholds_raw", mu=empirical_thresholds, sigma=0.5, shape=n_categories - 1
-                )
-
-                # Ensure ordering through transformation
-                thresholds = pm.Deterministic("thresholds", pt.sort(thresholds_raw))
+            if self.config.estimate_thresholds:
+                if self.config.use_empirical_thresholds:
+                    empirical_thresholds = self._get_empirical_thresholds(np.array(grades))
+                    thresholds_raw = pm.Normal(
+                        "thresholds_raw", mu=empirical_thresholds, sigma=0.5, shape=n_categories - 1
+                    )
+                    thresholds = pm.Deterministic("thresholds", pt.sort(thresholds_raw))
+                else:
+                    threshold_diffs = pm.Exponential("threshold_diffs", 1.0, shape=n_categories - 1)
+                    thresholds = pm.Deterministic("thresholds", pt.cumsum(threshold_diffs) - 3.0)
             else:
-                # Use standard ordered transformation
-                threshold_diffs = pm.Exponential("threshold_diffs", 1.0, shape=n_categories - 1)
-                thresholds = pm.Deterministic("thresholds", pt.cumsum(threshold_diffs) - 3.0)
+                blended_thresholds = self._get_blended_thresholds()
+                thresholds = pm.Data("thresholds_data", blended_thresholds)
+                pm.Deterministic("thresholds", thresholds)
 
             # Linear predictor: ability - severity (note the sign)
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
-
-            # Ordinal likelihood
-            pm.OrderedLogistic(
-                "grade_obs",
+            signal_probs = self._compute_signal_probabilities(
                 eta=eta,
-                cutpoints=thresholds,
-                observed=grades,
-                compute_p=False,  # Don't compute p-values during sampling
+                thresholds=thresholds,
+                n_categories=n_categories,
             )
 
-            # Add posterior predictive
+            if self.config.use_outlier_mixture:
+                mix_probs = self._apply_outlier_mixture(
+                    signal_probs=signal_probs,
+                    essay_idx=essay_idx,
+                    rater_idx=rater_idx,
+                    n_essays=n_essays,
+                    n_raters=n_raters,
+                )
+                pm.Categorical(
+                    "grade_obs",
+                    p=mix_probs,
+                    observed=grades,
+                )
+                pm.Deterministic("signal_probs", signal_probs)
+                pm.Deterministic("mix_probs", mix_probs)
+            else:
+                pm.OrderedLogistic(
+                    "grade_obs",
+                    eta=eta,
+                    cutpoints=thresholds,
+                    observed=grades,
+                    compute_p=False,
+                )
+
+            # Add posterior predictive helper
             pm.Deterministic("eta", eta)
 
         self.model = model
@@ -509,6 +686,7 @@ class ImprovedBayesianModel:
                 max_treedepth=self.config.max_treedepth,
                 return_inferencedata=True,
                 progressbar=True,
+                random_seed=self.config.random_seed,
             )
 
         self._fitted = True
@@ -596,6 +774,16 @@ class ImprovedBayesianModel:
                 essay_idx, thresholds
             )
 
+            if grade_counts is not None and total_ratings > 0:
+                dirichlet_strength = float(self.config.majority_dirichlet_strength)
+                smoothing = float(self.config.majority_smoothing)
+                combined = grade_probs * dirichlet_strength
+                combined = combined + smoothing
+                for grade_idx_int, count in grade_counts.items():
+                    combined[int(grade_idx_int)] += count
+                grade_probs = combined / combined.sum()
+                confidence = float(np.max(grade_probs))
+
             # Get consensus grade (highest probability)
             consensus_idx = np.argmax(grade_probs)
             consensus_grade = self.SWEDISH_GRADES[consensus_idx]
@@ -680,14 +868,9 @@ class ImprovedBayesianModel:
         for ability in ability_samples:
             # Calculate probabilities for this sample
             probs = self._calculate_grade_probabilities(ability, thresholds)
-            # The most likely grade for this sample
-            selected_grade = np.argmax(probs)
-            grade_counts[selected_grade] += 1
+            grade_counts += probs
 
-        # Grade probabilities are the frequency of selection across samples
         grade_probabilities = grade_counts / len(ability_samples)
-
-        # Confidence is naturally the probability of the most likely grade
         confidence = float(np.max(grade_probabilities))
 
         return grade_probabilities, confidence

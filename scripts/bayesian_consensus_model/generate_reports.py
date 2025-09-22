@@ -7,8 +7,8 @@ results, grade probabilities, rater adjustments, and threshold estimates.
 Example usage:
 
     pdm run python -m scripts.bayesian_consensus_model.generate_reports \
-        --ratings-csv docs/rapport_till_kollegor/BAYESIAN_ANALYSIS_GPT_5_PRO/ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.csv \
-        --output-dir docs/rapport_till_kollegor/BAYESIAN_ANALYSIS_GPT_5_PRO/updated
+        --ratings-csv data/ratings.csv \
+        --output-dir output/
 
 The input CSV must contain two leading columns (essay identifier and file
 name) followed by one column per rater, with letter grades as values.
@@ -19,14 +19,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 
-from . import ImprovedBayesianModel, ModelConfig
-
-SWEDISH_GRADES: tuple[str, ...] = ("F", "E", "D", "C", "B", "A")
+from . import (
+    ConsensusGradingConfig,
+    ImprovedBayesianModel,
+    ModelConfig,
+    PrincipledConsensusGrader,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -61,13 +64,56 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print progress information during execution.",
     )
+    parser.add_argument(
+        "--use-production-grader",
+        action="store_true",
+        help=(
+            "Use PrincipledConsensusGrader for production-ready "
+            "consensus with Wilson-score confidence intervals."
+        ),
+    )
     return parser.parse_args()
 
 
-def _load_ratings(path: Path) -> tuple[pd.DataFrame, Dict[str, str]]:
-    df = pd.read_csv(path)
+def _load_ratings(path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, Dict[str, str]]:
+    """Load ratings from a wide-format CSV file.
+
+    Args:
+        path: Path to the CSV file
+
+    Returns:
+        Tuple of (long-format ratings DataFrame, essay metadata dict)
+
+    Raises:
+        ValueError: If CSV format is invalid or no valid ratings found
+        FileNotFoundError: If the CSV file doesn't exist
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Ratings CSV file not found: {path}")
+
+    try:
+        # Check if the file uses semicolon delimiter (v2 format)
+        with open(path, 'r') as f:
+            first_lines = f.read(500)
+
+        if ';' in first_lines and ',' not in first_lines.split('\n')[1]:
+            # V2 format: semicolon-delimited with header line to skip
+            df = pd.read_csv(path, sep=';', skiprows=1)
+            if verbose:
+                print("Detected v2 format (semicolon-delimited)")
+        else:
+            # Original format: comma-delimited
+            df = pd.read_csv(path)
+            if verbose:
+                print("Detected v1 format (comma-delimited)")
+    except Exception as e:
+        raise ValueError(f"Failed to read CSV file: {e}")
+
     if df.shape[1] < 3:
-        raise ValueError("Ratings CSV must contain at least essay id, file name, and one rater column.")
+        raise ValueError(
+            "Ratings CSV must contain at least essay id, "
+            "file name, and one rater column."
+        )
 
     essay_col, file_col = df.columns[:2]
     rater_cols = df.columns[2:]
@@ -80,7 +126,12 @@ def _load_ratings(path: Path) -> tuple[pd.DataFrame, Dict[str, str]]:
     )
 
     long_df = (
-        df.melt(id_vars=[essay_col, file_col], value_vars=rater_cols, var_name="rater_id", value_name="grade")
+        df.melt(
+            id_vars=[essay_col, file_col],
+            value_vars=rater_cols,
+            var_name="rater_id",
+            value_name="grade",
+        )
         .rename(columns={essay_col: "essay_id", file_col: "file_name"})
     )
     long_df["grade"] = (
@@ -89,7 +140,16 @@ def _load_ratings(path: Path) -> tuple[pd.DataFrame, Dict[str, str]]:
     long_df = long_df.dropna(subset=["grade"])
 
     if long_df.empty:
-        raise ValueError("No ratings found after cleaning the CSV. Ensure grades are populated.")
+        raise ValueError(
+            "No valid ratings found after cleaning the CSV. "
+            "Ensure grades are populated and in Swedish format."
+        )
+
+    # Note: The model uses the full Swedish 10-level ordinal scale
+    # Each grade (F, F+, E-, E+, D-, D+, C-, C+, B, A) is a distinct ordinal category
+    if verbose:
+        unique_grades = sorted(long_df["grade"].unique())
+        print(f"Found {len(unique_grades)} distinct grades: {unique_grades}")
 
     return long_df[["essay_id", "rater_id", "grade"]], metadata
 
@@ -108,25 +168,35 @@ def _fit_bayesian_model(ratings_long: pd.DataFrame, config: ModelConfig) -> Impr
 
 
 def _extract_rater_adjustments(model: ImprovedBayesianModel) -> pd.DataFrame:
-    posterior = model.trace.posterior["rater_severity"].mean(dim=["chain", "draw"]).values
+    if not model.trace:
+        return pd.DataFrame()
+    posterior = model.trace.posterior["rater_severity"].mean(
+        dim=["chain", "draw"]
+    ).values
     rater_inverse = {idx: rater_id for rater_id, idx in model.rater_map.items()}
 
     records = [
         {
-            "rater_id": rater_inverse[idx],
+            "rater_id": rater_inverse.get(idx, f"Unknown_{idx}"),
             "severity_adjustment": float(posterior[idx]),
         }
         for idx in range(len(posterior))
+        if idx in rater_inverse
     ]
     return pd.DataFrame(records).sort_values("rater_id")
 
 
 def _extract_thresholds(model: ImprovedBayesianModel) -> pd.DataFrame:
-    thresholds = model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+    if not model.trace:
+        return pd.DataFrame()
+    thresholds = model.trace.posterior["thresholds"].mean(
+        dim=["chain", "draw"]
+    ).values
     records = []
     for k, tau_k in enumerate(thresholds, start=1):
-        lower_grade = SWEDISH_GRADES[k - 1]
-        upper_grade = SWEDISH_GRADES[k]
+        grades = ImprovedBayesianModel.SWEDISH_GRADES
+        lower_grade = grades[k - 1]
+        upper_grade = grades[k]
         records.append(
             {
                 "boundary": k,
@@ -141,18 +211,27 @@ def _essay_results(
     model: ImprovedBayesianModel,
     metadata: Dict[str, str],
     majority_threshold: float,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+    ratings_data: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     consensus = model.get_consensus_grades()
-    essay_abilities = model.trace.posterior["essay_ability"].mean(dim=["chain", "draw"]).values
-    ability_map = {essay_id: float(essay_abilities[idx]) for essay_id, idx in model.essay_map.items()}
+    if not model.trace:
+        return pd.DataFrame(), pd.DataFrame()
+    essay_abilities = model.trace.posterior["essay_ability"].mean(
+        dim=["chain", "draw"]
+    ).values
+    ability_map = {
+        essay_id: float(essay_abilities[idx])
+        for essay_id, idx in model.essay_map.items()
+    }
 
-    prepared = model._ratings_data  # Prepared DataFrame with integer grades
+    # Prepare ratings data with numeric values
+    prepared = ratings_data.copy()
+    prepared["grade_numeric"] = prepared["grade"].map(model.GRADE_TO_NUMERIC)
 
     records = []
     prob_records = []
 
     for essay_id, result in consensus.items():
-        essay_idx = model.essay_map[essay_id]
         ability = ability_map[essay_id]
         file_name = metadata.get(essay_id, "")
 
@@ -167,8 +246,11 @@ def _essay_results(
             and total_ratings > 0
         )
 
-        grade_indices = list(range(len(SWEDISH_GRADES)))
-        grade_probs = np.array([result.grade_probabilities.get(grade, 0.0) for grade in SWEDISH_GRADES])
+        grades = ImprovedBayesianModel.SWEDISH_GRADES
+        grade_indices = list(range(len(grades)))
+        grade_probs = np.array(
+            [result.grade_probabilities.get(grade, 0.0) for grade in grades]
+        )
         expected_index = float(np.dot(grade_probs, grade_indices))
         mode_index = int(np.argmax(grade_probs))
 
@@ -178,7 +260,9 @@ def _essay_results(
                 "file_name": file_name,
                 "consensus_grade": result.consensus_grade,
                 "confidence": result.confidence,
-                "consensus_method": "majority_override" if override_used else "bayesian",
+                "consensus_method": (
+                    "majority_override" if override_used else "bayesian"
+                ),
                 "total_ratings": total_ratings,
                 "majority_ratio": majority_ratio,
                 "latent_ability": ability,
@@ -188,7 +272,10 @@ def _essay_results(
         )
 
         prob_row = {"essay_id": essay_id, "file_name": file_name}
-        prob_row.update({grade: float(prob) for grade, prob in zip(SWEDISH_GRADES, grade_probs)})
+        grades = ImprovedBayesianModel.SWEDISH_GRADES
+        prob_row.update(
+            {grade: float(prob) for grade, prob in zip(grades, grade_probs)}
+        )
         prob_records.append(prob_row)
 
     essay_df = pd.DataFrame(records).sort_values("essay_id")
@@ -200,27 +287,97 @@ def _write_json(path: Path, payload: Dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _use_production_grader(
+    ratings_long: pd.DataFrame,
+    metadata: Dict[str, str],
+    config: ConsensusGradingConfig,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Use the production-ready PrincipledConsensusGrader for consensus grading.
+
+    Args:
+        ratings_long: Long-format ratings DataFrame
+        metadata: Essay metadata mapping
+        config: Consensus grading configuration
+
+    Returns:
+        Tuple of (consensus results DataFrame, grade probabilities DataFrame)
+    """
+    grader = PrincipledConsensusGrader(config)
+    consensus_results = grader.get_consensus(ratings_long)
+
+    records = []
+    prob_records = []
+
+    for essay_id, result in consensus_results.items():
+        file_name = metadata.get(essay_id, "")
+
+        records.append(
+            {
+                "essay_id": essay_id,
+                "file_name": file_name,
+                "consensus_grade": result.consensus_grade,
+                "confidence": result.confidence,
+                "confidence_lower": result.confidence_interval[0],
+                "confidence_upper": result.confidence_interval[1],
+                "method_used": result.method_used,
+                "warning": result.warning_message or "",
+            }
+        )
+
+        prob_row = {"essay_id": essay_id, "file_name": file_name}
+        prob_row.update(result.grade_probabilities)
+        prob_records.append(prob_row)
+
+    essay_df = pd.DataFrame(records).sort_values("essay_id")
+    probs_df = pd.DataFrame(prob_records).sort_values("essay_id")
+    return essay_df, probs_df
+
+
 def main() -> None:
     args = _parse_args()
-    ratings_long, metadata = _load_ratings(args.ratings_csv)
+    ratings_long, metadata = _load_ratings(args.ratings_csv, args.verbose)
     if args.verbose:
-        print(f"Loaded {len(ratings_long)} ratings covering {ratings_long['essay_id'].nunique()} essays and {ratings_long['rater_id'].nunique()} raters.")
+        num_essays = ratings_long["essay_id"].nunique()
+        num_raters = ratings_long["rater_id"].nunique()
+        print(
+            f"Loaded {len(ratings_long)} ratings covering "
+            f"{num_essays} essays and {num_raters} raters."
+        )
 
-    config = _build_model_config(args)
-    model = _fit_bayesian_model(ratings_long, config)
+    if args.use_production_grader:
+        # Use the production-ready consensus grader
+        config = ConsensusGradingConfig(
+            min_observations_for_bayesian=args.sparse_threshold,
+        )
+        essay_df, probs_df = _use_production_grader(ratings_long, metadata, config)
 
-    essay_df, probs_df = _essay_results(model, metadata, args.majority_threshold)
-    rater_df = _extract_rater_adjustments(model)
-    threshold_df = _extract_thresholds(model)
-    diagnostics = model.get_model_diagnostics()
+        # No rater adjustments or thresholds with production grader
+        rater_df = pd.DataFrame()
+        threshold_df = pd.DataFrame()
+        diagnostics = {"method": "PrincipledConsensusGrader", "config": config.__dict__}
+    else:
+        # Use the direct Bayesian model
+        config = _build_model_config(args)
+        model = _fit_bayesian_model(ratings_long, config)
+
+        essay_df, probs_df = _essay_results(
+            model, metadata, args.majority_threshold, ratings_long
+        )
+        rater_df = _extract_rater_adjustments(model)
+        threshold_df = _extract_thresholds(model)
+        diagnostics = model.get_model_diagnostics()
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     essay_df.to_csv(output_dir / "essay_consensus.csv", index=False)
     probs_df.to_csv(output_dir / "essay_grade_probabilities.csv", index=False)
-    rater_df.to_csv(output_dir / "rater_adjustments.csv", index=False)
-    threshold_df.to_csv(output_dir / "grade_thresholds.csv", index=False)
+
+    if not rater_df.empty:
+        rater_df.to_csv(output_dir / "rater_adjustments.csv", index=False)
+    if not threshold_df.empty:
+        threshold_df.to_csv(output_dir / "grade_thresholds.csv", index=False)
+
     _write_json(output_dir / "model_diagnostics.json", diagnostics)
 
     if args.verbose:

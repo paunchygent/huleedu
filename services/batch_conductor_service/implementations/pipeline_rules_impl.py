@@ -70,6 +70,9 @@ class DefaultPipelineRules(PipelineRulesProtocol):
 
         Prometheus counters are recorded for successes, pruned steps, and errors.
         """
+        # Clear last pruned phases at the start of each resolution
+        self._last_pruned_phases = []
+
         try:
             # Locate pipeline definition containing the requested step
             definition = await self._find_pipeline_containing_step(requested_pipeline)
@@ -92,8 +95,6 @@ class DefaultPipelineRules(PipelineRulesProtocol):
                 self._last_pruned_phases = [
                     step for step in original_steps if step not in ordered_steps
                 ]
-            else:
-                self._last_pruned_phases = []
 
             # Success metric
             self._rules_success.inc()

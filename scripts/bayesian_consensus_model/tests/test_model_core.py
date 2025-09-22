@@ -24,14 +24,26 @@ class TestModelConfig:
         assert config.n_chains == 4
         assert config.n_draws == 2000
         assert config.n_tune == 1000
-        assert config.target_accept == 0.9
+        assert config.target_accept == 0.97
         assert config.max_treedepth == 12
+        assert config.random_seed == 42
         assert config.ability_prior_sd == 1.0
         assert config.severity_prior_sd == 0.5
         assert config.use_reference_rater is True
         assert config.reference_rater_idx == 0
         assert config.use_empirical_thresholds is True
+        assert config.estimate_thresholds is False
         assert config.threshold_padding == 0.5
+        assert config.use_outlier_mixture is True
+        assert config.random_seed == 42
+        assert config.outlier_prior_strength == 20.0
+        assert config.base_slip_logit_mu == -2.5
+        assert config.base_slip_logit_sigma == 0.8
+        assert config.rater_slip_sigma == 0.5
+        assert config.essay_slip_sigma == 0.3
+        assert config.use_essay_disagreement is False
+        assert config.majority_dirichlet_strength == 2.0
+        assert config.majority_smoothing == pytest.approx(1e-6)
 
     def test_custom_config_initialization(self) -> None:
         """Test ModelConfig with custom values."""
@@ -51,6 +63,7 @@ class TestModelConfig:
         # Defaults should remain
         assert config.n_tune == 1000
         assert config.severity_prior_sd == 0.5
+        assert config.use_outlier_mixture is True
 
 
 class TestModelInitialization:
@@ -82,13 +95,17 @@ class TestModelInitialization:
         """Test SWEDISH_GRADES constant is properly defined."""
         model = ImprovedBayesianModel()
 
-        assert model.SWEDISH_GRADES == ["F", "E", "D", "C", "B", "A"]
-        assert len(model.SWEDISH_GRADES) == 6
+        assert model.SWEDISH_GRADES == ["F", "F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]
+        assert len(model.SWEDISH_GRADES) == 10
 
     def test_grade_to_numeric_mapping(self) -> None:
         """Test GRADE_TO_NUMERIC mapping is correctly generated."""
         model = ImprovedBayesianModel()
-        expected_mapping = {"F": 0, "E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
+        expected_mapping = {
+            "F": 0, "F+": 1, "E-": 2, "E+": 3,
+            "D-": 4, "D+": 5, "C-": 6, "C+": 7,
+            "B": 8, "A": 9
+        }
 
         assert model.GRADE_TO_NUMERIC == expected_mapping
 
@@ -125,7 +142,7 @@ class TestDataPreparation:
         assert "grade" in result_df.columns
 
         # Check new columns are added
-        assert "base_grade" in result_df.columns
+        assert "clean_grade" in result_df.columns
         assert "essay_idx" in result_df.columns
         assert "rater_idx" in result_df.columns
         assert "grade_numeric" in result_df.columns
@@ -155,30 +172,37 @@ class TestDataPreparation:
         assert "R3" in model.rater_map
 
         # Check grade scale mapping
-        expected_grade_scale = {"F": 0, "E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
+        expected_grade_scale = {
+            "F": 0, "F+": 1, "E-": 2, "E+": 3,
+            "D-": 4, "D+": 5, "C-": 6, "C+": 7,
+            "B": 8, "A": 9
+        }
         assert model.grade_scale == expected_grade_scale
 
     @pytest.mark.parametrize(
-        "grade, expected_base",
+        "grade, expected_clean",
         [
             ("A", "A"),
-            ("A+", "A"),
-            ("A-", "A"),
             ("B", "B"),
-            ("B+", "B"),
-            ("C-", "C"),
+            ("C+", "C+"),
+            ("C-", "C-"),
+            ("D+", "D+"),
+            ("D-", "D-"),
+            ("E+", "E+"),
+            ("E-", "E-"),
+            ("F+", "F+"),
             ("F", "F"),
         ],
     )
-    def test_grade_to_base_conversion(
-        self, model: ImprovedBayesianModel, grade: str, expected_base: str
+    def test_grade_cleaning(
+        self, model: ImprovedBayesianModel, grade: str, expected_clean: str
     ) -> None:
-        """Test grade modifier removal."""
+        """Test that grades are cleaned but modifiers preserved."""
         df = pd.DataFrame([{"essay_id": "E1", "rater_id": "R1", "grade": grade}])
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 1
-        assert result_df.iloc[0]["base_grade"] == expected_base
+        assert result_df.iloc[0]["clean_grade"] == expected_clean
 
     @pytest.mark.parametrize(
         "invalid_grade",
@@ -197,25 +221,24 @@ class TestDataPreparation:
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 1
-        assert result_df.iloc[0]["base_grade"] == "A"
+        assert result_df.iloc[0]["clean_grade"] == "A"
 
     @pytest.mark.parametrize(
-        "valid_with_modifiers",
-        ["AA", "a", "B+", "C-", "f"],
+        "valid_grade",
+        ["A", "B", "C+", "C-", "D+", "D-", "E+", "E-", "F+", "F"],
     )
-    def test_valid_grades_with_modifiers_accepted(
-        self, model: ImprovedBayesianModel, valid_with_modifiers: str
+    def test_valid_grades_accepted(
+        self, model: ImprovedBayesianModel, valid_grade: str
     ) -> None:
-        """Test that grades starting with valid letters are accepted."""
+        """Test that all valid Swedish grades are accepted."""
         df = pd.DataFrame(
             [
-                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},  # Valid
-                {"essay_id": "E1", "rater_id": "R2", "grade": valid_with_modifiers},  # Also valid
+                {"essay_id": "E1", "rater_id": "R1", "grade": valid_grade},
             ]
         )
         result_df = model.prepare_data(df)
 
-        assert len(result_df) == 2
+        assert len(result_df) == 1
 
     def test_na_grades_filtered_out(self, model: ImprovedBayesianModel) -> None:
         """Test that NA/null grades are filtered out."""
@@ -229,21 +252,21 @@ class TestDataPreparation:
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 1
-        assert result_df.iloc[0]["base_grade"] == "A"
+        assert result_df.iloc[0]["clean_grade"] == "A"
 
     def test_case_insensitive_grade_handling(self, model: ImprovedBayesianModel) -> None:
         """Test that lowercase grades are handled correctly."""
         df = pd.DataFrame(
             [
                 {"essay_id": "E1", "rater_id": "R1", "grade": "a"},
-                {"essay_id": "E1", "rater_id": "R2", "grade": "b+"},
+                {"essay_id": "E1", "rater_id": "R2", "grade": "c+"},  # Valid grade with modifier
             ]
         )
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 2
-        assert "A" in result_df["base_grade"].values
-        assert "B" in result_df["base_grade"].values
+        assert "A" in result_df["clean_grade"].values
+        assert "C+" in result_df["clean_grade"].values
 
     def test_numeric_indices_mapping(self, model: ImprovedBayesianModel) -> None:
         """Test that numeric indices are correctly mapped."""
@@ -268,8 +291,8 @@ class TestDataPreparation:
         assert result_df[result_df["rater_id"] == "R2"]["rater_idx"].iloc[0] == r2_idx
 
         # Check grade numeric values
-        assert result_df[result_df["grade"] == "A"]["grade_numeric"].iloc[0] == 5
-        assert result_df[result_df["grade"] == "B"]["grade_numeric"].iloc[0] == 4
+        assert result_df[result_df["grade"] == "A"]["grade_numeric"].iloc[0] == 9  # A is position 9 now
+        assert result_df[result_df["grade"] == "B"]["grade_numeric"].iloc[0] == 8  # B is position 8 now
 
 
 class TestEmpiricalThresholds:
@@ -283,10 +306,10 @@ class TestEmpiricalThresholds:
     @pytest.mark.parametrize(
         "grades, expected_length",
         [
-            ([0, 1, 2, 3, 4, 5], 5),  # All grades present
-            ([0, 2, 4], 5),  # Some grades missing
-            ([3, 3, 3], 5),  # Only one grade
-            ([5, 5, 5, 5], 5),  # Only highest grade
+            ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 9),  # All grades present
+            ([0, 2, 4], 9),  # Some grades missing
+            ([3, 3, 3], 9),  # Only one grade
+            ([9, 9, 9, 9], 9),  # Only highest grade
         ],
     )
     def test_empirical_thresholds_length(
@@ -321,17 +344,17 @@ class TestEmpiricalThresholds:
         grades = np.array([3, 3, 3, 3])  # Only grade C
         thresholds = model._get_empirical_thresholds(grades)
 
-        assert len(thresholds) == 5
+        assert len(thresholds) == 9
         assert all(isinstance(t, (int, float)) for t in thresholds)
         assert not any(np.isnan(t) for t in thresholds)
 
     def test_empirical_thresholds_with_extreme_grades(self, model: ImprovedBayesianModel) -> None:
         """Test empirical thresholds with only extreme grades."""
         # Only F and A grades
-        grades = np.array([0, 0, 5, 5])
+        grades = np.array([0, 0, 9, 9])
         thresholds = model._get_empirical_thresholds(grades)
 
-        assert len(thresholds) == 5
+        assert len(thresholds) == 9
         # Should produce reasonable threshold values
         assert all(isinstance(t, (int, float)) for t in thresholds)
 
@@ -347,17 +370,19 @@ class TestGradeProbabilityCalculation:
     def test_calculate_grade_probabilities_sums_to_one(self, model: ImprovedBayesianModel) -> None:
         """Test that grade probabilities sum to 1."""
         ability = 0.0
-        thresholds = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        # 9 thresholds for 10 categories
+        thresholds = np.array([-3.0, -2.25, -1.5, -0.75, 0.0, 0.75, 1.5, 2.25, 3.0])
 
         probs = model._calculate_grade_probabilities(ability, thresholds)
 
-        assert len(probs) == 6  # Six Swedish grades
+        assert len(probs) == 10  # Ten Swedish grades
         assert abs(np.sum(probs) - 1.0) < 1e-10  # Should sum to 1
 
     def test_calculate_grade_probabilities_all_positive(self, model: ImprovedBayesianModel) -> None:
         """Test that all grade probabilities are positive."""
         ability = 1.5
-        thresholds = np.array([-2.5, -1.0, 0.5, 1.0, 2.0])
+        # 9 thresholds for 10 categories
+        thresholds = np.array([-3.0, -2.25, -1.5, -0.75, 0.0, 0.75, 1.5, 2.25, 3.0])
 
         probs = model._calculate_grade_probabilities(ability, thresholds)
 
@@ -367,15 +392,16 @@ class TestGradeProbabilityCalculation:
         "ability, expected_highest_grade_idx",
         [
             (-10.0, 0),  # Very low ability -> F (index 0)
-            (10.0, 5),  # Very high ability -> A (index 5)
-            (0.0, 2),  # Medium ability -> around D (index 2)
+            (10.0, 9),  # Very high ability -> A (index 9)
+            (0.0, 4),  # Medium ability -> D- (index 4) at boundary
         ],
     )
     def test_calculate_grade_probabilities_peak_assignment(
         self, model: ImprovedBayesianModel, ability: float, expected_highest_grade_idx: int
     ) -> None:
         """Test that highest probability is assigned to expected grade."""
-        thresholds = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        # 9 thresholds for 10 categories
+        thresholds = np.array([-3.0, -2.25, -1.5, -0.75, 0.0, 0.75, 1.5, 2.25, 3.0])
 
         probs = model._calculate_grade_probabilities(ability, thresholds)
         highest_prob_idx = np.argmax(probs)
@@ -388,12 +414,12 @@ class TestGradeProbabilityCalculation:
         """Test grade probabilities with different threshold configurations."""
         ability = 0.0
 
-        # Tight thresholds
-        tight_thresholds = np.array([-0.5, -0.25, 0.0, 0.25, 0.5])
+        # Tight thresholds (9 for 10 categories)
+        tight_thresholds = np.array([-0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8])
         tight_probs = model._calculate_grade_probabilities(ability, tight_thresholds)
 
-        # Wide thresholds
-        wide_thresholds = np.array([-5.0, -2.5, 0.0, 2.5, 5.0])
+        # Wide thresholds (9 for 10 categories)
+        wide_thresholds = np.array([-6.0, -4.5, -3.0, -1.5, 0.0, 1.5, 3.0, 4.5, 6.0])
         wide_probs = model._calculate_grade_probabilities(ability, wide_thresholds)
 
         # With tight thresholds, probabilities should be more spread out around the ability level
@@ -411,15 +437,67 @@ class TestGradeProbabilityCalculation:
     ) -> None:
         """Test that properly ordered thresholds work correctly."""
         ability = 0.0
-        # Properly ordered thresholds
-        ordered_thresholds = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        # Properly ordered thresholds (9 for 10 categories)
+        ordered_thresholds = np.array([-3.0, -2.25, -1.5, -0.75, 0.0, 0.75, 1.5, 2.25, 3.0])
 
         probs = model._calculate_grade_probabilities(ability, ordered_thresholds)
 
         # Should produce valid probabilities
-        assert len(probs) == 6
+        assert len(probs) == 10
         assert abs(np.sum(probs) - 1.0) < 1e-10
         assert all(p >= 0 for p in probs)
+
+
+class TestOutlierRobustness:
+    """Integration tests for the outlier-robust likelihood."""
+
+    @pytest.mark.integration
+    def test_outlier_rating_is_downweighted(self) -> None:
+        """Ensure a single outlier cannot flip the consensus grade."""
+
+        ratings = pd.DataFrame(
+            [
+                # Essay with conflicting ratings (ES24 scenario)
+                {"essay_id": "ES24", "rater_id": "R1", "grade": "C+"},
+                {"essay_id": "ES24", "rater_id": "R2", "grade": "B"},
+                {"essay_id": "ES24", "rater_id": "R3", "grade": "C-"},
+                {"essay_id": "ES24", "rater_id": "R4", "grade": "A"},
+                {"essay_id": "ES24", "rater_id": "R5", "grade": "C+"},
+                {"essay_id": "ES24", "rater_id": "R6", "grade": "C+"},
+                # Calibration essays that anchor rater behaviour
+                {"essay_id": "JA99", "rater_id": "R1", "grade": "A"},
+                {"essay_id": "JA99", "rater_id": "R2", "grade": "A"},
+                {"essay_id": "JA99", "rater_id": "R3", "grade": "A"},
+                {"essay_id": "JA99", "rater_id": "R4", "grade": "B"},
+                {"essay_id": "JA99", "rater_id": "R5", "grade": "A"},
+                {"essay_id": "JA99", "rater_id": "R6", "grade": "A"},
+                {"essay_id": "EK99", "rater_id": "R1", "grade": "C-"},
+                {"essay_id": "EK99", "rater_id": "R2", "grade": "C-"},
+                {"essay_id": "EK99", "rater_id": "R3", "grade": "D+"},
+                {"essay_id": "EK99", "rater_id": "R4", "grade": "C-"},
+                {"essay_id": "EK99", "rater_id": "R5", "grade": "C-"},
+                {"essay_id": "EK99", "rater_id": "R6", "grade": "C-"},
+            ]
+        )
+
+        config = ModelConfig(
+            n_chains=2,
+            n_draws=300,
+            n_tune=300,
+            sparse_data_threshold=0,
+            use_empirical_thresholds=False,
+            min_essays_for_bayesian=3,
+            min_raters_for_bayesian=2,
+            min_observations_for_bayesian=6,
+        )
+
+        model = ImprovedBayesianModel(config=config)
+        model.fit(ratings)
+        results = model.get_consensus_grades()
+
+        es24 = results["ES24"]
+        assert es24.consensus_grade == "C+"
+        assert es24.grade_probabilities["C+"] > es24.grade_probabilities["C-"]
 
 
 class TestConsensusResult:
@@ -509,11 +587,15 @@ class TestModelValidation:
         # After setting mappings, these should be accessible
         model.essay_map = {"E1": 0}
         model.rater_map = {"R1": 0}
-        model.grade_scale = {"F": 0, "E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
+        model.grade_scale = {
+            "F": 0, "F+": 1, "E-": 2, "E+": 3,
+            "D-": 4, "D+": 5, "C-": 6, "C+": 7,
+            "B": 8, "A": 9
+        }
 
         assert len(model.essay_map) == 1
         assert len(model.rater_map) == 1
-        assert len(model.grade_scale) == 6
+        assert len(model.grade_scale) == 10
 
     def test_prepare_data_preserves_original_dataframe(self, model: ImprovedBayesianModel) -> None:
         """Test that prepare_data doesn't modify the original DataFrame."""

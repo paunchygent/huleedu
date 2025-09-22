@@ -73,6 +73,15 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         Raises:
             HuleEduError: If pipeline resolution fails (unknown pipeline, dependency issues, etc.)
         """
+        logger.info(
+            f"resolve_pipeline called for {requested_pipeline}",
+            extra={
+                "batch_id": batch_id,
+                "requested_pipeline": requested_pipeline,
+                "correlation_id": str(correlation_id),
+            },
+        )
+
         try:
             # Validate that the requested pipeline exists
             pipeline_steps = self.pipeline_generator.get_pipeline_steps(requested_pipeline)
@@ -286,6 +295,15 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         self, batch_id: str, pruned_phases: list[str], correlation_id: UUID
     ) -> None:
         """Publish PhaseSkippedV1 events for phases that were pruned from pipeline execution."""
+        logger.info(
+            f"Publishing phase skipped events for {len(pruned_phases)} phases: {pruned_phases}",
+            extra={
+                "batch_id": batch_id,
+                "pruned_phases": pruned_phases,
+                "correlation_id": str(correlation_id),
+            },
+        )
+
         try:
             metadata = SystemProcessingMetadata(
                 entity_id=batch_id,

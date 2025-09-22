@@ -38,7 +38,8 @@ class ConsensusGradingConfig:
 
     def __post_init__(self) -> None:
         if self.swedish_grades is None:
-            self.swedish_grades = ["F", "E", "D", "C", "B", "A"]
+            # Swedish National Exam grading scale (10 distinct ordinal levels)
+            self.swedish_grades = ["F", "F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]
 
 
 @dataclass
