@@ -13,7 +13,7 @@ This report presents a comprehensive quality analysis of the test suite for the 
 4. **test_model_stability.py** - Parameter stability tests (363 LoC) ✅ *[New file]*
 
 ### Implementation Files
-1. **improved_bayesian_model.py** - Main model implementation
+1. **bayesian_consensus_model.py** - Main model implementation
 2. **model_validation.py** - Validation utilities
 
 ## Rule 075 Compliance Assessment

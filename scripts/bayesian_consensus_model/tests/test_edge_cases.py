@@ -10,7 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from ..improved_bayesian_model import ImprovedBayesianModel, ModelConfig
+from ..bayesian_consensus_model import ImprovedBayesianModel, ModelConfig
 
 
 class TestEdgeCasesAndBoundaryConditions:

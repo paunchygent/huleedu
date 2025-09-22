@@ -181,7 +181,10 @@ class PrincipledConsensusGrader:
         Only called when sufficient data exists.
         """
         # Import here to avoid dependency when not needed
-        from scripts.bayesian_consensus_model.improved_bayesian_model import ImprovedBayesianModel, ModelConfig
+        from scripts.bayesian_consensus_model.bayesian_consensus_model import (
+            ImprovedBayesianModel,
+            ModelConfig,
+        )
 
         # Configure for robust estimation with sufficient data
         config = ModelConfig(

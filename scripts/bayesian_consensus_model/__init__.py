@@ -1,24 +1,20 @@
 """Bayesian consensus model for essay grading.
 
-This module provides an improved Bayesian ordinal regression model for
-determining consensus grades from multiple raters.
+Exposes the improved Bayesian ordinal regression implementation, validation
+helpers, and the production-ready consensus grading solution.
 """
 
-from .comparison_framework import (
-    BaselineMethod,
-    ComparisonFramework,
-    ComparisonResult,
-    SimpleMajority,
-    TrimmedMean,
-    WeightedMedian,
-)
-from .cross_validation import CrossValidator, CVResult
-from .improved_bayesian_model import (
+from .bayesian_consensus_model import (
     ConsensusResult,
     ImprovedBayesianModel,
     ModelConfig,
 )
 from .model_validation import ModelValidator, ValidationResult, validate_model
+from .consensus_grading_solution import (
+    ConsensusResult as HybridConsensusResult,
+    PrincipledConsensusGrader,
+    ConsensusGradingConfig,
+)
 
 __all__ = [
     "ImprovedBayesianModel",
@@ -27,12 +23,7 @@ __all__ = [
     "ModelValidator",
     "ValidationResult",
     "validate_model",
-    "ComparisonFramework",
-    "BaselineMethod",
-    "SimpleMajority",
-    "WeightedMedian",
-    "TrimmedMean",
-    "ComparisonResult",
-    "CrossValidator",
-    "CVResult",
+    "PrincipledConsensusGrader",
+    "ConsensusGradingConfig",
+    "HybridConsensusResult",
 ]

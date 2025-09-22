@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from .improved_bayesian_model import ImprovedBayesianModel, ModelConfig
+from .bayesian_consensus_model import ImprovedBayesianModel, ModelConfig
 
 
 @dataclass

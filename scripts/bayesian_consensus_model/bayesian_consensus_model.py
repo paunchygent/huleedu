@@ -48,6 +48,7 @@ class ModelConfig:
     severity_prior_sd: float = 0.5
     sparse_ability_prior_sd: float = 0.8  # Allows essays to nudge toward data without overshooting
     sparse_severity_prior_sd: float = 0.5  # Mild pooling for sparse-data raters
+    majority_override_ratio: float = 0.6  # Minimum vote share before majority override triggers
 
     # Reference rater approach
     use_reference_rater: bool = True
@@ -564,7 +565,7 @@ class ImprovedBayesianModel:
             if (
                 total_ratings < self.config.sparse_data_threshold
                 and grade_counts is not None
-                and majority_ratio >= 0.6
+                and majority_ratio >= self.config.majority_override_ratio
             ):
                 grade_probabilities = np.zeros(len(self.SWEDISH_GRADES))
                 for grade_idx_int, count in grade_counts.items():

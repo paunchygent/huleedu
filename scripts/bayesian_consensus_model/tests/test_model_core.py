@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ..improved_bayesian_model import ConsensusResult, ImprovedBayesianModel, ModelConfig
+from ..bayesian_consensus_model import ConsensusResult, ImprovedBayesianModel, ModelConfig
 
 
 class TestModelConfig:
