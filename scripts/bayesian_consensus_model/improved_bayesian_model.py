@@ -48,12 +48,17 @@ class ModelConfig:
     swedish_grade_distribution: Dict[str, float] = None  # Will be set in __post_init__
 
     # Adaptive complexity thresholds
-    sparse_data_threshold: int = 30  # Use simpler model below this (raised for borderline cases)
+    sparse_data_threshold: int = 10  # Use simpler model only for VERY sparse data
     medium_data_threshold: int = 50  # Below this, still boost sampling
     sparse_tune_multiplier: float = 1.5  # Increase tuning for sparse data
     sparse_draws_multiplier: float = 1.5  # Increase draws for sparse data
     medium_tune_multiplier: float = 1.25  # Moderate increase for medium data
     medium_draws_multiplier: float = 1.25  # Moderate increase for medium data
+
+    # Degeneracy detection thresholds
+    min_essays_for_bayesian: int = 3  # Need at least 3 essays
+    min_raters_for_bayesian: int = 3  # Need at least 3 raters
+    min_observations_for_bayesian: int = 9  # Need at least 3x3 matrix
 
     def __post_init__(self) -> None:
         """Initialize Swedish grade distribution after dataclass init."""
@@ -137,56 +142,25 @@ class ImprovedBayesianModel:
     def _get_empirical_thresholds(self, grades: np.ndarray) -> np.ndarray:
         """Calculate empirical thresholds from observed grade distribution.
 
-        For sparse data, this creates thresholds that allow the observed
-        grades to be achievable with reasonable probability.
+        NOTE: This method now uses a simplified approach that spaces thresholds
+        evenly on the latent scale. The previous implementation that centered
+        thresholds around observed grades was identified as circular reasoning.
+        The grades parameter is kept for API compatibility but not used.
 
         Args:
-            grades: Array of numeric grades
+            grades: Array of numeric grades (unused, kept for compatibility)
 
         Returns:
-            Array of threshold values
+            Array of threshold values evenly spaced on latent scale
         """
+        _ = grades  # Acknowledge parameter for API compatibility
         n_categories = len(self.SWEDISH_GRADES)
 
-        # Get the range of observed grades
-        min_grade = int(np.min(grades))
-        max_grade = int(np.max(grades))
+        # Use evenly spaced thresholds on the latent scale
+        # This is a neutral approach that doesn't bias toward observed data
+        thresholds = np.linspace(-2.5, 2.5, n_categories - 1)
 
-        # Create thresholds that center the observed range
-        # This ensures observed grades are achievable
-        if max_grade == min_grade:
-            # All same grade - center thresholds around that grade
-            center = min_grade
-            thresholds = []
-            for i in range(n_categories - 1):
-                if i < center - 1:
-                    thresholds.append(-3.0 + i * 0.5)
-                elif i == center - 1:
-                    thresholds.append(-0.5)
-                elif i == center:
-                    thresholds.append(0.5)
-                else:
-                    thresholds.append(3.0 - (n_categories - 2 - i) * 0.5)
-        else:
-            # Multiple grades - space thresholds to make observed grades likely
-            # Put thresholds between observed grades
-            thresholds = []
-            observed_range = max_grade - min_grade
-            spacing = 2.0 / (observed_range + 1)  # Space within [-1, 1] range
-
-            for i in range(n_categories - 1):
-                if i < min_grade:
-                    # Below observed range - use tight spacing
-                    thresholds.append(-2.0 - (min_grade - i - 1) * 0.3)
-                elif i >= max_grade:
-                    # Above observed range - use tight spacing
-                    thresholds.append(1.0 + (i - max_grade + 1) * 0.3)
-                else:
-                    # Within observed range - use wider spacing
-                    position = (i - min_grade + 1) / (observed_range + 1)
-                    thresholds.append(-1.0 + position * 2.0)
-
-        return np.array(thresholds)
+        return thresholds
 
     def _get_swedish_informed_thresholds(self) -> np.ndarray:
         """Get threshold values based on Swedish national grade distribution.
@@ -233,9 +207,16 @@ class ImprovedBayesianModel:
             PyMC model object
         """
         n_observations = self._calculate_data_sparsity(data_df)
+        n_essays = len(self.essay_map)
+        n_raters = len(self.rater_map)
 
-        # Adaptive model selection based on data sparsity
-        if n_observations < self.config.sparse_data_threshold:
+        # Check for degeneracy - insufficient data for Bayesian modeling
+        if (n_essays < self.config.min_essays_for_bayesian or
+            n_raters < self.config.min_raters_for_bayesian or
+            n_observations < self.config.min_observations_for_bayesian):
+            # Use simple model for degenerate cases
+            return self._build_simple_model(data_df)
+        elif n_observations < self.config.sparse_data_threshold:
             # Use simpler model for sparse data
             return self._build_simple_model(data_df)
         else:
@@ -256,7 +237,6 @@ class ImprovedBayesianModel:
         """
         n_essays = len(self.essay_map)
         n_raters = len(self.rater_map)
-        n_categories = len(self.SWEDISH_GRADES)
 
         essay_idx = data_df["essay_idx"].values
         rater_idx = data_df["rater_idx"].values
@@ -286,18 +266,10 @@ class ImprovedBayesianModel:
                 pt.zeros(n_raters) + global_severity
             )
 
-            # Use empirical thresholds if we have enough data diversity
-            # Otherwise use conservative evenly-spaced thresholds
-            unique_grades = np.unique(grades)
-            if len(unique_grades) >= 3:
-                # We have some diversity - use empirical estimates
-                empirical_thresholds = self._get_empirical_thresholds(np.array(grades))
-            else:
-                # Very limited diversity - use evenly spaced thresholds
-                # These are more conservative and allow all grades to be achievable
-                empirical_thresholds = np.linspace(-2.0, 2.0, n_categories - 1)
-
-            thresholds = pm.Data("thresholds", empirical_thresholds)
+            # Always use Swedish population-based thresholds for simple model
+            # This avoids circular reasoning and ensures consistency
+            swedish_thresholds = self._get_swedish_informed_thresholds()
+            thresholds = pm.Data("thresholds", swedish_thresholds)
 
             # Linear predictor
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
@@ -419,8 +391,17 @@ class ImprovedBayesianModel:
         # Prepare data
         data_df = self.prepare_data(ratings_df)
 
+        # Check for single essay case - use majority voting instead
+        if len(self.essay_map) == 1:
+            # Store data for majority voting fallback
+            self._use_majority_voting = True
+            self._ratings_data = data_df
+            self._fitted = True
+            return
+
         # Build model
         self.build_model(data_df)
+        self._use_majority_voting = False
 
         # Sample from posterior
         if self.model is None:
@@ -465,6 +446,10 @@ class ImprovedBayesianModel:
         """
         if not self._fitted:
             raise ValueError("Model must be fitted before getting consensus grades")
+
+        # Handle majority voting fallback for single essay
+        if hasattr(self, '_use_majority_voting') and self._use_majority_voting:
+            return self._get_majority_consensus()
 
         results = {}
 
@@ -587,6 +572,56 @@ class ImprovedBayesianModel:
         confidence = float(np.max(grade_probabilities))
 
         return grade_probabilities, confidence
+
+    def _get_majority_consensus(self) -> Dict[str, ConsensusResult]:
+        """Calculate consensus using simple majority voting for degenerate cases.
+
+        Used when we have only a single essay or insufficient data for Bayesian modeling.
+
+        Returns:
+            Dictionary mapping essay IDs to consensus results based on majority vote
+        """
+        results = {}
+
+        # Group ratings by essay
+        for essay_id in self.essay_map.keys():
+            essay_data = self._ratings_data[
+                self._ratings_data["essay_id"] == essay_id
+            ]
+
+            # Count grades
+            grade_counts = essay_data["grade_numeric"].value_counts()
+            total_ratings = len(essay_data)
+
+            # Find majority grade
+            majority_grade_numeric = grade_counts.idxmax()
+            majority_count = grade_counts.max()
+
+            # Calculate confidence as proportion of majority
+            confidence = float(majority_count / total_ratings)
+
+            # Create grade probabilities
+            grade_probs = {}
+            for i, grade in enumerate(self.SWEDISH_GRADES):
+                if i in grade_counts.index:
+                    grade_probs[grade] = float(grade_counts[i] / total_ratings)
+                else:
+                    grade_probs[grade] = 0.0
+
+            # Create consensus result
+            consensus_grade = self.SWEDISH_GRADES[majority_grade_numeric]
+
+            results[essay_id] = ConsensusResult(
+                essay_id=essay_id,
+                consensus_grade=consensus_grade,
+                grade_probabilities=grade_probs,
+                confidence=confidence,
+                raw_ability=0.0,  # Not applicable for majority voting
+                adjusted_ability=0.0,
+                rater_adjustments={},  # No rater adjustments in majority voting
+            )
+
+        return results
 
     def get_model_diagnostics(self) -> Dict[str, Any]:
         """Get comprehensive model diagnostics.

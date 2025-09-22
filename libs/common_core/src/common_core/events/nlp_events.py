@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
@@ -116,6 +116,14 @@ class BatchNlpProcessingRequestedV2(BaseEventData):
     essay_instructions: str = Field(
         description="Essay instructions used for context-aware analysis"
     )
+
+    @field_validator("essay_instructions")
+    @classmethod
+    def validate_essay_instructions(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("essay_instructions must be a non-empty string.")
+        return trimmed
 
 
 class NlpMetrics(BaseModel):

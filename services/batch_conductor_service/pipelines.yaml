@@ -9,8 +9,8 @@ pipelines:
         depends_on: []
       - name: "nlp"
         service_name: "nlp_service"
-        event_type: "huleedu.batch.nlp.initiate.command.v1"
-        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        event_type: "huleedu.batch.nlp.initiate.command.v2"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV2"
         depends_on:
           - "spellcheck"
       - name: "ai_feedback"
@@ -46,8 +46,8 @@ pipelines:
         depends_on: []
       - name: "nlp"
         service_name: "nlp_service"
-        event_type: "huleedu.batch.nlp.initiate.command.v1"
-        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        event_type: "huleedu.batch.nlp.initiate.command.v2"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV2"
         depends_on:
           - "spellcheck"
 
@@ -67,8 +67,8 @@ pipelines:
           - "spellcheck"
       - name: "nlp"
         service_name: "nlp_service"
-        event_type: "huleedu.batch.nlp.initiate.command.v1"
-        event_data_model: "BatchServiceNLPInitiateCommandDataV1"
+        event_type: "huleedu.batch.nlp.initiate.command.v2"
+        event_data_model: "BatchServiceNLPInitiateCommandDataV2"
         depends_on:
           - "spellcheck"
       - name: "ai_feedback"

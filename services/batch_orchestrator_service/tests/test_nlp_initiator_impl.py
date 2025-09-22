@@ -20,6 +20,7 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import HuleEduError
+from pydantic import ValidationError
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.nlp_initiator_impl import NLPInitiatorImpl
@@ -75,6 +76,27 @@ def sample_correlation_id() -> UUID:
 
 class TestNLPInitiatorImpl:
     """Test suite for NLP initiator implementation."""
+
+    def test_batch_registration_request_requires_non_empty_instructions(self) -> None:
+        with pytest.raises(ValidationError):
+            BatchRegistrationRequestV1(
+                expected_essay_count=1,
+                course_code=CourseCode.ENG5,
+                essay_instructions="   ",
+                user_id="teacher",
+                essay_ids=["essay-1"],
+            )
+
+    def test_batch_service_nlp_command_requires_instructions(self) -> None:
+        with pytest.raises(ValidationError):
+            BatchServiceNLPInitiateCommandDataV2(
+                event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
+                entity_id="batch-test",
+                entity_type="batch",
+                essays_to_process=[],
+                language="en",
+                essay_instructions="   ",
+            )
 
     async def test_initiate_phase_success(
         self,

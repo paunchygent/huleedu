@@ -129,6 +129,15 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                 },
             )
 
+            logger.debug(
+                "Received essay instructions for batch",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "instructions_preview": command_data.essay_instructions[:100],
+                },
+            )
+
             # Track batch processing start time
             batch_start_time = time.time()
             processed_count = 0

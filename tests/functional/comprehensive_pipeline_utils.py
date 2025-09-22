@@ -37,7 +37,7 @@ PIPELINE_TOPICS = {
     ),
     "cj_assessment_completed": topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
     # NLP pipeline topics
-    "batch_nlp_initiate": topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
+    "batch_nlp_initiate": topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
     "batch_nlp_analysis_completed": topic_name(ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED),
     # Phase skipping events from BCS (for pruning detection)
     "batch_phase_skipped": topic_name(ProcessingEvent.BATCH_PHASE_SKIPPED),

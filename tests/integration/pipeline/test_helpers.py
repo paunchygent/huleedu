@@ -57,7 +57,7 @@ class PipelineTestHelper:
         """
         Wait for ELS to transform BOS command to NLP service request.
 
-        Returns the BatchNlpProcessingRequestedV1 event if found.
+        Returns the BatchNlpProcessingRequestedV2 event if found.
         """
 
         els_topic = self.topic_names["batch_nlp_processing_requested"]
@@ -88,7 +88,7 @@ class PipelineTestHelper:
 
                     if (
                         envelope.correlation_id == correlation_id
-                        and envelope.event_type == "huleedu.batch.nlp.processing.requested.v1"
+                        and envelope.event_type == "huleedu.batch.nlp.processing.requested.v2"
                     ):
                         print(f"✅ Found ELS transformation: {envelope.event_id}")
                         return envelope

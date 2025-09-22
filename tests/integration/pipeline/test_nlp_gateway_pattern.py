@@ -105,11 +105,11 @@ class TestNlpGatewayPattern:
         # Step 3: Create BOS command event
         bos_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
-            event_type="huleedu.batch.nlp.initiate.command.v1",
+            event_type="huleedu.batch.nlp.initiate.command.v2",
             source_service="batch_orchestrator_service",
             correlation_id=correlation_id,
             data={
-                "event_name": "BATCH_NLP_INITIATE_COMMAND",
+                "event_name": "BATCH_NLP_INITIATE_COMMAND_V2",
                 "entity_id": batch_id,
                 "entity_type": "batch",
                 "essays_to_process": [
@@ -119,6 +119,7 @@ class TestNlpGatewayPattern:
                     }
                 ],
                 "language": "en",
+                "essay_instructions": "Describe the main conflict in the narrative.",
             },
         )
 
@@ -184,11 +185,11 @@ class TestNlpGatewayPattern:
         # Create BOS command with realistic metadata that the comprehensive test uses
         realistic_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
-            event_type="huleedu.batch.nlp.initiate.command.v1",
+            event_type="huleedu.batch.nlp.initiate.command.v2",
             source_service="batch_orchestrator_service",
             correlation_id=correlation_id,
             data={
-                "event_name": "BATCH_NLP_INITIATE_COMMAND",
+                "event_name": "BATCH_NLP_INITIATE_COMMAND_V2",
                 "entity_id": batch_id,
                 "entity_type": "batch",
                 "essays_to_process": [
@@ -199,6 +200,7 @@ class TestNlpGatewayPattern:
                     for essay in realistic_essays
                 ],
                 "language": "en",
+                "essay_instructions": "Summarize the primary argument presented in the assigned reading.",
                 "metadata": {
                     "test_context": "realistic_structure_validation",
                     "course_code": "ENG5",
@@ -259,11 +261,11 @@ class TestNlpGatewayPattern:
         # Create realistic test event
         pipeline_command: EventEnvelope = EventEnvelope(
             event_id=uuid4(),
-            event_type="huleedu.batch.nlp.initiate.command.v1",
+            event_type="huleedu.batch.nlp.initiate.command.v2",
             source_service="batch_orchestrator_service",
             correlation_id=correlation_id,
             data={
-                "event_name": "BATCH_NLP_INITIATE_COMMAND",
+                "event_name": "BATCH_NLP_INITIATE_COMMAND_V2",
                 "entity_id": batch_id,
                 "entity_type": "batch",
                 "essays_to_process": [
@@ -274,6 +276,7 @@ class TestNlpGatewayPattern:
                     }
                 ],
                 "language": "en",
+                "essay_instructions": "Outline the central thesis of the essay.",
             },
         )
 

@@ -7,7 +7,7 @@ the Batch Orchestrator Service sends to ELS to initiate various processing phase
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .domain_enums import CourseCode
 from .events.base_event_models import BaseEventData
@@ -85,6 +85,14 @@ class BatchServiceNLPInitiateCommandDataV2(BaseEventData):
     essays_to_process: list[EssayProcessingInputRefV1]
     language: str  # inferred from course_code
     essay_instructions: str  # required for context-aware analysis
+
+    @field_validator("essay_instructions")
+    @classmethod
+    def validate_essay_instructions(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("essay_instructions must be a non-empty string.")
+        return trimmed
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):

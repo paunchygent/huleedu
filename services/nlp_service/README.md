@@ -10,7 +10,7 @@ The NLP Service is a dual-phase Kafka worker service responsible for natural lan
 - **Stack**: Python 3.11, aiokafka, aiohttp, Dishka, thefuzz
 - **Phase 1 Input**: `BATCH_STUDENT_MATCHING_REQUESTED` events via Kafka
 - **Phase 1 Output**: `BATCH_AUTHOR_MATCHES_SUGGESTED` events via Kafka
-- **Phase 2 Input**: `BATCH_NLP_INITIATE_COMMAND` events via Kafka
+- **Phase 2 Input**: `BATCH_NLP_INITIATE_COMMAND_V2` events via Kafka
 - **Phase 2 Output**: Analysis results (future implementation)
 - **Dependencies**: File Service (HTTP), Class Management Service (HTTP), Redis (caching)
 - **Database**: PostgreSQL with outbox pattern for reliable event publishing

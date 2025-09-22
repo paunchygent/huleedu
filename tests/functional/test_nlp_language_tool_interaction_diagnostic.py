@@ -429,7 +429,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
 
         This test validates the complete fix for the "'str' object has no attribute 'get'" bug:
         1. Uploads essay content to Content Service
-        2. Triggers NLP processing via BatchNlpProcessingRequestedV1
+        2. Triggers NLP processing via BatchNlpProcessingRequestedV2
         3. Verifies Language Tool integration works without crashes
         4. Monitors for successful batch completion events
         """
@@ -498,7 +498,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
         await consumer.start()
         logger.info(f"✅ Consumer started for topics: {[nlp_completion_topic, essay_nlp_topic]}")
 
-        # Step 3: Publish BatchNlpProcessingRequestedV1 event
+        # Step 3: Publish BatchNlpProcessingRequestedV2 event
         producer = AIOKafkaProducer(
             bootstrap_servers=kafka_manager.config.bootstrap_servers,
             value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
@@ -515,19 +515,20 @@ class TestNLPLanguageToolInteractionDiagnostic:
                 )
             ]
 
-            nlp_request = BatchNlpProcessingRequestedV1(
-                event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED,
+            nlp_request = BatchNlpProcessingRequestedV2(
+                event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
                 batch_id=test_batch_id,
                 entity_type="batch",
                 entity_id=test_batch_id,
                 timestamp=datetime.now(timezone.utc),
                 essays_to_process=essays_to_process,
                 language="en",  # Language field for NLP processing
+                essay_instructions="Diagnostic validation prompt",
             )
 
-            envelope = EventEnvelope[BatchNlpProcessingRequestedV1](
+            envelope = EventEnvelope[BatchNlpProcessingRequestedV2](
                 event_id=uuid.uuid4(),
-                event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
+                event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2),
                 event_timestamp=datetime.now(timezone.utc),
                 source_service="test_e2e_validation",
                 correlation_id=uuid.UUID(test_correlation_id),
