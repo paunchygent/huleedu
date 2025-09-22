@@ -20,6 +20,17 @@ import pymc as pm
 import pytensor.tensor as pt
 
 warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings(
+    "ignore",
+    message="invalid value encountered in scalar divide",
+    category=RuntimeWarning,
+    module="arviz.stats.diagnostics",
+)
+warnings.filterwarnings(
+    "ignore",
+    message="invalid value encountered in scalar divide",
+    category=RuntimeWarning,
+)
 
 
 @dataclass
@@ -28,13 +39,15 @@ class ModelConfig:
 
     n_chains: int = 4
     n_draws: int = 2000
-    n_tune: int = 2000  # Increased for better convergence
-    target_accept: float = 0.95  # Increased for better sampling
-    max_treedepth: int = 15  # Increased for complex posteriors
+    n_tune: int = 1000
+    target_accept: float = 0.9
+    max_treedepth: int = 12
 
     # Prior parameters
     ability_prior_sd: float = 1.0  # Essay ability prior std dev
-    severity_prior_sd: float = 0.3  # Tighter prior for more stable estimates
+    severity_prior_sd: float = 0.5
+    sparse_ability_prior_sd: float = 0.8  # Allows essays to nudge toward data without overshooting
+    sparse_severity_prior_sd: float = 0.5  # Mild pooling for sparse-data raters
 
     # Reference rater approach
     use_reference_rater: bool = True
@@ -101,6 +114,7 @@ class ImprovedBayesianModel:
         self.rater_map: Dict[str, int] = {}
         self.grade_scale: Dict[str, int] = {}
         self._fitted = False
+        self._fixed_thresholds: Optional[np.ndarray] = None
 
     def prepare_data(self, ratings_df: pd.DataFrame) -> pd.DataFrame:
         """Prepare rating data for modeling.
@@ -244,32 +258,77 @@ class ImprovedBayesianModel:
         rater_idx = data_df["rater_idx"].values
         grades = data_df["grade_numeric"].values
 
+        # Pre-compute fixed thresholds and essay-specific prior means on the latent scale
+        evenly_spaced_thresholds = np.linspace(-2.5, 2.5, len(self.SWEDISH_GRADES) - 1)
+        swedish_thresholds = self._get_swedish_informed_thresholds()
+        blend_weight = 0.9
+        blended_thresholds = blend_weight * evenly_spaced_thresholds + (1 - blend_weight) * swedish_thresholds
+        self._fixed_thresholds = blended_thresholds
+
+        # Map each grade category to the midpoint between adjacent thresholds (latent location)
+        prior_centers = np.zeros(len(self.SWEDISH_GRADES), dtype=float)
+        prior_centers[0] = evenly_spaced_thresholds[0] - (evenly_spaced_thresholds[1] - evenly_spaced_thresholds[0])
+        prior_centers[-1] = evenly_spaced_thresholds[-1] + (
+            evenly_spaced_thresholds[-1] - evenly_spaced_thresholds[-2]
+        )
+        for grade_idx in range(1, len(self.SWEDISH_GRADES) - 1):
+            prior_centers[grade_idx] = 0.5 * (
+                evenly_spaced_thresholds[grade_idx - 1] + evenly_spaced_thresholds[grade_idx]
+            )
+
+        essay_prior_mu = np.zeros(n_essays, dtype=float)
+        for idx in range(n_essays):
+            mask = essay_idx == idx
+            if np.any(mask):
+                essay_prior_mu[idx] = float(np.mean(prior_centers[grades[mask].astype(int)]))
+
         with pm.Model() as model:
-            # Essay ability with informative prior based on Swedish distribution
-            # Use tighter prior for sparse data
+            # Essay ability prior centres on the observed latent midpoint and allows moderate spread
             essay_ability = pm.Normal(
                 "essay_ability",
-                mu=0,
-                sigma=0.7,  # Slightly wider to allow differentiation
+                mu=essay_prior_mu,
+                sigma=self.config.sparse_ability_prior_sd,
                 shape=n_essays,
             )
 
             # Per-rater severity with very strong priors for stability
             # Reference rater approach for identifiability
+            reference_idx = min(self.config.reference_rater_idx, max(n_raters - 1, 0))
+
             if n_raters > 1:
                 # Fix first rater at 0, estimate others with tight priors
                 rater_severity_raw = pm.Normal(
                     "rater_severity_raw",
                     mu=0,
-                    sigma=0.15,  # Very tight prior for sparse data
+                    sigma=self.config.sparse_severity_prior_sd,
                     shape=n_raters - 1,
                 )
-                # Insert 0 for reference rater
                 zeros = pt.zeros(1)
-                rater_severity = pm.Deterministic(
-                    "rater_severity",
-                    pt.concatenate([zeros, rater_severity_raw]),
-                )
+
+                if reference_idx == 0:
+                    rater_severity = pm.Deterministic(
+                        "rater_severity",
+                        pt.concatenate([zeros, rater_severity_raw]),
+                    )
+                elif reference_idx == n_raters - 1:
+                    rater_severity = pm.Deterministic(
+                        "rater_severity",
+                        pt.concatenate([
+                            rater_severity_raw[: reference_idx],
+                            zeros,
+                        ]),
+                    )
+                else:
+                    rater_severity = pm.Deterministic(
+                        "rater_severity",
+                        pt.concatenate(
+                            [
+                                rater_severity_raw[: reference_idx],
+                                zeros,
+                                rater_severity_raw[reference_idx:],
+                            ]
+                        ),
+                    )
             else:
                 # Single rater case
                 rater_severity = pm.Deterministic(
@@ -279,9 +338,8 @@ class ImprovedBayesianModel:
             # Use FIXED evenly spaced thresholds for simple model
             # These are NOT estimated, just fixed values
             # Swedish thresholds are too skewed for sparse data
-            evenly_spaced_thresholds = np.linspace(-2.5, 2.5, len(self.SWEDISH_GRADES) - 1)
-            # Use ConstantData to ensure these are NOT sampled
-            thresholds = pm.ConstantData("thresholds", evenly_spaced_thresholds)
+            thresholds_data = pm.Data("thresholds_data", blended_thresholds)
+            pm.Deterministic("thresholds", thresholds_data)
 
             # Linear predictor
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
@@ -290,7 +348,7 @@ class ImprovedBayesianModel:
             pm.OrderedLogistic(
                 "grade_obs",
                 eta=eta,
-                cutpoints=thresholds,
+                cutpoints=thresholds_data,
                 observed=grades,
                 compute_p=False,
             )
@@ -392,6 +450,7 @@ class ImprovedBayesianModel:
             pm.Deterministic("eta", eta)
 
         self.model = model
+        self._fixed_thresholds = None
         return model
 
     def fit(self, ratings_df: pd.DataFrame) -> None:
@@ -402,6 +461,7 @@ class ImprovedBayesianModel:
         """
         # Prepare data
         data_df = self.prepare_data(ratings_df)
+        self._ratings_data = data_df
 
         # Check for single essay case - use majority voting instead
         if len(self.essay_map) == 1:
@@ -477,8 +537,9 @@ class ImprovedBayesianModel:
         # Handle thresholds - might be in posterior (complex model) or fixed (simple model)
         if "thresholds" in self.trace.posterior:
             thresholds = self.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+        elif self._fixed_thresholds is not None:
+            thresholds = self._fixed_thresholds
         else:
-            # Simple model with fixed thresholds - reconstruct from Swedish distribution
             thresholds = self._get_swedish_informed_thresholds()
 
         # Reverse mappings
@@ -486,6 +547,47 @@ class ImprovedBayesianModel:
         id_to_rater = {v: k for k, v in self.rater_map.items()}
 
         for essay_idx, essay_id in id_to_essay.items():
+            essay_observations = self._ratings_data[
+                self._ratings_data["essay_idx"] == essay_idx
+            ]
+            total_ratings = len(essay_observations)
+            if total_ratings > 0:
+                grade_counts = essay_observations["grade_numeric"].value_counts()
+                majority_count = grade_counts.max()
+                majority_grade_idx = int(grade_counts.idxmax())
+                majority_ratio = majority_count / total_ratings
+            else:
+                grade_counts = None
+                majority_grade_idx = None
+                majority_ratio = 0.0
+
+            if (
+                total_ratings < self.config.sparse_data_threshold
+                and grade_counts is not None
+                and majority_ratio >= 0.6
+            ):
+                grade_probabilities = np.zeros(len(self.SWEDISH_GRADES))
+                for grade_idx_int, count in grade_counts.items():
+                    grade_probabilities[int(grade_idx_int)] = count / total_ratings
+                consensus_grade = self.SWEDISH_GRADES[majority_grade_idx]
+                ability = float(essay_abilities[essay_idx])
+                results[essay_id] = ConsensusResult(
+                    essay_id=essay_id,
+                    consensus_grade=consensus_grade,
+                    grade_probabilities={
+                        grade: float(prob)
+                        for grade, prob in zip(self.SWEDISH_GRADES, grade_probabilities)
+                    },
+                    confidence=float(majority_ratio),
+                    raw_ability=ability,
+                    adjusted_ability=ability,
+                    rater_adjustments={
+                        rater_id: float(rater_severities[r_idx])
+                        for r_idx, rater_id in id_to_rater.items()
+                    },
+                )
+                continue
+
             ability = essay_abilities[essay_idx]
 
             # Use posterior sampling for better confidence estimates
@@ -540,9 +642,9 @@ class ImprovedBayesianModel:
             lower = extended_thresholds[i]
             upper = extended_thresholds[i + 1]
 
-            # Use standard logistic CDF (no artificial temperature scaling)
-            p_upper = 1 / (1 + np.exp(-(ability - upper)))
-            p_lower = 1 / (1 + np.exp(-(ability - lower)))
+            # Use standard logistic CDF with the PyMC ordered-logit parameterisation
+            p_upper = 1 / (1 + np.exp(-(upper - ability)))
+            p_lower = 1 / (1 + np.exp(-(lower - ability)))
             probs[i] = p_upper - p_lower
 
         # Normalize to ensure sum = 1
@@ -643,11 +745,37 @@ class ImprovedBayesianModel:
         Returns:
             Dictionary of diagnostic metrics
         """
-        if not self._fitted or self.trace is None:
+        if not self._fitted:
             raise ValueError("Model must be fitted before getting diagnostics")
 
+        if self.trace is None:
+            n_essays = len(self.essay_map)
+            n_raters = len(self.rater_map)
+            n_observations = len(self._ratings_data) if hasattr(self, "_ratings_data") else 0
+
+            return {
+                "convergence": {
+                    "max_rhat": float("nan"),
+                    "min_ess_bulk": float("nan"),
+                    "min_ess_tail": float("nan"),
+                    "converged": False,
+                    "method": "majority_fallback",
+                },
+                "parameters": {
+                    "n_essays": n_essays,
+                    "n_raters": n_raters,
+                    "n_observations": n_observations,
+                },
+            }
+
         # Basic convergence diagnostics
-        summary = az.summary(self.trace)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="invalid value encountered in scalar divide",
+                category=RuntimeWarning,
+            )
+            summary = az.summary(self.trace)
 
         # Extract key metrics
         diagnostics = {

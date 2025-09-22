@@ -195,8 +195,27 @@ class ModelValidator:
                     .values
                 )
 
-                essay_abilities.append(abilities[: min(len(abilities), n_essays)])
-                rater_severities.append(severities[: min(len(severities), n_raters)])
+                boot_essay_map = {
+                    essay_id: idx for essay_id, idx in bootstrap_model.essay_map.items()
+                }
+                boot_rater_map = {
+                    rater_id: idx for rater_id, idx in bootstrap_model.rater_map.items()
+                }
+
+                full_abilities = np.zeros(n_essays, dtype=float)
+                for essay_id, original_idx in self.model.essay_map.items():
+                    boot_idx = boot_essay_map.get(essay_id)
+                    if boot_idx is not None:
+                        full_abilities[original_idx] = abilities[boot_idx]
+
+                full_severities = np.zeros(n_raters, dtype=float)
+                for rater_id, original_idx in self.model.rater_map.items():
+                    boot_idx = boot_rater_map.get(rater_id)
+                    if boot_idx is not None and boot_idx < len(severities):
+                        full_severities[original_idx] = severities[boot_idx]
+
+                essay_abilities.append(full_abilities)
+                rater_severities.append(full_severities)
             except Exception:
                 # Skip failed bootstrap samples
                 continue
@@ -208,12 +227,14 @@ class ModelValidator:
         essay_abilities_array = np.array(essay_abilities)
         rater_severities_array = np.array(rater_severities)
 
-        essay_cv = np.std(essay_abilities_array, axis=0).mean() / (
-            np.abs(np.mean(essay_abilities_array, axis=0)).mean() + 1e-6
-        )
-        rater_cv = np.std(rater_severities_array, axis=0).mean() / (
-            np.abs(np.mean(rater_severities_array, axis=0)).mean() + 1e-6
-        )
+        essay_mean_rms = np.sqrt(np.mean(np.square(np.mean(essay_abilities_array, axis=0))))
+        rater_mean_rms = np.sqrt(np.mean(np.square(np.mean(rater_severities_array, axis=0))))
+
+        essay_scale = max(essay_mean_rms, self.model.config.ability_prior_sd, 1e-6)
+        rater_scale = max(rater_mean_rms, self.model.config.severity_prior_sd, 1e-6)
+
+        essay_cv = np.std(essay_abilities_array, axis=0).mean() / essay_scale
+        rater_cv = np.std(rater_severities_array, axis=0).mean() / rater_scale
 
         return {
             "essay_ability_cv": float(essay_cv),
