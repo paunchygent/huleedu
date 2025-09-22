@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
@@ -99,13 +99,13 @@ class TestNLPInitiatorImpl:
         mock_event_publisher.publish_batch_event.assert_called_once()
 
         # Extract and verify the published envelope
-        published_envelope: EventEnvelope[BatchServiceNLPInitiateCommandDataV1] = (
+        published_envelope: EventEnvelope[BatchServiceNLPInitiateCommandDataV2] = (
             mock_event_publisher.publish_batch_event.call_args[0][0]
         )
 
-        assert isinstance(published_envelope.data, BatchServiceNLPInitiateCommandDataV1)
+        assert isinstance(published_envelope.data, BatchServiceNLPInitiateCommandDataV2)
         assert published_envelope.event_type == topic_name(
-            ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+            ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         )
         assert published_envelope.source_service == "batch-orchestrator-service"
         assert published_envelope.correlation_id == sample_correlation_id
@@ -116,7 +116,8 @@ class TestNLPInitiatorImpl:
         assert command_data.entity_type == "batch"
         assert command_data.essays_to_process == sample_essay_refs
         assert command_data.language == "en"  # Inferred from ENG5
-        assert command_data.event_name == ProcessingEvent.BATCH_NLP_INITIATE_COMMAND
+        assert command_data.essay_instructions == sample_batch_context.essay_instructions
+        assert command_data.event_name == ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2
 
     async def test_initiate_phase_wrong_phase_validation(
         self,
@@ -180,6 +181,7 @@ class TestNLPInitiatorImpl:
         # Verify Swedish language was inferred
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "sv"
+        assert published_envelope.data.essay_instructions == swedish_context.essay_instructions
 
     async def test_language_inference_unknown_defaults_to_english(
         self,
@@ -208,6 +210,7 @@ class TestNLPInitiatorImpl:
         # Verify English language (ENG6 maps to English via get_course_language)
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "en"
+        assert published_envelope.data.essay_instructions == english_context.essay_instructions
 
     async def test_event_publisher_exception_propagation(
         self,

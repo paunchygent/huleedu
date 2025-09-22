@@ -10,7 +10,7 @@ Validates that the model:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -262,9 +262,9 @@ class ModelValidator:
                     bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
                 )
 
-                bootstrap_estimates["mean_ability"].append(abilities.mean())
-                bootstrap_estimates["mean_severity"].append(severities.mean())
-                bootstrap_estimates["threshold_range"].append(thresholds.max() - thresholds.min())
+                bootstrap_estimates["mean_ability"].append(float(abilities.mean()))
+                bootstrap_estimates["mean_severity"].append(float(severities.mean()))
+                bootstrap_estimates["threshold_range"].append(float(thresholds.max() - thresholds.min()))
             except Exception:
                 continue
 

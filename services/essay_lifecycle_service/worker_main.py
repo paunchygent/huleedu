@@ -77,7 +77,7 @@ async def create_kafka_consumer() -> AIOKafkaConsumer:
         topic_name(ProcessingEvent.ESSAY_VALIDATION_FAILED),  # Added for validation coordination
         topic_name(ProcessingEvent.BATCH_SPELLCHECK_INITIATE_COMMAND),
         topic_name(ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND),
-        topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),  # Phase 2 NLP command from BOS
+        topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),  # Phase 2 NLP command from BOS
         topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
         topic_name(
             ProcessingEvent.BATCH_NLP_ANALYSIS_COMPLETED

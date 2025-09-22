@@ -17,6 +17,7 @@ __all__ = [
     "BatchServiceAIFeedbackInitiateCommandDataV1",
     "BatchServiceCJAssessmentInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
+    "BatchServiceNLPInitiateCommandDataV2",
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceStudentMatchingInitiateCommandDataV1",
 ]
@@ -72,10 +73,18 @@ class BatchServiceStudentMatchingInitiateCommandDataV1(BaseEventData):
 
 
 class BatchServiceNLPInitiateCommandDataV1(BaseEventData):
-    """Command data for Batch Orchestrator Service to initiate NLP phase for a batch."""
+    """(Deprecated) Command data for BOS to initiate NLP phase without instructions."""
 
     essays_to_process: list[EssayProcessingInputRefV1]
     language: str  # inferred from course_code
+
+
+class BatchServiceNLPInitiateCommandDataV2(BaseEventData):
+    """Command data for Batch Orchestrator Service to initiate NLP phase for a batch (v2)."""
+
+    essays_to_process: list[EssayProcessingInputRefV1]
+    language: str  # inferred from course_code
+    essay_instructions: str  # required for context-aware analysis
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):

@@ -129,7 +129,7 @@ class StudentAssociationHandler:
                         ),
                         course_code=course_code,
                         course_language=course_language,
-                        essay_instructions="",  # Would get from batch context
+                        essay_instructions="Instructions pending context integration.",
                         class_type="REGULAR",  # Always REGULAR for this flow
                     )
 

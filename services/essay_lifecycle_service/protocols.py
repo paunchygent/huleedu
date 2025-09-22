@@ -241,7 +241,7 @@ class BatchCommandHandler(Protocol):
 
     async def process_initiate_nlp_command(
         self,
-        command_data: Any,  # BatchServiceNLPInitiateCommandDataV1
+        command_data: Any,  # BatchServiceNLPInitiateCommandDataV2
         correlation_id: UUID,
     ) -> None:
         """Process NLP phase initiation command from Batch Service."""
@@ -403,6 +403,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_id: str,
+        essay_instructions: str,
         correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:

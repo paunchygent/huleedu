@@ -28,6 +28,7 @@ class ProcessingEvent(str, Enum):
     BATCH_CJ_ASSESSMENT_INITIATE_COMMAND = "batch.cj_assessment.initiate.command"
     BATCH_AI_FEEDBACK_INITIATE_COMMAND = "batch.ai_feedback.initiate.command"
     BATCH_NLP_INITIATE_COMMAND = "batch.nlp.initiate.command"
+    BATCH_NLP_INITIATE_COMMAND_V2 = "batch.nlp.initiate.command.v2"
     # -------------  ELS-BOS communication events  -------------#
     ELS_BATCH_PHASE_OUTCOME = "els.batch.phase.outcome"
     BATCH_VALIDATION_ERRORS = "batch.validation.errors"
@@ -40,6 +41,7 @@ class ProcessingEvent(str, Enum):
     SPELLCHECK_PHASE_COMPLETED = "spellcheck.phase.completed"  # Thin event for state transitions
     SPELLCHECK_RESULTS = "spellcheck.results"  # Rich event for business data
     BATCH_NLP_PROCESSING_REQUESTED = "batch.nlp.processing.requested"
+    BATCH_NLP_PROCESSING_REQUESTED_V2 = "batch.nlp.processing.requested.v2"
     ELS_CJ_ASSESSMENT_REQUESTED = "els.cj_assessment.requested"
     CJ_ASSESSMENT_COMPLETED = "cj_assessment.completed"
     CJ_ASSESSMENT_FAILED = "cj_assessment.failed"
@@ -105,6 +107,9 @@ _TOPIC_MAPPING = {
     ProcessingEvent.SPELLCHECK_PHASE_COMPLETED: "huleedu.batch.spellcheck.phase.completed.v1",
     ProcessingEvent.SPELLCHECK_RESULTS: "huleedu.essay.spellcheck.results.v1",
     ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED: "huleedu.batch.nlp.processing.requested.v1",
+    ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2: (
+        "huleedu.batch.nlp.processing.requested.v2"
+    ),
     ProcessingEvent.BATCH_ESSAYS_REGISTERED: "huleedu.batch.essays.registered.v1",
     ProcessingEvent.BATCH_PIPELINE_COMPLETED: "huleedu.batch.pipeline.completed.v1",
     ProcessingEvent.BATCH_PHASE_SKIPPED: "huleedu.batch.phase.skipped.v1",
@@ -120,6 +125,9 @@ _TOPIC_MAPPING = {
         "huleedu.batch.ai_feedback.initiate.command.v1"
     ),
     ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
+    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2: (
+        "huleedu.batch.nlp.initiate.command.v2"
+    ),
     ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED: (
         "huleedu.batch.content.provisioning.completed.v1"
     ),

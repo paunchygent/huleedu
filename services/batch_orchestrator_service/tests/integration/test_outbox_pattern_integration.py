@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from common_core.batch_service_models import (
-    BatchServiceNLPInitiateCommandDataV1,
+    BatchServiceNLPInitiateCommandDataV2,
     BatchServiceSpellcheckInitiateCommandDataV1,
 )
 from common_core.event_enums import ProcessingEvent, topic_name
@@ -405,8 +405,8 @@ class TestOutboxPatternIntegration:
                 event_publisher = await request_container.get(BatchEventPublisherProtocol)
 
                 for i in range(5):
-                    command_data = BatchServiceNLPInitiateCommandDataV1(
-                        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+                    command_data = BatchServiceNLPInitiateCommandDataV2(
+                        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
                         entity_id=f"concurrent-{i}",
                         entity_type="batch",
                         essays_to_process=[
@@ -415,10 +415,11 @@ class TestOutboxPatternIntegration:
                             ),
                         ],
                         language="en",
+                        essay_instructions="Test instructions",
                     )
 
-                    event_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV1](
-                        event_type=topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
+                    event_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV2](
+                        event_type=topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
                         source_service="batch-orchestrator-service",
                         correlation_id=correlation_id,
                         data=command_data,

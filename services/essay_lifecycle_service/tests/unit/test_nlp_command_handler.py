@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 from common_core.event_enums import ProcessingEvent
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -47,8 +47,8 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     repo.get_essay_state.return_value = essay_state
     repo.update_essay_status_via_machine.return_value = None
 
-    command = BatchServiceNLPInitiateCommandDataV1(
-        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+    command = BatchServiceNLPInitiateCommandDataV2(
+        event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         entity_id="batch-1",
         entity_type="batch",
         parent_id=None,
@@ -56,6 +56,7 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
             EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1")
         ],
         language="en",
+        essay_instructions="Analyze the impact of renewable energy adoption.",
     )
 
     await handler.process_initiate_nlp_command(command, uuid4())
@@ -66,3 +67,7 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     assert len(essays) == 1
     assert essays[0].spellcheck_metrics is not None
     assert essays[0].spellcheck_metrics.total_corrections == metrics.total_corrections
+    assert (
+        dispatched_args["essay_instructions"]
+        == "Analyze the impact of renewable energy adoption."
+    )

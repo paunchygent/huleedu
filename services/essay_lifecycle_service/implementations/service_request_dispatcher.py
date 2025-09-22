@@ -166,6 +166,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_id: str,
+        essay_instructions: str,
         correlation_id: UUID,
         session: AsyncSession | None = None,
     ) -> None:
@@ -177,7 +178,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
         from common_core.event_enums import ProcessingEvent, topic_name
         from common_core.events.envelope import EventEnvelope
-        from common_core.events.nlp_events import BatchNlpProcessingRequestedV1
+        from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 
         logger = create_service_logger("specialized_service_dispatcher")
 
@@ -193,18 +194,19 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
         try:
             # Create batch NLP processing request
-            nlp_request = BatchNlpProcessingRequestedV1(
-                event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED,
+            nlp_request = BatchNlpProcessingRequestedV2(
+                event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
                 entity_id=batch_id,
                 entity_type="batch",
                 essays_to_process=essays_to_process,
                 language=language.value,
                 batch_id=batch_id,
+                essay_instructions=essay_instructions,
             )
 
             # Create event envelope
-            envelope = EventEnvelope[BatchNlpProcessingRequestedV1](
-                event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED),
+            envelope = EventEnvelope[BatchNlpProcessingRequestedV2](
+                event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2),
                 source_service=self.settings.SERVICE_NAME,
                 correlation_id=correlation_id,
                 data=nlp_request,
@@ -215,7 +217,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 inject_trace_context(envelope.metadata)
 
             # Publish to outbox for reliable delivery
-            topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED)
+            topic = topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2)
             event_data = envelope.model_dump(mode="json")
 
             await self.outbox_repository.add_event(

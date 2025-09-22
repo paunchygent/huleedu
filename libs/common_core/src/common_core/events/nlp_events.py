@@ -89,7 +89,7 @@ class BatchAuthorMatchesSuggestedV1(BaseEventData):
 
 class BatchNlpProcessingRequestedV1(BaseEventData):
     """
-    Request from ELS to NLP Service for batch text analysis.
+    (Deprecated) Request from ELS to NLP Service for batch text analysis without instructions.
 
     This event is published by ELS after receiving BATCH_NLP_INITIATE_COMMAND
     from BOS. It follows the same pattern as ESSAY_SPELLCHECK_REQUESTED,
@@ -103,6 +103,19 @@ class BatchNlpProcessingRequestedV1(BaseEventData):
     )
     language: str = Field(description="Language code for processing (e.g., 'en', 'sv')")
     batch_id: str = Field(description="Batch identifier for tracking")
+
+
+class BatchNlpProcessingRequestedV2(BaseEventData):
+    """Request from ELS to NLP Service for batch text analysis with required instructions."""
+
+    essays_to_process: list[EssayProcessingInputRefV1] = Field(
+        description="List of essays to analyze with their text storage references"
+    )
+    language: str = Field(description="Language code for processing (e.g., 'en', 'sv')")
+    batch_id: str = Field(description="Batch identifier for tracking")
+    essay_instructions: str = Field(
+        description="Essay instructions used for context-aware analysis"
+    )
 
 
 class NlpMetrics(BaseModel):

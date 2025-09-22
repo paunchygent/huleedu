@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from common_core.batch_service_models import (
         BatchServiceAIFeedbackInitiateCommandDataV1,
         BatchServiceCJAssessmentInitiateCommandDataV1,
-        BatchServiceNLPInitiateCommandDataV1,
+        BatchServiceNLPInitiateCommandDataV2,
         BatchServiceSpellcheckInitiateCommandDataV1,
         BatchServiceStudentMatchingInitiateCommandDataV1,
     )
@@ -70,7 +70,7 @@ class DefaultBatchCommandHandler(BatchCommandHandler):
         )
 
     async def process_initiate_nlp_command(
-        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
+        self, command_data: BatchServiceNLPInitiateCommandDataV2, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service."""
         await self.nlp_handler.process_initiate_nlp_command(command_data, correlation_id)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -92,17 +92,18 @@ class NLPInitiatorImpl(NLPInitiatorProtocol):
             language = _infer_language_from_course_code(batch_context.course_code).value
 
             # Construct NLP command
-            nlp_command = BatchServiceNLPInitiateCommandDataV1(
-                event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND,
+            nlp_command = BatchServiceNLPInitiateCommandDataV2(
+                event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
                 entity_id=batch_id,
                 entity_type="batch",
                 essays_to_process=essays_for_processing,
                 language=language,
+                essay_instructions=batch_context.essay_instructions,
             )
 
             # Create EventEnvelope for NLP command
-            command_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV1](
-                event_type=topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND),
+            command_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV2](
+                event_type=topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2),
                 source_service="batch-orchestrator-service",
                 correlation_id=correlation_id,
                 data=nlp_command,

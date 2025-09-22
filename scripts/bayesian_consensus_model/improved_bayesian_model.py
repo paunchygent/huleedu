@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List, Tuple
+from typing import Any, Dict, Optional
 
 import arviz as az
 import numpy as np
 import pandas as pd
 import pymc as pm
+import pytensor.tensor as pt
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -27,13 +28,13 @@ class ModelConfig:
 
     n_chains: int = 4
     n_draws: int = 2000
-    n_tune: int = 1000
-    target_accept: float = 0.9
-    max_treedepth: int = 12
+    n_tune: int = 2000  # Increased for better convergence
+    target_accept: float = 0.95  # Increased for better sampling
+    max_treedepth: int = 15  # Increased for complex posteriors
 
     # Prior parameters
     ability_prior_sd: float = 1.0  # Essay ability prior std dev
-    severity_prior_sd: float = 0.5  # Rater severity prior std dev (tighter than original)
+    severity_prior_sd: float = 0.3  # Tighter prior for more stable estimates
 
     # Reference rater approach
     use_reference_rater: bool = True
@@ -181,10 +182,10 @@ class ImprovedBayesianModel:
                     shape=n_raters - 1,
                 )
                 # Insert 0 for reference rater
-                zeros = pm.math.zeros(1)
+                zeros = pt.zeros(1)
                 rater_severity = pm.Deterministic(
                     "rater_severity",
-                    pm.math.concatenate(
+                    pt.concatenate(
                         [
                             zeros
                             if self.config.reference_rater_idx == 0
@@ -213,11 +214,11 @@ class ImprovedBayesianModel:
                 )
 
                 # Ensure ordering through transformation
-                thresholds = pm.Deterministic("thresholds", pm.math.sort(thresholds_raw))
+                thresholds = pm.Deterministic("thresholds", pt.sort(thresholds_raw))
             else:
                 # Use standard ordered transformation
                 threshold_diffs = pm.Exponential("threshold_diffs", 1.0, shape=n_categories - 1)
-                thresholds = pm.Deterministic("thresholds", pm.math.cumsum(threshold_diffs) - 3.0)
+                thresholds = pm.Deterministic("thresholds", pt.cumsum(threshold_diffs) - 3.0)
 
             # Linear predictor: ability - severity (note the sign)
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
@@ -303,9 +304,12 @@ class ImprovedBayesianModel:
             confidence = grade_probs[consensus_idx]
 
             # Get rater adjustments for this essay
-            rater_adjustments = {
-                id_to_rater[i]: float(severity) for i, severity in enumerate(rater_severities)
-            }
+            rater_adjustments = {}
+            for rater_idx, rater_id in id_to_rater.items():
+                if rater_idx < len(rater_severities):
+                    rater_adjustments[rater_id] = float(rater_severities[rater_idx])
+                else:
+                    rater_adjustments[rater_id] = 0.0  # Default for missing indices
 
             results[essay_id] = ConsensusResult(
                 essay_id=essay_id,

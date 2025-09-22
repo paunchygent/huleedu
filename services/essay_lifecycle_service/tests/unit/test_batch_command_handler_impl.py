@@ -15,7 +15,7 @@ import pytest
 from common_core.batch_service_models import (
     BatchServiceAIFeedbackInitiateCommandDataV1,
     BatchServiceCJAssessmentInitiateCommandDataV1,
-    BatchServiceNLPInitiateCommandDataV1,
+    BatchServiceNLPInitiateCommandDataV2,
     BatchServiceSpellcheckInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
@@ -146,7 +146,7 @@ class TestDefaultBatchCommandHandler:
         correlation_id: UUID,
     ) -> None:
         """Test NLP command delegation to future services handler."""
-        mock_command = MagicMock(spec=BatchServiceNLPInitiateCommandDataV1)
+        mock_command = MagicMock(spec=BatchServiceNLPInitiateCommandDataV2)
 
         # Execute
         await command_handler.process_initiate_nlp_command(

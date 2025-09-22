@@ -50,7 +50,7 @@ class _MockRepo(BatchRepositoryProtocol):
                 expected_essay_count=ctx.expected_essay_count,
                 essay_ids=None,
                 course_code=CourseCode.ENG5,
-                essay_instructions="",
+                essay_instructions="Teacher provided instructions.",
                 user_id=ctx.user_id,
                 org_id=ctx.org_id,
                 class_id=None,

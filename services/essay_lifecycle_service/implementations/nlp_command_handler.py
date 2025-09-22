@@ -6,7 +6,7 @@ following the same architectural pattern as the spellcheck command handler.
 
 from uuid import UUID
 
-from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 from common_core.domain_enums import Language
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
 from common_core.metadata_models import EssayProcessingInputRefV1
@@ -42,7 +42,7 @@ class NlpCommandHandler:
         self.session_factory = session_factory
 
     async def process_initiate_nlp_command(
-        self, command_data: BatchServiceNLPInitiateCommandDataV1, correlation_id: UUID
+        self, command_data: BatchServiceNLPInitiateCommandDataV2, correlation_id: UUID
     ) -> None:
         """Process NLP initiation command from Batch Orchestrator Service.
 
@@ -174,6 +174,7 @@ class NlpCommandHandler:
                         essays_to_process=successfully_transitioned,
                         language=Language(command_data.language),
                         batch_id=batch_id,
+                        essay_instructions=command_data.essay_instructions,
                         correlation_id=correlation_id,
                         session=session,
                     )

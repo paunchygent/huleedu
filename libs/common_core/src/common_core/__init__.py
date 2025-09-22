@@ -11,6 +11,7 @@ from .batch_service_models import (
     BatchServiceAIFeedbackInitiateCommandDataV1,
     BatchServiceCJAssessmentInitiateCommandDataV1,
     BatchServiceNLPInitiateCommandDataV1,
+    BatchServiceNLPInitiateCommandDataV2,
     BatchServiceSpellcheckInitiateCommandDataV1,
     BatchServiceStudentMatchingInitiateCommandDataV1,
 )
@@ -81,7 +82,12 @@ from .events.llm_provider_events import (
     LLMUsageAnalyticsV1,
     TokenUsage,
 )
-from .events.nlp_events import BatchAuthorMatchesSuggestedV1, StudentMatchSuggestion
+from .events.nlp_events import (
+    BatchAuthorMatchesSuggestedV1,
+    BatchNlpProcessingRequestedV1,
+    BatchNlpProcessingRequestedV2,
+    StudentMatchSuggestion,
+)
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
 from .identity_enums import LoginFailureReason
 from .identity_models import (
@@ -221,6 +227,8 @@ __all__ = [
     "EssayValidationFailedV1",
     # NLP Service Event Models
     "BatchAuthorMatchesSuggestedV1",
+    "BatchNlpProcessingRequestedV1",
+    "BatchNlpProcessingRequestedV2",
     "StudentMatchSuggestion",
     # LLM Provider Event Models
     "LLMComparisonResultV1",
@@ -234,6 +242,7 @@ __all__ = [
     # Batch Service Command Models
     "BatchServiceSpellcheckInitiateCommandDataV1",
     "BatchServiceNLPInitiateCommandDataV1",
+    "BatchServiceNLPInitiateCommandDataV2",
     "BatchServiceAIFeedbackInitiateCommandDataV1",
     "BatchServiceCJAssessmentInitiateCommandDataV1",
     "BatchServiceStudentMatchingInitiateCommandDataV1",
@@ -254,6 +263,7 @@ SpellcheckResultDataV1.model_rebuild(raise_errors=True)
 AIFeedbackInputDataV1.model_rebuild(raise_errors=True)
 BatchServiceSpellcheckInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceNLPInitiateCommandDataV1.model_rebuild(raise_errors=True)
+BatchServiceNLPInitiateCommandDataV2.model_rebuild(raise_errors=True)
 BatchServiceAIFeedbackInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceCJAssessmentInitiateCommandDataV1.model_rebuild(raise_errors=True)
 BatchServiceStudentMatchingInitiateCommandDataV1.model_rebuild(raise_errors=True)
@@ -273,4 +283,6 @@ CJAssessmentFailedV1.model_rebuild(raise_errors=True)
 LLMComparisonResultV1.model_rebuild(raise_errors=True)
 TokenUsage.model_rebuild(raise_errors=True)
 BatchAuthorMatchesSuggestedV1.model_rebuild(raise_errors=True)
+BatchNlpProcessingRequestedV1.model_rebuild(raise_errors=True)
+BatchNlpProcessingRequestedV2.model_rebuild(raise_errors=True)
 StudentMatchSuggestion.model_rebuild(raise_errors=True)

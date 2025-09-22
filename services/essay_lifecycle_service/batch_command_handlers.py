@@ -295,10 +295,12 @@ async def _route_event(
                 )
             return True
 
-        elif event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND):
-            from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV1
+        elif event_type == topic_name(ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2):
+            from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
 
-            nlp_command_data = BatchServiceNLPInitiateCommandDataV1.model_validate(envelope.data)
+            nlp_command_data = BatchServiceNLPInitiateCommandDataV2.model_validate(
+                envelope.data
+            )
 
             # Record NLP command processing
             if coordination_events_metric:
@@ -313,9 +315,9 @@ async def _route_event(
                         command_data=nlp_command_data, correlation_id=correlation_id
                     )
             else:
-                await batch_command_handler.process_initiate_nlp_command(
-                    command_data=nlp_command_data, correlation_id=correlation_id
-                )
+                    await batch_command_handler.process_initiate_nlp_command(
+                        command_data=nlp_command_data, correlation_id=correlation_id
+                    )
             return True
 
         # Handle specialized service result events
