@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
 from .improved_bayesian_model import ImprovedBayesianModel, ModelConfig
 
 
@@ -233,7 +234,11 @@ class ModelValidator:
         Returns:
             Dictionary mapping parameter names to (lower, upper) CI bounds
         """
-        bootstrap_estimates: Dict[str, List[float]] = {"mean_ability": [], "mean_severity": [], "threshold_range": []}
+        bootstrap_estimates: Dict[str, List[float]] = {
+            "mean_ability": [],
+            "mean_severity": [],
+            "threshold_range": [],
+        }
 
         for _ in range(n_bootstrap):
             # Bootstrap sample
@@ -262,21 +267,31 @@ class ModelValidator:
                 # Handle thresholds - might be fixed or estimated
                 if "thresholds" in bootstrap_model.trace.posterior:
                     thresholds = (
-                        bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+                        bootstrap_model.trace.posterior["thresholds"]
+                        .mean(dim=["chain", "draw"])
+                        .values
                     )
                 elif "thresholds_raw" in bootstrap_model.trace.posterior:
                     # Complex model with sorted thresholds
                     thresholds = (
-                        bootstrap_model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+                        bootstrap_model.trace.posterior["thresholds"]
+                        .mean(dim=["chain", "draw"])
+                        .values
                     )
                 else:
                     # Simple model with fixed thresholds - get from observed data
-                    thresholds = bootstrap_model.model.thresholds.eval() if hasattr(bootstrap_model.model, 'thresholds') else np.array([])
+                    thresholds = (
+                        bootstrap_model.model.thresholds.eval()
+                        if hasattr(bootstrap_model.model, "thresholds")
+                        else np.array([])
+                    )
 
                 bootstrap_estimates["mean_ability"].append(float(np.mean(abilities)))
                 bootstrap_estimates["mean_severity"].append(float(np.mean(severities)))
                 if len(thresholds) > 0:
-                    bootstrap_estimates["threshold_range"].append(float(np.max(thresholds) - np.min(thresholds)))
+                    bootstrap_estimates["threshold_range"].append(
+                        float(np.max(thresholds) - np.min(thresholds))
+                    )
                 else:
                     bootstrap_estimates["threshold_range"].append(0.0)
             except Exception:

@@ -253,9 +253,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
 
                 envelope = EventEnvelope[BatchNlpProcessingRequestedV2](
                     event_id=uuid.uuid4(),
-                    event_type=topic_name(
-                        ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2
-                    ),
+                    event_type=topic_name(ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2),
                     event_timestamp=datetime.now(timezone.utc),
                     source_service="test_diagnostic",
                     correlation_id=uuid.UUID(test_correlation_id),

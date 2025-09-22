@@ -125,9 +125,7 @@ _TOPIC_MAPPING = {
         "huleedu.batch.ai_feedback.initiate.command.v1"
     ),
     ProcessingEvent.BATCH_NLP_INITIATE_COMMAND: ("huleedu.batch.nlp.initiate.command.v1"),
-    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2: (
-        "huleedu.batch.nlp.initiate.command.v2"
-    ),
+    ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2: ("huleedu.batch.nlp.initiate.command.v2"),
     ProcessingEvent.BATCH_CONTENT_PROVISIONING_COMPLETED: (
         "huleedu.batch.content.provisioning.completed.v1"
     ),

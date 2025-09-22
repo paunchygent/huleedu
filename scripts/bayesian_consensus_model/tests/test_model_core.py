@@ -7,8 +7,6 @@ threshold calculation, and grade probability calculations.
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -106,14 +104,18 @@ class TestDataPreparation:
     @pytest.fixture
     def sample_ratings_df(self) -> pd.DataFrame:
         """Fixture providing sample rating data."""
-        return pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
-            {"essay_id": "E1", "rater_id": "R2", "grade": "B"},
-            {"essay_id": "E2", "rater_id": "R1", "grade": "C"},
-            {"essay_id": "E2", "rater_id": "R3", "grade": "B"},
-        ])
+        return pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
+                {"essay_id": "E1", "rater_id": "R2", "grade": "B"},
+                {"essay_id": "E2", "rater_id": "R1", "grade": "C"},
+                {"essay_id": "E2", "rater_id": "R3", "grade": "B"},
+            ]
+        )
 
-    def test_prepare_data_basic_functionality(self, model: ImprovedBayesianModel, sample_ratings_df: pd.DataFrame) -> None:
+    def test_prepare_data_basic_functionality(
+        self, model: ImprovedBayesianModel, sample_ratings_df: pd.DataFrame
+    ) -> None:
         """Test basic data preparation functionality."""
         result_df = model.prepare_data(sample_ratings_df)
 
@@ -133,7 +135,9 @@ class TestDataPreparation:
         assert result_df["rater_idx"].dtype in [np.int64, int]
         assert result_df["grade_numeric"].dtype in [np.int64, int]
 
-    def test_prepare_data_creates_mappings(self, model: ImprovedBayesianModel, sample_ratings_df: pd.DataFrame) -> None:
+    def test_prepare_data_creates_mappings(
+        self, model: ImprovedBayesianModel, sample_ratings_df: pd.DataFrame
+    ) -> None:
         """Test that prepare_data creates proper mappings."""
         model.prepare_data(sample_ratings_df)
 
@@ -166,7 +170,9 @@ class TestDataPreparation:
             ("F", "F"),
         ],
     )
-    def test_grade_to_base_conversion(self, model: ImprovedBayesianModel, grade: str, expected_base: str) -> None:
+    def test_grade_to_base_conversion(
+        self, model: ImprovedBayesianModel, grade: str, expected_base: str
+    ) -> None:
         """Test grade modifier removal."""
         df = pd.DataFrame([{"essay_id": "E1", "rater_id": "R1", "grade": grade}])
         result_df = model.prepare_data(df)
@@ -178,12 +184,16 @@ class TestDataPreparation:
         "invalid_grade",
         ["X", "Z", "G", "", "1", "0", "H"],
     )
-    def test_invalid_grades_filtered_out(self, model: ImprovedBayesianModel, invalid_grade: str) -> None:
+    def test_invalid_grades_filtered_out(
+        self, model: ImprovedBayesianModel, invalid_grade: str
+    ) -> None:
         """Test that invalid grades are filtered out."""
-        df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},  # Valid
-            {"essay_id": "E1", "rater_id": "R2", "grade": invalid_grade},  # Invalid
-        ])
+        df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},  # Valid
+                {"essay_id": "E1", "rater_id": "R2", "grade": invalid_grade},  # Invalid
+            ]
+        )
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 1
@@ -193,23 +203,29 @@ class TestDataPreparation:
         "valid_with_modifiers",
         ["AA", "a", "B+", "C-", "f"],
     )
-    def test_valid_grades_with_modifiers_accepted(self, model: ImprovedBayesianModel, valid_with_modifiers: str) -> None:
+    def test_valid_grades_with_modifiers_accepted(
+        self, model: ImprovedBayesianModel, valid_with_modifiers: str
+    ) -> None:
         """Test that grades starting with valid letters are accepted."""
-        df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},  # Valid
-            {"essay_id": "E1", "rater_id": "R2", "grade": valid_with_modifiers},  # Also valid
-        ])
+        df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},  # Valid
+                {"essay_id": "E1", "rater_id": "R2", "grade": valid_with_modifiers},  # Also valid
+            ]
+        )
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 2
 
     def test_na_grades_filtered_out(self, model: ImprovedBayesianModel) -> None:
         """Test that NA/null grades are filtered out."""
-        df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
-            {"essay_id": "E1", "rater_id": "R2", "grade": None},
-            {"essay_id": "E1", "rater_id": "R3", "grade": np.nan},
-        ])
+        df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
+                {"essay_id": "E1", "rater_id": "R2", "grade": None},
+                {"essay_id": "E1", "rater_id": "R3", "grade": np.nan},
+            ]
+        )
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 1
@@ -217,10 +233,12 @@ class TestDataPreparation:
 
     def test_case_insensitive_grade_handling(self, model: ImprovedBayesianModel) -> None:
         """Test that lowercase grades are handled correctly."""
-        df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "a"},
-            {"essay_id": "E1", "rater_id": "R2", "grade": "b+"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "a"},
+                {"essay_id": "E1", "rater_id": "R2", "grade": "b+"},
+            ]
+        )
         result_df = model.prepare_data(df)
 
         assert len(result_df) == 2
@@ -229,10 +247,12 @@ class TestDataPreparation:
 
     def test_numeric_indices_mapping(self, model: ImprovedBayesianModel) -> None:
         """Test that numeric indices are correctly mapped."""
-        df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
-            {"essay_id": "E2", "rater_id": "R2", "grade": "B"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
+                {"essay_id": "E2", "rater_id": "R2", "grade": "B"},
+            ]
+        )
         result_df = model.prepare_data(df)
 
         # Check essay indices
@@ -269,7 +289,9 @@ class TestEmpiricalThresholds:
             ([5, 5, 5, 5], 5),  # Only highest grade
         ],
     )
-    def test_empirical_thresholds_length(self, model: ImprovedBayesianModel, grades: list[int], expected_length: int) -> None:
+    def test_empirical_thresholds_length(
+        self, model: ImprovedBayesianModel, grades: list[int], expected_length: int
+    ) -> None:
         """Test that empirical thresholds always have correct length."""
         thresholds = model._get_empirical_thresholds(np.array(grades))
         assert len(thresholds) == expected_length
@@ -280,7 +302,7 @@ class TestEmpiricalThresholds:
         thresholds = model._get_empirical_thresholds(grades)
 
         for i in range(1, len(thresholds)):
-            assert thresholds[i] > thresholds[i-1], f"Threshold {i} not greater than {i-1}"
+            assert thresholds[i] > thresholds[i - 1], f"Threshold {i} not greater than {i - 1}"
 
     def test_empirical_thresholds_minimum_spacing(self, model: ImprovedBayesianModel) -> None:
         """Test that empirical thresholds have minimum spacing."""
@@ -289,8 +311,10 @@ class TestEmpiricalThresholds:
 
         # Check minimum spacing between consecutive thresholds
         for i in range(1, len(thresholds)):
-            spacing = thresholds[i] - thresholds[i-1]
-            assert spacing >= 0.3, f"Spacing between thresholds {i-1} and {i} too small: {spacing}"
+            spacing = thresholds[i] - thresholds[i - 1]
+            assert spacing >= 0.3, (
+                f"Spacing between thresholds {i - 1} and {i} too small: {spacing}"
+            )
 
     def test_empirical_thresholds_with_single_grade(self, model: ImprovedBayesianModel) -> None:
         """Test empirical thresholds when only one grade is present."""
@@ -343,8 +367,8 @@ class TestGradeProbabilityCalculation:
         "ability, expected_highest_grade_idx",
         [
             (-10.0, 0),  # Very low ability -> F (index 0)
-            (10.0, 5),   # Very high ability -> A (index 5)
-            (0.0, 2),    # Medium ability -> around D (index 2)
+            (10.0, 5),  # Very high ability -> A (index 5)
+            (0.0, 2),  # Medium ability -> around D (index 2)
         ],
     )
     def test_calculate_grade_probabilities_peak_assignment(
@@ -358,7 +382,9 @@ class TestGradeProbabilityCalculation:
 
         assert highest_prob_idx == expected_highest_grade_idx
 
-    def test_calculate_grade_probabilities_different_thresholds(self, model: ImprovedBayesianModel) -> None:
+    def test_calculate_grade_probabilities_different_thresholds(
+        self, model: ImprovedBayesianModel
+    ) -> None:
         """Test grade probabilities with different threshold configurations."""
         ability = 0.0
 
@@ -378,9 +404,11 @@ class TestGradeProbabilityCalculation:
 
         # Actually, let's just test that both produce valid probability distributions
         assert tight_entropy > 0  # Should have some uncertainty
-        assert wide_entropy > 0   # Should have some uncertainty
+        assert wide_entropy > 0  # Should have some uncertainty
 
-    def test_calculate_grade_probabilities_with_ordered_thresholds(self, model: ImprovedBayesianModel) -> None:
+    def test_calculate_grade_probabilities_with_ordered_thresholds(
+        self, model: ImprovedBayesianModel
+    ) -> None:
         """Test that properly ordered thresholds work correctly."""
         ability = 0.0
         # Properly ordered thresholds
@@ -450,12 +478,18 @@ class TestModelValidation:
         """Fixture providing a fresh model instance."""
         return ImprovedBayesianModel()
 
-    def test_get_consensus_grades_before_fit_raises_error(self, model: ImprovedBayesianModel) -> None:
+    def test_get_consensus_grades_before_fit_raises_error(
+        self, model: ImprovedBayesianModel
+    ) -> None:
         """Test that getting consensus grades before fitting raises ValueError."""
-        with pytest.raises(ValueError, match="Model must be fitted before getting consensus grades"):
+        with pytest.raises(
+            ValueError, match="Model must be fitted before getting consensus grades"
+        ):
             model.get_consensus_grades()
 
-    def test_get_model_diagnostics_before_fit_raises_error(self, model: ImprovedBayesianModel) -> None:
+    def test_get_model_diagnostics_before_fit_raises_error(
+        self, model: ImprovedBayesianModel
+    ) -> None:
         """Test that getting diagnostics before fitting raises ValueError."""
         with pytest.raises(ValueError, match="Model must be fitted before getting diagnostics"):
             model.get_model_diagnostics()
@@ -483,9 +517,11 @@ class TestModelValidation:
 
     def test_prepare_data_preserves_original_dataframe(self, model: ImprovedBayesianModel) -> None:
         """Test that prepare_data doesn't modify the original DataFrame."""
-        original_df = pd.DataFrame([
-            {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
-        ])
+        original_df = pd.DataFrame(
+            [
+                {"essay_id": "E1", "rater_id": "R1", "grade": "A"},
+            ]
+        )
         original_columns = original_df.columns.tolist()
 
         result_df = model.prepare_data(original_df)

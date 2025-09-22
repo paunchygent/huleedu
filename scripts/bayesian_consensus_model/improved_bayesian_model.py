@@ -48,8 +48,8 @@ class ModelConfig:
     swedish_grade_distribution: Dict[str, float] = None  # Will be set in __post_init__
 
     # Adaptive complexity thresholds
-    sparse_data_threshold: int = 10  # Use simpler model only for VERY sparse data
-    medium_data_threshold: int = 50  # Below this, still boost sampling
+    sparse_data_threshold: int = 50  # Use simpler model for sparse data (< 50 observations)
+    medium_data_threshold: int = 100  # Below this, still boost sampling
     sparse_tune_multiplier: float = 1.5  # Increase tuning for sparse data
     sparse_draws_multiplier: float = 1.5  # Increase draws for sparse data
     medium_tune_multiplier: float = 1.25  # Moderate increase for medium data
@@ -211,9 +211,11 @@ class ImprovedBayesianModel:
         n_raters = len(self.rater_map)
 
         # Check for degeneracy - insufficient data for Bayesian modeling
-        if (n_essays < self.config.min_essays_for_bayesian or
-            n_raters < self.config.min_raters_for_bayesian or
-            n_observations < self.config.min_observations_for_bayesian):
+        if (
+            n_essays < self.config.min_essays_for_bayesian
+            or n_raters < self.config.min_raters_for_bayesian
+            or n_observations < self.config.min_observations_for_bayesian
+        ):
             # Use simple model for degenerate cases
             return self._build_simple_model(data_df)
         elif n_observations < self.config.sparse_data_threshold:
@@ -227,7 +229,7 @@ class ImprovedBayesianModel:
         """Build a simplified model for sparse data scenarios.
 
         Uses fixed thresholds based on Swedish distribution and
-        simpler rater modeling for better convergence.
+        per-rater severity with strong priors for stability.
 
         Args:
             data_df: Prepared data frame with numeric indices
@@ -248,28 +250,38 @@ class ImprovedBayesianModel:
             essay_ability = pm.Normal(
                 "essay_ability",
                 mu=0,
-                sigma=0.5,  # Tighter prior for sparse data
-                shape=n_essays
+                sigma=0.7,  # Slightly wider to allow differentiation
+                shape=n_essays,
             )
 
-            # Simple global severity adjustment (no per-rater effects for sparse data)
-            # This reduces parameter count significantly
-            global_severity = pm.Normal(
-                "global_severity",
-                mu=0,
-                sigma=0.2  # Very tight prior
-            )
+            # Per-rater severity with very strong priors for stability
+            # Reference rater approach for identifiability
+            if n_raters > 1:
+                # Fix first rater at 0, estimate others with tight priors
+                rater_severity_raw = pm.Normal(
+                    "rater_severity_raw",
+                    mu=0,
+                    sigma=0.15,  # Very tight prior for sparse data
+                    shape=n_raters - 1,
+                )
+                # Insert 0 for reference rater
+                zeros = pt.zeros(1)
+                rater_severity = pm.Deterministic(
+                    "rater_severity",
+                    pt.concatenate([zeros, rater_severity_raw]),
+                )
+            else:
+                # Single rater case
+                rater_severity = pm.Deterministic(
+                    "rater_severity", pt.zeros(n_raters)
+                )
 
-            # Expand global severity to match rater indices
-            rater_severity = pm.Deterministic(
-                "rater_severity",
-                pt.zeros(n_raters) + global_severity
-            )
-
-            # Always use Swedish population-based thresholds for simple model
-            # This avoids circular reasoning and ensures consistency
-            swedish_thresholds = self._get_swedish_informed_thresholds()
-            thresholds = pm.Data("thresholds", swedish_thresholds)
+            # Use FIXED evenly spaced thresholds for simple model
+            # These are NOT estimated, just fixed values
+            # Swedish thresholds are too skewed for sparse data
+            evenly_spaced_thresholds = np.linspace(-2.5, 2.5, len(self.SWEDISH_GRADES) - 1)
+            # Use ConstantData to ensure these are NOT sampled
+            thresholds = pm.ConstantData("thresholds", evenly_spaced_thresholds)
 
             # Linear predictor
             eta = essay_ability[essay_idx] - rater_severity[rater_idx]
@@ -415,7 +427,7 @@ class ImprovedBayesianModel:
             n_tune = max(1000, int(self.config.n_tune * self.config.sparse_tune_multiplier))
             target_accept = min(0.98, self.config.target_accept + 0.03)  # Higher for sparse data
         elif n_observations < self.config.medium_data_threshold:
-            # Moderate increase for medium data (complex model needs more sampling)
+            # Moderate increase for medium data
             n_draws = max(750, int(self.config.n_draws * self.config.medium_draws_multiplier))
             n_tune = max(750, int(self.config.n_tune * self.config.medium_tune_multiplier))
             target_accept = min(0.97, self.config.target_accept + 0.02)  # Slightly higher
@@ -429,7 +441,9 @@ class ImprovedBayesianModel:
             self.trace = pm.sample(
                 draws=n_draws,
                 tune=n_tune,
-                chains=min(self.config.n_chains, 2) if n_observations < 10 else self.config.n_chains,
+                chains=min(self.config.n_chains, 2)
+                if n_observations < 10
+                else self.config.n_chains,
                 target_accept=target_accept,
                 max_treedepth=self.config.max_treedepth,
                 return_inferencedata=True,
@@ -448,7 +462,7 @@ class ImprovedBayesianModel:
             raise ValueError("Model must be fitted before getting consensus grades")
 
         # Handle majority voting fallback for single essay
-        if hasattr(self, '_use_majority_voting') and self._use_majority_voting:
+        if hasattr(self, "_use_majority_voting") and self._use_majority_voting:
             return self._get_majority_consensus()
 
         results = {}
@@ -475,7 +489,9 @@ class ImprovedBayesianModel:
             ability = essay_abilities[essay_idx]
 
             # Use posterior sampling for better confidence estimates
-            grade_probs, confidence = self._calculate_grade_probabilities_from_posterior(essay_idx, thresholds)
+            grade_probs, confidence = self._calculate_grade_probabilities_from_posterior(
+                essay_idx, thresholds
+            )
 
             # Get consensus grade (highest probability)
             consensus_idx = np.argmax(grade_probs)
@@ -585,9 +601,7 @@ class ImprovedBayesianModel:
 
         # Group ratings by essay
         for essay_id in self.essay_map.keys():
-            essay_data = self._ratings_data[
-                self._ratings_data["essay_id"] == essay_id
-            ]
+            essay_data = self._ratings_data[self._ratings_data["essay_id"] == essay_id]
 
             # Count grades
             grade_counts = essay_data["grade_numeric"].value_counts()

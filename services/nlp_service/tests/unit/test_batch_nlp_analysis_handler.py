@@ -125,10 +125,7 @@ async def test_batch_nlp_analysis_handler_passes_prompt_text_to_pipeline_and_pub
     # Assert
     assert result is True
     feature_pipeline.extract_features.assert_awaited_once()
-    assert (
-        feature_pipeline.extract_features.await_args.kwargs["prompt_text"]
-        == instructions
-    )
+    assert feature_pipeline.extract_features.await_args.kwargs["prompt_text"] == instructions
     event_publisher.publish_essay_nlp_completed.assert_awaited_once()
     assert (
         event_publisher.publish_essay_nlp_completed.await_args.kwargs["essay_instructions"]

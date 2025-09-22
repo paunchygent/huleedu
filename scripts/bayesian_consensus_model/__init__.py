@@ -4,12 +4,6 @@ This module provides an improved Bayesian ordinal regression model for
 determining consensus grades from multiple raters.
 """
 
-from .improved_bayesian_model import (
-    ConsensusResult,
-    ImprovedBayesianModel,
-    ModelConfig,
-)
-from .model_validation import ModelValidator, ValidationResult, validate_model
 from .comparison_framework import (
     BaselineMethod,
     ComparisonFramework,
@@ -19,6 +13,12 @@ from .comparison_framework import (
     WeightedMedian,
 )
 from .cross_validation import CrossValidator, CVResult
+from .improved_bayesian_model import (
+    ConsensusResult,
+    ImprovedBayesianModel,
+    ModelConfig,
+)
+from .model_validation import ModelValidator, ValidationResult, validate_model
 
 __all__ = [
     "ImprovedBayesianModel",

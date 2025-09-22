@@ -293,9 +293,7 @@ class CrossValidator:
             Confusion matrix as DataFrame
         """
         # Initialize matrix
-        matrix = pd.DataFrame(
-            0, index=self.SWEDISH_GRADES, columns=self.SWEDISH_GRADES, dtype=int
-        )
+        matrix = pd.DataFrame(0, index=self.SWEDISH_GRADES, columns=self.SWEDISH_GRADES, dtype=int)
 
         # Fill matrix
         for pred, actual in zip(predictions, actuals):

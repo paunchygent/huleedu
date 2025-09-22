@@ -45,11 +45,13 @@ def create_test_data(
     for essay_idx in range(n_essays):
         for rater_idx in range(n_raters):
             grade = np.random.choice(grades, p=weights)
-            ratings.append({
-                "essay_id": f"E{essay_idx:03d}",
-                "rater_id": f"R{rater_idx:03d}",
-                "grade": grade,
-            })
+            ratings.append(
+                {
+                    "essay_id": f"E{essay_idx:03d}",
+                    "rater_id": f"R{rater_idx:03d}",
+                    "grade": grade,
+                }
+            )
 
     return pd.DataFrame(ratings)
 
@@ -69,19 +71,16 @@ def create_majority_consensus_data() -> pd.DataFrame:
         {"essay_id": "JA24", "rater_id": "R005", "grade": "A"},
         {"essay_id": "JA24", "rater_id": "R006", "grade": "B"},
         {"essay_id": "JA24", "rater_id": "R007", "grade": "B"},
-
         # Strong B consensus (4/5 raters)
         {"essay_id": "EB01", "rater_id": "R001", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R002", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R003", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R004", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R005", "grade": "C"},
-
         # Perfect C consensus (3/3 raters)
         {"essay_id": "EC01", "rater_id": "R001", "grade": "C"},
         {"essay_id": "EC01", "rater_id": "R002", "grade": "C"},
         {"essay_id": "EC01", "rater_id": "R003", "grade": "C"},
-
         # Split consensus (no clear majority)
         {"essay_id": "ESPLIT", "rater_id": "R001", "grade": "B"},
         {"essay_id": "ESPLIT", "rater_id": "R002", "grade": "C"},
@@ -98,7 +97,7 @@ class TestModelConvergence:
     @pytest.mark.parametrize(
         "n_chains, n_draws, max_expected_rhat",
         [
-            (2, 500, 3.0),   # Test that model completes, very lenient for 2 chains
+            (2, 500, 3.0),  # Test that model completes, very lenient for 2 chains
             (4, 1000, 3.0),  # More chains should be more stable
             (3, 2000, 3.0),  # More draws should improve convergence
         ],
@@ -167,17 +166,21 @@ class TestModelConvergence:
 
         # Verify basic convergence metrics exist
         diagnostics = model.get_model_diagnostics()
-        assert diagnostics["convergence"]["max_rhat"] < 1.2  # Reasonable convergence for variable data
+        assert (
+            diagnostics["convergence"]["max_rhat"] < 1.2
+        )  # Reasonable convergence for variable data
 
     def test_model_convergence_with_minimal_data(self) -> None:
         """Test convergence behavior with minimal rating data."""
         # Arrange - Very sparse data
-        data = pd.DataFrame([
-            {"essay_id": "E001", "rater_id": "R001", "grade": "B"},
-            {"essay_id": "E001", "rater_id": "R002", "grade": "C"},
-            {"essay_id": "E002", "rater_id": "R001", "grade": "A"},
-            {"essay_id": "E002", "rater_id": "R002", "grade": "A"},
-        ])
+        data = pd.DataFrame(
+            [
+                {"essay_id": "E001", "rater_id": "R001", "grade": "B"},
+                {"essay_id": "E001", "rater_id": "R002", "grade": "C"},
+                {"essay_id": "E002", "rater_id": "R001", "grade": "A"},
+                {"essay_id": "E002", "rater_id": "R002", "grade": "A"},
+            ]
+        )
         config = ModelConfig(n_draws=500, n_tune=500, target_accept=0.95)
         model = ImprovedBayesianModel(config)
 
@@ -215,8 +218,8 @@ class TestMajorityConsistency:
     @pytest.mark.parametrize(
         "essay_id, expected_grade, min_confidence",
         [
-            ("EB01", "B", 0.6),    # Strong B consensus
-            ("EC01", "C", 0.7),    # Perfect C consensus
+            ("EB01", "B", 0.6),  # Strong B consensus
+            ("EC01", "C", 0.7),  # Perfect C consensus
         ],
     )
     def test_strong_majority_cases(
@@ -251,8 +254,10 @@ class TestMajorityConsistency:
         # Act
         model.fit(data)
         validator = ModelValidator(model)
-        consistency_rate, failed_cases = validator.validate_majority_consistency(data, threshold=0.7)
+        consistency_rate, failed_cases = validator.validate_majority_consistency(
+            data, threshold=0.7
+        )
 
         # Assert
         assert consistency_rate >= 0.6  # More realistic threshold for consistency
-        assert len(failed_cases) <= 2   # Allow some variation in consensus
+        assert len(failed_cases) <= 2  # Allow some variation in consensus

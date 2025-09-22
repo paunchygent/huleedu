@@ -83,6 +83,5 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     assert essays[0].spellcheck_metrics is not None
     assert essays[0].spellcheck_metrics.total_corrections == metrics.total_corrections
     assert (
-        dispatched_args["essay_instructions"]
-        == "Analyze the impact of renewable energy adoption."
+        dispatched_args["essay_instructions"] == "Analyze the impact of renewable energy adoption."
     )

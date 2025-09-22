@@ -45,11 +45,13 @@ def create_test_data(
     for essay_idx in range(n_essays):
         for rater_idx in range(n_raters):
             grade = np.random.choice(grades, p=weights)
-            ratings.append({
-                "essay_id": f"E{essay_idx:03d}",
-                "rater_id": f"R{rater_idx:03d}",
-                "grade": grade,
-            })
+            ratings.append(
+                {
+                    "essay_id": f"E{essay_idx:03d}",
+                    "rater_id": f"R{rater_idx:03d}",
+                    "grade": grade,
+                }
+            )
 
     return pd.DataFrame(ratings)
 
@@ -69,19 +71,16 @@ def create_majority_consensus_data() -> pd.DataFrame:
         {"essay_id": "JA24", "rater_id": "R005", "grade": "A"},
         {"essay_id": "JA24", "rater_id": "R006", "grade": "B"},
         {"essay_id": "JA24", "rater_id": "R007", "grade": "B"},
-
         # Strong B consensus (4/5 raters)
         {"essay_id": "EB01", "rater_id": "R001", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R002", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R003", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R004", "grade": "B"},
         {"essay_id": "EB01", "rater_id": "R005", "grade": "C"},
-
         # Perfect C consensus (3/3 raters)
         {"essay_id": "EC01", "rater_id": "R001", "grade": "C"},
         {"essay_id": "EC01", "rater_id": "R002", "grade": "C"},
         {"essay_id": "EC01", "rater_id": "R003", "grade": "C"},
-
         # Split consensus (no clear majority)
         {"essay_id": "ESPLIT", "rater_id": "R001", "grade": "B"},
         {"essay_id": "ESPLIT", "rater_id": "R002", "grade": "C"},
@@ -98,7 +97,7 @@ class TestParameterStability:
     @pytest.mark.parametrize(
         "use_reference_rater, expected_stability_threshold",
         [
-            (True, 0.3),   # More realistic threshold for reference rater
+            (True, 0.3),  # More realistic threshold for reference rater
             (False, 0.2),  # More realistic threshold for free estimation
         ],
     )
@@ -136,8 +135,12 @@ class TestParameterStability:
         severities_array = np.array(severities_list)
 
         # Coefficient of variation across runs
-        ability_cv = np.std(abilities_array, axis=0).mean() / (np.abs(np.mean(abilities_array, axis=0)).mean() + 1e-6)
-        severity_cv = np.std(severities_array, axis=0).mean() / (np.abs(np.mean(severities_array, axis=0)).mean() + 1e-6)
+        ability_cv = np.std(abilities_array, axis=0).mean() / (
+            np.abs(np.mean(abilities_array, axis=0)).mean() + 1e-6
+        )
+        severity_cv = np.std(severities_array, axis=0).mean() / (
+            np.abs(np.mean(severities_array, axis=0)).mean() + 1e-6
+        )
 
         overall_stability = 1.0 - (ability_cv + severity_cv) / 2
 
@@ -148,7 +151,7 @@ class TestParameterStability:
     @pytest.mark.parametrize(
         "use_empirical_thresholds, expected_threshold_consistency",
         [
-            (True, 0.3),   # More realistic threshold for empirical init
+            (True, 0.3),  # More realistic threshold for empirical init
             (False, 0.2),  # More realistic threshold for standard init
         ],
     )
@@ -330,8 +333,8 @@ class TestModelValidationIntegration:
     @pytest.mark.parametrize(
         "data_quality, expected_overall_pass",
         [
-            ("high", True),   # Clear majorities should pass
-            ("medium", None), # May or may not pass
+            ("high", True),  # Clear majorities should pass
+            ("medium", None),  # May or may not pass
         ],
     )
     def test_validation_with_different_data_quality(

@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 def analyze_empirical_thresholds():
     """Analyze how empirical thresholds work for JA24 case."""
 
@@ -20,7 +21,7 @@ def analyze_empirical_thresholds():
     min_grade = int(np.min(grades))  # 4 (B)
     max_grade = int(np.max(grades))  # 5 (A)
 
-    print(f"\nThreshold calculation logic:")
+    print("\nThreshold calculation logic:")
     print(f"min_grade = {min_grade}, max_grade = {max_grade}")
 
     thresholds = []
@@ -54,15 +55,15 @@ def analyze_empirical_thresholds():
     # Show what grades each range maps to
     print("\nGrade ranges with thresholds:")
     extended = np.concatenate([[-np.inf], thresholds, [np.inf]])
-    grades_list = ['F', 'E', 'D', 'C', 'B', 'A']
+    grades_list = ["F", "E", "D", "C", "B", "A"]
     for i, grade in enumerate(grades_list):
-        print(f"  {grade}: ({extended[i]:6.2f}, {extended[i+1]:6.2f}]")
+        print(f"  {grade}: ({extended[i]:6.2f}, {extended[i + 1]:6.2f}]")
 
     # Test with an ability value of 0 (neutral)
     print("\nWith ability = 0 (neutral):")
     ability = 0
     for i, grade in enumerate(grades_list):
-        in_range = extended[i] < ability <= extended[i+1]
+        in_range = extended[i] < ability <= extended[i + 1]
         marker = " <-- Selected" if in_range else ""
         print(f"  {grade}: {in_range}{marker}")
 
@@ -70,6 +71,7 @@ def analyze_empirical_thresholds():
     print("\nPROBLEM IDENTIFIED:")
     print("The empirical thresholds push B and A thresholds to the positive side,")
     print("making lower grades (C, D, E) more likely for neutral abilities!")
+
 
 if __name__ == "__main__":
     analyze_empirical_thresholds()

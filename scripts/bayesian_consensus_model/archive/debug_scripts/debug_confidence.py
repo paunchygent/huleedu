@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from improved_bayesian_model import ImprovedBayesianModel, ModelConfig
 
 
@@ -31,12 +30,14 @@ def simulate_confidence_with_temperature(ability, thresholds, temperatures):
         max_conf = np.max(probs)
         max_grade = np.argmax(probs)
 
-        results.append({
-            'temperature': temp,
-            'max_confidence': max_conf,
-            'grade': max_grade,
-            'probabilities': probs
-        })
+        results.append(
+            {
+                "temperature": temp,
+                "max_confidence": max_conf,
+                "grade": max_grade,
+                "probabilities": probs,
+            }
+        )
 
     return results
 
@@ -49,13 +50,15 @@ def test_consensus_scenarios():
     print("=" * 80)
 
     # Create test data for strong consensus case (e.g., 4/5 raters agree)
-    strong_consensus_data = pd.DataFrame([
-        {"essay_id": "TEST1", "rater_id": "R1", "grade": "B"},
-        {"essay_id": "TEST1", "rater_id": "R2", "grade": "B"},
-        {"essay_id": "TEST1", "rater_id": "R3", "grade": "B"},
-        {"essay_id": "TEST1", "rater_id": "R4", "grade": "B"},
-        {"essay_id": "TEST1", "rater_id": "R5", "grade": "C"},
-    ])
+    strong_consensus_data = pd.DataFrame(
+        [
+            {"essay_id": "TEST1", "rater_id": "R1", "grade": "B"},
+            {"essay_id": "TEST1", "rater_id": "R2", "grade": "B"},
+            {"essay_id": "TEST1", "rater_id": "R3", "grade": "B"},
+            {"essay_id": "TEST1", "rater_id": "R4", "grade": "B"},
+            {"essay_id": "TEST1", "rater_id": "R5", "grade": "C"},
+        ]
+    )
 
     # Test with different temperature values
     temperatures = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5]
@@ -81,9 +84,11 @@ def test_consensus_scenarios():
         result = results[0]
 
         grades = ["F", "E", "D", "C", "B", "A"]
-        grade = grades[result['grade']]
+        grade = grades[result["grade"]]
 
-        print(f"Temperature: {temp:4.1f} -> Grade: {grade}, Confidence: {result['max_confidence']:.3f}")
+        print(
+            f"Temperature: {temp:4.1f} -> Grade: {grade}, Confidence: {result['max_confidence']:.3f}"
+        )
 
     print("\n2. ANALYZING THE MATHEMATICAL APPROACH")
     print("-" * 50)
@@ -119,7 +124,7 @@ def test_consensus_scenarios():
 
     print(f"Consensus Grade: {test_result.consensus_grade}")
     print(f"Confidence: {test_result.confidence:.3f}")
-    print(f"Grade Probabilities:")
+    print("Grade Probabilities:")
     for grade, prob in test_result.grade_probabilities.items():
         print(f"  {grade}: {prob:.3f}")
 
@@ -132,11 +137,17 @@ def test_consensus_scenarios():
 
     print(f"Ability mean: {np.mean(ability_samples):.3f}")
     print(f"Ability std: {np.std(ability_samples):.3f}")
-    print(f"95% CI: [{np.percentile(ability_samples, 2.5):.3f}, {np.percentile(ability_samples, 97.5):.3f}]")
+    print(
+        f"95% CI: [{np.percentile(ability_samples, 2.5):.3f}, {np.percentile(ability_samples, 97.5):.3f}]"
+    )
 
     # Calculate how often each grade would be selected across samples
     grade_counts = np.zeros(6)
-    thresholds = model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values if "thresholds" in model.trace.posterior else model._get_swedish_informed_thresholds()
+    thresholds = (
+        model.trace.posterior["thresholds"].mean(dim=["chain", "draw"]).values
+        if "thresholds" in model.trace.posterior
+        else model._get_swedish_informed_thresholds()
+    )
 
     for ability in ability_samples:
         probs = model._calculate_grade_probabilities(ability, thresholds)
@@ -144,7 +155,7 @@ def test_consensus_scenarios():
 
     grade_frequencies = grade_counts / len(ability_samples)
 
-    print(f"\nGrade selection frequency across posterior samples:")
+    print("\nGrade selection frequency across posterior samples:")
     for i, grade in enumerate(["F", "E", "D", "C", "B", "A"]):
         print(f"  {grade}: {grade_frequencies[i]:.3f}")
 

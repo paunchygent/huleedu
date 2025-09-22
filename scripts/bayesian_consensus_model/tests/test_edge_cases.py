@@ -90,7 +90,9 @@ class TestEdgeCasesAndBoundaryConditions:
         result = results["extreme_test"]
         # The expected grade should be among the top probabilities
         sorted_probs = sorted(result.grade_probabilities.values(), reverse=True)
-        assert result.grade_probabilities[expected_high_prob_grade] >= sorted_probs[1]  # Top 2 grades
+        assert (
+            result.grade_probabilities[expected_high_prob_grade] >= sorted_probs[1]
+        )  # Top 2 grades
         assert result.consensus_grade in model.SWEDISH_GRADES
 
     @pytest.mark.parametrize(
@@ -359,11 +361,15 @@ class TestEdgeCasesAndBoundaryConditions:
         ratings_data = []
         # One prolific rater
         for i in range(10):
-            ratings_data.append({"essay_id": f"essay_{i}", "rater_id": "prolific_rater", "grade": "B"})
+            ratings_data.append(
+                {"essay_id": f"essay_{i}", "rater_id": "prolific_rater", "grade": "B"}
+            )
 
         # Other raters rate only one essay each
         for i in range(3):
-            ratings_data.append({"essay_id": "essay_0", "rater_id": f"rare_rater_{i}", "grade": "A"})
+            ratings_data.append(
+                {"essay_id": "essay_0", "rater_id": f"rare_rater_{i}", "grade": "A"}
+            )
 
         ratings_df = pd.DataFrame(ratings_data)
 
@@ -387,7 +393,11 @@ class TestEdgeCasesAndBoundaryConditions:
         # Arrange - Create challenging data for diagnostics
         ratings_data = [
             {"essay_id": "edge_essay", "rater_id": "rater_åäö", "grade": "A"},
-            {"essay_id": "edge_essay", "rater_id": "rater_normal", "grade": "F"},  # Extreme disagreement
+            {
+                "essay_id": "edge_essay",
+                "rater_id": "rater_normal",
+                "grade": "F",
+            },  # Extreme disagreement
         ]
         ratings_df = pd.DataFrame(ratings_data)
 
