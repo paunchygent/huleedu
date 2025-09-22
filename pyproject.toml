@@ -46,6 +46,16 @@ monorepo-tools = [
     "reportlab",
     "types-reportlab",
     "aiosmtplib>=4.0.1",
+    # Verification and analysis tools
+    "pandas",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "tabulate",
+    "pandas-stubs",  # Type stubs
+    "types-tabulate",  # Type stubs
 ]
 
 # Install all services and common_core for unified development

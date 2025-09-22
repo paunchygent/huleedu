@@ -63,3 +63,4 @@ llm_response_logs/
 .DS_Store
 services/spellchecker_service/data/whitelist/combined_whitelist.txt
 .gitignore
+docs/rapport_till_kollegor/
