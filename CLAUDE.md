@@ -5,25 +5,18 @@
 ### 1. Initial Setup
 
 ```markdown
-- Read `.cursor/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards.
-- Use the user's task description to read and review all rule files related to the task at hand.
+- FIRST ACTION Read `.cursor/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards.
+- SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - Key architectural documents in this order:
-  1. `.claude/rules/080-repository-workflow-and-tooling.mdc`
-  2. `.claude/rules/010-foundational-principles.mdc`
-  3. `.claude/rules/020-architectural-mandates.mdc`
-  4. `.claude/rules/030-event-driven-architecture-eda-standards.mdc`
-  5. `.claude/rules/042-async-patterns-and-di.mdc`
-  6. `.claude/rules/050-python-coding-standards.mdc`
-  7. `.claude/rules/100-terminology-and-definitions.mdc`
-  8. `.claude/rules/048-structured-error-handling-standards.mdc`
-```
 
 ### 2. Task Execution
 
 ```markdown
-1. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
-2. **Rule Reference**: Consult `.claude/rules/000-rule-index.mdc` for relevant rules
-3. **Task Analysis**: Read full task from `TASKS/` directory
+1. **To avoid immediate task failure**: Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
+2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
+3. **Rule Reference**: Consult `.claude/rules/000-rule-index.mdc` for relevant rules
+cross-service task context.
+4. **Update**: Update `.claude/HANDOFF.md` and `.claude/README_FIRST.md` with any new information.
 ```
 
 ### 3. Error Resolution Protocol
@@ -40,7 +33,7 @@
 - Update relevant task documents per `.claude/rules/090-documentation-standards.mdc`
 - Never create files in root - follow folder patterns
 - All code changes require tests (run and verified)
-- Never lint style issues manually before having run format-all and/or lint-fix --unsafe-fixes
+- Never lint style issues manually before having run format-all and lint-fix --unsafe-fixes
 - Always run typecheck-all from root after creating a test or implementing new code
 ```
 
@@ -53,13 +46,19 @@
 ### Architecture (.claude/rules/010-foundational-principles.mdc)
 
 ```markdown
-- **Pattern**: Event-driven microservices with DDD
+- **Pattern**: Event-driven microservices with STRICT DDD, CC principles, and small modular SRP files (<400-500 LoC HARD LIMIT FILE SIZE).
 - **Stack**: 
-  - Core: Python 3.11, Quart, PDM, Dishka, Pydantic
+  - Core: Python 3.11, Quart, monorepo PDM, Dishka, Pydantic classes for all data classes.
   - Data: PostgreSQL, SQLAlchemy, asyncpg
-  - Comms: Kafka, aiohttp
+  - Comms: Kafka, aiohttp, Redis
   - Container: Docker, Docker Compose
+  - Dependency management: PDM with single root lockfile. 
+  - Client Facing Services: FastAPI 
 ```
+
+**CRITICAL CONSTRAINT** Always use `pdm <command>` *from root directory* to run any command. *Never* use `pdm <command>` from subdirectory.
+
+**dependency resolution** full path relative root for all imports. **NEVER** use relative imports when importing dependencies from outside service directory.
 
 ### Service Communication (.claude/rules/020-architectural-mandates.mdc)
 
@@ -67,14 +66,17 @@
 - **Primary**: Asynchronous via Kafka
 - **Secondary**: Synchronous HTTP for queries requiring immediate response
 - **Strict**: No direct DB access between services
+- **Strict**: all boundary objects defined as event contracts and api models in libs/common_core/src/common_core. All events registered as topics in libs/common_core/src/common_core/event_enums.py. 
+- **Strict**: all error and exception handling done using centralized and quart/fastapi specific error handling patterns `libs/huleedu_service_libs/src/huleedu_service_libs/error_handling/`+ error models in `libs/common_core/src/common_core/error_enums.py`
 ```
 
 ### Database & Persistence (.claude/rules/085-database-migration-standards.md)
 
 ```markdown
 - **ORM**: SQLAlchemy async with `asyncpg`
+- **Strict** ban on RAW SQL
 - **Isolation**: Each service has its own PostgreSQL database
-- **Migrations**: see .claude/rules/085-database-migration-standards.md
+- **Migrations**: always consult .claude/rules/085-database-migration-standards.md
 ```
 
 ### HTTP Services (.claude/rules/042-async-patterns-and-di.mdc)
@@ -87,11 +89,10 @@
 
 ### Worker Services (.claude/rules/042-async-patterns-and-di.mdc)
 
-```markdown
-- `worker_main.py`: Service lifecycle and DI
-- `event_processor.py`: Core business logic
-- **Example**: `@services/spell_checker_service/`
-```
+- **Quart Deployment Patterns**:
+  - [services/essay_lifecycle_service]: Standalone worker and API services (complex processing)
+  - Other services: Integrated worker using Quart's `@app.before_serving` in `services/*/app.py` (simpler services)
+- **Example**: `services/spellchecker_service/` (integrated) vs `services/essay_lifecycle_service/` (standalone)
 
 ### Dependency Injection (.claude/rules/042-async-patterns-and-di.mdc)
 
@@ -113,7 +114,7 @@
 
 ## Testing & Quality
 
-### Testing (.claude/rules/070-test-creation-methodology.mdc)
+### Testing (strict adherence to `.claude/rules/075-test-creation-methodology.mdc` + `.claude/rules/075.1-parallel-test-creation-methodology.mdc`)
 
 #### Test Types
 
@@ -121,6 +122,8 @@
 - **Unit**: Isolated function testing
 - **Integration**: Component interaction
 - **Contracts**: Event/API schema validation
+
+Only cross-service integration and functional Dockers tests in `tests/` directory. Service code tests in services.
 ```
 
 #### Test Execution
@@ -152,10 +155,11 @@ pdmr pytest-root <path-or-nodeid> [args]
 #### Common Markers
 
 ```markdown
+- `pytest.mark.asyncio`: Unit tests
 - `@pytest.mark.integration`: External services required
+- `@pytest.mark.financial`: incur real costs via external API calls
 - `@pytest.mark.slow`: Long-running tests
-- `@pytest.mark.docker`: Needs Docker Compose
-- `@pytest.mark.kafka`: Requires Kafka
+- `@pytest.mark.e2e`: End-to-end tests (using docker-compose)
 ```
 
 ### Subagents
@@ -193,11 +197,11 @@ pdm run prod-health                  # Check service health
 
 ```markdown
 # IMPORTANT: Shell doesn't have .env variables by default!
-# Always source .env first:
-source /Users/olofs_mba/Documents/Repos/huledu-reboot/.env
+# Always source .env first (from repo root):
+source .env
 
-# Then access database:
-docker exec huleedu_<service>_db psql -U $HULEEDU_DB_USER -d <db_name> -c "SQL"
+# Then access database (note: quotes around variable are required):
+docker exec huleedu_<service>_db psql -U "$HULEEDU_DB_USER" -d <db_name> -c "SQL"
 
 # Or use hardcoded values:
 docker exec huleedu_class_management_db psql -U huleedu_user -d huleedu_class_management -c "\dt"
@@ -223,23 +227,9 @@ pdm run prod-validate              # Validate production config
 pdm run prod-migrate               # Run production migrations
 ```
 
-### Service Management
-
-```markdown
-- **Migrations**: `pdm run alembic upgrade head` (from service dir)
-- **Rebuild Rule**: Always use `--no-cache` after code changes
-```
-
 ## Database Migrations
 
-### Standards (.claude/rules/085-database-migration-standards.md)
-
-```markdown
-- Always create migrations from service directory
-- Include both upgrade and downgrade paths
-- Test migrations in development before committing
-- Never modify migration versions after pushing
-```
+### follow established pattern in `.claude/rules/085-database-migration-standards.md`
 
 ## Monitoring & Observability
 
@@ -255,12 +245,10 @@ pdm run prod-migrate               # Run production migrations
 
 ### Standards (.claude/rules/090-documentation-standards.md)
 
-```markdown
 - Keep documentation in sync with code changes
 - Use Google-style docstrings for all public interfaces
 - Document all environment variables
 - Include examples in documentation
-```
 
-- ALWAYS USE   1. restart - for restarting specific services
-  2. restart-all - for restarting all services
+- For development services: only rebuild after changes to libs/ 
+- For internal code changes to development services: use pdm run restart [service]

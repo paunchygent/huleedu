@@ -1,29 +1,15 @@
-"""Bayesian consensus model for essay grading.
-
-Exposes the improved Bayesian ordinal regression implementation, validation
-helpers, and the production-ready consensus grading solution.
-"""
+"""Public interface for the Bayesian consensus modelling package."""
 
 from .bayesian_consensus_model import (
+    ConsensusModel,
     ConsensusResult,
-    ImprovedBayesianModel,
-    ModelConfig,
-)
-from .model_validation import ModelValidator, ValidationResult, validate_model
-from .consensus_grading_solution import (
-    ConsensusResult as HybridConsensusResult,
-    PrincipledConsensusGrader,
-    ConsensusGradingConfig,
+    GRADES,
+    KernelConfig,
 )
 
 __all__ = [
-    "ImprovedBayesianModel",
-    "ModelConfig",
+    "ConsensusModel",
     "ConsensusResult",
-    "ModelValidator",
-    "ValidationResult",
-    "validate_model",
-    "PrincipledConsensusGrader",
-    "ConsensusGradingConfig",
-    "HybridConsensusResult",
+    "KernelConfig",
+    "GRADES",
 ]
