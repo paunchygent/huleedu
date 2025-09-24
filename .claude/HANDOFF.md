@@ -10,6 +10,7 @@ Designed Redis caching solution for BCS duplicate calls with proper error handli
 - Tests passing (including `test_e2e_cj_after_nlp_with_pruning.py`)
 - No blocking issues
 - Redis caching plan complete in `TASKS/updated_plan.md`
+- Consensus reporting now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes bias posteriors.
 
 ## Open Work
 

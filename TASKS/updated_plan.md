@@ -7,6 +7,7 @@ This document outlines the implementation of a Redis caching layer to eliminate 
 ## Problem Statement
 
 ### Current Behavior
+
 - BOS makes two identical calls to BCS for each pipeline request:
   1. **Preflight endpoint** (`batch_routes.py:351`) - validates credits before execution
   2. **Kafka handler** (`client_pipeline_request_handler.py:212`) - executes the pipeline
@@ -14,11 +15,13 @@ This document outlines the implementation of a Redis caching layer to eliminate 
 - While the system handles duplicates via idempotency, this creates unnecessary load
 
 ### Root Cause
+
 The preflight and handler operate independently without shared state, leading to redundant BCS resolution calls.
 
 ## Solution Architecture
 
 ### Design Principles
+
 1. **Cache-aside pattern**: Cache failures never block core operations
 2. **Error transparency**: Delegate errors propagate unchanged
 3. **Degraded mode support**: Cache serves hits even when circuit breaker is open
@@ -40,6 +43,7 @@ Request Flow:
 ```
 
 **Critical**: Cache wraps circuit breaker, not vice versa. This allows:
+
 - Cache hits to be served even when circuit breaker is open
 - Reduced pressure on downstream services during degraded states
 - Clear separation of caching concerns from resilience concerns
@@ -70,12 +74,49 @@ BCS_CACHE_ENABLED: bool = Field(
 ```
 
 **Rationale**:
+
 - Default 10 seconds covers the typical preflight→handler gap (< 100ms) with margin
 - Configurable for production tuning without code changes
 - Bounded to prevent misconfiguration (1s - 5m range)
 - Feature flag allows quick disable if issues arise
 
 ### 2. Cache Implementation
+
+#### 2.1 Metrics registration (must be completed before wiring cache)
+
+**File**: `services/batch_orchestrator_service/metrics.py`
+
+- **Add counters** inside `_create_metrics()` so cache behaviour is observable:
+
+  ```python
+  "bos_bcs_cache_hits_total": Counter(
+      "bos_bcs_cache_hits_total",
+      "Total BCS cache hits served by BOS",
+      ["service"],
+      registry=REGISTRY,
+  ),
+  "bos_bcs_cache_misses_total": Counter(
+      "bos_bcs_cache_misses_total",
+      "Total BCS cache misses in BOS",
+      ["service"],
+      registry=REGISTRY,
+  ),
+  "bos_bcs_cache_errors_total": Counter(
+      "bos_bcs_cache_errors_total",
+      "Total Redis errors encountered by the BCS cache",
+      ["service", "operation"],
+      registry=REGISTRY,
+  ),
+  "bos_bcs_cache_corrupted_total": Counter(
+      "bos_bcs_cache_corrupted_total",
+      "Total corrupted cache entries evicted by the BCS cache",
+      ["service"],
+      registry=REGISTRY,
+  ),
+  ```
+
+- **Update `_get_existing_metrics()`** to map the new logical keys so re-imports reuse existing collectors.
+- **Ensure `get_metrics()`** returns the counters (including fallback path when metrics already registered) to avoid KeyErrors when the cache wrapper retrieves them.
 
 **File**: `services/batch_orchestrator_service/implementations/cached_batch_conductor_client.py`
 
@@ -86,16 +127,19 @@ Caching wrapper for Batch Conductor Service client.
 This module implements a cache-aside pattern for BCS pipeline resolutions,
 eliminating duplicate calls between preflight and handler operations.
 """
+from __future__ import annotations
+
 import json
-import logging
 from typing import Any
 
-from common_core.enums.phase_enums import PhaseName
+from common_core.pipeline_models import PhaseName
+from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
 from services.batch_orchestrator_service.config import Settings
+from services.batch_orchestrator_service.metrics import get_metrics
 from services.batch_orchestrator_service.protocols import BatchConductorClientProtocol
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger("bos.client.batch_conductor.cache")
 
 
 class CachedBatchConductorClient(BatchConductorClientProtocol):
@@ -137,6 +181,14 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
         self._cache_enabled = settings.BCS_CACHE_ENABLED
         self._service_name = settings.SERVICE_NAME
 
+        metrics = get_metrics()
+        self._cache_hits = metrics["bos_bcs_cache_hits_total"].labels(service=self._service_name)
+        self._cache_misses = metrics["bos_bcs_cache_misses_total"].labels(service=self._service_name)
+        self._cache_errors = metrics["bos_bcs_cache_errors_total"]
+        self._cache_corrupted = metrics["bos_bcs_cache_corrupted_total"].labels(
+            service=self._service_name
+        )
+
         logger.info(
             "Initialized CachedBatchConductorClient",
             extra={
@@ -173,6 +225,7 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
         """
         # Bypass if caching disabled
         if not self._cache_enabled:
+            self._cache_misses.inc()
             return await self._delegate.resolve_pipeline(
                 batch_id, requested_pipeline, correlation_id
             )
@@ -184,6 +237,8 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
         cached_result = await self._safe_cache_get(cache_key, batch_id, correlation_id)
         if cached_result is not None:
             return cached_result
+
+        self._cache_misses.inc()
 
         # Cache miss - call delegate
         # IMPORTANT: Let delegate exceptions propagate unchanged
@@ -277,6 +332,7 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
                 },
                 exc_info=True,
             )
+            self._cache_errors.labels(service=self._service_name, operation="get").inc()
             return None
 
         # Handle cache miss (normal case)
@@ -299,6 +355,7 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
                     "correlation_id": correlation_id,
                 }
             )
+            self._cache_hits.inc()
             return parsed_result
 
         except (json.JSONDecodeError, TypeError, AttributeError) as e:
@@ -314,10 +371,13 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
                 }
             )
 
+            self._cache_corrupted.inc()
+
             # Best-effort eviction
             try:
                 await self._redis_client.delete_key(key)
             except Exception:
+                self._cache_errors.labels(service=self._service_name, operation="delete").inc()
                 pass  # Eviction failure is non-critical
 
             return None
@@ -376,6 +436,7 @@ class CachedBatchConductorClient(BatchConductorClientProtocol):
                 },
                 exc_info=True,
             )
+            self._cache_errors.labels(service=self._service_name, operation="setex").inc()
 ```
 
 ### 3. Dependency Injection Updates
@@ -470,6 +531,7 @@ def provide_batch_conductor_client(
 **File**: `services/batch_orchestrator_service/tests/unit/test_cached_batch_conductor_client.py`
 
 Test cases:
+
 1. **Cache flow**:
    - Cache miss → delegate call → cache set
    - Cache hit returns without calling delegate
@@ -499,6 +561,7 @@ Test cases:
 **File**: `services/batch_orchestrator_service/tests/integration/test_cache_circuit_breaker_integration.py`
 
 Test cases:
+
 1. **Layering verification**:
    - Circuit breaker open + cache hit = returns cached value
    - Circuit breaker open + cache miss = raises CircuitBreakerError
@@ -514,6 +577,7 @@ Test cases:
 **Existing test**: `tests/functional/test_e2e_cj_after_nlp_with_pruning.py`
 
 Expected log output after implementation:
+
 ```
 22:08:57.970 - BCS resolution cache miss, calling delegate
 22:08:57.981 - Cached BCS resolution
@@ -521,6 +585,7 @@ Expected log output after implementation:
 ```
 
 Metrics to verify:
+
 - BCS actual calls: 1 (down from 2)
 - Cache hits: 1
 - Cache misses: 1
@@ -529,18 +594,21 @@ Metrics to verify:
 ## Rollout Plan
 
 ### Phase 1: Development Testing
+
 1. Implement code changes
 2. Run unit tests
 3. Run integration tests
 4. Verify in local Docker environment
 
 ### Phase 2: Staging Deployment
+
 1. Deploy with `BCS_CACHE_ENABLED=true`, `BCS_CACHE_TTL_SECONDS=10`
 2. Monitor Redis memory usage
 3. Verify cache hit rates via logs
 4. Check for any error spikes
 
 ### Phase 3: Production Deployment
+
 1. Deploy with feature flag off initially (`BCS_CACHE_ENABLED=false`)
 2. Enable for small percentage of traffic
 3. Monitor metrics:
@@ -550,7 +618,9 @@ Metrics to verify:
 4. Gradually increase to 100% if metrics are healthy
 
 ### Rollback Strategy
+
 If issues arise:
+
 1. Set `BCS_CACHE_ENABLED=false` (immediate effect)
 2. No code changes or deployments required
 3. Cache entries expire naturally per TTL
@@ -558,6 +628,7 @@ If issues arise:
 ## Monitoring & Observability
 
 ### Metrics to Track
+
 1. **Cache effectiveness**:
    - `bos_bcs_cache_hits_total` (counter)
    - `bos_bcs_cache_misses_total` (counter)
@@ -573,6 +644,7 @@ If issues arise:
    - `bos_bcs_resolution_duration_seconds{cached="false"}` (histogram)
 
 ### Alerts
+
 1. **High cache miss ratio**: If hit ratio < 30% for 5 minutes (indicates TTL too short)
 2. **Redis connection failures**: If error rate > 1% for 5 minutes
 3. **High corruption rate**: If > 10 corrupted entries per minute (indicates serialization issue)
@@ -601,7 +673,9 @@ If issues arise:
 ## Production Metrics
 
 ### Required for Deployment
+
 **Prometheus Metrics Integration**: Add cache observability metrics following existing patterns
+
 - `bos_bcs_cache_hits_total` (counter)
 - `bos_bcs_cache_misses_total` (counter)
 - Implementation follows existing metrics patterns in `services/batch_orchestrator_service/metrics.py`

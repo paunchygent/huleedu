@@ -103,7 +103,11 @@ def _write_outputs(
     (output_dir / "essay_grade_probabilities.csv").write_text(probs_df.to_csv(index=False), encoding="utf-8")
 
 
-def _write_rater_reports(output_dir: Path, metrics: pd.DataFrame) -> None:
+def _write_rater_reports(
+    output_dir: Path,
+    metrics: pd.DataFrame,
+    bias_posteriors: pd.DataFrame,
+) -> None:
     metrics = metrics.sort_values("rater_id").reset_index(drop=True)
     (output_dir / "rater_weights.csv").write_text(
         metrics[["rater_id", "weight", "n_rated"]].to_csv(index=False),
@@ -119,6 +123,11 @@ def _write_rater_reports(output_dir: Path, metrics: pd.DataFrame) -> None:
     )
     (output_dir / "rater_spread.csv").write_text(
         metrics[["rater_id", "unique_grades", "grade_range", "min_grade_index", "max_grade_index"]].to_csv(index=False),
+        encoding="utf-8",
+    )
+    bias = bias_posteriors.sort_values("rater_id").reset_index(drop=True)
+    (output_dir / "rater_bias_posteriors_eb.csv").write_text(
+        bias.to_csv(index=False),
         encoding="utf-8",
     )
 
@@ -159,7 +168,9 @@ def main() -> None:
 
     consensus_objects = model.get_consensus()
     _write_outputs(output_dir, consensus_objects, metadata)
-    _write_rater_reports(output_dir, model.rater_metrics)
+    metrics_df = model.rater_metrics
+    bias_posteriors = model.rater_bias_posteriors
+    _write_rater_reports(output_dir, metrics_df, bias_posteriors)
     inter_rater_df = _essay_inter_rater_stats(ratings, consensus_objects)
     (output_dir / "essay_inter_rater_stats.csv").write_text(inter_rater_df.to_csv(index=False), encoding="utf-8")
     (output_dir / "grade_thresholds.csv").unlink(missing_ok=True)

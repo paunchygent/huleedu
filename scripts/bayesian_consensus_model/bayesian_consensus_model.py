@@ -56,6 +56,10 @@ class ConsensusModel:
     def rater_metrics(self) -> pd.DataFrame:
         return self._model.rater_metrics
 
+    @property
+    def rater_bias_posteriors(self) -> pd.DataFrame:
+        return self._model.rater_bias_posteriors
+
 __all__ = [
     "ConsensusModel",
     "ConsensusResult",

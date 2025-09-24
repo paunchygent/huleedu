@@ -96,3 +96,82 @@ def compute_rater_weights(
     ).reset_index(drop=True)
 
     return weights.to_dict(), metrics
+
+
+def compute_rater_bias_posteriors_eb(
+    ratings: pd.DataFrame,
+    grade_to_index: Dict[str, int],
+    *,
+    min_sigma2: float = 1e-6,
+    min_tau2: float = 1e-6,
+) -> pd.DataFrame:
+    """Estimate empirical-Bayes rater bias posteriors on the grade-index scale.
+
+    Returns a DataFrame with posterior summaries per rater, including the
+    shrinkage-adjusted bias mean ("mu_post") that should be subtracted from the
+    rater's grade indices. All values are expressed on the integer grade index
+    scale used by the kernel smoother."""
+
+    columns = [
+        "rater_id",
+        "n_rated",
+        "b_data",
+        "se2",
+        "tau2",
+        "shrinkage",
+        "mu_post",
+        "var_post",
+        "sigma2_used",
+    ]
+
+    if ratings.empty:
+        return pd.DataFrame(columns=columns)
+
+    df = ratings.copy()
+    df["grade_index"] = df["grade"].map(grade_to_index).astype(float)
+    df = df.dropna(subset=["grade_index"])
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    essay_means = df.groupby("essay_id")["grade_index"].mean()
+    df = df.join(essay_means, on="essay_id", rsuffix="_essay_mean")
+    df["deviation"] = df["grade_index"] - df["grade_index_essay_mean"]
+
+    grouped = df.groupby("rater_id")
+    counts = grouped.size().astype(float)
+    b_data = grouped["deviation"].mean()
+
+    sigma2 = float(df["deviation"].var(ddof=0)) if len(df) > 1 else 0.0
+    if np.isnan(sigma2) or sigma2 < min_sigma2:
+        sigma2 = min_sigma2
+
+    se2 = sigma2 / counts.replace(0.0, np.nan)
+    se2 = se2.fillna(np.inf)
+
+    var_b = float(b_data.var(ddof=0)) if len(b_data) > 1 else 0.0
+    if np.isnan(var_b):
+        var_b = 0.0
+
+    mean_se2 = float(se2.replace(np.inf, 0.0).mean()) if len(se2) > 0 else 0.0
+    tau2 = max(var_b - mean_se2, min_tau2)
+
+    shrinkage = tau2 / (tau2 + se2)
+    shrinkage = shrinkage.replace({np.inf: 0.0}).fillna(0.0)
+
+    mu_post = shrinkage * b_data
+    var_post = (tau2 * se2) / (tau2 + se2)
+    var_post = var_post.replace({np.inf: tau2})
+
+    result = pd.DataFrame({
+        "rater_id": counts.index,
+        "n_rated": counts[counts.index],
+        "b_data": b_data.reindex(counts.index).fillna(0.0),
+        "se2": se2.reindex(counts.index).fillna(np.inf),
+        "tau2": tau2,
+        "shrinkage": shrinkage.reindex(counts.index).fillna(0.0),
+        "mu_post": mu_post.reindex(counts.index).fillna(0.0),
+        "var_post": var_post.reindex(counts.index).fillna(tau2),
+        "sigma2_used": sigma2,
+    }).reset_index(drop=True)
+
+    return result[columns]

@@ -8,7 +8,12 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
-from .rater_severity import RaterSeverityConfig, compute_rater_weights
+from .rater_severity import (
+    RaterSeverityConfig,
+    compute_rater_bias_posteriors_eb,
+    compute_rater_weights,
+)
+
 GRADES: tuple[str, ...] = (
     "F",
     "F+",
@@ -37,6 +42,22 @@ def _gaussian_kernel(size: int, sigma: float) -> np.ndarray:
     return kernel
 
 
+def _fractional_kernel_row(kernel: np.ndarray, position: float) -> np.ndarray:
+    """Linearly interpolate the kernel row for a fractional grade index."""
+
+    max_idx = kernel.shape[0] - 1
+    if position <= 0.0:
+        return kernel[0]
+    if position >= max_idx:
+        return kernel[max_idx]
+    lower = int(np.floor(position))
+    upper = int(np.ceil(position))
+    if lower == upper:
+        return kernel[lower]
+    frac = position - lower
+    return (1.0 - frac) * kernel[lower] + frac * kernel[upper]
+
+
 @dataclass
 class KernelConfig:
     sigma: float = 0.85
@@ -51,6 +72,7 @@ class OrdinalKernelModel:
         self._probabilities: Dict[str, np.ndarray] = {}
         self._sample_sizes: Dict[str, int] = {}
         self._rater_metrics: pd.DataFrame | None = None
+        self._rater_bias_posteriors: pd.DataFrame | None = None
 
     @staticmethod
     def prepare_data(ratings: pd.DataFrame) -> pd.DataFrame:
@@ -70,11 +92,15 @@ class OrdinalKernelModel:
         kernel = _gaussian_kernel(len(GRADES), self.config.sigma)
         weights, metrics = compute_rater_weights(cleaned, GRADE_TO_INDEX, self.config.severity)
         self._rater_metrics = metrics
+        bias_df = compute_rater_bias_posteriors_eb(cleaned, GRADE_TO_INDEX)
+        self._rater_bias_posteriors = bias_df
+        bias_lookup = {} if bias_df.empty else bias_df.set_index("rater_id")["mu_post"].to_dict()
         self._expected_index.clear()
         self._probabilities.clear()
         self._sample_sizes.clear()
 
         base = np.full(len(GRADES), self.config.pseudo_count, dtype=float)
+        max_idx = len(GRADES) - 1
 
         for essay_id, group in cleaned.groupby("essay_id"):
             expected_sum = 0.0
@@ -85,8 +111,10 @@ class OrdinalKernelModel:
                 grade = row["grade"]
                 idx = GRADE_TO_INDEX[grade]
                 weight = weights.get(row["rater_id"], 1.0)
-                smoothed += weight * kernel[idx]
-                expected_sum += weight * idx
+                bias_shift = float(bias_lookup.get(row["rater_id"], 0.0))
+                adjusted_idx = float(idx) - bias_shift
+                smoothed += weight * _fractional_kernel_row(kernel, adjusted_idx)
+                expected_sum += weight * float(np.clip(adjusted_idx, 0.0, max_idx))
                 total_weight += weight
 
             if total_weight == 0.0:
@@ -103,6 +131,12 @@ class OrdinalKernelModel:
         if self._rater_metrics is None:
             raise ValueError("Model must be fitted before accessing rater metrics")
         return self._rater_metrics.copy()
+
+    @property
+    def rater_bias_posteriors(self) -> pd.DataFrame:
+        if self._rater_bias_posteriors is None:
+            raise ValueError("Model must be fitted before accessing rater bias posteriors")
+        return self._rater_bias_posteriors.copy()
 
     def consensus(self) -> Dict[str, Dict[str, float | Dict[str, float]]]:
         if not self._probabilities:

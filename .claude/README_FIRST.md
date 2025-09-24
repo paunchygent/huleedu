@@ -142,3 +142,6 @@ pdm run typecheck-all # Run MyPy
 - Services use APP-scoped DI for singletons, REQUEST-scoped for per-operation
 - All events use EventEnvelope wrapper with correlation tracking
 - Transactional outbox pattern ensures event delivery reliability
+## Rater Metrics
+- `generate_reports.py` now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes posterior bias per rater on the grade-index scale.
+
