@@ -1,0 +1,6 @@
+{
+  "bias_correction": true,
+  "model": "ordinal_kernel",
+  "pseudo_count": 0.02,
+  "sigma": 0.85
+}

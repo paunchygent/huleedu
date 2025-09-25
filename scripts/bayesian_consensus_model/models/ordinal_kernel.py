@@ -63,6 +63,7 @@ class KernelConfig:
     sigma: float = 0.85
     pseudo_count: float = 0.02
     severity: RaterSeverityConfig | None = None
+    bias_correction: bool = True
 
 
 class OrdinalKernelModel:
@@ -93,8 +94,13 @@ class OrdinalKernelModel:
         weights, metrics = compute_rater_weights(cleaned, GRADE_TO_INDEX, self.config.severity)
         self._rater_metrics = metrics
         bias_df = compute_rater_bias_posteriors_eb(cleaned, GRADE_TO_INDEX)
+        bias_df = bias_df.copy()
+        bias_df["applied"] = self.config.bias_correction
         self._rater_bias_posteriors = bias_df
-        bias_lookup = {} if bias_df.empty else bias_df.set_index("rater_id")["mu_post"].to_dict()
+        if self.config.bias_correction and not bias_df.empty:
+            bias_lookup = bias_df.set_index("rater_id")["mu_post"].to_dict()
+        else:
+            bias_lookup = {rater: 0.0 for rater in cleaned["rater_id"].unique()}
         self._expected_index.clear()
         self._probabilities.clear()
         self._sample_sizes.clear()

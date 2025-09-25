@@ -11,7 +11,10 @@ from scripts.bayesian_consensus_model.bayesian_consensus_model import (
     GRADES,
     KernelConfig,
 )
-from scripts.bayesian_consensus_model.models import compute_rater_bias_posteriors_eb
+from scripts.bayesian_consensus_model.models import (
+    compute_rater_bias_posteriors_eb,
+    compute_rater_weights,
+)
 
 GRADE_TO_INDEX = {grade: idx for idx, grade in enumerate(GRADES)}
 
@@ -135,6 +138,8 @@ def test_consensus_bias_correction_with_empirical_bayes() -> None:
     model.fit(df)
     results = model.get_consensus()
     bias_df = model.rater_bias_posteriors
+    assert not bias_df.empty
+    assert bias_df["applied"].all()
     biased_mu = bias_df.loc[bias_df["rater_id"] == "R_bias", "mu_post"].iloc[0]
     assert biased_mu > 0.5
 
@@ -145,3 +150,46 @@ def test_consensus_bias_correction_with_empirical_bayes() -> None:
         base_idx = base_by_essay[essay_id]
         assert abs(expected_idx - base_idx) < abs(naive_mean - base_idx)
 
+
+
+def test_bias_correction_toggle_restores_naive_expectation() -> None:
+    rows = []
+    base_indices = [6, 7, 5, 6, 7]
+    for idx, base_idx in enumerate(base_indices, start=1):
+        essay_id = f"B{idx}"
+        base_grade = GRADES[base_idx]
+        for rater in ("R1", "R2"):
+            rows.append({"essay_id": essay_id, "rater_id": rater, "grade": base_grade})
+        shifted_index = min(base_idx + 1, len(GRADES) - 1)
+        rows.append({"essay_id": essay_id, "rater_id": "R_bias", "grade": GRADES[shifted_index]})
+    df = pd.DataFrame(rows)
+
+    model_off = ConsensusModel(KernelConfig(bias_correction=False))
+    model_off.fit(df)
+    results_off = model_off.get_consensus()
+    bias_df_off = model_off.rater_bias_posteriors
+    if not bias_df_off.empty:
+        assert not bias_df_off["applied"].any()
+
+    weights, _ = compute_rater_weights(df, GRADE_TO_INDEX)
+    for essay_id, group in df.groupby("essay_id"):
+        expected_off = results_off[essay_id].expected_grade_index
+        weighted_sum = 0.0
+        weight_total = 0.0
+        for _, row in group.iterrows():
+            w = weights.get(row["rater_id"], 1.0)
+            idx = GRADE_TO_INDEX[row["grade"]]
+            weighted_sum += w * idx
+            weight_total += w
+        assert weight_total > 0
+        assert expected_off == pytest.approx(weighted_sum / weight_total)
+
+    model_on = ConsensusModel(KernelConfig(bias_correction=True))
+    model_on.fit(df)
+    results_on = model_on.get_consensus()
+    differing = False
+    for essay_id in results_on:
+        if not pytest.approx(results_on[essay_id].expected_grade_index) == results_off[essay_id].expected_grade_index:
+            differing = True
+            break
+    assert differing

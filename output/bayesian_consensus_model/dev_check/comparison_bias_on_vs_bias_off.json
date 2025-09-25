@@ -1,0 +1,7 @@
+{
+  "base_bias_correction": true,
+  "grade_changes": 2,
+  "max_abs_delta_expected": 0.2826006978444324,
+  "mean_abs_delta_expected": 0.11611277302121299,
+  "median_abs_delta_expected": 0.08385768062682786
+}

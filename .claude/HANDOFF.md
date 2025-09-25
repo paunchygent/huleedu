@@ -11,6 +11,7 @@ Designed Redis caching solution for BCS duplicate calls with proper error handli
 - No blocking issues
 - Redis caching plan complete in `TASKS/updated_plan.md`
 - Consensus reporting now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes bias posteriors.
+- Bias vs weight plots and bias-on/off comparison artefacts are written into timestamped subdirectories under `output/bayesian_consensus_model/`.
 
 ## Open Work
 

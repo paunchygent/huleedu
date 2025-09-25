@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple
 
@@ -16,8 +17,11 @@ from .bayesian_consensus_model import ConsensusModel, ConsensusResult, KernelCon
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ratings-csv", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, default=Path("output/bayesian_consensus_model"))
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--bias-correction", choices=["on", "off"], default="on")
+    parser.add_argument("--compare-without-bias", action="store_true")
+    parser.add_argument("--run-label", type=str, default="", help="Optional label for run directory; defaults to timestamp")
     return parser.parse_args()
 
 
@@ -76,7 +80,7 @@ def _write_outputs(
     output_dir: Path,
     consensus: Dict[str, "ConsensusResult"],
     metadata: Dict[str, str],
-) -> None:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     records = []
     prob_rows = []
     for essay_id, result in consensus.items():
@@ -101,13 +105,14 @@ def _write_outputs(
 
     (output_dir / "essay_consensus.csv").write_text(consensus_df.to_csv(index=False), encoding="utf-8")
     (output_dir / "essay_grade_probabilities.csv").write_text(probs_df.to_csv(index=False), encoding="utf-8")
+    return consensus_df, probs_df
 
 
 def _write_rater_reports(
     output_dir: Path,
     metrics: pd.DataFrame,
     bias_posteriors: pd.DataFrame,
-) -> None:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     metrics = metrics.sort_values("rater_id").reset_index(drop=True)
     (output_dir / "rater_weights.csv").write_text(
         metrics[["rater_id", "weight", "n_rated"]].to_csv(index=False),
@@ -130,6 +135,158 @@ def _write_rater_reports(
         bias.to_csv(index=False),
         encoding="utf-8",
     )
+    return metrics, bias
+
+def _run_pipeline(
+    ratings: pd.DataFrame,
+    metadata: Dict[str, str],
+    output_dir: Path,
+    *,
+    bias_correction: bool,
+    verbose: bool = False,
+) -> Dict[str, object]:
+    config = KernelConfig(bias_correction=bias_correction)
+    model = ConsensusModel(config)
+    model.fit(ratings)
+
+    consensus = model.get_consensus()
+    consensus_df, probs_df = _write_outputs(output_dir, consensus, metadata)
+    metrics_df = model.rater_metrics
+    bias_posteriors = model.rater_bias_posteriors
+    metrics_sorted, bias_sorted = _write_rater_reports(output_dir, metrics_df, bias_posteriors)
+    plot_created = _plot_bias_vs_weight(output_dir, metrics_sorted, bias_sorted)
+    inter_rater_df = _essay_inter_rater_stats(ratings, consensus)
+    (output_dir / "essay_inter_rater_stats.csv").write_text(
+        inter_rater_df.to_csv(index=False), encoding="utf-8"
+    )
+    (output_dir / "grade_thresholds.csv").unlink(missing_ok=True)
+    _write_json(
+        output_dir / "model_diagnostics.json",
+        {
+            "model": "ordinal_kernel",
+            "sigma": config.sigma,
+            "pseudo_count": config.pseudo_count,
+            "bias_correction": bias_correction,
+        },
+    )
+    if verbose and plot_created:
+        print(f"Saved rater bias vs weight plot to {output_dir}")
+    return {
+        "config": config,
+        "model": model,
+        "consensus": consensus,
+        "consensus_df": consensus_df,
+        "probabilities_df": probs_df,
+        "metrics_df": metrics_sorted,
+        "bias_df": bias_sorted,
+    }
+
+
+def _write_comparison_outputs(
+    output_dir: Path,
+    base: Dict[str, object],
+    alt: Dict[str, object],
+    *,
+    base_bias_correction: bool,
+) -> None:
+    base_label = "bias_on" if base_bias_correction else "bias_off"
+    alt_label = "bias_off" if base_bias_correction else "bias_on"
+
+    base_df = base["consensus_df"].copy()
+    alt_df = alt["consensus_df"].copy()
+    base_df = base_df.rename(
+        columns={
+            "consensus_grade": f"consensus_grade_{base_label}",
+            "confidence": f"confidence_{base_label}",
+            "expected_grade_index": f"expected_grade_index_{base_label}",
+            "ability": f"ability_{base_label}",
+        }
+    )
+    alt_df = alt_df.rename(
+        columns={
+            "consensus_grade": f"consensus_grade_{alt_label}",
+            "confidence": f"confidence_{alt_label}",
+            "expected_grade_index": f"expected_grade_index_{alt_label}",
+            "ability": f"ability_{alt_label}",
+        }
+    )
+    merged = base_df.merge(alt_df, on=["essay_id", "file_name", "sample_size"], how="inner")
+    merged["delta_expected"] = (
+        merged[f"expected_grade_index_{base_label}"]
+        - merged[f"expected_grade_index_{alt_label}"]
+    )
+    merged["delta_confidence"] = (
+        merged[f"confidence_{base_label}"]
+        - merged[f"confidence_{alt_label}"]
+    )
+    merged["grade_changed"] = (
+        merged[f"consensus_grade_{base_label}"]
+        != merged[f"consensus_grade_{alt_label}"]
+    )
+    merged = merged.sort_values("delta_expected", key=lambda s: s.abs(), ascending=False)
+
+    comparison_csv = output_dir / f"comparison_{base_label}_vs_{alt_label}.csv"
+    comparison_csv.write_text(merged.to_csv(index=False), encoding="utf-8")
+
+    summary = {
+        "base_bias_correction": base_bias_correction,
+        "grade_changes": int(merged["grade_changed"].sum()),
+        "mean_abs_delta_expected": float(merged["delta_expected"].abs().mean()),
+        "median_abs_delta_expected": float(merged["delta_expected"].abs().median()),
+        "max_abs_delta_expected": float(merged["delta_expected"].abs().max()),
+    }
+    _write_json(
+        output_dir / f"comparison_{base_label}_vs_{alt_label}.json", summary
+    )
+
+
+def _plot_bias_vs_weight(output_dir: Path, metrics: pd.DataFrame, bias_posteriors: pd.DataFrame) -> bool:
+    """Create a scatter plot of posterior bias versus reliability weight."""
+
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return False
+
+    df = bias_posteriors.merge(metrics[["rater_id", "weight"]], on="rater_id", how="left")
+    if df.empty:
+        return False
+    df = df.copy()
+    df["abs_mu"] = df["mu_post"].abs()
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    scatter = ax.scatter(
+        df["weight"],
+        df["mu_post"],
+        c=df["shrinkage"],
+        cmap="coolwarm",
+        s=80,
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    ax.axhline(0.0, color="grey", linewidth=1, linestyle="--")
+    ax.set_xlabel("Reliability weight")
+    ax.set_ylabel("Posterior bias (grade index units)")
+    ax.set_title("Rater bias vs reliability weight")
+    fig.colorbar(scatter, ax=ax, label="Shrinkage factor")
+
+    flagged = df[df["abs_mu"] >= 0.5]
+    for _, row in flagged.iterrows():
+        ax.annotate(
+            row["rater_id"],
+            (row["weight"], row["mu_post"]),
+            textcoords="offset points",
+            xytext=(6, 6),
+            fontsize=9,
+            ha="left",
+        )
+
+    output_path = output_dir / "rater_bias_vs_weight.png"
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    return True
+
 
 
 def _essay_inter_rater_stats(ratings: pd.DataFrame, consensus: Dict[str, "ConsensusResult"]) -> pd.DataFrame:
@@ -159,29 +316,39 @@ def _essay_inter_rater_stats(ratings: pd.DataFrame, consensus: Dict[str, "Consen
 def main() -> None:
     args = _parse_args()
     ratings, metadata = _load_ratings(args.ratings_csv, verbose=args.verbose)
-    output_dir = args.output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    base_output = args.output_dir
+    base_output.mkdir(parents=True, exist_ok=True)
 
-    config = KernelConfig()
-    model = ConsensusModel(config)
-    model.fit(ratings)
+    if args.run_label:
+        run_label = args.run_label
+    else:
+        run_label = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    run_dir = base_output / run_label
+    run_dir.mkdir(parents=True, exist_ok=True)
 
-    consensus_objects = model.get_consensus()
-    _write_outputs(output_dir, consensus_objects, metadata)
-    metrics_df = model.rater_metrics
-    bias_posteriors = model.rater_bias_posteriors
-    _write_rater_reports(output_dir, metrics_df, bias_posteriors)
-    inter_rater_df = _essay_inter_rater_stats(ratings, consensus_objects)
-    (output_dir / "essay_inter_rater_stats.csv").write_text(inter_rater_df.to_csv(index=False), encoding="utf-8")
-    (output_dir / "grade_thresholds.csv").unlink(missing_ok=True)
-    _write_json(
-        output_dir / "model_diagnostics.json",
-        {
-            "model": "ordinal_kernel",
-            "sigma": config.sigma,
-            "pseudo_count": config.pseudo_count,
-        },
+    apply_bias = args.bias_correction == "on"
+    if args.verbose:
+        state = "enabled" if apply_bias else "disabled"
+        print(f"Bias correction {state} for primary run")
+        print(f"Writing outputs to {run_dir}")
+
+    base_results = _run_pipeline(
+        ratings, metadata, run_dir, bias_correction=apply_bias, verbose=args.verbose
     )
+
+    if args.compare_without_bias:
+        alt_dir = run_dir / ("bias_off" if apply_bias else "bias_on")
+        alt_dir.mkdir(parents=True, exist_ok=True)
+        alt_results = _run_pipeline(
+            ratings,
+            metadata,
+            alt_dir,
+            bias_correction=not apply_bias,
+            verbose=args.verbose,
+        )
+        _write_comparison_outputs(
+            run_dir, base_results, alt_results, base_bias_correction=apply_bias
+        )
 
 
 if __name__ == "__main__":
