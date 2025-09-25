@@ -1,17 +1,17 @@
 # HuleEdu Monorepo - Handoff Document
 
-## Current Status (Dec 24, 2024)
+## Current Status (Jan 25, 2025)
 
 ### What We Just Completed
-Designed Redis caching solution for BCS duplicate calls with proper error handling, layering, and configuration. Plan addresses all architectural concerns and is ready for implementation.
+Corrected major inaccuracies in Bayesian consensus model report (`docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html`). Fixed rater bias interpretation (negative=strict, positive=generous), updated all data values to match actual model output, anonymized content, and regenerated all figures with proper color schemes and layouts.
 
 ### System State
 - All services running and healthy
 - Tests passing (including `test_e2e_cj_after_nlp_with_pruning.py`)
 - No blocking issues
-- Redis caching plan complete in `TASKS/updated_plan.md`
-- Consensus reporting now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes bias posteriors.
-- Bias vs weight plots and bias-on/off comparison artefacts are written into timestamped subdirectories under `output/bayesian_consensus_model/`.
+- Redis caching plan still complete in `TASKS/updated_plan.md` (pending implementation)
+- Bayesian report corrections completed using data from `output/bayesian_consensus_model/20250924-202445/bias_on/`
+- All figures regenerated via `docs/rapport_till_kollegor/create_corrected_figures.py`
 
 ## Open Work
 
@@ -72,14 +72,19 @@ pdm run pytest-root tests/functional/test_e2e_cj_after_nlp_with_pruning.py -v -s
 docker logs huleedu_batch_orchestrator_service 2>&1 | grep "BCS resolution cache"
 ```
 
-### Expected Cache Behavior
-```
-# First call (preflight):
-BCS resolution cache miss, calling delegate
-Cached BCS resolution
+### Recent Report Corrections
+**Data Source**: `output/bayesian_consensus_model/20250924-202445/bias_on/`
+**Key Files**:
+- `essay_consensus.csv` - 12 essays, grades E+ to B, ability scores 3.43-8.50
+- `rater_bias_posteriors_eb.csv` - 14 raters, bias range -0.74 to +0.56
+- `essay_inter_rater_stats.csv` - Agreement statistics
 
-# Second call (handler, ~9ms later):
-BCS resolution cache hit
+**Figures Generated**:
+```
+docs/rapport_till_kollegor/files/figur1_uppsatskvalitet.png
+docs/rapport_till_kollegor/files/figur2_bedömarstränghet.png
+docs/rapport_till_kollegor/files/figur3_betygströsklar.png
+docs/rapport_till_kollegor/files/figur4_bedömarspridning.png
 ```
 
 ## Environment Setup
@@ -117,8 +122,17 @@ BCS_CACHE_ENABLED: bool = Field(default=True)
 
 ## Critical Notes
 
+### System
 - **PDM**: Always run from repo root, never from subdirectories
 - **Tests**: Use `pdm run pytest-root` for correct path resolution
 - **Docker logs**: Never use `--since` (timezone issues)
+
+### Bayesian Data Interpretation
+- **Rater bias**: Negative = strict, positive = generous (was backwards in original)
+- **Grade scale**: F, F+, E-, E+, D-, D+, C-, C+, B, A (E, D, C don't exist standalone)
+- **Anonymization**: Real names → Rater IDs via `MAP_OF_RATER_ID_AND_REAL_RATERS.csv`
+- **Outlier**: JP24 (E+) only essay at that level, affects step analysis
+
+### Redis Caching (Still Pending)
 - **Cache layering**: Cache must wrap circuit breaker (outermost)
 - **Error handling**: Redis failures must not block operations
