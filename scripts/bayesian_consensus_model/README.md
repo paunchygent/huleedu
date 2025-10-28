@@ -77,20 +77,49 @@ pdm run python -m scripts.bayesian_consensus_model.generate_reports \
 ```
 
 ### Command Line Arguments
-- `--ratings-csv`: Path to input CSV file (required)
-- `--output-dir`: Directory for output files (required)
-- `--sparse-threshold`: Min observations for Bayesian mode (default: 5)
-- `--majority-threshold`: Min vote share for majority override (default: 0.6)
-- `--use-production-grader`: Use PrincipledConsensusGrader
-- `--verbose`: Print detailed progress information
+- `--ratings-csv`: Path to the long-format ratings CSV (required)
+- `--output-dir`: Directory for run artifacts (default: `output/bayesian_consensus_model`)
+- `--verbose`: Print progress information
+- `--bias-correction`: Toggle empirical-Bayes bias adjustment (`on`/`off`, default `on`)
+- `--compare-without-bias`: Emit paired runs with and without bias correction
+- `--run-label`: Optional label for the output directory
+- `--use-argmax-decision`: Select the highest-probability grade instead of rounding the expectation
+- `--use-loo-alignment`: Enable leave-one-out alignment for severity weights and bias posteriors
+- `--use-precision-weights`: Down-weight raters with high posterior uncertainty or large bias magnitude
+- `--use-neutral-gating`: Compute neutral ESS per essay (informational only)
+- `--neutral-delta-mu`: Absolute posterior bias threshold for “neutral” raters (default `0.25`)
+- `--neutral-var-max`: Posterior variance ceiling for neutral raters (default `0.20`)
 
 ### Output Files
 Generated in the specified output directory:
-- `essay_consensus.csv` - Final consensus grades with confidence scores
-- `essay_grade_probabilities.csv` - Full probability distribution per essay
-- `grade_thresholds.csv` - Estimated ordinal regression thresholds
-- `rater_adjustments.csv` - Estimated rater severity parameters
-- `model_diagnostics.json` - MCMC convergence metrics (rhat, ESS)
+- `essay_consensus.csv` – Consensus grade, confidence, expected grade index, and neutral ESS (flag retained for compatibility but no longer auto-gates)
+- `essay_grade_probabilities.csv` – Full posterior mass over the 10-grade lattice
+- `rater_weights.csv` / `rater_severity.csv` / `rater_agreement.csv` / `rater_spread.csv` – Severity diagnostics and precision factors
+- `rater_bias_posteriors_eb.csv` – Empirical-Bayes bias mean, variance, shrinkage, and neutral classification inputs
+- `essay_inter_rater_stats.csv` – Entropy, spread, and neutral ESS per essay
+- `model_diagnostics.json` – Serialized `KernelConfig` including feature toggles and hyperparameters
+- `rater_bias_vs_weight.png` – Optional visualization (requires Matplotlib)
+
+## Modular Improvements (What & Why)
+
+| Feature | What It Does | Why It Matters |
+| --- | --- | --- |
+| `use_argmax_decision` | Chooses the grade with the highest posterior probability instead of rounding the expected index. | Prevents bimodal distributions from collapsing to the lower neighbour when the posterior mass is skewed upward, aligning the reported grade with the modal support. |
+| `use_loo_alignment` | Removes the focal rater before recomputing essay means for alignment, weights, and bias posteriors. | Eliminates self-influence when panels are sparse, tightening bias estimates and reducing false generosity penalties on high-volume raters. |
+| `use_precision_weights` | Multiplies reliability weights by inverse posterior variance and dampens large absolute bias. | Encourages the model to trust raters whose bias is estimated precisely while down-weighting noisy or extreme raters, improving robustness under disagreement. |
+| `use_neutral_gating` | Classifies neutral raters and tracks their effective sample size per essay. | Provides neutral ESS visibility for coordinators without enforcing automatic gates. |
+
+Set these toggles via the CLI flags listed above or by instantiating `KernelConfig` directly.
+
+## Evaluation Harness
+
+Use `scripts/bayesian_consensus_model/evaluation/harness.py` to quantify each improvement in isolation. The harness:
+
+- Loads the same long-format ratings used by the CLI.
+- Runs configurable `KernelConfig` baselines and toggled variants.
+- Reports grade changes, confidence deltas, and neutral ESS coverage (informational only).
+
+This workflow ensures we ship toggles only after demonstrating measurable value on anchor datasets.
 
 ## Input Data Format
 
@@ -118,6 +147,11 @@ The script auto-detects format based on delimiters in the file.
 - **Rationale**: Preserve meaningful distinctions between grades (C+ ≠ C-)
 - **Files Updated**: All model files, tests, and consensus grading solution
 - **Impact**: Grade modifiers now treated as distinct ordinal positions
+
+### 2025-01-25: Modular Ordinal Kernel Enhancements
+- **Change**: Added configurability for argmax decision rule, leave-one-out alignment, precision-aware weighting, and neutral ESS metrics (no automatic gating)
+- **Evaluation**: `scripts/bayesian_consensus_model/evaluation/harness.py` provides ablation studies and comparative metrics
+- **Outputs**: Consensus CSVs now include `neutral_ess` (informational) and backward-compatible `needs_more_ratings`
 
 ### 2024-09-22: Critical Bug Identified
 - **Issue**: Ordinal regression produces incorrect consensus for mixed ratings

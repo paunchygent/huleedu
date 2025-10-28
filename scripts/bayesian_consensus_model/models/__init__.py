@@ -3,6 +3,7 @@
 from .ordinal_kernel import OrdinalKernelModel, KernelConfig
 from .rater_severity import (
     RaterSeverityConfig,
+    apply_precision_weights,
     compute_rater_bias_posteriors_eb,
     compute_rater_weights,
 )
@@ -13,4 +14,5 @@ __all__ = [
     "RaterSeverityConfig",
     "compute_rater_weights",
     "compute_rater_bias_posteriors_eb",
+    "apply_precision_weights",
 ]

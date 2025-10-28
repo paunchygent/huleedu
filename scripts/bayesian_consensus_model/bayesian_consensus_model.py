@@ -19,6 +19,8 @@ class ConsensusResult:
     sample_size: int
     ability: float
     expected_grade_index: float
+    neutral_ess: float = 0.0
+    needs_more_ratings: bool = False
 
 
 class ConsensusModel:
@@ -45,6 +47,8 @@ class ConsensusModel:
                 sample_size=result["sample_size"],
                 ability=result["expected_grade_index"],
                 expected_grade_index=result["expected_grade_index"],
+                neutral_ess=result.get("neutral_ess", 0.0),
+                needs_more_ratings=result.get("needs_more_ratings", False),
             )
 
     def get_consensus(self) -> Dict[str, ConsensusResult]:

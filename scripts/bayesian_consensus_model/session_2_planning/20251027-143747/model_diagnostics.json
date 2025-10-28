@@ -1,0 +1,13 @@
+{
+  "bias_correction": true,
+  "model": "ordinal_kernel",
+  "neutral_delta_mu": 0.25,
+  "neutral_var_max": 0.2,
+  "pseudo_count": 0.02,
+  "severity": null,
+  "sigma": 0.85,
+  "use_argmax_decision": false,
+  "use_loo_alignment": false,
+  "use_neutral_gating": false,
+  "use_precision_weights": false
+}

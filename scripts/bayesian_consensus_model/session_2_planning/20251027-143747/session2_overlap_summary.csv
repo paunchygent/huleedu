@@ -1,0 +1,34 @@
+pair_label,total_occurrences,core_occurrences,extra_occurrences,raters,pair_ids
+B1 vs JA24,2,1,1,Ann B;Robin S,2;137
+A2 vs JA24,3,2,1,Jenny L;Robin S;Ullis,3;83;123
+B2 vs II24,2,1,1,Lena R;Ullis,4;102
+C+ vs ES24,2,2,0,Jenny P;Lena R,7;69
+C- vs EK24,2,2,0,Erik A;Jenny P,11;70
+B2 vs C+,2,1,1,Jenny P;Ullis,19;131
+C- vs ER24,2,2,0,Erik A;Jenny P,20;71
+D+ vs TK24,2,2,0,Erik A;Jenny P,24;72
+D+ vs SN24,2,2,0,Marcus D;Mats A,27;73
+D- vs HJ17,2,2,0,Mats A;Sophie O,30;74
+D- vs SA24,2,2,0,Mats A;Sophie O,33;75
+D- vs LW24,2,2,0,Mats A;Yvonne R,36;76
+E+ vs JF24,2,2,0,Robin S;Yvonne R,40;77
+JF24 vs LW24,2,2,0,Anna P;Hanna L,46;61
+C- vs D+,2,1,1,Mats A;Yvonne R,47;93
+E- vs JP24,2,2,0,Anna P;Robin S,56;78
+B2 vs SA24,2,1,1,Jenny L;Sophie O,63;110
+B2 vs JA24,2,1,1,Ann B;Jenny L,67;99
+B1 vs II24,2,1,1,Hanna L;Lena R,68;96
+B1 vs C+,2,1,1,Anna P;Mats A,79;91
+B1 vs B2,2,1,1,Jenny P;Mats A,80;132
+B1 vs ER24,2,1,1,Anna P;Robin S,82;121
+B2 vs ES24,3,0,3,Ann B;Jenny L;Jenny P,85;125;133
+B1 vs EK24,2,0,2,Anna P;Erik A,86;120
+B2 vs ER24,2,0,2,Erik A;Lena R,87;98
+B2 vs SN24,3,0,3,Mats A;Sophie O;Ullis,89;104;135
+B1 vs JP24,2,0,2,Hanna L;Marcus D,90;127
+A2 vs II24,2,0,2,Ann B;Jenny L,100;124
+B1 vs HJ17,2,0,2,Agneta D;Marcus D,107;118
+B2 vs HJ17,2,0,2,Mats A;Sophie O,111;136
+C+ vs JF24,2,0,2,Sophie O;Yvonne R,112;114
+B2 vs JP24,2,0,2,Anna P;Robin S,122;138
+C+ vs JP24,2,0,2,Hanna L;Jenny L,126;128

@@ -1,0 +1,15 @@
+rater_id,unique_grades,grade_range,min_grade_index,max_grade_index
+Agneta D,3,3.0,5.0,8.0
+Ann B,2,1.0,5.0,6.0
+Anna P,4,4.0,5.0,9.0
+Erik A,5,4.0,5.0,9.0
+Hanna L,4,3.0,6.0,9.0
+Jenny L,6,7.0,1.0,8.0
+Jenny P,4,6.0,3.0,9.0
+Lena R,3,2.0,5.0,7.0
+Marcus D,2,4.0,2.0,6.0
+Mats A,3,4.0,3.0,7.0
+Robin S,4,3.0,4.0,7.0
+Sophie O,3,4.0,2.0,6.0
+Ullis,3,3.0,5.0,8.0
+Yvonne R,3,3.0,5.0,8.0

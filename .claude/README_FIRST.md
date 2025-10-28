@@ -128,6 +128,18 @@ pdm run typecheck-all # Run MyPy
 **Purpose**: Improve grading accuracy for sparse data scenarios.
 **Status**: Implemented and validated.
 
+### 4. Ordinal Kernel Feature Flags
+**What**: Config/CLI toggles for argmax decision, leave-one-out alignment, precision-aware weighting, and neutral ESS metrics.
+**Why**: Gives data science control to test each mitigation independently—argmax protects against modal skew, LOO removes self-influence, precision weights emphasise reliable raters, and neutral ESS reveals balanced evidence without enforcing gates.
+**How**: Consensus CSVs now surface `neutral_ess` (informational) and `needs_more_ratings`; run `scripts/bayesian_consensus_model/evaluation/harness.py` to produce ablation metrics before changing defaults.
+
+### 5. Harness Metrics (2025-09-25)
+- Baseline anchors: mean confidence 0.308, expected grade index 5.888, neutral ESS 0 and no gating triggered.
+- Argmax toggle: 3/12 essays flip with +0.0125 mean confidence and unchanged expected indices; gating count stays 0.
+- Leave-one-out alignment: no grade flips, mean expected index −0.0005, mean confidence +0.0042.
+- Precision-aware weights: no grade flips, mean expected index −0.0289, mean confidence −0.0044.
+- Neutral ESS metrics: enabling the flag raises neutral ESS mean to 1.46 but leaves gating count at 0; running all toggles moves JA24 B→A and JP24 E+→E− while still reporting zero `needs_more_ratings`.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts
@@ -146,4 +158,3 @@ pdm run typecheck-all # Run MyPy
 - `generate_reports.py` now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes posterior bias per rater on the grade-index scale.
 - Use `--bias-correction {on,off}` and `--compare-without-bias` to run EB and legacy consensus side-by-side; each invocation writes into `output/bayesian_consensus_model/<run_label or timestamp>/` by default (override with `--output-dir`), with comparison CSV/JSON saved alongside the bias-on results.
 - Each run also saves `rater_bias_vs_weight.png`, highlighting high-bias raters against their reliability weights for coaching review.
-

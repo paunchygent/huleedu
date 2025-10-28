@@ -10,6 +10,7 @@ import pandas as pd
 
 from .rater_severity import (
     RaterSeverityConfig,
+    apply_precision_weights,
     compute_rater_bias_posteriors_eb,
     compute_rater_weights,
 )
@@ -64,6 +65,12 @@ class KernelConfig:
     pseudo_count: float = 0.02
     severity: RaterSeverityConfig | None = None
     bias_correction: bool = True
+    use_argmax_decision: bool = False
+    use_loo_alignment: bool = False
+    use_precision_weights: bool = False
+    use_neutral_gating: bool = False
+    neutral_delta_mu: float = 0.25
+    neutral_var_max: float = 0.20
 
 
 class OrdinalKernelModel:
@@ -72,6 +79,8 @@ class OrdinalKernelModel:
         self._expected_index: Dict[str, float] = {}
         self._probabilities: Dict[str, np.ndarray] = {}
         self._sample_sizes: Dict[str, int] = {}
+        self._neutral_ess: Dict[str, float] = {}
+        self._needs_more: Dict[str, bool] = {}
         self._rater_metrics: pd.DataFrame | None = None
         self._rater_bias_posteriors: pd.DataFrame | None = None
 
@@ -91,19 +100,51 @@ class OrdinalKernelModel:
     def fit(self, ratings: pd.DataFrame) -> None:
         cleaned = self.prepare_data(ratings)
         kernel = _gaussian_kernel(len(GRADES), self.config.sigma)
-        weights, metrics = compute_rater_weights(cleaned, GRADE_TO_INDEX, self.config.severity)
-        self._rater_metrics = metrics
-        bias_df = compute_rater_bias_posteriors_eb(cleaned, GRADE_TO_INDEX)
+        weights, metrics = compute_rater_weights(
+            cleaned,
+            GRADE_TO_INDEX,
+            self.config.severity,
+            use_loo_alignment=self.config.use_loo_alignment,
+        )
+        bias_df = compute_rater_bias_posteriors_eb(
+            cleaned,
+            GRADE_TO_INDEX,
+            use_loo_alignment=self.config.use_loo_alignment,
+        )
         bias_df = bias_df.copy()
         bias_df["applied"] = self.config.bias_correction
+
+        if self.config.use_precision_weights:
+            weights, precision_table = apply_precision_weights(weights, bias_df)
+            metrics = metrics.merge(precision_table, on="rater_id", how="left")
+            metrics["precision_factor"] = metrics["precision_factor"].fillna(1.0)
+            metrics["weight"] = metrics["rater_id"].map(weights).astype(float)
+        else:
+            metrics = metrics.copy()
+            metrics["precision_factor"] = 1.0
+
+        self._rater_metrics = metrics
         self._rater_bias_posteriors = bias_df
         if self.config.bias_correction and not bias_df.empty:
             bias_lookup = bias_df.set_index("rater_id")["mu_post"].to_dict()
         else:
             bias_lookup = {rater: 0.0 for rater in cleaned["rater_id"].unique()}
+
+        if self.config.use_neutral_gating and not bias_df.empty:
+            neutral_map = {
+                row["rater_id"]: (
+                    abs(float(row["mu_post"])) <= self.config.neutral_delta_mu
+                    and float(row["var_post"]) <= self.config.neutral_var_max
+                )
+                for _, row in bias_df.iterrows()
+            }
+        else:
+            neutral_map = {}
         self._expected_index.clear()
         self._probabilities.clear()
         self._sample_sizes.clear()
+        self._neutral_ess.clear()
+        self._needs_more.clear()
 
         base = np.full(len(GRADES), self.config.pseudo_count, dtype=float)
         max_idx = len(GRADES) - 1
@@ -112,16 +153,20 @@ class OrdinalKernelModel:
             expected_sum = 0.0
             total_weight = 0.0
             smoothed = base.copy()
+            neutral_weights: list[float] = []
 
             for _, row in group.iterrows():
                 grade = row["grade"]
                 idx = GRADE_TO_INDEX[grade]
-                weight = weights.get(row["rater_id"], 1.0)
-                bias_shift = float(bias_lookup.get(row["rater_id"], 0.0))
+                rater_id = row["rater_id"]
+                weight = weights.get(rater_id, 1.0)
+                bias_shift = float(bias_lookup.get(rater_id, 0.0))
                 adjusted_idx = float(idx) - bias_shift
                 smoothed += weight * _fractional_kernel_row(kernel, adjusted_idx)
                 expected_sum += weight * float(np.clip(adjusted_idx, 0.0, max_idx))
                 total_weight += weight
+                if neutral_map.get(rater_id, False):
+                    neutral_weights.append(float(weight))
 
             if total_weight == 0.0:
                 continue
@@ -131,6 +176,16 @@ class OrdinalKernelModel:
             probs = smoothed / smoothed.sum()
             self._probabilities[essay_id] = probs
             self._sample_sizes[essay_id] = int(group.shape[0])
+
+            if neutral_weights:
+                neutral_sum = float(np.sum(neutral_weights))
+                neutral_weight_sq = float(np.sum(np.square(neutral_weights)))
+                neutral_ess = float((neutral_sum ** 2) / neutral_weight_sq) if neutral_weight_sq > 0.0 else 0.0
+            else:
+                neutral_ess = 0.0
+            needs_more = False
+            self._neutral_ess[essay_id] = neutral_ess
+            self._needs_more[essay_id] = needs_more
 
     @property
     def rater_metrics(self) -> pd.DataFrame:
@@ -151,7 +206,10 @@ class OrdinalKernelModel:
         results: Dict[str, Dict[str, float | Dict[str, float]]] = {}
         for essay_id, probs in self._probabilities.items():
             expected_index = self._expected_index[essay_id]
-            consensus_idx = int(np.clip(round(expected_index), 0, len(GRADES) - 1))
+            if self.config.use_argmax_decision:
+                consensus_idx = int(np.argmax(probs))
+            else:
+                consensus_idx = int(np.clip(round(expected_index), 0, len(GRADES) - 1))
             consensus_grade = INDEX_TO_GRADE[consensus_idx]
             confidence = float(probs[consensus_idx])
             results[essay_id] = {
@@ -160,5 +218,7 @@ class OrdinalKernelModel:
                 "probabilities": {grade: float(prob) for grade, prob in zip(GRADES, probs)},
                 "sample_size": self._sample_sizes[essay_id],
                 "expected_grade_index": expected_index,
+                "neutral_ess": self._neutral_ess.get(essay_id, 0.0),
+                "needs_more_ratings": self._needs_more.get(essay_id, False),
             }
         return results

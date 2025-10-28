@@ -63,6 +63,20 @@ Corrected major inaccuracies in Bayesian consensus model report (`docs/rapport_t
 - **TTL**: 10 seconds (configurable)
 - **Layering**: Cache → Circuit Breaker → Base Client
 
+### Modular Kernel Improvements
+- Feature toggles unlock isolated testing: argmax decision, leave-one-out alignment, precision weighting, and neutral ESS metrics are all optional so we can quantify each intervention before enabling it by default.
+- Neutral ESS output now surfaces balanced-evidence coverage without enforcing automatic holds; the legacy `needs_more_ratings` flag remains for compatibility but stays false unless downstream systems repurpose it.
+- Evaluation harness (`scripts/bayesian_consensus_model/evaluation/harness.py`) runs ablation studies and baseline comparisons, making it easy to report the impact (accuracy, confidence, neutral ESS coverage) of each switch.
+
+### Harness Snapshot (2025-09-25)
+- Baseline anchors: mean confidence 0.308, expected grade index 5.888, neutral ESS 0 and no essays gated by default.
+- Argmax toggle: 3/12 essays flip, mean confidence +0.0125, expected indices unchanged, `needs_more_ratings` stays 0.
+- Leave-one-out alignment: no grade changes, mean expected index −0.0005, confidence +0.0042, no gating triggered.
+- Precision weights: no grade changes, mean expected index −0.0289, confidence −0.0044 (slight downward pressure), no gating.
+- Neutral ESS metrics: enabling the flag raises neutral ESS mean to 1.46 but still reports zero gating because thresholds were removed.
+- All toggles enabled: JA24 shifts B→A and JP24 shifts E+→E− while mean confidence climbs +0.0098; `needs_more_ratings` remains 0 across essays.
+- Note: Minimum ESS gating thresholds removed—neutral ESS is now informational only.
+
 ### Test Commands
 ```bash
 # Verify duplicate calls eliminated

@@ -24,7 +24,10 @@ dependencies = [
     "psutil",
     "pyarrow",
     "fastparquet",
-    "weasyprint>=66.0",
+    "weasyprint",
+    "typer",
+    "click",
+    "textual",
 ]
 
 [dependency-groups]

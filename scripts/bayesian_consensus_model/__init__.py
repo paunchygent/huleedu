@@ -6,10 +6,12 @@ from .bayesian_consensus_model import (
     GRADES,
     KernelConfig,
 )
+from .evaluation.harness import ImprovementHarness
 
 __all__ = [
     "ConsensusModel",
     "ConsensusResult",
     "KernelConfig",
     "GRADES",
+    "ImprovementHarness",
 ]

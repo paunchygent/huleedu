@@ -82,7 +82,24 @@ def get_supplementary_css() -> str:
     return """
     @page {
         size: A4;
-        margin: 1.5cm 2cm;
+        margin: 15mm 20mm;
+    }
+
+    /* For print/PDF: optimize layout */
+    @media print {
+        body {
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+
+        .container {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            border-radius: 0;
+        }
     }
 
     /* Ensure images fit within page */
@@ -119,6 +136,11 @@ def get_supplementary_css() -> str:
 
     .figure-caption {
         page-break-before: avoid;
+    }
+
+    /* Boxes should not break */
+    .highlight, .recommendation, .warning {
+        page-break-inside: avoid;
     }
     """
 

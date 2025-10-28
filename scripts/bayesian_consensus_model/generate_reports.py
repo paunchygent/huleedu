@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Tuple
@@ -22,6 +23,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--bias-correction", choices=["on", "off"], default="on")
     parser.add_argument("--compare-without-bias", action="store_true")
     parser.add_argument("--run-label", type=str, default="", help="Optional label for run directory; defaults to timestamp")
+    parser.add_argument("--use-argmax-decision", action="store_true", help="Select consensus grade via argmax over smoothed probabilities")
+    parser.add_argument("--use-loo-alignment", action="store_true", help="Enable leave-one-out essay means for rater alignment")
+    parser.add_argument("--use-precision-weights", action="store_true", help="Scale rater weights by bias posterior precision")
+    parser.add_argument("--use-neutral-gating", action="store_true", help="Compute neutral evidence ESS metrics")
+    parser.add_argument("--neutral-delta-mu", type=float, default=0.25, help="Bias magnitude threshold for neutral ESS computation")
+    parser.add_argument("--neutral-var-max", type=float, default=0.20, help="Posterior variance ceiling for neutral ESS computation")
     return parser.parse_args()
 
 
@@ -72,6 +79,18 @@ def _load_ratings(path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, Dict
     return long_df[["essay_id", "rater_id", "grade"]], metadata
 
 
+def _build_kernel_config(*, bias_correction: bool, args: argparse.Namespace) -> KernelConfig:
+    return KernelConfig(
+        bias_correction=bias_correction,
+        use_argmax_decision=getattr(args, "use_argmax_decision", False),
+        use_loo_alignment=getattr(args, "use_loo_alignment", False),
+        use_precision_weights=getattr(args, "use_precision_weights", False),
+        use_neutral_gating=getattr(args, "use_neutral_gating", False),
+        neutral_delta_mu=getattr(args, "neutral_delta_mu", 0.25),
+        neutral_var_max=getattr(args, "neutral_var_max", 0.20),
+    )
+
+
 def _write_json(path: Path, payload: Dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -94,6 +113,8 @@ def _write_outputs(
                 "sample_size": result.sample_size,
                 "ability": result.ability,
                 "expected_grade_index": result.expected_grade_index,
+                "neutral_ess": result.neutral_ess,
+                "needs_more_ratings": result.needs_more_ratings,
             }
         )
         prob_row = {"essay_id": essay_id, "file_name": file_name}
@@ -142,10 +163,9 @@ def _run_pipeline(
     metadata: Dict[str, str],
     output_dir: Path,
     *,
-    bias_correction: bool,
+    config: KernelConfig,
     verbose: bool = False,
 ) -> Dict[str, object]:
-    config = KernelConfig(bias_correction=bias_correction)
     model = ConsensusModel(config)
     model.fit(ratings)
 
@@ -160,15 +180,12 @@ def _run_pipeline(
         inter_rater_df.to_csv(index=False), encoding="utf-8"
     )
     (output_dir / "grade_thresholds.csv").unlink(missing_ok=True)
-    _write_json(
-        output_dir / "model_diagnostics.json",
-        {
-            "model": "ordinal_kernel",
-            "sigma": config.sigma,
-            "pseudo_count": config.pseudo_count,
-            "bias_correction": bias_correction,
-        },
-    )
+    diagnostics = asdict(config)
+    diagnostics.update({
+        "model": "ordinal_kernel",
+        "bias_correction": config.bias_correction,
+    })
+    _write_json(output_dir / "model_diagnostics.json", diagnostics)
     if verbose and plot_created:
         print(f"Saved rater bias vs weight plot to {output_dir}")
     return {
@@ -200,6 +217,8 @@ def _write_comparison_outputs(
             "confidence": f"confidence_{base_label}",
             "expected_grade_index": f"expected_grade_index_{base_label}",
             "ability": f"ability_{base_label}",
+            "neutral_ess": f"neutral_ess_{base_label}",
+            "needs_more_ratings": f"needs_more_ratings_{base_label}",
         }
     )
     alt_df = alt_df.rename(
@@ -208,6 +227,8 @@ def _write_comparison_outputs(
             "confidence": f"confidence_{alt_label}",
             "expected_grade_index": f"expected_grade_index_{alt_label}",
             "ability": f"ability_{alt_label}",
+            "neutral_ess": f"neutral_ess_{alt_label}",
+            "needs_more_ratings": f"needs_more_ratings_{alt_label}",
         }
     )
     merged = base_df.merge(alt_df, on=["essay_id", "file_name", "sample_size"], how="inner")
@@ -234,6 +255,8 @@ def _write_comparison_outputs(
         "mean_abs_delta_expected": float(merged["delta_expected"].abs().mean()),
         "median_abs_delta_expected": float(merged["delta_expected"].abs().median()),
         "max_abs_delta_expected": float(merged["delta_expected"].abs().max()),
+        "neutral_ess_mean_variant": float(merged[f"neutral_ess_{alt_label}"].mean()),
+        "needs_more_ratings_variant": int(merged[f"needs_more_ratings_{alt_label}"].sum()),
     }
     _write_json(
         output_dir / f"comparison_{base_label}_vs_{alt_label}.json", summary
@@ -308,6 +331,8 @@ def _essay_inter_rater_stats(ratings: pd.DataFrame, consensus: Dict[str, "Consen
                 "majority_ratio": float(counts.max() / counts.sum()),
                 "consensus_grade": consensus[essay_id].consensus_grade if essay_id in consensus else "",
                 "consensus_confidence": consensus[essay_id].confidence if essay_id in consensus else np.nan,
+                "neutral_ess": consensus[essay_id].neutral_ess if essay_id in consensus else 0.0,
+                "needs_more_ratings": consensus[essay_id].needs_more_ratings if essay_id in consensus else False,
             }
         )
     return pd.DataFrame(rows).sort_values("essay_id")
@@ -332,18 +357,20 @@ def main() -> None:
         print(f"Bias correction {state} for primary run")
         print(f"Writing outputs to {run_dir}")
 
+    base_config = _build_kernel_config(bias_correction=apply_bias, args=args)
     base_results = _run_pipeline(
-        ratings, metadata, run_dir, bias_correction=apply_bias, verbose=args.verbose
+        ratings, metadata, run_dir, config=base_config, verbose=args.verbose
     )
 
     if args.compare_without_bias:
         alt_dir = run_dir / ("bias_off" if apply_bias else "bias_on")
         alt_dir.mkdir(parents=True, exist_ok=True)
+        alt_config = _build_kernel_config(bias_correction=not apply_bias, args=args)
         alt_results = _run_pipeline(
             ratings,
             metadata,
             alt_dir,
-            bias_correction=not apply_bias,
+            config=alt_config,
             verbose=args.verbose,
         )
         _write_comparison_outputs(

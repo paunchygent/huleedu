@@ -1,0 +1,4 @@
+>....  
+
+q
+pdm run python scripts/bayesian_consensus_model/redistribute_tui.py
