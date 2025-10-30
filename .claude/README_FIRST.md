@@ -140,6 +140,19 @@ pdm run typecheck-all # Run MyPy
 - Precision-aware weights: no grade flips, mean expected index −0.0289, mean confidence −0.0044.
 - Neutral ESS metrics: enabling the flag raises neutral ESS mean to 1.46 but leaves gating count at 0; running all toggles moves JA24 B→A and JP24 E+→E− while still reporting zero `needs_more_ratings`.
 
+### 6. D-Optimal Pair Scheduling (Jan 2025)
+- Added `scripts/bayesian_consensus_model/d_optimal_optimizer.py` and `d_optimal_prototype.py` to build Fisher-information-maximizing comparison schedules with anchor adjacency + student bracketing constraints.
+- Session 2 optimized outputs:
+  - 84-comparison update: log-det gain +3.69, stored in `session_2_planning/20251027-143747/session2_pairs_optimized.csv`.
+  - 149-comparison expansion: log-det gain +17.65 with coverage mix anchor_anchor=31, student_anchor=86, student_student=32, stored at `session2_pairs_optimized_149.csv`.
+- Follow-up integration & assignment balancing tasks are tracked in `TASKS/d_optimal_pair_optimizer_plan.md`.
+
+### 7. Optimizer Integration & Balanced Redistribution (Jan 2025)
+- Typer CLI: `python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs` covers session/synthetic runs, exposes slot/repeat controls, and writes JSON diagnostics.
+- Textual TUI: `redistribute_tui.py` now has optimization controls + auto-run toggle; logs show comparison mix, anchor coverage, and repeat counts.
+- Rater assignments: `redistribute_core.assign_pairs` delivers balanced comparison mixes so no rater receives anchor-only workloads when student essays exist.
+- Tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py` exercises CLI, allocator, and CSV compatibility.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

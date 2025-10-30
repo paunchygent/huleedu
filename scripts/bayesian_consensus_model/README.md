@@ -119,7 +119,75 @@ Use `scripts/bayesian_consensus_model/evaluation/harness.py` to quantify each im
 - Runs configurable `KernelConfig` baselines and toggled variants.
 - Reports grade changes, confidence deltas, and neutral ESS coverage (informational only).
 
-This workflow ensures we ship toggles only after demonstrating measurable value on anchor datasets.
+## D-Optimal Pair Scheduling & Redistribution
+
+Use the optimizer utilities to generate comparison schedules with maximal Fisher information for CJ sessions, then feed the output straight into the redistribution tools.
+
+### Prototype script (legacy)
+
+```bash
+# 84-slot optimization for Session 2 (improves log-det from 33.98 → 37.67)
+python scripts/bayesian_consensus_model/d_optimal_prototype.py \
+  --mode session2 \
+  --output scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv
+
+# 149-slot expansion (target ~150 comparisons for 24 essays)
+python scripts/bayesian_consensus_model/d_optimal_prototype.py \
+  --mode session2 \
+  --total-slots 149 \
+  --output scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized_149.csv
+```
+
+- `--max-repeat` controls how many times any ordered pair may appear (default `3`).
+- Use `--mode synthetic --total-slots <n>` to sanity-check behaviour on mock data.
+
+### Typer CLI workflow
+
+```bash
+# Session-driven optimization with diagnostics + JSON report
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --pairs-csv scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs.csv \
+  --output-csv scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv \
+  --include-status core \
+  --total-slots 84 \
+  --max-repeat 3 \
+  --report-json output/d_optimal/session2_84.json
+
+# Synthetic smoke test
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --mode synthetic \
+  --total-slots 36 \
+  --max-repeat 3 \
+  --output-csv output/d_optimal/synthetic_36.csv
+```
+
+The CLI prints baseline/optimized log-determinant, comparison-type distributions, per-student anchor coverage, and any repeated pairs (respecting the configured `--max-repeat`). Use `--report-json` for machine-readable diagnostics to slot into notebooks/pipelines.
+
+### Textual TUI
+
+Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interactive flow:
+
+- Fill in pair/assignment paths, then set optimization parameters (`total slots`, `max repeat`, status pool).
+- Press `o` (or click **Optimize**) to regenerate a schedule; the optimizer summary is streamed to the log and the pairs path updates automatically.
+- Toggle “Optimize before assigning?” to run the optimizer every time you press `g`/Generate so redistribution always consumes the fresh schedule.
+
+### Optimization guarantees
+
+- Anchor adjacency comparisons (each anchor compares with its neighbours at least once).
+- Student bracket coverage derived from the baseline plan (below/near/above anchors per student).
+- Slot budgets so you can align with 84 vs 149+ comparison targets.
+
+### Balanced redistribution
+
+`redistribute_core.assign_pairs` now performs type-aware balancing so every rater receives at least one student-anchor comparison (when available) and a mixed workload across comparison types—no more anchor-only chunks unless the pool truly lacks student essays. CLI and TUI flows both use the new allocator, and regression tests lock in the behaviour.
+
+Generated CSVs retain the `pair_id, essay_*` schema, so downstream tooling consuming `redistribute_core.write_assignments` continues to work unchanged.
+
+### Troubleshooting
+
+- **“No remaining slots after applying locked constraints.”** Increase `--total-slots` so the budget covers anchor adjacency (`len(anchor_order) - 1`) plus student bracket requirements, or include more baseline comparisons (`--include-status all`).
+- **Missing anchor coverage warnings.** Inspect the listed students, then bump `--total-slots` or revisit the baseline CSV to ensure each student has three anchor brackets available.
+- **Repeat count violation.** Lower `--max-repeat` or prune locked pairs in the baseline before rerunning; the CLI summary lists offending pairs.
 
 ## Input Data Format
 

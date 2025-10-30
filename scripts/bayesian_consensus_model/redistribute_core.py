@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import csv
+from collections import Counter, deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 ANCHOR_DISPLAY = {
     "F+1": "SA1701",
@@ -119,18 +120,78 @@ def assign_pairs(
     rater_names: Sequence[str],
     per_rater: int,
 ) -> List[Tuple[str, Comparison]]:
+    if per_rater <= 0:
+        raise ValueError("Comparisons per rater must be a positive integer.")
+
+    total_needed = len(rater_names) * per_rater
+    ordered: List[Comparison] = list(comparisons)[:total_needed]
+    if len(ordered) < total_needed:
+        raise ValueError(
+            f"Requested {total_needed} assignments but only {len(ordered)} comparisons available."
+        )
+
+    type_queues: Dict[str, Deque[Comparison]] = {}
+    for comparison in ordered:
+        type_queues.setdefault(comparison.comparison_type, deque()).append(comparison)
+
+    rater_state: Dict[str, _RaterAllocation] = {
+        rater: _RaterAllocation(remaining=per_rater, type_counts=Counter()) for rater in rater_names
+    }
+
+    type_cycle = deque(sorted(type_queues, key=lambda key: (-len(type_queues[key]), key)))
     assignments: List[Tuple[str, Comparison]] = []
-    for idx, rater in enumerate(rater_names):
-        start = idx * per_rater
-        end = start + per_rater
-        chunk = comparisons[start:end]
-        if len(chunk) != per_rater:
-            raise ValueError(
-                f"Insufficient comparisons ({len(chunk)}) to assign {per_rater} pairs to {rater}."
-            )
-        for comparison in chunk:
-            assignments.append((rater, comparison))
+
+    while type_cycle:
+        comparison_type = type_cycle[0]
+        queue = type_queues[comparison_type]
+        if not queue:
+            type_cycle.popleft()
+            continue
+
+        comparison = queue.popleft()
+        rater = _select_rater_for_type(rater_state, comparison_type)
+
+        state = rater_state[rater]
+        state.remaining -= 1
+        state.type_counts[comparison_type] += 1
+
+        assignments.append((rater, comparison))
+
+        if queue:
+            type_cycle.rotate(-1)
+        else:
+            type_cycle.popleft()
+
+    if any(state.remaining for state in rater_state.values()):
+        raise ValueError("Insufficient comparisons to satisfy the requested allocation.")
+
     return assignments
+
+
+def _select_rater_for_type(
+    rater_state: Dict[str, "_RaterAllocation"],
+    comparison_type: str,
+) -> str:
+    eligible = [
+        (name, state)
+        for name, state in rater_state.items()
+        if state.remaining
+    ]
+    if not eligible:
+        raise ValueError("No raters remain eligible for additional comparisons.")
+
+    def sort_key(item: Tuple[str, "_RaterAllocation"]) -> Tuple[int, int, str]:
+        name, state = item
+        return (state.type_counts.get(comparison_type, 0), -state.remaining, name)
+
+    selected_name, _ = min(eligible, key=sort_key)
+    return selected_name
+
+
+@dataclass
+class _RaterAllocation:
+    remaining: int
+    type_counts: Counter[str]
 
 
 def write_assignments(

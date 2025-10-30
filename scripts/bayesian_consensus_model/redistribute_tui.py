@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -16,6 +17,12 @@ except ImportError:  # pragma: no cover - compatibility with older Textual
     from textual.widgets import Log as TextLog  # type: ignore
 
 try:
+    from .d_optimal_workflow import (  # type: ignore[attr-defined]
+        DEFAULT_ANCHOR_ORDER,
+        OptimizationResult,
+        optimize_schedule,
+        write_design,
+    )
     from .redistribute_core import (
         StatusSelector,
         assign_pairs,
@@ -25,6 +32,12 @@ try:
         write_assignments,
     )
 except ImportError:  # pragma: no cover - fallback for direct execution
+    from d_optimal_workflow import (  # type: ignore[attr-defined]
+        DEFAULT_ANCHOR_ORDER,
+        OptimizationResult,
+        optimize_schedule,
+        write_design,
+    )
     from redistribute_core import (  # type: ignore
         StatusSelector,
         assign_pairs,
@@ -36,6 +49,9 @@ except ImportError:  # pragma: no cover - fallback for direct execution
 
 DEFAULT_PAIRS = Path(
     "scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs.csv"
+)
+DEFAULT_OPTIMIZED = Path(
+    "scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv"
 )
 DEFAULT_OUTPUT = Path("session2_dynamic_assignments.csv")
 DEFAULT_RATER_COUNT = 14
@@ -87,7 +103,7 @@ class RedistributeApp(App):
     }
 
     #form {
-        height: 22;
+        height: 28;
         overflow-y: auto;
     }
 
@@ -104,6 +120,7 @@ class RedistributeApp(App):
 
     BINDINGS = [
         Binding("g", "generate", "Generate assignments"),
+        Binding("o", "optimize", "Optimize pairs"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -152,12 +169,49 @@ class RedistributeApp(App):
                     value=StatusSelector.ALL.value,
                     classes="field-select",
                 )
+                yield Static("Optimization Settings", classes="bold")
+                yield Label("Optimization Output CSV Path")
+                yield Input(
+                    value=str(DEFAULT_OPTIMIZED),
+                    id="optimizer_output_input",
+                    classes="field-input",
+                )
+                yield Label("Optimization Status Pool")
+                yield Select(
+                    id="optimizer_status_select",
+                    options=[
+                        ("Core only", StatusSelector.CORE.value),
+                        ("Core + extra", StatusSelector.ALL.value),
+                    ],
+                    value=StatusSelector.CORE.value,
+                    classes="field-select",
+                )
+                yield Label("Optimization Total Slots (blank = baseline count)")
+                yield Input(
+                    id="optimizer_slots_input",
+                    placeholder="e.g., 84",
+                    classes="field-input",
+                )
+                yield Label("Optimization Max Repeat")
+                yield Input(
+                    value="3",
+                    id="optimizer_max_repeat_input",
+                    classes="field-input",
+                )
+                yield Label("Optimize before assigning?")
+                yield Select(
+                    id="optimizer_toggle",
+                    options=[("No", "no"), ("Yes", "yes")],
+                    value="no",
+                    classes="field-select",
+                )
             with Container(id="actions"):
+                yield Button("Optimize (o)", id="optimize_button", variant="primary")
                 yield Button("Generate (g)", id="generate_button", variant="success")
                 yield Button("Reset", id="reset_button")
             yield Static(
-                "Enter either the total number of raters or a comma-separated list of names. "
-                "Adjust comparisons per rater and press g to generate assignments.",
+                "Use Optimize (o) to generate a refreshed schedule, or toggle automatic optimization before assignment. "
+                "Provide either the rater count or explicit names before generating assignments.",
                 id="instructions",
             )
             yield TextLog(id="result", highlight=False)
@@ -170,9 +224,15 @@ class RedistributeApp(App):
     def action_generate(self) -> None:
         self._generate_assignments()
 
+    def action_optimize(self) -> None:
+        log_widget = self.query_one(TextLog)
+        self._run_optimizer(log_widget, clear_log=True)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "generate_button":
             self._generate_assignments()
+        elif event.button.id == "optimize_button":
+            self.action_optimize()
         elif event.button.id == "reset_button":
             self._reset_form()
 
@@ -183,18 +243,34 @@ class RedistributeApp(App):
         self.query_one("#rater_names_input", Input).value = ""
         self.query_one("#per_rater_input", Input).value = "10"
         self.query_one("#status_select", Select).value = StatusSelector.ALL.value
+        self.query_one("#optimizer_output_input", Input).value = str(DEFAULT_OPTIMIZED)
+        self.query_one("#optimizer_status_select", Select).value = StatusSelector.CORE.value
+        self.query_one("#optimizer_slots_input", Input).value = ""
+        self.query_one("#optimizer_max_repeat_input", Input).value = "3"
+        self.query_one("#optimizer_toggle", Select).value = "no"
         self.query_one(TextLog).write("Form reset.")
 
     def _generate_assignments(self) -> None:
         log_widget = self.query_one(TextLog)
         log_widget.clear()
         try:
-            pairs_path = Path(self.query_one("#pairs_input", Input).value.strip())
-            output_path = Path(self.query_one("#output_input", Input).value.strip())
-            if not pairs_path:
+            pairs_value = self.query_one("#pairs_input", Input).value.strip()
+            if not pairs_value:
                 raise ValueError("Pairs CSV path is required.")
+            output_value = self.query_one("#output_input", Input).value.strip()
+            if not output_value:
+                raise ValueError("Output CSV path is required.")
+            output_path = Path(output_value)
             if output_path.is_dir():
                 raise ValueError("Output path points to a directory; provide a file path.")
+
+            if self.query_one("#optimizer_toggle", Select).value == "yes":
+                optimized_path = self._run_optimizer(log_widget, clear_log=False)
+                if optimized_path is None:
+                    return
+                pairs_path = optimized_path
+            else:
+                pairs_path = Path(pairs_value)
 
             comparisons = read_pairs(pairs_path)
 
@@ -234,6 +310,91 @@ class RedistributeApp(App):
         )
         log_widget.write(f"Pairs drawn from statuses: {statuses}")
         log_widget.write(f"Output written to {output_path}")
+
+    def _run_optimizer(self, log_widget: TextLog, *, clear_log: bool) -> Optional[Path]:
+        if clear_log:
+            log_widget.clear()
+
+        try:
+            pairs_value = self.query_one("#pairs_input", Input).value.strip()
+            if not pairs_value:
+                raise ValueError("Pairs CSV path is required for optimization.")
+            output_value = self.query_one("#optimizer_output_input", Input).value.strip()
+            if not output_value:
+                raise ValueError("Optimization output path is required.")
+
+            slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
+            total_slots = int(slots_raw) if slots_raw else None
+
+            max_repeat_raw = self.query_one("#optimizer_max_repeat_input", Input).value.strip()
+            max_repeat = int(max_repeat_raw) if max_repeat_raw else 3
+            if max_repeat <= 0:
+                raise ValueError("Optimization max repeat must be positive.")
+
+            status_value = self.query_one("#optimizer_status_select", Select).value
+            include_status = StatusSelector(status_value or StatusSelector.CORE.value)
+            status_filter = None if include_status is StatusSelector.ALL else (include_status.value,)
+
+            result = optimize_schedule(
+                Path(pairs_value),
+                total_slots=total_slots,
+                max_repeat=max_repeat,
+                anchor_order=DEFAULT_ANCHOR_ORDER,
+                status_filter=status_filter,
+            )
+
+            output_path = Path(output_value)
+            write_design(result.optimized_design, output_path)
+            self.query_one("#pairs_input", Input).value = str(output_path)
+
+            self._log_optimizer_summary(log_widget, result, output_path)
+            return output_path
+        except ValueError as exc:
+            log_widget.write(f"[red]Optimization error:[/] {exc}")
+        except FileNotFoundError as exc:
+            log_widget.write(f"[red]Optimization error:[/] {exc}")
+        return None
+
+    def _log_optimizer_summary(
+        self,
+        log_widget: TextLog,
+        result: OptimizationResult,
+        output_path: Path,
+    ) -> None:
+        log_widget.write(
+            "[green]Optimization succeeded[/]: "
+            f"log-det gain {result.log_det_gain:.4f} "
+            f"({result.baseline_log_det:.4f} → {result.optimized_log_det:.4f})"
+        )
+        log_widget.write(f"Optimized schedule written to {output_path}")
+
+        log_widget.write("Type distribution (optimized):")
+        for comp_type, count in result.optimized_diagnostics.type_counts.items():
+            log_widget.write(f"  {comp_type:<16} {count}")
+
+        coverage = result.optimized_diagnostics.student_anchor_coverage
+        if coverage:
+            log_widget.write("Student anchor coverage:")
+            for student in sorted(coverage):
+                anchors = ", ".join(coverage[student]) or "—"
+                log_widget.write(f"  {student:<10} {anchors}")
+        else:
+            log_widget.write("Student anchor coverage: none")
+
+        missing = sorted(set(result.students) - set(coverage))
+        if missing:
+            log_widget.write(
+                "[yellow]Warning[/]: Missing anchor coverage for "
+                + ", ".join(missing)
+            )
+
+        repeats = result.optimized_diagnostics.repeat_counts
+        if repeats:
+            log_widget.write("Repeated pairs (>1 occurrence):")
+            for key, count in sorted(repeats.items()):
+                log_widget.write(f"  {key}: {count}×")
+        else:
+            log_widget.write("Repeated pairs: none")
 
 
 if __name__ == "__main__":

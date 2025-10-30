@@ -3,7 +3,17 @@
 ## Current Status (Jan 25, 2025)
 
 ### What We Just Completed
-Corrected major inaccuracies in Bayesian consensus model report (`docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html`). Fixed rater bias interpretation (negative=strict, positive=generous), updated all data values to match actual model output, anonymized content, and regenerated all figures with proper color schemes and layouts.
+- Corrected major inaccuracies in Bayesian consensus model report (`docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html`). Fixed rater bias interpretation (negative=strict, positive=generous), updated all data values to match actual model output, anonymized content, and regenerated all figures with proper color schemes and layouts.
+- Implemented D-optimal comparison planning tools for the CJ session:
+  - Added `scripts/bayesian_consensus_model/d_optimal_optimizer.py` (Fisher log-det greedy + exchange optimizer with anchor adjacency + student bracket constraints).
+  - Added `scripts/bayesian_consensus_model/d_optimal_prototype.py` to generate optimized schedules; default run now improves Session 2 core set (log-det 33.98 → 37.67).
+  - Generated 149-comparison expansion (`scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized_149.csv`) yielding log-det 51.63 and coverage mix (anchor-anchor 31 | student-anchor 86 | student-student 32).
+  - Tracked follow-up integration + assignment balancing tasks in `TASKS/d_optimal_pair_optimizer_plan.md`.
+- Completed the optimizer rollout plan:
+  - Added a Typer command (`redistribute_pairs optimize-pairs`) with session/synthetic modes, JSON diagnostics, and regression coverage.
+  - Upgraded the Textual TUI with optimization controls + auto-run toggle; optimizer summaries now surface mix, coverage, and repeat counts.
+  - Implemented a type-aware rater assignment balancer eliminating anchor-only workloads; README + session plan now document the workflow.
+  - Tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py` (covers CLI + allocator).
 
 ### System State
 - All services running and healthy

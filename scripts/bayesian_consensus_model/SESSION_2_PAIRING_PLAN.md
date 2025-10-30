@@ -6,6 +6,13 @@
 - **14 raters** × 12 comparisons = **168 total pairs**
 - **Duration**: ~40 minutes per rater (4 min/comparison)
 - **Format**: Single session, pre-generated pairs
+- **Optimized schedules**:
+  - 84-comparison core (`session2_pairs_optimized.csv`, log-det +3.69 vs. original)
+  - 149-comparison expansion (`session2_pairs_optimized_149.csv`, log-det +17.65; mix anchor_anchor=31, student_anchor=86, student_student=32)
+- Regenerate via either:
+  - `python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs --pairs-csv session2_pairs.csv --output-csv session2_pairs_optimized.csv --total-slots 84 --max-repeat 3`
+  - TUI (`python scripts/bayesian_consensus_model/redistribute_tui.py`) → press **Optimize (o)** with desired slot/ repeat settings
+- `redistribute_pairs.redistribute` now performs type-aware balancing so each rater receives mixed comparison types (student-anchor, anchor-anchor, student-student) by default.
 
 ---
 
