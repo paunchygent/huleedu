@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 if __package__ in (None, ""):
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -71,6 +71,39 @@ DEFAULT_OUTPUT = Path("session2_dynamic_assignments.csv")
 DEFAULT_RATER_COUNT = 14
 
 
+def _load_students_from_csv(csv_path: Path) -> List[str]:
+    """Load student IDs from CSV, trying common column names (case-insensitive)."""
+    import csv
+
+    with csv_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            raise ValueError("CSV file is empty or has no headers")
+
+        # Build case-insensitive mapping: lowercase → original column name
+        fieldname_map = {name.lower(): name for name in reader.fieldnames}
+
+        # Try common column names (case-insensitive)
+        for col_name in ["essay_id", "student_id", "id"]:
+            if col_name in fieldname_map:
+                original_col = fieldname_map[col_name]
+                f.seek(0)
+                reader = csv.DictReader(f)
+                students = [
+                    row[original_col].strip()
+                    for row in reader
+                    if row.get(original_col, "").strip()
+                ]
+                if not students:
+                    raise ValueError(f"CSV column '{original_col}' is empty")
+                return students
+
+        raise ValueError(
+            f"CSV must have one of: essay_id, student_id, or id column (case-insensitive). "
+            f"Found: {', '.join(reader.fieldnames)}"
+        )
+
+
 class RedistributeApp(App):
     """Interactive TUI for generating rater assignments."""
 
@@ -134,7 +167,6 @@ class RedistributeApp(App):
 
     BINDINGS = [
         Binding("g", "generate", "Generate assignments"),
-        Binding("o", "optimize", "Optimize pairs"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -143,19 +175,25 @@ class RedistributeApp(App):
         with Container(id="panel"):
             yield Label("Redistribute Comparison Pairs", id="title", classes="bold")
             with Vertical(id="form"):
-                yield Label("Student Essay IDs (comma-separated)")
+                yield Label("Students CSV (optional - recommended for large cohorts)")
+                yield Input(
+                    placeholder="Path to CSV with essay_id/student_id/id column",
+                    id="students_csv_input",
+                    classes="field-input",
+                )
+                yield Label("Students (comma-separated - fallback if no CSV)")
                 yield Input(
                     placeholder="e.g., JA24, II24, ES24",
                     id="students_input",
                     classes="field-input",
                 )
-                yield Label("Anchor Order Override (comma-separated, optional)")
+                yield Label("Anchors (optional - leave blank for default 12-anchor ladder)")
                 yield Input(
                     placeholder="Leave blank for default anchor ladder",
                     id="anchors_input",
                     classes="field-input",
                 )
-                yield Label("Output CSV Path")
+                yield Label("Assignments CSV Path (final rater assignments)")
                 yield Input(
                     value=str(DEFAULT_OUTPUT),
                     id="output_input",
@@ -190,7 +228,7 @@ class RedistributeApp(App):
                     classes="field-select",
                 )
                 yield Static("Optimization Settings", classes="bold")
-                yield Label("Optimization Output CSV Path")
+                yield Label("Pairs CSV Path (optimized comparison pairs)")
                 yield Input(
                     value=str(DEFAULT_OPTIMIZED),
                     id="optimizer_output_input",
@@ -208,14 +246,14 @@ class RedistributeApp(App):
                     id="locked_pairs_input",
                     classes="field-input",
                 )
-                yield Label("Optimization Total Slots (required)")
+                yield Label("Total Comparison Slots")
                 yield Input(
                     value="24",
                     id="optimizer_slots_input",
                     placeholder="e.g., 84",
                     classes="field-input",
                 )
-                yield Label("Optimization Max Repeat")
+                yield Label("Max Repetitions Per Pair (default: 3)")
                 yield Input(
                     value="3",
                     id="optimizer_max_repeat_input",
@@ -228,20 +266,13 @@ class RedistributeApp(App):
                     value="yes",
                     classes="field-select",
                 )
-                yield Label("Optimize before assigning?")
-                yield Select(
-                    id="optimizer_toggle",
-                    options=[("No", "no"), ("Yes", "yes")],
-                    value="no",
-                    classes="field-select",
-                )
             with Container(id="actions"):
-                yield Button("Optimize (o)", id="optimize_button", variant="primary")
-                yield Button("Generate (g)", id="generate_button", variant="success")
+                yield Button("Generate Assignments (g)", id="generate_button", variant="success")
                 yield Button("Reset", id="reset_button")
             yield Static(
-                "Use Optimize (o) to generate a refreshed schedule, or toggle automatic optimization before assignment. "
-                "Provide either the rater count or explicit names before generating assignments.",
+                "Load students via CSV (recommended) or comma-separated entry. "
+                "Generate Assignments runs the optimizer to create comparison pairs, "
+                "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV.",
                 id="instructions",
             )
             yield TextLog(id="result", highlight=False)
@@ -254,19 +285,14 @@ class RedistributeApp(App):
     def action_generate(self) -> None:
         self._generate_assignments()
 
-    def action_optimize(self) -> None:
-        log_widget = self.query_one(TextLog)
-        self._run_optimizer(log_widget, clear_log=True)
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "generate_button":
             self._generate_assignments()
-        elif event.button.id == "optimize_button":
-            self.action_optimize()
         elif event.button.id == "reset_button":
             self._reset_form()
 
     def _reset_form(self) -> None:
+        self.query_one("#students_csv_input", Input).value = ""
         self.query_one("#students_input", Input).value = ""
         self.query_one("#anchors_input", Input).value = ""
         self.query_one("#output_input", Input).value = str(DEFAULT_OUTPUT)
@@ -278,8 +304,8 @@ class RedistributeApp(App):
         self.query_one("#optimizer_slots_input", Input).value = "24"
         self.query_one("#optimizer_max_repeat_input", Input).value = "3"
         self.query_one("#locked_pairs_input", Input).value = ""
+        self.query_one("#previous_csv_input", Input).value = ""
         self.query_one("#include_anchor_anchor_select", Select).value = "yes"
-        self.query_one("#optimizer_toggle", Select).value = "no"
         self.query_one(TextLog).write("Form reset.")
 
     def _generate_assignments(self) -> None:
@@ -288,28 +314,15 @@ class RedistributeApp(App):
         try:
             output_value = self.query_one("#output_input", Input).value.strip()
             if not output_value:
-                raise ValueError("Output CSV path is required.")
+                raise ValueError("Assignments CSV path is required.")
             output_path = Path(output_value)
             if output_path.is_dir():
                 raise ValueError("Output path points to a directory; provide a file path.")
 
-            # If optimizer toggle is on, run optimizer first to generate pairs CSV
-            if self.query_one("#optimizer_toggle", Select).value == "yes":
-                optimized_path = self._run_optimizer(log_widget, clear_log=False)
-                if optimized_path is None:
-                    return
-                pairs_path = optimized_path
-            else:
-                # Use manually specified optimized pairs file
-                optimizer_output = self.query_one("#optimizer_output_input", Input).value.strip()
-                if not optimizer_output:
-                    raise ValueError(
-                        "Either enable optimization or provide an existing optimized pairs "
-                        "CSV path."
-                    )
-                pairs_path = Path(optimizer_output)
-                if not pairs_path.exists():
-                    raise FileNotFoundError(f"Pairs CSV not found: {pairs_path}")
+            # Always run optimizer first (unified workflow)
+            pairs_path = self._run_optimizer(log_widget, clear_log=False)
+            if pairs_path is None:
+                return
 
             comparisons = read_pairs(pairs_path)
 
@@ -383,13 +396,22 @@ class RedistributeApp(App):
             log_widget.clear()
 
         try:
-            # Get student IDs
-            students_value = self.query_one("#students_input", Input).value.strip()
-            if not students_value:
-                raise ValueError("Student Essay IDs are required for optimization.")
-            student_list = [s.strip() for s in students_value.split(",") if s.strip()]
-            if not student_list:
-                raise ValueError("At least one student essay ID is required.")
+            # Get student IDs - try CSV first, fallback to manual entry
+            students_csv = self.query_one("#students_csv_input", Input).value.strip()
+            if students_csv:
+                csv_path = Path(students_csv)
+                if not csv_path.exists():
+                    raise FileNotFoundError(f"Students CSV not found: {csv_path}")
+                student_list = _load_students_from_csv(csv_path)
+                log_widget.write(f"Loaded {len(student_list)} students from CSV")
+            else:
+                # Fallback to manual comma-separated entry
+                students_value = self.query_one("#students_input", Input).value.strip()
+                if not students_value:
+                    raise ValueError("Provide students via CSV or comma-separated entry.")
+                student_list = [s.strip() for s in students_value.split(",") if s.strip()]
+                if not student_list:
+                    raise ValueError("At least one student essay ID is required.")
 
             # Get output path
             output_value = self.query_one("#optimizer_output_input", Input).value.strip()

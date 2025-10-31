@@ -7,20 +7,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
-ANCHOR_DISPLAY = {
-    "F+1": "SA1701",
-    "F+2": "SA1702",
-    "E-": "SA1703",
-    "E+": "SA1704",
-    "D-": "SA1705",
-    "D+": "SA1706",
-    "C-": "SA1707",
-    "C+": "SA1708",
-    "B1": "SA1709",
-    "B2": "SA1710",
-    "A1": "SA1711",
-    "A2": "SA1712",
-}
 
 
 class StatusSelector(str, Enum):
@@ -35,14 +21,6 @@ class Comparison:
     essay_b_id: str
     comparison_type: str
     status: str
-
-    @property
-    def display_a(self) -> str:
-        return ANCHOR_DISPLAY.get(self.essay_a_id, self.essay_a_id)
-
-    @property
-    def display_b(self) -> str:
-        return ANCHOR_DISPLAY.get(self.essay_b_id, self.essay_b_id)
 
 
 def read_pairs(path: Path) -> List[Comparison]:
@@ -307,6 +285,19 @@ def write_assignments(
     output_path: Path,
     assignments: Sequence[Tuple[str, Comparison]],
 ) -> None:
+    # Build auto-generated display name mapping for complete anonymization
+    all_essay_ids: set[str] = set()
+    for _, comparison in assignments:
+        all_essay_ids.add(comparison.essay_a_id)
+        all_essay_ids.add(comparison.essay_b_id)
+
+    # Sort for deterministic mapping (same input → same display codes)
+    sorted_essays = sorted(all_essay_ids)
+    display_mapping = {
+        essay_id: f"essay_{idx:02d}"
+        for idx, essay_id in enumerate(sorted_essays, start=1)
+    }
+
     fieldnames = [
         "rater_name",
         "pair_id",
@@ -327,8 +318,8 @@ def write_assignments(
                     "pair_id": comparison.pair_id,
                     "essay_a_id": comparison.essay_a_id,
                     "essay_b_id": comparison.essay_b_id,
-                    "essay_a_display": comparison.display_a,
-                    "essay_b_display": comparison.display_b,
+                    "essay_a_display": display_mapping[comparison.essay_a_id],
+                    "essay_b_display": display_mapping[comparison.essay_b_id],
                     "comparison_type": comparison.comparison_type,
                     "status": comparison.status,
                 }

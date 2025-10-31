@@ -7,7 +7,8 @@
 
 ## Inputs & Preprocessing
 - **Posterior snapshot**: Current student ability estimates, standard errors, and pair history (from `essay_consensus.csv` and session 1 logs).
-- **Anchor catalogue**: Ordered list of anchor essays with grade levels and identifiers (e.g., `ANCHOR_DISPLAY` mapping).
+- **Anchor catalogue**: Ordered list of anchor essay IDs (any naming scheme supported: `F+1`, `1a`, `Low-Example`, etc.).
+- **Display Name Handling**: All essays (anchors + students) receive auto-generated sequential display names (`essay_01`, `essay_02`, ...) in the Assignments CSV for complete rater anonymization. No hardcoded mappings required.
 - **Rater roster**: Optional list to keep per-rater calibration pairs in the final export.
 - Build a canonical node index (students first, anchors second) so the optimizer can address the parameter vector consistently.
 - Construct the universe of allowable pairs (student–anchor, student–student, anchor–anchor); flag already-observed pairs so we can weight repeated matchups.

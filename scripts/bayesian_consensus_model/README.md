@@ -123,24 +123,6 @@ Use `scripts/bayesian_consensus_model/evaluation/harness.py` to quantify each im
 
 Use the optimizer utilities to generate comparison schedules with maximal Fisher information for CJ sessions, then feed the output straight into the redistribution tools.
 
-### Prototype script (legacy)
-
-```bash
-# 84-slot optimization for Session 2 (improves log-det from 33.98 → 37.67)
-python scripts/bayesian_consensus_model/d_optimal_prototype.py \
-  --mode session2 \
-  --output scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv
-
-# 149-slot expansion (target ~150 comparisons for 24 essays)
-python scripts/bayesian_consensus_model/d_optimal_prototype.py \
-  --mode session2 \
-  --total-slots 149 \
-  --output scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized_149.csv
-```
-
-- `--max-repeat` controls how many times any ordered pair may appear (default `3`).
-- Use `--mode synthetic --total-slots <n>` to sanity-check behaviour on mock data.
-
 ### Dynamic Intake Workflow (Multi-Session Support)
 
 **New as of 2025-10-31**: The optimizer now supports multi-session workflows with coverage analysis, eliminating the need for baseline CSV files.
@@ -238,12 +220,37 @@ The CLI prints baseline/optimized log-determinant, comparison-type distributions
 
 ### Textual TUI
 
-Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interactive flow:
+Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interactive workflow.
 
-- Fill in pair/assignment paths, then set optimization parameters (`total slots`, `max repeat`, status pool). The
-  **Optional Baseline JSON Path** field accepts the same payload format as `--baseline-json` for browser/API handoff.
-- Press `o` (or click **Optimize**) to regenerate a schedule; the optimizer summary is streamed to the log and the pairs path updates automatically.
-- Toggle “Optimize before assigning?” to run the optimizer every time you press `g`/Generate so redistribution always consumes the fresh schedule.
+**Student Input:**
+- **Recommended**: Provide a CSV file with `essay_id`, `student_id`, or `id` column (case-insensitive)
+- **Fallback**: Enter comma-separated student IDs manually
+
+**Workflow:**
+1. Configure paths for Pairs CSV (optimizer output) and Assignments CSV (final rater distribution)
+2. Set optimization parameters: total slots, max repetitions per pair
+3. Optional: Provide previous session CSV for multi-session workflows
+4. Optional: Lock specific pairs as hard constraints
+5. Press `g` or click "Generate Assignments"
+
+**What happens:**
+- Optimizer generates optimized comparison pairs → saves to Pairs CSV
+- Assignment generator distributes pairs to raters → saves to Assignments CSV
+- Log displays both outputs with optimization metrics and coverage analysis
+
+**Anonymization:**
+All essays (students + anchors) receive auto-generated sequential display names
+(`essay_01`, `essay_02`, etc.) in the Assignments CSV to ensure complete rater blinding.
+
+### Anchor Flexibility
+
+The system supports any anchor naming scheme:
+- Swedish grades: `F+1, F+2, E-, E+, ...`
+- Numeric: `1a, 1b, 2a, 2b, ...`
+- Custom: `Low-Example, Mid-Example, High-Example`
+
+No configuration needed - anchor IDs are used directly in optimization logic.
+For rater anonymization, all essays receive auto-generated sequential display names in the Assignments CSV output.
 
 ### Optimization guarantees
 
