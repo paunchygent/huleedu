@@ -25,11 +25,9 @@ try:
         write_design,
     )
     from .redistribute_core import (  # type: ignore[attr-defined]
-        StatusSelector,
         assign_pairs,
         build_rater_list,
         compute_quota_distribution,
-        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -44,11 +42,9 @@ except ImportError:  # pragma: no cover - fallback for direct execution
         write_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
-        StatusSelector,
         assign_pairs,
         build_rater_list,
         compute_quota_distribution,
-        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -102,12 +98,6 @@ def redistribute(
         "-n",
         help="Explicit rater names (repeat option per rater or supply comma-separated values).",
     ),
-    include_status: StatusSelector = typer.Option(
-        StatusSelector.ALL,
-        "--include-status",
-        case_sensitive=False,
-        help="Select from 'core' (84 comparisons) or 'all' (core + extras).",
-    ),
 ) -> None:
     """Redistribute comparison pairs and export a new rater assignment file."""
     try:
@@ -123,26 +113,24 @@ def redistribute(
                 raters = typer.prompt("How many raters will attend?", type=int)
             names = build_rater_list(raters, None)
 
-        pool = filter_comparisons(comparisons, include_status)
         requested_total = len(names) * per_rater
-        available_total = len(pool)
+        available_total = len(comparisons)
 
         if available_total == 0:
             raise ValueError(
-                "No comparisons available after filtering. "
-                "Adjust status selection or regenerate pairs."
+                "No comparisons available in pairs CSV."
             )
 
         shortage = requested_total > available_total
         if shortage:
             quotas = compute_quota_distribution(names, per_rater, available_total)
             total_needed = sum(quotas.values())
-            selected = select_comparisons(comparisons, include_status, total_needed)
+            selected = select_comparisons(comparisons, total_needed)
             assignments = assign_pairs(selected, names, quotas)
         else:
             quotas = {name: per_rater for name in names}
             total_needed = requested_total
-            selected = select_comparisons(comparisons, include_status, total_needed)
+            selected = select_comparisons(comparisons, total_needed)
             assignments = assign_pairs(selected, names, per_rater)
 
         write_assignments(output_path, assignments)
@@ -150,7 +138,6 @@ def redistribute(
         typer.secho(f"Error: {error}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-    statuses = sorted({comparison.status for _, comparison in assignments})
     actual_counts: Sequence[int] = [quotas[name] for name in names]
     min_count = min(actual_counts)
     max_count = max(actual_counts)
@@ -169,7 +156,6 @@ def redistribute(
         f"{sum(actual_counts)} (requested {requested_total}).",
         fg=typer.colors.GREEN,
     )
-    typer.echo(f"Pairs drawn from statuses: {', '.join(statuses)}")
     typer.echo(f"Output written to {output_path}")
 
 
@@ -211,13 +197,19 @@ def optimize_pairs(
         "--previous-csv",
         "-p",
         metavar="PATH",
-        help="Previous session CSV for multi-session workflows (provides historical comparison data).",
+        help=(
+            "Previous session CSV for multi-session workflows "
+            "(provides historical comparison data)."
+        ),
     ),
     locked_pairs: Optional[List[str]] = typer.Option(
         None,
         "--lock-pair",
         "-l",
-        help="Hard constraint pairs that MUST be included (rare; distinct from previous comparisons).",
+        help=(
+            "Hard constraint pairs that MUST be included "
+            "(rare; distinct from previous comparisons)."
+        ),
     ),
     max_repeat: int = typer.Option(
         3,
@@ -252,7 +244,10 @@ def optimize_pairs(
         previous_comparisons = None
         if previous_csv:
             previous_comparisons = load_previous_comparisons_from_csv(previous_csv)
-            typer.echo(f"Loaded {len(previous_comparisons)} previous comparisons from {previous_csv}")
+            typer.echo(
+                f"Loaded {len(previous_comparisons)} previous comparisons "
+                f"from {previous_csv}"
+            )
 
         # Parse locked pairs
         locked_list: List[Tuple[str, str]] = []

@@ -196,7 +196,6 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --pairs-csv scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs.csv \
   --output-csv scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv \
-  --include-status core \
   --total-slots 84 \
   --max-repeat 3 \
   --report-json output/d_optimal/session2_84.json
@@ -266,9 +265,9 @@ Generated CSVs retain the `pair_id, essay_*` schema, so downstream tooling consu
 
 ### Troubleshooting
 
-- **“No remaining slots after applying locked constraints.”** Increase `--total-slots` so the budget covers anchor adjacency (`len(anchor_order) - 1`) plus student bracket requirements, or include more baseline comparisons (`--include-status all`).
-- **Missing anchor coverage warnings.** Inspect the listed students, then bump `--total-slots` or revisit the baseline CSV to ensure each student has three anchor brackets available.
-- **Repeat count violation.** Lower `--max-repeat` or prune locked pairs in the baseline before rerunning; the CLI summary lists offending pairs.
+- **"No remaining slots after applying locked constraints."** Increase `--total-slots` so the budget covers anchor adjacency (`len(anchor_order) - 1`) plus student bracket requirements.
+- **Missing anchor coverage warnings.** Inspect the listed students, then bump `--total-slots` or revisit the previous session CSV to ensure each student has three anchor brackets available.
+- **Repeat count violation.** Lower `--max-repeat` or prune locked pairs before rerunning; the CLI summary lists offending pairs.
 
 ## Input Data Format
 

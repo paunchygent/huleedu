@@ -36,7 +36,9 @@ def _pair_vector(candidate: PairCandidate, index_map: Dict[str, int]) -> np.ndar
     return vec
 
 
-def compute_log_det(design: Sequence[DesignEntry], index_map: Dict[str, int], *, epsilon: float = 1e-3) -> float:
+def compute_log_det(
+    design: Sequence[DesignEntry], index_map: Dict[str, int], *, epsilon: float = 1e-3
+) -> float:
     size = len(index_map)
     information = np.eye(size, dtype=float) * epsilon
     for entry in design:

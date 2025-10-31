@@ -97,7 +97,6 @@ class BaselinePayload:
 
     records: Sequence[Mapping[str, object]]
     anchor_order: Sequence[str]
-    status_filter: Optional[Sequence[str]]
     total_slots: Optional[int]
 
 
@@ -111,8 +110,7 @@ class ComparisonRecord:
 
     essay_a_id: str
     essay_b_id: str
-    comparison_type: str  # student_anchor, student_student, anchor_anchor
-    status: str  # core, extra
+    comparison_type: str  # student_anchor, student_student, anchor_anchor  # core, extra
 
 
 @dataclass(frozen=True)
@@ -147,7 +145,8 @@ def load_dynamic_spec(
         students: List of student essay IDs to include in pairing
         anchors: Ordered anchor ladder (defaults to DEFAULT_ANCHOR_ORDER)
         include_anchor_anchor: Whether to include anchor-anchor comparisons in candidate universe
-        previous_comparisons: Historical comparisons from previous sessions (for multi-session workflows)
+        previous_comparisons: Historical comparisons from previous sessions
+            (for multi-session workflows)
         locked_pairs: Optional hard constraint pairs that MUST be included (rarely used)
         total_slots: Required comparison slot budget
 
@@ -224,7 +223,6 @@ def load_baseline_payload(
         raise ValueError(f"Invalid JSON payload in {path}") from exc
 
     anchor_order: Sequence[str] = list(fallback_anchor_order)
-    status_filter: Optional[Sequence[str]] = None
     total_slots: Optional[int] = None
 
     def _normalize_string_sequence(value: object, field: str) -> List[str]:
@@ -242,8 +240,6 @@ def load_baseline_payload(
             raise ValueError("Baseline payload must include a 'comparisons' array.")
         if "anchor_order" in raw:
             anchor_order = _normalize_string_sequence(raw["anchor_order"], "anchor_order")
-        if "status_filter" in raw:
-            status_filter = _normalize_string_sequence(raw["status_filter"], "status_filter")
         if "total_slots" in raw and raw["total_slots"] is not None:
             try:
                 total_slots = int(raw["total_slots"])
@@ -269,7 +265,6 @@ def load_baseline_payload(
     return BaselinePayload(
         records=normalized_records,
         anchor_order=list(anchor_order),
-        status_filter=list(status_filter) if status_filter is not None else None,
         total_slots=total_slots,
     )
 
@@ -280,7 +275,6 @@ def optimize_from_payload(
     total_slots: int | None,
     max_repeat: int,
     anchor_order: Sequence[str] | None = None,
-    status_filter: Iterable[str] | None = ("core",),
 ) -> OptimizationResult:
     """Run optimization for a pre-normalized baseline payload."""
 
@@ -288,19 +282,12 @@ def optimize_from_payload(
     effective_anchor_order = (
         list(anchor_order) if anchor_order is not None else list(payload.anchor_order)
     )
-    payload_status = payload.status_filter
-    effective_status_filter: Iterable[str] | None
-    if status_filter is not None:
-        effective_status_filter = status_filter
-    else:
-        effective_status_filter = payload_status
 
     return optimize_schedule(
         pairs_path=None,
         total_slots=effective_slots,
         max_repeat=max_repeat,
         anchor_order=effective_anchor_order,
-        status_filter=effective_status_filter,
         baseline_records=payload.records,
     )
 
@@ -309,7 +296,6 @@ def load_baseline_design(
     pairs_path: Path,
     *,
     anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
-    status_filter: Iterable[str] | None = ("core",),
 ) -> Tuple[List[str], List[DesignEntry]]:
     """Load a baseline design from CSV for optimization."""
     if not pairs_path.exists():
@@ -318,20 +304,16 @@ def load_baseline_design(
     anchors = set(anchor_order)
     students: set[str] = set()
     design: List[DesignEntry] = []
-    statuses = {status.lower() for status in status_filter} if status_filter is not None else None
 
     with pairs_path.open(newline="") as handle:
         reader = csv.DictReader(handle)
-        required = {"essay_a_id", "essay_b_id", "comparison_type", "status"}
+        required = {"essay_a_id", "essay_b_id", "comparison_type"}
         missing = required - set(reader.fieldnames or [])
         if missing:
             field_list = ", ".join(sorted(missing))
             raise ValueError(f"Pairs CSV missing required columns: {field_list}")
 
         for row in reader:
-            status_value = (row.get("status") or "").lower()
-            if statuses is not None and status_value not in statuses:
-                continue
             candidate = PairCandidate(
                 essay_a=row["essay_a_id"],
                 essay_b=row["essay_b_id"],
@@ -343,21 +325,18 @@ def load_baseline_design(
                     students.add(essay)
 
     if not design:
-        raise ValueError("No comparisons matched the requested status filter.")
+        raise ValueError("No comparisons found in CSV.")
 
     return sorted(students), design
 
 
 def load_previous_comparisons_from_csv(
     csv_path: Path,
-    *,
-    status_filter: Iterable[str] | None = ("core",),
 ) -> List[ComparisonRecord]:
     """Load previous comparison records from a CSV file.
 
     Args:
         csv_path: Path to CSV file with comparison history
-        status_filter: Optional filter for comparison status (default: only "core")
 
     Returns:
         List of ComparisonRecord objects
@@ -370,31 +349,26 @@ def load_previous_comparisons_from_csv(
         raise FileNotFoundError(f"Previous comparisons CSV not found: {csv_path}")
 
     records: List[ComparisonRecord] = []
-    statuses = {status.lower() for status in status_filter} if status_filter is not None else None
 
     with csv_path.open(newline="") as handle:
         reader = csv.DictReader(handle)
-        required = {"essay_a_id", "essay_b_id", "comparison_type", "status"}
+        required = {"essay_a_id", "essay_b_id", "comparison_type"}
         missing = required - set(reader.fieldnames or [])
         if missing:
             field_list = ", ".join(sorted(missing))
             raise ValueError(f"CSV missing required columns: {field_list}")
 
         for row in reader:
-            status_value = (row.get("status") or "").lower()
-            if statuses is not None and status_value not in statuses:
-                continue
             records.append(
                 ComparisonRecord(
                     essay_a_id=row["essay_a_id"],
                     essay_b_id=row["essay_b_id"],
                     comparison_type=row["comparison_type"],
-                    status=status_value,
                 )
             )
 
     if not records:
-        raise ValueError("No comparisons matched the requested status filter.")
+        raise ValueError("No comparisons found in CSV.")
 
     return records
 
@@ -403,18 +377,14 @@ def load_baseline_from_records(
     records: Iterable[Mapping[str, object]],
     *,
     anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
-    status_filter: Optional[Iterable[str]] = ("core",),
 ) -> Tuple[List[str], List[DesignEntry]]:
     """Load a baseline design from in-memory records."""
     raw_comparisons = load_comparisons_from_records(records)
-    statuses = {status.lower() for status in status_filter} if status_filter is not None else None
     anchors = set(anchor_order)
     students: set[str] = set()
     design: List[DesignEntry] = []
 
     for comparison in raw_comparisons:
-        if statuses is not None and comparison.status.lower() not in statuses:
-            continue
         candidate = PairCandidate(
             essay_a=comparison.essay_a_id,
             essay_b=comparison.essay_b_id,
@@ -426,7 +396,7 @@ def load_baseline_from_records(
                 students.add(essay)
 
     if not design:
-        raise ValueError("No comparisons matched the requested status filter.")
+        raise ValueError("No comparisons found in records.")
 
     return sorted(students), design
 
@@ -632,9 +602,9 @@ def optimize_from_dynamic_spec(
     )
 
 
-def write_design(design: Sequence[DesignEntry], output_path: Path, *, status: str = "core") -> None:
+def write_design(design: Sequence[DesignEntry], output_path: Path) -> None:
     """Persist a design to CSV using the standard comparison schema."""
-    fieldnames = ["pair_id", "essay_a_id", "essay_b_id", "comparison_type", "status"]
+    fieldnames = ["pair_id", "essay_a_id", "essay_b_id", "comparison_type"]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -646,7 +616,6 @@ def write_design(design: Sequence[DesignEntry], output_path: Path, *, status: st
                     "essay_a_id": entry.candidate.essay_a,
                     "essay_b_id": entry.candidate.essay_b,
                     "comparison_type": entry.candidate.comparison_type,
-                    "status": status,
                 }
             )
 
@@ -657,7 +626,6 @@ def optimize_schedule(
     total_slots: int | None,
     max_repeat: int,
     anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
-    status_filter: Iterable[str] | None = ("core",),
     baseline_records: Optional[Iterable[Mapping[str, object]]] = None,
 ) -> OptimizationResult:
     """Run the optimizer against a baseline design and return metrics."""
@@ -665,7 +633,6 @@ def optimize_schedule(
         students, baseline_design = load_baseline_from_records(
             baseline_records,
             anchor_order=anchor_order,
-            status_filter=status_filter,
         )
     else:
         if pairs_path is None:
@@ -673,7 +640,6 @@ def optimize_schedule(
         students, baseline_design = load_baseline_design(
             pairs_path,
             anchor_order=anchor_order,
-            status_filter=status_filter,
         )
     if not students:
         raise ValueError("No student essays detected in the baseline design.")

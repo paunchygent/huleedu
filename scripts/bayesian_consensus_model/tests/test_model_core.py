@@ -189,7 +189,9 @@ def test_bias_correction_toggle_restores_naive_expectation() -> None:
     results_on = model_on.get_consensus()
     differing = False
     for essay_id in results_on:
-        if not pytest.approx(results_on[essay_id].expected_grade_index) == results_off[essay_id].expected_grade_index:
+        if not pytest.approx(results_on[essay_id].expected_grade_index) == results_off[
+            essay_id
+        ].expected_grade_index:
             differing = True
             break
     assert differing

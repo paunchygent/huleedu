@@ -50,16 +50,20 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 
 ## Current Implementation Status
 
-### ✅ Complete (as of 2025-10-31)
+### ✅ Complete (as of 2025-11-01)
 
 - **Dynamic Spec Schema**: `DynamicSpec` dataclass with students, anchors, previous_comparisons, locked_pairs, total_slots
 - **CLI Redesign**: Replaced `--mode session/synthetic` with direct parameters (`--student`, `--previous-csv`, `--lock-pair`, etc.)
 - **TUI Workflow**: Updated inputs for dynamic spec (student IDs, previous session CSV, locked pairs)
 - **Optimizer Integration**: `optimize_from_dynamic_spec()` with coverage gap analysis
 - **Previous Session Support**: Multi-session workflows via `--previous-csv` flag and CSV loader
-- **Testing**: 26 tests passing (Session 1, Session 2+, CLI/TUI integration, coverage analysis)
+- **Testing**: 50 tests passing (includes 11 new CSV loading tests)
 - **Type Safety**: All type checks passing
+- **Code Quality**: All linting issues resolved (0 errors)
 - **Documentation**: README updated with previous_comparisons vs locked_pairs distinction
+- **Status Filter Removal**: Removed legacy "core" vs "extra" status filtering from entire optimizer workflow
+- **CSV Loading Tests**: Comprehensive test coverage for `_load_students_from_csv()` with 11 test cases
+- **Refactoring Plan**: Architectural analysis and refactoring recommendations documented for bloated files
 
 ## Completion Summary (2025-10-31)
 
@@ -141,15 +145,14 @@ pdm run pytest-root scripts/bayesian_consensus_model/tests/ -v
 
 ## Next Actions
 
-### 🧪 HIGH PRIORITY: Add CSV Loading Tests
+### ✅ COMPLETE: Add CSV Loading Tests
 
-**Context:**
-The `_load_students_from_csv()` helper function works correctly (manually verified) but lacks automated test coverage.
+**Completed 2025-11-01**
 
-**Key Implementation Detail:**
-Function builds `{lowercase_name: original_name}` mapping first, then uses original column name to access row data. This prevents errors with mixed-case headers like `Essay_ID`.
+**What Was Done:**
+Created comprehensive test coverage for the `_load_students_from_csv()` helper function in `test_csv_loading.py`.
 
-**Test scenarios needed in `test_redistribute.py`:**
+**Test Coverage (11 tests):**
 1. Valid CSV with `essay_id` column (lowercase)
 2. Valid CSV with `Essay_ID` column (mixed case) - verifies case-insensitive matching
 3. Valid CSV with `student_id` column
@@ -158,40 +161,204 @@ Function builds `{lowercase_name: original_name}` mapping first, then uses origi
 6. CSV with matching column but all empty values → clear error
 7. Missing file → FileNotFoundError
 8. Whitespace in values → properly stripped
+9. Multiple valid columns → uses first match
+10. Empty CSV file → appropriate error
+11. CSV with only headers → appropriate error
 
-**Import:**
-```python
-from scripts.bayesian_consensus_model.redistribute_tui import _load_students_from_csv
-```
+**Files Added:**
+- `scripts/bayesian_consensus_model/tests/test_csv_loading.py`
 
-**Estimated Effort:** 1 hour
+**Test Results:**
+All 11 tests passing ✅
 
-### 🔧 HIGH PRIORITY: Remove Legacy "core" vs "extra" Status Filter
+### ✅ COMPLETE: Remove Legacy "core" vs "extra" Status Filter
+
+**Completed 2025-11-01**
+
+**What Was Done:**
+Successfully removed all status filtering logic from the optimizer workflow. The optimizer now treats all comparison pairs equally, as originally designed.
+
+**Changes Made:**
+1. **Core Module** (`redistribute_core.py`):
+   - Removed `StatusSelector` enum completely
+   - Removed `status` field from `Comparison` dataclass
+   - Removed `filter_comparisons()` function
+   - Updated `select_comparisons()` to remove `include_status` parameter
+   - Updated `read_pairs()` to not require/use status column
+   - Updated `write_assignments()` to remove status from output CSV
+
+2. **Workflow Module** (`d_optimal_workflow.py`):
+   - Removed `status` field from `ComparisonRecord` dataclass
+   - Removed `status_filter` field from `BaselinePayload` dataclass
+   - Updated all functions to remove status filtering logic
+   - Updated `write_design()` to remove status parameter and column from CSV output
+
+3. **CLI** (`redistribute_pairs.py`):
+   - Removed `--include-status` flag from `redistribute` command
+   - Updated command logic to use all comparisons without filtering
+
+4. **TUI** (`redistribute_tui.py`):
+   - Removed status dropdown UI element
+   - Removed status handling in `_generate_assignments()` method
+
+5. **Tests** (`test_redistribute.py`):
+   - Updated all 50 tests to remove status references
+   - All tests passing after status removal
+
+6. **Documentation**:
+   - Updated `README.md` to remove `--include-status` flag examples
+   - Updated troubleshooting section to remove status filter references
+
+**Design Rationale:**
+The status filter was legacy from pre-dynamic-spec workflow. The correct approach is to specify the exact number of desired slots upfront via `--total-slots N`, allowing the optimizer to generate N optimal pairs treating all pairs equally. Arbitrarily filtering pairs after optimization breaks the Fisher-information design.
+
+### 🔧 NEXT: Code Organization Refactoring
 
 **Problem Identified:**
-The `StatusSelector` filter (core/all) is legacy from pre-dynamic-spec workflow and breaks optimizer design:
-1. Optimizer generates N pairs with Fisher-information maximization treating ALL pairs equally
-2. Arbitrarily filtering "extra" pairs (e.g., keeping only 1-84, discarding 85-140) breaks the optimized design
-3. Users should specify `--total-slots 84` or `--total-slots 140` directly, not generate 140 then filter to 84
+Two files violate the **400-500 LoC hard limit** from `.cursor/rules/015-project-structure-standards.mdc`, mixing multiple responsibilities in violation of the Single Responsibility Principle:
 
-**Correct Workflow:**
-- Need 84 slots? → `--total-slots 84` → optimizer generates 84 optimal pairs
-- Need 140 slots? → `--total-slots 140` → optimizer generates 140 optimal pairs
-- DON'T: Generate 140, mark some as "extra", filter to 84
+| File | Lines | Violation | Overage |
+|------|-------|-----------|---------|
+| `d_optimal_workflow.py` | 788 | ❌ **CRITICAL** | 288 lines (57%) |
+| `redistribute_tui.py` | 523 | ❌ **MODERATE** | 23 lines (5%) |
 
-**Investigation Needed:**
-1. Trace where "core" vs "extra" status gets assigned
-2. Determine if this distinction serves any valid purpose in current workflow
-3. If not: Remove `StatusSelector`, remove status filtering, simplify assignment logic
-4. If yes: Document the actual purpose (currently unclear)
+#### `d_optimal_workflow.py` Analysis (788 lines)
 
-**Files to investigate:**
-- `redistribute_core.py`: `StatusSelector` enum, `filter_comparisons()`
-- `d_optimal_workflow.py`: `write_design()` - all pairs get same status
-- `redistribute_pairs.py` CLI: `--include-status` flag
-- `redistribute_tui.py`: Status selection dropdown
+**Current Mixed Responsibilities:**
+1. **Data Loading** (CSV, JSON payload parsing) - 4 functions, ~167 lines
+2. **Data Validation & Spec Building** - 1 function, ~75 lines
+3. **Workflow Orchestration** (multiple optimization entry points) - 4 functions, ~251 lines
+4. **Design Analysis & Diagnostics** - 2 functions, ~90 lines
+5. **CSV Writing** - 1 function, ~16 lines
+6. **Synthetic Data Generation** - 2 functions, ~94 lines
 
-**Estimated Effort:** 2-3 hours (investigation + removal if legacy)
+**Proposed Solution: Split into Focused Package**
+
+```
+scripts/bayesian_consensus_model/
+├── d_optimal_workflow/              # NEW: Package structure
+│   ├── __init__.py                  # Exports public API (backward compatibility)
+│   ├── data_loaders.py              # ~150 lines
+│   │   - load_baseline_design()
+│   │   - load_baseline_payload()
+│   │   - load_baseline_from_records()
+│   │   - load_previous_comparisons_from_csv()
+│   │   - load_dynamic_spec()
+│   ├── design_analysis.py           # ~120 lines
+│   │   - summarize_design()
+│   │   - derive_student_anchor_requirements()
+│   │   - DesignDiagnostics dataclass
+│   ├── optimization_runners.py      # ~200 lines
+│   │   - optimize_from_payload()
+│   │   - optimize_schedule()
+│   │   - optimize_from_dynamic_spec()
+│   ├── synthetic_data.py            # ~100 lines
+│   │   - run_synthetic_optimization()
+│   │   - _build_random_design()
+│   └── io_utils.py                  # ~80 lines
+│       - write_design()
+│       - CSV/JSON writing utilities
+```
+
+**Shared Models** (in `__init__.py` or separate `models.py`):
+- `OptimizationResult`, `BaselinePayload`, `ComparisonRecord`, `DynamicSpec`
+- `DEFAULT_ANCHOR_ORDER`
+
+#### `redistribute_tui.py` Analysis (523 lines)
+
+**Current Mixed Responsibilities:**
+1. **Textual UI Definition** (app structure, widgets, layout) - ~250 lines
+2. **Business Logic** (CSV loading, optimization, assignment generation) - ~150 lines
+3. **Event Handling** (button clicks, form validation) - ~100 lines
+
+**Proposed Solution: Extract Shared Utilities**
+
+Option 1 (Minimal): Move `_load_students_from_csv()` to `d_optimal_workflow/io_utils.py` (shared utility)
+- Reduces `redistribute_tui.py` to ~450 lines (acceptable)
+- No package restructuring needed
+
+Option 2 (Comprehensive): Split into package if further growth expected:
+```
+scripts/bayesian_consensus_model/
+├── tui/                             # NEW: Package structure
+│   ├── __init__.py                  # Exports RedistributeApp
+│   ├── app.py                       # ~200 lines (UI structure only)
+│   ├── handlers.py                  # ~200 lines (event handlers, validation)
+│   └── data_loaders.py              # ~100 lines (CSV parsing, error handling)
+```
+
+**Recommendation:** Start with Option 1 (move shared utility), assess if Option 2 needed later.
+
+#### Benefits of Refactoring
+
+1. **Adherence to Standards**: All files under 500 LoC hard limit
+2. **Single Responsibility**: Each module has one clear purpose
+3. **Testability**: Focused unit tests per module (easier to write and maintain)
+4. **Maintainability**: Easier code review, debugging, and future enhancements
+5. **Alignment**: Follows project's DDD/Clean Code principles
+
+#### Backward Compatibility Strategy
+
+Use `__init__.py` re-exports to maintain existing import paths:
+
+**Before:**
+```python
+from scripts.bayesian_consensus_model.d_optimal_workflow import (
+    optimize_from_dynamic_spec,
+    load_dynamic_spec,
+    write_design,
+)
+```
+
+**After (with re-exports):**
+```python
+# Same imports work - no breaking changes
+from scripts.bayesian_consensus_model.d_optimal_workflow import (
+    optimize_from_dynamic_spec,  # Re-exported from optimization_runners
+    load_dynamic_spec,            # Re-exported from data_loaders
+    write_design,                 # Re-exported from io_utils
+)
+```
+
+#### Implementation Checklist
+
+**Phase 1: `d_optimal_workflow.py` Refactoring**
+- [ ] Create package directory: `d_optimal_workflow/`
+- [ ] Create `__init__.py` with public API re-exports
+- [ ] Split into 5 focused modules (data_loaders, design_analysis, optimization_runners, synthetic_data, io_utils)
+- [ ] Update imports in dependent files:
+  - [ ] `redistribute_pairs.py`
+  - [ ] `redistribute_tui.py`
+  - [ ] `d_optimal_prototype.py`
+- [ ] Run type checking: `pdm run typecheck-all`
+- [ ] Run all tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/ -v`
+- [ ] Run linting: `pdm run ruff check scripts/bayesian_consensus_model/`
+
+**Phase 2: `redistribute_tui.py` Cleanup**
+- [ ] Extract `_load_students_from_csv()` to `d_optimal_workflow/io_utils.py`
+- [ ] Update imports in `redistribute_tui.py`
+- [ ] Verify line count reduction to ~450 lines
+- [ ] Run tests and validation
+
+**Success Criteria:**
+✅ All files under 500 LoC
+✅ Each module has single, clear responsibility
+✅ No breaking changes to public API
+✅ All 50+ tests passing
+✅ Type checking passes
+✅ Linting passes
+
+**Estimated Effort:**
+- Phase 1: 3-4 hours
+- Phase 2: 1-2 hours
+- Testing & Validation: 1-2 hours
+- **Total**: 5-8 hours
+
+**Risk Assessment:** Low
+- Primarily structural refactoring (moving code, not changing logic)
+- Backward compatibility maintained via re-exports
+- Comprehensive test coverage (50+ tests)
+- Type checker will catch import issues early
 
 ### 🔮 FUTURE (Lower Priority)
 

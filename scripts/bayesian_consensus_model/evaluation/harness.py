@@ -53,7 +53,9 @@ class ImprovementHarness:
     def _diff_metrics(base: pd.DataFrame, variant: pd.DataFrame) -> Dict[str, float | int]:
         merged = base.merge(variant, on="essay_id", suffixes=("_base", "_variant"))
         grade_changes = (merged["consensus_grade_base"] != merged["consensus_grade_variant"]).sum()
-        delta_expected = merged["expected_grade_index_variant"] - merged["expected_grade_index_base"]
+        delta_expected = (
+            merged["expected_grade_index_variant"] - merged["expected_grade_index_base"]
+        )
         delta_confidence = merged["confidence_variant"] - merged["confidence_base"]
         needs_more = merged["needs_more_ratings_variant"].sum()
         return {

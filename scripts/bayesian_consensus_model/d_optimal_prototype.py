@@ -87,7 +87,10 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--total-slots",
         type=int,
-        help="Target number of comparisons (defaults to baseline count in session2 or 36 in synthetic mode).",
+        help=(
+            "Target number of comparisons "
+            "(defaults to baseline count in session2 or 36 in synthetic mode)."
+        ),
     )
     return parser.parse_args(argv)
 

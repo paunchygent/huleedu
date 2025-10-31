@@ -22,13 +22,44 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--bias-correction", choices=["on", "off"], default="on")
     parser.add_argument("--compare-without-bias", action="store_true")
-    parser.add_argument("--run-label", type=str, default="", help="Optional label for run directory; defaults to timestamp")
-    parser.add_argument("--use-argmax-decision", action="store_true", help="Select consensus grade via argmax over smoothed probabilities")
-    parser.add_argument("--use-loo-alignment", action="store_true", help="Enable leave-one-out essay means for rater alignment")
-    parser.add_argument("--use-precision-weights", action="store_true", help="Scale rater weights by bias posterior precision")
-    parser.add_argument("--use-neutral-gating", action="store_true", help="Compute neutral evidence ESS metrics")
-    parser.add_argument("--neutral-delta-mu", type=float, default=0.25, help="Bias magnitude threshold for neutral ESS computation")
-    parser.add_argument("--neutral-var-max", type=float, default=0.20, help="Posterior variance ceiling for neutral ESS computation")
+    parser.add_argument(
+        "--run-label",
+        type=str,
+        default="",
+        help="Optional label for run directory; defaults to timestamp",
+    )
+    parser.add_argument(
+        "--use-argmax-decision",
+        action="store_true",
+        help="Select consensus grade via argmax over smoothed probabilities",
+    )
+    parser.add_argument(
+        "--use-loo-alignment",
+        action="store_true",
+        help="Enable leave-one-out essay means for rater alignment",
+    )
+    parser.add_argument(
+        "--use-precision-weights",
+        action="store_true",
+        help="Scale rater weights by bias posterior precision",
+    )
+    parser.add_argument(
+        "--use-neutral-gating",
+        action="store_true",
+        help="Compute neutral evidence ESS metrics",
+    )
+    parser.add_argument(
+        "--neutral-delta-mu",
+        type=float,
+        default=0.25,
+        help="Bias magnitude threshold for neutral ESS computation",
+    )
+    parser.add_argument(
+        "--neutral-var-max",
+        type=float,
+        default=0.20,
+        help="Posterior variance ceiling for neutral ESS computation",
+    )
     return parser.parse_args()
 
 
@@ -47,7 +78,9 @@ def _load_ratings(path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, Dict
         fmt = "comma"
 
     if df.shape[1] < 3:
-        raise ValueError("Ratings CSV must contain essay id, file name, and at least one rater column")
+        raise ValueError(
+            "Ratings CSV must contain essay id, file name, and at least one rater column"
+        )
 
     if verbose:
         print(f"Detected {fmt}-delimited file with {df.shape[0]} essays")
@@ -124,8 +157,12 @@ def _write_outputs(
     consensus_df = pd.DataFrame(records).sort_values("essay_id")
     probs_df = pd.DataFrame(prob_rows).sort_values("essay_id")
 
-    (output_dir / "essay_consensus.csv").write_text(consensus_df.to_csv(index=False), encoding="utf-8")
-    (output_dir / "essay_grade_probabilities.csv").write_text(probs_df.to_csv(index=False), encoding="utf-8")
+    (output_dir / "essay_consensus.csv").write_text(
+        consensus_df.to_csv(index=False), encoding="utf-8"
+    )
+    (output_dir / "essay_grade_probabilities.csv").write_text(
+        probs_df.to_csv(index=False), encoding="utf-8"
+    )
     return consensus_df, probs_df
 
 
@@ -144,11 +181,15 @@ def _write_rater_reports(
         encoding="utf-8",
     )
     (output_dir / "rater_agreement.csv").write_text(
-        metrics[["rater_id", "mad_alignment", "std_grade_index", "grade_range"]].to_csv(index=False),
+        metrics[["rater_id", "mad_alignment", "std_grade_index", "grade_range"]].to_csv(
+            index=False
+        ),
         encoding="utf-8",
     )
     (output_dir / "rater_spread.csv").write_text(
-        metrics[["rater_id", "unique_grades", "grade_range", "min_grade_index", "max_grade_index"]].to_csv(index=False),
+        metrics[
+            ["rater_id", "unique_grades", "grade_range", "min_grade_index", "max_grade_index"]
+        ].to_csv(index=False),
         encoding="utf-8",
     )
     bias = bias_posteriors.sort_values("rater_id").reset_index(drop=True)
@@ -263,7 +304,9 @@ def _write_comparison_outputs(
     )
 
 
-def _plot_bias_vs_weight(output_dir: Path, metrics: pd.DataFrame, bias_posteriors: pd.DataFrame) -> bool:
+def _plot_bias_vs_weight(
+    output_dir: Path, metrics: pd.DataFrame, bias_posteriors: pd.DataFrame
+) -> bool:
     """Create a scatter plot of posterior bias versus reliability weight."""
 
     try:
@@ -312,7 +355,9 @@ def _plot_bias_vs_weight(output_dir: Path, metrics: pd.DataFrame, bias_posterior
 
 
 
-def _essay_inter_rater_stats(ratings: pd.DataFrame, consensus: Dict[str, "ConsensusResult"]) -> pd.DataFrame:
+def _essay_inter_rater_stats(
+    ratings: pd.DataFrame, consensus: Dict[str, "ConsensusResult"]
+) -> pd.DataFrame:
     rows = []
     grade_map = {grade: idx for idx, grade in enumerate(GRADES)}
     for essay_id, group in ratings.groupby("essay_id"):
@@ -329,10 +374,16 @@ def _essay_inter_rater_stats(ratings: pd.DataFrame, consensus: Dict[str, "Consen
                 "grade_range": float(indices.max() - indices.min()),
                 "shannon_entropy": float(entropy),
                 "majority_ratio": float(counts.max() / counts.sum()),
-                "consensus_grade": consensus[essay_id].consensus_grade if essay_id in consensus else "",
-                "consensus_confidence": consensus[essay_id].confidence if essay_id in consensus else np.nan,
+                "consensus_grade": (
+                    consensus[essay_id].consensus_grade if essay_id in consensus else ""
+                ),
+                "consensus_confidence": (
+                    consensus[essay_id].confidence if essay_id in consensus else np.nan
+                ),
                 "neutral_ess": consensus[essay_id].neutral_ess if essay_id in consensus else 0.0,
-                "needs_more_ratings": consensus[essay_id].needs_more_ratings if essay_id in consensus else False,
+                "needs_more_ratings": (
+                    consensus[essay_id].needs_more_ratings if essay_id in consensus else False
+                ),
             }
         )
     return pd.DataFrame(rows).sort_values("essay_id")

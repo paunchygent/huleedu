@@ -26,33 +26,26 @@ def pairs_csv(tmp_path: Path) -> Path:
     path = tmp_path / "pairs.csv"
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type", "status"])
+        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type"])
         writer.writerows(
             [
-                (1, "JA24", "A1", "student_anchor", "core"),
-                (2, "JA24", "B1", "student_anchor", "core"),
-                (3, "II24", "A1", "student_anchor", "core"),
-                (4, "II24", "B1", "student_anchor", "core"),
-                (5, "ES24", "A1", "student_anchor", "extra"),
-                (6, "ES24", "B1", "student_anchor", "extra"),
+                (1, "JA24", "A1", "student_anchor"),
+                (2, "JA24", "B1", "student_anchor"),
+                (3, "II24", "A1", "student_anchor"),
+                (4, "II24", "B1", "student_anchor"),
+                (5, "ES24", "A1", "student_anchor"),
+                (6, "ES24", "B1", "student_anchor"),
             ]
         )
     return path
 
 
-def test_read_pairs_orders_by_status(pairs_csv: Path) -> None:
-    comparisons = core.read_pairs(pairs_csv)
-    statuses = [comparison.status for comparison in comparisons]
-    assert statuses[:4] == ["core"] * 4
-    assert statuses[4:] == ["extra", "extra"]
-
-
 def test_select_comparisons_respects_pool(pairs_csv: Path) -> None:
     comparisons = core.read_pairs(pairs_csv)
-    selected_core = core.select_comparisons(comparisons, core.StatusSelector.CORE, total_needed=4)
-    assert len(selected_core) == 4
+    selected = core.select_comparisons(comparisons, total_needed=4)
+    assert len(selected) == 4
     with pytest.raises(ValueError):
-        core.select_comparisons(comparisons, core.StatusSelector.CORE, total_needed=6)
+        core.select_comparisons(comparisons, total_needed=10)
 
 
 def test_compute_quota_distribution_handles_shortage() -> None:
@@ -67,11 +60,7 @@ def test_assign_pairs_accepts_mixed_quotas(pairs_csv: Path) -> None:
     comparisons = core.read_pairs(pairs_csv)
     quotas = {"R1": 2, "R2": 1, "R3": 1}
     total_needed = sum(quotas.values())
-    selected = core.select_comparisons(
-        comparisons,
-        core.StatusSelector.CORE,
-        total_needed=total_needed,
-    )
+    selected = core.select_comparisons(comparisons, total_needed=total_needed)
     assignments = core.assign_pairs(selected, list(quotas), quotas)
     assert len(assignments) == 4
     for name in quotas:
@@ -80,7 +69,7 @@ def test_assign_pairs_accepts_mixed_quotas(pairs_csv: Path) -> None:
 
 def test_assign_and_write(tmp_path: Path, pairs_csv: Path) -> None:
     comparisons = core.read_pairs(pairs_csv)
-    selected = core.select_comparisons(comparisons, core.StatusSelector.ALL, total_needed=6)
+    selected = core.select_comparisons(comparisons, total_needed=6)
     raters = core.build_rater_list(3, None)
     assignments = core.assign_pairs(selected, raters, per_rater=2)
     assert len(assignments) == 6
@@ -105,8 +94,6 @@ def test_cli_generates_assignments(tmp_path: Path, pairs_csv: Path) -> None:
             "2",
             "--per-rater",
             "2",
-            "--include-status",
-            "core",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -117,7 +104,7 @@ def test_cli_generates_assignments(tmp_path: Path, pairs_csv: Path) -> None:
 
 def test_assign_pairs_balances_comparison_types() -> None:
     comparisons = [
-        core.Comparison(idx, student, anchor, "student_anchor", "core")
+        core.Comparison(idx, student, anchor, "student_anchor")
         for idx, (student, anchor) in enumerate(
             [
                 ("JA24", "A1"),
@@ -132,12 +119,12 @@ def test_assign_pairs_balances_comparison_types() -> None:
     ]
     comparisons.extend(
         [
-            core.Comparison(7, "JA24", "II24", "student_student", "core"),
-            core.Comparison(8, "ES24", "II24", "student_student", "core"),
-            core.Comparison(9, "JA24", "ES24", "student_student", "core"),
-            core.Comparison(10, "A1", "B1", "anchor_anchor", "core"),
-            core.Comparison(11, "A1", "C+", "anchor_anchor", "core"),
-            core.Comparison(12, "B1", "C+", "anchor_anchor", "core"),
+            core.Comparison(7, "JA24", "II24", "student_student"),
+            core.Comparison(8, "ES24", "II24", "student_student"),
+            core.Comparison(9, "JA24", "ES24", "student_student"),
+            core.Comparison(10, "A1", "B1", "anchor_anchor"),
+            core.Comparison(11, "A1", "C+", "anchor_anchor"),
+            core.Comparison(12, "B1", "C+", "anchor_anchor"),
         ]
     )
     raters = ["R1", "R2", "R3"]
@@ -154,6 +141,7 @@ def test_assign_pairs_balances_comparison_types() -> None:
 
 
 def test_cli_handles_pair_shortage(tmp_path: Path, pairs_csv: Path) -> None:
+    """Test CLI with more raters than available pairs leads to shortage handling."""
     output_csv = tmp_path / "cli_shortage.csv"
     runner = CliRunner()
     result = runner.invoke(
@@ -165,19 +153,17 @@ def test_cli_handles_pair_shortage(tmp_path: Path, pairs_csv: Path) -> None:
             "--output-csv",
             str(output_csv),
             "--raters",
-            "3",
+            "5",  # 5 raters * 2 = 10 requested, but only 6 available
             "--per-rater",
             "2",
-            "--include-status",
-            "core",
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "Requested 6 comparisons but only 4 available." in result.output
+    assert "Requested 10 comparisons but only 6 available." in result.output
     assert "min" in result.output and "max" in result.output
     lines = output_csv.read_text().strip().splitlines()
-    # header + available_total assignments (4 core comparisons)
-    assert len(lines) == 1 + 4
+    # header + available_total assignments (6 comparisons)
+    assert len(lines) == 1 + 6
 
 
 def test_optimize_payload_errors_when_slots_too_small(tmp_path: Path) -> None:
@@ -189,7 +175,6 @@ def test_optimize_payload_errors_when_slots_too_small(tmp_path: Path) -> None:
                 "essay_a_id": "JA24",
                 "essay_b_id": "A1",
                 "comparison_type": "student_anchor",
-                "status": "core",
             }
         ],
         "anchor_order": DEFAULT_ANCHOR_ORDER,
@@ -204,7 +189,6 @@ def test_optimize_payload_errors_when_slots_too_small(tmp_path: Path) -> None:
             total_slots=5,
             max_repeat=2,
             anchor_order=None,
-            status_filter=None,
         )
 
 
@@ -215,7 +199,6 @@ def test_load_baseline_payload_accepts_empty_array(tmp_path: Path) -> None:
             {
                 "comparisons": [],
                 "anchor_order": DEFAULT_ANCHOR_ORDER,
-                "status_filter": ["core"],
             }
         )
     )
@@ -224,11 +207,10 @@ def test_load_baseline_payload_accepts_empty_array(tmp_path: Path) -> None:
 
     assert payload.records == []
     assert payload.anchor_order == DEFAULT_ANCHOR_ORDER
-    assert payload.status_filter == ["core"]
     assert payload.total_slots is None
 
 
-def test_load_baseline_payload_preserves_slots_and_status_filter(tmp_path: Path) -> None:
+def test_load_baseline_payload_preserves_total_slots(tmp_path: Path) -> None:
     payload_path = tmp_path / "payload.json"
     payload_path.write_text(
         json.dumps(
@@ -238,10 +220,8 @@ def test_load_baseline_payload_preserves_slots_and_status_filter(tmp_path: Path)
                         "essay_a_id": "JA24",
                         "essay_b_id": "A1",
                         "comparison_type": "student_anchor",
-                        "status": "core",
                     }
                 ],
-                "status_filter": ["core", "extra"],
                 "total_slots": 12,
             }
         )
@@ -251,7 +231,6 @@ def test_load_baseline_payload_preserves_slots_and_status_filter(tmp_path: Path)
 
     assert len(payload.records) == 1
     assert payload.records[0]["essay_a_id"] == "JA24"
-    assert payload.status_filter == ["core", "extra"]
     assert payload.total_slots == 12
 
 
@@ -472,8 +451,8 @@ def test_session2_workflow_with_previous_comparisons() -> None:
 
     # Simulate Session 1 comparisons (only JA24 has anchor coverage)
     previous_comparisons = [
-        ComparisonRecord("JA24", "A1", "student_anchor", "core"),
-        ComparisonRecord("JA24", "A2", "student_anchor", "core"),
+        ComparisonRecord("JA24", "A1", "student_anchor"),
+        ComparisonRecord("JA24", "A2", "student_anchor"),
     ]
 
     spec = load_dynamic_spec(
@@ -523,20 +502,19 @@ def test_load_previous_comparisons_from_csv(tmp_path: Path) -> None:
     csv_path = tmp_path / "session1.csv"
     with csv_path.open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type", "status"])
+        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type"])
         writer.writerows([
-            (1, "JA24", "A1", "student_anchor", "core"),
-            (2, "II24", "B1", "student_anchor", "core"),
-            (3, "ES24", "A2", "student_anchor", "extra"),
+            (1, "JA24", "A1", "student_anchor"),
+            (2, "II24", "B1", "student_anchor"),
+            (3, "ES24", "A2", "student_anchor"),
         ])
 
     records = load_previous_comparisons_from_csv(csv_path)
 
-    assert len(records) == 2  # Only "core" status by default
+    assert len(records) == 3
     assert records[0].essay_a_id == "JA24"
     assert records[0].essay_b_id == "A1"
     assert records[0].comparison_type == "student_anchor"
-    assert records[0].status == "core"
 
 
 def test_cli_optimize_with_previous_csv(tmp_path: Path) -> None:
@@ -545,10 +523,10 @@ def test_cli_optimize_with_previous_csv(tmp_path: Path) -> None:
     previous_csv = tmp_path / "session1.csv"
     with previous_csv.open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type", "status"])
+        writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type"])
         writer.writerows([
-            (1, "JA24", "A1", "student_anchor", "core"),
-            (2, "JA24", "A2", "student_anchor", "core"),
+            (1, "JA24", "A1", "student_anchor"),
+            (2, "JA24", "A2", "student_anchor"),
         ])
 
     output_csv = tmp_path / "session2.csv"

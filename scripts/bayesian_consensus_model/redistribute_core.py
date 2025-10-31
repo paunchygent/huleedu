@@ -3,15 +3,10 @@ from __future__ import annotations
 import csv
 from collections import Counter, deque
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 from typing import Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
-
-
-class StatusSelector(str, Enum):
-    CORE = "core"
-    ALL = "all"
+# REMOVED: StatusSelector enum - status filtering is no longer used
 
 
 @dataclass(frozen=True)
@@ -20,7 +15,6 @@ class Comparison:
     essay_a_id: str
     essay_b_id: str
     comparison_type: str
-    status: str
 
 
 def read_pairs(path: Path) -> List[Comparison]:
@@ -30,7 +24,7 @@ def read_pairs(path: Path) -> List[Comparison]:
     comparisons: List[Comparison] = []
     with path.open(newline="") as handle:
         reader = csv.DictReader(handle)
-        required = {"pair_id", "essay_a_id", "essay_b_id", "comparison_type", "status"}
+        required = {"pair_id", "essay_a_id", "essay_b_id", "comparison_type"}
         missing = required - set(reader.fieldnames or [])
         if missing:
             fields = ", ".join(sorted(missing))
@@ -47,11 +41,10 @@ def read_pairs(path: Path) -> List[Comparison]:
                     essay_a_id=row["essay_a_id"],
                     essay_b_id=row["essay_b_id"],
                     comparison_type=row["comparison_type"],
-                    status=row["status"],
                 )
             )
 
-    comparisons.sort(key=lambda item: (0 if item.status == "core" else 1, item.pair_id))
+    comparisons.sort(key=lambda item: item.pair_id)
     return comparisons
 
 
@@ -75,30 +68,18 @@ def build_rater_list(
     return [f"Rater_{idx:02d}" for idx in range(1, count + 1)]
 
 
-def filter_comparisons(
-    comparisons: Sequence[Comparison],
-    include_status: StatusSelector,
-) -> List[Comparison]:
-    if include_status is StatusSelector.CORE:
-        pool = [item for item in comparisons if item.status == "core"]
-    else:
-        pool = list(comparisons)
-    return pool
+# REMOVED: filter_comparisons - status filtering is no longer used
 
 
 def select_comparisons(
     comparisons: Sequence[Comparison],
-    include_status: StatusSelector,
     total_needed: int,
 ) -> List[Comparison]:
-    pool = filter_comparisons(comparisons, include_status)
-
-    if total_needed > len(pool):
+    if total_needed > len(comparisons):
         raise ValueError(
-            f"Requested {total_needed} comparisons but only {len(pool)} available "
-            f"(include_status={include_status.value})."
+            f"Requested {total_needed} comparisons but only {len(comparisons)} available."
         )
-    return list(pool[:total_needed])
+    return list(comparisons[:total_needed])
 
 
 def compute_quota_distribution(
@@ -170,7 +151,6 @@ def load_comparisons_from_records(
                 pair_id = int(raw_pair)
             except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
                 raise ValueError(f"Invalid pair_id value: {raw_pair}") from exc
-        status = str(record.get("status", "core"))
 
         comparisons.append(
             Comparison(
@@ -178,12 +158,11 @@ def load_comparisons_from_records(
                 essay_a_id=essay_a_id,
                 essay_b_id=essay_b_id,
                 comparison_type=comparison_type,
-                status=status,
             )
         )
         next_pair_id = max(next_pair_id, pair_id + 1)
 
-    comparisons.sort(key=lambda item: (0 if item.status == "core" else 1, item.pair_id))
+    comparisons.sort(key=lambda item: item.pair_id)
     return comparisons
 
 
@@ -306,7 +285,6 @@ def write_assignments(
         "essay_a_display",
         "essay_b_display",
         "comparison_type",
-        "status",
     ]
     with output_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -321,6 +299,5 @@ def write_assignments(
                     "essay_a_display": display_mapping[comparison.essay_a_id],
                     "essay_b_display": display_mapping[comparison.essay_b_id],
                     "comparison_type": comparison.comparison_type,
-                    "status": comparison.status,
                 }
             )

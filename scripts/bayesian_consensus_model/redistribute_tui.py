@@ -24,8 +24,6 @@ except ImportError:  # pragma: no cover - compatibility with older Textual
 
 try:
     from .d_optimal_workflow import (  # type: ignore[attr-defined]
-        DEFAULT_ANCHOR_ORDER,
-        DynamicSpec,
         OptimizationResult,
         load_dynamic_spec,
         load_previous_comparisons_from_csv,
@@ -33,11 +31,9 @@ try:
         write_design,
     )
     from .redistribute_core import (
-        StatusSelector,
         assign_pairs,
         build_rater_list,
         compute_quota_distribution,
-        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -51,11 +47,9 @@ except ImportError:  # pragma: no cover - fallback for direct execution
         write_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
-        StatusSelector,
         assign_pairs,
         build_rater_list,
         compute_quota_distribution,
-        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -217,16 +211,6 @@ class RedistributeApp(App):
                     id="per_rater_input",
                     classes="field-input",
                 )
-                yield Label("Include Comparison Statuses")
-                yield Select(
-                    id="status_select",
-                    options=[
-                        ("Core only", StatusSelector.CORE.value),
-                        ("Core + extra", StatusSelector.ALL.value),
-                    ],
-                    value=StatusSelector.ALL.value,
-                    classes="field-select",
-                )
                 yield Static("Optimization Settings", classes="bold")
                 yield Label("Pairs CSV Path (optimized comparison pairs)")
                 yield Input(
@@ -299,7 +283,6 @@ class RedistributeApp(App):
         self.query_one("#rater_count_input", Input).value = str(DEFAULT_RATER_COUNT)
         self.query_one("#rater_names_input", Input).value = ""
         self.query_one("#per_rater_input", Input).value = "10"
-        self.query_one("#status_select", Select).value = StatusSelector.ALL.value
         self.query_one("#optimizer_output_input", Input).value = str(DEFAULT_OPTIMIZED)
         self.query_one("#optimizer_slots_input", Input).value = "24"
         self.query_one("#optimizer_max_repeat_input", Input).value = "3"
@@ -329,8 +312,6 @@ class RedistributeApp(App):
             names_raw = self.query_one("#rater_names_input", Input).value.strip()
             count_raw = self.query_one("#rater_count_input", Input).value.strip()
             per_rater_raw = self.query_one("#per_rater_input", Input).value.strip()
-            status_value = self.query_one("#status_select", Select).value
-            include_status = StatusSelector(status_value or StatusSelector.ALL.value)
 
             per_rater = int(per_rater_raw) if per_rater_raw else 10
             if per_rater <= 0:
@@ -347,26 +328,22 @@ class RedistributeApp(App):
                     raise ValueError("Rater count must be an integer.") from exc
                 names = build_rater_list(count, None)
 
-            pool = filter_comparisons(comparisons, include_status)
             requested_total = len(names) * per_rater
-            available_total = len(pool)
+            available_total = len(comparisons)
 
             if available_total == 0:
-                raise ValueError(
-                    "No comparisons available after filtering. "
-                    "Adjust status selection or regenerate pairs."
-                )
+                raise ValueError("No comparisons available in pairs CSV.")
 
             shortage = requested_total > available_total
             if shortage:
                 quotas = compute_quota_distribution(names, per_rater, available_total)
                 total_needed = sum(quotas.values())
-                selected = select_comparisons(comparisons, include_status, total_needed)
+                selected = select_comparisons(comparisons, total_needed)
                 assignments = assign_pairs(selected, names, quotas)
             else:
                 quotas = {name: per_rater for name in names}
                 total_needed = requested_total
-                selected = select_comparisons(comparisons, include_status, total_needed)
+                selected = select_comparisons(comparisons, total_needed)
                 assignments = assign_pairs(selected, names, per_rater)
             write_assignments(output_path, assignments)
         except (FileNotFoundError, ValueError) as error:
@@ -424,7 +401,8 @@ class RedistributeApp(App):
             if anchors_value:
                 anchor_list = [a.strip() for a in anchors_value.split(",") if a.strip()]
 
-            # Get locked pairs (format: "essay_a,essay_b; essay_c,essay_d" using semicolons between pairs)
+            # Get locked pairs
+            # Format: "essay_a,essay_b; essay_c,essay_d" using semicolons between pairs
             locked_value = self.query_one("#locked_pairs_input", Input).value.strip()
             locked_pairs = None
             if locked_value:
@@ -437,7 +415,10 @@ class RedistributeApp(App):
                     if len(parts) == 2:
                         locked_list.append((parts[0], parts[1]))
                     elif pair_str:  # Non-empty but wrong format
-                        raise ValueError(f"Invalid locked pair format: '{pair_str}' (use 'essay_a,essay_b')")
+                        raise ValueError(
+                            f"Invalid locked pair format: '{pair_str}' "
+                            "(use 'essay_a,essay_b')"
+                        )
                 locked_pairs = locked_list if locked_list else None
 
             # Get total slots
