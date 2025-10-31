@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 
 from scripts.bayesian_consensus_model.bayesian_consensus_model import (
+    GRADES,
     ConsensusModel,
     ConsensusResult,
-    GRADES,
     KernelConfig,
 )
 from scripts.bayesian_consensus_model.models import (

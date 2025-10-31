@@ -19,6 +19,7 @@ try:
         PairCandidate,
         compute_log_det,
         derive_anchor_adjacency_constraints,
+        derive_required_student_anchor_pairs,
         select_design,
     )
     from .redistribute_core import load_comparisons_from_records  # type: ignore[attr-defined]
@@ -28,6 +29,7 @@ except ImportError:  # pragma: no cover - direct execution fallback
         PairCandidate,
         compute_log_det,
         derive_anchor_adjacency_constraints,
+        derive_required_student_anchor_pairs,
         select_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
@@ -99,9 +101,111 @@ class BaselinePayload:
     total_slots: Optional[int]
 
 
+@dataclass(frozen=True)
+class ComparisonRecord:
+    """A single comparison record from historical data.
+
+    Used to represent comparisons from previous sessions that inform
+    coverage analysis for multi-session workflows.
+    """
+
+    essay_a_id: str
+    essay_b_id: str
+    comparison_type: str  # student_anchor, student_student, anchor_anchor
+    status: str  # core, extra
+
+
+@dataclass(frozen=True)
+class DynamicSpec:
+    """Dynamic input specification for optimizer without baseline files."""
+
+    students: Sequence[str]
+    anchors: Sequence[str]
+    include_anchor_anchor: bool
+    previous_comparisons: Sequence[ComparisonRecord]  # Historical data from past sessions
+    locked_pairs: Sequence[Tuple[str, str]]  # Optional hard constraints (rarely used)
+    total_slots: int
+
+
 def _unique_pair_count(pairs: Iterable[PairCandidate]) -> int:
     """Count distinct comparison pairs by essay IDs."""
     return len({pair.key() for pair in pairs})
+
+
+def load_dynamic_spec(
+    students: Sequence[str],
+    *,
+    anchors: Optional[Sequence[str]] = None,
+    include_anchor_anchor: bool = True,
+    previous_comparisons: Optional[Sequence[ComparisonRecord]] = None,
+    locked_pairs: Optional[Sequence[Tuple[str, str]]] = None,
+    total_slots: int,
+) -> DynamicSpec:
+    """Build and validate a dynamic input specification for the optimizer.
+
+    Args:
+        students: List of student essay IDs to include in pairing
+        anchors: Ordered anchor ladder (defaults to DEFAULT_ANCHOR_ORDER)
+        include_anchor_anchor: Whether to include anchor-anchor comparisons in candidate universe
+        previous_comparisons: Historical comparisons from previous sessions (for multi-session workflows)
+        locked_pairs: Optional hard constraint pairs that MUST be included (rarely used)
+        total_slots: Required comparison slot budget
+
+    Returns:
+        Validated DynamicSpec object
+
+    Raises:
+        ValueError: If validation fails (empty students/anchors, invalid total_slots, etc.)
+    """
+    student_list = list(students)
+    if not student_list:
+        raise ValueError("Students list cannot be empty.")
+
+    anchor_list = list(anchors) if anchors is not None else list(DEFAULT_ANCHOR_ORDER)
+    if not anchor_list:
+        raise ValueError("Anchors list cannot be empty.")
+
+    previous_list: List[ComparisonRecord] = []
+    if previous_comparisons is not None:
+        previous_list = list(previous_comparisons)
+
+    locked_list: List[Tuple[str, str]] = []
+    if locked_pairs is not None:
+        essay_ids = set(student_list) | set(anchor_list)
+        for pair in locked_pairs:
+            if len(pair) != 2:
+                raise ValueError(f"Locked pair must have exactly 2 elements: {pair}")
+            essay_a, essay_b = pair
+            if essay_a not in essay_ids:
+                raise ValueError(f"Locked pair references unknown essay ID: {essay_a}")
+            if essay_b not in essay_ids:
+                raise ValueError(f"Locked pair references unknown essay ID: {essay_b}")
+            locked_list.append((essay_a, essay_b))
+
+    if total_slots <= 0:
+        raise ValueError(f"Total slots must be positive, got: {total_slots}")
+
+    # Compute minimum required slots from anchor adjacency
+    adjacency_count = len(anchor_list) - 1
+    locked_count = len(locked_list)
+    min_required = adjacency_count + locked_count
+
+    if total_slots < min_required:
+        raise ValueError(
+            f"Total slots ({total_slots}) insufficient: "
+            f"anchor adjacency requires {adjacency_count}, "
+            f"locked pairs require {locked_count} "
+            f"(minimum {min_required} slots needed)."
+        )
+
+    return DynamicSpec(
+        students=student_list,
+        anchors=anchor_list,
+        include_anchor_anchor=include_anchor_anchor,
+        previous_comparisons=previous_list,
+        locked_pairs=locked_list,
+        total_slots=total_slots,
+    )
 
 
 def load_baseline_payload(
@@ -244,6 +348,57 @@ def load_baseline_design(
     return sorted(students), design
 
 
+def load_previous_comparisons_from_csv(
+    csv_path: Path,
+    *,
+    status_filter: Iterable[str] | None = ("core",),
+) -> List[ComparisonRecord]:
+    """Load previous comparison records from a CSV file.
+
+    Args:
+        csv_path: Path to CSV file with comparison history
+        status_filter: Optional filter for comparison status (default: only "core")
+
+    Returns:
+        List of ComparisonRecord objects
+
+    Raises:
+        FileNotFoundError: If CSV file doesn't exist
+        ValueError: If CSV is missing required columns
+    """
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Previous comparisons CSV not found: {csv_path}")
+
+    records: List[ComparisonRecord] = []
+    statuses = {status.lower() for status in status_filter} if status_filter is not None else None
+
+    with csv_path.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        required = {"essay_a_id", "essay_b_id", "comparison_type", "status"}
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            field_list = ", ".join(sorted(missing))
+            raise ValueError(f"CSV missing required columns: {field_list}")
+
+        for row in reader:
+            status_value = (row.get("status") or "").lower()
+            if statuses is not None and status_value not in statuses:
+                continue
+            records.append(
+                ComparisonRecord(
+                    essay_a_id=row["essay_a_id"],
+                    essay_b_id=row["essay_b_id"],
+                    comparison_type=row["comparison_type"],
+                    status=status_value,
+                )
+            )
+
+    if not records:
+        raise ValueError("No comparisons matched the requested status filter.")
+
+    return records
+
+
 def load_baseline_from_records(
     records: Iterable[Mapping[str, object]],
     *,
@@ -367,6 +522,113 @@ def summarize_design(
             student: ordered_coverage[student] for student in sorted(ordered_coverage)
         },
         repeat_counts=repeat_counts,
+    )
+
+
+def optimize_from_dynamic_spec(
+    spec: DynamicSpec,
+    *,
+    max_repeat: int = 3,
+) -> OptimizationResult:
+    """Run the optimizer using a dynamic input specification.
+
+    Args:
+        spec: Dynamic specification with students, anchors, previous comparisons, and budget
+        max_repeat: Maximum allowed repeat count for any pair in the design
+
+    Returns:
+        OptimizationResult with baseline (from previous comparisons) and optimized designs
+
+    Raises:
+        ValueError: If spec constraints cannot be satisfied
+    """
+    students = list(spec.students)
+    anchors = list(spec.anchors)
+    anchor_set = set(anchors)
+
+    # Build baseline design from previous comparisons (historical data)
+    baseline_design: List[DesignEntry] = []
+    if spec.previous_comparisons:
+        for rec in spec.previous_comparisons:
+            candidate = PairCandidate(rec.essay_a_id, rec.essay_b_id, rec.comparison_type)
+            baseline_design.append(DesignEntry(candidate, locked=False))
+
+    # Build locked pairs as hard constraints (separate from baseline)
+    locked_candidates: List[PairCandidate] = []
+    for essay_a, essay_b in spec.locked_pairs:
+        # Determine comparison type
+        a_is_anchor = essay_a in anchor_set
+        b_is_anchor = essay_b in anchor_set
+        if a_is_anchor and b_is_anchor:
+            comp_type = "anchor_anchor"
+        elif a_is_anchor or b_is_anchor:
+            comp_type = "student_anchor"
+        else:
+            comp_type = "student_student"
+        locked_candidates.append(PairCandidate(essay_a, essay_b, comp_type))
+
+    # Derive required student-anchor pairs from baseline coverage analysis
+    required_pairs = derive_required_student_anchor_pairs(
+        students=students,
+        anchors=anchors,
+        anchor_order=anchors,
+        baseline_design=baseline_design,
+    )
+
+    # Anchor adjacency constraints
+    adjacency_pairs = derive_anchor_adjacency_constraints(anchors)
+    anchor_adjacency_count = _unique_pair_count(adjacency_pairs)
+
+    # Validate minimum slots
+    locked_count = _unique_pair_count(locked_candidates)
+    required_count = _unique_pair_count(required_pairs)
+    min_slots_required = anchor_adjacency_count + locked_count + required_count
+    if spec.total_slots < min_slots_required:
+        raise ValueError(
+            f"Minimum required slots not met: requested "
+            f"{spec.total_slots}, but anchor adjacency requires {anchor_adjacency_count}, "
+            f"locked pairs require {locked_count}, "
+            f"and baseline coverage requires {required_count} "
+            f"(total {min_slots_required}). Increase total slots."
+        )
+
+    # Run optimizer with coverage requirements from baseline analysis
+    optimized_design, _ = select_design(
+        students,
+        anchors,
+        total_slots=spec.total_slots,
+        anchor_order=anchors,
+        locked_pairs=locked_candidates,  # Hard constraints
+        required_pairs=required_pairs,  # Coverage requirements from baseline
+        max_repeat=max_repeat,
+        include_anchor_anchor=spec.include_anchor_anchor,
+    )
+
+    # Compute log-det values
+    combined_items = list(students) + list(anchors)
+    index_map = {item: idx for idx, item in enumerate(combined_items)}
+    if baseline_design:
+        baseline_log_det = compute_log_det(baseline_design, index_map)
+    else:
+        baseline_log_det = float("-inf")
+    optimized_log_det = compute_log_det(optimized_design, index_map)
+
+    # Build diagnostics
+    baseline_diag = summarize_design(baseline_design, anchors)
+    optimized_diag = summarize_design(optimized_design, anchors)
+
+    return OptimizationResult(
+        students=students,
+        anchor_order=anchors,
+        baseline_design=baseline_design,
+        optimized_design=optimized_design,
+        baseline_log_det=baseline_log_det,
+        optimized_log_det=optimized_log_det,
+        baseline_diagnostics=baseline_diag,
+        optimized_diagnostics=optimized_diag,
+        anchor_adjacency_count=anchor_adjacency_count,
+        required_pair_count=required_count,
+        max_repeat=max_repeat,
     )
 
 

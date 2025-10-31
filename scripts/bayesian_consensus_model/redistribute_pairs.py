@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import json
 import sys
-from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 if __package__ in (None, ""):
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -18,12 +17,11 @@ import typer
 
 try:
     from .d_optimal_workflow import (  # type: ignore[attr-defined]
-        DEFAULT_ANCHOR_ORDER,
+        DynamicSpec,
         OptimizationResult,
-        load_baseline_payload,
-        optimize_from_payload,
-        optimize_schedule,
-        run_synthetic_optimization,
+        load_dynamic_spec,
+        load_previous_comparisons_from_csv,
+        optimize_from_dynamic_spec,
         write_design,
     )
     from .redistribute_core import (  # type: ignore[attr-defined]
@@ -38,12 +36,11 @@ try:
     )
 except ImportError:  # pragma: no cover - fallback for direct execution
     from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
-        DEFAULT_ANCHOR_ORDER,
+        DynamicSpec,
         OptimizationResult,
-        load_baseline_payload,
-        optimize_from_payload,
-        optimize_schedule,
-        run_synthetic_optimization,
+        load_dynamic_spec,
+        load_previous_comparisons_from_csv,
+        optimize_from_dynamic_spec,
         write_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
@@ -58,11 +55,6 @@ except ImportError:  # pragma: no cover - fallback for direct execution
     )
 
 app = typer.Typer(help="Redistribute CJ comparison pairs across available raters.")
-
-
-class OptimizerMode(str, Enum):
-    SESSION = "session"
-    SYNTHETIC = "synthetic"
 
 
 def _resolve_raters(
@@ -181,113 +173,121 @@ def redistribute(
     typer.echo(f"Output written to {output_path}")
 
 
-def _status_filter(include_status: StatusSelector) -> Optional[List[str]]:
-    if include_status is StatusSelector.ALL:
-        return None
-    return [include_status.value]
-
-
 @app.command("optimize-pairs")
 def optimize_pairs(
-    mode: OptimizerMode = typer.Option(
-        OptimizerMode.SESSION,
-        "--mode",
-        case_sensitive=False,
-        help="Run against an existing session CSV ('session') or the synthetic demo ('synthetic').",
+    students: List[str] = typer.Option(
+        ...,
+        "--student",
+        "-s",
+        help="Student essay ID to include in pairing (repeat for multiple students).",
     ),
-    pairs_csv: Optional[Path] = typer.Option(
-        None,
-        "--pairs-csv",
-        metavar="PATH",
-        help="Path to the baseline comparison CSV (session mode).",
-    ),
-    output_csv: Optional[Path] = typer.Option(
-        None,
+    output_csv: Path = typer.Option(
+        ...,
         "--output-csv",
+        "-o",
         metavar="PATH",
-        help="Destination for the optimized schedule CSV (session mode).",
+        help="Destination for the optimized schedule CSV.",
     ),
-    total_slots: Optional[int] = typer.Option(
-        None,
+    total_slots: int = typer.Option(
+        ...,
         "--total-slots",
-        help="Override the comparison budget (defaults to baseline count or 36 synthetic).",
+        "-t",
+        min=1,
+        help="Required comparison slot budget.",
+    ),
+    anchors: Optional[str] = typer.Option(
+        None,
+        "--anchors",
+        "-a",
+        help="Comma-separated anchor order override (defaults to standard ladder).",
+    ),
+    include_anchor_anchor: bool = typer.Option(
+        True,
+        "--include-anchor-anchor/--no-include-anchor-anchor",
+        help="Include anchor-anchor comparisons in candidate universe (default: True).",
+    ),
+    previous_csv: Optional[Path] = typer.Option(
+        None,
+        "--previous-csv",
+        "-p",
+        metavar="PATH",
+        help="Previous session CSV for multi-session workflows (provides historical comparison data).",
+    ),
+    locked_pairs: Optional[List[str]] = typer.Option(
+        None,
+        "--lock-pair",
+        "-l",
+        help="Hard constraint pairs that MUST be included (rare; distinct from previous comparisons).",
     ),
     max_repeat: int = typer.Option(
         3,
         "--max-repeat",
+        "-r",
         min=1,
-        help="Maximum allowed repeat count for a pair in the optimized design (default: 3).",
-    ),
-    include_status: StatusSelector = typer.Option(
-        StatusSelector.CORE,
-        "--include-status",
-        case_sensitive=False,
-        help="Which statuses to treat as the baseline pool when optimizing (session mode).",
-    ),
-    seed: int = typer.Option(
-        17,
-        "--seed",
-        help="Random seed for the synthetic baseline generator (synthetic mode).",
+        help="Maximum allowed repeat count for any pair in the design (default: 3).",
     ),
     report_json: Optional[Path] = typer.Option(
         None,
         "--report-json",
         metavar="PATH",
-        help="Optional JSON report path capturing diagnostics.",
-    ),
-    baseline_json: Optional[Path] = typer.Option(
-        None,
-        "--baseline-json",
-        metavar="PATH",
-        help=(
-            "Optional JSON payload describing baseline comparisons (session mode only). "
-            "Overrides --pairs-csv when supplied."
-        ),
+        help="Optional JSON report path capturing diagnostics and dynamic spec.",
     ),
 ) -> None:
-    """Optimize comparison schedules using the Fisher-information optimizer."""
+    """Optimize comparison schedules using dynamic input specification (no baseline CSV needed)."""
     try:
-        if mode is OptimizerMode.SYNTHETIC:
-            if baseline_json is not None:
-                raise ValueError("--baseline-json is not supported in synthetic mode.")
-            slots = total_slots or 36
-            result = run_synthetic_optimization(
-                total_slots=slots,
-                max_repeat=max_repeat,
-                seed=seed,
-            )
-            if output_csv:
-                write_design(result.optimized_design, output_csv)
-                typer.echo(f"Optimized schedule written to {output_csv}")
-        else:
-            output_path = output_csv or Path(typer.prompt("Path for optimized schedule CSV"))
-            status_filter = _status_filter(include_status)
+        # Parse student IDs (could be comma-separated in single option)
+        student_list: List[str] = []
+        for entry in students:
+            student_list.extend(s.strip() for s in entry.split(",") if s.strip())
 
-            if baseline_json is not None:
-                payload = load_baseline_payload(baseline_json)
-                result = optimize_from_payload(
-                    payload,
-                    total_slots=total_slots,
-                    max_repeat=max_repeat,
-                    anchor_order=None,
-                    status_filter=status_filter,
-                )
-            else:
-                pairs_path = pairs_csv or Path(typer.prompt("Path to baseline pairs CSV"))
-                result = optimize_schedule(
-                    pairs_path,
-                    total_slots=total_slots,
-                    max_repeat=max_repeat,
-                    anchor_order=DEFAULT_ANCHOR_ORDER,
-                    status_filter=status_filter,
-                )
-            write_design(result.optimized_design, output_path)
-            typer.echo(f"Optimized schedule written to {output_path}")
+        if not student_list:
+            raise ValueError("At least one student essay ID is required.")
 
+        # Parse anchor order
+        anchor_list: Optional[List[str]] = None
+        if anchors:
+            anchor_list = [a.strip() for a in anchors.split(",") if a.strip()]
+
+        # Load previous comparisons if provided (for multi-session workflows)
+        previous_comparisons = None
+        if previous_csv:
+            previous_comparisons = load_previous_comparisons_from_csv(previous_csv)
+            typer.echo(f"Loaded {len(previous_comparisons)} previous comparisons from {previous_csv}")
+
+        # Parse locked pairs
+        locked_list: List[Tuple[str, str]] = []
+        if locked_pairs:
+            for pair_str in locked_pairs:
+                parts = [p.strip() for p in pair_str.split(",")]
+                if len(parts) != 2:
+                    raise ValueError(
+                        f"Locked pair must be in format 'essay_a,essay_b', got: {pair_str}"
+                    )
+                locked_list.append((parts[0], parts[1]))
+
+        # Build dynamic spec
+        spec = load_dynamic_spec(
+            students=student_list,
+            anchors=anchor_list,
+            include_anchor_anchor=include_anchor_anchor,
+            previous_comparisons=previous_comparisons,
+            locked_pairs=locked_list if locked_list else None,
+            total_slots=total_slots,
+        )
+
+        # Run optimizer
+        result = optimize_from_dynamic_spec(spec, max_repeat=max_repeat)
+
+        # Write output
+        write_design(result.optimized_design, output_csv)
+        typer.echo(f"Optimized schedule written to {output_csv}")
+
+        # Emit summary
         _emit_optimizer_summary(result)
 
+        # Write diagnostics if requested
         if report_json:
-            _write_report(report_json, result)
+            _write_report(report_json, result, spec)
             typer.echo(f"Diagnostics written to {report_json}")
     except (FileNotFoundError, ValueError) as error:
         typer.secho(f"Error: {error}", fg=typer.colors.RED, err=True)
@@ -349,7 +349,9 @@ def _print_repeat_counts(repeat_counts: Dict[str, int]) -> None:
         typer.echo(f"  {key}: {count}×")
 
 
-def _write_report(path: Path, result: OptimizationResult) -> None:
+def _write_report(
+    path: Path, result: OptimizationResult, spec: Optional[DynamicSpec] = None
+) -> None:
     payload = {
         "students": list(result.students),
         "anchor_order": list(result.anchor_order),
@@ -373,6 +375,16 @@ def _write_report(path: Path, result: OptimizationResult) -> None:
             "repeat_counts": result.optimized_diagnostics.repeat_counts,
         },
     }
+
+    # Include dynamic spec if provided
+    if spec is not None:
+        payload["dynamic_spec"] = {
+            "students": list(spec.students),
+            "anchors": list(spec.anchors),
+            "include_anchor_anchor": spec.include_anchor_anchor,
+            "locked_pairs": [list(pair) for pair in spec.locked_pairs],
+            "total_slots": spec.total_slots,
+        }
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2))

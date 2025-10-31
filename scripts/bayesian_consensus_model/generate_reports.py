@@ -12,7 +12,7 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 
-from .bayesian_consensus_model import ConsensusModel, ConsensusResult, KernelConfig, GRADES
+from .bayesian_consensus_model import GRADES, ConsensusModel, ConsensusResult, KernelConfig
 
 
 def _parse_args() -> argparse.Namespace:

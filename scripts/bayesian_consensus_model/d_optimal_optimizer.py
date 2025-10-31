@@ -5,7 +5,6 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import numpy as np
 
-
 ComparisonType = str
 
 
@@ -80,6 +79,52 @@ def derive_anchor_adjacency_constraints(anchor_order: Sequence[str]) -> List[Pai
         pair = PairCandidate(anchor_order[idx], anchor_order[idx + 1], "anchor_anchor")
         constraints.append(pair)
     return constraints
+
+
+def derive_required_student_anchor_pairs(
+    students: Sequence[str],
+    anchors: Sequence[str],
+    anchor_order: Sequence[str],
+    baseline_design: Sequence[DesignEntry],
+) -> List[PairCandidate]:
+    """Derive required student-anchor pairs based on baseline coverage analysis.
+
+    For multi-session workflows: analyzes which students already have anchor coverage
+    in the baseline and ensures uncovered students get at least one anchor comparison.
+
+    Args:
+        students: List of student essay IDs
+        anchors: List of anchor essay IDs
+        anchor_order: Ordered list of anchors (used for selecting first anchor)
+        baseline_design: Historical comparisons from previous sessions
+
+    Returns:
+        List of student-anchor pairs required to ensure baseline coverage
+    """
+    anchor_set = set(anchors)
+    students_with_coverage: set[str] = set()
+
+    # Identify which students already have anchor coverage in baseline
+    for entry in baseline_design:
+        pair = entry.candidate
+        if pair.comparison_type == "student_anchor":
+            # Determine which is student and which is anchor
+            if pair.essay_a in anchor_set:
+                students_with_coverage.add(pair.essay_b)
+            elif pair.essay_b in anchor_set:
+                students_with_coverage.add(pair.essay_a)
+
+    # For students without coverage, require at least one anchor comparison
+    required_pairs: List[PairCandidate] = []
+    first_anchor = anchor_order[0] if anchor_order else (anchors[0] if anchors else None)
+
+    if first_anchor:
+        for student in students:
+            if student not in students_with_coverage:
+                # Ensure this student gets compared with at least one anchor
+                required_pairs.append(PairCandidate(student, first_anchor, "student_anchor"))
+
+    return required_pairs
 
 
 def ensure_required_pairs(
@@ -209,11 +254,18 @@ def select_design(
     locked_pairs: Sequence[PairCandidate] = (),
     required_pairs: Sequence[PairCandidate] = (),
     max_repeat: int = 3,
+    include_student_student: bool = True,
+    include_anchor_anchor: bool = True,
 ) -> Tuple[List[DesignEntry], float]:
     items = list(students) + list(anchors)
     index_map = _build_index_map(items)
 
-    candidates = build_candidate_universe(students, anchors)
+    candidates = build_candidate_universe(
+        students,
+        anchors,
+        include_student_student=include_student_student,
+        include_anchor_anchor=include_anchor_anchor,
+    )
     candidate_lookup = {candidate.key(): candidate for candidate in candidates}
 
     design: List[DesignEntry] = []
@@ -241,7 +293,9 @@ def select_design(
     if remaining_slots < 0:
         raise ValueError("No remaining slots after applying locked constraints.")
 
-    score = greedy_fill(design, counts, candidates, remaining_slots, index_map, max_repeat=max_repeat)
+    score = greedy_fill(
+        design, counts, candidates, remaining_slots, index_map, max_repeat=max_repeat
+    )
     score = fedorov_exchange(design, counts, candidates, index_map, max_repeat=max_repeat)
 
     return design, score

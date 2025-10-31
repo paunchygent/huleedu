@@ -141,6 +141,72 @@ python scripts/bayesian_consensus_model/d_optimal_prototype.py \
 - `--max-repeat` controls how many times any ordered pair may appear (default `3`).
 - Use `--mode synthetic --total-slots <n>` to sanity-check behaviour on mock data.
 
+### Dynamic Intake Workflow (Multi-Session Support)
+
+**New as of 2025-10-31**: The optimizer now supports multi-session workflows with coverage analysis, eliminating the need for baseline CSV files.
+
+#### Understanding Previous Comparisons vs Locked Pairs
+
+Two distinct concepts:
+- **`--previous-csv`**: Historical data from past sessions that informs coverage analysis (e.g., "Session 1 has these 84 comparisons, analyze what coverage exists and fill gaps")
+- **`--lock-pair`**: Hard constraints forcing specific pairs into the current schedule (rare use case, e.g., "this specific pair MUST appear")
+
+#### Session 1 Workflow (No Historical Data)
+
+Generate fresh comparisons with baseline coverage:
+
+```bash
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --student JA24 --student II24 --student ES24 \
+  --total-slots 84 \
+  --output-csv session1_pairs.csv
+```
+
+This ensures every student gets anchor coverage (at least one comparison with anchors).
+
+#### Session 2+ Workflow (Building on Previous Sessions)
+
+Load previous session data and generate complementary comparisons:
+
+```bash
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --student JA24 --student II24 --student ES24 \
+  --previous-csv session1_pairs.csv \
+  --total-slots 84 \
+  --output-csv session2_pairs.csv
+```
+
+**How it works:**
+1. Loads 84 comparisons from Session 1 as historical data
+2. Analyzes which students already have anchor coverage
+3. Ensures students without coverage get required anchor pairs
+4. Generates 84 NEW complementary comparisons
+5. Improves overall design information across both sessions
+
+#### Advanced Options
+
+```bash
+# With custom anchors and locked constraints
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --student JA24,II24,ES24 \
+  --anchors "A1,A2,B1,B2" \
+  --previous-csv session1_pairs.csv \
+  --lock-pair "JA24,A1" \
+  --lock-pair "II24,B1" \
+  --total-slots 84 \
+  --max-repeat 3 \
+  --output-csv session2_pairs.csv \
+  --report-json session2_report.json
+
+# Disable anchor-anchor comparisons
+python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --student JA24,II24 \
+  --no-include-anchor-anchor \
+  --total-slots 60 \
+  --output-csv minimal_pairs.csv
+```
+
+
 ### Typer CLI workflow
 
 ```bash

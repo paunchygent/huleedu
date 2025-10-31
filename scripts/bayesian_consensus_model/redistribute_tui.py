@@ -25,10 +25,11 @@ except ImportError:  # pragma: no cover - compatibility with older Textual
 try:
     from .d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
+        DynamicSpec,
         OptimizationResult,
-        load_baseline_payload,
-        optimize_from_payload,
-        optimize_schedule,
+        load_dynamic_spec,
+        load_previous_comparisons_from_csv,
+        optimize_from_dynamic_spec,
         write_design,
     )
     from .redistribute_core import (
@@ -43,11 +44,10 @@ try:
     )
 except ImportError:  # pragma: no cover - fallback for direct execution
     from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
-        DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
-        load_baseline_payload,
-        optimize_from_payload,
-        optimize_schedule,
+        load_dynamic_spec,
+        load_previous_comparisons_from_csv,
+        optimize_from_dynamic_spec,
         write_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
@@ -143,10 +143,16 @@ class RedistributeApp(App):
         with Container(id="panel"):
             yield Label("Redistribute Comparison Pairs", id="title", classes="bold")
             with Vertical(id="form"):
-                yield Label("Pairs CSV Path")
+                yield Label("Student Essay IDs (comma-separated)")
                 yield Input(
-                    value=str(DEFAULT_PAIRS),
-                    id="pairs_input",
+                    placeholder="e.g., JA24, II24, ES24",
+                    id="students_input",
+                    classes="field-input",
+                )
+                yield Label("Anchor Order Override (comma-separated, optional)")
+                yield Input(
+                    placeholder="Leave blank for default anchor ladder",
+                    id="anchors_input",
                     classes="field-input",
                 )
                 yield Label("Output CSV Path")
@@ -190,24 +196,21 @@ class RedistributeApp(App):
                     id="optimizer_output_input",
                     classes="field-input",
                 )
-                yield Label("Optional Baseline JSON Path")
+                yield Label("Previous Session CSV (optional, for multi-session workflows)")
                 yield Input(
-                    placeholder="e.g., baseline_payload.json",
-                    id="optimizer_baseline_json_input",
+                    placeholder="e.g., session1_pairs.csv (leave blank for first session)",
+                    id="previous_csv_input",
                     classes="field-input",
                 )
-                yield Label("Optimization Status Pool")
-                yield Select(
-                    id="optimizer_status_select",
-                    options=[
-                        ("Core only", StatusSelector.CORE.value),
-                        ("Core + extra", StatusSelector.ALL.value),
-                    ],
-                    value=StatusSelector.CORE.value,
-                    classes="field-select",
-                )
-                yield Label("Optimization Total Slots (blank = baseline count)")
+                yield Label("Locked Pairs (semicolon-separated: essay_a,essay_b; essay_c,essay_d)")
                 yield Input(
+                    placeholder="e.g., JA24,A1; II24,B1",
+                    id="locked_pairs_input",
+                    classes="field-input",
+                )
+                yield Label("Optimization Total Slots (required)")
+                yield Input(
+                    value="24",
                     id="optimizer_slots_input",
                     placeholder="e.g., 84",
                     classes="field-input",
@@ -217,6 +220,13 @@ class RedistributeApp(App):
                     value="3",
                     id="optimizer_max_repeat_input",
                     classes="field-input",
+                )
+                yield Label("Include Anchor-Anchor Comparisons")
+                yield Select(
+                    id="include_anchor_anchor_select",
+                    options=[("Yes", "yes"), ("No", "no")],
+                    value="yes",
+                    classes="field-select",
                 )
                 yield Label("Optimize before assigning?")
                 yield Select(
@@ -238,7 +248,7 @@ class RedistributeApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#pairs_input", Input).focus()
+        self.query_one("#students_input", Input).focus()
         self.query_one(TextLog).write("Ready.")
 
     def action_generate(self) -> None:
@@ -257,27 +267,25 @@ class RedistributeApp(App):
             self._reset_form()
 
     def _reset_form(self) -> None:
-        self.query_one("#pairs_input", Input).value = str(DEFAULT_PAIRS)
+        self.query_one("#students_input", Input).value = ""
+        self.query_one("#anchors_input", Input).value = ""
         self.query_one("#output_input", Input).value = str(DEFAULT_OUTPUT)
         self.query_one("#rater_count_input", Input).value = str(DEFAULT_RATER_COUNT)
         self.query_one("#rater_names_input", Input).value = ""
         self.query_one("#per_rater_input", Input).value = "10"
         self.query_one("#status_select", Select).value = StatusSelector.ALL.value
         self.query_one("#optimizer_output_input", Input).value = str(DEFAULT_OPTIMIZED)
-        self.query_one("#optimizer_status_select", Select).value = StatusSelector.CORE.value
-        self.query_one("#optimizer_slots_input", Input).value = ""
+        self.query_one("#optimizer_slots_input", Input).value = "24"
         self.query_one("#optimizer_max_repeat_input", Input).value = "3"
+        self.query_one("#locked_pairs_input", Input).value = ""
+        self.query_one("#include_anchor_anchor_select", Select).value = "yes"
         self.query_one("#optimizer_toggle", Select).value = "no"
-        self.query_one("#optimizer_baseline_json_input", Input).value = ""
         self.query_one(TextLog).write("Form reset.")
 
     def _generate_assignments(self) -> None:
         log_widget = self.query_one(TextLog)
         log_widget.clear()
         try:
-            pairs_value = self.query_one("#pairs_input", Input).value.strip()
-            if not pairs_value:
-                raise ValueError("Pairs CSV path is required.")
             output_value = self.query_one("#output_input", Input).value.strip()
             if not output_value:
                 raise ValueError("Output CSV path is required.")
@@ -285,13 +293,23 @@ class RedistributeApp(App):
             if output_path.is_dir():
                 raise ValueError("Output path points to a directory; provide a file path.")
 
+            # If optimizer toggle is on, run optimizer first to generate pairs CSV
             if self.query_one("#optimizer_toggle", Select).value == "yes":
                 optimized_path = self._run_optimizer(log_widget, clear_log=False)
                 if optimized_path is None:
                     return
                 pairs_path = optimized_path
             else:
-                pairs_path = Path(pairs_value)
+                # Use manually specified optimized pairs file
+                optimizer_output = self.query_one("#optimizer_output_input", Input).value.strip()
+                if not optimizer_output:
+                    raise ValueError(
+                        "Either enable optimization or provide an existing optimized pairs "
+                        "CSV path."
+                    )
+                pairs_path = Path(optimizer_output)
+                if not pairs_path.exists():
+                    raise FileNotFoundError(f"Pairs CSV not found: {pairs_path}")
 
             comparisons = read_pairs(pairs_path)
 
@@ -365,54 +383,82 @@ class RedistributeApp(App):
             log_widget.clear()
 
         try:
-            pairs_value = self.query_one("#pairs_input", Input).value.strip()
+            # Get student IDs
+            students_value = self.query_one("#students_input", Input).value.strip()
+            if not students_value:
+                raise ValueError("Student Essay IDs are required for optimization.")
+            student_list = [s.strip() for s in students_value.split(",") if s.strip()]
+            if not student_list:
+                raise ValueError("At least one student essay ID is required.")
+
+            # Get output path
             output_value = self.query_one("#optimizer_output_input", Input).value.strip()
             if not output_value:
                 raise ValueError("Optimization output path is required.")
 
-            baseline_value = self.query_one("#optimizer_baseline_json_input", Input).value.strip()
-            if not pairs_value and not baseline_value:
-                raise ValueError(
-                    "Provide a pairs CSV path or a baseline JSON payload before optimizing."
-                )
+            # Get anchors (optional)
+            anchors_value = self.query_one("#anchors_input", Input).value.strip()
+            anchor_list = None
+            if anchors_value:
+                anchor_list = [a.strip() for a in anchors_value.split(",") if a.strip()]
 
+            # Get locked pairs (format: "essay_a,essay_b; essay_c,essay_d" using semicolons between pairs)
+            locked_value = self.query_one("#locked_pairs_input", Input).value.strip()
+            locked_pairs = None
+            if locked_value:
+                locked_list = []
+                for pair_str in locked_value.split(";"):  # Semicolon separates multiple pairs
+                    pair_str = pair_str.strip()
+                    if not pair_str:
+                        continue
+                    parts = [p.strip() for p in pair_str.split(",")]  # Comma within pair
+                    if len(parts) == 2:
+                        locked_list.append((parts[0], parts[1]))
+                    elif pair_str:  # Non-empty but wrong format
+                        raise ValueError(f"Invalid locked pair format: '{pair_str}' (use 'essay_a,essay_b')")
+                locked_pairs = locked_list if locked_list else None
+
+            # Get total slots
             slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
-            total_slots = int(slots_raw) if slots_raw else None
+            if not slots_raw:
+                raise ValueError("Total slots is required for optimization.")
+            total_slots = int(slots_raw)
 
+            # Get max repeat
             max_repeat_raw = self.query_one("#optimizer_max_repeat_input", Input).value.strip()
             max_repeat = int(max_repeat_raw) if max_repeat_raw else 3
             if max_repeat <= 0:
                 raise ValueError("Optimization max repeat must be positive.")
 
-            status_value = self.query_one("#optimizer_status_select", Select).value
-            include_status = StatusSelector(status_value or StatusSelector.CORE.value)
-            status_filter = None if include_status is StatusSelector.ALL else (include_status.value,)
+            # Get include anchor-anchor toggle
+            include_aa_value = self.query_one("#include_anchor_anchor_select", Select).value
+            include_anchor_anchor = include_aa_value == "yes"
 
-            if baseline_value:
-                baseline_path = Path(baseline_value)
-                if not baseline_path.exists():
-                    raise FileNotFoundError(f"Baseline JSON not found: {baseline_path}")
-                payload = load_baseline_payload(baseline_path)
-                result = optimize_from_payload(
-                    payload,
-                    total_slots=total_slots,
-                    max_repeat=max_repeat,
-                    anchor_order=None,
-                    status_filter=status_filter,
-                )
-            else:
-                pairs_path = Path(pairs_value)
-                result = optimize_schedule(
-                    pairs_path,
-                    total_slots=total_slots,
-                    max_repeat=max_repeat,
-                    anchor_order=DEFAULT_ANCHOR_ORDER,
-                    status_filter=status_filter,
-                )
+            # Get previous comparisons CSV (optional, for multi-session workflows)
+            previous_csv_value = self.query_one("#previous_csv_input", Input).value.strip()
+            previous_comparisons = None
+            if previous_csv_value:
+                previous_csv_path = Path(previous_csv_value)
+                previous_comparisons = load_previous_comparisons_from_csv(previous_csv_path)
+                log_widget.write(f"Loaded {len(previous_comparisons)} previous comparisons")
 
+            # Build dynamic spec
+            spec = load_dynamic_spec(
+                students=student_list,
+                anchors=anchor_list,
+                include_anchor_anchor=include_anchor_anchor,
+                previous_comparisons=previous_comparisons,
+                locked_pairs=locked_pairs,
+                total_slots=total_slots,
+            )
+
+            # Run optimizer
+            result = optimize_from_dynamic_spec(spec, max_repeat=max_repeat)
+
+            # Write output
             output_path = Path(output_value)
             write_design(result.optimized_design, output_path)
-            self.query_one("#pairs_input", Input).value = str(output_path)
+            self.query_one("#students_input", Input).value = students_value
 
             self._log_optimizer_summary(log_widget, result, output_path)
             return output_path

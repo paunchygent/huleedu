@@ -1,6 +1,6 @@
 """Model implementations for the Bayesian consensus package."""
 
-from .ordinal_kernel import OrdinalKernelModel, KernelConfig
+from .ordinal_kernel import KernelConfig, OrdinalKernelModel
 from .rater_severity import (
     RaterSeverityConfig,
     apply_precision_weights,
