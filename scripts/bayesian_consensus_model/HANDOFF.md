@@ -13,6 +13,20 @@ volume and agreement, so sparse or erratic raters carry less influence.
 - Prototype CLI supports synthetic demos and future Typer/TUI wiring.
 - Implementation and assignment-balancing follow-ups are outlined in `TASKS/d_optimal_pair_optimizer_plan.md`.
 
+### October 2025 Update – Multi-Session Workflow Support
+- **Critical Feature**: Added dynamic intake with multi-session workflow support (2025-10-31)
+- **Previous Comparisons vs Locked Pairs**: Implemented proper distinction:
+  - `previous_comparisons`: Historical data from past sessions that informs coverage analysis
+  - `locked_pairs`: Hard constraints forcing specific pairs (separate concept, rarely used)
+- **Coverage Analysis**: `derive_required_student_anchor_pairs()` analyzes baseline coverage and ensures uncovered students get required anchor pairs
+- **CLI**: Added `--previous-csv` flag for multi-session workflows
+- **TUI**: Added "Previous Session CSV" input field
+- **Multi-Session Flow**:
+  - Session 1: Generate fresh 84 comparisons with baseline coverage
+  - Session 2+: Load Session 1 data, analyze gaps, generate 84 NEW complementary comparisons
+- **Tests**: 4 new tests covering Session 1, Session 2+, CSV loading, and CLI integration (26 tests total, all passing)
+- **Documentation**: README updated with multi-session workflow examples
+
 Pipeline per essay:
 
 1. Map grades to indices and gather rater weights.
