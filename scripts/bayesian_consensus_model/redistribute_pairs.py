@@ -4,9 +4,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
+
+if __package__ in (None, ""):
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(_PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(_PROJECT_ROOT))
 
 import typer
 
@@ -28,14 +34,14 @@ try:
         write_assignments,
     )
 except ImportError:  # pragma: no cover - fallback for direct execution
-    from d_optimal_workflow import (  # type: ignore[attr-defined]
+    from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
         optimize_schedule,
         run_synthetic_optimization,
         write_design,
     )
-    from redistribute_core import (  # type: ignore
+    from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
         Comparison,
         StatusSelector,
         assign_pairs,

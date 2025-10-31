@@ -3,8 +3,14 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional
+
+if __package__ in (None, ""):
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(_PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(_PROJECT_ROOT))
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -32,13 +38,13 @@ try:
         write_assignments,
     )
 except ImportError:  # pragma: no cover - fallback for direct execution
-    from d_optimal_workflow import (  # type: ignore[attr-defined]
+    from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
         optimize_schedule,
         write_design,
     )
-    from redistribute_core import (  # type: ignore
+    from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
         StatusSelector,
         assign_pairs,
         build_rater_list,
