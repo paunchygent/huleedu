@@ -26,6 +26,8 @@ try:
     from .d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
+        load_baseline_payload,
+        optimize_from_payload,
         optimize_schedule,
         write_design,
     )
@@ -33,6 +35,8 @@ try:
         StatusSelector,
         assign_pairs,
         build_rater_list,
+        compute_quota_distribution,
+        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -41,6 +45,8 @@ except ImportError:  # pragma: no cover - fallback for direct execution
     from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
+        load_baseline_payload,
+        optimize_from_payload,
         optimize_schedule,
         write_design,
     )
@@ -48,6 +54,8 @@ except ImportError:  # pragma: no cover - fallback for direct execution
         StatusSelector,
         assign_pairs,
         build_rater_list,
+        compute_quota_distribution,
+        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -182,6 +190,12 @@ class RedistributeApp(App):
                     id="optimizer_output_input",
                     classes="field-input",
                 )
+                yield Label("Optional Baseline JSON Path")
+                yield Input(
+                    placeholder="e.g., baseline_payload.json",
+                    id="optimizer_baseline_json_input",
+                    classes="field-input",
+                )
                 yield Label("Optimization Status Pool")
                 yield Select(
                     id="optimizer_status_select",
@@ -254,6 +268,7 @@ class RedistributeApp(App):
         self.query_one("#optimizer_slots_input", Input).value = ""
         self.query_one("#optimizer_max_repeat_input", Input).value = "3"
         self.query_one("#optimizer_toggle", Select).value = "no"
+        self.query_one("#optimizer_baseline_json_input", Input).value = ""
         self.query_one(TextLog).write("Form reset.")
 
     def _generate_assignments(self) -> None:
@@ -301,18 +316,46 @@ class RedistributeApp(App):
                     raise ValueError("Rater count must be an integer.") from exc
                 names = build_rater_list(count, None)
 
-            total_needed = len(names) * per_rater
-            selected = select_comparisons(comparisons, include_status, total_needed)
-            assignments = assign_pairs(selected, names, per_rater)
+            pool = filter_comparisons(comparisons, include_status)
+            requested_total = len(names) * per_rater
+            available_total = len(pool)
+
+            if available_total == 0:
+                raise ValueError(
+                    "No comparisons available after filtering. "
+                    "Adjust status selection or regenerate pairs."
+                )
+
+            shortage = requested_total > available_total
+            if shortage:
+                quotas = compute_quota_distribution(names, per_rater, available_total)
+                total_needed = sum(quotas.values())
+                selected = select_comparisons(comparisons, include_status, total_needed)
+                assignments = assign_pairs(selected, names, quotas)
+            else:
+                quotas = {name: per_rater for name in names}
+                total_needed = requested_total
+                selected = select_comparisons(comparisons, include_status, total_needed)
+                assignments = assign_pairs(selected, names, per_rater)
             write_assignments(output_path, assignments)
         except (FileNotFoundError, ValueError) as error:
             log_widget.write(f"[red]Error:[/] {error}")
             return
 
+        actual_counts = [quotas[name] for name in names]
         statuses = ", ".join(sorted({comparison.status for _, comparison in assignments}))
+        if shortage:
+            log_widget.write(
+                f"[yellow]Notice[/]: Requested {requested_total} comparisons but only "
+                f"{available_total} available."
+            )
         log_widget.write(
-            f"Success: Generated assignments for {len(names)} raters "
-            f"({per_rater} comparisons each)."
+            "Success: Generated assignments for "
+            f"{len(names)} raters (min {min(actual_counts)}, max {max(actual_counts)})."
+        )
+        log_widget.write(
+            "Total allocated comparisons: "
+            f"{sum(actual_counts)} (requested {requested_total})."
         )
         log_widget.write(f"Pairs drawn from statuses: {statuses}")
         log_widget.write(f"Output written to {output_path}")
@@ -323,11 +366,15 @@ class RedistributeApp(App):
 
         try:
             pairs_value = self.query_one("#pairs_input", Input).value.strip()
-            if not pairs_value:
-                raise ValueError("Pairs CSV path is required for optimization.")
             output_value = self.query_one("#optimizer_output_input", Input).value.strip()
             if not output_value:
                 raise ValueError("Optimization output path is required.")
+
+            baseline_value = self.query_one("#optimizer_baseline_json_input", Input).value.strip()
+            if not pairs_value and not baseline_value:
+                raise ValueError(
+                    "Provide a pairs CSV path or a baseline JSON payload before optimizing."
+                )
 
             slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
             total_slots = int(slots_raw) if slots_raw else None
@@ -341,13 +388,27 @@ class RedistributeApp(App):
             include_status = StatusSelector(status_value or StatusSelector.CORE.value)
             status_filter = None if include_status is StatusSelector.ALL else (include_status.value,)
 
-            result = optimize_schedule(
-                Path(pairs_value),
-                total_slots=total_slots,
-                max_repeat=max_repeat,
-                anchor_order=DEFAULT_ANCHOR_ORDER,
-                status_filter=status_filter,
-            )
+            if baseline_value:
+                baseline_path = Path(baseline_value)
+                if not baseline_path.exists():
+                    raise FileNotFoundError(f"Baseline JSON not found: {baseline_path}")
+                payload = load_baseline_payload(baseline_path)
+                result = optimize_from_payload(
+                    payload,
+                    total_slots=total_slots,
+                    max_repeat=max_repeat,
+                    anchor_order=None,
+                    status_filter=status_filter,
+                )
+            else:
+                pairs_path = Path(pairs_value)
+                result = optimize_schedule(
+                    pairs_path,
+                    total_slots=total_slots,
+                    max_repeat=max_repeat,
+                    anchor_order=DEFAULT_ANCHOR_ORDER,
+                    status_filter=status_filter,
+                )
 
             output_path = Path(output_value)
             write_design(result.optimized_design, output_path)

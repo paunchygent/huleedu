@@ -5,7 +5,7 @@ from collections import Counter, deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Deque, Dict, List, Optional, Sequence, Tuple
+from typing import Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 ANCHOR_DISPLAY = {
     "F+1": "SA1701",
@@ -97,15 +97,23 @@ def build_rater_list(
     return [f"Rater_{idx:02d}" for idx in range(1, count + 1)]
 
 
-def select_comparisons(
+def filter_comparisons(
     comparisons: Sequence[Comparison],
     include_status: StatusSelector,
-    total_needed: int,
 ) -> List[Comparison]:
     if include_status is StatusSelector.CORE:
         pool = [item for item in comparisons if item.status == "core"]
     else:
         pool = list(comparisons)
+    return pool
+
+
+def select_comparisons(
+    comparisons: Sequence[Comparison],
+    include_status: StatusSelector,
+    total_needed: int,
+) -> List[Comparison]:
+    pool = filter_comparisons(comparisons, include_status)
 
     if total_needed > len(pool):
         raise ValueError(
@@ -115,15 +123,115 @@ def select_comparisons(
     return list(pool[:total_needed])
 
 
+def compute_quota_distribution(
+    rater_names: Sequence[str],
+    desired_per_rater: int,
+    total_available: int,
+) -> Dict[str, int]:
+    if desired_per_rater <= 0:
+        raise ValueError("Comparisons per rater must be a positive integer.")
+    if total_available < 0:
+        raise ValueError("Total available comparisons cannot be negative.")
+
+    quotas: Dict[str, int] = {}
+    rater_count = len(rater_names)
+    if rater_count == 0:
+        return quotas
+
+    base = min(desired_per_rater, total_available // rater_count) if rater_count else 0
+    remainder = total_available - (base * rater_count)
+
+    for index, name in enumerate(rater_names):
+        extra = 1 if remainder > 0 and base < desired_per_rater else 0
+        if extra:
+            remainder -= 1
+        quota = min(desired_per_rater, base + extra)
+        quotas[name] = quota
+
+    # Distribute any remaining comparisons without exceeding desired_per_rater
+    idx = 0
+    while remainder > 0 and rater_names:
+        name = rater_names[idx % rater_count]
+        if quotas[name] < desired_per_rater:
+            quotas[name] += 1
+            remainder -= 1
+        idx += 1
+
+    assigned_total = sum(quotas.values())
+    if assigned_total > total_available:
+        # Trim excess starting from last to preserve earlier allocations
+        overflow = assigned_total - total_available
+        for name in reversed(rater_names):
+            reclaimable = min(overflow, quotas[name])
+            quotas[name] -= reclaimable
+            overflow -= reclaimable
+            if overflow == 0:
+                break
+
+    return quotas
+
+
+def load_comparisons_from_records(
+    records: Iterable[Mapping[str, Union[str, int]]],
+) -> List[Comparison]:
+    comparisons: List[Comparison] = []
+    next_pair_id = 1
+    for record in records:
+        try:
+            essay_a_id = str(record["essay_a_id"])
+            essay_b_id = str(record["essay_b_id"])
+            comparison_type = str(record.get("comparison_type", "student_anchor"))
+        except KeyError as exc:
+            raise ValueError(f"Missing comparison field: {exc.args[0]}") from exc
+
+        raw_pair = record.get("pair_id")
+        if raw_pair is None:
+            pair_id = next_pair_id
+        else:
+            try:
+                pair_id = int(raw_pair)
+            except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+                raise ValueError(f"Invalid pair_id value: {raw_pair}") from exc
+        status = str(record.get("status", "core"))
+
+        comparisons.append(
+            Comparison(
+                pair_id=pair_id,
+                essay_a_id=essay_a_id,
+                essay_b_id=essay_b_id,
+                comparison_type=comparison_type,
+                status=status,
+            )
+        )
+        next_pair_id = max(next_pair_id, pair_id + 1)
+
+    comparisons.sort(key=lambda item: (0 if item.status == "core" else 1, item.pair_id))
+    return comparisons
+
+
 def assign_pairs(
     comparisons: Sequence[Comparison],
     rater_names: Sequence[str],
-    per_rater: int,
+    per_rater: Union[int, Sequence[int], Mapping[str, int]],
 ) -> List[Tuple[str, Comparison]]:
-    if per_rater <= 0:
-        raise ValueError("Comparisons per rater must be a positive integer.")
+    quotas: Dict[str, int]
+    if isinstance(per_rater, int):
+        if per_rater <= 0:
+            raise ValueError("Comparisons per rater must be a positive integer.")
+        quotas = {rater: per_rater for rater in rater_names}
+    elif isinstance(per_rater, Mapping):
+        missing = [name for name in rater_names if name not in per_rater]
+        if missing:
+            missing_list = ", ".join(missing)
+            raise ValueError(f"Missing quota for raters: {missing_list}")
+        quotas = {name: int(per_rater[name]) for name in rater_names}
+    else:
+        per_rater_list = list(per_rater)
+        if len(per_rater_list) != len(rater_names):
+            raise ValueError("Per-rater sequence length must match number of rater names.")
+        quotas = {name: int(count) for name, count in zip(rater_names, per_rater_list)}
 
-    total_needed = len(rater_names) * per_rater
+    total_needed = sum(max(count, 0) for count in quotas.values())
     ordered: List[Comparison] = list(comparisons)[:total_needed]
     if len(ordered) < total_needed:
         raise ValueError(
@@ -135,7 +243,8 @@ def assign_pairs(
         type_queues.setdefault(comparison.comparison_type, deque()).append(comparison)
 
     rater_state: Dict[str, _RaterAllocation] = {
-        rater: _RaterAllocation(remaining=per_rater, type_counts=Counter()) for rater in rater_names
+        rater: _RaterAllocation(remaining=max(quotas.get(rater, 0), 0), type_counts=Counter())
+        for rater in rater_names
     }
 
     type_cycle = deque(sorted(type_queues, key=lambda key: (-len(type_queues[key]), key)))

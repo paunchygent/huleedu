@@ -10,6 +10,10 @@ from typer.testing import CliRunner
 
 from scripts.bayesian_consensus_model import redistribute_core as core
 from scripts.bayesian_consensus_model.redistribute_pairs import app as cli_app
+from scripts.bayesian_consensus_model.d_optimal_workflow import (
+    DEFAULT_ANCHOR_ORDER,
+    load_baseline_payload,
+)
 
 
 @pytest.fixture()
@@ -44,6 +48,29 @@ def test_select_comparisons_respects_pool(pairs_csv: Path) -> None:
     assert len(selected_core) == 4
     with pytest.raises(ValueError):
         core.select_comparisons(comparisons, core.StatusSelector.CORE, total_needed=6)
+
+
+def test_compute_quota_distribution_handles_shortage() -> None:
+    names = ["R1", "R2", "R3"]
+    quotas = core.compute_quota_distribution(names, desired_per_rater=3, total_available=5)
+    assert sum(quotas.values()) == 5
+    assert max(quotas.values()) <= 3
+    assert set(quotas) == set(names)
+
+
+def test_assign_pairs_accepts_mixed_quotas(pairs_csv: Path) -> None:
+    comparisons = core.read_pairs(pairs_csv)
+    quotas = {"R1": 2, "R2": 1, "R3": 1}
+    total_needed = sum(quotas.values())
+    selected = core.select_comparisons(
+        comparisons,
+        core.StatusSelector.CORE,
+        total_needed=total_needed,
+    )
+    assignments = core.assign_pairs(selected, list(quotas), quotas)
+    assert len(assignments) == 4
+    for name in quotas:
+        assert sum(1 for rater, _ in assignments if rater == name) == quotas[name]
 
 
 def test_assign_and_write(tmp_path: Path, pairs_csv: Path) -> None:
@@ -121,6 +148,33 @@ def test_assign_pairs_balances_comparison_types() -> None:
         assert len(types) >= 2  # ensure some mix of comparison types
 
 
+def test_cli_handles_pair_shortage(tmp_path: Path, pairs_csv: Path) -> None:
+    output_csv = tmp_path / "cli_shortage.csv"
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_app,
+        [
+            "redistribute",
+            "--pairs-csv",
+            str(pairs_csv),
+            "--output-csv",
+            str(output_csv),
+            "--raters",
+            "3",
+            "--per-rater",
+            "2",
+            "--include-status",
+            "core",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Requested 6 comparisons but only 4 available." in result.output
+    assert "min" in result.output and "max" in result.output
+    lines = output_csv.read_text().strip().splitlines()
+    # header + available_total assignments (4 core comparisons)
+    assert len(lines) == 1 + 4
+
+
 def test_optimize_cli_writes_outputs(tmp_path: Path, pairs_csv: Path) -> None:
     optimized_csv = tmp_path / "optimized.csv"
     report_path = tmp_path / "report.json"
@@ -151,3 +205,117 @@ def test_optimize_cli_writes_outputs(tmp_path: Path, pairs_csv: Path) -> None:
     report = json.loads(report_path.read_text())
     assert report["optimized"]["total_pairs"] == 24
     assert "log_det_gain" in report
+
+
+def test_optimize_cli_accepts_baseline_json(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    output_csv = tmp_path / "optimized_baseline.csv"
+    payload = {
+        "total_slots": 3,
+        "comparisons": [
+            {
+                "essay_a_id": "JA24",
+                "essay_b_id": "A1",
+                "comparison_type": "student_anchor",
+                "status": "core",
+            },
+            {
+                "essay_a_id": "II24",
+                "essay_b_id": "B1",
+                "comparison_type": "student_anchor",
+                "status": "core",
+            },
+            {
+                "essay_a_id": "JA24",
+                "essay_b_id": "II24",
+                "comparison_type": "student_student",
+                "status": "core",
+            },
+        ],
+        "anchor_order": [
+            "F+1",
+            "F+2",
+            "E-",
+            "E+",
+            "D-",
+            "D+",
+            "C-",
+            "C+",
+            "B1",
+            "B2",
+            "A1",
+            "A2",
+        ],
+    }
+    baseline_path.write_text(json.dumps(payload))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_app,
+        [
+            "optimize-pairs",
+            "--mode",
+            "session",
+            "--baseline-json",
+            str(baseline_path),
+            "--output-csv",
+            str(output_csv),
+            "--total-slots",
+            "15",
+            "--max-repeat",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert output_csv.exists()
+    rows = list(csv.reader(output_csv.open()))
+    # header + requested optimized comparisons
+    assert len(rows) == 1 + 15
+
+
+def test_load_baseline_payload_accepts_empty_array(tmp_path: Path) -> None:
+    payload_path = tmp_path / "empty_payload.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "comparisons": [],
+                "anchor_order": DEFAULT_ANCHOR_ORDER,
+                "status_filter": ["core"],
+            }
+        )
+    )
+
+    payload = load_baseline_payload(payload_path)
+
+    assert payload.records == []
+    assert payload.anchor_order == DEFAULT_ANCHOR_ORDER
+    assert payload.status_filter == ["core"]
+    assert payload.total_slots is None
+
+
+def test_load_baseline_payload_preserves_slots_and_status_filter(tmp_path: Path) -> None:
+    payload_path = tmp_path / "payload.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "comparisons": [
+                    {
+                        "essay_a_id": "JA24",
+                        "essay_b_id": "A1",
+                        "comparison_type": "student_anchor",
+                        "status": "core",
+                    }
+                ],
+                "status_filter": ["core", "extra"],
+                "total_slots": 12,
+            }
+        )
+    )
+
+    payload = load_baseline_payload(payload_path)
+
+    assert len(payload.records) == 1
+    assert payload.records[0]["essay_a_id"] == "JA24"
+    assert payload.status_filter == ["core", "extra"]
+    assert payload.total_slots == 12

@@ -1,31 +1,35 @@
 from __future__ import annotations
 
+import csv
+import json
 import sys
+from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 if __package__ in (None, ""):
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
     if str(_PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(_PROJECT_ROOT))
 
-import csv
-from collections import Counter, defaultdict
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Tuple
-
 try:
-    from .d_optimal_optimizer import (
+    from .d_optimal_optimizer import (  # type: ignore[attr-defined]
         DesignEntry,
         PairCandidate,
         compute_log_det,
         select_design,
     )
+    from .redistribute_core import load_comparisons_from_records  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - direct execution fallback
     from scripts.bayesian_consensus_model.d_optimal_optimizer import (  # type: ignore[attr-defined]
         DesignEntry,
         PairCandidate,
         compute_log_det,
         select_design,
+    )
+    from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
+        load_comparisons_from_records,
     )
 
 DEFAULT_ANCHOR_ORDER: List[str] = [
@@ -77,6 +81,113 @@ class OptimizationResult:
         return len(self.optimized_design)
 
 
+@dataclass(frozen=True)
+class BaselinePayload:
+    """Normalized payload describing dynamic baseline comparisons."""
+
+    records: Sequence[Mapping[str, object]]
+    anchor_order: Sequence[str]
+    status_filter: Optional[Sequence[str]]
+    total_slots: Optional[int]
+
+
+def load_baseline_payload(
+    path: Path,
+    *,
+    fallback_anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
+) -> BaselinePayload:
+    """Parse a JSON payload describing baseline comparisons for optimization."""
+
+    if not path.exists():
+        raise FileNotFoundError(f"Baseline JSON not found: {path}")
+
+    try:
+        raw = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+        raise ValueError(f"Invalid JSON payload in {path}") from exc
+
+    anchor_order: Sequence[str] = list(fallback_anchor_order)
+    status_filter: Optional[Sequence[str]] = None
+    total_slots: Optional[int] = None
+
+    def _normalize_string_sequence(value: object, field: str) -> List[str]:
+        if isinstance(value, str) or not isinstance(value, Iterable):
+            raise ValueError(f"'{field}' must be an array of strings.")
+        return [str(item) for item in value]
+
+    if isinstance(raw, Mapping):
+        records_obj = (
+            raw["comparisons"]
+            if "comparisons" in raw
+            else raw.get("records")
+        )
+        if records_obj is None:
+            raise ValueError("Baseline payload must include a 'comparisons' array.")
+        if "anchor_order" in raw:
+            anchor_order = _normalize_string_sequence(raw["anchor_order"], "anchor_order")
+        if "status_filter" in raw:
+            status_filter = _normalize_string_sequence(raw["status_filter"], "status_filter")
+        if "total_slots" in raw and raw["total_slots"] is not None:
+            try:
+                total_slots = int(raw["total_slots"])
+            except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+                raise ValueError("'total_slots' must be an integer if supplied.") from exc
+    elif isinstance(raw, Sequence):
+        records_obj = raw
+    else:
+        raise ValueError("Baseline payload must be a JSON object or array.")
+
+    if not isinstance(records_obj, Sequence):
+        raise ValueError("'comparisons' must be an array of objects.")
+
+    normalized_records: List[Mapping[str, object]] = []
+    for index, record in enumerate(records_obj):
+        if not isinstance(record, Mapping):
+            raise ValueError(f"Comparison at index {index} is not an object.")
+        normalized_records.append(dict(record))
+
+    if not anchor_order:
+        raise ValueError("Anchor order cannot be empty.")
+
+    return BaselinePayload(
+        records=normalized_records,
+        anchor_order=list(anchor_order),
+        status_filter=list(status_filter) if status_filter is not None else None,
+        total_slots=total_slots,
+    )
+
+
+def optimize_from_payload(
+    payload: BaselinePayload,
+    *,
+    total_slots: int | None,
+    max_repeat: int,
+    anchor_order: Sequence[str] | None = None,
+    status_filter: Iterable[str] | None = ("core",),
+) -> OptimizationResult:
+    """Run optimization for a pre-normalized baseline payload."""
+
+    effective_slots = total_slots if total_slots is not None else payload.total_slots
+    effective_anchor_order = (
+        list(anchor_order) if anchor_order is not None else list(payload.anchor_order)
+    )
+    payload_status = payload.status_filter
+    effective_status_filter: Iterable[str] | None
+    if status_filter is not None:
+        effective_status_filter = status_filter
+    else:
+        effective_status_filter = payload_status
+
+    return optimize_schedule(
+        pairs_path=None,
+        total_slots=effective_slots,
+        max_repeat=max_repeat,
+        anchor_order=effective_anchor_order,
+        status_filter=effective_status_filter,
+        baseline_records=payload.records,
+    )
+
+
 def load_baseline_design(
     pairs_path: Path,
     *,
@@ -113,6 +224,38 @@ def load_baseline_design(
             for essay in (candidate.essay_a, candidate.essay_b):
                 if essay not in anchors:
                     students.add(essay)
+
+    if not design:
+        raise ValueError("No comparisons matched the requested status filter.")
+
+    return sorted(students), design
+
+
+def load_baseline_from_records(
+    records: Iterable[Mapping[str, object]],
+    *,
+    anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
+    status_filter: Optional[Iterable[str]] = ("core",),
+) -> Tuple[List[str], List[DesignEntry]]:
+    """Load a baseline design from in-memory records."""
+    raw_comparisons = load_comparisons_from_records(records)
+    statuses = {status.lower() for status in status_filter} if status_filter is not None else None
+    anchors = set(anchor_order)
+    students: set[str] = set()
+    design: List[DesignEntry] = []
+
+    for comparison in raw_comparisons:
+        if statuses is not None and comparison.status.lower() not in statuses:
+            continue
+        candidate = PairCandidate(
+            essay_a=comparison.essay_a_id,
+            essay_b=comparison.essay_b_id,
+            comparison_type=comparison.comparison_type,
+        )
+        design.append(DesignEntry(candidate))
+        for essay in (candidate.essay_a, candidate.essay_b):
+            if essay not in anchors:
+                students.add(essay)
 
     if not design:
         raise ValueError("No comparisons matched the requested status filter.")
@@ -168,7 +311,7 @@ def summarize_design(
     design: Sequence[DesignEntry],
     anchor_order: Sequence[str],
 ) -> DesignDiagnostics:
-    """Produce diagnostics for a design for reporting and validation."""
+    """Return design diagnostics."""
     anchor_index = {anchor: idx for idx, anchor in enumerate(anchor_order)}
     anchor_set = set(anchor_order)
 
@@ -191,10 +334,13 @@ def summarize_design(
         anchor = candidate.essay_a if a_is_anchor else candidate.essay_b
         coverage[student].add(anchor)
 
-    ordered_coverage: Dict[str, List[str]] = {
-        student: sorted(list(anchors), key=lambda name: anchor_index.get(name, len(anchor_index)))
-        for student, anchors in coverage.items()
-    }
+    ordered_coverage: Dict[str, List[str]] = {}
+    for student, anchors in coverage.items():
+        sorted_anchors = sorted(
+            list(anchors),
+            key=lambda name: anchor_index.get(name, len(anchor_index)),
+        )
+        ordered_coverage[student] = sorted_anchors
     repeat_counts = {
         f"{pair[0]}|{pair[1]}": count
         for pair, count in repeats.items()
@@ -231,19 +377,29 @@ def write_design(design: Sequence[DesignEntry], output_path: Path, *, status: st
 
 
 def optimize_schedule(
-    pairs_path: Path,
+    pairs_path: Optional[Path] = None,
     *,
     total_slots: int | None,
     max_repeat: int,
     anchor_order: Sequence[str] = DEFAULT_ANCHOR_ORDER,
     status_filter: Iterable[str] | None = ("core",),
+    baseline_records: Optional[Iterable[Mapping[str, object]]] = None,
 ) -> OptimizationResult:
-    """Run the optimizer against a baseline CSV and return metrics."""
-    students, baseline_design = load_baseline_design(
-        pairs_path,
-        anchor_order=anchor_order,
-        status_filter=status_filter,
-    )
+    """Run the optimizer against a baseline design and return metrics."""
+    if baseline_records is not None:
+        students, baseline_design = load_baseline_from_records(
+            baseline_records,
+            anchor_order=anchor_order,
+            status_filter=status_filter,
+        )
+    else:
+        if pairs_path is None:
+            raise ValueError("Provide either pairs_path or baseline_records to optimize.")
+        students, baseline_design = load_baseline_design(
+            pairs_path,
+            anchor_order=anchor_order,
+            status_filter=status_filter,
+        )
     if not students:
         raise ValueError("No student essays detected in the baseline design.")
 
@@ -259,7 +415,8 @@ def optimize_schedule(
         max_repeat=max_repeat,
     )
 
-    index_map = {item: idx for idx, item in enumerate(list(students) + list(anchor_order))}
+    combined_items = list(students) + list(anchor_order)
+    index_map = {item: idx for idx, item in enumerate(combined_items)}
     baseline_log_det = compute_log_det(baseline_design, index_map)
     optimized_log_det = compute_log_det(optimized_design, index_map)
 
@@ -306,7 +463,11 @@ def _build_random_design(
 
     rng = random.Random(seed)
     for _ in range(total_slots):
-        eligible = [candidate for candidate in candidates if counts.get(candidate.key(), 0) < max_repeat]
+        eligible = [
+            candidate
+            for candidate in candidates
+            if counts.get(candidate.key(), 0) < max_repeat
+        ]
         if not eligible:
             break
         picked = rng.choice(eligible)

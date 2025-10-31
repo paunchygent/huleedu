@@ -7,7 +7,7 @@ import json
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 if __package__ in (None, ""):
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -20,15 +20,18 @@ try:
     from .d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
+        load_baseline_payload,
+        optimize_from_payload,
         optimize_schedule,
         run_synthetic_optimization,
         write_design,
     )
-    from .redistribute_core import (
-        Comparison,
+    from .redistribute_core import (  # type: ignore[attr-defined]
         StatusSelector,
         assign_pairs,
         build_rater_list,
+        compute_quota_distribution,
+        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -37,15 +40,18 @@ except ImportError:  # pragma: no cover - fallback for direct execution
     from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
         DEFAULT_ANCHOR_ORDER,
         OptimizationResult,
+        load_baseline_payload,
+        optimize_from_payload,
         optimize_schedule,
         run_synthetic_optimization,
         write_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
-        Comparison,
         StatusSelector,
         assign_pairs,
         build_rater_list,
+        compute_quota_distribution,
+        filter_comparisons,
         read_pairs,
         select_comparisons,
         write_assignments,
@@ -125,18 +131,50 @@ def redistribute(
                 raters = typer.prompt("How many raters will attend?", type=int)
             names = build_rater_list(raters, None)
 
-        total_needed = len(names) * per_rater
-        selected: List[Comparison] = select_comparisons(comparisons, include_status, total_needed)
-        assignments = assign_pairs(selected, names, per_rater)
+        pool = filter_comparisons(comparisons, include_status)
+        requested_total = len(names) * per_rater
+        available_total = len(pool)
+
+        if available_total == 0:
+            raise ValueError(
+                "No comparisons available after filtering. "
+                "Adjust status selection or regenerate pairs."
+            )
+
+        shortage = requested_total > available_total
+        if shortage:
+            quotas = compute_quota_distribution(names, per_rater, available_total)
+            total_needed = sum(quotas.values())
+            selected = select_comparisons(comparisons, include_status, total_needed)
+            assignments = assign_pairs(selected, names, quotas)
+        else:
+            quotas = {name: per_rater for name in names}
+            total_needed = requested_total
+            selected = select_comparisons(comparisons, include_status, total_needed)
+            assignments = assign_pairs(selected, names, per_rater)
+
         write_assignments(output_path, assignments)
     except (FileNotFoundError, ValueError) as error:
         typer.secho(f"Error: {error}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
     statuses = sorted({comparison.status for _, comparison in assignments})
+    actual_counts: Sequence[int] = [quotas[name] for name in names]
+    min_count = min(actual_counts)
+    max_count = max(actual_counts)
+    if shortage:
+        typer.secho(
+            f"Requested {requested_total} comparisons but only {available_total} available.",
+            fg=typer.colors.YELLOW,
+        )
     typer.secho(
-        f"Generated assignments for {len(names)} raters "
-        f"({per_rater} comparisons each).",
+        "Generated assignments for "
+        f"{len(names)} raters (min {min_count}, max {max_count} comparisons).",
+        fg=typer.colors.GREEN,
+    )
+    typer.secho(
+        "Total allocated comparisons: "
+        f"{sum(actual_counts)} (requested {requested_total}).",
         fg=typer.colors.GREEN,
     )
     typer.echo(f"Pairs drawn from statuses: {', '.join(statuses)}")
@@ -197,10 +235,21 @@ def optimize_pairs(
         metavar="PATH",
         help="Optional JSON report path capturing diagnostics.",
     ),
+    baseline_json: Optional[Path] = typer.Option(
+        None,
+        "--baseline-json",
+        metavar="PATH",
+        help=(
+            "Optional JSON payload describing baseline comparisons (session mode only). "
+            "Overrides --pairs-csv when supplied."
+        ),
+    ),
 ) -> None:
     """Optimize comparison schedules using the Fisher-information optimizer."""
     try:
         if mode is OptimizerMode.SYNTHETIC:
+            if baseline_json is not None:
+                raise ValueError("--baseline-json is not supported in synthetic mode.")
             slots = total_slots or 36
             result = run_synthetic_optimization(
                 total_slots=slots,
@@ -211,15 +260,27 @@ def optimize_pairs(
                 write_design(result.optimized_design, output_csv)
                 typer.echo(f"Optimized schedule written to {output_csv}")
         else:
-            pairs_path = pairs_csv or Path(typer.prompt("Path to baseline pairs CSV"))
             output_path = output_csv or Path(typer.prompt("Path for optimized schedule CSV"))
-            result = optimize_schedule(
-                pairs_path,
-                total_slots=total_slots,
-                max_repeat=max_repeat,
-                anchor_order=DEFAULT_ANCHOR_ORDER,
-                status_filter=_status_filter(include_status),
-            )
+            status_filter = _status_filter(include_status)
+
+            if baseline_json is not None:
+                payload = load_baseline_payload(baseline_json)
+                result = optimize_from_payload(
+                    payload,
+                    total_slots=total_slots,
+                    max_repeat=max_repeat,
+                    anchor_order=None,
+                    status_filter=status_filter,
+                )
+            else:
+                pairs_path = pairs_csv or Path(typer.prompt("Path to baseline pairs CSV"))
+                result = optimize_schedule(
+                    pairs_path,
+                    total_slots=total_slots,
+                    max_repeat=max_repeat,
+                    anchor_order=DEFAULT_ANCHOR_ORDER,
+                    status_filter=status_filter,
+                )
             write_design(result.optimized_design, output_path)
             typer.echo(f"Optimized schedule written to {output_path}")
 

@@ -153,8 +153,15 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --max-repeat 3 \
   --report-json output/d_optimal/session2_84.json
 
-# Synthetic smoke test
+# Same run but sourcing comparisons from a prepared JSON payload
 python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
+  --baseline-json output/session2_baseline_payload.json \
+  --output-csv scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.json.csv \
+  --total-slots 84 \
+  --max-repeat 3
+
+# Synthetic smoke test
+python -m scripts/bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --mode synthetic \
   --total-slots 36 \
   --max-repeat 3 \
@@ -167,7 +174,8 @@ The CLI prints baseline/optimized log-determinant, comparison-type distributions
 
 Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interactive flow:
 
-- Fill in pair/assignment paths, then set optimization parameters (`total slots`, `max repeat`, status pool).
+- Fill in pair/assignment paths, then set optimization parameters (`total slots`, `max repeat`, status pool). The
+  **Optional Baseline JSON Path** field accepts the same payload format as `--baseline-json` for browser/API handoff.
 - Press `o` (or click **Optimize**) to regenerate a schedule; the optimizer summary is streamed to the log and the pairs path updates automatically.
 - Toggle “Optimize before assigning?” to run the optimizer every time you press `g`/Generate so redistribution always consumes the fresh schedule.
 
@@ -179,7 +187,7 @@ Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interac
 
 ### Balanced redistribution
 
-`redistribute_core.assign_pairs` now performs type-aware balancing so every rater receives at least one student-anchor comparison (when available) and a mixed workload across comparison types—no more anchor-only chunks unless the pool truly lacks student essays. CLI and TUI flows both use the new allocator, and regression tests lock in the behaviour.
+`redistribute_core.assign_pairs` now performs type-aware balancing so every rater receives at least one student-anchor comparison (when available) and a mixed workload across comparison types—no more anchor-only chunks unless the pool truly lacks student essays. When the requested workload exceeds the available pool, the CLI/TUI auto-scale per-rater quotas, emit a shortage notice, and export the exact number of feasible assignments. Regression tests lock in both the balancing and shortage handling behaviours.
 
 Generated CSVs retain the `pair_id, essay_*` schema, so downstream tooling consuming `redistribute_core.write_assignments` continues to work unchanged.
 
