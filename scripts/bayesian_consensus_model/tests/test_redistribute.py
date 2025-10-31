@@ -13,6 +13,7 @@ from scripts.bayesian_consensus_model.redistribute_pairs import app as cli_app
 from scripts.bayesian_consensus_model.d_optimal_workflow import (
     DEFAULT_ANCHOR_ORDER,
     load_baseline_payload,
+    optimize_from_payload,
 )
 
 
@@ -205,6 +206,9 @@ def test_optimize_cli_writes_outputs(tmp_path: Path, pairs_csv: Path) -> None:
     report = json.loads(report_path.read_text())
     assert report["optimized"]["total_pairs"] == 24
     assert "log_det_gain" in report
+    assert report["anchor_adjacency_pairs"] == len(DEFAULT_ANCHOR_ORDER) - 1
+    assert report["required_pairs"] == 0
+    assert report["min_slots_required"] == report["anchor_adjacency_pairs"]
 
 
 def test_optimize_cli_accepts_baseline_json(tmp_path: Path) -> None:
@@ -272,6 +276,34 @@ def test_optimize_cli_accepts_baseline_json(tmp_path: Path) -> None:
     rows = list(csv.reader(output_csv.open()))
     # header + requested optimized comparisons
     assert len(rows) == 1 + 15
+
+
+def test_optimize_payload_errors_when_slots_too_small(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "baseline_small.json"
+    payload = {
+        "total_slots": 3,
+        "comparisons": [
+            {
+                "essay_a_id": "JA24",
+                "essay_b_id": "A1",
+                "comparison_type": "student_anchor",
+                "status": "core",
+            }
+        ],
+        "anchor_order": DEFAULT_ANCHOR_ORDER,
+    }
+    baseline_path.write_text(json.dumps(payload))
+
+    payload_obj = load_baseline_payload(baseline_path)
+
+    with pytest.raises(ValueError, match="Minimum required slots"):
+        optimize_from_payload(
+            payload_obj,
+            total_slots=5,
+            max_repeat=2,
+            anchor_order=None,
+            status_filter=None,
+        )
 
 
 def test_load_baseline_payload_accepts_empty_array(tmp_path: Path) -> None:

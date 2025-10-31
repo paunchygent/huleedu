@@ -434,6 +434,12 @@ class RedistributeApp(App):
             f"({result.baseline_log_det:.4f} → {result.optimized_log_det:.4f})"
         )
         log_widget.write(f"Optimized schedule written to {output_path}")
+        log_widget.write(
+            "Minimum required slots: "
+            f"{result.min_slots_required} "
+            f"(anchor adjacency {result.anchor_adjacency_count}, "
+            f"baseline-required {result.required_pair_count})"
+        )
 
         log_widget.write("Type distribution (optimized):")
         for comp_type, count in result.optimized_diagnostics.type_counts.items():

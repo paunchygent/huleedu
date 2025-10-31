@@ -18,6 +18,7 @@ try:
         DesignEntry,
         PairCandidate,
         compute_log_det,
+        derive_anchor_adjacency_constraints,
         select_design,
     )
     from .redistribute_core import load_comparisons_from_records  # type: ignore[attr-defined]
@@ -26,6 +27,7 @@ except ImportError:  # pragma: no cover - direct execution fallback
         DesignEntry,
         PairCandidate,
         compute_log_det,
+        derive_anchor_adjacency_constraints,
         select_design,
     )
     from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
@@ -70,6 +72,8 @@ class OptimizationResult:
     optimized_log_det: float
     baseline_diagnostics: DesignDiagnostics
     optimized_diagnostics: DesignDiagnostics
+    anchor_adjacency_count: int
+    required_pair_count: int
     max_repeat: int
 
     @property
@@ -80,6 +84,10 @@ class OptimizationResult:
     def total_comparisons(self) -> int:
         return len(self.optimized_design)
 
+    @property
+    def min_slots_required(self) -> int:
+        return self.anchor_adjacency_count + self.required_pair_count
+
 
 @dataclass(frozen=True)
 class BaselinePayload:
@@ -89,6 +97,11 @@ class BaselinePayload:
     anchor_order: Sequence[str]
     status_filter: Optional[Sequence[str]]
     total_slots: Optional[int]
+
+
+def _unique_pair_count(pairs: Iterable[PairCandidate]) -> int:
+    """Count distinct comparison pairs by essay IDs."""
+    return len({pair.key() for pair in pairs})
 
 
 def load_baseline_payload(
@@ -404,7 +417,18 @@ def optimize_schedule(
         raise ValueError("No student essays detected in the baseline design.")
 
     slots = total_slots if total_slots is not None else len(baseline_design)
+    adjacency_pairs = derive_anchor_adjacency_constraints(anchor_order)
     required_pairs = derive_student_anchor_requirements(baseline_design, anchor_order)
+    anchor_adjacency_count = _unique_pair_count(adjacency_pairs)
+    required_pair_count = _unique_pair_count(required_pairs)
+    min_slots_required = anchor_adjacency_count + required_pair_count
+    if slots < min_slots_required:
+        raise ValueError(
+            "Minimum required slots not met: requested "
+            f"{slots}, but anchor adjacency requires {anchor_adjacency_count} "
+            f"and baseline coverage requires {required_pair_count} "
+            f"(total {min_slots_required}). Increase total slots or relax the baseline payload."
+        )
 
     optimized_design, _ = select_design(
         students,
@@ -432,6 +456,8 @@ def optimize_schedule(
         optimized_log_det=optimized_log_det,
         baseline_diagnostics=baseline_diag,
         optimized_diagnostics=optimized_diag,
+        anchor_adjacency_count=anchor_adjacency_count,
+        required_pair_count=required_pair_count,
         max_repeat=max_repeat,
     )
 
@@ -494,6 +520,16 @@ def run_synthetic_optimization(
         seed=seed,
     )
 
+    adjacency_pairs = derive_anchor_adjacency_constraints(anchor_order)
+    anchor_adjacency_count = _unique_pair_count(adjacency_pairs)
+    required_pair_count = 0
+    if total_slots < anchor_adjacency_count:
+        raise ValueError(
+            "Minimum required slots not met: requested "
+            f"{total_slots}, but anchor adjacency requires {anchor_adjacency_count}. "
+            "Increase total slots to run the synthetic demonstration."
+        )
+
     optimized_design, _ = select_design(
         students,
         anchor_order,
@@ -518,5 +554,7 @@ def run_synthetic_optimization(
         optimized_log_det=optimized_log_det,
         baseline_diagnostics=baseline_diag,
         optimized_diagnostics=optimized_diag,
+        anchor_adjacency_count=anchor_adjacency_count,
+        required_pair_count=required_pair_count,
         max_repeat=max_repeat,
     )

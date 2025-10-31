@@ -302,6 +302,12 @@ def _emit_optimizer_summary(result: OptimizationResult) -> None:
         f"Gain: {result.log_det_gain:.4f}"
     )
     typer.echo(f"Total comparisons: {result.total_comparisons}  (max repeat {result.max_repeat})")
+    typer.echo(
+        "Minimum required slots: "
+        f"{result.min_slots_required} "
+        f"(anchor adjacency {result.anchor_adjacency_count}, "
+        f"baseline-required {result.required_pair_count})"
+    )
 
     typer.echo("\nComparison type distribution (baseline):")
     for comp_type, count in result.baseline_diagnostics.type_counts.items():
@@ -351,6 +357,9 @@ def _write_report(path: Path, result: OptimizationResult) -> None:
         "optimized_log_det": result.optimized_log_det,
         "log_det_gain": result.log_det_gain,
         "max_repeat": result.max_repeat,
+        "anchor_adjacency_pairs": result.anchor_adjacency_count,
+        "required_pairs": result.required_pair_count,
+        "min_slots_required": result.min_slots_required,
         "baseline": {
             "total_pairs": result.baseline_diagnostics.total_pairs,
             "type_counts": result.baseline_diagnostics.type_counts,
