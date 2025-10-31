@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 if __package__ in (None, ""):
     _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -27,6 +27,7 @@ try:
         OptimizationResult,
         load_dynamic_spec,
         load_previous_comparisons_from_csv,
+        load_students_from_csv,
         optimize_from_dynamic_spec,
         write_design,
     )
@@ -43,6 +44,7 @@ except ImportError:  # pragma: no cover - fallback for direct execution
         OptimizationResult,
         load_dynamic_spec,
         load_previous_comparisons_from_csv,
+        load_students_from_csv,
         optimize_from_dynamic_spec,
         write_design,
     )
@@ -63,39 +65,6 @@ DEFAULT_OPTIMIZED = Path(
 )
 DEFAULT_OUTPUT = Path("session2_dynamic_assignments.csv")
 DEFAULT_RATER_COUNT = 14
-
-
-def _load_students_from_csv(csv_path: Path) -> List[str]:
-    """Load student IDs from CSV, trying common column names (case-insensitive)."""
-    import csv
-
-    with csv_path.open(newline="") as f:
-        reader = csv.DictReader(f)
-        if not reader.fieldnames:
-            raise ValueError("CSV file is empty or has no headers")
-
-        # Build case-insensitive mapping: lowercase → original column name
-        fieldname_map = {name.lower(): name for name in reader.fieldnames}
-
-        # Try common column names (case-insensitive)
-        for col_name in ["essay_id", "student_id", "id"]:
-            if col_name in fieldname_map:
-                original_col = fieldname_map[col_name]
-                f.seek(0)
-                reader = csv.DictReader(f)
-                students = [
-                    row[original_col].strip()
-                    for row in reader
-                    if row.get(original_col, "").strip()
-                ]
-                if not students:
-                    raise ValueError(f"CSV column '{original_col}' is empty")
-                return students
-
-        raise ValueError(
-            f"CSV must have one of: essay_id, student_id, or id column (case-insensitive). "
-            f"Found: {', '.join(reader.fieldnames)}"
-        )
 
 
 class RedistributeApp(App):
@@ -379,7 +348,7 @@ class RedistributeApp(App):
                 csv_path = Path(students_csv)
                 if not csv_path.exists():
                     raise FileNotFoundError(f"Students CSV not found: {csv_path}")
-                student_list = _load_students_from_csv(csv_path)
+                student_list = load_students_from_csv(csv_path)
                 log_widget.write(f"Loaded {len(student_list)} students from CSV")
             else:
                 # Fallback to manual comma-separated entry

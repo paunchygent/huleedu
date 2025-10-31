@@ -8,9 +8,9 @@ probability distributions. Raters are scaled by reliability weights derived from
 volume and agreement, so sparse or erratic raters carry less influence.
 
 ### January 2025 Update – D-Optimal Pair Planning
-- Added `d_optimal_optimizer.py` and `d_optimal_prototype.py` to generate Fisher-information-driven comparison plans (default 84-slot or expanded 149-slot schedules).
+- Added `d_optimal_optimizer.py` and the `d_optimal_workflow` package to generate Fisher-information-driven comparison plans (default 84-slot or expanded 149-slot schedules).
 - Session 2 optimized schedule (149 comparisons) lives at `session_2_planning/20251027-143747/session2_pairs_optimized_149.csv`, improving log-det from 33.98 to 51.63 while keeping bracket coverage.
-- Prototype CLI supports synthetic demos and future Typer/TUI wiring.
+- Prototype CLI supported synthetic demos and future Typer/TUI wiring (legacy script now removed in favor of shared workflow package).
 - Implementation and assignment-balancing follow-ups are outlined in `TASKS/d_optimal_pair_optimizer_plan.md`.
 
 ### October 2025 Update – Multi-Session Workflow Support

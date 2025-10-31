@@ -271,7 +271,7 @@ If research reveals multiple viable approaches, present 2-3 options with pros/co
 ### Data Integration Note
 - Session 1 data (58 comparisons) will be merged with Session 2 (84 comparisons)
 - Combined graph will have 142 edges
-- Node count: 23 essays total (12 student + 11 anchor)
+- Node count: 24 essays total (12 student + 12 anchor)
 - Existing Session 1 edges are all student-student (no anchors involved yet)
 
 ---
