@@ -78,10 +78,12 @@ class BatchPipelineStateManager:
                         version=Batch.version + 1,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
+                    .returning(Batch.id)
                 )
                 result = await session.execute(stmt)
+                updated_id = result.scalar_one_or_none()
 
-                if result.rowcount == 0:
+                if updated_id is None:
                     return False
 
                 return True
@@ -209,10 +211,12 @@ class BatchPipelineStateManager:
                         version=Batch.version + 1,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
+                    .returning(Batch.id)
                 )
                 result = await session.execute(stmt)
+                updated_id = result.scalar_one_or_none()
 
-                if result.rowcount == 0:
+                if updated_id is None:
                     self.logger.warning(
                         f"Optimistic lock failed for batch {batch_id} phase {phase_name} update",
                     )

@@ -207,10 +207,12 @@ class EssayRepositoryQueries:
                     batch_id=current_state.batch_id,
                     updated_at=datetime.now(UTC).replace(tzinfo=None),
                 )
+                .returning(EssayStateDB.essay_id)
             )
             update_result = await session.execute(update_stmt)
+            updated_id = update_result.scalar_one_or_none()
 
-            if update_result.rowcount == 0:
+            if updated_id is None:
                 raise_resource_not_found(
                     service="essay_lifecycle_service",
                     operation="update_essay_state",
@@ -390,10 +392,12 @@ class EssayRepositoryQueries:
                     updated_at=datetime.now(UTC).replace(tzinfo=None),
                     version=db_essay.version + 1,
                 )
+                .returning(EssayStateDB.essay_id)
             )
             update_result = await session.execute(update_stmt)
+            updated_id = update_result.scalar_one_or_none()
 
-            if update_result.rowcount == 0:
+            if updated_id is None:
                 raise_resource_not_found(
                     service="essay_lifecycle_service",
                     operation="update_essay_processing_metadata",
@@ -468,10 +472,12 @@ class EssayRepositoryQueries:
                     updated_at=datetime.now(UTC).replace(tzinfo=None),
                     version=db_essay.version + 1,
                 )
+                .returning(EssayStateDB.essay_id)
             )
             update_result = await session.execute(update_stmt)
+            updated_id = update_result.scalar_one_or_none()
 
-            if update_result.rowcount == 0:
+            if updated_id is None:
                 raise_resource_not_found(
                     service="essay_lifecycle_service",
                     operation="update_student_association",

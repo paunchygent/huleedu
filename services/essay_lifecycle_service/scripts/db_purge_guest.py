@@ -51,10 +51,11 @@ async def purge_guest_batches(older_than_days: int, dry_run: bool = False) -> di
         pending_del = (
             delete(BatchPendingContent)
             .where(BatchPendingContent.batch_id.in_(batch_ids))
+            .returning(BatchPendingContent.id)
             .execution_options(synchronize_session=False)
         )
         res = await session.execute(pending_del)
-        deleted_pending = res.rowcount or 0
+        deleted_pending = len(res.scalars().all())
 
         # Delete orphan failures with NULL tracker (tracked before registration)
         failures_del = (
@@ -63,19 +64,21 @@ async def purge_guest_batches(older_than_days: int, dry_run: bool = False) -> di
                 BatchValidationFailure.batch_id.in_(batch_ids),
                 BatchValidationFailure.batch_tracker_id.is_(None),
             )
+            .returning(BatchValidationFailure.id)
             .execution_options(synchronize_session=False)
         )
         res = await session.execute(failures_del)
-        deleted_failures = res.rowcount or 0
+        deleted_failures = len(res.scalars().all())
 
         # Delete guest batch trackers (cascades to slot assignments and failures with tracker_id)
         tracker_del = (
             delete(BatchEssayTrackerDB)
             .where(BatchEssayTrackerDB.batch_id.in_(batch_ids))
+            .returning(BatchEssayTrackerDB.id)
             .execution_options(synchronize_session=False)
         )
         res = await session.execute(tracker_del)
-        deleted_batches = res.rowcount or 0
+        deleted_batches = len(res.scalars().all())
 
         await session.commit()
 

@@ -48,318 +48,176 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 - Added CLI `--previous-csv` flag and TUI "Previous Session CSV" field
 - Preserved baseline loading functions (they were needed, not legacy bloat)
 
-## Current Implementation Status
+## Current Implementation Status (2025-11-01)
 
-### ✅ Complete (as of 2025-11-01)
+### ✅ Complete
 
-- **Dynamic Spec Schema**: `DynamicSpec` dataclass with students, anchors, previous_comparisons, locked_pairs, total_slots
-- **CLI Redesign**: Replaced `--mode session/synthetic` with direct parameters (`--student`, `--previous-csv`, `--lock-pair`, etc.)
-- **TUI Workflow**: Updated inputs for dynamic spec (student IDs, previous session CSV, locked pairs)
-- **Optimizer Integration**: `optimize_from_dynamic_spec()` with coverage gap analysis
-- **Previous Session Support**: Multi-session workflows via `--previous-csv` flag and CSV loader
-- **Testing**: 50 tests passing (includes 11 new CSV loading tests)
-- **Type Safety**: All type checks passing
-- **Code Quality**: All linting issues resolved (0 errors)
-- **Documentation**: README updated with previous_comparisons vs locked_pairs distinction
-- **Status Filter Removal**: Removed legacy "core" vs "extra" status filtering from entire optimizer workflow
-- **CSV Loading Tests**: Comprehensive test coverage for `load_students_from_csv()` with 11 test cases
-- **Refactoring Plan**: Architectural analysis and refactoring recommendations documented for bloated files
+**Core Features:**
+- Dynamic Spec Schema with students, anchors, previous_comparisons, locked_pairs, total_slots
+- CLI with direct parameters (`--student`, `--previous-csv`, `--lock-pair`)
+- TUI with unified workflow (single "Generate Assignments" button)
+- Multi-session support via previous comparisons CSV loading
+- CSV student loading with case-insensitive column matching
+- Dynamic anchor display (auto-generated essay_01, essay_02, etc.)
+- Status filter removal (legacy "core" vs "extra" filtering eliminated)
 
-## Completion Summary (2025-10-31)
+**Quality Metrics:**
+- 50+ tests passing (includes 11 CSV loading tests)
+- Type checks passing
+- Linting clean (0 errors)
+- Code organization: All files under 500 LoC after refactoring
 
-### ✅ HIGH PRIORITY: TUI Simplification (COMPLETE)
+**Documentation:**
+- README updated with current workflow
+- CSV loading test coverage documented
+- Previous_comparisons vs locked_pairs distinction clarified
 
-**Implemented:**
-- ✅ CSV student loading with case-insensitive column matching (`essay_id`, `student_id`, `id`)
-- ✅ Case-insensitive column mapping implemented correctly (maps lowercase search key to original column name before row access)
-- ✅ Manual comma-separated entry preserved as fallback
-- ✅ Unified workflow: single "Generate Assignments" button creates both Pairs CSV and Assignments CSV
-- ✅ Removed dual workflow toggle ("Optimize before assigning?")
-- ✅ Removed separate "Optimize" button and keyboard binding
-- ✅ Clearer field labels:
-  - "Students CSV (optional - recommended for large cohorts)"
-  - "Students (comma-separated - fallback if no CSV)"
-  - "Anchors (optional - leave blank for default 12-anchor ladder)"
-  - "Assignments CSV Path (final rater assignments)"
-  - "Pairs CSV Path (optimized comparison pairs)"
-  - "Total Comparison Slots" (was "Optimization Total Slots")
-  - "Max Repetitions Per Pair (default: 3)" (was "Optimization Max Repeat")
-- ✅ Updated instructions text to reflect unified workflow
-- ✅ Log now shows both output paths (Pairs CSV + Assignments CSV)
+## Completed Work Summary
 
-**Files Modified:**
-- `redistribute_tui.py`: Added CSV loader (now shared via `d_optimal_workflow`), unified workflow, renamed fields
-- `README.md`: Updated TUI section with new workflow documentation
+### ✅ TUI Simplification
+- CSV student loading with fallback to manual entry
+- Unified workflow: single button generates both pairs and assignments
+- Clearer field labels and instructions
+- Dynamic anchor display (no hardcoded mappings)
 
-### ✅ BONUS: Dynamic Anchor Display (COMPLETE)
+### ✅ Status Filter Removal
+- Removed `StatusSelector` enum, `status` field from `Comparison`, `filter_comparisons()` function
+- Updated all modules: `redistribute_core.py`, `d_optimal_workflow`, CLI, TUI
+- Design rationale: Status filtering breaks Fisher-information design; specify exact slots upfront instead
 
-**Implemented:**
-- ✅ Removed hardcoded `ANCHOR_DISPLAY` dictionary from `redistribute_core.py`
-- ✅ Removed `display_a` and `display_b` properties from `Comparison` class
-- ✅ Auto-generated sequential display names for all essays (anchors + students)
-- ✅ Format: `essay_01`, `essay_02`, ..., `essay_N`
-- ✅ Deterministic mapping (sorted by essay ID for reproducibility)
-- ✅ Complete rater anonymization in Assignments CSV output
+### ✅ Code Organization Refactoring
+- Split bloated `d_optimal_workflow.py` (788 lines) into focused package:
+  - `data_loaders.py`, `design_analysis.py`, `optimization_runners.py`, `synthetic_data.py`, `io_utils.py`
+- Moved `load_students_from_csv()` to shared utilities
+- All modules now under 500 LoC hard limit
+- Backward compatibility maintained via `__init__.py` re-exports
+
+### ✅ CSV Loading Tests
+- 11 comprehensive test cases covering column matching, error handling, whitespace normalization, empty file detection
+- All tests passing
+
+## Active Tasks
+
+### 🔧 NEXT: Auto-Calculate Total Slots from Rater Settings
+
+**Problem:**
+The TUI has two independent inputs that users must manually sync:
+- "Total Comparison Slots" (optimizer input) - default: 24
+- "Number of Raters" × "Comparisons Per Rater" (assignment inputs) - default: 14 × 10 = 140
+
+This creates confusion and mismatch potential. The optimizer generates pairs based on "Total Slots" regardless of rater settings.
+
+**Current Workflow:**
+1. `_run_optimizer()` reads "Total Comparison Slots" → generates N pairs
+2. `_generate_assignments()` reads rater settings → expects M pairs
+3. If N ≠ M, shortage/excess handling kicks in (unintended)
+
+**Root Cause:**
+Lines 392-396 in `redistribute_tui.py`:
+```python
+slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
+if not slots_raw:
+    raise ValueError("Total slots is required for optimization.")
+total_slots = int(slots_raw)
+```
+
+The optimizer receives a manual `total_slots` value instead of deriving it from rater configuration.
+
+**Solution: Auto-Calculate from Rater Settings**
+
+Remove "Total Comparison Slots" input and calculate automatically:
+```
+total_slots = Number of Raters × Comparisons Per Rater
+```
 
 **Benefits:**
-- Works with any anchor naming scheme (F+1, 1a, Grade-A-Low, etc.)
-- Zero configuration needed
-- Symmetric treatment of anchors and students
-- No maintenance burden for different exam variants
+- Eliminates duplicate/conflicting inputs
+- Prevents user confusion and sync errors
+- Simplifies UI (one less field)
+- Follows DRY principle (derive, don't duplicate)
+- Users can still adjust via rater settings if needed
+
+**Implementation Plan:**
+
+**1. UI Changes (`redistribute_tui.py`)**
+
+Remove:
+- Lines 202-208: "Total Comparison Slots" input field and label
+- Line 256: Reset value for slots field in `_reset_form()`
+- Lines 392-396: Manual slots reading in `_run_optimizer()`
+
+Add (in `_run_optimizer()`, before building spec):
+```python
+# Calculate total slots from rater configuration
+names_raw = self.query_one("#rater_names_input", Input).value.strip()
+count_raw = self.query_one("#rater_count_input", Input).value.strip()
+per_rater_raw = self.query_one("#per_rater_input", Input).value.strip()
+
+per_rater = int(per_rater_raw) if per_rater_raw else 10
+if per_rater <= 0:
+    raise ValueError("Comparisons per rater must be positive.")
+
+if names_raw:
+    names = build_rater_list(None, [names_raw])
+else:
+    if not count_raw:
+        raise ValueError("Provide a rater count or explicit rater names.")
+    count = int(count_raw)
+    names = build_rater_list(count, None)
+
+total_slots = len(names) * per_rater
+log_widget.write(f"Generating {total_slots} pairs for {len(names)} raters × {per_rater} comparisons")
+```
+
+**2. Legacy Code Cleanup**
+
+Remove all references to manual total_slots input:
+- DEFAULT constant if only used for slots field
+- Any helper text or documentation mentioning "Total Comparison Slots"
+- Validation logic for manual slots value
+
+**3. Update Instructions Text**
+
+Lines 225-229: Update instructions to remove mention of "Total Slots":
+```python
+yield Static(
+    "Load students via CSV (recommended) or comma-separated entry. "
+    "Set rater count and comparisons per rater. "
+    "Generate Assignments runs the optimizer to create comparison pairs, "
+    "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV.",
+    id="instructions",
+)
+```
+
+**4. Testing Validation**
+
+Before:
+- User sets slots=24, raters=14, per_rater=10
+- Optimizer generates 24 pairs
+- Assignment phase expects 140 pairs → shortage warning
+
+After:
+- User sets raters=14, per_rater=10
+- Optimizer automatically generates 140 pairs
+- Assignment phase gets exactly 140 pairs → no shortage
 
 **Files Modified:**
-- `redistribute_core.py`: Removed hardcoded mapping, added auto-generation logic in `write_assignments()`
-- `d_optimal_pairing_plan.md`: Updated architecture guidance to reflect dynamic display names
-- `README.md`: Added "Anchor Flexibility" section
-
-### ✅ LOW PRIORITY: Legacy Cleanup (COMPLETE)
-
-**Findings:**
-- ✅ `OptimizerMode` enum already removed (verified via grep)
-- ✅ Baseline loading functions are NOT legacy - they support multi-session workflows
-- ✅ No unused code found in `redistribute_pairs.py` or `d_optimal_workflow.py`
-
-**Documentation Updates:**
-- ✅ Removed "Prototype script (legacy)" section from README.md
-- ✅ Updated `d_optimal_pairing_plan.md` to remove `ANCHOR_DISPLAY` references
-- ✅ All documentation reflects current dynamic workflow
-
-### 📊 Testing Results
-
-**Regression Tests:**
-- ✅ All 40 existing tests pass
-- ✅ No test failures from dynamic display name changes
-- ✅ Auto-generated display names are backward compatible
-- ✅ Changes to `redistribute_core.py` and `redistribute_tui.py` don't break existing functionality
-
-**Test Command:**
-```bash
-pdm run pytest-root scripts/bayesian_consensus_model/tests/ -v
-# Result: 40 passed in 14.14s
-```
-
-**Coverage Notes:**
-- CSV loading functionality works but not yet covered by automated tests
-- Manual testing confirmed case-insensitive matching works correctly
-- Future: Add dedicated CSV loading test cases
-
-## Next Actions
-
-### ✅ COMPLETE: Add CSV Loading Tests
-
-**Completed 2025-11-01**
-
-**What Was Done:**
-Created comprehensive test coverage for the `load_students_from_csv()` helper function in `test_csv_loading.py`.
-
-**Test Coverage (11 tests):**
-1. Valid CSV with `essay_id` column (lowercase)
-2. Valid CSV with `Essay_ID` column (mixed case) - verifies case-insensitive matching
-3. Valid CSV with `student_id` column
-4. Valid CSV with `id` column (fallback)
-5. CSV with no matching columns → error message includes available columns
-6. CSV with matching column but all empty values → clear error
-7. Missing file → FileNotFoundError
-8. Whitespace in values → properly stripped
-9. Multiple valid columns → uses first match
-10. Empty CSV file → appropriate error
-11. CSV with only headers → appropriate error
-
-**Files Added:**
-- `scripts/bayesian_consensus_model/tests/test_csv_loading.py`
-
-**Test Results:**
-All 11 tests passing ✅
-
-### ✅ COMPLETE: Remove Legacy "core" vs "extra" Status Filter
-
-**Completed 2025-11-01**
-
-**What Was Done:**
-Successfully removed all status filtering logic from the optimizer workflow. The optimizer now treats all comparison pairs equally, as originally designed.
-
-**Changes Made:**
-1. **Core Module** (`redistribute_core.py`):
-   - Removed `StatusSelector` enum completely
-   - Removed `status` field from `Comparison` dataclass
-   - Removed `filter_comparisons()` function
-   - Updated `select_comparisons()` to remove `include_status` parameter
-   - Updated `read_pairs()` to not require/use status column
-   - Updated `write_assignments()` to remove status from output CSV
-
-2. **Workflow Module** (`d_optimal_workflow.py`):
-   - Removed `status` field from `ComparisonRecord` dataclass
-   - Removed `status_filter` field from `BaselinePayload` dataclass
-   - Updated all functions to remove status filtering logic
-   - Updated `write_design()` to remove status parameter and column from CSV output
-
-3. **CLI** (`redistribute_pairs.py`):
-   - Removed `--include-status` flag from `redistribute` command
-   - Updated command logic to use all comparisons without filtering
-
-4. **TUI** (`redistribute_tui.py`):
-   - Removed status dropdown UI element
-   - Removed status handling in `_generate_assignments()` method
-
-5. **Tests** (`test_redistribute.py`):
-   - Updated all 50 tests to remove status references
-   - All tests passing after status removal
-
-6. **Documentation**:
-   - Updated `README.md` to remove `--include-status` flag examples
-   - Updated troubleshooting section to remove status filter references
-
-**Design Rationale:**
-The status filter was legacy from pre-dynamic-spec workflow. The correct approach is to specify the exact number of desired slots upfront via `--total-slots N`, allowing the optimizer to generate N optimal pairs treating all pairs equally. Arbitrarily filtering pairs after optimization breaks the Fisher-information design.
-
-### 🔧 NEXT: Code Organization Refactoring
-
-**Problem Identified:**
-Two files violate the **400-500 LoC hard limit** from `.cursor/rules/015-project-structure-standards.mdc`, mixing multiple responsibilities in violation of the Single Responsibility Principle:
-
-| File | Lines | Violation | Overage |
-|------|-------|-----------|---------|
-| `d_optimal_workflow.py` | 788 | ❌ **CRITICAL** | 288 lines (57%) |
-| `redistribute_tui.py` | 523 | ❌ **MODERATE** | 23 lines (5%) |
-
-#### `d_optimal_workflow.py` Analysis (788 lines)
-
-**Current Mixed Responsibilities:**
-1. **Data Loading** (CSV, JSON payload parsing) - 4 functions, ~167 lines
-2. **Data Validation & Spec Building** - 1 function, ~75 lines
-3. **Workflow Orchestration** (multiple optimization entry points) - 4 functions, ~251 lines
-4. **Design Analysis & Diagnostics** - 2 functions, ~90 lines
-5. **CSV Writing** - 1 function, ~16 lines
-6. **Synthetic Data Generation** - 2 functions, ~94 lines
-
-**Proposed Solution: Split into Focused Package**
-
-```
-scripts/bayesian_consensus_model/
-├── d_optimal_workflow/              # NEW: Package structure
-│   ├── __init__.py                  # Exports public API (backward compatibility)
-│   ├── data_loaders.py              # ~150 lines
-│   │   - load_baseline_design()
-│   │   - load_baseline_payload()
-│   │   - load_baseline_from_records()
-│   │   - load_previous_comparisons_from_csv()
-│   │   - load_dynamic_spec()
-│   ├── design_analysis.py           # ~120 lines
-│   │   - summarize_design()
-│   │   - derive_student_anchor_requirements()
-│   │   - DesignDiagnostics dataclass
-│   ├── optimization_runners.py      # ~200 lines
-│   │   - optimize_from_payload()
-│   │   - optimize_schedule()
-│   │   - optimize_from_dynamic_spec()
-│   ├── synthetic_data.py            # ~100 lines
-│   │   - run_synthetic_optimization()
-│   │   - _build_random_design()
-│   └── io_utils.py                  # ~80 lines
-│       - write_design()
-│       - CSV/JSON writing utilities
-```
-
-**Shared Models** (in `__init__.py` or separate `models.py`):
-- `OptimizationResult`, `BaselinePayload`, `ComparisonRecord`, `DynamicSpec`
-- `DEFAULT_ANCHOR_ORDER`
-
-#### `redistribute_tui.py` Analysis (523 lines)
-
-**Current Mixed Responsibilities:**
-1. **Textual UI Definition** (app structure, widgets, layout) - ~250 lines
-2. **Business Logic** (CSV loading, optimization, assignment generation) - ~150 lines
-3. **Event Handling** (button clicks, form validation) - ~100 lines
-
-**Proposed Solution: Extract Shared Utilities**
-
-Option 1 (Minimal): Move `load_students_from_csv()` to `d_optimal_workflow/io_utils.py` (shared utility)
-- Reduces `redistribute_tui.py` to ~450 lines (acceptable)
-- No package restructuring needed
-
-Option 2 (Comprehensive): Split into package if further growth expected:
-```
-scripts/bayesian_consensus_model/
-├── tui/                             # NEW: Package structure
-│   ├── __init__.py                  # Exports RedistributeApp
-│   ├── app.py                       # ~200 lines (UI structure only)
-│   ├── handlers.py                  # ~200 lines (event handlers, validation)
-│   └── data_loaders.py              # ~100 lines (CSV parsing, error handling)
-```
-
-**Recommendation:** Start with Option 1 (move shared utility), assess if Option 2 needed later.
-
-#### Benefits of Refactoring
-
-1. **Adherence to Standards**: All files under 500 LoC hard limit
-2. **Single Responsibility**: Each module has one clear purpose
-3. **Testability**: Focused unit tests per module (easier to write and maintain)
-4. **Maintainability**: Easier code review, debugging, and future enhancements
-5. **Alignment**: Follows project's DDD/Clean Code principles
-
-#### Backward Compatibility Strategy
-
-Use `__init__.py` re-exports to maintain existing import paths:
-
-**Before:**
-```python
-from scripts.bayesian_consensus_model.d_optimal_workflow import (
-    optimize_from_dynamic_spec,
-    load_dynamic_spec,
-    write_design,
-)
-```
-
-**After (with re-exports):**
-```python
-# Same imports work - no breaking changes
-from scripts.bayesian_consensus_model.d_optimal_workflow import (
-    optimize_from_dynamic_spec,  # Re-exported from optimization_runners
-    load_dynamic_spec,            # Re-exported from data_loaders
-    write_design,                 # Re-exported from io_utils
-)
-```
-
-#### Implementation Checklist
-
-**Phase 1: `d_optimal_workflow.py` Refactoring**
-- [x] Create package directory: `d_optimal_workflow/`
-- [x] Create `__init__.py` with public API re-exports
-- [x] Split into 5 focused modules (data_loaders, design_analysis, optimization_runners, synthetic_data, io_utils)
-- [x] Update imports in dependent files:
-  - [x] `redistribute_pairs.py`
-  - [x] `redistribute_tui.py`
-  - [x] Removed legacy `d_optimal_prototype.py`
-- [x] Run type checking: `pdm run typecheck-all` *(fails on existing SQLAlchemy `rowcount` annotations in identity_service/class_management/batch_orchestrator modules; unchanged by this refactor)*
-- [x] Run regression tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py` and `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_csv_loading.py`
-- [x] Run linting: `pdm run ruff check scripts/bayesian_consensus_model/`
-
-**Phase 2: `redistribute_tui.py` Cleanup**
-- [x] Extract `load_students_from_csv()` to `d_optimal_workflow/io_utils.py`
-- [x] Update imports in `redistribute_tui.py`
-- [x] Verify line count reduction to ~500 lines (current: 492)
-- [x] Run tests and validation (commands above)
+- `redistribute_tui.py`: Remove slots input, add auto-calculation logic
+- `README.md`: Update TUI documentation to reflect new workflow
 
 **Success Criteria:**
-✅ All files under 500 LoC
-✅ Each module has single, clear responsibility
-✅ No breaking changes to public API
-✅ All 50+ tests passing
-⚠️ Type checking command still reports pre-existing `rowcount` typing errors outside optimizer modules
-✅ Linting passes
+- ✅ "Total Comparison Slots" field removed from UI
+- ✅ Optimizer generates exactly `num_raters × per_rater` pairs
+- ✅ No shortage/excess warnings in normal workflow
+- ✅ All existing tests still pass
+- ✅ Manual testing confirms correct pair count generation
+- ✅ Code remains under 500 LoC limit
+- ✅ No orphaned constants or validation logic
 
-**Estimated Effort:**
-- Phase 1: 3-4 hours
-- Phase 2: 1-2 hours
-- Testing & Validation: 1-2 hours
-- **Total**: 5-8 hours
+**Estimated Effort:** 1-2 hours
 
 **Risk Assessment:** Low
-- Primarily structural refactoring (moving code, not changing logic)
-- Backward compatibility maintained via re-exports
-- Comprehensive test coverage (50+ tests)
-- Type checker will catch import issues early
-
-### 🔮 FUTURE (Lower Priority)
-
-- **Per-rater quota flexibility**: Accept heterogeneous per-rater counts for precise assignment control (e.g., some raters do 8 comparisons, others do 12)
+- Straightforward calculation replacement
+- No complex logic changes
+- Existing tests validate optimizer behavior
+- User-facing simplification (fewer inputs = less error-prone)

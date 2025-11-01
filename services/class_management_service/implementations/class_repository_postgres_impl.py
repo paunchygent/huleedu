@@ -162,9 +162,10 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
     async def delete_class(self, class_id: uuid.UUID) -> bool:
         async with self.session() as session:
-            stmt = delete(UserClass).where(UserClass.id == class_id)
+            stmt = delete(UserClass).where(UserClass.id == class_id).returning(UserClass.id)
             result = await session.execute(stmt)
-            return result.rowcount > 0
+            deleted_ids = result.scalars().all()
+            return bool(deleted_ids)
 
     async def create_student(
         self, user_id: str, student_data: CreateStudentRequest, correlation_id: UUID
@@ -308,9 +309,10 @@ class PostgreSQLClassRepositoryImpl(ClassRepositoryProtocol[T, U]):
 
         try:
             async with self.session() as session:
-                stmt = delete(Student).where(Student.id == student_id)
+                stmt = delete(Student).where(Student.id == student_id).returning(Student.id)
                 result = await session.execute(stmt)
-                return result.rowcount > 0
+                deleted_ids = result.scalars().all()
+                return bool(deleted_ids)
 
         except Exception as e:
             success = False

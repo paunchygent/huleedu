@@ -157,12 +157,14 @@ class UserSessionRepositoryImpl(UserSessionRepositoryProtocol):
                     update(UserSession)
                     .where(and_(UserSession.jti == jti, UserSession.revoked_at.is_(None)))
                     .values(revoked_at=now)
+                    .returning(UserSession.id)
                 )
 
                 result = await session.execute(stmt)
+                revoked_ids = result.scalars().all()
                 await session.commit()
 
-                if result.rowcount > 0:
+                if revoked_ids:
                     logger.info(
                         "Session revoked",
                         extra={
@@ -201,12 +203,14 @@ class UserSessionRepositoryImpl(UserSessionRepositoryProtocol):
                     update(UserSession)
                     .where(and_(UserSession.user_id == user_id, UserSession.revoked_at.is_(None)))
                     .values(revoked_at=now)
+                    .returning(UserSession.id)
                 )
 
                 result = await session.execute(stmt)
+                revoked_ids = result.scalars().all()
                 await session.commit()
 
-                count = result.rowcount
+                count = len(revoked_ids)
 
                 if count > 0:
                     logger.info(
@@ -253,12 +257,14 @@ class UserSessionRepositoryImpl(UserSessionRepositoryProtocol):
                         )
                     )
                     .values(last_activity=now)
+                    .returning(UserSession.id)
                 )
 
                 result = await session.execute(stmt)
+                updated_ids = result.scalars().all()
                 await session.commit()
 
-                return result.rowcount > 0
+                return bool(updated_ids)
 
         except Exception as e:
             logger.error(

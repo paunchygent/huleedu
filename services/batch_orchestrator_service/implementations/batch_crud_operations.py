@@ -106,10 +106,12 @@ class BatchCrudOperations:
                         status=status_enum,
                         updated_at=datetime.now(UTC).replace(tzinfo=None),
                     )
+                    .returning(Batch.id)
                 )
                 result = await session.execute(stmt)
+                updated_id = result.scalar_one_or_none()
 
-                if result.rowcount == 0:
+                if updated_id is None:
                     self.logger.warning(f"Batch {batch_id} not found for status update")
                     return False
 

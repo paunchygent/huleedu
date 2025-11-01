@@ -257,11 +257,13 @@ class PostgreSQLOutboxRepository:
                 update(EventOutbox)
                 .where(EventOutbox.id == event_id)
                 .values(published_at=datetime.now(UTC))
+                .returning(EventOutbox.id)
             )
             result = await session.execute(stmt)
+            updated_ids = result.scalars().all()
             await session.commit()
 
-            if result.rowcount == 0:
+            if not updated_ids:
                 logger.warning(
                     "No outbox event found to mark as published",
                     extra={"event_id": str(event_id)},
@@ -286,11 +288,17 @@ class PostgreSQLOutboxRepository:
             error = error[:max_error_length]
 
         async with self._session_factory() as session:
-            stmt = update(EventOutbox).where(EventOutbox.id == event_id).values(last_error=error)
+            stmt = (
+                update(EventOutbox)
+                .where(EventOutbox.id == event_id)
+                .values(last_error=error)
+                .returning(EventOutbox.id)
+            )
             result = await session.execute(stmt)
+            updated_ids = result.scalars().all()
             await session.commit()
 
-            if result.rowcount > 0:
+            if updated_ids:
                 logger.warning(
                     "Marked outbox event as permanently failed",
                     extra={"event_id": str(event_id), "error": error},

@@ -57,9 +57,6 @@ except ImportError:  # pragma: no cover - fallback for direct execution
         write_assignments,
     )
 
-DEFAULT_PAIRS = Path(
-    "scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs.csv"
-)
 DEFAULT_OPTIMIZED = Path(
     "scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized.csv"
 )
@@ -199,13 +196,6 @@ class RedistributeApp(App):
                     id="locked_pairs_input",
                     classes="field-input",
                 )
-                yield Label("Total Comparison Slots")
-                yield Input(
-                    value="24",
-                    id="optimizer_slots_input",
-                    placeholder="e.g., 84",
-                    classes="field-input",
-                )
                 yield Label("Max Repetitions Per Pair (default: 3)")
                 yield Input(
                     value="3",
@@ -224,6 +214,7 @@ class RedistributeApp(App):
                 yield Button("Reset", id="reset_button")
             yield Static(
                 "Load students via CSV (recommended) or comma-separated entry. "
+                "Set rater count and comparisons per rater. "
                 "Generate Assignments runs the optimizer to create comparison pairs, "
                 "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV.",
                 id="instructions",
@@ -253,7 +244,6 @@ class RedistributeApp(App):
         self.query_one("#rater_names_input", Input).value = ""
         self.query_one("#per_rater_input", Input).value = "10"
         self.query_one("#optimizer_output_input", Input).value = str(DEFAULT_OPTIMIZED)
-        self.query_one("#optimizer_slots_input", Input).value = "24"
         self.query_one("#optimizer_max_repeat_input", Input).value = "3"
         self.query_one("#locked_pairs_input", Input).value = ""
         self.query_one("#previous_csv_input", Input).value = ""
@@ -320,7 +310,6 @@ class RedistributeApp(App):
             return
 
         actual_counts = [quotas[name] for name in names]
-        statuses = ", ".join(sorted({comparison.status for _, comparison in assignments}))
         if shortage:
             log_widget.write(
                 f"[yellow]Notice[/]: Requested {requested_total} comparisons but only "
@@ -334,7 +323,6 @@ class RedistributeApp(App):
             "Total allocated comparisons: "
             f"{sum(actual_counts)} (requested {requested_total})."
         )
-        log_widget.write(f"Pairs drawn from statuses: {statuses}")
         log_widget.write(f"Output written to {output_path}")
 
     def _run_optimizer(self, log_widget: TextLog, *, clear_log: bool) -> Optional[Path]:
@@ -349,6 +337,7 @@ class RedistributeApp(App):
                 if not csv_path.exists():
                     raise FileNotFoundError(f"Students CSV not found: {csv_path}")
                 student_list = load_students_from_csv(csv_path)
+                students_value = ", ".join(student_list)
                 log_widget.write(f"Loaded {len(student_list)} students from CSV")
             else:
                 # Fallback to manual comma-separated entry
@@ -390,11 +379,28 @@ class RedistributeApp(App):
                         )
                 locked_pairs = locked_list if locked_list else None
 
-            # Get total slots
-            slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
-            if not slots_raw:
-                raise ValueError("Total slots is required for optimization.")
-            total_slots = int(slots_raw)
+            # Auto-calculate total slots from rater configuration
+            names_raw_for_calc = self.query_one("#rater_names_input", Input).value.strip()
+            count_raw_for_calc = self.query_one("#rater_count_input", Input).value.strip()
+            per_rater_for_calc_raw = self.query_one("#per_rater_input", Input).value.strip()
+
+            per_rater_for_calc = int(per_rater_for_calc_raw) if per_rater_for_calc_raw else 10
+            if per_rater_for_calc <= 0:
+                raise ValueError("Comparisons per rater must be positive.")
+
+            if names_raw_for_calc:
+                rater_names_for_calc = build_rater_list(None, [names_raw_for_calc])
+            else:
+                if not count_raw_for_calc:
+                    raise ValueError("Provide a rater count or explicit rater names.")
+                rater_count_for_calc = int(count_raw_for_calc)
+                rater_names_for_calc = build_rater_list(rater_count_for_calc, None)
+
+            total_slots = len(rater_names_for_calc) * per_rater_for_calc
+            log_widget.write(
+                f"Generating {total_slots} pairs for "
+                f"{len(rater_names_for_calc)} raters × {per_rater_for_calc} comparisons"
+            )
 
             # Get max repeat
             max_repeat_raw = self.query_one("#optimizer_max_repeat_input", Input).value.strip()
