@@ -1,0 +1,170 @@
+---
+description: Textual TUI development patterns and corrections to AI training data
+globs:
+alwaysApply: false
+---
+# 095: Textual TUI Patterns
+
+## 1. Container Types
+
+### 1.1. Scrollable Containers
+- **MUST** use `VerticalScroll` for scrollable vertical layouts
+- **FORBIDDEN**: `Vertical` with `overflow-y: auto` hack - does not work
+- **Source**: `textual.containers.VerticalScroll` (built-in scrollbar)
+
+```python
+from textual.containers import VerticalScroll
+
+with VerticalScroll(id="form"):
+    yield Input(...)
+```
+
+### 1.2. CSS for Scrollable Containers
+```css
+#form {
+    height: 20;  /* No overflow-y needed - VerticalScroll handles it */
+}
+```
+
+## 2. Select Widget
+
+### 2.1. Component Structure
+- **Official**: "This widget has no component classes"
+- **FORBIDDEN**: Assuming SelectCurrent CSS selector exists in docs
+- **Reality**: SelectCurrent exists in source but not documented as stylable
+
+### 2.2. Height Handling
+- **Default**: `height: auto` from widget source
+- **FORBIDDEN**: Forcing `height: 3` - clips selected value display
+- **REQUIRED**: Let Select use native `height: auto`
+
+```css
+/* ✅ CORRECT */
+.field-select {
+    margin-bottom: 1;
+}
+
+/* ❌ WRONG - clips content */
+.field-select {
+    height: 3;
+    background: $surface-lighten-1;
+    border: solid $accent;
+}
+```
+
+## 3. App Title
+
+### 3.1. Class Variable (Uppercase)
+```python
+from textual.app import App
+
+class MyApp(App):
+    TITLE = "App Title"  # Uppercase TITLE, not lowercase title
+    CSS = APP_CSS
+```
+
+### 3.2. Dynamic Setting
+```python
+def on_mount(self) -> None:
+    self.title = "Dynamic Title"
+    self.sub_title = "Subtitle"
+```
+
+## 4. Button Layout
+
+### 4.1. Equal Distribution
+```css
+#actions {
+    layout: horizontal;
+}
+
+#actions Button {
+    width: 1fr;  /* Equal expansion */
+    margin: 0 1 0 0;  /* Gap between buttons */
+}
+
+#actions Button:last-child {
+    margin-right: 0;
+}
+```
+
+## 5. Widget Styling
+
+### 5.1. Native Styling Priority
+- **FORBIDDEN**: Overriding `background` and `border` on Input/Select
+- **REASON**: Conflicts with native focus states
+- **REQUIRED**: Let widgets use default Textual styling
+
+```css
+/* ✅ CORRECT */
+.field-input {
+    margin-bottom: 1;
+    height: 3;
+    padding: 0 1;
+}
+
+/* ❌ WRONG - fights native styling */
+.field-input {
+    background: $surface-lighten-1;
+    border: solid $accent;
+}
+```
+
+## 6. TextLog Wrapping
+
+### 6.1. No Native wrap Parameter
+- **FORBIDDEN**: `TextLog(wrap=True)` - parameter does not exist
+- **REQUIRED**: Manual text wrapping before write
+
+```python
+import textwrap
+
+def wrap_log_message(message: str, width: int = 82) -> str:
+    return textwrap.fill(
+        message,
+        width=width,
+        break_long_words=False,
+        break_on_hyphens=False,
+        subsequent_indent="  ",
+    )
+
+log_widget.write(wrap_log_message("Long message..."))
+```
+
+### 6.2. CSS Overflow Control
+```css
+#result {
+    height: 5;
+    overflow-x: hidden;  /* Prevent horizontal scroll */
+}
+```
+
+## 7. Spacing Control
+
+### 7.1. Margin vs Padding
+- **Margin**: Space outside widget
+- **Padding**: Space inside widget (added to content area)
+- **PATTERN**: Use `padding` for internal spacing, `margin` for widget separation
+
+```css
+/* Tight spacing between sections */
+#actions {
+    margin-bottom: 0;
+}
+
+#instructions {
+    margin-top: 0;
+    padding-top: 1;  /* Internal spacing */
+}
+```
+
+## 8. Documentation Sources
+
+### 8.1. Priority Order
+1. Official Textual docs (https://textual.textualize.io)
+2. Source code (github.com/Textualize/textual)
+3. AI training data (outdated, verify against docs)
+
+### 8.2. Version Compatibility
+- **REQUIRED**: Check docs for Textual 0.40+ (2024-2025)
+- **FORBIDDEN**: Assuming parameters/CSS from training data without verification

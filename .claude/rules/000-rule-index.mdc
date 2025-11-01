@@ -87,6 +87,7 @@ alwaysApply: false
 - [086-mypy-configuration-standards.mdc](mdc:086-mypy-configuration-standards.mdc): MyPy configuration and monorepo type checking standards with module conflict resolution
 - [087-docker-development-container-patterns.mdc](mdc:087-docker-development-container-patterns.mdc): Docker development container patterns and optimization standards for layer caching and hot-reload
 - [090-documentation-standards.mdc](mdc:090-documentation-standards.mdc): Service, contract, and architectural documentation
+- [095-textual-tui-patterns.mdc](mdc:095-textual-tui-patterns.mdc): Textual TUI development patterns and corrections to AI training data
 
 ## Frontend Development Standards
 - [200-frontend-core-rules.mdc](mdc:200-frontend-core-rules.mdc): Core frontend architecture patterns (Svelte 5 + Vite, TypeScript, modular design)
