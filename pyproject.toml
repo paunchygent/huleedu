@@ -28,6 +28,7 @@ dependencies = [
     "typer",
     "click",
     "textual",
+    "textual-filedrop",
 ]
 
 [dependency-groups]

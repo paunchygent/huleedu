@@ -96,128 +96,122 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 - 11 comprehensive test cases covering column matching, error handling, whitespace normalization, empty file detection
 - All tests passing
 
-## Active Tasks
+## Completed Tasks (2025-11-01 Session)
 
-### 🔧 NEXT: Auto-Calculate Total Slots from Rater Settings
+### ✅ Auto-Calculate Total Slots from Rater Settings
 
-**Problem:**
-The TUI has two independent inputs that users must manually sync:
-- "Total Comparison Slots" (optimizer input) - default: 24
-- "Number of Raters" × "Comparisons Per Rater" (assignment inputs) - default: 14 × 10 = 140
+**Completed:** 2025-11-01
 
-This creates confusion and mismatch potential. The optimizer generates pairs based on "Total Slots" regardless of rater settings.
-
-**Current Workflow:**
-1. `_run_optimizer()` reads "Total Comparison Slots" → generates N pairs
-2. `_generate_assignments()` reads rater settings → expects M pairs
-3. If N ≠ M, shortage/excess handling kicks in (unintended)
-
-**Root Cause:**
-Lines 392-396 in `redistribute_tui.py`:
-```python
-slots_raw = self.query_one("#optimizer_slots_input", Input).value.strip()
-if not slots_raw:
-    raise ValueError("Total slots is required for optimization.")
-total_slots = int(slots_raw)
-```
-
-The optimizer receives a manual `total_slots` value instead of deriving it from rater configuration.
-
-**Solution: Auto-Calculate from Rater Settings**
-
-Remove "Total Comparison Slots" input and calculate automatically:
-```
-total_slots = Number of Raters × Comparisons Per Rater
-```
-
-**Benefits:**
-- Eliminates duplicate/conflicting inputs
-- Prevents user confusion and sync errors
-- Simplifies UI (one less field)
-- Follows DRY principle (derive, don't duplicate)
-- Users can still adjust via rater settings if needed
-
-**Implementation Plan:**
-
-**1. UI Changes (`redistribute_tui.py`)**
-
-Remove:
-- Lines 202-208: "Total Comparison Slots" input field and label
-- Line 256: Reset value for slots field in `_reset_form()`
-- Lines 392-396: Manual slots reading in `_run_optimizer()`
-
-Add (in `_run_optimizer()`, before building spec):
-```python
-# Calculate total slots from rater configuration
-names_raw = self.query_one("#rater_names_input", Input).value.strip()
-count_raw = self.query_one("#rater_count_input", Input).value.strip()
-per_rater_raw = self.query_one("#per_rater_input", Input).value.strip()
-
-per_rater = int(per_rater_raw) if per_rater_raw else 10
-if per_rater <= 0:
-    raise ValueError("Comparisons per rater must be positive.")
-
-if names_raw:
-    names = build_rater_list(None, [names_raw])
-else:
-    if not count_raw:
-        raise ValueError("Provide a rater count or explicit rater names.")
-    count = int(count_raw)
-    names = build_rater_list(count, None)
-
-total_slots = len(names) * per_rater
-log_widget.write(f"Generating {total_slots} pairs for {len(names)} raters × {per_rater} comparisons")
-```
-
-**2. Legacy Code Cleanup**
-
-Remove all references to manual total_slots input:
-- DEFAULT constant if only used for slots field
-- Any helper text or documentation mentioning "Total Comparison Slots"
-- Validation logic for manual slots value
-
-**3. Update Instructions Text**
-
-Lines 225-229: Update instructions to remove mention of "Total Slots":
-```python
-yield Static(
-    "Load students via CSV (recommended) or comma-separated entry. "
-    "Set rater count and comparisons per rater. "
-    "Generate Assignments runs the optimizer to create comparison pairs, "
-    "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV.",
-    id="instructions",
-)
-```
-
-**4. Testing Validation**
-
-Before:
-- User sets slots=24, raters=14, per_rater=10
-- Optimizer generates 24 pairs
-- Assignment phase expects 140 pairs → shortage warning
-
-After:
-- User sets raters=14, per_rater=10
-- Optimizer automatically generates 140 pairs
-- Assignment phase gets exactly 140 pairs → no shortage
+**Implementation Summary:**
+- Removed "Total Comparison Slots" input field from TUI
+- Auto-calculate `total_slots = num_raters × per_rater` in `_run_optimizer()`
+- Updated instructions text to reflect simplified workflow
+- Removed orphaned `DEFAULT_PAIRS` constant
 
 **Files Modified:**
-- `redistribute_tui.py`: Remove slots input, add auto-calculation logic
-- `README.md`: Update TUI documentation to reflect new workflow
+- `redistribute_tui.py`: Removed manual slots input, added auto-calculation (498 LoC)
+- Tests: All 47 tests passing
 
-**Success Criteria:**
-- ✅ "Total Comparison Slots" field removed from UI
-- ✅ Optimizer generates exactly `num_raters × per_rater` pairs
+**Results:**
+- ✅ UI simplified (one less confusing input)
+- ✅ Optimizer generates exact pairs needed for rater assignments
 - ✅ No shortage/excess warnings in normal workflow
-- ✅ All existing tests still pass
-- ✅ Manual testing confirms correct pair count generation
-- ✅ Code remains under 500 LoC limit
-- ✅ No orphaned constants or validation logic
+- ✅ File size: 498 LoC (under 500 LoC limit)
 
-**Estimated Effort:** 1-2 hours
+---
 
-**Risk Assessment:** Low
-- Straightforward calculation replacement
-- No complex logic changes
-- Existing tests validate optimizer behavior
-- User-facing simplification (fewer inputs = less error-prone)
+### ✅ Dead Code Removal: Legacy Baseline Workflow
+
+**Completed:** 2025-11-01
+
+**Implementation Summary:**
+Removed all legacy baseline CSV workflow code that was replaced by dynamic spec workflow.
+
+**Removed from `d_optimal_workflow/__init__.py`:**
+- 12 unused exports (60% reduction: 20 → 8 exports)
+- Legacy functions: `load_baseline_design`, `load_baseline_from_records`, `load_baseline_payload`, `optimize_from_payload`
+- Internal-only functions: `optimize_schedule`, `derive_student_anchor_requirements`, `summarize_design`, `unique_pair_count`, `run_synthetic_optimization`
+- Test-only types: `DEFAULT_ANCHOR_ORDER`, `ComparisonRecord`, `BaselinePayload`
+
+**Removed from `test_redistribute.py`:**
+- 3 legacy test functions (~70 lines)
+- Inlined test-only constants for remaining tests
+
+**Files Modified:**
+- `d_optimal_workflow/__init__.py`: Cleaned public API to 8 exports
+- `test_redistribute.py`: Removed 3 legacy tests (50 → 47 tests)
+
+**Results:**
+- ✅ All 47 tests passing
+- ✅ Clean public API (only actively used exports)
+- ✅ Type checking passes
+- ✅ Linting passes
+
+---
+
+### ✅ Import Structure Simplification
+
+**Completed:** 2025-11-01
+
+**Implementation Summary:**
+Removed complex try/except import blocks and sys.path hacks, replaced with clean absolute imports matching project standards.
+
+**Before (58 lines):**
+```python
+import sys
+if __package__ in (None, ""):
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    if str(_PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(_PROJECT_ROOT))
+
+try:
+    from .d_optimal_workflow import (...)
+    from .redistribute_core import (...)
+except ImportError:
+    from scripts.bayesian_consensus_model.d_optimal_workflow import (...)
+    from scripts.bayesian_consensus_model.redistribute_core import (...)
+```
+
+**After (27 lines):**
+```python
+from pathlib import Path
+from typing import Optional
+
+from scripts.bayesian_consensus_model.d_optimal_workflow import (...)
+from scripts.bayesian_consensus_model.redistribute_core import (...)
+```
+
+**Files Modified:**
+- `redistribute_tui.py`: Removed 31 lines of import complexity
+- `redistribute_pairs.py`: Removed 31 lines of import complexity
+
+**Results:**
+- ✅ All 47 tests passing
+- ✅ CLI works: `pdm run python -m scripts.bayesian_consensus_model.redistribute_pairs --help`
+- ✅ TUI imports successfully
+- ✅ No sys.path hacks
+- ✅ Consistent with project standards
+- ✅ Type checking passes
+- ✅ Linting passes
+
+---
+
+## Active Tasks
+
+### 🔧 NEXT: PyInstaller Standalone Executables (Optional Enhancement)
+
+**Status:** Plan created in `TASKS/pyinstaller_standalone_executables_plan.md`
+
+**Objective:**
+Create standalone executable binaries for `redistribute-tui` and `redistribute-pairs` using PyInstaller `--onefile` mode.
+
+**Benefits:**
+- True standalone executables (no Python installation required)
+- Single-file distribution (~25-35MB per executable)
+- Copy to `/usr/local/bin/` or distribute to non-developers
+- 1-3 second startup time (acceptable for interactive tools)
+
+**See:** `TASKS/pyinstaller_standalone_executables_plan.md` for complete implementation guide.
+
+**Estimated Effort:** ~60 minutes
+

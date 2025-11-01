@@ -3,22 +3,45 @@ from __future__ import annotations
 import csv
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List
 
 import pytest
 from typer.testing import CliRunner
 
 from scripts.bayesian_consensus_model import redistribute_core as core
 from scripts.bayesian_consensus_model.d_optimal_workflow import (
-    DEFAULT_ANCHOR_ORDER,
-    ComparisonRecord,
-    load_baseline_payload,
     load_dynamic_spec,
     load_previous_comparisons_from_csv,
     optimize_from_dynamic_spec,
-    optimize_from_payload,
 )
 from scripts.bayesian_consensus_model.redistribute_pairs import app as cli_app
+
+# Test-only constants inlined from models.py
+DEFAULT_ANCHOR_ORDER: List[str] = [
+    "F+1",
+    "F+2",
+    "E-",
+    "E+",
+    "D-",
+    "D+",
+    "C-",
+    "C+",
+    "B1",
+    "B2",
+    "A1",
+    "A2",
+]
+
+
+@dataclass(frozen=True)
+class ComparisonRecord:
+    """Historical comparison record for testing."""
+
+    essay_a_id: str
+    essay_b_id: str
+    comparison_type: str
 
 
 @pytest.fixture()
@@ -164,74 +187,6 @@ def test_cli_handles_pair_shortage(tmp_path: Path, pairs_csv: Path) -> None:
     lines = output_csv.read_text().strip().splitlines()
     # header + available_total assignments (6 comparisons)
     assert len(lines) == 1 + 6
-
-
-def test_optimize_payload_errors_when_slots_too_small(tmp_path: Path) -> None:
-    baseline_path = tmp_path / "baseline_small.json"
-    payload = {
-        "total_slots": 3,
-        "comparisons": [
-            {
-                "essay_a_id": "JA24",
-                "essay_b_id": "A1",
-                "comparison_type": "student_anchor",
-            }
-        ],
-        "anchor_order": DEFAULT_ANCHOR_ORDER,
-    }
-    baseline_path.write_text(json.dumps(payload))
-
-    payload_obj = load_baseline_payload(baseline_path)
-
-    with pytest.raises(ValueError, match="Minimum required slots"):
-        optimize_from_payload(
-            payload_obj,
-            total_slots=5,
-            max_repeat=2,
-            anchor_order=None,
-        )
-
-
-def test_load_baseline_payload_accepts_empty_array(tmp_path: Path) -> None:
-    payload_path = tmp_path / "empty_payload.json"
-    payload_path.write_text(
-        json.dumps(
-            {
-                "comparisons": [],
-                "anchor_order": DEFAULT_ANCHOR_ORDER,
-            }
-        )
-    )
-
-    payload = load_baseline_payload(payload_path)
-
-    assert payload.records == []
-    assert payload.anchor_order == DEFAULT_ANCHOR_ORDER
-    assert payload.total_slots is None
-
-
-def test_load_baseline_payload_preserves_total_slots(tmp_path: Path) -> None:
-    payload_path = tmp_path / "payload.json"
-    payload_path.write_text(
-        json.dumps(
-            {
-                "comparisons": [
-                    {
-                        "essay_a_id": "JA24",
-                        "essay_b_id": "A1",
-                        "comparison_type": "student_anchor",
-                    }
-                ],
-                "total_slots": 12,
-            }
-        )
-    )
-
-    payload = load_baseline_payload(payload_path)
-
-    assert len(payload.records) == 1
-    assert payload.records[0]["essay_a_id"] == "JA24"
-    assert payload.total_slots == 12
 
 
 # Dynamic Spec Tests

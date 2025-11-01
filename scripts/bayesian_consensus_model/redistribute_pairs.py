@@ -4,51 +4,27 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-if __package__ in (None, ""):
-    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-    if str(_PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(_PROJECT_ROOT))
-
 import typer
 
-try:
-    from .d_optimal_workflow import (  # type: ignore[attr-defined]
-        DynamicSpec,
-        OptimizationResult,
-        load_dynamic_spec,
-        load_previous_comparisons_from_csv,
-        optimize_from_dynamic_spec,
-        write_design,
-    )
-    from .redistribute_core import (  # type: ignore[attr-defined]
-        assign_pairs,
-        build_rater_list,
-        compute_quota_distribution,
-        read_pairs,
-        select_comparisons,
-        write_assignments,
-    )
-except ImportError:  # pragma: no cover - fallback for direct execution
-    from scripts.bayesian_consensus_model.d_optimal_workflow import (  # type: ignore[attr-defined]
-        DynamicSpec,
-        OptimizationResult,
-        load_dynamic_spec,
-        load_previous_comparisons_from_csv,
-        optimize_from_dynamic_spec,
-        write_design,
-    )
-    from scripts.bayesian_consensus_model.redistribute_core import (  # type: ignore[attr-defined]
-        assign_pairs,
-        build_rater_list,
-        compute_quota_distribution,
-        read_pairs,
-        select_comparisons,
-        write_assignments,
-    )
+from scripts.bayesian_consensus_model.d_optimal_workflow import (
+    DynamicSpec,
+    OptimizationResult,
+    load_dynamic_spec,
+    load_previous_comparisons_from_csv,
+    optimize_from_dynamic_spec,
+    write_design,
+)
+from scripts.bayesian_consensus_model.redistribute_core import (
+    assign_pairs,
+    build_rater_list,
+    compute_quota_distribution,
+    read_pairs,
+    select_comparisons,
+    write_assignments,
+)
 
 app = typer.Typer(help="Redistribute CJ comparison pairs across available raters.")
 
