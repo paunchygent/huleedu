@@ -14,8 +14,8 @@ try:
 except ImportError:  # pragma: no cover - compatibility with older Textual
     from textual.widgets import Log as TextLog  # type: ignore
 
-DEFAULT_PAIRS_OUTPUT = Path("optimized_pairs.csv")
-DEFAULT_OUTPUT = Path("session2_dynamic_assignments.csv")
+DEFAULT_PAIRS_OUTPUT = Path("cj_comparison_pairs.csv")
+DEFAULT_OUTPUT = Path("cj_rater_assignments.csv")
 DEFAULT_RATER_COUNT = 14
 MAX_LOG_WIDTH = 82  # Fits within 90-column panel with padding
 
@@ -87,6 +87,11 @@ Screen {
     margin-top: 0;
     padding-top: 1;
 }
+
+/* Remove black highlight on button press */
+Button:focus {
+    text-style: bold;
+}
 """
 
 
@@ -109,7 +114,7 @@ def create_form_layout() -> ComposeResult:
             )
             yield Label("Anchors (optional - leave blank for default 12-anchor ladder)")
             yield Input(
-                placeholder="Leave blank for default anchor ladder",
+                placeholder="e.g., F+1, F+2, D1, B1, B2, A1 (essays with known grades)",
                 id="anchors_input",
                 classes="field-input",
             )
@@ -137,8 +142,8 @@ def create_form_layout() -> ComposeResult:
                 id="per_rater_input",
                 classes="field-input",
             )
-            yield Static("Optimization Settings", classes="bold")
-            yield Label("Generated Pairs Output Path (optimizer saves pairs here)")
+            yield Static("Comparison Design Settings", classes="bold")
+            yield Label("Comparison Pairs Output Path (saves full pair list)")
             yield Input(
                 value=str(DEFAULT_PAIRS_OUTPUT),
                 id="optimizer_output_input",
@@ -175,7 +180,7 @@ def create_form_layout() -> ComposeResult:
         yield Static(
             "Load students via CSV (recommended) or comma-separated entry. "
             "Set rater count and comparisons per rater. "
-            "Generate Assignments runs the optimizer to create comparison pairs, "
+            "Generate Assignments builds comparison pairs, "
             "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV. "
             "Tip: focus a file path field and drag files onto the terminal to "
             "auto-populate it.",

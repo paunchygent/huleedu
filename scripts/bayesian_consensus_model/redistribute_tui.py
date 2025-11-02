@@ -25,6 +25,7 @@ from scripts.bayesian_consensus_model.tui.form_layout import (
     DEFAULT_RATER_COUNT,
     create_form_layout,
 )
+from scripts.bayesian_consensus_model.tui.help_screen import HelpScreen
 from scripts.bayesian_consensus_model.tui.result_formatter import (
     format_assignment_summary,
     format_optimization_summary,
@@ -44,6 +45,8 @@ class RedistributeApp(App):
     CSS = APP_CSS
 
     BINDINGS = [
+        Binding("f1", "show_help", "Help", priority=True),
+        Binding("question_mark", "show_help", show=False, priority=True),
         Binding("g", "generate", "Generate assignments"),
         Binding("q", "quit", "Quit"),
     ]
@@ -56,7 +59,7 @@ class RedistributeApp(App):
         """Initialize app state on mount."""
         log_widget = self.query_one(TextLog)
         log_widget.write("Initializing CJ Pair Generator...")
-        self.query_one("#students_input", Input).focus()
+        self.query_one("#students_csv_input", Input).focus()
         log_widget.write("Ready.")
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -97,13 +100,19 @@ class RedistributeApp(App):
             f"Detected file drop; populated '{placeholder}' with {summary_path}."
         )
 
+    def action_show_help(self) -> None:
+        """Show help screen."""
+        self.push_screen(HelpScreen())
+
     def action_generate(self) -> None:
         """Generate assignments (keyboard shortcut handler)."""
+        self.query_one("#generate_button", Button).disabled = True
         self._generate_assignments()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "generate_button":
+            event.button.disabled = True
             self._generate_assignments()
         elif event.button.id == "reset_button":
             self._reset_form()
@@ -182,6 +191,12 @@ class RedistributeApp(App):
 
         except (FileNotFoundError, ValueError) as error:
             self.call_from_thread(log_widget.write, f"[red]Error:[/] {error}")
+        finally:
+            # Re-enable button in main thread
+            def enable_button() -> None:
+                self.query_one("#generate_button", Button).disabled = False
+
+            self.call_from_thread(enable_button)
 
 
 def main() -> None:

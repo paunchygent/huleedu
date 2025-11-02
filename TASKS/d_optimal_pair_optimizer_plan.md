@@ -203,7 +203,7 @@ from scripts.bayesian_consensus_model.redistribute_core import (...)
 **Status:** Plan created in `TASKS/pyinstaller_standalone_executables_plan.md`
 
 **Objective:**
-Create standalone executable binaries for `redistribute-tui` and `redistribute-pairs` using PyInstaller `--onefile` mode.
+Create standalone executable binaries for `cj-pair-generator-tui` and `redistribute-pairs` using PyInstaller `--onefile` mode.
 
 **Benefits:**
 - True standalone executables (no Python installation required)
@@ -215,3 +215,39 @@ Create standalone executable binaries for `redistribute-tui` and `redistribute-p
 
 **Estimated Effort:** ~60 minutes
 
+---
+
+## Proposed Enhancements
+
+### 🗂 1. Native Save Dialogs for Output CSV Paths
+
+**Goal:** Allow users to choose output destinations (assignments + comparison pairs) via OS-native “Save As” dialogs instead of manual path entry.
+
+**Steps:**
+1. **Library selection:** Evaluate `crossfiledialog` (preferred) or platform-specific fallbacks if licensing/availability requires.
+2. **Async integration:** Wrap dialog launch in `asyncio.to_thread()` (or executor) so the Textual UI stays responsive while the modal dialog is open.
+3. **UI affordance:** Add “Browse…” buttons beside `#output_input` and `#optimizer_output_input`; disable the generate button while waiting for the dialog result.
+4. **Result handling:** On success, populate the corresponding input field; on cancel, keep the previous value and surface a brief log message.
+5. **Documentation:** Update help modal and README to explain the new workflow and note Linux prerequisites (`zenity`/`kdialog`).
+6. **Packaging check:** Verify the PyInstaller bundle launches the dialog correctly on macOS and Windows; document required packages for Linux users.
+
+**Deliverables:** Updated TUI form, asynchronous helper function, doc/help updates, manual test notes (macOS, Windows, Linux).
+
+### 🔄 2. Previous Session CSV Drag-and-Drop Parity
+
+**Goal:** Make the `Previous Session CSV` field behave identically to the `Students CSV` field for drag-and-drop and multi-path paste.
+
+**Steps:**
+1. Extend `FILE_DROP_TARGET_IDS` to include `previous_csv_input`.
+2. Ensure `on_input_changed` / `on_paste` logic treats the field the same as the existing CSV inputs.
+3. Update placeholder/help text to advertise drag-and-drop support.
+4. Regression checklist: Finder drag-and-drop, Windows Explorer drag, multi-path paste with quotes, manual entry fallback.
+
+**Deliverables:** Updated handler wiring, help text tweaks, manual QA notes.
+
+---
+
+### Tracking
+
+- [ ] Native save dialogs implemented and documented.
+- [ ] Previous session CSV drag/drop parity delivered.

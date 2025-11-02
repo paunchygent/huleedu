@@ -50,8 +50,8 @@ Form structure, CSS, and widget composition.
 
 **Constants:**
 
-- `DEFAULT_PAIRS_OUTPUT = Path("optimized_pairs.csv")`
-- `DEFAULT_OUTPUT = Path("session2_dynamic_assignments.csv")`
+- `DEFAULT_PAIRS_OUTPUT = Path("cj_comparison_pairs.csv")`
+- `DEFAULT_OUTPUT = Path("cj_rater_assignments.csv")`
 - `DEFAULT_RATER_COUNT = 14`
 
 **Key Function:**
@@ -67,7 +67,7 @@ Form structure, CSS, and widget composition.
 - `rater_count_input`: Number of raters
 - `rater_names_input`: Explicit rater names
 - `per_rater_input`: Comparisons per rater
-- `optimizer_output_input`: Optimized pairs CSV path
+- `optimizer_output_input`: Comparison pairs CSV path
 - `previous_csv_input`: Previous session CSV for multi-session workflows
 - `locked_pairs_input`: Hard-locked pairs (semicolon-separated)
 - `optimizer_max_repeat_input`: Max repetitions per pair

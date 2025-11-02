@@ -2,7 +2,7 @@
 
 ## Objective
 
-Create standalone executable binaries for `redistribute-tui` and `redistribute-pairs` using PyInstaller with `--onefile` mode, enabling distribution and execution on any machine without Python installation or dependency management.
+Create standalone executable binaries for `cj-pair-generator-tui` and `redistribute-pairs` using PyInstaller with `--onefile` mode, enabling distribution and execution on any machine without Python installation or dependency management.
 
 ## Context
 
@@ -87,10 +87,10 @@ echo "Building standalone executables with PyInstaller..."
 rm -rf build/ dist/
 
 # Build TUI
-echo "Building redistribute-tui..."
+echo "Building cj-pair-generator-tui..."
 pdm run pyinstaller \
   --onefile \
-  --name redistribute-tui \
+  --name cj-pair-generator-tui \
   --clean \
   scripts/bayesian_consensus_model/redistribute_tui.py
 
@@ -104,11 +104,11 @@ pdm run pyinstaller \
 
 echo "✅ Build complete!"
 echo "Executables:"
-echo "  - dist/redistribute-tui"
+echo "  - dist/cj-pair-generator-tui"
 echo "  - dist/redistribute-pairs"
 echo ""
 echo "To install system-wide:"
-echo "  sudo cp dist/redistribute-tui /usr/local/bin/"
+echo "  sudo cp dist/cj-pair-generator-tui /usr/local/bin/"
 echo "  sudo cp dist/redistribute-pairs /usr/local/bin/"
 ```
 
@@ -195,7 +195,7 @@ pdm run build-standalone
 
 ```bash
 # Test TUI (should launch immediately)
-./dist/redistribute-tui
+./dist/cj-pair-generator-tui
 
 # Test CLI help
 ./dist/redistribute-pairs --help
@@ -212,15 +212,15 @@ pdm run build-standalone
 Optional: Test on machine without Python/PDM to verify true standalone:
 ```bash
 # Copy to clean VM/container
-scp dist/redistribute-tui user@clean-machine:/tmp/
-ssh user@clean-machine /tmp/redistribute-tui
+scp dist/cj-pair-generator-tui user@clean-machine:/tmp/
+ssh user@clean-machine /tmp/cj-pair-generator-tui
 ```
 
 **4.4. Measure Performance**
 
 ```bash
 # Measure startup time
-time ./dist/redistribute-tui --help
+time ./dist/cj-pair-generator-tui --help
 time ./dist/redistribute-pairs --help
 ```
 
@@ -234,12 +234,12 @@ Expected: 1-3 seconds first run (unpacking), slightly faster on subsequent runs 
 
 ```bash
 # System-wide installation
-sudo cp dist/redistribute-tui /usr/local/bin/
+sudo cp dist/cj-pair-generator-tui /usr/local/bin/
 sudo cp dist/redistribute-pairs /usr/local/bin/
 
 # User-specific installation
 mkdir -p ~/bin
-cp dist/redistribute-tui ~/bin/
+cp dist/cj-pair-generator-tui ~/bin/
 cp dist/redistribute-pairs ~/bin/
 # Add ~/bin to PATH if needed
 ```
@@ -248,7 +248,7 @@ cp dist/redistribute-pairs ~/bin/
 
 ```bash
 # Create symlinks instead of copying
-sudo ln -s "$(pwd)/dist/redistribute-tui" /usr/local/bin/
+sudo ln -s "$(pwd)/dist/cj-pair-generator-tui" /usr/local/bin/
 sudo ln -s "$(pwd)/dist/redistribute-pairs" /usr/local/bin/
 ```
 
@@ -258,7 +258,7 @@ sudo ln -s "$(pwd)/dist/redistribute-pairs" /usr/local/bin/
 # Create distribution archive
 tar -czf redistribute-tools-macos-$(uname -m).tar.gz \
   -C dist \
-  redistribute-tui \
+  cj-pair-generator-tui \
   redistribute-pairs
 
 # Users extract and install:
@@ -278,7 +278,7 @@ huledu-reboot/
 │       ├── redistribute_tui.py      # MODIFIED: Add main() entry point
 │       └── redistribute_pairs.py    # MODIFIED: Add main() entry point
 ├── dist/                             # NEW: Built executables (gitignored)
-│   ├── redistribute-tui             # ~25-35MB standalone binary
+│   ├── cj-pair-generator-tui             # ~25-35MB standalone binary
 │   └── redistribute-pairs           # ~25-35MB standalone binary
 ├── build/                            # NEW: Build cache (gitignored)
 ├── *.spec                            # NEW: PyInstaller specs (gitignored)
@@ -292,12 +292,12 @@ huledu-reboot/
 
 ### Build Phase
 - ✅ `pdm run build-standalone` completes without errors
-- ✅ Creates `dist/redistribute-tui` and `dist/redistribute-pairs`
+- ✅ Creates `dist/cj-pair-generator-tui` and `dist/redistribute-pairs`
 - ✅ Both executables are ~25-35MB single files
 - ✅ File permissions are executable (`-rwxr-xr-x`)
 
 ### Execution Phase
-- ✅ `./dist/redistribute-tui` launches TUI without errors
+- ✅ `./dist/cj-pair-generator-tui` launches TUI without errors
 - ✅ `./dist/redistribute-pairs --help` shows CLI help
 - ✅ `./dist/redistribute-pairs optimize-pairs ...` runs optimizer
 - ✅ Startup time is 1-3 seconds (acceptable)
@@ -305,7 +305,7 @@ huledu-reboot/
 
 ### Distribution Phase
 - ✅ Executables can be copied to `/usr/local/bin/`
-- ✅ Run from any directory: `redistribute-tui` works globally
+- ✅ Run from any directory: `cj-pair-generator-tui` works globally
 - ✅ No dependency errors on clean environment
 
 ---
@@ -317,7 +317,7 @@ huledu-reboot/
 # Use UPX compression (requires upx installed)
 pdm run pyinstaller \
   --onefile \
-  --name redistribute-tui \
+  --name cj-pair-generator-tui \
   --upx-dir /usr/local/bin \
   scripts/bayesian_consensus_model/redistribute_tui.py
 ```
@@ -369,7 +369,7 @@ pdm run build-standalone
 
 # Reinstall if using symlinks (automatic)
 # Or copy if using direct installation:
-sudo cp dist/redistribute-tui /usr/local/bin/
+sudo cp dist/cj-pair-generator-tui /usr/local/bin/
 ```
 
 ### Cleanup
@@ -472,8 +472,8 @@ rm -rf build/ dist/ *.spec
 ## PyInstaller Standalone TUI ✅ COMPLETED
 
 **Status**: Functional - 106MB onefile executable, PyInstaller 6.16.0, Textual 6.5.0
-**Build**: `pdm run build-standalone` → `dist/redistribute-tui` (~60s)
-**Distribution**: `sudo cp dist/redistribute-tui /usr/local/bin/`
+**Build**: `pdm run build-standalone` → `dist/cj-pair-generator-tui` (~60s)
+**Distribution**: `sudo cp dist/cj-pair-generator-tui /usr/local/bin/`
 
 ### Setup Complete
 - Dependencies: PyInstaller 6.16.0 (monorepo-tools), numpy/scipy moved to main deps
