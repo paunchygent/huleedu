@@ -29,6 +29,8 @@ dependencies = [
     "click",
     "textual",
     "textual-filedrop",
+    "numpy",
+    "scipy",
 ]
 
 [dependency-groups]
@@ -36,6 +38,7 @@ dependencies = [
 monorepo-tools = [
     "ruff",
     "mypy",
+    "pyinstaller",
     "pytest",
     "pytest-mock",
     "pytest-cov",
@@ -53,8 +56,6 @@ monorepo-tools = [
     "aiosmtplib>=4.0.1",
     # Verification and analysis tools
     "pandas",
-    "numpy",
-    "scipy",
     "matplotlib",
     "seaborn",
     "plotly",
@@ -396,6 +397,7 @@ prod-migrate = "scripts/migrate-production.sh"  # Run production migrations
 
 # Utilities
 build-common-core = "pdm build -p libs/common_core"  # Build shared library
+build-standalone = {shell = "scripts/build_standalone.sh"}  # Build standalone executables
 kafka-setup = "python scripts/kafka_topic_bootstrap.py"  # Initialize Kafka topics
 docker-clean = "docker system prune -af"  # Clean Docker resources (use with caution)
 codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning

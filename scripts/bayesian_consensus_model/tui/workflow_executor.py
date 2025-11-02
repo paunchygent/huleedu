@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+
+from textual.widgets import Input, Select
 
 from scripts.bayesian_consensus_model.d_optimal_workflow import (
     OptimizationResult,
@@ -23,9 +24,6 @@ from scripts.bayesian_consensus_model.redistribute_core import (
     select_comparisons,
     write_assignments,
 )
-
-if TYPE_CHECKING:
-    from textual.widgets import Input, Select
 
 
 @dataclass

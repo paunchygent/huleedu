@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-from textual import events
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Button, Input, Select
 
 try:
-    from textual.widgets import TextLog  # type: ignore[attr-defined]
+    from textual.widgets import RichLog as TextLog  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - compatibility with older Textual
     from textual.widgets import Log as TextLog  # type: ignore
 
@@ -24,7 +24,6 @@ from scripts.bayesian_consensus_model.tui.form_layout import (
     DEFAULT_PAIRS_OUTPUT,
     DEFAULT_RATER_COUNT,
     create_form_layout,
-    wrap_log_message,
 )
 from scripts.bayesian_consensus_model.tui.result_formatter import (
     format_assignment_summary,
@@ -55,8 +54,10 @@ class RedistributeApp(App):
 
     def on_mount(self) -> None:
         """Initialize app state on mount."""
+        log_widget = self.query_one(TextLog)
+        log_widget.write("Initializing CJ Pair Generator...")
         self.query_one("#students_input", Input).focus()
-        self.query_one(TextLog).write("Ready.")
+        log_widget.write("Ready.")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Remove quotes from file paths set by Finder drag-and-drop."""
@@ -93,9 +94,7 @@ class RedistributeApp(App):
         if len(file_paths) > 1:
             summary_path += f" (+{len(file_paths) - 1} more)"
         log_widget.write(
-            wrap_log_message(
-                f"Detected file drop; populated '{placeholder}' with {summary_path}."
-            )
+            f"Detected file drop; populated '{placeholder}' with {summary_path}."
         )
 
     def action_generate(self) -> None:
@@ -125,40 +124,49 @@ class RedistributeApp(App):
         self.query_one("#include_anchor_anchor_select", Select).value = "yes"
         self.query_one(TextLog).write("Form reset.")
 
-    def _generate_assignments(self) -> None:
-        """Run optimizer and generate assignments workflow."""
+    @work(thread=True, exclusive=True, exit_on_error=False)
+    async def _generate_assignments(self) -> None:
+        """Run optimizer and generate assignments workflow in background thread."""
         log_widget = self.query_one(TextLog)
-        log_widget.clear()
+        self.call_from_thread(log_widget.clear)
 
         try:
             # Extract form inputs
+            self.call_from_thread(log_widget.write, "Extracting form inputs...")
             optimizer_inputs = extract_optimizer_inputs(self.query_one)
             assignment_inputs = extract_assignment_inputs(self.query_one)
 
             # Run optimizer
+            self.call_from_thread(log_widget.write, "Running D-optimal optimizer...")
             opt_result, pairs_path, students_value = run_optimizer(optimizer_inputs)
 
             # Log optimizer results
-            log_widget.write(wrap_log_message(f"Loaded {len(opt_result.students)} students"))
-            log_widget.write(
-                wrap_log_message(
-                    f"Generating {opt_result.total_comparisons} pairs for "
-                    f"{len(opt_result.students)} students"
-                )
+            self.call_from_thread(
+                log_widget.write, f"Loaded {len(opt_result.students)} students"
+            )
+            self.call_from_thread(
+                log_widget.write,
+                f"Generating {opt_result.total_comparisons} pairs for "
+                f"{len(opt_result.students)} students",
             )
             if optimizer_inputs.previous_csv:
                 prev_count = len(opt_result.baseline_design)
-                log_widget.write(
-                    wrap_log_message(f"Loaded {prev_count} previous comparisons")
+                self.call_from_thread(
+                    log_widget.write,
+                    f"Loaded {prev_count} previous comparisons",
                 )
 
             for message in format_optimization_summary(opt_result, pairs_path):
-                log_widget.write(wrap_log_message(message))
+                self.call_from_thread(log_widget.write, message)
 
             # Update students display field
-            self.query_one("#students_input", Input).value = students_value
+            def update_students_field(value: str) -> None:
+                self.query_one("#students_input", Input).value = value
+
+            self.call_from_thread(update_students_field, students_value)
 
             # Generate assignments
+            self.call_from_thread(log_widget.write, "Generating rater assignments...")
             assignment_result = generate_assignments(assignment_inputs, pairs_path)
 
             # Log assignment results
@@ -168,11 +176,18 @@ class RedistributeApp(App):
                 assignment_result.available_total,
                 assignment_result.output_path,
             ):
-                log_widget.write(wrap_log_message(message))
+                self.call_from_thread(log_widget.write, message)
+
+            self.call_from_thread(log_widget.write, "[green]Complete![/]")
 
         except (FileNotFoundError, ValueError) as error:
-            log_widget.write(wrap_log_message(f"[red]Error:[/] {error}"))
+            self.call_from_thread(log_widget.write, f"[red]Error:[/] {error}")
+
+
+def main() -> None:
+    """Entry point for standalone executable."""
+    RedistributeApp().run()
 
 
 if __name__ == "__main__":
-    RedistributeApp().run()
+    main()

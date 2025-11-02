@@ -64,3 +64,8 @@ llm_response_logs/
 services/spellchecker_service/data/whitelist/combined_whitelist.txt
 .gitignore
 docs/rapport_till_kollegor/
+
+# PyInstaller
+build/
+dist/
+*.spec

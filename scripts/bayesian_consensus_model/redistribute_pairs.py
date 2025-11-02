@@ -361,5 +361,10 @@ def _write_report(
     path.write_text(json.dumps(payload, indent=2))
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Entry point for standalone executable."""
     app()
+
+
+if __name__ == "__main__":
+    main()

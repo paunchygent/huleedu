@@ -466,3 +466,76 @@ rm -rf build/ dist/ *.spec
 - Test thoroughly before distribution
 - Keep original Python module workflow as fallback
 - Document any PyInstaller-specific configuration needed
+
+---
+
+## PyInstaller Standalone TUI ✅ COMPLETED
+
+**Status**: Functional - 106MB onefile executable, PyInstaller 6.16.0, Textual 6.5.0
+**Build**: `pdm run build-standalone` → `dist/redistribute-tui` (~60s)
+**Distribution**: `sudo cp dist/redistribute-tui /usr/local/bin/`
+
+### Setup Complete
+- Dependencies: PyInstaller 6.16.0 (monorepo-tools), numpy/scipy moved to main deps
+- Build script: `scripts/build_standalone.sh` (`--onefile --clean --noconfirm`)
+- Gitignore: build/, dist/, *.spec
+- Entry point: `main()` in redistribute_tui.py
+
+### Critical Fixes Applied
+
+**1. UI Blocking** - CPU-intensive operations froze event loop
+```python
+from textual import work  # NOT from textual.worker (ImportError)
+
+@work(thread=True, exclusive=True, exit_on_error=False)
+async def _generate_assignments(self) -> None:
+    self.call_from_thread(log_widget.write, "Status...")  # Thread-safe UI updates
+```
+
+**2. Text Truncation** - Log widget API misuse
+- `Log.write()` ignores newlines → use `Log.write_line()` for wrapping
+- CSS: `text-wrap: wrap; overflow-x: hidden` required
+- Removed obsolete manual `textwrap.fill()` wrapping
+
+**3. Rich Markup** - Log doesn't support markup, switched to RichLog
+```python
+from textual.widgets import RichLog as TextLog
+yield TextLog(id="result", markup=True, wrap=True, auto_scroll=True)
+self.call_from_thread(log_widget.write, "[green]Complete![/]")  # RichLog uses write()
+```
+
+**4. TYPE_CHECKING** - Runtime NameError for Input/Select (previous session)
+```python
+from textual.widgets import Input, Select  # Removed TYPE_CHECKING guard
+```
+
+**Textual API Gotchas** (training data errors):
+- ❌ `from textual.worker import work` → ✅ `from textual import work`
+- ❌ `Log(markup=True)` → ✅ `RichLog(markup=True)`
+- ❌ `RichLog.write_line()` → ✅ `RichLog.write()`
+- Verify imports: `pdm run python -c "from textual import work; print(work)"`
+
+**macOS Splash Screen Limitation**:
+- PyInstaller `--splash` incompatible (Tcl/Tk threading restriction)
+- Native Swift launcher viable but out of scope (YAGNI)
+- Accepted 1-3s startup delay without feedback
+
+### Build Details
+- Binary size: 106MB (vs estimated 25-35MB) - includes numpy/scipy/pandas/matplotlib + Python 3.11
+- TUI-only build (CLI removed per user request)
+- Build time: ~60s
+- PyInstaller-safe codebase verified (27 files analyzed, no dynamic imports/sys.path hacks)
+
+### Files Modified
+- `pyproject.toml`: PyInstaller dep, numpy/scipy to main, build-standalone script
+- `redistribute_tui.py`: @work decorator, RichLog import, write() calls, main() entry
+- `workflow_executor.py`: Removed TYPE_CHECKING guard for Input/Select
+- `form_layout.py`: RichLog import, CSS `text-wrap: wrap; overflow-x: hidden`
+- `build_standalone.sh`: TUI-only (CLI removed)
+- `.gitignore`: PyInstaller artifacts
+- `.claude/rules/095-textual-tui-patterns.mdc`: Sections 9-12 (workers, Log vs RichLog, API gotchas)
+
+### Success Criteria ✅
+- Build: `pdm run build-standalone` completes, 106MB onefile, ~60s
+- Runtime: TUI responsive, background threading works, Rich markup renders, text wraps
+- Distribution: No Python required, 1-3s startup

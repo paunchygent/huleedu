@@ -10,7 +10,7 @@ from textual.containers import Container, VerticalScroll
 from textual.widgets import Button, Footer, Header, Input, Label, Select, Static
 
 try:
-    from textual.widgets import TextLog  # type: ignore[attr-defined]
+    from textual.widgets import RichLog as TextLog  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - compatibility with older Textual
     from textual.widgets import Log as TextLog  # type: ignore
 
@@ -62,6 +62,7 @@ Screen {
 #result {
     height: 5;
     margin-top: 1;
+    text-wrap: wrap;
     overflow-x: hidden;
     scrollbar-size: 1 1;
 }
@@ -180,7 +181,7 @@ def create_form_layout() -> ComposeResult:
             "auto-populate it.",
             id="instructions",
         )
-        yield TextLog(id="result", highlight=False)
+        yield TextLog(id="result", markup=True, wrap=True, auto_scroll=True)
     yield Footer()
 
 

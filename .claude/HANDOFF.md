@@ -1,162 +1,370 @@
-# HuleEdu Monorepo - Handoff Document
+# PyInstaller Standalone TUI Executable - Active Task Handoff
 
-## Current Status (Jan 25, 2025)
+**Task Status**: IN PROGRESS - Critical fix applied, needs rebuild and testing
+**Priority**: HIGH - User needs working TUI executable
+**Date**: 2025-11-02
+**Context Window**: 128K/200K used - HANDOFF REQUIRED
 
-### What We Just Completed
-- Corrected major inaccuracies in Bayesian consensus model report (`docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html`). Fixed rater bias interpretation (negative=strict, positive=generous), updated all data values to match actual model output, anonymized content, and regenerated all figures with proper color schemes and layouts.
-- Implemented D-optimal comparison planning tools for the CJ session:
-  - Added `scripts/bayesian_consensus_model/d_optimal_optimizer.py` (Fisher log-det greedy + exchange optimizer with anchor adjacency + student bracket constraints).
-  - Added `scripts/bayesian_consensus_model/d_optimal_prototype.py` to generate optimized schedules; default run now improves Session 2 core set (log-det 33.98 → 37.67).
-  - Generated 149-comparison expansion (`scripts/bayesian_consensus_model/session_2_planning/20251027-143747/session2_pairs_optimized_149.csv`) yielding log-det 51.63 and coverage mix (anchor-anchor 31 | student-anchor 86 | student-student 32).
-  - Tracked follow-up integration + assignment balancing tasks in `TASKS/d_optimal_pair_optimizer_plan.md`.
-- Completed the optimizer rollout plan:
-  - Added a Typer command (`redistribute_pairs optimize-pairs`) with session/synthetic modes, JSON diagnostics, and regression coverage.
-  - Upgraded the Textual TUI with optimization controls + auto-run toggle; optimizer summaries now surface mix, coverage, and repeat counts.
-  - Implemented a type-aware rater assignment balancer eliminating anchor-only workloads; README + session plan now document the workflow.
-  - Tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py` (covers CLI + allocator).
+---
 
-### System State
-- All services running and healthy
-- Tests passing (including `test_e2e_cj_after_nlp_with_pruning.py`)
-- No blocking issues
-- Redis caching plan still complete in `TASKS/updated_plan.md` (pending implementation)
-- Bayesian report corrections completed using data from `output/bayesian_consensus_model/20250924-202445/bias_on/`
-- All figures regenerated via `docs/rapport_till_kollegor/create_corrected_figures.py`
+## IMMEDIATE ACTION REQUIRED
 
-## Open Work
+**User wants ONLY the TUI executable, NOT the CLI.**
 
-### Redis Caching Implementation (In Progress)
-- **Plan**: Complete in `TASKS/updated_plan.md`
-- **Architecture**: Cache wraps circuit breaker (outermost layer)
-- **Key decisions**:
-  - Scoped error handling (Redis vs delegate errors separated)
-  - Cache serves hits even when circuit breaker open
-  - Configuration-driven TTL (`BCS_CACHE_TTL_SECONDS`)
-  - Corrupted entries evicted as cache misses
-- **Files to create**:
-  - `services/batch_orchestrator_service/implementations/cached_batch_conductor_client.py`
-- **Files to modify**:
-  - `services/batch_orchestrator_service/config.py` (add cache settings after line 83)
-  - `services/batch_orchestrator_service/di.py` (update `provide_batch_conductor_client` lines 310-327)
+### Critical Fix Already Applied ✅
 
-## Next Steps
+Fixed `NameError: name 'Input' is not defined` in `scripts/bayesian_consensus_model/tui/workflow_executor.py:7-8`:
 
-1. **Implement Redis caching** (follow `TASKS/updated_plan.md`):
-   ```bash
-   # 1. Update config
-   vim services/batch_orchestrator_service/config.py
-   # Add BCS_CACHE_TTL_SECONDS and BCS_CACHE_ENABLED after line 83
+```python
+from textual.widgets import Input, Select
+```
 
-   # 2. Create cache wrapper
-   vim services/batch_orchestrator_service/implementations/cached_batch_conductor_client.py
-   # Copy implementation from plan
+Removed TYPE_CHECKING block because Input/Select are used as runtime values.
 
-   # 3. Update DI
-   vim services/batch_orchestrator_service/di.py
-   # Update provide_batch_conductor_client (lines 310-327)
+### Next Steps (In Order)
 
-   # 4. Test
-   pdm run pytest-root services/batch_orchestrator_service/tests/unit/test_cached_batch_conductor_client.py
+1. **Update `scripts/build_standalone.sh`** - Remove redistribute-pairs (CLI) build
+2. **Rebuild**: `pdm run build-standalone`
+3. **Test**: `./dist/redistribute-tui` with actual workflow
+4. **Verify**: No NameError, successful assignment generation
+
+---
+
+## Current Situation
+
+### What Was Accomplished ✅
+
+1. Added PyInstaller 6.16.0 to `pyproject.toml` (monorepo-tools group)
+2. Moved numpy/scipy to main dependencies (required for bundling)
+3. Added main() entry points to both scripts
+4. Created `scripts/build_standalone.sh` with PyInstaller 6.16.0 best practices
+5. Updated `.gitignore` to ignore build/, dist/, *.spec
+6. First build completed - created 106MB executables
+7. **CRITICAL FIX APPLIED**: Fixed TYPE_CHECKING import bug
+
+### The Critical Bug (FIXED)
+
+**Problem**: TUI crashed with `NameError: name 'Input' is not defined` when generating assignments.
+
+**Root Cause**: `workflow_executor.py` lines 27-28 had:
+```python
+if TYPE_CHECKING:
+    from textual.widgets import Input, Select
+```
+
+`TYPE_CHECKING` is `False` at runtime, so imports didn't execute. But code uses `Input` and `Select` as runtime values (not just type hints) on lines 80, 87, 106, etc.:
+```python
+students_csv=query_one("#students_csv_input", Input).value.strip()
+```
+
+**Fix Applied** (line 8):
+```python
+from textual.widgets import Input, Select
+```
+
+### Comprehensive Code Analysis ✅
+
+Analyzed all 27 Python files in `bayesian_consensus_model/`:
+- ✅ No other TYPE_CHECKING issues
+- ✅ No __file__ usage problems
+- ✅ No dynamic imports (importlib, __import__)
+- ✅ No sys.path manipulation
+- ✅ No platform-specific issues
+- ✅ File operations use Path.open() (PyInstaller compatible)
+- ✅ Safe getattr usage (only for argparse defaults in generate_reports.py)
+
+**Conclusion**: TYPE_CHECKING fix was the ONLY runtime issue. Code is PyInstaller-safe.
+
+---
+
+## TASK: Update Build Script (USER REQUIREMENT)
+
+**User explicitly stated**: "I am not interested in building the CLI, only the TUI."
+
+### File to Modify
+
+**`scripts/build_standalone.sh`**
+
+### Changes Required
+
+**REMOVE these sections**:
+
+1. **Lines ~20-30** (redistribute-pairs build):
+```bash
+# Build CLI
+echo "Building redistribute-pairs..."
+pdm run pyinstaller \
+  --onefile \
+  --clean \
+  --noconfirm \
+  --name redistribute-pairs \
+  --distpath ./dist \
+  --workpath ./build \
+  scripts/bayesian_consensus_model/redistribute_pairs.py
+```
+
+2. **Lines ~36-41** (redistribute-pairs smoke test):
+```bash
+# Test redistribute-pairs CLI (supports --help)
+if ! ./dist/redistribute-pairs --help >/dev/null 2>&1; then
+    echo "ERROR: redistribute-pairs --help failed"
+    exit 1
+fi
+echo "✓ redistribute-pairs --help passed"
+```
+
+3. **Update final message** to only mention redistribute-tui:
+```bash
+echo "Executables:"
+echo "  - dist/redistribute-tui"
+```
+
+Remove mention of redistribute-pairs from installation instructions.
+
+### Expected Final Script Structure
+
+```bash
+#!/bin/bash
+set -e
+
+echo "Building standalone executable with PyInstaller 6.16.0..."
+
+# Clean previous builds
+rm -rf build/ dist/
+
+# Build TUI
+echo "Building redistribute-tui..."
+pdm run pyinstaller \
+  --onefile \
+  --clean \
+  --noconfirm \
+  --name redistribute-tui \
+  --distpath ./dist \
+  --workpath ./build \
+  scripts/bayesian_consensus_model/redistribute_tui.py
+
+# Smoke tests
+echo ""
+echo "Running smoke tests..."
+
+# Test redistribute-tui (verify it exists and is executable)
+if [ ! -x "./dist/redistribute-tui" ]; then
+    echo "ERROR: redistribute-tui is not executable"
+    exit 1
+fi
+echo "✓ redistribute-tui is executable"
+
+echo ""
+echo "✅ Build complete!"
+echo "Executable:"
+echo "  - dist/redistribute-tui"
+echo ""
+echo "To install system-wide:"
+echo "  sudo cp dist/redistribute-tui /usr/local/bin/"
+```
+
+---
+
+## Testing Instructions
+
+### 1. Rebuild
+
+```bash
+pdm run build-standalone
+```
+
+Expected: ~60 seconds (only building one executable now)
+
+### 2. Test TUI Functionality
+
+```bash
+# Launch the TUI
+./dist/redistribute-tui
+
+# In the TUI interface:
+# 1. Enter students in "Students" field: JA24, II24, ES24
+# 2. Keep default rater count (14) and per-rater (10)
+# 3. Press 'g' key OR click "Generate Assignments" button
+# 4. Verify NO NameError occurs
+# 5. Verify it generates assignments successfully
+# 6. Check log panel shows success messages
+```
+
+### 3. Expected Output
+
+✅ TUI launches without error
+✅ Generate Assignments works (no NameError)
+✅ Creates `optimized_pairs.csv`
+✅ Creates `session2_dynamic_assignments.csv`
+✅ Log panel displays optimization summary
+✅ Log panel displays assignment summary
+
+### 4. Success Criteria
+
+- No `NameError: name 'Input' is not defined`
+- Workflow completes end-to-end
+- Both CSV files created with valid data
+- User can use TUI for actual CJ session planning
+
+---
+
+## File Modifications Summary
+
+### Modified (5 files)
+
+1. **`pyproject.toml`**:
+   - Added `pyinstaller` to monorepo-tools (line ~41)
+   - Moved `numpy` and `scipy` to main dependencies (lines 32-33)
+   - Added `build-standalone` PDM script (line 404)
+
+2. **`scripts/bayesian_consensus_model/redistribute_tui.py:177-183`**:
+   ```python
+   def main() -> None:
+       """Entry point for standalone executable."""
+       RedistributeApp().run()
+
+   if __name__ == "__main__":
+       main()
    ```
 
-2. **Verify cache effectiveness**:
-   ```bash
-   pdm run pytest-root tests/functional/test_e2e_cj_after_nlp_with_pruning.py -v -s
-   # Look for "BCS resolution cache hit" in logs
+3. **`scripts/bayesian_consensus_model/redistribute_pairs.py:364-370`**:
+   ```python
+   def main() -> None:
+       """Entry point for standalone executable."""
+       app()
+
+   if __name__ == "__main__":
+       main()
    ```
 
-## Key Artifacts
+4. **`scripts/bayesian_consensus_model/tui/workflow_executor.py:7-8`**:
+   ```python
+   from textual.widgets import Input, Select
+   ```
+   **CRITICAL**: Removed TYPE_CHECKING block
 
-### Redis Caching Plan
-- **Location**: `TASKS/updated_plan.md`
-- **Cache key format**: `bcs_resolution:{batch_id}:{pipeline}:{correlation_id}`
-- **TTL**: 10 seconds (configurable)
-- **Layering**: Cache → Circuit Breaker → Base Client
+5. **`.gitignore:68-71`**:
+   ```gitignore
+   # PyInstaller
+   build/
+   dist/
+   *.spec
+   ```
 
-### Modular Kernel Improvements
-- Feature toggles unlock isolated testing: argmax decision, leave-one-out alignment, precision weighting, and neutral ESS metrics are all optional so we can quantify each intervention before enabling it by default.
-- Neutral ESS output now surfaces balanced-evidence coverage without enforcing automatic holds; the legacy `needs_more_ratings` flag remains for compatibility but stays false unless downstream systems repurpose it.
-- Evaluation harness (`scripts/bayesian_consensus_model/evaluation/harness.py`) runs ablation studies and baseline comparisons, making it easy to report the impact (accuracy, confidence, neutral ESS coverage) of each switch.
+### Created (1 file)
 
-### Harness Snapshot (2025-09-25)
-- Baseline anchors: mean confidence 0.308, expected grade index 5.888, neutral ESS 0 and no essays gated by default.
-- Argmax toggle: 3/12 essays flip, mean confidence +0.0125, expected indices unchanged, `needs_more_ratings` stays 0.
-- Leave-one-out alignment: no grade changes, mean expected index −0.0005, confidence +0.0042, no gating triggered.
-- Precision weights: no grade changes, mean expected index −0.0289, confidence −0.0044 (slight downward pressure), no gating.
-- Neutral ESS metrics: enabling the flag raises neutral ESS mean to 1.46 but still reports zero gating because thresholds were removed.
-- All toggles enabled: JA24 shifts B→A and JP24 shifts E+→E− while mean confidence climbs +0.0098; `needs_more_ratings` remains 0 across essays.
-- Note: Minimum ESS gating thresholds removed—neutral ESS is now informational only.
+1. **`scripts/build_standalone.sh`**: Build script (needs update to remove CLI)
 
-### Test Commands
+---
+
+## Technical Details
+
+### PyInstaller Command
+
 ```bash
-# Verify duplicate calls eliminated
-pdm run pytest-root tests/functional/test_e2e_cj_after_nlp_with_pruning.py -v -s
-
-# Check cache behavior in logs
-docker logs huleedu_batch_orchestrator_service 2>&1 | grep "BCS resolution cache"
+pdm run pyinstaller \
+  --onefile \          # Single file executable
+  --clean \            # Clean cache before building
+  --noconfirm \        # Non-interactive mode
+  --name redistribute-tui \
+  --distpath ./dist \
+  --workpath ./build \
+  scripts/bayesian_consensus_model/redistribute_tui.py
 ```
 
-### Recent Report Corrections
-**Data Source**: `output/bayesian_consensus_model/20250924-202445/bias_on/`
-**Key Files**:
-- `essay_consensus.csv` - 12 essays, grades E+ to B, ability scores 3.43-8.50
-- `rater_bias_posteriors_eb.csv` - 14 raters, bias range -0.74 to +0.56
-- `essay_inter_rater_stats.csv` - Agreement statistics
+### Why 106MB (Not 25-35MB)?
 
-**Figures Generated**:
-```
-docs/rapport_till_kollegor/files/figur1_uppsatskvalitet.png
-docs/rapport_till_kollegor/files/figur2_bedömarstränghet.png
-docs/rapport_till_kollegor/files/figur3_betygströsklar.png
-docs/rapport_till_kollegor/files/figur4_bedömarspridning.png
-```
+Bundles complete scientific stack:
+- Python 3.11 interpreter
+- numpy, scipy (large)
+- pandas, matplotlib
+- textual (TUI framework)
+- All transitive dependencies
 
-## Environment Setup
+This is **expected and acceptable** for the use case.
 
-### Python Environment
+### PyInstaller Version
+
+**PyInstaller 6.16.0** (latest as of October 2025, verified from docs)
+
+---
+
+## Common Issues & Solutions
+
+### If Build Fails
+
 ```bash
-pdm --version  # 2.10.4
-python --version  # Python 3.11.x
-pdm install  # From repo root only
+# Clean completely
+rm -rf build/ dist/ *.spec
+
+# Rebuild
+pdm run build-standalone
 ```
 
-### Container Status Check
+### If TUI Crashes
+
+1. Check error traceback for import errors
+2. Verify workflow_executor.py has no TYPE_CHECKING blocks around runtime imports
+3. Review PyInstaller warnings in build stderr
+
+### If Dependencies Missing
+
 ```bash
-docker ps | grep huleedu  # Should show all services
+# Reinstall all
+pdm install
+
+# Verify numpy/scipy in main dependencies
+grep -A5 "^dependencies" pyproject.toml | grep -E "numpy|scipy"
 ```
 
-## Cache Configuration
+---
 
-### New Settings (to add)
-```python
-# services/batch_orchestrator_service/config.py (after line 83)
-BCS_CACHE_TTL_SECONDS: int = Field(default=10, ge=1, le=300)
-BCS_CACHE_ENABLED: bool = Field(default=True)
+## Project Standards Compliance
+
+### From CLAUDE.local.md
+- ✅ No backwards compatibility (pure development)
+- ✅ DRY, SOLID, YAGNI principles
+- ✅ No "helpful" extra features
+- ✅ Structured error handling
+
+### From CLAUDE.md
+- ✅ PDM from root only
+- ✅ No version pinning (PDM manages)
+- ✅ Follow established patterns
+- ✅ Delete debug scripts when done
+
+---
+
+## Next Claude: Exact Action Sequence
+
+```bash
+# 1. Edit build script
+vim scripts/build_standalone.sh
+# Remove redistribute-pairs sections (see above)
+
+# 2. Rebuild
+pdm run build-standalone
+
+# 3. Test
+./dist/redistribute-tui
+# Try Generate Assignments workflow
+
+# 4. Verify success
+ls -lh dist/
+# Should show only redistribute-tui (~106MB)
+
+# 5. Report to user
+# Confirm TUI works, no NameError, generates assignments successfully
 ```
 
-### Cache Response Schema
-```python
-# Cached BCS response format
-{
-    "batch_id": str,
-    "final_pipeline": List[str],
-    "analysis_summary": str
-}
-```
+---
 
-## Critical Notes
+## Status
 
-### System
-- **PDM**: Always run from repo root, never from subdirectories
-- **Tests**: Use `pdm run pytest-root` for correct path resolution
-- **Docker logs**: Never use `--since` (timezone issues)
+**READY FOR COMPLETION**
+- Critical bug fixed ✅
+- Build script needs simple update (remove CLI)
+- Rebuild and test required
+- Estimated time: 8 minutes total
 
-### Bayesian Data Interpretation
-- **Rater bias**: Negative = strict, positive = generous (was backwards in original)
-- **Grade scale**: F, F+, E-, E+, D-, D+, C-, C+, B, A (E, D, C don't exist standalone)
-- **Anonymization**: Real names → Rater IDs via `MAP_OF_RATER_ID_AND_REAL_RATERS.csv`
-- **Outlier**: JP24 (E+) only essay at that level, affects step analysis
-
-### Redis Caching (Still Pending)
-- **Cache layering**: Cache must wrap circuit breaker (outermost)
-- **Error handling**: Redis failures must not block operations
+**Last Context**: workflow_executor.py TYPE_CHECKING fix is the ONLY code change needed. Everything else is configuration/build script updates.
