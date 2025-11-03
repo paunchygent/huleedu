@@ -1,9 +1,24 @@
 # Handoff: Mathematical Validation of CJ Confidence Calculations
 
-**Date**: 2025-01-03
-**From**: Claude (Session: TUI README creation + code quality review)
-**To**: Next Claude iteration
+**Date**: 2025-11-03
+**From**: Codex (CJ Confidence Validation Session)
+**To**: Next Assistant / Maintainer
 **Task**: `TASKS/TASK-CJ-CONFIDENCE-MATHEMATICAL-VALIDATION.md`
+
+---
+
+## Session Summary (2025-11-07)
+
+- Phase 1 research inputs are complete: core service files reviewed, initial analytical tooling created, and the expanded literature set (Pollitt 2012 through Kinnear et al. 2025) summarised in `.claude/research/CJ-CONFIDENCE-VALIDATION.md`.
+- Phase 2 theoretical work captured in the same notebook: Fisher-information derivation, SE → boundary probability mapping, audit notes for `compute_bt_standard_errors`, and the planned factor-weight sensitivity analysis.
+- Baseline analysis scripts (`cj_confidence_analysis.py`, `test_cj_confidence_analysis.py`) reproduce production heuristics and generate comparison tables for theoretical benchmarking.
+- Existing empirical logs are single-essay rating records (58 assessments for 12 essays) – **no pairwise CJ comparisons currently exist**, so fresh CJ batches must be executed via the CJ Assessment Service to collect comparison data for validation.
+- Progress and research notebooks have been refreshed with the new findings; ready to proceed into Phase 2 (theoretical validation) followed by data generation in Phase 3.
+
+Outstanding next steps:
+1. Complete the Fisher-information derivation, audit `compute_bt_standard_errors`, and design the factor-weight sensitivity analysis (Phase 2).
+2. Use the CJ Assessment Service (Docker + APIs) to run new batches, capturing pairwise comparisons, BT scores, and SEs for empirical validation (Phase 3).
+3. Re-weight/replace confidence formulas, add tests, and document recommendations once theoretical and empirical work converge (Phases 4–5).
 
 ---
 

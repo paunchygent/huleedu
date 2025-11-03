@@ -1,0 +1,962 @@
+[
+  {
+    "comparisons": 1,
+    "logistic_confidence": 0.2086,
+    "logistic_label": "LOW",
+    "approx_se": 2.0,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.51
+  },
+  {
+    "comparisons": 1,
+    "logistic_confidence": 0.2086,
+    "logistic_label": "LOW",
+    "approx_se": 2.0,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5199
+  },
+  {
+    "comparisons": 1,
+    "logistic_confidence": 0.2086,
+    "logistic_label": "LOW",
+    "approx_se": 2.0,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5299
+  },
+  {
+    "comparisons": 1,
+    "logistic_confidence": 0.2086,
+    "logistic_label": "LOW",
+    "approx_se": 2.0,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5398
+  },
+  {
+    "comparisons": 2,
+    "logistic_confidence": 0.2689,
+    "logistic_label": "LOW",
+    "approx_se": 1.4142,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5141
+  },
+  {
+    "comparisons": 2,
+    "logistic_confidence": 0.2689,
+    "logistic_label": "LOW",
+    "approx_se": 1.4142,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5282
+  },
+  {
+    "comparisons": 2,
+    "logistic_confidence": 0.2689,
+    "logistic_label": "LOW",
+    "approx_se": 1.4142,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5422
+  },
+  {
+    "comparisons": 2,
+    "logistic_confidence": 0.2689,
+    "logistic_label": "LOW",
+    "approx_se": 1.4142,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5562
+  },
+  {
+    "comparisons": 3,
+    "logistic_confidence": 0.3392,
+    "logistic_label": "LOW",
+    "approx_se": 1.1547,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5173
+  },
+  {
+    "comparisons": 3,
+    "logistic_confidence": 0.3392,
+    "logistic_label": "LOW",
+    "approx_se": 1.1547,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5345
+  },
+  {
+    "comparisons": 3,
+    "logistic_confidence": 0.3392,
+    "logistic_label": "LOW",
+    "approx_se": 1.1547,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5517
+  },
+  {
+    "comparisons": 3,
+    "logistic_confidence": 0.3392,
+    "logistic_label": "LOW",
+    "approx_se": 1.1547,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5688
+  },
+  {
+    "comparisons": 4,
+    "logistic_confidence": 0.4174,
+    "logistic_label": "MID",
+    "approx_se": 1.0,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5199
+  },
+  {
+    "comparisons": 4,
+    "logistic_confidence": 0.4174,
+    "logistic_label": "MID",
+    "approx_se": 1.0,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5398
+  },
+  {
+    "comparisons": 4,
+    "logistic_confidence": 0.4174,
+    "logistic_label": "MID",
+    "approx_se": 1.0,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5596
+  },
+  {
+    "comparisons": 4,
+    "logistic_confidence": 0.4174,
+    "logistic_label": "MID",
+    "approx_se": 1.0,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5793
+  },
+  {
+    "comparisons": 5,
+    "logistic_confidence": 0.5,
+    "logistic_label": "MID",
+    "approx_se": 0.8944,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5223
+  },
+  {
+    "comparisons": 5,
+    "logistic_confidence": 0.5,
+    "logistic_label": "MID",
+    "approx_se": 0.8944,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5445
+  },
+  {
+    "comparisons": 5,
+    "logistic_confidence": 0.5,
+    "logistic_label": "MID",
+    "approx_se": 0.8944,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5666
+  },
+  {
+    "comparisons": 5,
+    "logistic_confidence": 0.5,
+    "logistic_label": "MID",
+    "approx_se": 0.8944,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5885
+  },
+  {
+    "comparisons": 6,
+    "logistic_confidence": 0.5826,
+    "logistic_label": "MID",
+    "approx_se": 0.8165,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5244
+  },
+  {
+    "comparisons": 6,
+    "logistic_confidence": 0.5826,
+    "logistic_label": "MID",
+    "approx_se": 0.8165,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5487
+  },
+  {
+    "comparisons": 6,
+    "logistic_confidence": 0.5826,
+    "logistic_label": "MID",
+    "approx_se": 0.8165,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5729
+  },
+  {
+    "comparisons": 6,
+    "logistic_confidence": 0.5826,
+    "logistic_label": "MID",
+    "approx_se": 0.8165,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.5968
+  },
+  {
+    "comparisons": 7,
+    "logistic_confidence": 0.6608,
+    "logistic_label": "MID",
+    "approx_se": 0.7559,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5264
+  },
+  {
+    "comparisons": 7,
+    "logistic_confidence": 0.6608,
+    "logistic_label": "MID",
+    "approx_se": 0.7559,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5526
+  },
+  {
+    "comparisons": 7,
+    "logistic_confidence": 0.6608,
+    "logistic_label": "MID",
+    "approx_se": 0.7559,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5786
+  },
+  {
+    "comparisons": 7,
+    "logistic_confidence": 0.6608,
+    "logistic_label": "MID",
+    "approx_se": 0.7559,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6043
+  },
+  {
+    "comparisons": 8,
+    "logistic_confidence": 0.7311,
+    "logistic_label": "MID",
+    "approx_se": 0.7071,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5282
+  },
+  {
+    "comparisons": 8,
+    "logistic_confidence": 0.7311,
+    "logistic_label": "MID",
+    "approx_se": 0.7071,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5562
+  },
+  {
+    "comparisons": 8,
+    "logistic_confidence": 0.7311,
+    "logistic_label": "MID",
+    "approx_se": 0.7071,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.584
+  },
+  {
+    "comparisons": 8,
+    "logistic_confidence": 0.7311,
+    "logistic_label": "MID",
+    "approx_se": 0.7071,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6114
+  },
+  {
+    "comparisons": 9,
+    "logistic_confidence": 0.7914,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6667,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5299
+  },
+  {
+    "comparisons": 9,
+    "logistic_confidence": 0.7914,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6667,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5596
+  },
+  {
+    "comparisons": 9,
+    "logistic_confidence": 0.7914,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6667,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.589
+  },
+  {
+    "comparisons": 9,
+    "logistic_confidence": 0.7914,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6667,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6179
+  },
+  {
+    "comparisons": 10,
+    "logistic_confidence": 0.8411,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6325,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5315
+  },
+  {
+    "comparisons": 10,
+    "logistic_confidence": 0.8411,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6325,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5628
+  },
+  {
+    "comparisons": 10,
+    "logistic_confidence": 0.8411,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6325,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5937
+  },
+  {
+    "comparisons": 10,
+    "logistic_confidence": 0.8411,
+    "logistic_label": "HIGH",
+    "approx_se": 0.6325,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6241
+  },
+  {
+    "comparisons": 11,
+    "logistic_confidence": 0.8808,
+    "logistic_label": "HIGH",
+    "approx_se": 0.603,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.533
+  },
+  {
+    "comparisons": 11,
+    "logistic_confidence": 0.8808,
+    "logistic_label": "HIGH",
+    "approx_se": 0.603,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5659
+  },
+  {
+    "comparisons": 11,
+    "logistic_confidence": 0.8808,
+    "logistic_label": "HIGH",
+    "approx_se": 0.603,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.5982
+  },
+  {
+    "comparisons": 11,
+    "logistic_confidence": 0.8808,
+    "logistic_label": "HIGH",
+    "approx_se": 0.603,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6299
+  },
+  {
+    "comparisons": 12,
+    "logistic_confidence": 0.9116,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5774,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5345
+  },
+  {
+    "comparisons": 12,
+    "logistic_confidence": 0.9116,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5774,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5688
+  },
+  {
+    "comparisons": 12,
+    "logistic_confidence": 0.9116,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5774,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6025
+  },
+  {
+    "comparisons": 12,
+    "logistic_confidence": 0.9116,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5774,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6355
+  },
+  {
+    "comparisons": 13,
+    "logistic_confidence": 0.935,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5547,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5359
+  },
+  {
+    "comparisons": 13,
+    "logistic_confidence": 0.935,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5547,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5715
+  },
+  {
+    "comparisons": 13,
+    "logistic_confidence": 0.935,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5547,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6066
+  },
+  {
+    "comparisons": 13,
+    "logistic_confidence": 0.935,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5547,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6408
+  },
+  {
+    "comparisons": 14,
+    "logistic_confidence": 0.9526,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5345,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5373
+  },
+  {
+    "comparisons": 14,
+    "logistic_confidence": 0.9526,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5345,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5742
+  },
+  {
+    "comparisons": 14,
+    "logistic_confidence": 0.9526,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5345,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6105
+  },
+  {
+    "comparisons": 14,
+    "logistic_confidence": 0.9526,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5345,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6459
+  },
+  {
+    "comparisons": 15,
+    "logistic_confidence": 0.9656,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5164,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5386
+  },
+  {
+    "comparisons": 15,
+    "logistic_confidence": 0.9656,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5164,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5768
+  },
+  {
+    "comparisons": 15,
+    "logistic_confidence": 0.9656,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5164,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6143
+  },
+  {
+    "comparisons": 15,
+    "logistic_confidence": 0.9656,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5164,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6507
+  },
+  {
+    "comparisons": 16,
+    "logistic_confidence": 0.9751,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5398
+  },
+  {
+    "comparisons": 16,
+    "logistic_confidence": 0.9751,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5793
+  },
+  {
+    "comparisons": 16,
+    "logistic_confidence": 0.9751,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6179
+  },
+  {
+    "comparisons": 16,
+    "logistic_confidence": 0.9751,
+    "logistic_label": "HIGH",
+    "approx_se": 0.5,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6554
+  },
+  {
+    "comparisons": 17,
+    "logistic_confidence": 0.982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4851,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.541
+  },
+  {
+    "comparisons": 17,
+    "logistic_confidence": 0.982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4851,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5817
+  },
+  {
+    "comparisons": 17,
+    "logistic_confidence": 0.982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4851,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6214
+  },
+  {
+    "comparisons": 17,
+    "logistic_confidence": 0.982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4851,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6599
+  },
+  {
+    "comparisons": 18,
+    "logistic_confidence": 0.987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4714,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5422
+  },
+  {
+    "comparisons": 18,
+    "logistic_confidence": 0.987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4714,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.584
+  },
+  {
+    "comparisons": 18,
+    "logistic_confidence": 0.987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4714,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6248
+  },
+  {
+    "comparisons": 18,
+    "logistic_confidence": 0.987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4714,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6643
+  },
+  {
+    "comparisons": 19,
+    "logistic_confidence": 0.9907,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4588,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5434
+  },
+  {
+    "comparisons": 19,
+    "logistic_confidence": 0.9907,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4588,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5863
+  },
+  {
+    "comparisons": 19,
+    "logistic_confidence": 0.9907,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4588,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6281
+  },
+  {
+    "comparisons": 19,
+    "logistic_confidence": 0.9907,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4588,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6685
+  },
+  {
+    "comparisons": 20,
+    "logistic_confidence": 0.9933,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4472,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5445
+  },
+  {
+    "comparisons": 20,
+    "logistic_confidence": 0.9933,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4472,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5885
+  },
+  {
+    "comparisons": 20,
+    "logistic_confidence": 0.9933,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4472,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6313
+  },
+  {
+    "comparisons": 20,
+    "logistic_confidence": 0.9933,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4472,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6726
+  },
+  {
+    "comparisons": 21,
+    "logistic_confidence": 0.9952,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4364,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5456
+  },
+  {
+    "comparisons": 21,
+    "logistic_confidence": 0.9952,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4364,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5906
+  },
+  {
+    "comparisons": 21,
+    "logistic_confidence": 0.9952,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4364,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6345
+  },
+  {
+    "comparisons": 21,
+    "logistic_confidence": 0.9952,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4364,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6766
+  },
+  {
+    "comparisons": 22,
+    "logistic_confidence": 0.9966,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4264,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5467
+  },
+  {
+    "comparisons": 22,
+    "logistic_confidence": 0.9966,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4264,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5927
+  },
+  {
+    "comparisons": 22,
+    "logistic_confidence": 0.9966,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4264,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6375
+  },
+  {
+    "comparisons": 22,
+    "logistic_confidence": 0.9966,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4264,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6805
+  },
+  {
+    "comparisons": 23,
+    "logistic_confidence": 0.9975,
+    "logistic_label": "HIGH",
+    "approx_se": 0.417,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5477
+  },
+  {
+    "comparisons": 23,
+    "logistic_confidence": 0.9975,
+    "logistic_label": "HIGH",
+    "approx_se": 0.417,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5948
+  },
+  {
+    "comparisons": 23,
+    "logistic_confidence": 0.9975,
+    "logistic_label": "HIGH",
+    "approx_se": 0.417,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6405
+  },
+  {
+    "comparisons": 23,
+    "logistic_confidence": 0.9975,
+    "logistic_label": "HIGH",
+    "approx_se": 0.417,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6842
+  },
+  {
+    "comparisons": 24,
+    "logistic_confidence": 0.9982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4082,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5487
+  },
+  {
+    "comparisons": 24,
+    "logistic_confidence": 0.9982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4082,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5968
+  },
+  {
+    "comparisons": 24,
+    "logistic_confidence": 0.9982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4082,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6433
+  },
+  {
+    "comparisons": 24,
+    "logistic_confidence": 0.9982,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4082,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6879
+  },
+  {
+    "comparisons": 25,
+    "logistic_confidence": 0.9987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5497
+  },
+  {
+    "comparisons": 25,
+    "logistic_confidence": 0.9987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.5987
+  },
+  {
+    "comparisons": 25,
+    "logistic_confidence": 0.9987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6462
+  },
+  {
+    "comparisons": 25,
+    "logistic_confidence": 0.9987,
+    "logistic_label": "HIGH",
+    "approx_se": 0.4,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6915
+  },
+  {
+    "comparisons": 26,
+    "logistic_confidence": 0.9991,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3922,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5507
+  },
+  {
+    "comparisons": 26,
+    "logistic_confidence": 0.9991,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3922,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.6006
+  },
+  {
+    "comparisons": 26,
+    "logistic_confidence": 0.9991,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3922,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6489
+  },
+  {
+    "comparisons": 26,
+    "logistic_confidence": 0.9991,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3922,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6949
+  },
+  {
+    "comparisons": 27,
+    "logistic_confidence": 0.9993,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3849,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5517
+  },
+  {
+    "comparisons": 27,
+    "logistic_confidence": 0.9993,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3849,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.6025
+  },
+  {
+    "comparisons": 27,
+    "logistic_confidence": 0.9993,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3849,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6516
+  },
+  {
+    "comparisons": 27,
+    "logistic_confidence": 0.9993,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3849,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.6983
+  },
+  {
+    "comparisons": 28,
+    "logistic_confidence": 0.9995,
+    "logistic_label": "HIGH",
+    "approx_se": 0.378,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5526
+  },
+  {
+    "comparisons": 28,
+    "logistic_confidence": 0.9995,
+    "logistic_label": "HIGH",
+    "approx_se": 0.378,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.6043
+  },
+  {
+    "comparisons": 28,
+    "logistic_confidence": 0.9995,
+    "logistic_label": "HIGH",
+    "approx_se": 0.378,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6543
+  },
+  {
+    "comparisons": 28,
+    "logistic_confidence": 0.9995,
+    "logistic_label": "HIGH",
+    "approx_se": 0.378,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.7016
+  },
+  {
+    "comparisons": 29,
+    "logistic_confidence": 0.9997,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3714,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5535
+  },
+  {
+    "comparisons": 29,
+    "logistic_confidence": 0.9997,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3714,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.6061
+  },
+  {
+    "comparisons": 29,
+    "logistic_confidence": 0.9997,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3714,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6569
+  },
+  {
+    "comparisons": 29,
+    "logistic_confidence": 0.9997,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3714,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.7049
+  },
+  {
+    "comparisons": 30,
+    "logistic_confidence": 0.9998,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3651,
+    "boundary_distance": 0.05,
+    "boundary_stay_probability": 0.5545
+  },
+  {
+    "comparisons": 30,
+    "logistic_confidence": 0.9998,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3651,
+    "boundary_distance": 0.1,
+    "boundary_stay_probability": 0.6079
+  },
+  {
+    "comparisons": 30,
+    "logistic_confidence": 0.9998,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3651,
+    "boundary_distance": 0.15,
+    "boundary_stay_probability": 0.6594
+  },
+  {
+    "comparisons": 30,
+    "logistic_confidence": 0.9998,
+    "logistic_label": "HIGH",
+    "approx_se": 0.3651,
+    "boundary_distance": 0.2,
+    "boundary_stay_probability": 0.7081
+  }
+]

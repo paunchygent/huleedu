@@ -8,6 +8,53 @@
 
 ---
 
+## Progress Log
+
+### 2025-11-03 – Phase 1 (Scope Review & Context Gathering)
+- Read core CJ service modules (`confidence_calculator`, `bt_inference`, `scoring_ranking`, `grade_projector`) and service README to document current heuristics, boundary handling, and SE computation patterns.
+- Reviewed Bayesian consensus documentation (`README`, `ordinal_kernel.py`) plus pairing utilities to understand current human CJ workflow and to ensure we avoid adaptive pairing for this validation.
+- Located available empirical artifacts (Session 1 summary, session 2 planning CSVs, anchor rating CSV) and confirmed existing integration tests covering BT scoring/stability.
+- Noted key heuristic assumptions requiring validation: logistic comparison-count curve (50% @5, 90% @15), fixed weight mix (0.35/0.20/0.35/0.10), boundary distance cap at 0.15, anchor bonus of 0.15, and comparison estimate heuristic `k * n * log n`.
+- Outstanding needs: confirm availability of raw Session 1 comparison logs (pair-level data) for bootstrap SE analysis and clarify preferred repository location for newly created assessment scripts/tests.
+
+### 2025-11-03 – Phase 2 (Theoretical Validation Framework Draft)
+- Derived analytical Fisher Information for Bradley–Terry abilities under random non-adaptive pairing: per-item information accumulates as `∑_j p_ij (1 - p_ij)`; with balanced abilities (p≈0.5) each comparison contributes ≈0.25, giving `SE_i ≈ 2 / √n_i` where `n_i` counts distinct comparisons touching essay *i*.
+- Established that the current logistic mapping in `confidence_calculator` implicitly assumes SE scaling proportional to comparison count but overstates confidence: matching `SE=2/√n` to 50% confidence at 5 comparisons implies `SE≈0.89`, far looser than grade-boundary tolerances, and 90% at 15 comparisons (`SE≈0.52`) still exceeds the 0.15 boundary distance heuristic.
+- Defined a confidence calibration pathway: compute SE from Fisher Information (or a bootstrap equivalent), translate to probability of crossing nearest grade boundary via normal/logistic tail (`confidence = 1 - 2·Φ(-|Δ|/SE)`), and combine with weightings only after grounding each factor in statistical evidence.
+- Identified literature alignment tasks: collect references on CJ design variance (Pollitt 2012; Bramley & Johnson, 2012) and Bayesian SE approximations for pairwise comparisons to justify the `n·log n` heuristic or replace it with information-based targets.
+
+### 2025-11-03 – Phase 3 (Assessment Tooling & Initial Analysis)
+- Created `.claude/research/scripts/cj_confidence_analysis.py`, reproducing production heuristics alongside Fisher-based SE estimates, the grade-boundary stay probability model, and JSON table generation for downstream plotting.
+- Added complementary unit tests `.claude/research/scripts/test_cj_confidence_analysis.py` covering logistic monotonicity, SE scaling, boundary confidence trends, and serialization; tests pass via `pdm run pytest-root .claude/research/scripts/test_cj_confidence_analysis.py`.
+- Generated baseline summary output (`.claude/research/scripts/cj_confidence_summary.json`) spanning 1–30 comparisons and boundary distances of 0.05–0.20, highlighting that the heuristic logistic reaches the “HIGH” label while boundary-stay probabilities remain below 70% for the 0.15 threshold.
+- Confirmed future empirical calibration should rely on grade boundaries derived by `GradeProjector`, aligning the probability calculations with the service’s existing calibration step.
+
+### 2025-11-03 – Phase 4 (Synthesis & Next Steps)
+- Summarized findings and outstanding tasks in `.claude/HANDOFF.md`, capturing Phase 1–3 outputs, tooling locations, and follow-up actions for literature review, simulation, and integration planning.
+- Identified immediate Phase 4+ priorities: (1) gather comparative judgement confidence literature/framework references, (2) extract GradeProjector-derived boundaries for simulations, (3) evaluate justification for factor weights and anchor bonus, and (4) outline integration of SE-based confidence into both LLM and human CJ pipelines.
+- No production code changes were made; all artefacts remain under `.claude/research/`.
+
+### 2025-11-03 – Literature Survey Kickoff
+- Queried Crossref for seminal CJ confidence sources: Pollitt (2012), Bramley & Vitello (2019), Verhavert et al. (2019), Bartholomew & Jones (2022), and Wheadon & Jones (2020), capturing DOIs and abstracts for reference.
+- Created `.claude/research/CJ-CONFIDENCE-VALIDATION.md` with a literature matrix summarising each source’s key findings and their relevance to confidence validation, plus a to-do list for deeper extraction (SE formulas, tool heuristics, factor weighting evidence).
+- Remaining literature actions: pull full texts (where accessible), document published heuristics from ACJ platforms, and map evidence for/against current weightings and anchor bonus assumptions.
+- **New TODOs**:
+  - Extract explicit SE / reliability expressions and recommended thresholds from each cited source.
+  - Catalogue any tool-specific heuristics (No More Marking, Comproved, etc.) referenced in the literature.
+  - Crosswalk reported reliability targets (e.g., SSR ≥ 0.75) with current confidence thresholds for later calibration.
+
+### 2025-11-07 – Phase 1 Extension (Expanded Literature Integration)
+- Reviewed the additional research artefacts in `.claude/research/` (Kinnear et al. 2025, Bartholomew & Jones 2021, Verhavert et al. 2022, van Daal et al. 2022) to solidify SSR/SE benchmarks and adaptivity considerations.
+- Updated `.claude/research/CJ-CONFIDENCE-VALIDATION.md` with the new findings, added action items for the framework comparison matrix, and confirmed that the literature requirements for Phase 2 are satisfied.
+- Ready to proceed into Phase 2 (Mathematical Validation) with sufficient theoretical and practitioner evidence gathered.
+
+### 2025-11-07 – Phase 2 (Theoretical Validation Progress)
+- Added the full Fisher-information derivation and boundary-stay probability mapping to `.claude/research/CJ-CONFIDENCE-VALIDATION.md`, providing closed-form targets for SE vs. comparison count and confidence.
+- Audited `compute_bt_standard_errors()` with synthetic random-pair datasets (via `pdm run python`), confirming monotonic SE shrinkage while documenting the observed ~20–30 % inflation relative to the naive \(2/\sqrt{n}\) rule due to pairing imbalance and reference constraints.
+- Captured the planned sensitivity-analysis methodology (correlation/regression/ablation) to reassess factor weights once empirical CJ batches are available in Phase 3.
+
+---
+
 ## Context & Motivation
 
 The CJ Assessment Service (`services/cj_assessment_service/`) currently uses a confidence calculator (`cj_core_logic/confidence_calculator.py`) with **hardcoded thresholds** that appear to be assumptions rather than validated statistical calculations:
