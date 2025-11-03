@@ -206,7 +206,7 @@ def run_optimizer(inputs: OptimizerInputs) -> tuple[OptimizationResult, Path, st
 
     # Write output
     output_path = Path(inputs.optimizer_output)
-    write_design(result.optimized_design, output_path)
+    write_design(result.new_design, output_path)
 
     return result, output_path, students_value
 

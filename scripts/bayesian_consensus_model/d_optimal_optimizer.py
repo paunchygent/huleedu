@@ -242,9 +242,10 @@ def _add_locked_pairs(
         key = pair.key()
         if counts.get(key, 0) >= max_repeat:
             continue
-        candidate = candidate_lookup.get(key, pair)
-        design.append(DesignEntry(candidate, locked=True))
-        counts[key] = counts.get(key, 0) + 1
+        if counts.get(key, 0) == 0:
+            candidate = candidate_lookup.get(key, pair)
+            design.append(DesignEntry(candidate, locked=True))
+            counts[key] = counts.get(key, 0) + 1
 
 
 def select_design(
@@ -253,6 +254,7 @@ def select_design(
     *,
     total_slots: int,
     anchor_order: Sequence[str],
+    baseline_design: Sequence[DesignEntry] = (),
     locked_pairs: Sequence[PairCandidate] = (),
     required_pairs: Sequence[PairCandidate] = (),
     max_repeat: int = 3,
@@ -273,6 +275,14 @@ def select_design(
     design: List[DesignEntry] = []
     counts: Dict[Tuple[str, str], int] = {}
 
+    for entry in baseline_design:
+        key = entry.candidate.key()
+        candidate_lookup.setdefault(key, entry.candidate)
+        design.append(DesignEntry(entry.candidate, locked=True))
+        counts[key] = counts.get(key, 0) + 1
+
+    baseline_count = len(design)
+
     _add_locked_pairs(design, counts, candidate_lookup, locked_pairs, max_repeat=max_repeat)
 
     ensure_required_pairs(
@@ -291,9 +301,14 @@ def select_design(
         max_repeat=max_repeat,
     )
 
-    remaining_slots = total_slots - len(design)
+    prefilled_slots = len(design) - baseline_count
+    remaining_slots = total_slots - prefilled_slots
     if remaining_slots < 0:
-        raise ValueError("No remaining slots after applying locked constraints.")
+        raise ValueError(
+            "Not enough new slots to satisfy mandatory comparisons. "
+            f"Requested {total_slots} new slots but {prefilled_slots} are required "
+            "for adjacency, locked, and coverage constraints."
+        )
 
     score = greedy_fill(
         design, counts, candidates, remaining_slots, index_map, max_repeat=max_repeat

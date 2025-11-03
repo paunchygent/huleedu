@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
-from typing import Iterable, List, Mapping, Optional, Sequence
+from typing import Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from ..d_optimal_optimizer import (
     DesignEntry,
@@ -59,12 +60,23 @@ def optimize_from_dynamic_spec(
     students = list(spec.students)
     anchors = list(spec.anchors)
     anchor_set = set(anchors)
+    student_index = {student: idx for idx, student in enumerate(students)}
+    anchor_index = {anchor: idx for idx, anchor in enumerate(anchors)}
 
-    baseline_design: List[DesignEntry] = []
-    if spec.previous_comparisons:
-        for rec in spec.previous_comparisons:
-            candidate = PairCandidate(rec.essay_a_id, rec.essay_b_id, rec.comparison_type)
-            baseline_design.append(DesignEntry(candidate, locked=False))
+    baseline_design: List[DesignEntry] = [
+        DesignEntry(entry.candidate, locked=True) for entry in spec.baseline_design
+    ]
+    baseline_counts: Counter[Tuple[str, str]] = Counter()
+    for entry in baseline_design:
+        baseline_counts[entry.candidate.key()] += 1
+        count = baseline_counts[entry.candidate.key()]
+        if count > max_repeat:
+            raise ValueError(
+                "Baseline pair "
+                f"{entry.candidate.essay_a} vs {entry.candidate.essay_b} "
+                f"({entry.candidate.comparison_type}) occurs {count} times, "
+                f"exceeding max_repeat {max_repeat}."
+            )
 
     locked_candidates: List[PairCandidate] = []
     for essay_a, essay_b in spec.locked_pairs:
@@ -72,10 +84,16 @@ def optimize_from_dynamic_spec(
         b_is_anchor = essay_b in anchor_set
         if a_is_anchor and b_is_anchor:
             comp_type = "anchor_anchor"
+            if anchor_index[essay_a] > anchor_index[essay_b]:
+                essay_a, essay_b = essay_b, essay_a
         elif a_is_anchor or b_is_anchor:
             comp_type = "student_anchor"
+            if a_is_anchor:
+                essay_a, essay_b = essay_b, essay_a
         else:
             comp_type = "student_student"
+            if student_index[essay_a] > student_index[essay_b]:
+                essay_a, essay_b = essay_b, essay_a
         locked_candidates.append(PairCandidate(essay_a, essay_b, comp_type))
 
     required_pairs = derive_required_student_anchor_pairs(
@@ -86,17 +104,24 @@ def optimize_from_dynamic_spec(
     )
 
     adjacency_pairs = derive_anchor_adjacency_constraints(anchors)
-    anchor_adjacency_count = unique_pair_count(adjacency_pairs)
+    anchor_adjacency_needed = sum(
+        1 for pair in adjacency_pairs if baseline_counts.get(pair.key(), 0) == 0
+    )
 
-    locked_count = unique_pair_count(locked_candidates)
+    locked_required_keys = {
+        pair.key() for pair in locked_candidates if baseline_counts.get(pair.key(), 0) == 0
+    }
+    locked_required_count = len(locked_required_keys)
+
     required_count = unique_pair_count(required_pairs)
-    min_slots_required = anchor_adjacency_count + locked_count + required_count
+    baseline_slots = len(baseline_design)
+    min_slots_required = anchor_adjacency_needed + locked_required_count + required_count
     if spec.total_slots < min_slots_required:
         raise ValueError(
-            f"Minimum required slots not met: requested "
-            f"{spec.total_slots}, but anchor adjacency requires {anchor_adjacency_count}, "
-            f"locked pairs require {locked_count}, "
-            f"and baseline coverage requires {required_count} "
+            f"Minimum required new slots not met: requested "
+            f"{spec.total_slots}, but anchor adjacency adds {anchor_adjacency_needed}, "
+            f"locked pairs add {locked_required_count}, "
+            f"and coverage requires {required_count} "
             f"(total {min_slots_required}). Increase total slots."
         )
 
@@ -105,6 +130,7 @@ def optimize_from_dynamic_spec(
         anchors,
         total_slots=spec.total_slots,
         anchor_order=anchors,
+        baseline_design=baseline_design,
         locked_pairs=locked_candidates,
         required_pairs=required_pairs,
         max_repeat=max_repeat,
@@ -113,26 +139,44 @@ def optimize_from_dynamic_spec(
 
     combined_items = list(students) + list(anchors)
     index_map = {item: idx for idx, item in enumerate(combined_items)}
-    if baseline_design:
-        baseline_log_det = compute_log_det(baseline_design, index_map)
-    else:
-        baseline_log_det = float("-inf")
+    baseline_log_det = compute_log_det(baseline_design, index_map) if baseline_design else float(
+        "-inf"
+    )
     optimized_log_det = compute_log_det(optimized_design, index_map)
 
     baseline_diag = summarize_design(baseline_design, anchors)
     optimized_diag = summarize_design(optimized_design, anchors)
 
+    baseline_signature_counts: Counter[Tuple[str, str, str]] = Counter(
+        (entry.candidate.essay_a, entry.candidate.essay_b, entry.candidate.comparison_type)
+        for entry in baseline_design
+    )
+    new_design: List[DesignEntry] = []
+    for entry in optimized_design:
+        signature = (
+            entry.candidate.essay_a,
+            entry.candidate.essay_b,
+            entry.candidate.comparison_type,
+        )
+        if baseline_signature_counts.get(signature, 0) > 0:
+            baseline_signature_counts[signature] -= 1
+            continue
+        new_design.append(entry)
+
     return OptimizationResult(
         students=students,
         anchor_order=anchors,
         baseline_design=baseline_design,
+        new_design=new_design,
         optimized_design=optimized_design,
         baseline_log_det=baseline_log_det,
         optimized_log_det=optimized_log_det,
         baseline_diagnostics=baseline_diag,
         optimized_diagnostics=optimized_diag,
-        anchor_adjacency_count=anchor_adjacency_count,
+        anchor_adjacency_count=anchor_adjacency_needed,
         required_pair_count=required_count,
+        locked_pair_count=locked_required_count,
+        baseline_slots_in_design=baseline_slots,
         max_repeat=max_repeat,
     )
 
@@ -196,6 +240,7 @@ def optimize_schedule(
         students=students,
         anchor_order=list(anchor_order),
         baseline_design=baseline_design,
+        new_design=list(optimized_design),
         optimized_design=optimized_design,
         baseline_log_det=baseline_log_det,
         optimized_log_det=optimized_log_det,
@@ -203,6 +248,8 @@ def optimize_schedule(
         optimized_diagnostics=optimized_diag,
         anchor_adjacency_count=anchor_adjacency_count,
         required_pair_count=required_pair_count,
+        locked_pair_count=0,
+        baseline_slots_in_design=0,
         max_repeat=max_repeat,
     )
 

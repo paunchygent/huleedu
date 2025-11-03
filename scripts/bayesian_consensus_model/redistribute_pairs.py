@@ -246,8 +246,8 @@ def optimize_pairs(
         result = optimize_from_dynamic_spec(spec, max_repeat=max_repeat)
 
         # Write output
-        write_design(result.optimized_design, output_csv)
-        typer.echo(f"Optimized schedule written to {output_csv}")
+        write_design(result.new_design, output_csv)
+        typer.echo(f"New comparisons written to {output_csv}")
 
         # Emit summary
         _emit_optimizer_summary(result)
@@ -268,12 +268,17 @@ def _emit_optimizer_summary(result: OptimizationResult) -> None:
         f"Optimized log-det: {result.optimized_log_det:.4f}  |  "
         f"Gain: {result.log_det_gain:.4f}"
     )
-    typer.echo(f"Total comparisons: {result.total_comparisons}  (max repeat {result.max_repeat})")
     typer.echo(
-        "Minimum required slots: "
+        "Total comparisons (combined): "
+        f"{result.total_comparisons}  |  New comparisons: {result.new_comparisons}  "
+        f"(baseline locked {result.baseline_slots_in_design}, max repeat {result.max_repeat})"
+    )
+    typer.echo(
+        "Minimum required new slots: "
         f"{result.min_slots_required} "
-        f"(anchor adjacency {result.anchor_adjacency_count}, "
-        f"baseline-required {result.required_pair_count})"
+        f"(anchor adjacency additions {result.anchor_adjacency_count}, "
+        f"locked pairs {result.locked_pair_count}, "
+        f"coverage {result.required_pair_count})"
     )
 
     typer.echo("\nComparison type distribution (baseline):")
@@ -326,8 +331,12 @@ def _write_report(
         "optimized_log_det": result.optimized_log_det,
         "log_det_gain": result.log_det_gain,
         "max_repeat": result.max_repeat,
+        "baseline_slots": result.baseline_slots_in_design,
+        "total_comparisons": result.total_comparisons,
+        "new_comparisons": result.new_comparisons,
         "anchor_adjacency_pairs": result.anchor_adjacency_count,
         "required_pairs": result.required_pair_count,
+        "locked_pairs": result.locked_pair_count,
         "min_slots_required": result.min_slots_required,
         "baseline": {
             "total_pairs": result.baseline_diagnostics.total_pairs,

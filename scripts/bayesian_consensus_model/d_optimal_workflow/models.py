@@ -38,6 +38,7 @@ class OptimizationResult:
     students: Sequence[str]
     anchor_order: Sequence[str]
     baseline_design: List[DesignEntry]
+    new_design: List[DesignEntry]
     optimized_design: List[DesignEntry]
     baseline_log_det: float
     optimized_log_det: float
@@ -45,6 +46,8 @@ class OptimizationResult:
     optimized_diagnostics: DesignDiagnostics
     anchor_adjacency_count: int
     required_pair_count: int
+    locked_pair_count: int
+    baseline_slots_in_design: int
     max_repeat: int
 
     @property
@@ -56,8 +59,12 @@ class OptimizationResult:
         return len(self.optimized_design)
 
     @property
+    def new_comparisons(self) -> int:
+        return len(self.new_design)
+
+    @property
     def min_slots_required(self) -> int:
-        return self.anchor_adjacency_count + self.required_pair_count
+        return self.anchor_adjacency_count + self.locked_pair_count + self.required_pair_count
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,7 @@ class DynamicSpec:
     anchors: Sequence[str]
     include_anchor_anchor: bool
     previous_comparisons: Sequence[ComparisonRecord]
+    baseline_design: Sequence[DesignEntry]
     locked_pairs: Sequence[Tuple[str, str]]
     total_slots: int
 

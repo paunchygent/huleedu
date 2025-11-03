@@ -24,11 +24,17 @@ def format_optimization_summary(result: OptimizationResult, output_path: Path) -
         f"log-det gain {result.log_det_gain:.4f} "
         f"({result.baseline_log_det:.4f} → {result.optimized_log_det:.4f})"
     )
-    messages.append(f"Optimized schedule written to {output_path}")
+    messages.append(f"New comparisons written to {output_path}")
     messages.append(
-        f"Minimum required slots: {result.min_slots_required} "
-        f"(anchor adjacency {result.anchor_adjacency_count}, "
-        f"baseline-required {result.required_pair_count})"
+        f"Minimum required new slots: {result.min_slots_required} "
+        f"(anchor adjacency additions {result.anchor_adjacency_count}, "
+        f"locked pairs {result.locked_pair_count}, "
+        f"coverage {result.required_pair_count})"
+    )
+    messages.append(
+        "Total comparisons (combined): "
+        f"{result.total_comparisons} | New comparisons: {result.new_comparisons} "
+        f"(baseline locked {result.baseline_slots_in_design}, max repeat {result.max_repeat})"
     )
 
     messages.append("Type distribution (optimized):")

@@ -154,8 +154,9 @@ pdm run typecheck-all # Run MyPy
 - Tests: `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py` exercises CLI, allocator, and CSV compatibility.
 
 ### 8. Continuation-aware D-Optimal Optimizer (Nov 2025)
-- Task file: `TASKS/d_optimal_continuation_plan.md` (2025-11-05) outlines required changes so historical comparisons influence slot budgeting, repeat limits, and log-det metrics while only newly generated pairs are exported.
-- Deliverables: Seed baseline design in optimizer, enforce cross-session limits, expand CLI/TUI messaging, update documentation/tests, and run `pdm run lint-all` + `pdm run typecheck-all` prior to handoff.
+- Baseline comparisons are now canonicalized and locked into the optimizer so repeat limits and log-det metrics span all sessions; `total_slots` represents new comparisons for the current run while `OptimizationResult` exposes both `new_design` (new-only) and the combined schedule.
+- CLI/TUI output CSVs contain only newly scheduled comparisons while summaries/report JSON highlight baseline consumption, mandatory new-slot components (adjacency, locked, coverage), and combined totals.
+- Tests expanded (`test_load_dynamic_spec_canonicalizes_previous_comparisons`, multi-session assertions on `new_design`) with automation via `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py`; manual CLI/TUI smoke passes are still recommended per handoff notes.
 
 ## Configuration Files
 - `.env` - Environment variables (not in git)

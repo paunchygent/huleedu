@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from ..d_optimal_optimizer import DesignEntry, PairCandidate
+from ..d_optimal_optimizer import (
+    DesignEntry,
+    PairCandidate,
+    derive_anchor_adjacency_constraints,
+    derive_required_student_anchor_pairs,
+)
 from ..redistribute_core import load_comparisons_from_records
 from .models import (
     DEFAULT_ANCHOR_ORDER,
@@ -33,13 +39,67 @@ def load_dynamic_spec(
     if not anchor_list:
         raise ValueError("Anchors list cannot be empty.")
 
+    essay_ids = set(student_list) | set(anchor_list)
+    anchor_index = {anchor: idx for idx, anchor in enumerate(anchor_list)}
+    student_index = {student: idx for idx, student in enumerate(student_list)}
+
+    def canonical_key(essay_a: str, essay_b: str) -> Tuple[str, str]:
+        if essay_a in anchor_index and essay_b in anchor_index:
+            return (
+                (essay_a, essay_b)
+                if anchor_index[essay_a] <= anchor_index[essay_b]
+                else (essay_b, essay_a)
+            )
+        if essay_a in anchor_index or essay_b in anchor_index:
+            return (essay_b, essay_a) if essay_a in anchor_index else (essay_a, essay_b)
+        return (
+            (essay_a, essay_b)
+            if student_index[essay_a] <= student_index[essay_b]
+            else (essay_b, essay_a)
+        )
+
     previous_list: List[ComparisonRecord] = []
     if previous_comparisons is not None:
         previous_list = list(previous_comparisons)
 
+    baseline_design: List[DesignEntry] = []
+    if previous_list:
+        for record in previous_list:
+            essay_a = record.essay_a_id
+            essay_b = record.essay_b_id
+            comparison_type = record.comparison_type
+
+            if essay_a not in essay_ids:
+                raise ValueError(
+                    f"Previous comparison references unknown essay ID: {essay_a}"
+                )
+            if essay_b not in essay_ids:
+                raise ValueError(
+                    f"Previous comparison references unknown essay ID: {essay_b}"
+                )
+
+            if comparison_type == "student_anchor":
+                a_is_anchor = essay_a in anchor_index
+                b_is_anchor = essay_b in anchor_index
+                if a_is_anchor == b_is_anchor:
+                    raise ValueError(
+                        "Student-anchor comparison must contain exactly one anchor essay."
+                    )
+                student_id, anchor_id = canonical_key(essay_a, essay_b)
+                candidate = PairCandidate(student_id, anchor_id, comparison_type)
+            elif comparison_type == "anchor_anchor":
+                first, second = canonical_key(essay_a, essay_b)
+                candidate = PairCandidate(first, second, comparison_type)
+            elif comparison_type == "student_student":
+                first, second = canonical_key(essay_a, essay_b)
+                candidate = PairCandidate(first, second, comparison_type)
+            else:  # pragma: no cover - defensive
+                raise ValueError(f"Unsupported comparison type: {comparison_type}")
+
+            baseline_design.append(DesignEntry(candidate, locked=True))
+
     locked_list: List[Tuple[str, str]] = []
     if locked_pairs is not None:
-        essay_ids = set(student_list) | set(anchor_list)
         for pair in locked_pairs:
             if len(pair) != 2:
                 raise ValueError(f"Locked pair must have exactly 2 elements: {pair}")
@@ -48,21 +108,41 @@ def load_dynamic_spec(
                 raise ValueError(f"Locked pair references unknown essay ID: {essay_a}")
             if essay_b not in essay_ids:
                 raise ValueError(f"Locked pair references unknown essay ID: {essay_b}")
-            locked_list.append((essay_a, essay_b))
+            locked_list.append(canonical_key(essay_a, essay_b))
 
     if total_slots <= 0:
         raise ValueError(f"Total slots must be positive, got: {total_slots}")
 
-    adjacency_count = len(anchor_list) - 1
-    locked_count = len(locked_list)
-    min_required = adjacency_count + locked_count
+    baseline_counts: Counter[Tuple[str, str]] = Counter(
+        entry.candidate.key() for entry in baseline_design
+    )
+    anchor_needed = sum(
+        1
+        for pair in derive_anchor_adjacency_constraints(anchor_list)
+        if baseline_counts.get(pair.key(), 0) == 0
+    )
+
+    locked_required = {
+        key for key in locked_list if baseline_counts.get(key, 0) == 0
+    }
+
+    required_pairs = derive_required_student_anchor_pairs(
+        students=student_list,
+        anchors=anchor_list,
+        anchor_order=anchor_list,
+        baseline_design=baseline_design,
+    )
+    required_count = len({pair.key() for pair in required_pairs})
+
+    min_required = anchor_needed + len(locked_required) + required_count
 
     if total_slots < min_required:
         raise ValueError(
             f"Total slots ({total_slots}) insufficient: "
-            f"anchor adjacency requires {adjacency_count}, "
-            f"locked pairs require {locked_count} "
-            f"(minimum {min_required} slots needed)."
+            f"anchor adjacency additions {anchor_needed}, "
+            f"locked pairs {len(locked_required)}, "
+            f"coverage {required_count} "
+            f"(minimum {min_required} new slots needed)."
         )
 
     return DynamicSpec(
@@ -70,6 +150,7 @@ def load_dynamic_spec(
         anchors=anchor_list,
         include_anchor_anchor=include_anchor_anchor,
         previous_comparisons=previous_list,
+        baseline_design=baseline_design,
         locked_pairs=locked_list,
         total_slots=total_slots,
     )

@@ -224,6 +224,29 @@ def test_load_dynamic_spec_accepts_custom_anchors() -> None:
     assert list(spec.anchors) == custom_anchors
 
 
+def test_load_dynamic_spec_canonicalizes_previous_comparisons() -> None:
+    students = ["JA24", "II24"]
+    previous = [
+        ComparisonRecord("A2", "A1", "anchor_anchor"),
+        ComparisonRecord("A1", "JA24", "student_anchor"),
+        ComparisonRecord("II24", "JA24", "student_student"),
+    ]
+
+    spec = load_dynamic_spec(
+        students=students,
+        total_slots=20,
+        previous_comparisons=previous,
+    )
+
+    canonical = [
+        (entry.candidate.essay_a, entry.candidate.essay_b, entry.candidate.comparison_type)
+        for entry in spec.baseline_design
+    ]
+    assert ("A1", "A2", "anchor_anchor") in canonical
+    assert ("JA24", "A1", "student_anchor") in canonical
+    assert ("JA24", "II24", "student_student") in canonical
+
+
 def test_optimize_from_dynamic_spec_builds_design() -> None:
     students = ["JA24", "II24", "ES24"]
     spec = load_dynamic_spec(
@@ -361,6 +384,9 @@ def test_cli_optimize_with_report_includes_dynamic_spec(tmp_path: Path) -> None:
     assert report["dynamic_spec"]["students"] == ["JA24", "II24"]
     assert report["dynamic_spec"]["total_slots"] == 20
     assert report["dynamic_spec"]["include_anchor_anchor"] is True
+    assert report["baseline_slots"] == 0
+    assert report["total_comparisons"] == 20
+    assert report["new_comparisons"] == 20
 
 
 # ============================================================================
@@ -398,7 +424,8 @@ def test_session1_workflow_no_previous_comparisons() -> None:
     for student in students:
         assert student in students_with_coverage, f"Student {student} missing anchor coverage"
 
-    assert result.total_comparisons == 84
+    assert result.baseline_slots_in_design == 0
+    assert result.new_comparisons == spec.total_slots
     assert result.optimized_log_det > float("-inf")
 
 
@@ -428,6 +455,16 @@ def test_session2_workflow_with_previous_comparisons() -> None:
     assert ("JA24", "A1") in baseline_keys
     assert ("JA24", "A2") in baseline_keys
 
+    # New design should exclude baseline pairs while filling remaining slots
+    assert result.baseline_slots_in_design == len(result.baseline_design)
+    assert result.total_comparisons == len(result.baseline_design) + spec.total_slots
+    assert result.new_comparisons == spec.total_slots
+    new_keys = {
+        (entry.candidate.essay_a, entry.candidate.essay_b) for entry in result.new_design
+    }
+    assert ("JA24", "A1") not in new_keys
+    assert ("JA24", "A2") not in new_keys
+
     # Verify coverage analysis: II24 and ES24 should get required anchor pairs
     # (since they had no coverage in baseline)
     student_anchor_pairs = [
@@ -450,7 +487,6 @@ def test_session2_workflow_with_previous_comparisons() -> None:
             f"Student {student} missing anchor coverage in Session 2"
         )
 
-    assert result.total_comparisons == 84
     assert result.required_pair_count > 0  # Should derive required pairs for II24, ES24
 
 
@@ -521,4 +557,7 @@ def test_cli_optimize_with_previous_csv(tmp_path: Path) -> None:
     with output_csv.open(newline="") as handle:
         reader = csv.DictReader(handle)
         rows = list(reader)
-        assert len(rows) == 84
+        assert len(rows) == 84  # all requested slots are new comparisons
+        csv_pairs = {(row["essay_a_id"], row["essay_b_id"]) for row in rows}
+        assert ("JA24", "A1") not in csv_pairs
+        assert ("JA24", "A2") not in csv_pairs

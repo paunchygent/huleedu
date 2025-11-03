@@ -97,6 +97,7 @@ def run_synthetic_optimization(
         students=list(students),
         anchor_order=list(anchor_order),
         baseline_design=baseline_design,
+        new_design=list(optimized_design),
         optimized_design=optimized_design,
         baseline_log_det=baseline_log_det,
         optimized_log_det=optimized_log_det,
@@ -104,6 +105,8 @@ def run_synthetic_optimization(
         optimized_diagnostics=optimized_diag,
         anchor_adjacency_count=anchor_adjacency_count,
         required_pair_count=required_pair_count,
+        locked_pair_count=0,
+        baseline_slots_in_design=0,
         max_repeat=max_repeat,
     )
 
