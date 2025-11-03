@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -116,6 +118,12 @@ class RedistributeApp(App):
             self._generate_assignments()
         elif event.button.id == "reset_button":
             self._reset_form()
+        elif event.button.id in self._BROWSE_BUTTON_CONFIG:
+            field_id, title = self._BROWSE_BUTTON_CONFIG[event.button.id]
+            input_widget = self.query_one(f"#{field_id}", Input)
+            current_value = input_widget.value.strip()
+            placeholder = input_widget.placeholder or field_id.replace("_", " ")
+            self._open_save_dialog(field_id, title, current_value, placeholder)
 
     def _reset_form(self) -> None:
         """Reset all form fields to defaults."""
@@ -197,6 +205,91 @@ class RedistributeApp(App):
                 self.query_one("#generate_button", Button).disabled = False
 
             self.call_from_thread(enable_button)
+
+    _BROWSE_BUTTON_CONFIG: dict[str, tuple[str, str]] = {
+        "output_browse_button": (
+            "output_input",
+            "Save assignments CSV",
+        ),
+        "optimizer_output_browse_button": (
+            "optimizer_output_input",
+            "Save comparison pairs CSV",
+        ),
+    }
+
+    @work(thread=True, exclusive=False, exit_on_error=False)
+    async def _open_save_dialog(
+        self,
+        field_id: str,
+        title: str,
+        current_value: str,
+        placeholder: str,
+    ) -> None:
+        """Open a native save dialog and update the target input field."""
+        log_widget = self.query_one(TextLog)
+
+        try:
+            from crossfiledialog import exceptions, save_file
+        except ImportError as exc:  # pragma: no cover - package missing
+            self.call_from_thread(
+                log_widget.write,
+                f"[red]File dialog error:[/] crossfiledialog unavailable ({exc})",
+            )
+            return
+
+        start_dir = self._derive_start_dir(current_value)
+        try:
+            result = save_file(title=title, start_dir=start_dir)
+        except exceptions.NoImplementationFoundException:
+            self.call_from_thread(
+                log_widget.write,
+                "[yellow]Notice[/]: Native file dialogs are not supported on this platform.",
+            )
+            return
+        except Exception as exc:  # pragma: no cover - OS dialog failure
+            self.call_from_thread(
+                log_widget.write, f"[red]File dialog error:[/] {exc}"
+            )
+            return
+
+        if not result:
+            self.call_from_thread(
+                log_widget.write, f"No changes made to {placeholder} path."
+            )
+            return
+
+        resolved_path = str(Path(result).expanduser())
+
+        def update_field() -> None:
+            target_input = self.query_one(f"#{field_id}", Input)
+            target_input.value = resolved_path
+            target_input.focus()
+
+        self.call_from_thread(update_field)
+        self.call_from_thread(
+            log_widget.write,
+            f"Updated {placeholder} path to {resolved_path}",
+        )
+
+    @staticmethod
+    def _derive_start_dir(current_value: str) -> str | None:
+        """Determine a sensible starting directory for the save dialog."""
+        if not current_value:
+            return None
+
+        try:
+            candidate = Path(current_value).expanduser()
+        except (OSError, ValueError):
+            return None
+
+        if candidate.is_dir():
+            return str(candidate)
+
+        parent = candidate.parent
+        if parent.exists():
+            return str(parent)
+
+        return None
 
 
 def main() -> None:

@@ -6,7 +6,7 @@ import textwrap
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Container, VerticalScroll
+from textual.containers import Container, HorizontalGroup, VerticalScroll
 from textual.widgets import Button, Footer, Header, Input, Label, Select, Static
 
 try:
@@ -42,17 +42,19 @@ Screen {
     margin-bottom: 1;
 }
 
-.field {
+.file-row {
     width: 100%;
-    margin-bottom: 1;
+    layout: horizontal;
 }
 
-.field Label {
-    padding-bottom: 0;
+.file-row Input {
+    width: 1fr;
 }
 
-.field Input, .field Select {
-    width: 100%;
+.file-row Button {
+    width: auto;
+    min-width: 14;
+    margin-left: 1;
 }
 
 #form {
@@ -119,11 +121,16 @@ def create_form_layout() -> ComposeResult:
                 classes="field-input",
             )
             yield Label("Assignments CSV Path (final rater assignments)")
-            yield Input(
-                value=str(DEFAULT_OUTPUT),
-                id="output_input",
-                classes="field-input",
-            )
+            with HorizontalGroup(classes="file-row"):
+                yield Input(
+                    value=str(DEFAULT_OUTPUT),
+                    id="output_input",
+                    classes="field-input",
+                )
+                yield Button(
+                    "Browse…",
+                    id="output_browse_button",
+                )
             yield Label("Number of Raters (leave blank if naming each)")
             yield Input(
                 value=str(DEFAULT_RATER_COUNT),
@@ -144,11 +151,16 @@ def create_form_layout() -> ComposeResult:
             )
             yield Static("Comparison Design Settings", classes="bold")
             yield Label("Comparison Pairs Output Path (saves full pair list)")
-            yield Input(
-                value=str(DEFAULT_PAIRS_OUTPUT),
-                id="optimizer_output_input",
-                classes="field-input",
-            )
+            with HorizontalGroup(classes="file-row"):
+                yield Input(
+                    value=str(DEFAULT_PAIRS_OUTPUT),
+                    id="optimizer_output_input",
+                    classes="field-input",
+                )
+                yield Button(
+                    "Browse…",
+                    id="optimizer_output_browse_button",
+                )
             yield Label("Previous Session CSV (optional, for multi-session workflows)")
             yield Input(
                 placeholder="e.g., session1_pairs.csv (leave blank for first session)",
@@ -182,8 +194,8 @@ def create_form_layout() -> ComposeResult:
             "Set rater count and comparisons per rater. "
             "Generate Assignments builds comparison pairs, "
             "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV. "
-            "Tip: focus a file path field and drag files onto the terminal to "
-            "auto-populate it.",
+            "Tip: focus a file path field, drag files onto the terminal, or use "
+            "Browse… buttons to update paths.",
             id="instructions",
         )
         yield TextLog(id="result", markup=True, wrap=True, auto_scroll=True)

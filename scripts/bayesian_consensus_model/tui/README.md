@@ -30,7 +30,9 @@ Main application class and event handlers.
 - `compose()`: Delegates to `create_form_layout()`
 - `on_input_changed()`: Strips quotes from file paths on change events
 - `on_paste()`: Detects file paths in paste events and populates target fields
+- `on_button_pressed()`: Routes generate/reset actions and launches native Save dialogs
 - `_generate_assignments()`: Orchestrates optimizer → assignment workflow
+- `_open_save_dialog()`: Runs `crossfiledialog.save_file()` in a worker thread and applies changes on the main thread
 - `_reset_form()`: Resets all fields to defaults
 
 **Keyboard Bindings:**
@@ -73,23 +75,21 @@ Form structure, CSS, and widget composition.
 - `optimizer_max_repeat_input`: Max repetitions per pair
 - `include_anchor_anchor_select`: Include anchor-anchor comparisons (yes/no)
 
-**CSS Classes:**
+**Button IDs:**
+
+- `output_browse_button`: Launches a native Save dialog for the assignments CSV path
+- `optimizer_output_browse_button`: Launches a native Save dialog for the comparison pairs CSV path
+
+**CSS Notes:**
 
 - `.field-input`: Styled input fields
 - `.field-select`: Styled select dropdowns
-- `.field`: Field containers
+- `.file-row`: Applied to `HorizontalGroup` rows that pair inputs with Browse buttons
+- `.file-row Input`: Uses `width: 1fr` (per Textual width docs) to occupy remaining space
+- `.file-row Button`: Adds small left margin so button separates from input
 - `#form`: Scrollable form container (height: 28)
 - `#result`: Log output area (height: 5)
 - `#actions`: Horizontal button container
-
-**CSS Structure:**
-
-```css
-Screen: overflow-y auto, center top alignment
-#panel: 80% width, max 90 columns, round border, boost background
-.field-input: margin-bottom 1, height 3, surface-lighten-1 background
-.field-select: margin-bottom 1, height 3, surface-lighten-1 background
-```
 
 ### file_drop_handler.py
 
@@ -109,6 +109,7 @@ Handles file path extraction from paste events and quote removal.
 
 - Extracts file paths from pasted text
 - Supports multiple delimiters: null byte (`\x00`), newline, comma, space
+- Ensures drag-and-drop parity across students, output, pairs, and previous session inputs
 - Strips quotes (single and double)
 - Removes `file://` prefix
 - Expands `~` to home directory
@@ -395,6 +396,10 @@ macOS Finder wraps file paths in single quotes when dragged to terminal applicat
 2. **on_paste()**: Quote removal during paste event processing
 
 Both use `unquote_file_path()` to validate the unquoted path exists before updating the field.
+
+### Native Save Dialogs
+
+Browse buttons trigger `_open_save_dialog()`, which calls `crossfiledialog.save_file()` inside a Textual worker thread. This keeps the UI responsive while the OS dialog is open. Once a path is selected, the worker applies the change via `call_from_thread()` and logs the update. Cancelled dialogs leave the original value unchanged.
 
 ### Multi-Session Workflows
 
