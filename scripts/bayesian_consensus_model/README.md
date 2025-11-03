@@ -56,12 +56,14 @@ Mapped to numeric indices 0-9 for ordinal regression.
 ## How to Run
 
 ### Installation
+
 ```bash
 # Install dependencies via PDM
 pdm install
 ```
 
 ### Basic Usage
+
 ```bash
 # Generate consensus grades from rating data
 pdm run python -m scripts.bayesian_consensus_model.generate_reports \
@@ -77,6 +79,7 @@ pdm run python -m scripts.bayesian_consensus_model.generate_reports \
 ```
 
 ### Command Line Arguments
+
 - `--ratings-csv`: Path to the long-format ratings CSV (required)
 - `--output-dir`: Directory for run artifacts (default: `output/bayesian_consensus_model`)
 - `--verbose`: Print progress information
@@ -91,7 +94,9 @@ pdm run python -m scripts.bayesian_consensus_model.generate_reports \
 - `--neutral-var-max`: Posterior variance ceiling for neutral raters (default `0.20`)
 
 ### Output Files
+
 Generated in the specified output directory:
+
 - `essay_consensus.csv` – Consensus grade, confidence, expected grade index, and neutral ESS (flag retained for compatibility but no longer auto-gates)
 - `essay_grade_probabilities.csv` – Full posterior mass over the 10-grade lattice
 - `rater_weights.csv` / `rater_severity.csv` / `rater_agreement.csv` / `rater_spread.csv` – Severity diagnostics and precision factors
@@ -130,6 +135,7 @@ Use the optimizer utilities to generate comparison schedules with maximal Fisher
 #### Understanding Previous Comparisons vs Locked Pairs
 
 Two distinct concepts:
+
 - **`--previous-csv`**: Historical data from past sessions that informs coverage analysis (e.g., "Session 1 has these 84 comparisons, analyze what coverage exists and fill gaps")
 - **`--lock-pair`**: Hard constraints forcing specific pairs into the current schedule (rare use case, e.g., "this specific pair MUST appear")
 
@@ -159,6 +165,7 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
 ```
 
 **How it works:**
+
 1. Loads 84 comparisons from Session 1 as historical data
 2. Analyzes which students already have anchor coverage
 3. Ensures students without coverage get required anchor pairs
@@ -187,7 +194,6 @@ python -m scripts.bayesian_consensus_model.redistribute_pairs optimize-pairs \
   --total-slots 60 \
   --output-csv minimal_pairs.csv
 ```
-
 
 ### Typer CLI workflow
 
@@ -222,10 +228,12 @@ The CLI prints baseline/optimized log-determinant, comparison-type distributions
 Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interactive workflow.
 
 **Student Input:**
+
 - **Recommended**: Provide a CSV file with `essay_id`, `student_id`, or `id` column (case-insensitive)
 - **Fallback**: Enter comma-separated student IDs manually
 
 **Workflow:**
+
 1. Configure paths for Pairs CSV (optimizer output) and Assignments CSV (final rater distribution)
 2. Set optimization parameters: total slots, max repetitions per pair
 3. Optional: Provide previous session CSV for multi-session workflows
@@ -233,6 +241,7 @@ Run `python scripts/bayesian_consensus_model/redistribute_tui.py` for an interac
 5. Press `g` or click "Generate Assignments"
 
 **What happens:**
+
 - Optimizer generates optimized comparison pairs → saves to Pairs CSV
 - Assignment generator distributes pairs to raters → saves to Assignments CSV
 - Log displays both outputs with optimization metrics and coverage analysis
@@ -244,6 +253,7 @@ All essays (students + anchors) receive auto-generated sequential display names
 ### Anchor Flexibility
 
 The system supports any anchor naming scheme:
+
 - Swedish grades: `F+1, F+2, E-, E+, ...`
 - Numeric: `1a, 1b, 2a, 2b, ...`
 - Custom: `Low-Example, Mid-Example, High-Example`
@@ -272,7 +282,9 @@ Generated CSVs retain the `pair_id, essay_*` schema, so downstream tooling consu
 ## Input Data Format
 
 ### V2 Format (Recommended)
+
 Semicolon-delimited with header line to skip:
+
 ```csv
 header_line_to_skip
 ANCHOR-ID;FILE-NAME;Rater1;Rater2;Rater3;...
@@ -280,7 +292,9 @@ ES24;essay_file.docx;C+;B;C-;A;C+;C+
 ```
 
 ### V1 Format
+
 Comma-delimited without header:
+
 ```csv
 ANCHOR-ID,FILE-NAME,Rater1,Rater2,Rater3,...
 ES24,essay_file.docx,C+,B,C-,A,C+,C+
@@ -291,17 +305,20 @@ The script auto-detects format based on delimiters in the file.
 ## Recent Decisions & Changes
 
 ### 2024-09-22: Swedish 10-Level Scale Implementation
+
 - **Change**: Migrated from incorrect 6 base grades to full 10-level ordinal scale
 - **Rationale**: Preserve meaningful distinctions between grades (C+ ≠ C-)
 - **Files Updated**: All model files, tests, and consensus grading solution
 - **Impact**: Grade modifiers now treated as distinct ordinal positions
 
 ### 2025-01-25: Modular Ordinal Kernel Enhancements
+
 - **Change**: Added configurability for argmax decision rule, leave-one-out alignment, precision-aware weighting, and neutral ESS metrics (no automatic gating)
 - **Evaluation**: `scripts/bayesian_consensus_model/evaluation/harness.py` provides ablation studies and comparative metrics
 - **Outputs**: Consensus CSVs now include `neutral_ess` (informational) and backward-compatible `needs_more_ratings`
 
 ### 2024-09-22: Critical Bug Identified
+
 - **Issue**: Ordinal regression produces incorrect consensus for mixed ratings
 - **Example**: ES24 gets C- instead of C+ despite 3/6 C+ votes
 - **Root Cause**: OrderedLogistic likelihood weights all observations equally
@@ -314,11 +331,13 @@ The script auto-detects format based on delimiters in the file.
 The Bayesian model fails when essays have mixed ratings:
 
 **Example - Essay ES24**:
+
 - **Input**: C+ (×3), B (×1), A (×1), C- (×1)
 - **Expected**: C+ (50% majority)
 - **Actual**: C- with 81% confidence ❌
 
 **Root Cause**:
+
 ```python
 # The problematic likelihood in bayesian_consensus_model.py
 eta = essay_ability[essay_idx] - rater_severity[rater_idx]
@@ -326,6 +345,7 @@ pm.OrderedLogistic("grade_obs", eta=eta, cutpoints=thresholds, observed=grades)
 ```
 
 The OrderedLogistic likelihood:
+
 1. Weights all observations equally
 2. Finds compromise latent ability (1.52 for ES24)
 3. Allows outliers to shift consensus from majority
@@ -364,6 +384,7 @@ scripts/bayesian_consensus_model/
 ## Development Notes
 
 ### Debugging the Consensus Issue
+
 ```python
 # Quick check for ES24's grades
 import pandas as pd
@@ -375,11 +396,13 @@ print([g for g in es24.iloc[0][2:] if pd.notna(g) and g.strip()])
 ```
 
 ### Model Diagnostics
+
 - Convergence warnings (rhat > 1.01) expected with current model issues
 - Check `model_diagnostics.json` for detailed metrics
 - Poor convergence likely symptom, not cause, of fundamental model flaw
 
 ### Next Steps for Fix
+
 1. Replace OrderedLogistic with robust likelihood (e.g., Student-t)
 2. Implement weighted observations based on rater agreement
 3. Consider mixture model for heterogeneous disagreement
