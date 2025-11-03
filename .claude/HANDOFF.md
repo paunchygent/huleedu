@@ -7,18 +7,81 @@
 
 ---
 
-## Session Summary (2025-11-07)
+## Session Summary (2025-11-03) - Phase 3.1 Partial Completion
+
+**Status**: Phase 3.1 (Grade Scale Registry + Migrations) is 40% complete (4 of 10 steps)
+
+### Completed Components:
+
+1. ✅ **Grade Scale Registry** (`libs/common_core/src/common_core/grade_scales.py` - 260 LoC):
+   - `GradeScaleMetadata` dataclass with comprehensive validation
+   - Three scales implemented: `swedish_8_anchor`, `eng5_np_legacy_9_step`, `eng5_np_national_9_step`
+   - Helper functions: `get_scale()`, `validate_grade_for_scale()`, `list_available_scales()`, `get_grade_index()`, `get_uniform_priors()`
+   - Exported from `common_core.__init__`
+
+2. ✅ **Unit Tests** (`libs/common_core/tests/test_grade_scales.py` - 365 LoC):
+   - 59 behavioral tests (all passing)
+   - Comprehensive coverage: scale validation, error cases, edge cases
+   - Parametrized tests for all three scales
+
+3. ✅ **Database Migration** (revision: `bf559b4a86bf`):
+   - Added `grade_scale` column to `anchor_essay_references` and `grade_projections`
+   - Type: `String(50)`, default: `swedish_8_anchor`, indexed
+   - Migration applied and verified via psql
+   - File: `services/cj_assessment_service/alembic/versions/20251103_2222_bf559b4a86bf_add_grade_scale_columns.py`
+
+4. ✅ **ORM Models Updated** (`services/cj_assessment_service/models_db.py`):
+   - `AnchorEssayReference.grade_scale` field added
+   - `GradeProjection.grade_scale` field added
+   - Type checking passes (pdm run typecheck-all: Success)
+
+### Remaining Work (Steps 5-10):
+
+5. **Pydantic API Models**: Create `RegisterAnchorRequest` with scale validation
+6. **API Endpoint**: Update anchor registration to accept grade_scale parameter
+7. **Repository Layer**: Add scale-aware anchor queries
+8. **GradeProjector**: Refactor to load scales dynamically from registry
+9. **ContextBuilder**: Thread grade_scale parameter through workflow
+10. **Tests & Documentation**: Update fixtures, create ENG5 NP tests, document changes
+
+### Configuration Decisions (User-Confirmed):
+- ENG5 NP Legacy: `F+, E-, E+, D-, D+, C-, C+, B, A` (below F+ → F, uniform priors 1/9)
+- ENG5 NP National: `1-9` (below 1 → 0, uniform priors 1/9)
+- CLI tooling deferred to Phase 3.2
+- Backward compatibility: Swedish 8-anchor remains default
+- Assignment metadata (instructions table) is the source of truth for `grade_scale`; anchor registration and grade projection must resolve scale via `assignment_id` rather than trusting client input.
+
+### Quality Gates Met:
+- All tests passing (59 new + existing)
+- Type checking clean (1171 files)
+- Migration applied successfully
+- Files under 500 LoC limit
+- Database schema verified
+
+### Next Session Tasks:
+1. Complete remaining Phase 3.1 steps (5-10)
+2. Run integration tests with ENG5 NP scales
+3. Update service README with grade scale documentation
+4. Plan Phase 3.2 (CLI + enhanced integration)
+
+---
+
+## Session Summary (2025-11-07) - Phase 2 Theoretical Validation
 
 - Phase 1 research inputs are complete: core service files reviewed, initial analytical tooling created, and the expanded literature set (Pollitt 2012 through Kinnear et al. 2025) summarised in `.claude/research/CJ-CONFIDENCE-VALIDATION.md`.
 - Phase 2 theoretical work captured in the same notebook: Fisher-information derivation, SE → boundary probability mapping, audit notes for `compute_bt_standard_errors`, and the planned factor-weight sensitivity analysis.
 - Baseline analysis scripts (`cj_confidence_analysis.py`, `test_cj_confidence_analysis.py`) reproduce production heuristics and generate comparison tables for theoretical benchmarking.
 - Existing empirical logs are single-essay rating records (58 assessments for 12 essays) – **no pairwise CJ comparisons currently exist**, so fresh CJ batches must be executed via the CJ Assessment Service to collect comparison data for validation.
-- Progress and research notebooks have been refreshed with the new findings; ready to proceed into Phase 2 (theoretical validation) followed by data generation in Phase 3.
+- Phase 3 implementation plan recorded in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`, outlining grade-scale registry work, service integration, and ENG5 NP batch tooling per rule 110.7.
+- Grade-scale implementation will introduce `eng5_np_legacy_9_step` (grade codes `F+, E-, E+, D-, D+, C-, C+, B, A`; anchor IDs such as `F+1`, `F+2` map to the same `F+` code, essays below `F+` treated as `F`) and `eng5_np_national_9_step` (ordered `1`–`9`); SV3’s multi-aspect scale is deferred. Legacy anchors remain on the current Swedish 8-grade default until migration.
+- ENG5 NP 2016 artefacts: student essays (`test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays/`), anchors from `scripts/bayesian_consensus_model/d_optimal_workflow/models.py::DEFAULT_ANCHOR_ORDER`, exam instructions (`.../eng5_np_vt_2017_essay_instruction.md`), LLM comparison prompt (`.../llm_prompt_cj_assessment_eng5.md`).
+- Phase 3 data capture will persist machine-readable JSON bundles under `.claude/research/data/eng5_np_2016/` (metadata, essay registry, comparisons, BT stats, grade projections) to avoid repeated LLM runs.
+- Progress and research notebooks have been refreshed with the new findings; ready to proceed into grade-scale implementation and data generation.
 
 Outstanding next steps:
-1. Complete the Fisher-information derivation, audit `compute_bt_standard_errors`, and design the factor-weight sensitivity analysis (Phase 2).
-2. Use the CJ Assessment Service (Docker + APIs) to run new batches, capturing pairwise comparisons, BT scores, and SEs for empirical validation (Phase 3).
-3. Re-weight/replace confidence formulas, add tests, and document recommendations once theoretical and empirical work converge (Phases 4–5).
+1. Execute Phase 3.1 (grade-scale registry + migrations) per `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`.
+2. Update CJ anchor API, GradeProjector, and helper CLI for scale awareness (Phase 3.2).
+3. Build/run the ENG5 NP ingestion CLI, capture outputs using the agreed JSON schema (Phase 3.3), then move to confidence recalibration/testing (Phase 4).
 
 ---
 

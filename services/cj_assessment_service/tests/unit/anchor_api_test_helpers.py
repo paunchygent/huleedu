@@ -95,6 +95,11 @@ class MockCJRepository(CJRepositoryProtocol):
         self.behavior = behavior
         self.created_anchor: AnchorEssayReference | None = None
         self.session_context_calls = 0
+        self.assignment_context: dict[str, Any] | None = {
+            "assignment_id": "default-assignment",
+            "instructions_text": "Default instructions",
+            "grade_scale": "swedish_8_anchor",
+        }
 
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Return mock session context manager."""
@@ -107,6 +112,17 @@ class MockCJRepository(CJRepositoryProtocol):
         course_id: str | None,
     ) -> Any | None:
         """Mock implementation - not used in anchor management tests."""
+        return None
+
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        """Return stored assignment context for tests."""
+
+        if self.assignment_context and self.assignment_context["assignment_id"] == assignment_id:
+            return self.assignment_context
         return None
 
     async def get_cj_batch_upload(

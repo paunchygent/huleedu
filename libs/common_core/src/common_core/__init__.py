@@ -89,6 +89,15 @@ from .events.nlp_events import (
     StudentMatchSuggestion,
 )
 from .events.spellcheck_models import SpellcheckRequestedDataV1, SpellcheckResultDataV1
+from .grade_scales import (
+    GRADE_SCALES,
+    GradeScaleMetadata,
+    get_grade_index,
+    get_scale,
+    get_uniform_priors,
+    list_available_scales,
+    validate_grade_for_scale,
+)
 from .identity_enums import LoginFailureReason
 from .identity_models import (
     EmailVerificationRequestedV1,
@@ -252,6 +261,14 @@ __all__ = [
     "EssayLifecycleAIFeedbackRequestV1",
     # API Models
     "BatchRegistrationRequestV1",
+    # Grade Scales
+    "GRADE_SCALES",
+    "GradeScaleMetadata",
+    "get_scale",
+    "validate_grade_for_scale",
+    "list_available_scales",
+    "get_grade_index",
+    "get_uniform_priors",
 ]
 
 # Rebuild models to resolve forward references after all imports

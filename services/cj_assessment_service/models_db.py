@@ -410,6 +410,9 @@ class AssessmentInstruction(Base):
     )
     course_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     instructions_text: Mapped[str] = mapped_column(Text, nullable=False)
+    grade_scale: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="swedish_8_anchor", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -433,6 +436,9 @@ class AnchorEssayReference(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     grade: Mapped[str] = mapped_column(String(4), nullable=False, index=True)
+    grade_scale: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="swedish_8_anchor", index=True
+    )
     text_storage_id: Mapped[str] = mapped_column(String(255), nullable=False)
     assignment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -454,6 +460,9 @@ class GradeProjection(Base):
         Integer, ForeignKey("cj_batch_uploads.id"), primary_key=True
     )
     primary_grade: Mapped[str] = mapped_column(String(4), nullable=False)
+    grade_scale: Mapped[str] = mapped_column(
+        String(50), nullable=False, server_default="swedish_8_anchor", index=True
+    )
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
     confidence_label: Mapped[str] = mapped_column(String(10), nullable=False)
     calculation_metadata: Mapped[dict] = mapped_column(JSON, nullable=False)

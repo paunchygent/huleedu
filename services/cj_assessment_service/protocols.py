@@ -122,6 +122,14 @@ class CJRepositoryProtocol(Protocol):
         """Get assessment instruction by assignment or course ID."""
         ...
 
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch assignment-level metadata including instructions and grade scale."""
+        ...
+
     async def get_cj_batch_upload(
         self,
         session: AsyncSession,

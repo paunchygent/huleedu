@@ -110,7 +110,7 @@ which matches the proposal already sketched during earlier sessions. This forms 
 
 ### 4.3 Audit of `compute_bt_standard_errors`
 
-To validate the implementation against the theoretical curve, synthetic comparison sets were generated using the CJ service utilities (random pairing with balanced wins). A sample summary is below (median SE excludes the reference essay whose SE is fixed at 0):
+To validate the implementation against the theoretical curve, synthetic comparison sets were generated using the CJ service utilities (random pairing with balanced wins). The code lives in `.claude/research/scripts/phase2_theoretical_checks.py` with unit coverage via `test_phase2_theoretical_checks.py`. Run `pdm run python -m .claude.research.scripts.phase2_theoretical_checks` to reproduce the summary below (median SE excludes the reference essay whose SE is fixed at 0):
 
 | Target min comparisons per essay | Mean realised comparisons | Median SE (empirical) | Approx. SE \(2/\sqrt{\text{mean}}\) |
 |----------------------------------|---------------------------|-----------------------|-------------------------------------|
@@ -136,3 +136,12 @@ Phase 3 will furnish the empirical dataset needed to back-test factor weights.
 4. **Stability metric**: once multi-session data exist, incorporate score drift (|θ_t − θ_{t-1}|) to test whether temporal stability deserves explicit weighting.
 
 The outputs will feed directly into the recommendation phase, ensuring that any reweighted confidence formula carries statistical justification.
+
+---
+
+## 5. Phase 3 Roadmap Reference
+
+- Detailed implementation plan for grade-scale enablement and ENG5 NP data capture lives in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (per rule `.claude/rules/110.7-task-creation-and-decomposition-methodology.mdc`).
+- Planned grade scales: `eng5_np_legacy_9_step` (`["F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]`, essays below `F+` treated as `F`) and `eng5_np_national_9_step` (`["1", "2", "3", "4", "5", "6", "7", "8", "9"]`).
+- ENG5 NP 2016 inputs: instructions (`test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md`), LLM prompt (`.../llm_prompt_cj_assessment_eng5.md`), student essays (`.../anchor_essays/`), anchors defined in `scripts/bayesian_consensus_model/d_optimal_workflow/models.py::DEFAULT_ANCHOR_ORDER`.
+- Phase 3 data outputs will be stored as JSON bundles under `.claude/research/data/eng5_np_2016/` capturing metadata, comparisons, BT stats, and grade projections.

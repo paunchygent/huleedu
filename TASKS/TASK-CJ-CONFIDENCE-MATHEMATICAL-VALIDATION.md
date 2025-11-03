@@ -53,6 +53,10 @@
 - Audited `compute_bt_standard_errors()` with synthetic random-pair datasets (via `pdm run python`), confirming monotonic SE shrinkage while documenting the observed ~20–30 % inflation relative to the naive \(2/\sqrt{n}\) rule due to pairing imbalance and reference constraints.
 - Captured the planned sensitivity-analysis methodology (correlation/regression/ablation) to reassess factor weights once empirical CJ batches are available in Phase 3.
 
+### 2025-11-07 – Phase 3 Plan (Grade Scale + Data Pipeline)
+- Detailed execution plan documented in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` per rule `.claude/rules/110.7-task-creation-and-decomposition-methodology.mdc`.
+- Plan covers grade-scale foundations, service integration, and ENG5 NP 2016 batch tooling with explicit deliverables, checkpoints, dependencies, and rule citations.
+
 ---
 
 ## Context & Motivation

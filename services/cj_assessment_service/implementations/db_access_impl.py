@@ -20,6 +20,7 @@ from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_api import ComparisonResult
 from services.cj_assessment_service.models_db import (
+    AssessmentInstruction,
     Base,
     CJBatchUpload,
     ComparisonPair,
@@ -379,7 +380,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         session: AsyncSession,
         assignment_id: str | None,
         course_id: str | None,
-    ) -> Any | None:  # AssessmentInstruction | None
+    ) -> AssessmentInstruction | None:
         """Get assessment instruction by assignment or course ID.
 
         Args:
