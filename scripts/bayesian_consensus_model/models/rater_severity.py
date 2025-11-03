@@ -104,16 +104,9 @@ def compute_rater_weights(
 
     deviations = aligned["deviation"]
     rms_alignment = (
-        aligned.assign(dev_sq=deviations**2)
-        .groupby("rater_id")["dev_sq"]
-        .mean()
-        .pipe(np.sqrt)
+        aligned.assign(dev_sq=deviations**2).groupby("rater_id")["dev_sq"].mean().pipe(np.sqrt)
     )
-    mad_alignment = (
-        aligned.assign(abs_dev=deviations.abs())
-        .groupby("rater_id")["abs_dev"]
-        .mean()
-    )
+    mad_alignment = aligned.assign(abs_dev=deviations.abs()).groupby("rater_id")["abs_dev"].mean()
 
     alignment_weight = 1.0 / (1.0 + cfg.alignment_scale * rms_alignment)
 

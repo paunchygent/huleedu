@@ -64,6 +64,7 @@ class ConsensusModel:
     def rater_bias_posteriors(self) -> pd.DataFrame:
         return self._model.rater_bias_posteriors
 
+
 __all__ = [
     "ConsensusModel",
     "ConsensusResult",

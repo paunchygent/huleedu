@@ -151,7 +151,6 @@ def test_consensus_bias_correction_with_empirical_bayes() -> None:
         assert abs(expected_idx - base_idx) < abs(naive_mean - base_idx)
 
 
-
 def test_bias_correction_toggle_restores_naive_expectation() -> None:
     rows = []
     base_indices = [6, 7, 5, 6, 7]
@@ -189,9 +188,10 @@ def test_bias_correction_toggle_restores_naive_expectation() -> None:
     results_on = model_on.get_consensus()
     differing = False
     for essay_id in results_on:
-        if not pytest.approx(results_on[essay_id].expected_grade_index) == results_off[
-            essay_id
-        ].expected_grade_index:
+        if (
+            not pytest.approx(results_on[essay_id].expected_grade_index)
+            == results_off[essay_id].expected_grade_index
+        ):
             differing = True
             break
     assert differing

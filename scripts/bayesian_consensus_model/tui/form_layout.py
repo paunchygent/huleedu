@@ -103,11 +103,16 @@ def create_form_layout() -> ComposeResult:
     with Container(id="panel"):
         with VerticalScroll(id="form"):
             yield Label("Students CSV (optional - recommended for large cohorts)")
-            yield Input(
-                placeholder="Path to CSV with essay_id/student_id/id column",
-                id="students_csv_input",
-                classes="field-input",
-            )
+            with HorizontalGroup(classes="file-row"):
+                yield Input(
+                    placeholder="Path to CSV with essay_id/student_id/id column",
+                    id="students_csv_input",
+                    classes="field-input",
+                )
+                yield Button(
+                    "Browse…",
+                    id="students_csv_browse_button",
+                )
             yield Label("Students (comma-separated - fallback if no CSV)")
             yield Input(
                 placeholder="e.g., JA24, II24, ES24",
@@ -162,11 +167,16 @@ def create_form_layout() -> ComposeResult:
                     id="optimizer_output_browse_button",
                 )
             yield Label("Previous Session CSV (optional, for multi-session workflows)")
-            yield Input(
-                placeholder="e.g., session1_pairs.csv (leave blank for first session)",
-                id="previous_csv_input",
-                classes="field-input",
-            )
+            with HorizontalGroup(classes="file-row"):
+                yield Input(
+                    placeholder="e.g., session1_pairs.csv (leave blank for first session)",
+                    id="previous_csv_input",
+                    classes="field-input",
+                )
+                yield Button(
+                    "Browse…",
+                    id="previous_csv_browse_button",
+                )
             yield Label("Locked Pairs (semicolon-separated: essay_a,essay_b; essay_c,essay_d)")
             yield Input(
                 placeholder="e.g., JA24,A1; II24,B1",
@@ -195,7 +205,7 @@ def create_form_layout() -> ComposeResult:
             "Generate Assignments builds comparison pairs, "
             "then distributes them to raters. Outputs: Pairs CSV + Assignments CSV. "
             "Tip: focus a file path field, drag files onto the terminal, or use "
-            "Browse… buttons to update paths.",
+            "Browse… buttons to select input/output paths.",
             id="instructions",
         )
         yield TextLog(id="result", markup=True, wrap=True, auto_scroll=True)

@@ -93,9 +93,7 @@ def redistribute(
         available_total = len(comparisons)
 
         if available_total == 0:
-            raise ValueError(
-                "No comparisons available in pairs CSV."
-            )
+            raise ValueError("No comparisons available in pairs CSV.")
 
         shortage = requested_total > available_total
         if shortage:
@@ -128,8 +126,7 @@ def redistribute(
         fg=typer.colors.GREEN,
     )
     typer.secho(
-        "Total allocated comparisons: "
-        f"{sum(actual_counts)} (requested {requested_total}).",
+        f"Total allocated comparisons: {sum(actual_counts)} (requested {requested_total}).",
         fg=typer.colors.GREEN,
     )
     typer.echo(f"Output written to {output_path}")
@@ -221,8 +218,7 @@ def optimize_pairs(
         if previous_csv:
             previous_comparisons = load_previous_comparisons_from_csv(previous_csv)
             typer.echo(
-                f"Loaded {len(previous_comparisons)} previous comparisons "
-                f"from {previous_csv}"
+                f"Loaded {len(previous_comparisons)} previous comparisons from {previous_csv}"
             )
 
         # Parse locked pairs

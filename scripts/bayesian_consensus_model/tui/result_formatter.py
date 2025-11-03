@@ -46,9 +46,7 @@ def format_optimization_summary(result: OptimizationResult, output_path: Path) -
 
     missing = sorted(set(result.students) - set(coverage))
     if missing:
-        messages.append(
-            "[yellow]Warning[/]: Missing anchor coverage for " + ", ".join(missing)
-        )
+        messages.append("[yellow]Warning[/]: Missing anchor coverage for " + ", ".join(missing))
 
     repeats = result.optimized_diagnostics.repeat_counts
     if repeats:

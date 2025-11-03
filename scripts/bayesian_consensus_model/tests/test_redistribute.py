@@ -362,6 +362,7 @@ def test_cli_optimize_with_report_includes_dynamic_spec(tmp_path: Path) -> None:
     assert report["dynamic_spec"]["total_slots"] == 20
     assert report["dynamic_spec"]["include_anchor_anchor"] is True
 
+
 # ============================================================================
 # Multi-Session Workflow Tests (Session 1 vs Session 2+)
 # ============================================================================
@@ -380,7 +381,8 @@ def test_session1_workflow_no_previous_comparisons() -> None:
 
     # Verify baseline coverage: each student should have anchor comparisons
     student_anchor_pairs = [
-        entry for entry in result.optimized_design
+        entry
+        for entry in result.optimized_design
         if entry.candidate.comparison_type == "student_anchor"
     ]
     students_with_coverage = set()
@@ -421,8 +423,7 @@ def test_session2_workflow_with_previous_comparisons() -> None:
     # Check that baseline design reflects previous comparisons
     assert len(result.baseline_design) == 2
     baseline_keys = {
-        (entry.candidate.essay_a, entry.candidate.essay_b)
-        for entry in result.baseline_design
+        (entry.candidate.essay_a, entry.candidate.essay_b) for entry in result.baseline_design
     }
     assert ("JA24", "A1") in baseline_keys
     assert ("JA24", "A2") in baseline_keys
@@ -430,7 +431,8 @@ def test_session2_workflow_with_previous_comparisons() -> None:
     # Verify coverage analysis: II24 and ES24 should get required anchor pairs
     # (since they had no coverage in baseline)
     student_anchor_pairs = [
-        entry for entry in result.optimized_design
+        entry
+        for entry in result.optimized_design
         if entry.candidate.comparison_type == "student_anchor"
     ]
     students_with_coverage = set()
@@ -458,11 +460,13 @@ def test_load_previous_comparisons_from_csv(tmp_path: Path) -> None:
     with csv_path.open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type"])
-        writer.writerows([
-            (1, "JA24", "A1", "student_anchor"),
-            (2, "II24", "B1", "student_anchor"),
-            (3, "ES24", "A2", "student_anchor"),
-        ])
+        writer.writerows(
+            [
+                (1, "JA24", "A1", "student_anchor"),
+                (2, "II24", "B1", "student_anchor"),
+                (3, "ES24", "A2", "student_anchor"),
+            ]
+        )
 
     records = load_previous_comparisons_from_csv(csv_path)
 
@@ -479,10 +483,12 @@ def test_cli_optimize_with_previous_csv(tmp_path: Path) -> None:
     with previous_csv.open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(["pair_id", "essay_a_id", "essay_b_id", "comparison_type"])
-        writer.writerows([
-            (1, "JA24", "A1", "student_anchor"),
-            (2, "JA24", "A2", "student_anchor"),
-        ])
+        writer.writerows(
+            [
+                (1, "JA24", "A1", "student_anchor"),
+                (2, "JA24", "A2", "student_anchor"),
+            ]
+        )
 
     output_csv = tmp_path / "session2.csv"
     runner = CliRunner()
@@ -490,12 +496,18 @@ def test_cli_optimize_with_previous_csv(tmp_path: Path) -> None:
         cli_app,
         [
             "optimize-pairs",
-            "--student", "JA24",
-            "--student", "II24",
-            "--student", "ES24",
-            "--previous-csv", str(previous_csv),
-            "--total-slots", "84",
-            "--output-csv", str(output_csv),
+            "--student",
+            "JA24",
+            "--student",
+            "II24",
+            "--student",
+            "ES24",
+            "--previous-csv",
+            str(previous_csv),
+            "--total-slots",
+            "84",
+            "--output-csv",
+            str(output_csv),
         ],
     )
 

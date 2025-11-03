@@ -91,11 +91,7 @@ def summarize_design(
         )
         ordered_coverage[student] = sorted_anchors
 
-    repeat_counts = {
-        f"{pair[0]}|{pair[1]}": count
-        for pair, count in repeats.items()
-        if count > 1
-    }
+    repeat_counts = {f"{pair[0]}|{pair[1]}": count for pair, count in repeats.items() if count > 1}
 
     return DesignDiagnostics(
         total_pairs=len(design),

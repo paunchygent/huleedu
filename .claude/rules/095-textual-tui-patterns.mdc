@@ -26,6 +26,12 @@ with VerticalScroll(id="form"):
 }
 ```
 
+### 1.3. Horizontal Rows (Field + Button)
+- **RECOMMENDED**: Use `HorizontalGroup` for single-row combinations (non-expanding, `height: auto`)
+- **FORBIDDEN**: Using `Horizontal` for form rows; default CSS sets `height: 1fr`, collapsing the row in scroll containers
+- **Layout**: Apply `classes="file-row"` (or similar) and style with `width: 1fr` on the input, `margin-left: 1` on the button
+- **Reference**: `textual.containers.HorizontalGroup` API docs
+
 ## 2. Select Widget
 
 ### 2.1. Component Structure

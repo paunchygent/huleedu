@@ -37,9 +37,7 @@ def test_argmax_decision_prefers_highest_probability() -> None:
 
     assert round_grade == "C-"
     assert argmax_result.consensus_grade == "C+"
-    assert argmax_result.confidence == pytest.approx(
-        argmax_result.grade_probabilities["C+"]
-    )
+    assert argmax_result.confidence == pytest.approx(argmax_result.grade_probabilities["C+"])
 
 
 def test_leave_one_out_alignment_increases_bias_penalty() -> None:
@@ -89,18 +87,17 @@ def test_precision_weighting_downscales_high_variance_raters() -> None:
 
     baseline_model = ConsensusModel(KernelConfig(bias_correction=True))
     baseline_model.fit(df)
-    precision_model = ConsensusModel(
-        KernelConfig(bias_correction=True, use_precision_weights=True)
-    )
+    precision_model = ConsensusModel(KernelConfig(bias_correction=True, use_precision_weights=True))
     precision_model.fit(df)
 
     base_metrics = baseline_model.rater_metrics.set_index("rater_id")
     precision_metrics = precision_model.rater_metrics.set_index("rater_id")
 
     assert precision_metrics.loc["R_noisy", "precision_factor"] < 1.0
-    assert precision_metrics.loc["R_noisy", "precision_factor"] < precision_metrics.loc[
-        "R_cons", "precision_factor"
-    ]
+    assert (
+        precision_metrics.loc["R_noisy", "precision_factor"]
+        < precision_metrics.loc["R_cons", "precision_factor"]
+    )
     assert precision_metrics.loc["R_noisy", "weight"] < base_metrics.loc["R_noisy", "weight"]
     assert precision_metrics.loc["R_anchor", "weight"] == pytest.approx(
         base_metrics.loc["R_anchor", "weight"]

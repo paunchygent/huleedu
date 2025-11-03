@@ -40,9 +40,7 @@ def _build_random_design(
     rng = random.Random(seed)
     for _ in range(total_slots):
         eligible = [
-            candidate
-            for candidate in candidates
-            if counts.get(candidate.key(), 0) < max_repeat
+            candidate for candidate in candidates if counts.get(candidate.key(), 0) < max_repeat
         ]
         if not eligible:
             break

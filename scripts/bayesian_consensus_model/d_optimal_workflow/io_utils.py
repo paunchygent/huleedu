@@ -40,9 +40,7 @@ def load_students_from_csv(csv_path: Path) -> List[str]:
                 handle.seek(0)
                 reader = csv.DictReader(handle)
                 students = [
-                    row[original].strip()
-                    for row in reader
-                    if row.get(original, "").strip()
+                    row[original].strip() for row in reader if row.get(original, "").strip()
                 ]
                 if not students:
                     raise ValueError(f"CSV column '{original}' is empty")

@@ -30,9 +30,9 @@ Main application class and event handlers.
 - `compose()`: Delegates to `create_form_layout()`
 - `on_input_changed()`: Strips quotes from file paths on change events
 - `on_paste()`: Detects file paths in paste events and populates target fields
-- `on_button_pressed()`: Routes generate/reset actions and launches native Save dialogs
+- `on_button_pressed()`: Routes generate/reset actions and launches native Open/Save dialogs
 - `_generate_assignments()`: Orchestrates optimizer → assignment workflow
-- `_open_save_dialog()`: Runs `crossfiledialog.save_file()` in a worker thread and applies changes on the main thread
+- `_launch_file_dialog()`: Runs `crossfiledialog.open_file()` / `save_file()` in a worker thread and applies changes on the main thread
 - `_reset_form()`: Resets all fields to defaults
 
 **Keyboard Bindings:**
@@ -77,6 +77,8 @@ Form structure, CSS, and widget composition.
 
 **Button IDs:**
 
+- `students_csv_browse_button`: Opens a native Open dialog for the student roster CSV
+- `previous_csv_browse_button`: Opens a native Open dialog for the previous session CSV
 - `output_browse_button`: Launches a native Save dialog for the assignments CSV path
 - `optimizer_output_browse_button`: Launches a native Save dialog for the comparison pairs CSV path
 
@@ -399,7 +401,7 @@ Both use `unquote_file_path()` to validate the unquoted path exists before updat
 
 ### Native Save Dialogs
 
-Browse buttons trigger `_open_save_dialog()`, which calls `crossfiledialog.save_file()` inside a Textual worker thread. This keeps the UI responsive while the OS dialog is open. Once a path is selected, the worker applies the change via `call_from_thread()` and logs the update. Cancelled dialogs leave the original value unchanged.
+Browse buttons trigger `_launch_file_dialog()`, which calls `crossfiledialog.open_file()` or `save_file()` inside a Textual worker thread. This keeps the UI responsive while the OS dialog is open. Once a path is selected, the worker applies the change via `call_from_thread()` and logs the update. Cancelled dialogs leave the original value unchanged.
 
 ### Multi-Session Workflows
 

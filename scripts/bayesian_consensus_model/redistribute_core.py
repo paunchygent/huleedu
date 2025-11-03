@@ -238,11 +238,7 @@ def _select_rater_for_type(
     rater_state: Dict[str, "_RaterAllocation"],
     comparison_type: str,
 ) -> str:
-    eligible = [
-        (name, state)
-        for name, state in rater_state.items()
-        if state.remaining
-    ]
+    eligible = [(name, state) for name, state in rater_state.items() if state.remaining]
     if not eligible:
         raise ValueError("No raters remain eligible for additional comparisons.")
 
@@ -273,8 +269,7 @@ def write_assignments(
     # Sort for deterministic mapping (same input → same display codes)
     sorted_essays = sorted(all_essay_ids)
     display_mapping = {
-        essay_id: f"essay_{idx:02d}"
-        for idx, essay_id in enumerate(sorted_essays, start=1)
+        essay_id: f"essay_{idx:02d}" for idx, essay_id in enumerate(sorted_essays, start=1)
     }
 
     fieldnames = [

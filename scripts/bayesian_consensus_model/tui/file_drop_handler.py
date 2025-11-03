@@ -25,8 +25,9 @@ def extract_paths_from_paste(paste_text: str) -> list[str]:
     paste_text = paste_text.strip()
 
     # Check if entire text is a single quoted string
-    if (paste_text.startswith("'") and paste_text.endswith("'") and paste_text.count("'") == 2) or \
-       (paste_text.startswith('"') and paste_text.endswith('"') and paste_text.count('"') == 2):
+    if (paste_text.startswith("'") and paste_text.endswith("'") and paste_text.count("'") == 2) or (
+        paste_text.startswith('"') and paste_text.endswith('"') and paste_text.count('"') == 2
+    ):
         segments = [paste_text]
     # Otherwise split on common delimiters
     elif "\x00" in paste_text:
@@ -45,8 +46,9 @@ def extract_paths_from_paste(paste_text: str) -> list[str]:
             continue
 
         # Strip quotes if present
-        if (segment.startswith("'") and segment.endswith("'")) or \
-           (segment.startswith('"') and segment.endswith('"')):
+        if (segment.startswith("'") and segment.endswith("'")) or (
+            segment.startswith('"') and segment.endswith('"')
+        ):
             segment = segment[1:-1]
 
         # Strip file:// prefix if present
@@ -77,8 +79,9 @@ def unquote_file_path(value: str) -> str | None:
         return None
 
     # Check if value is wrapped in quotes
-    if (value.startswith("'") and value.endswith("'")) or \
-       (value.startswith('"') and value.endswith('"')):
+    if (value.startswith("'") and value.endswith("'")) or (
+        value.startswith('"') and value.endswith('"')
+    ):
         unquoted = value[1:-1]
         if Path(unquoted).exists():
             return unquoted

@@ -89,17 +89,15 @@ def _load_ratings(path: Path, verbose: bool = False) -> Tuple[pd.DataFrame, Dict
     metadata = (
         df[[essay_col, file_col]]
         .rename(columns={essay_col: "essay_id", file_col: "file_name"})
-        .set_index("essay_id")["file_name"].to_dict()
+        .set_index("essay_id")["file_name"]
+        .to_dict()
     )
 
-    long_df = (
-        df.melt(
-            id_vars=[essay_col, file_col],
-            var_name="rater_id",
-            value_name="grade",
-        )
-        .rename(columns={essay_col: "essay_id", file_col: "file_name"})
-    )
+    long_df = df.melt(
+        id_vars=[essay_col, file_col],
+        var_name="rater_id",
+        value_name="grade",
+    ).rename(columns={essay_col: "essay_id", file_col: "file_name"})
     long_df["grade"] = long_df["grade"].astype(str).str.strip().str.upper()
     long_df = long_df.replace({"": np.nan, "NAN": np.nan}).dropna(subset=["grade"])
 
@@ -199,6 +197,7 @@ def _write_rater_reports(
     )
     return metrics, bias
 
+
 def _run_pipeline(
     ratings: pd.DataFrame,
     metadata: Dict[str, str],
@@ -222,10 +221,12 @@ def _run_pipeline(
     )
     (output_dir / "grade_thresholds.csv").unlink(missing_ok=True)
     diagnostics = asdict(config)
-    diagnostics.update({
-        "model": "ordinal_kernel",
-        "bias_correction": config.bias_correction,
-    })
+    diagnostics.update(
+        {
+            "model": "ordinal_kernel",
+            "bias_correction": config.bias_correction,
+        }
+    )
     _write_json(output_dir / "model_diagnostics.json", diagnostics)
     if verbose and plot_created:
         print(f"Saved rater bias vs weight plot to {output_dir}")
@@ -274,16 +275,13 @@ def _write_comparison_outputs(
     )
     merged = base_df.merge(alt_df, on=["essay_id", "file_name", "sample_size"], how="inner")
     merged["delta_expected"] = (
-        merged[f"expected_grade_index_{base_label}"]
-        - merged[f"expected_grade_index_{alt_label}"]
+        merged[f"expected_grade_index_{base_label}"] - merged[f"expected_grade_index_{alt_label}"]
     )
     merged["delta_confidence"] = (
-        merged[f"confidence_{base_label}"]
-        - merged[f"confidence_{alt_label}"]
+        merged[f"confidence_{base_label}"] - merged[f"confidence_{alt_label}"]
     )
     merged["grade_changed"] = (
-        merged[f"consensus_grade_{base_label}"]
-        != merged[f"consensus_grade_{alt_label}"]
+        merged[f"consensus_grade_{base_label}"] != merged[f"consensus_grade_{alt_label}"]
     )
     merged = merged.sort_values("delta_expected", key=lambda s: s.abs(), ascending=False)
 
@@ -299,9 +297,7 @@ def _write_comparison_outputs(
         "neutral_ess_mean_variant": float(merged[f"neutral_ess_{alt_label}"].mean()),
         "needs_more_ratings_variant": int(merged[f"needs_more_ratings_{alt_label}"].sum()),
     }
-    _write_json(
-        output_dir / f"comparison_{base_label}_vs_{alt_label}.json", summary
-    )
+    _write_json(output_dir / f"comparison_{base_label}_vs_{alt_label}.json", summary)
 
 
 def _plot_bias_vs_weight(
@@ -352,7 +348,6 @@ def _plot_bias_vs_weight(
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     return True
-
 
 
 def _essay_inter_rater_stats(

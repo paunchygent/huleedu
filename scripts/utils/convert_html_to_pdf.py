@@ -25,6 +25,7 @@ from typing import Optional, Tuple
 try:
     from weasyprint import CSS, HTML
     from weasyprint.text.fonts import FontConfiguration
+
     WEASYPRINT_AVAILABLE = True
 except ImportError:
     WEASYPRINT_AVAILABLE = False
@@ -33,6 +34,7 @@ except ImportError:
 # pypandoc should always be available (already in project dependencies)
 try:
     import pypandoc
+
     PYPANDOC_AVAILABLE = True
 except ImportError:
     PYPANDOC_AVAILABLE = False
@@ -43,9 +45,7 @@ def setup_logging(verbose: bool = False) -> None:
     """Configure logging for the script."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        level=level, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
 
@@ -71,7 +71,9 @@ def validate_html_file(input_path: Path) -> None:
             images_found.append(img_file.name)
 
     if images_found:
-        logging.info(f"Found {len(images_found)} image(s) in same directory: {', '.join(images_found)}")
+        logging.info(
+            f"Found {len(images_found)} image(s) in same directory: {', '.join(images_found)}"
+        )
 
 
 def get_supplementary_css() -> str:
@@ -146,9 +148,7 @@ def get_supplementary_css() -> str:
 
 
 def convert_with_weasyprint(
-    html_path: Path,
-    output_path: Path,
-    add_supplementary_css: bool = True
+    html_path: Path, output_path: Path, add_supplementary_css: bool = True
 ) -> Path:
     """
     Convert HTML to PDF using WeasyPrint (best CSS support).
@@ -175,10 +175,7 @@ def convert_with_weasyprint(
             html_content = f.read()
 
         # Create HTML object with proper base URL for relative image paths
-        html_doc = HTML(
-            string=html_content,
-            base_url=str(html_path.parent.absolute()) + "/"
-        )
+        html_doc = HTML(string=html_content, base_url=str(html_path.parent.absolute()) + "/")
 
         # Prepare stylesheets
         stylesheets = []
@@ -187,11 +184,7 @@ def convert_with_weasyprint(
             stylesheets.append(css_doc)
 
         # Generate PDF
-        html_doc.write_pdf(
-            str(output_path),
-            stylesheets=stylesheets,
-            font_config=font_config
-        )
+        html_doc.write_pdf(str(output_path), stylesheets=stylesheets, font_config=font_config)
 
         # Verify PDF was created
         if not output_path.exists():
@@ -200,7 +193,9 @@ def convert_with_weasyprint(
         if output_path.stat().st_size == 0:
             raise RuntimeError("PDF file is empty")
 
-        logging.info(f"Successfully created PDF: {output_path} ({output_path.stat().st_size:,} bytes)")
+        logging.info(
+            f"Successfully created PDF: {output_path} ({output_path.stat().st_size:,} bytes)"
+        )
         return output_path
 
     except Exception as e:
@@ -208,10 +203,7 @@ def convert_with_weasyprint(
         raise
 
 
-def convert_with_pypandoc(
-    html_path: Path,
-    output_path: Path
-) -> Path:
+def convert_with_pypandoc(html_path: Path, output_path: Path) -> Path:
     """
     Convert HTML to PDF using pypandoc (fallback method).
 
@@ -238,8 +230,8 @@ def convert_with_pypandoc(
                 "--variable=geometry:a4paper",
                 "--variable=geometry:margin=2cm",
                 "--standalone",
-                "--embed-resources"
-            ]
+                "--embed-resources",
+            ],
         )
 
         # Verify PDF was created
@@ -250,7 +242,7 @@ def convert_with_pypandoc(
                 str(html_path),
                 "pdf",
                 outputfile=str(output_path),
-                extra_args=["--standalone", "--embed-resources"]
+                extra_args=["--standalone", "--embed-resources"],
             )
 
         if not output_path.exists():
@@ -259,7 +251,9 @@ def convert_with_pypandoc(
         if output_path.stat().st_size == 0:
             raise RuntimeError("PDF file is empty")
 
-        logging.info(f"Successfully created PDF: {output_path} ({output_path.stat().st_size:,} bytes)")
+        logging.info(
+            f"Successfully created PDF: {output_path} ({output_path.stat().st_size:,} bytes)"
+        )
         return output_path
 
     except Exception as e:
@@ -271,7 +265,7 @@ def convert_html_to_pdf(
     input_path: Path,
     output_path: Optional[Path] = None,
     prefer_weasyprint: bool = True,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> Tuple[Path, str]:
     """
     Convert HTML file to PDF with automatic backend selection.
@@ -326,8 +320,7 @@ def convert_html_to_pdf(
 
     if not available:
         raise RuntimeError(
-            "No PDF conversion backend available. "
-            "Install weasyprint with: pdm add weasyprint"
+            "No PDF conversion backend available. Install weasyprint with: pdm add weasyprint"
         )
     else:
         raise RuntimeError(f"All available backends failed: {', '.join(available)}")
@@ -347,39 +340,25 @@ Examples:
 
 Note: WeasyPrint provides the best CSS support but requires installation:
   pdm add weasyprint
-        """
+        """,
     )
 
+    parser.add_argument("input", type=Path, nargs="?", help="Input HTML file path")
+
     parser.add_argument(
-        "input",
+        "-o",
+        "--output",
         type=Path,
-        nargs="?",
-        help="Input HTML file path"
+        help="Output PDF file path (default: input file with .pdf extension)",
     )
 
-    parser.add_argument(
-        "-o", "--output",
-        type=Path,
-        help="Output PDF file path (default: input file with .pdf extension)"
-    )
+    parser.add_argument("--pypandoc", action="store_true", help="Prefer pypandoc over weasyprint")
 
     parser.add_argument(
-        "--pypandoc",
-        action="store_true",
-        help="Prefer pypandoc over weasyprint"
+        "--check-backends", action="store_true", help="Check which backends are available and exit"
     )
 
-    parser.add_argument(
-        "--check-backends",
-        action="store_true",
-        help="Check which backends are available and exit"
-    )
-
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 
@@ -407,7 +386,7 @@ Note: WeasyPrint provides the best CSS support but requires installation:
             input_path=args.input,
             output_path=args.output,
             prefer_weasyprint=not args.pypandoc,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
 
         print(f"✅ Successfully converted to PDF using {backend}: {pdf_path}")
@@ -417,12 +396,13 @@ Note: WeasyPrint provides the best CSS support but requires installation:
         if size_kb < 1024:
             print(f"   File size: {size_kb:.1f} KB")
         else:
-            print(f"   File size: {size_kb/1024:.1f} MB")
+            print(f"   File size: {size_kb / 1024:.1f} MB")
 
     except Exception as e:
         print(f"❌ Conversion failed: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 

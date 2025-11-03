@@ -181,9 +181,7 @@ class OrdinalKernelModel:
                 neutral_sum = float(np.sum(neutral_weights))
                 neutral_weight_sq = float(np.sum(np.square(neutral_weights)))
                 neutral_ess = (
-                    float((neutral_sum**2) / neutral_weight_sq)
-                    if neutral_weight_sq > 0.0
-                    else 0.0
+                    float((neutral_sum**2) / neutral_weight_sq) if neutral_weight_sq > 0.0 else 0.0
                 )
             else:
                 neutral_ess = 0.0

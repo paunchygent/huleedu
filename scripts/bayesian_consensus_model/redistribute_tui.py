@@ -98,9 +98,7 @@ class RedistributeApp(App):
         summary_path = file_paths[0]
         if len(file_paths) > 1:
             summary_path += f" (+{len(file_paths) - 1} more)"
-        log_widget.write(
-            f"Detected file drop; populated '{placeholder}' with {summary_path}."
-        )
+        log_widget.write(f"Detected file drop; populated '{placeholder}' with {summary_path}.")
 
     def action_show_help(self) -> None:
         """Show help screen."""
@@ -119,11 +117,11 @@ class RedistributeApp(App):
         elif event.button.id == "reset_button":
             self._reset_form()
         elif event.button.id in self._BROWSE_BUTTON_CONFIG:
-            field_id, title = self._BROWSE_BUTTON_CONFIG[event.button.id]
+            field_id, title, mode = self._BROWSE_BUTTON_CONFIG[event.button.id]
             input_widget = self.query_one(f"#{field_id}", Input)
             current_value = input_widget.value.strip()
             placeholder = input_widget.placeholder or field_id.replace("_", " ")
-            self._open_save_dialog(field_id, title, current_value, placeholder)
+            self._launch_file_dialog(field_id, title, current_value, placeholder, mode)
 
     def _reset_form(self) -> None:
         """Reset all form fields to defaults."""
@@ -158,9 +156,7 @@ class RedistributeApp(App):
             opt_result, pairs_path, students_value = run_optimizer(optimizer_inputs)
 
             # Log optimizer results
-            self.call_from_thread(
-                log_widget.write, f"Loaded {len(opt_result.students)} students"
-            )
+            self.call_from_thread(log_widget.write, f"Loaded {len(opt_result.students)} students")
             self.call_from_thread(
                 log_widget.write,
                 f"Generating {opt_result.total_comparisons} pairs for "
@@ -206,30 +202,43 @@ class RedistributeApp(App):
 
             self.call_from_thread(enable_button)
 
-    _BROWSE_BUTTON_CONFIG: dict[str, tuple[str, str]] = {
+    _BROWSE_BUTTON_CONFIG: dict[str, tuple[str, str, str]] = {
         "output_browse_button": (
             "output_input",
             "Save assignments CSV",
+            "save",
         ),
         "optimizer_output_browse_button": (
             "optimizer_output_input",
             "Save comparison pairs CSV",
+            "save",
+        ),
+        "students_csv_browse_button": (
+            "students_csv_input",
+            "Select students CSV",
+            "open",
+        ),
+        "previous_csv_browse_button": (
+            "previous_csv_input",
+            "Select previous session CSV",
+            "open",
         ),
     }
 
     @work(thread=True, exclusive=False, exit_on_error=False)
-    async def _open_save_dialog(
+    async def _launch_file_dialog(
         self,
         field_id: str,
         title: str,
         current_value: str,
         placeholder: str,
+        mode: str,
     ) -> None:
-        """Open a native save dialog and update the target input field."""
+        """Open a native file dialog and update the target input field."""
         log_widget = self.query_one(TextLog)
 
         try:
-            from crossfiledialog import exceptions, save_file
+            from crossfiledialog import exceptions, open_file, save_file
         except ImportError as exc:  # pragma: no cover - package missing
             self.call_from_thread(
                 log_widget.write,
@@ -239,7 +248,10 @@ class RedistributeApp(App):
 
         start_dir = self._derive_start_dir(current_value)
         try:
-            result = save_file(title=title, start_dir=start_dir)
+            if mode == "save":
+                result = save_file(title=title, start_dir=start_dir)
+            else:
+                result = open_file(title=title, start_dir=start_dir)
         except exceptions.NoImplementationFoundException:
             self.call_from_thread(
                 log_widget.write,
@@ -247,15 +259,11 @@ class RedistributeApp(App):
             )
             return
         except Exception as exc:  # pragma: no cover - OS dialog failure
-            self.call_from_thread(
-                log_widget.write, f"[red]File dialog error:[/] {exc}"
-            )
+            self.call_from_thread(log_widget.write, f"[red]File dialog error:[/] {exc}")
             return
 
         if not result:
-            self.call_from_thread(
-                log_widget.write, f"No changes made to {placeholder} path."
-            )
+            self.call_from_thread(log_widget.write, f"No changes made to {placeholder} path.")
             return
 
         resolved_path = str(Path(result).expanduser())
@@ -273,7 +281,7 @@ class RedistributeApp(App):
 
     @staticmethod
     def _derive_start_dir(current_value: str) -> str | None:
-        """Determine a sensible starting directory for the save dialog."""
+        """Determine a sensible starting directory for native file dialogs."""
         if not current_value:
             return None
 

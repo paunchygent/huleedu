@@ -6,7 +6,6 @@ from pathlib import Path
 
 from scripts.bayesian_consensus_model.tui.file_drop_handler import extract_paths_from_paste
 
-
 # ============================================================================
 # Path Extraction Tests (Drag-and-Drop / Paste Handling)
 # ============================================================================
@@ -86,7 +85,7 @@ def test_extract_paths_from_paste_mixed_quoting(tmp_path: Path) -> None:
     file2.write_text("dummy2")
 
     # Mix single and double quotes
-    payload = f'"{file1}" \'{file2}\''
+    payload = f"\"{file1}\" '{file2}'"
     result = extract_paths_from_paste(payload)
 
     assert len(result) == 2
