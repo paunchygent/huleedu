@@ -1,15 +1,15 @@
 # Handoff: Mathematical Validation of CJ Confidence Calculations
 
-**Date**: 2025-11-03
+**Date**: 2025-11-04
 **From**: Codex (CJ Confidence Validation Session)
 **To**: Next Assistant / Maintainer
 **Task**: `TASKS/TASK-CJ-CONFIDENCE-MATHEMATICAL-VALIDATION.md`
 
 ---
 
-## Session Summary (2025-11-03) - Phase 3.1 Partial Completion
+## Session Summary (2025-11-04) - Phase 3.1 Grade Scale Completion
 
-**Status**: Phase 3.1 (Grade Scale Registry + Migrations) is 40% complete (4 of 10 steps)
+**Status**: Phase 3.1 (Grade Scale Registry + Migrations) is complete (10 of 10 steps)
 
 ### Completed Components:
 
@@ -35,14 +35,14 @@
    - `GradeProjection.grade_scale` field added
    - Type checking passes (pdm run typecheck-all: Success)
 
-### Remaining Work (Steps 5-10):
+### Phase 3.1 Completion Highlights
 
-5. **Pydantic API Models**: Create `RegisterAnchorRequest` with scale validation
-6. **API Endpoint**: Update anchor registration to accept grade_scale parameter
-7. **Repository Layer**: Add scale-aware anchor queries
-8. **GradeProjector**: Refactor to load scales dynamically from registry
-9. **ContextBuilder**: Thread grade_scale parameter through workflow
-10. **Tests & Documentation**: Update fixtures, create ENG5 NP tests, document changes
+- ✅ `RegisterAnchorRequest` extended; API now resolves assignment grade scale and validates grades against the registry.
+- ✅ Repository/context builder expose `grade_scale`; anchor queries filter by scale; batch preparation pulls scale-aware anchors.
+- ✅ `GradeProjector` rewritten to consume registry metadata, derive priors/boundaries per scale, and persist scale diagnostics.
+- ✅ Unit suites refreshed (`test_anchor_management_api_core.py`, `test_grade_projector_swedish.py`, `test_grade_projector_system.py`), all passing.
+- ✅ Alembic migration `f83f2988a7c2` applied and verified (`assessment_instructions.grade_scale`).
+- ✅ Mock repository/test helpers updated to register assignment contexts explicitly; tests now assert emitted `grade_scale`.
 
 ### Configuration Decisions (User-Confirmed):
 - ENG5 NP Legacy: `F+, E-, E+, D-, D+, C-, C+, B, A` (below F+ → F, uniform priors 1/9)
@@ -59,10 +59,29 @@
 - Database schema verified
 
 ### Next Session Tasks:
-1. Complete remaining Phase 3.1 steps (5-10)
-2. Run integration tests with ENG5 NP scales
-3. Update service README with grade scale documentation
-4. Plan Phase 3.2 (CLI + enhanced integration)
+1. Refresh documentation/CLI notes for scale-aware workflows (Phase 3.1 Step 10 follow-up).
+2. Plan and execute Phase 3.2 (ENG5 NP batch tooling + data capture).
+3. Begin preparation for Phase 3.3 JSON artefact pipeline once ENG5 NP batch runner is ready.
+
+### Phase 3.2 Planning Outline (for next session)
+1. **Admin Assignment Management**
+   - Design authenticated API/CLI for creating/updating `assessment_instructions` (fields: `assignment_id`, `course_id`, `instructions_text`, `grade_scale`).
+   - Coordinate with Class Management/BOS teams so the owning service exposes assignment metadata consistently.
+2. **Assess ENG5 NP Instruction Seeding**
+   - Verify migration/tooling to seed ENG5 NP 2016 instructions via the new admin interface.
+   - Define repeatable workflow to toggle `grade_scale` between Swedish default and ENG5 variants.
+3. **CLI/Automation Enhancements**
+   - Extend anchor helper CLI (or create dedicated Typer command) to surface available scales, seed assignments via the new admin route, and register anchors.
+   - Document invocation patterns (assignment lookup, grade validation errors, scale inventory).
+4. **ENG5 NP Batch Runner Design**
+   - Decide on execution surface (`scripts/bayesian_consensus_model` vs. service CLI) and environment isolation.
+   - Enumerate required artefacts (essay registry, anchor payloads, comparison outputs, BT stats, projection export).
+5. **Data Capture Schema Finalization**
+   - Confirm JSON schema fields for `.claude/research/data/eng5_np_2016/*` (metadata, comparisons, calibration info).
+   - Map service events/logs to schema inputs; note additional instrumentation needs if gaps exist.
+6. **Testing & Observability Plan**
+   - Identify target unit/integration tests for ENG5 NP scale flows (including new admin endpoint).
+   - Outline metrics/log updates to trace scale propagation during batch runs.
 
 ---
 

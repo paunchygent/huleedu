@@ -197,8 +197,30 @@ async def _fetch_and_add_anchors(
     if not batch_upload.assignment_id:
         return anchors
 
+    # Resolve assignment metadata to determine active grade scale
+    assignment_context = await database.get_assignment_context(
+        session=session,
+        assignment_id=batch_upload.assignment_id,
+    )
+
+    if not assignment_context:
+        logger.warning(
+            "No assignment context found while attempting to add anchors",
+            extra={
+                "correlation_id": correlation_id,
+                "assignment_id": batch_upload.assignment_id,
+            },
+        )
+        return anchors
+
+    grade_scale = assignment_context.get("grade_scale", "swedish_8_anchor")
+
     # Get anchor references for this assignment
-    anchor_refs = await database.get_anchor_essay_references(session, batch_upload.assignment_id)
+    anchor_refs = await database.get_anchor_essay_references(
+        session,
+        batch_upload.assignment_id,
+        grade_scale=grade_scale,
+    )
 
     for ref in anchor_refs:
         try:

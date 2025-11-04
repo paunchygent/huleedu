@@ -57,6 +57,13 @@ class _Repo(CJRepositoryProtocol):
     async def get_cj_batch_upload(self, *args: Any, **kwargs: Any) -> Any | None:
         return None
 
+    async def get_assignment_context(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        return {
+            "assignment_id": "test-assignment",
+            "instructions_text": "Mock instructions",
+            "grade_scale": "swedish_8_anchor",
+        }
+
     async def get_anchor_essay_references(self, *args: Any, **kwargs: Any) -> list[Any]:
         return []
 

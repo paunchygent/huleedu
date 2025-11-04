@@ -122,6 +122,7 @@ class TestSwedishGradeSystem:
         mock_context = Mock()
         mock_context.anchor_essay_refs = []
         mock_context.context_source = "sparse_swedish_anchors"
+        mock_context.grade_scale = "swedish_8_anchor"
 
         with patch.object(
             grade_projector.context_builder, "build", new_callable=AsyncMock
@@ -287,6 +288,7 @@ class TestSwedishGradeSystem:
         mock_context = Mock()
         mock_context.anchor_essay_refs = []
         mock_context.context_source = "minus_grade_test"
+        mock_context.grade_scale = "swedish_8_anchor"
 
         with patch.object(
             grade_projector.context_builder, "build", new_callable=AsyncMock
@@ -540,6 +542,7 @@ class TestSwedishGradeSystem:
         mock_context = Mock()
         mock_context.anchor_essay_refs = []
         mock_context.context_source = "confidence_test"
+        mock_context.grade_scale = "swedish_8_anchor"
 
         with patch.object(
             grade_projector.context_builder, "build", new_callable=AsyncMock
@@ -772,6 +775,7 @@ class TestSwedishGradeSystem:
         mock_context = Mock()
         mock_context.anchor_essay_refs = []
         mock_context.context_source = "realistic_distribution"
+        mock_context.grade_scale = "swedish_8_anchor"
 
         with patch.object(
             grade_projector.context_builder, "build", new_callable=AsyncMock

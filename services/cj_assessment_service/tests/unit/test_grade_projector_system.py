@@ -60,6 +60,7 @@ class TestGradeProjectorSystem:
             "anchor_b_456": "Good essay content",
             "anchor_c_789": "Average essay content",
         }
+        mock_context.grade_scale = "swedish_8_anchor"
         return mock_context
 
     @pytest.fixture
@@ -70,6 +71,7 @@ class TestGradeProjectorSystem:
         mock_context.context_source = "course_fallback"
         mock_context.assessment_instructions = "Default grading instructions"
         mock_context.anchor_contents = {}
+        mock_context.grade_scale = "swedish_8_anchor"
         return mock_context
 
     @pytest.fixture

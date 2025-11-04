@@ -16,32 +16,29 @@
 
 ## Phase Breakdown
 
-### Phase 3.1 – Grade Scale Foundations
-- **Deliverables**
-  - `grade_scales.py` (or equivalent) defining `eng5_np_legacy_9_step`, `eng5_np_national_9_step` metadata (ordering, labels, priors).
-  - Database migration adding `grade_scale` columns to anchor/projection tables; ORM/Pydantic updates.
-- **Steps**
-1. Design scale metadata structure (names, ordinal indices, display labels, optional priors).  
-    - `eng5_np_legacy_9_step` grade codes: `["F+", "E-", "E+", "D-", "D+", "C-", "C+", "B", "A"]` (anchor IDs like `F+1`, `F+2`, `B1`, `B2` map to these codes; essays below `F+` treated as `F`).  
-    - `eng5_np_national_9_step` ordered grades: `["1", "2", "3", "4", "5", "6", "7", "8", "9"]`.
-  2. Implement shared registry consumed by service + helper; ensure no reinvention of existing logic (reuse current anchor helpers).
-  3. Create Alembic migration + data models changes; maintain backward compatibility (default existing anchors to `swedish_8_anchor` until deprecation).
-- **Checkpoints**
-  - Metadata review signed off (no missing grades, naming aligned with ENG5 NP variants).
-  - Migration validated locally (`pdm run pytest-root`, `pdm run typecheck-all` per rule 070).
-- **Done Definition**
-  - Registry module unit-tested for lookup/validation behavior.
-  - Migration generates new columns with defaults; CI scripts green.
+### Phase 3.1 – Grade Scale Foundations *(Completed 2025-11-04)*
+- **Deliverables (✅)**
+  - Registry metadata for Swedish + ENG5 NP scales with helper utilities.
+  - Alembic migration + ORM/Pydantic updates threading `grade_scale` across instructions, anchors, projections.
+  - Scale-aware anchor API, batch preparation, context builder, and GradeProjector with updated unit coverage.
+- **Implementation Notes**
+  - `assessment_instructions.grade_scale` now authoritative; anchors filtered per assignment scale.
+  - GradeProjector emits `grade_scale`, boundary diagnostics, and primary anchor grade in stored metadata.
+  - Anchor registration responses include the resolved scale for client awareness.
+- **Follow-ups**
+  - Documentation refreshed (README updated 2025-11-04); CLI helper refresh scheduled for Phase 3.2 alongside ENG5 NP tooling.
 
 ### Phase 3.2 – Service Integration
 - **Deliverables**
+  - Admin-facing endpoint or CLI command to register/update `assessment_instructions` (assignment metadata + `grade_scale`).
   - Anchor API (`services/cj_assessment_service/api/anchor_management.py`) accepts/validates `grade_scale`.
   - `GradeProjector`, `ContextBuilder`, and related calibrators consume scale metadata.
   - Helper CLI (`.claude/agents/...` or existing helper script) exposes `--grade-scale` flags + inventory mode.
 - **Steps**
-  1. Update API request models & handlers to persist scale by resolving `assignment_id` metadata (instructions table); enforce structured error responses (rule 048).
-  2. Propagate scale through DI wiring, ensuring Dishka scopes remain correct (rule 042).
-  3. Extend helper CLI (keeping in sync with repo tooling rules 080) for scale-aware anchor management.
+  1. Design and implement an authenticated admin route that accepts `assignment_id`, `course_id`, `instructions_text`, and `grade_scale`, validating the scale against the registry before persisting to `assessment_instructions`.
+  2. Update API request models & handlers to persist scale by resolving `assignment_id` metadata (instructions table); enforce structured error responses (rule 048).
+  3. Propagate scale through DI wiring, ensuring Dishka scopes remain correct (rule 042).
+  4. Extend helper CLI (keeping in sync with repo tooling rules 080) for scale-aware anchor management, including convenience commands to seed assignment instructions where appropriate.
 - **Checkpoints**
   - Unit tests covering ENG5 legacy vs national scale flows (no behavioral drift).
   - Helper smoke test against dev stack confirming validation/inventory commands.

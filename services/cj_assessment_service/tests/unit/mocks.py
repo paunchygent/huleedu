@@ -387,10 +387,23 @@ class MockDatabase(CJRepositoryProtocol):
             return MockBatchUpload(cj_batch_id)
         return None
 
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        """Return simplified assignment context for tests."""
+        return {
+            "assignment_id": assignment_id,
+            "instructions_text": "Mock instructions",
+            "grade_scale": "swedish_8_anchor",
+        }
+
     async def get_anchor_essay_references(
         self,
         session: AsyncSession,
         assignment_id: str,
+        grade_scale: str | None = None,
     ) -> list[Any]:
         """Get anchor essay references for an assignment."""
         # Mock implementation - return empty list for tests

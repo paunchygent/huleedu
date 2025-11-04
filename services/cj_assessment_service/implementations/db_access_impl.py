@@ -414,6 +414,29 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
 
         return None
 
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch assignment-level instructions and metadata for anchor workflows."""
+        stmt = select(AssessmentInstruction).where(
+            AssessmentInstruction.assignment_id == assignment_id
+        )
+        result = await session.execute(stmt)
+        instruction = result.scalars().first()
+
+        if instruction is None:
+            return None
+
+        return {
+            "assignment_id": instruction.assignment_id,
+            "course_id": instruction.course_id,
+            "instructions_text": instruction.instructions_text,
+            "grade_scale": instruction.grade_scale,
+            "instruction_id": instruction.id,
+        }
+
     async def get_cj_batch_upload(
         self,
         session: AsyncSession,
@@ -426,12 +449,14 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         self,
         session: AsyncSession,
         assignment_id: str,
+        grade_scale: str | None = None,
     ) -> list[Any]:  # list[AnchorEssayReference]
         """Get anchor essay references for an assignment.
 
         Args:
             session: Database session
             assignment_id: Assignment ID
+            grade_scale: Optional grade scale to filter anchors
 
         Returns:
             List of AnchorEssayReference objects
@@ -441,6 +466,10 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         stmt = select(AnchorEssayReference).where(
             AnchorEssayReference.assignment_id == assignment_id
         )
+
+        if grade_scale:
+            stmt = stmt.where(AnchorEssayReference.grade_scale == grade_scale)
+
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
@@ -513,6 +542,7 @@ async def get_assessment_instruction(
 async def get_anchor_essay_references(
     session: AsyncSession,
     assignment_id: str,
+    grade_scale: str | None = None,
 ) -> list[Any]:  # list[AnchorEssayReference]
     """Get anchor essay references for an assignment.
 
@@ -521,6 +551,7 @@ async def get_anchor_essay_references(
     Args:
         session: Database session
         assignment_id: Assignment ID
+        grade_scale: Optional grade scale filter
 
     Returns:
         List of AnchorEssayReference objects
@@ -528,5 +559,9 @@ async def get_anchor_essay_references(
     from services.cj_assessment_service.models_db import AnchorEssayReference
 
     stmt = select(AnchorEssayReference).where(AnchorEssayReference.assignment_id == assignment_id)
+
+    if grade_scale:
+        stmt = stmt.where(AnchorEssayReference.grade_scale == grade_scale)
+
     result = await session.execute(stmt)
     return list(result.scalars().all())

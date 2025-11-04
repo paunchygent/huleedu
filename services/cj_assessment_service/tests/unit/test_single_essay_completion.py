@@ -64,7 +64,23 @@ class RepoMock(CJRepositoryProtocol):
     async def get_cj_batch_upload(self, session: Any, cj_batch_id: int) -> Any | None:
         return self._session._batch
 
-    async def get_anchor_essay_references(self, session: Any, assignment_id: str) -> list[Any]:
+    async def get_assignment_context(
+        self,
+        session: Any,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        return {
+            "assignment_id": assignment_id,
+            "instructions_text": "Mock",
+            "grade_scale": "swedish_8_anchor",
+        }
+
+    async def get_anchor_essay_references(
+        self,
+        session: Any,
+        assignment_id: str,
+        grade_scale: str | None = None,
+    ) -> list[Any]:
         return []
 
     async def store_grade_projections(self, session: Any, projections: list[Any]) -> None:

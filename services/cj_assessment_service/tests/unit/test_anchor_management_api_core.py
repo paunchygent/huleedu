@@ -76,6 +76,7 @@ class TestAnchorRegistrationEndpoint:
     ) -> None:
         """Test successful anchor essay registration."""
         # Arrange
+        mock_repository.register_assignment_context("assignment-123")
         request_data = {
             "assignment_id": "assignment-123",
             "grade": "A",
@@ -94,6 +95,7 @@ class TestAnchorRegistrationEndpoint:
 
         assert response_data["anchor_id"] == 42
         assert response_data["storage_id"] == "content-abc123"
+        assert response_data["grade_scale"] == "swedish_8_anchor"
         assert response_data["status"] == "registered"
 
         # Integration behavior is verified through the successful HTTP response
@@ -115,11 +117,13 @@ class TestAnchorRegistrationEndpoint:
     async def test_register_anchor_essay_grade_validation(
         self,
         client: QuartTestClient,
+        mock_repository: CJRepositoryProtocol,
         grade: str,
         expected_success: bool,
     ) -> None:
         """Test anchor essay registration with different grade values."""
         # Arrange
+        mock_repository.register_assignment_context("assignment-test")
         request_data = {
             "assignment_id": "assignment-test",
             "grade": grade,
@@ -137,6 +141,7 @@ class TestAnchorRegistrationEndpoint:
             assert response.status_code == 201
             response_data = await response.get_json()
             assert response_data["status"] == "registered"
+            assert response_data["grade_scale"] == "swedish_8_anchor"
         else:
             assert response.status_code == 400
 
@@ -149,6 +154,7 @@ class TestAnchorRegistrationEndpoint:
     ) -> None:
         """Test that essay content is successfully processed."""
         # Arrange
+        mock_repository.register_assignment_context("assignment-content-type-test")
         request_data = {
             "assignment_id": "assignment-content-type-test",
             "grade": "B",
@@ -195,6 +201,7 @@ class TestAnchorAPIDependencyIntegration:
         app.register_blueprint(bp)
 
         async with app.test_client() as client:
+            mock_repository.register_assignment_context("integration-workflow-test")
             request_data = {
                 "assignment_id": "integration-workflow-test",
                 "grade": "B",
@@ -220,6 +227,7 @@ class TestAnchorAPIDependencyIntegration:
             # Verify anchor was created with content storage reference
             assert mock_repository.created_anchor is not None
             assert mock_repository.created_anchor.text_storage_id == "integration-test-123"
+            assert mock_repository.created_anchor.grade_scale == "swedish_8_anchor"
 
     @pytest.mark.asyncio
     async def test_repository_protocol_session_management(self) -> None:
@@ -243,6 +251,7 @@ class TestAnchorAPIDependencyIntegration:
         app.register_blueprint(bp)
 
         async with app.test_client() as client:
+            mock_repository.register_assignment_context("session-management-test")
             request_data = {
                 "assignment_id": "session-management-test",
                 "grade": "D",
@@ -262,6 +271,7 @@ class TestAnchorAPIDependencyIntegration:
             # Verify the anchor entity was created and has expected ID
             assert mock_repository.created_anchor is not None
             assert mock_repository.created_anchor.id == 42  # Mock auto-increment value
+            assert mock_repository.created_anchor.grade_scale == "swedish_8_anchor"
 
     @pytest.mark.asyncio
     async def test_dependency_injection_isolation(self) -> None:

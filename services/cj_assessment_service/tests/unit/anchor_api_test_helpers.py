@@ -86,6 +86,11 @@ class MockAsyncSession(AsyncSession):
         if self.repository.behavior == "database_failure":
             raise RuntimeError("Database commit failed")
 
+    async def flush(self) -> None:
+        """Mock session flush operation."""
+        if self.repository.behavior == "database_failure":
+            raise RuntimeError("Database flush failed")
+
 
 class MockCJRepository(CJRepositoryProtocol):
     """Mock implementation of CJRepositoryProtocol for testing."""
@@ -95,10 +100,23 @@ class MockCJRepository(CJRepositoryProtocol):
         self.behavior = behavior
         self.created_anchor: AnchorEssayReference | None = None
         self.session_context_calls = 0
-        self.assignment_context: dict[str, Any] | None = {
-            "assignment_id": "default-assignment",
-            "instructions_text": "Default instructions",
-            "grade_scale": "swedish_8_anchor",
+        self.assignment_contexts: dict[str, dict[str, Any]] = {}
+        self.register_assignment_context("default-assignment")
+
+    def register_assignment_context(
+        self,
+        assignment_id: str,
+        *,
+        grade_scale: str = "swedish_8_anchor",
+        instructions_text: str = "Default instructions",
+        course_id: str | None = None,
+    ) -> None:
+        """Add or update assignment metadata returned to the API under test."""
+        self.assignment_contexts[assignment_id] = {
+            "assignment_id": assignment_id,
+            "course_id": course_id,
+            "instructions_text": instructions_text,
+            "grade_scale": grade_scale,
         }
 
     def session(self) -> AsyncContextManager[AsyncSession]:
@@ -120,10 +138,7 @@ class MockCJRepository(CJRepositoryProtocol):
         assignment_id: str,
     ) -> dict[str, Any] | None:
         """Return stored assignment context for tests."""
-
-        if self.assignment_context and self.assignment_context["assignment_id"] == assignment_id:
-            return self.assignment_context
-        return None
+        return self.assignment_contexts.get(assignment_id)
 
     async def get_cj_batch_upload(
         self,
@@ -137,6 +152,7 @@ class MockCJRepository(CJRepositoryProtocol):
         self,
         session: AsyncSession,
         assignment_id: str,
+        grade_scale: str | None = None,
     ) -> list[Any]:
         """Mock implementation - not used in anchor management tests."""
         return []

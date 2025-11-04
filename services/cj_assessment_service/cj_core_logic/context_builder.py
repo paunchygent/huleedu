@@ -33,6 +33,7 @@ class AssessmentContext(NamedTuple):
     anchor_essay_refs: list[AnchorEssayReference]
     anchor_contents: dict[str, str]  # content_id -> text
     context_source: str  # "assignment" or "course"
+    grade_scale: str
 
 
 class InsufficientAnchorsError(HuleEduError):
@@ -97,6 +98,7 @@ class ContextBuilder:
         instructions = None
         anchor_refs = []
         context_source = "none"
+        grade_scale = "swedish_8_anchor"
 
         # Try assignment-specific context first
         if assignment_id:
@@ -104,8 +106,11 @@ class ContextBuilder:
                 session, assignment_id=assignment_id, course_id=None
             )
             if instructions:
+                grade_scale = instructions.grade_scale
                 anchor_refs = await get_anchor_essay_references(
-                    session, assignment_id=assignment_id
+                    session,
+                    assignment_id=assignment_id,
+                    grade_scale=grade_scale,
                 )
                 context_source = "assignment"
                 self.logger.info(
@@ -123,6 +128,7 @@ class ContextBuilder:
                 session, assignment_id=None, course_id=course_code
             )
             if instructions:
+                grade_scale = instructions.grade_scale
                 # For course-level, we don't have course-specific anchors yet
                 # This could be extended in the future
                 anchor_refs = []
@@ -152,7 +158,8 @@ class ContextBuilder:
                 instructions_text=(
                     "Compare the essays based on overall quality, clarity, "
                     "argumentation, and adherence to academic standards."
-                )
+                ),
+                grade_scale=grade_scale,
             )
             context_source = "default"
 
@@ -198,4 +205,5 @@ class ContextBuilder:
             anchor_essay_refs=anchor_refs,
             anchor_contents=anchor_contents,
             context_source=context_source,
+            grade_scale=grade_scale,
         )

@@ -38,18 +38,61 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **Database**: Async SQLAlchemy (SQLite by default for development; **PostgreSQL recommended for production deployments**)
 - **Kafka**: Event consumption and publishing via EventEnvelope pattern
 
-## Grading System
+## Grade Scale Registry & Calibration
 
-The service now uses a sophisticated 8-anchor Swedish national exam grade system. This system is designed for high psychometric reliability and statistical stability.
+The CJ service now resolves grades from a shared registry defined in
+`libs/common_core/src/common_core/grade_scales.py`. Each scale entry provides the
+ordered grades, optional population priors, and configuration for handling scores
+below the lowest anchor. Today the registry includes:
 
-### Key Features
+- `swedish_8_anchor` (default)
+- `eng5_np_legacy_9_step`
+- `eng5_np_national_9_step`
 
-- **8 Anchor Grades**: The core calibration is based on 8 anchor grades: `F, E, D, D+, C, C+, B, A`.
-- **Derived Minus Grades**: The system derives "minus" and "plus" grades (e.g., `B-`, `C-`, `E+`, `B+`) for scores that fall in the lower quartile of a grade band, providing more granular feedback without increasing rater complexity.
-- **Population Priors**: Instead of relying on the frequency of anchors provided, the system uses a set of population priors based on historical Swedish national exam data. This makes the grading more robust and less susceptible to bias from anchor selection.
-- **Shrinkage Estimation**: For grades with few or no anchors, the system uses shrinkage estimation to provide a stable and reasonable grade estimate, preventing wild fluctuations caused by sparse data.
+### How Scales Are Selected
 
-This new system provides more reliable, valid, and fair assessments compared to the previous 15-point scale.
+1. **Assignment instructions** (`assessment_instructions` table) carry a
+   `grade_scale` column. Migrations have backfilled existing rows to
+   `swedish_8_anchor`.
+2. **Anchor registration** (`POST /api/v1/anchors/register`) resolves the
+   assignment, validates the submitted grade against the configured scale, and
+   persists both grade and scale to `anchor_essay_references`.
+3. **Batch preparation** fetches only anchors whose `grade_scale` matches the
+   assignment, ensuring mixed-scale anchors are never combined.
+4. **GradeProjector** loads the registry metadata for the resolved scale,
+   applies scale-specific priors/boundaries, and tags every stored projection
+   with the active scale for downstream reporting.
+
+### Operational Workflow
+
+To work with a non-default scale (for example ENG5 NP variants):
+
+1. Insert or update the relevant row in `assessment_instructions` with the
+   desired `grade_scale` value. (The instructions text remains the canonical
+   metadata for the assignment.)
+2. Register anchors via the HTTP API or helper CLI; supplied grades will be
+   validated against the new scale automatically.
+3. Trigger CJ batches as usual. All downstream consumers (context builder,
+   projector, events/tests) will operate with the chosen scale.
+
+> **Note**: If you register anchors before inserting the instruction row the API
+> will respond with `400 Unknown assignment_id`—seed instructions first, then add
+> anchors.
+
+> **Upcoming**: Phase 3.2 will introduce an authenticated admin endpoint/CLI to
+> create or update `assessment_instructions` directly. Until then, seed rows via
+> the upstream Class Management workflow or manual SQL as outlined above.
+
+### Calibration Highlights
+
+- **Population Priors**: When the registry provides priors they override anchor
+  frequency, reducing bias from sparse anchors. If none are supplied a uniform
+  prior is generated on the fly.
+- **Shrinkage & Extrapolation**: Grades without anchors borrow expected positions
+  from the registry ordering, preventing unstable calibrations.
+- **Metadata in Projections**: Stored projections now include
+  `grade_scale`, `primary_anchor_grade`, and scale-specific boundary metadata to
+  simplify analytics and export tooling.
 
 ## LLM Configuration & Dynamic Overrides
 

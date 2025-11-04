@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from common_core.grade_scales import validate_grade_for_scale
 from dishka import FromDishka
 from huleedu_service_libs.logging_utils import create_service_logger
+from pydantic import ValidationError
 from quart import Blueprint, request
 from quart_dishka import inject
 
+from services.cj_assessment_service.models_api import RegisterAnchorRequest
 from services.cj_assessment_service.models_db import AnchorEssayReference
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
 
@@ -41,48 +44,90 @@ async def register_anchor_essay(
     }
     """
     try:
-        data = await request.json
+        payload = await request.get_json()
+    except Exception:  # pragma: no cover - Quart handles JSON errors variably
+        logger.warning("Invalid JSON payload for anchor registration", exc_info=True)
+        return {"error": "Invalid JSON body"}, 400
 
-        # Basic validation
-        if not all(k in data for k in ["assignment_id", "grade", "essay_text"]):
-            return {"error": "Missing required fields"}, 400
+    if not isinstance(payload, dict):
+        return {"error": "Invalid JSON body"}, 400
 
-        if data["grade"] not in ["A", "B", "C", "D", "E", "F"]:
-            return {"error": "Invalid grade"}, 400
+    required_fields = {"assignment_id", "grade", "essay_text"}
+    if not required_fields.issubset(payload.keys()):
+        return {"error": "Missing required fields"}, 400
 
-        if len(data["essay_text"]) < 100:
-            return {"error": "Essay text too short (min 100 chars)"}, 400
+    try:
+        register_request = RegisterAnchorRequest.model_validate(payload)
+    except ValidationError as exc:
+        error_messages = "; ".join(error["msg"] for error in exc.errors())
+        return {"error": error_messages}, 400
 
-        # Note: Non-atomic operation - content storage and DB write are separate
-        # If DB write fails, content will be orphaned in Content Service
-        # Consider implementing cleanup or two-phase commit in future iteration
-
-        # 1. Store content in Content Service
-        storage_response = await content_client.store_content(
-            content=data["essay_text"], content_type="text/plain"
-        )
-        storage_id = storage_response.get("content_id")
-
-        if not storage_id:
-            logger.error("Content Service did not return storage_id")
-            return {"error": "Failed to store essay content"}, 500
-
-        # 2. Create AnchorEssayReference record (separate transaction)
+    try:
         async with repository.session() as session:
+            assignment_context = await repository.get_assignment_context(
+                session,
+                register_request.assignment_id,
+            )
+
+            if not assignment_context:
+                return {
+                    "error": f"Unknown assignment_id '{register_request.assignment_id}'"
+                }, 400
+
+            grade_scale = assignment_context.get("grade_scale", "swedish_8_anchor")
+
+            try:
+                grade_is_valid = validate_grade_for_scale(
+                    register_request.grade,
+                    grade_scale,
+                )
+            except ValueError as validation_error:
+                logger.error(
+                    "Grade scale validation failed",
+                    extra={
+                        "assignment_id": register_request.assignment_id,
+                        "grade_scale": grade_scale,
+                        "error": str(validation_error),
+                    },
+                )
+                return {"error": str(validation_error)}, 400
+
+            if not grade_is_valid:
+                return {
+                    "error": (
+                        f"Invalid grade '{register_request.grade}' for scale "
+                        f"'{grade_scale}'"
+                    )
+                }, 400
+
+            storage_response = await content_client.store_content(
+                content=register_request.essay_text,
+                content_type="text/plain",
+            )
+            storage_id = storage_response.get("content_id")
+
+            if not storage_id:
+                logger.error("Content Service did not return storage_id")
+                return {"error": "Failed to store essay content"}, 500
+
             anchor_ref = AnchorEssayReference(
-                assignment_id=data["assignment_id"],
-                grade=data["grade"],
-                text_storage_id=storage_id,  # Using renamed field
+                assignment_id=register_request.assignment_id,
+                grade=register_request.grade,
+                grade_scale=grade_scale,
+                text_storage_id=storage_id,
             )
             session.add(anchor_ref)
-            await session.commit()
+            await session.flush()
 
             logger.info(
-                f"Registered anchor essay {anchor_ref.id} for assignment {data['assignment_id']}",
+                "Registered anchor essay %s for assignment %s",
+                anchor_ref.id,
+                register_request.assignment_id,
                 extra={
                     "anchor_id": anchor_ref.id,
-                    "assignment_id": data["assignment_id"],
-                    "grade": data["grade"],
+                    "assignment_id": register_request.assignment_id,
+                    "grade": register_request.grade,
+                    "grade_scale": grade_scale,
                     "storage_id": storage_id,
                 },
             )
@@ -90,6 +135,7 @@ async def register_anchor_essay(
             return {
                 "anchor_id": anchor_ref.id,
                 "storage_id": storage_id,
+                "grade_scale": grade_scale,
                 "status": "registered",
             }, 201
 

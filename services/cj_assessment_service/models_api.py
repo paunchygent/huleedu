@@ -14,7 +14,7 @@ from uuid import UUID
 from common_core import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EssayForComparison(BaseModel):
@@ -109,3 +109,25 @@ class FailedComparisonPool(BaseModel):
     pool_statistics: FailedComparisonPoolStatistics = Field(
         default_factory=FailedComparisonPoolStatistics
     )
+
+
+class RegisterAnchorRequest(BaseModel):
+    """Request payload for registering anchor essays."""
+
+    assignment_id: str
+    grade: str
+    essay_text: str
+
+    @field_validator("assignment_id", "grade")
+    @classmethod
+    def validate_non_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value cannot be empty")
+        return value
+
+    @field_validator("essay_text")
+    @classmethod
+    def validate_essay_length(cls, value: str) -> str:
+        if len(value) < 100:
+            raise ValueError("Essay text too short (min 100 chars)")
+        return value

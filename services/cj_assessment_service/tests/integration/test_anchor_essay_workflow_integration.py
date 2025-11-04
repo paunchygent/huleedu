@@ -385,6 +385,7 @@ class TestAnchorEssayWorkflow:
         # Verify projection properties
         for projection in stored_projections:
             assert projection.primary_grade in valid_grades
+            assert projection.grade_scale == "swedish_8_anchor"
             assert 0.0 <= projection.confidence_score <= 1.0
             assert projection.confidence_label in ["HIGH", "MID", "LOW"]
             assert projection.calculation_metadata is not None

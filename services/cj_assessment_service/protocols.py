@@ -142,8 +142,9 @@ class CJRepositoryProtocol(Protocol):
         self,
         session: AsyncSession,
         assignment_id: str,
+        grade_scale: str | None = None,
     ) -> list[Any]:  # list[AnchorEssayReference]
-        """Get anchor essay references for an assignment."""
+        """Get anchor essay references for an assignment and optional grade scale."""
         ...
 
     async def store_grade_projections(

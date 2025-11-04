@@ -116,8 +116,22 @@ class MockRepository(CJRepositoryProtocol):
     async def get_cj_batch_upload(self, session: AsyncSession, cj_batch_id: int) -> Any | None:
         return None
 
+    async def get_assignment_context(
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+    ) -> dict[str, Any] | None:
+        return {
+            "assignment_id": assignment_id,
+            "instructions_text": "Mock instructions",
+            "grade_scale": "swedish_8_anchor",
+        }
+
     async def get_anchor_essay_references(
-        self, session: AsyncSession, assignment_id: str
+        self,
+        session: AsyncSession,
+        assignment_id: str,
+        grade_scale: str | None = None,
     ) -> list[Any]:
         return []
 
