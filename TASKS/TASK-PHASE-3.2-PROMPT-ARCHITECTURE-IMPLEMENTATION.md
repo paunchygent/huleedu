@@ -25,14 +25,14 @@ The objective is to decouple student prompt payloads from registration forms whi
 
 ## Implementation Plan
 1. **Gateway & BOS DTO Adjustments** (1.0–1.5 weeks)  
-   - Make registration time `assignment_id` optional; deprecate inline prompt payloads.  
+   - Make registration time `assignment_id` optional; replace inline prompt payloads with Content Service references.  
    - Introduce prompt-dependent pipeline discriminated union (`{assignment_id}` vs `{cms_prompt_ref}`) using canonical `PhaseName`.  
-   - Enforce BOS validation: canonical runs forbid inline prompts; ad-hoc runs must provide `cms_prompt_ref`.  
+   - Enforce BOS validation: canonical runs forbid teacher prompt references; ad-hoc runs must provide `cms_prompt_ref`.  
    - Update persistence to store only references plus content hash.
 
 2. **BCS Prompt Gating** (0.5–1.0 week)  
-   - Extend batch state to include `prompt_attached` (clarify storage during discovery).  
-   - Block prompt-dependent phases when flag is unset; emit metric `bcs_prompt_prerequisite_blocked_total`.  
+   - Extend `BCSPipelineDefinitionRequestV1` and BCS client calls with a `batch_metadata` payload carrying `prompt_attached`.  
+   - Fail prompt-dependent pipelines in `validate_pipeline_compatibility` when metadata indicates no prompt; emit metric `bcs_prompt_prerequisite_blocked_total`.  
    - Add tests covering blocked vs allowed transitions.
 
 3. **CMS Prompt Reference Lifecycle** (1.0–1.5 weeks)  
@@ -75,7 +75,7 @@ The objective is to decouple student prompt payloads from registration forms whi
 - CJ exposes canonical assignment metadata (prompt reference, grade scale, anchor presence) through a stable read endpoint.  
 - NLP and AI Feedback operate on prompt references without persisting prompt bodies.  
 - Observability includes metrics for BOS/BCS prompt invariants, and documentation reflects the new ownership model.  
-- Backward compatibility for existing batches is maintained through optional fields and migration guards during rollout.
+- Prototype scope confirmed: no backward-compat path required; a single cutover to reference-based payloads is acceptable.
 
 ## Risks & Mitigations
 - **BCS State Ambiguity**: Clarify during discovery whether BOS or BCS owns the new flag; document and align storage early to avoid double writes.  
@@ -84,8 +84,8 @@ The objective is to decouple student prompt payloads from registration forms whi
   *Mitigation*: Extend discovery notes with auth scope details; add hash verification tests.  
 - **Event Schema Evolution**: Introducing prompt reference fields may break consumers.  
   *Mitigation*: Use optional fields with versioned events and document migration path.  
-- **Legacy Batch Compatibility**: Existing registrations may lack prompt references.  
-  *Mitigation*: Support transitional behavior (e.g., treat historical inline prompts as references during migration) and track with metrics.
+- **Prototype Cutover Risk**: Hard switch to references means in-flight tests must be updated simultaneously.  
+  *Mitigation*: Stage a single branch/PR that updates contracts, fixtures, and service consumers together; communicate timing to all contributors.
 
 ## Out of Scope
 - Changes to Phase 1 student matching workflows.  
