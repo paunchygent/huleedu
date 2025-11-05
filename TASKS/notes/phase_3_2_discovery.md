@@ -44,6 +44,10 @@
 
 - **Discarded alternative**  
   - Persisting prompt flags or prompt blobs inside BCS repositories would require new endpoints and introduce unnecessary coordination complexity for a prototype; the metadata-in-request approach is leaner and keeps responsibilities clear.
+
+### Status Snapshot (2025-11-05)
+- Implemented: common_core contract changes, Gateway/BOS registration and pipeline DTO updates, BOS→BCS metadata flow, BCS validation/metrics, and ELS persistence/BatchEssaysReady propagation of `student_prompt_ref`.  
+- Pending: add Content Service hydration inside ELS dispatchers, migrate NLP/CJ consumers to reference-aware payloads, update fixtures/tests/docs (see test list below), wire observability for prompt fetch failures, and delete bridging/legacy `essay_instructions` handling immediately after both downstream services are reference-native.
 ## Contract Update Checklist
 - Gateway DTO → drop essay_instructions, keep prompt union {assignment_id|cms_prompt_ref}
 - BatchRegistrationRequestV1 → remove essay_instructions, optionally add student_prompt_ref reference slot
@@ -57,3 +61,4 @@
 - NLP, AI Feedback, CJ services → fetch prompt text via ContentServiceClient using reference, drop inline handling
 - CMS prompt APIs → accept/return StorageReferenceMetadata, persist hash + storage_id
 - Documentation → update sample payloads + ADR for reference-only prompts
+- Tests currently requiring updates: `services/essay_lifecycle_service/tests/unit/test_nlp_command_handler.py`, `services/essay_lifecycle_service/tests/unit/test_cj_assessment_command_handler.py`, `services/essay_lifecycle_service/tests/unit/test_kafka_circuit_breaker_business_impact.py`

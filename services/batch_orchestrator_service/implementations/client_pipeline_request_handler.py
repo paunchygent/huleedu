@@ -192,6 +192,31 @@ class ClientPipelineRequestHandler:
                         )
                         return
 
+                    prompt_payload = request_data.prompt_payload
+                    prompt_attached = False
+                    prompt_source = "none"
+                    assignment_context: str | None = None
+
+                    if prompt_payload:
+                        assignment_context = prompt_payload.assignment_id
+                        if prompt_payload.assignment_id:
+                            prompt_attached = True
+                            prompt_source = "canonical"
+                        if prompt_payload.cms_prompt_ref:
+                            prompt_attached = True
+                            prompt_source = "cms"
+                            batch_context.student_prompt_ref = prompt_payload.cms_prompt_ref
+                    elif getattr(batch_context, "student_prompt_ref", None):
+                        prompt_attached = True
+                        prompt_source = "context"
+
+                    batch_metadata = {
+                        "prompt_attached": prompt_attached,
+                        "prompt_source": prompt_source,
+                    }
+                    if assignment_context:
+                        batch_metadata["assignment_id"] = assignment_context
+
                     # Convert string pipeline name to PhaseName enum for BCS client
                     try:
                         requested_pipeline_enum = PhaseName(requested_pipeline)
@@ -210,7 +235,10 @@ class ClientPipelineRequestHandler:
                     # Request pipeline resolution from BCS
                     try:
                         bcs_response = await self.bcs_client.resolve_pipeline(
-                            batch_id, requested_pipeline_enum, str(correlation_id)
+                            batch_id,
+                            requested_pipeline_enum,
+                            str(correlation_id),
+                            batch_metadata,
                         )
                     except Exception as e:
                         error_msg = f"BCS pipeline resolution failed: {e}"

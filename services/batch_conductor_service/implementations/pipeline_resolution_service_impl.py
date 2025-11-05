@@ -57,7 +57,11 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
         self._metrics = metrics
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: str, correlation_id: UUID
+        self,
+        batch_id: str,
+        requested_pipeline: str,
+        correlation_id: UUID,
+        batch_metadata: dict[str, Any] | None = None,
     ) -> list[str]:
         """
         Resolve pipeline for batch processing with error handling and metrics.
@@ -105,6 +109,11 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
                     correlation_id=correlation_id,
                     batch_id=batch_id,
                 )
+
+            # Validate compatibility with provided metadata (prompt attachment, etc.)
+            await self.pipeline_rules.validate_pipeline_compatibility(
+                requested_pipeline, correlation_id, batch_metadata
+            )
 
             # Resolve pipeline dependencies using event-driven state
             try:
@@ -204,7 +213,10 @@ class DefaultPipelineResolutionService(PipelineResolutionServiceProtocol):
 
         try:
             resolved_pipeline = await self.resolve_pipeline(
-                request.batch_id, request.requested_pipeline, correlation_id
+                request.batch_id,
+                request.requested_pipeline,
+                correlation_id,
+                request.batch_metadata,
             )
 
             # Track duration for successful resolution

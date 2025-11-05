@@ -7,6 +7,8 @@ between the Batch Orchestrator Service (BOS) and Batch Conductor Service (BCS).
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from common_core.pipeline_models import PhaseName
@@ -33,6 +35,10 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
         min_length=1,
         max_length=100,
     )
+    batch_metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional metadata (prompt attachment, assignment context, etc.) for validation",
+    )
 
     model_config = {
         "str_strip_whitespace": True,
@@ -43,11 +49,13 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
                     "batch_id": "batch_12345",
                     "requested_pipeline": "ai_feedback",
                     "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "batch_metadata": {"prompt_attached": True, "prompt_source": "cms"},
                 },
                 {
                     "batch_id": "batch_67890",
                     "requested_pipeline": "cj_assessment",
                     "correlation_id": "550e8400-e29b-41d4-a716-446655440001",
+                    "batch_metadata": {"prompt_attached": False, "prompt_source": "none"},
                 },
             ]
         },

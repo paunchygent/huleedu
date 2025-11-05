@@ -48,7 +48,11 @@ class CircuitBreakerBatchConductorClient(BatchConductorClientProtocol):
         self._circuit_breaker = circuit_breaker
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+        self,
+        batch_id: str,
+        requested_pipeline: PhaseName,
+        correlation_id: str,
+        batch_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Request pipeline resolution with circuit breaker protection.
 
@@ -77,6 +81,7 @@ class CircuitBreakerBatchConductorClient(BatchConductorClientProtocol):
             batch_id,
             requested_pipeline,
             correlation_id,
+            batch_metadata,
         )
 
     async def report_phase_completion(

@@ -12,6 +12,7 @@ from datetime import datetime
 from uuid import UUID
 
 from common_core.domain_enums import CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 
 
 @dataclass(frozen=True)
@@ -29,9 +30,10 @@ class BatchExpectation:
     expected_essay_ids: frozenset[str]  # Immutable set of internal essay ID slots from BOS
     expected_count: int
     course_code: CourseCode
-    essay_instructions: str
     user_id: str
     org_id: str | None
     correlation_id: UUID  # Original correlation ID from registration
     created_at: datetime
+    student_prompt_ref: StorageReferenceMetadata | None = None
+    essay_instructions: str = ""
     timeout_seconds: int = 86400  # 24 hours for complex processing including overnight LLM batches

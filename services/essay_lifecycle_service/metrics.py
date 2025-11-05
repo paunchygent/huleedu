@@ -155,6 +155,13 @@ def _create_metrics(database_metrics: DatabaseMetrics | None = None) -> dict[str
             ["class_type"],
             registry=registry,
         ),
+        # Content Service Prompt Hydration Metrics
+        "prompt_fetch_failures": Counter(
+            "huleedu_els_prompt_fetch_failures_total",
+            "Content Service prompt fetch failures during dispatch",
+            ["context"],
+            registry=registry,
+        ),
     }
 
     # Add database metrics if provided

@@ -21,6 +21,7 @@ from common_core.events.file_events import EssayValidationFailedV1
 from common_core.metadata_models import (
     # EntityReference removed - using primitive parameters
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -114,11 +115,11 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             expected_essay_ids=frozenset(batch_essays_registered.essay_ids),
             expected_count=len(batch_essays_registered.essay_ids),
             course_code=batch_essays_registered.course_code,
-            essay_instructions=batch_essays_registered.essay_instructions,
             user_id=batch_essays_registered.user_id,
             org_id=batch_essays_registered.org_id,
             correlation_id=correlation_id,
             created_at=datetime.now(UTC),
+            student_prompt_ref=batch_essays_registered.student_prompt_ref,
             timeout_seconds=86400,  # 24 hours for complex processing
         )
 
@@ -184,6 +185,18 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             ]
             missing_slots = await self._persistence.get_missing_slot_ids(batch_id)
 
+            # Deserialize student_prompt_ref from batch_metadata (Phase 3.2)
+            student_prompt_ref = None
+            if tracker.batch_metadata:
+                try:
+                    ref_dict = tracker.batch_metadata.get("student_prompt_ref")
+                    if ref_dict:
+                        student_prompt_ref = StorageReferenceMetadata.model_validate(ref_dict)
+                except Exception as e:
+                    self._logger.warning(
+                        f"Failed to deserialize student_prompt_ref for batch {batch_id}: {e}"
+                    )
+
             return {
                 "batch_id": batch_id,
                 "expected_count": expected_count,
@@ -195,6 +208,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
                 "created_at": tracker.created_at.isoformat() if tracker.created_at else None,
                 "user_id": tracker.user_id,
                 "org_id": tracker.org_id,
+                "student_prompt_ref": student_prompt_ref,  # Phase 3.2 bridging
             }
         except Exception as e:
             self._logger.error(
@@ -346,6 +360,18 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         course_language = get_course_language(course_code_enum).value
         class_type = "REGULAR" if getattr(tracker, "org_id", None) else "GUEST"
 
+        metadata_payload = getattr(tracker, "batch_metadata", None)
+        student_prompt_ref: StorageReferenceMetadata | None = None
+        if isinstance(metadata_payload, dict):
+            prompt_payload = metadata_payload.get("student_prompt_ref")
+            if isinstance(prompt_payload, dict):
+                try:
+                    student_prompt_ref = StorageReferenceMetadata.model_validate(prompt_payload)
+                except Exception:
+                    self._logger.warning(
+                        "Failed to deserialize student_prompt_ref for tracker %s", batch_id
+                    )
+
         event = BatchEssaysReady(
             batch_id=batch_id,
             ready_essays=ready_essays,
@@ -358,7 +384,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             ),
             course_code=course_code_enum,
             course_language=course_language,
-            essay_instructions=getattr(tracker, "essay_instructions", ""),
+            student_prompt_ref=student_prompt_ref,
             class_type=class_type,
         )
 
@@ -401,6 +427,16 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
         if class_type not in ["GUEST", "REGULAR"]:
             raise ValueError(f"Invalid or missing class_type in batch metadata: {class_type}")
 
+        student_prompt_ref: StorageReferenceMetadata | None = None
+        prompt_payload = metadata.get("student_prompt_ref") if isinstance(metadata, dict) else None
+        if isinstance(prompt_payload, dict):
+            try:
+                student_prompt_ref = StorageReferenceMetadata.model_validate(prompt_payload)
+            except Exception:
+                self._logger.warning(
+                    "Failed to deserialize Redis student_prompt_ref for batch %s", batch_id
+                )
+
         # Create clean BatchEssaysReady event with NO legacy validation fields
         ready_event = BatchEssaysReady(
             batch_id=batch_id,
@@ -415,7 +451,7 @@ class DefaultBatchEssayTracker(BatchEssayTracker):
             ),
             course_code=course_code,
             course_language=course_language,
-            essay_instructions=metadata.get("essay_instructions", ""),
+            student_prompt_ref=student_prompt_ref,
             class_type=class_type,
         )
 

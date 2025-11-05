@@ -20,6 +20,7 @@ from services.essay_lifecycle_service.essay_state_machine import (
     EssayStateMachine,
 )
 from services.essay_lifecycle_service.protocols import (
+    BatchEssayTracker,
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
@@ -34,11 +35,13 @@ class NlpCommandHandler:
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
+        batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
     ) -> None:
         """Initialize with dependencies."""
         self.repository = repository
         self.request_dispatcher = request_dispatcher
+        self.batch_tracker = batch_tracker
         self.session_factory = session_factory
 
     async def process_initiate_nlp_command(
@@ -170,6 +173,12 @@ class NlpCommandHandler:
                         )
                         return
 
+                    # Retrieve student_prompt_ref from batch context (Phase 3.2 bridging)
+                    student_prompt_ref = None
+                    batch_status = await self.batch_tracker.get_batch_status(batch_id)
+                    if batch_status:
+                        student_prompt_ref = batch_status.get("student_prompt_ref")
+
                     await self.request_dispatcher.dispatch_nlp_requests(
                         essays_to_process=successfully_transitioned,
                         language=Language(command_data.language),
@@ -177,6 +186,7 @@ class NlpCommandHandler:
                         essay_instructions=command_data.essay_instructions,
                         correlation_id=correlation_id,
                         session=session,
+                        student_prompt_ref=student_prompt_ref,
                     )
 
                 logger.info(

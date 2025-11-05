@@ -7,6 +7,88 @@
 
 ---
 
+## Session Summary (2025-11-05) – Phase 3.2 ELS Dispatcher Bridging Complete (Step 3)
+
+**Status**: ELS dispatcher bridging implemented and tested; ready for downstream service migrations (NLP, CJ).
+
+### What Changed Today (Latest Session)
+**ELS Dispatcher Bridging (Step 3 Complete)**:
+- Implemented Content Service prompt hydration in `DefaultSpecializedServiceRequestDispatcher`:
+  - Added `_fetch_prompt_text()` helper method with structured error handling
+  - Fetches from Content Service using `student_prompt_ref`, falls back to `essay_instructions` on failure
+  - Logs correlation_id-tagged warnings and increments `huleedu_els_prompt_fetch_failures_total{context="nlp|cj"}` metric
+  - Populates both `student_prompt_ref` and hydrated `essay_instructions` in dispatch events
+
+- DI & Configuration:
+  - Added `ContentServiceClient` to ELS DI container (APP scope) with settings-based configuration
+  - Injected into `DefaultSpecializedServiceRequestDispatcher` along with metrics registry
+  - Wired `HttpClient` → `ContentServiceClient` provider chain in `ServiceClientsProvider`
+
+- Command Handler Updates:
+  - Updated `NlpCommandHandler` to include `BatchEssayTracker` dependency and retrieve `student_prompt_ref` from batch context
+  - Updated `CJAssessmentCommandHandler` to fetch `student_prompt_ref` from `get_batch_status()` before dispatch
+  - Both handlers pass reference to dispatcher for hydration
+
+- Batch Context Access:
+  - Enhanced `BatchEssayTracker.get_batch_status()` to deserialize and expose `student_prompt_ref` from `batch_metadata`
+  - Added structured logging for deserialization failures
+
+- Protocol Updates:
+  - Extended `SpecializedServiceRequestDispatcher` protocol with optional `student_prompt_ref` parameter on dispatch methods
+  - Updated test mocks and assertions to match new signatures
+
+### Sites Touched (This Session)
+- `services/essay_lifecycle_service/di.py` - Added ContentServiceClient providers
+- `services/essay_lifecycle_service/metrics.py` - Added prompt_fetch_failures counter
+- `services/essay_lifecycle_service/implementations/service_request_dispatcher.py` - Implemented hydration logic
+- `services/essay_lifecycle_service/implementations/nlp_command_handler.py` - Added batch_tracker dependency
+- `services/essay_lifecycle_service/implementations/cj_assessment_command_handler.py` - Integrated prompt reference retrieval
+- `services/essay_lifecycle_service/implementations/batch_essay_tracker_impl.py` - Enhanced get_batch_status()
+- `services/essay_lifecycle_service/protocols.py` - Updated dispatcher signatures
+- `services/essay_lifecycle_service/tests/unit/test_nlp_command_handler.py` - Updated mocks
+- `services/essay_lifecycle_service/tests/unit/test_cj_assessment_command_handler.py` - Updated assertions
+- `services/essay_lifecycle_service/tests/unit/test_kafka_circuit_breaker_business_impact.py` - Updated dispatcher instantiations
+- `TASKS/TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.md` - Updated progress log
+
+### Test Results
+✅ All ELS target tests passing:
+- `test_nlp_command_handler.py`: 2/2 passed
+- `test_cj_assessment_command_handler.py`: 8/8 passed
+- `test_kafka_circuit_breaker_business_impact.py`: 8/8 passed
+
+### Outstanding Work Before Next Session
+**Critical Path**: Migrate downstream services to consume `student_prompt_ref` natively, then remove ELS dispatcher bridging.
+
+1. **NLP Service Migration**:
+   - Update event handlers to fetch prompt text from Content Service using `student_prompt_ref`
+   - Remove dependency on `essay_instructions` string field
+   - Update tests and fixtures
+
+2. **CJ Assessment Service Migration**:
+   - Similar to NLP: fetch prompt via Content Service client
+   - Remove `essay_instructions` from event consumption
+   - Update test fixtures
+
+3. **Remove Dispatcher Bridging**:
+   - After both NLP and CJ are reference-native, remove `_fetch_prompt_text()` and hydration logic from dispatcher
+   - Remove `essay_instructions` parameter from dispatch method signatures
+   - Clean up metrics and logging related to bridging
+
+4. **Documentation**:
+   - Update service READMEs with prompt reference consumption patterns
+   - Document Content Service client usage in `.claude/rules/`
+   - Add ADR "Prompt Ownership and Content References"
+
+### Validation Plan
+- After downstream propagation, rerun affected unit/integration suites:
+  - `pdm run pytest-root services/batch_orchestrator_service -k prompt`
+  - `pdm run pytest-root services/batch_conductor_service -k prompt`
+  - `pdm run pytest-root services/essay_lifecycle_service -k prompt`
+  - NLP/AI Feedback/CJ service tests once reference consumption is wired.
+- Manual smoke: register batch, attach CMS prompt reference, execute AI Feedback/NLP/CJ pipelines, confirm Content Service fetches succeed and BCS gating metrics increment when prompt missing.
+
+---
+
 ## Session Summary (2025-11-04) - Phase 3.1 Grade Scale Completion
 
 **Status**: Phase 3.1 (Grade Scale Registry + Migrations) is complete (10 of 10 steps)

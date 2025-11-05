@@ -71,6 +71,12 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(0.1, 0.5, 1, 2.5, 5, 10, 30, 60),  # Meaningful buckets
                 registry=REGISTRY,
             ),
+            "prompt_prerequisite_blocked_total": Counter(
+                "huleedu_bcs_prompt_prerequisite_blocked_total",
+                "Prompt prerequisite violations detected during pipeline validation",
+                ["pipeline_name"],
+                registry=REGISTRY,
+            ),
             "events_processed_total": Counter(
                 "huleedu_bcs_events_processed_total",
                 "Total events processed by the BCS Kafka consumer to build state",
@@ -141,6 +147,7 @@ def _get_existing_metrics() -> dict[str, Any]:
         "http_request_duration_seconds": "bcs_http_request_duration_seconds",
         "pipeline_resolutions_total": "huleedu_bcs_pipeline_resolutions_total",
         "pipeline_resolution_duration_seconds": "huleedu_bcs_pipeline_resolution_duration_seconds",
+        "prompt_prerequisite_blocked_total": "huleedu_bcs_prompt_prerequisite_blocked_total",
         "events_processed_total": "huleedu_bcs_events_processed_total",
         "els_requests": "bcs_els_requests_total",
         "db_operation_duration": "bcs_db_operation_duration_seconds",

@@ -26,7 +26,11 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
         self.bcs_endpoint = f"{settings.BCS_BASE_URL}{settings.BCS_PIPELINE_ENDPOINT}"
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+        self,
+        batch_id: str,
+        requested_pipeline: PhaseName,
+        correlation_id: str,
+        batch_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Request pipeline resolution from BCS internal API.
@@ -35,6 +39,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
             batch_id: The unique identifier of the target batch
             requested_pipeline: The final pipeline phase the user wants to run
             correlation_id: The correlation ID from the original request for event tracking
+            batch_metadata: Optional metadata (e.g., prompt_attached flags) for compatibility checks
 
         Returns:
             BCS response containing resolved pipeline and analysis
@@ -49,6 +54,8 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
             "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
             "correlation_id": correlation_id,  # Pass correlation_id to BCS for event tracking
         }
+        if batch_metadata:
+            request_data["batch_metadata"] = batch_metadata
 
         self.logger.info(
             "Requesting pipeline resolution from BCS",

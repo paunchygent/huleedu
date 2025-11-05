@@ -102,7 +102,7 @@ class AIFeedbackInitiatorImpl(AIFeedbackInitiatorProtocol):
                 language=language,
                 # Orchestration context (from BOS lean registration)
                 course_code=batch_context.course_code,
-                essay_instructions=batch_context.essay_instructions,
+                student_prompt_ref=batch_context.student_prompt_ref,
                 # Educational context - determine from class_id presence
                 # Services needing teacher context should query CMS directly
                 class_type="REGULAR" if batch_context.class_id else "GUEST",

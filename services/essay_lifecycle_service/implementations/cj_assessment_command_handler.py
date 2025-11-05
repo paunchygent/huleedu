@@ -176,6 +176,8 @@ class CJAssessmentCommandHandler:
                         # Prefer identity from envelope metadata (canonical source)
                         user_id = None
                         org_id = None
+                        student_prompt_ref = None
+                        batch_status = None
 
                         if envelope_metadata:
                             user_id = envelope_metadata.get("user_id")
@@ -188,6 +190,10 @@ class CJAssessmentCommandHandler:
                                     "batch_id": command_data.entity_id,
                                     "correlation_id": str(correlation_id),
                                 },
+                            )
+                            # Still need batch_status for student_prompt_ref
+                            batch_status = await self.batch_tracker.get_batch_status(
+                                command_data.entity_id
                             )
                         else:
                             # Fallback to Redis if metadata missing (backward compatibility)
@@ -215,6 +221,10 @@ class CJAssessmentCommandHandler:
                                     },
                                 )
 
+                        # Extract student_prompt_ref from batch status (Phase 3.2 bridging)
+                        if batch_status:
+                            student_prompt_ref = batch_status.get("student_prompt_ref")
+
                         await self.request_dispatcher.dispatch_cj_assessment_requests(
                             essays_to_process=successfully_transitioned_essays,
                             language=language_enum,
@@ -225,6 +235,7 @@ class CJAssessmentCommandHandler:
                             org_id=org_id,
                             correlation_id=correlation_id,
                             session=session,
+                            student_prompt_ref=student_prompt_ref,
                         )
 
                         logger.info(

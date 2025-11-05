@@ -14,6 +14,13 @@ from aiohttp import ClientSession
 from aiokafka.errors import KafkaError
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.http_client.base_client import BaseHttpClient
+from huleedu_service_libs.http_client.config import ContentServiceConfig, HttpClientConfig
+from huleedu_service_libs.http_client.content_service_client import ContentServiceClient
+from huleedu_service_libs.http_client.protocols import (
+    ContentServiceClientProtocol,
+    HttpClientProtocol,
+)
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
@@ -284,6 +291,39 @@ class ServiceClientsProvider(Provider):
     """Provider for external service client implementations."""
 
     @provide(scope=Scope.APP)
+    def provide_http_client_config(self) -> HttpClientConfig:
+        """Provide HTTP client configuration."""
+        return HttpClientConfig(
+            default_timeout_seconds=15,  # Slightly higher for Content Service
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_base_http_client(
+        self,
+        session: ClientSession,
+        settings: Settings,
+        config: HttpClientConfig,
+    ) -> HttpClientProtocol:
+        """Provide base HTTP client for service communications."""
+        return BaseHttpClient(
+            session=session, service_name=settings.SERVICE_NAME, config=config
+        )
+
+    @provide(scope=Scope.APP)
+    def provide_content_service_config(self, settings: Settings) -> ContentServiceConfig:
+        """Provide Content Service configuration from settings."""
+        return ContentServiceConfig(base_url=settings.CONTENT_SERVICE_URL)
+
+    @provide(scope=Scope.APP)
+    def provide_content_service_client(
+        self,
+        http_client: HttpClientProtocol,
+        content_service_config: ContentServiceConfig,
+    ) -> ContentServiceClientProtocol:
+        """Provide Content Service client for prompt hydration."""
+        return ContentServiceClient(http_client=http_client, config=content_service_config)
+
+    @provide(scope=Scope.APP)
     def provide_outbox_manager(
         self,
         outbox_repository: OutboxRepositoryProtocol,
@@ -333,9 +373,13 @@ class ServiceClientsProvider(Provider):
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         outbox_repository: OutboxRepositoryProtocol,
+        content_service_client: ContentServiceClientProtocol,
+        registry: CollectorRegistry,
     ) -> SpecializedServiceRequestDispatcher:
-        """Provide specialized service request dispatcher implementation with outbox support."""
-        return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
+        """Provide specialized service request dispatcher implementation with Content Service hydration."""
+        return DefaultSpecializedServiceRequestDispatcher(
+            kafka_bus, settings, outbox_repository, content_service_client, registry
+        )
 
     @provide(scope=Scope.APP)
     def provide_kafka_consumer_health_monitor(
@@ -398,10 +442,11 @@ class CommandHandlerProvider(Provider):
         self,
         repository: EssayRepositoryProtocol,
         request_dispatcher: SpecializedServiceRequestDispatcher,
+        batch_tracker: BatchEssayTracker,
         session_factory: async_sessionmaker,
     ) -> NlpCommandHandler:
         """Provide NLP command handler implementation."""
-        return NlpCommandHandler(repository, request_dispatcher, session_factory)
+        return NlpCommandHandler(repository, request_dispatcher, batch_tracker, session_factory)
 
     @provide(scope=Scope.APP)
     def provide_student_matching_command_handler(

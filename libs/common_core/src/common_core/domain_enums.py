@@ -20,6 +20,7 @@ class ContentType(str, Enum):
     CJ_RESULTS_JSON = "cj_results_json"  # cj_assessment_service output
     RAW_UPLOAD_BLOB = "raw_upload_blob"
     EXTRACTED_PLAINTEXT = "extracted_plaintext"  # file_service output
+    STUDENT_PROMPT_TEXT = "student_prompt_text"
 
 
 class CourseCode(str, Enum):

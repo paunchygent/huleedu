@@ -98,7 +98,7 @@ class NLPInitiatorImpl(NLPInitiatorProtocol):
                 entity_type="batch",
                 essays_to_process=essays_for_processing,
                 language=language,
-                essay_instructions=batch_context.essay_instructions,
+                student_prompt_ref=batch_context.student_prompt_ref,
             )
 
             # Create EventEnvelope for NLP command

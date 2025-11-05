@@ -204,6 +204,7 @@ class TestCJAssessmentCommandHandler:
                 org_id="test-org-456",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
+                student_prompt_ref=None,  # Phase 3.2 bridging parameter
             )
 
     # Test: State Machine Transition Failure
@@ -406,6 +407,7 @@ class TestCJAssessmentCommandHandler:
                 org_id="stockholm-school",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
+                student_prompt_ref=None,  # Phase 3.2 bridging parameter
             )
 
     # Test: Create command with course code
@@ -547,6 +549,7 @@ class TestCJAssessmentCommandHandler:
                 org_id="minimal-org-789",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
+                student_prompt_ref=None,  # Phase 3.2 bridging parameter
             )
 
     # Test: Create command that should fail validation

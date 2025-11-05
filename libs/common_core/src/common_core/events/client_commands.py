@@ -9,7 +9,38 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from ..metadata_models import StorageReferenceMetadata
+
+
+class PipelinePromptPayload(BaseModel):
+    """
+    Carries prompt-selection metadata for pipelines that require student prompts.
+
+    Exactly one of assignment_id (canonical prompt) or cms_prompt_ref (ad-hoc teacher prompt)
+    must be supplied.
+    """
+
+    assignment_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Canonical assignment identifier for system-managed prompts",
+    )
+    cms_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for teacher-provided prompt payloads",
+    )
+
+    @model_validator(mode="after")
+    def validate_prompt_selection(self) -> PipelinePromptPayload:
+        has_assignment = bool(self.assignment_id)
+        has_cms_ref = self.cms_prompt_ref is not None
+        if has_assignment and has_cms_ref:
+            raise ValueError("Provide either assignment_id or cms_prompt_ref, not both.")
+        if not has_assignment and not has_cms_ref:
+            raise ValueError("Prompt payload requires assignment_id or cms_prompt_ref.")
+        return self
 
 
 class ClientBatchPipelineRequestV1(BaseModel):
@@ -50,10 +81,9 @@ class ClientBatchPipelineRequestV1(BaseModel):
         description="Optional user-provided reason for the retry.",
         max_length=500,
     )
-    assignment_id: str | None = Field(
+    prompt_payload: PipelinePromptPayload | None = Field(
         default=None,
-        max_length=100,
-        description="Predefined assignment identifier for context-aware assessment",
+        description="Prompt-selection metadata for pipelines that require student prompts.",
     )
 
     model_config = {
@@ -68,6 +98,16 @@ class ClientBatchPipelineRequestV1(BaseModel):
                     "user_id": "user_789",
                     "is_retry": False,
                     "retry_reason": None,
+                    "prompt_payload": {
+                        "cms_prompt_ref": {
+                            "references": {
+                                "student_prompt_text": {
+                                    "storage_id": "0123abcd4567ef890123abcd4567ef89",
+                                    "path": ""
+                                }
+                            }
+                        }
+                    },
                 },
                 {
                     "batch_id": "batch_67890",
@@ -76,6 +116,7 @@ class ClientBatchPipelineRequestV1(BaseModel):
                     "user_id": "user_456",
                     "is_retry": True,
                     "retry_reason": "Spellcheck failed due to network error, retrying",
+                    "prompt_payload": None,
                 },
             ],
         },

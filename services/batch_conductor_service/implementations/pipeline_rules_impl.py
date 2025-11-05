@@ -18,6 +18,7 @@ from huleedu_service_libs.error_handling.batch_conductor_factories import (
 from huleedu_service_libs.error_handling.factories import (
     raise_resource_not_found,
 )
+from common_core.pipeline_models import PhaseName
 from services.batch_conductor_service.pipeline_definitions import PipelineDefinition, PipelineStep
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,
@@ -200,8 +201,30 @@ class DefaultPipelineRules(PipelineRulesProtocol):
                     correlation_id=correlation_id,
                 )
 
-            # Basic validation - pipeline exists and is well-formed
-            # Additional metadata-based validation can be added here as needed
+            # Prompt-dependent phases require prompt attachment metadata
+            prompt_required = pipeline_name in {
+                PhaseName.AI_FEEDBACK.value,
+                PhaseName.CJ_ASSESSMENT.value,
+                PhaseName.NLP.value,
+            }
+            if prompt_required:
+                prompt_attached = bool(batch_metadata and batch_metadata.get("prompt_attached"))
+                if not prompt_attached:
+                    from services.batch_conductor_service.metrics import get_metrics
+
+                    metrics = get_metrics()
+                    metrics["prompt_prerequisite_blocked_total"].labels(
+                        pipeline_name=pipeline_name
+                    ).inc()
+                    raise_pipeline_compatibility_failed(
+                        service="batch_conductor_service",
+                        operation="validate_pipeline_compatibility",
+                        message="Prompt-dependent pipeline requested without prompt attachment.",
+                        correlation_id=correlation_id,
+                        pipeline_name=pipeline_name,
+                        batch_metadata=batch_metadata,
+                        compatibility_issue="prompt_not_attached",
+                    )
             # Success case: method returns without raising
 
         except Exception as e:

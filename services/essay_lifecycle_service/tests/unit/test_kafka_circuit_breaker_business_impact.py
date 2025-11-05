@@ -263,7 +263,7 @@ class TestBatchCoordinationBusinessImpact:
             ),
             course_code=CourseCode.ENG5,
             course_language="English",
-            essay_instructions=batch_registered_event.essay_instructions,
+            student_prompt_ref=batch_registered_event.student_prompt_ref,  # Phase 3.2
             class_type="GUEST",
             user_id="test_user_123",
         )
@@ -478,10 +478,16 @@ class TestServiceRequestDispatchBusinessImpact:
         # Arrange: Set up outbox to fail when storing spellcheck requests
         mock_outbox_repository.add_event.side_effect = Exception("Database unavailable")
 
+        # Mock Content Service client and metrics registry
+        mock_content_service_client = AsyncMock()
+        mock_metrics_registry = Mock()
+
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
             outbox_repository=mock_outbox_repository,
+            content_service_client=mock_content_service_client,
+            metrics_registry=mock_metrics_registry,
         )
 
         essays_to_process = [
@@ -548,10 +554,16 @@ class TestServiceRequestDispatchBusinessImpact:
         # Create a mock Kafka bus (won't be used directly with outbox pattern)
         failing_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
 
+        # Mock Content Service client and metrics registry
+        mock_content_service_client = AsyncMock()
+        mock_metrics_registry = Mock()
+
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
             outbox_repository=mock_outbox_repository,
+            content_service_client=mock_content_service_client,
+            metrics_registry=mock_metrics_registry,
         )
 
         essays_to_process = [
@@ -945,10 +957,16 @@ class TestBusinessImpactIntegrationScenarios:
         )
 
         # Create dispatcher for potential use in extended test scenarios
+        # Mock Content Service client and metrics registry
+        mock_content_service_client = AsyncMock()
+        mock_metrics_registry = Mock()
+
         _dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=kafka_bus,
             settings=mock_settings,
             outbox_repository=mock_outbox_repository,
+            content_service_client=mock_content_service_client,
+            metrics_registry=mock_metrics_registry,
         )
 
         # Act: Execute complete business workflow with failures

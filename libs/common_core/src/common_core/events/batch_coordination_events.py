@@ -19,10 +19,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from ..domain_enums import CourseCode
-from ..metadata_models import (
-    EssayProcessingInputRefV1,
-    SystemProcessingMetadata,
-)
+from ..metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata, SystemProcessingMetadata
 from ..status_enums import BatchStatus
 
 # Import for structured error handling (forward reference resolution)
@@ -57,7 +54,10 @@ class BatchEssaysRegistered(BaseModel):
 
     # Course context from BOS lean registration (added for ELS to use in BatchEssaysReady)
     course_code: CourseCode = Field(description="Course code from batch registration")
-    essay_instructions: str = Field(description="Essay instructions from batch registration")
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for student prompt payloads",
+    )
     user_id: str = Field(description="User who owns this batch")
     org_id: str | None = Field(
         default=None,
@@ -112,7 +112,10 @@ class BatchEssaysReady(BaseModel):
     # Enhanced context from Class Management Service (lean registration refactoring)
     course_code: CourseCode = Field(description="Course code from BOS lean registration")
     course_language: str = Field(description="Language inferred from course_code")
-    essay_instructions: str = Field(description="Essay instructions from BOS lean registration")
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for prompt payloads",
+    )
 
     # Educational context from Class Management Service
     class_type: str = Field(description="GUEST or REGULAR - determines processing behavior")

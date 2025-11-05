@@ -17,6 +17,7 @@ from services.essay_lifecycle_service.implementations.nlp_command_handler import
     NlpCommandHandler,
 )
 from services.essay_lifecycle_service.protocols import (
+    BatchEssayTracker,
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
@@ -41,8 +42,16 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
 ) -> None:
     repo = AsyncMock(spec=EssayRepositoryProtocol)
     dispatcher = AsyncMock(spec=SpecializedServiceRequestDispatcher)
+    batch_tracker = AsyncMock(spec=BatchEssayTracker)
 
-    handler = NlpCommandHandler(repo, dispatcher, mock_session_factory)
+    # Mock batch_tracker to return None for student_prompt_ref (backward compat)
+    batch_tracker.get_batch_status.return_value = {
+        "batch_id": "batch-1",
+        "user_id": "user-1",
+        "student_prompt_ref": None,
+    }
+
+    handler = NlpCommandHandler(repo, dispatcher, batch_tracker, mock_session_factory)
 
     metrics = SpellcheckMetricsV1(
         total_corrections=3,

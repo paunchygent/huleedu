@@ -129,7 +129,7 @@ class StudentAssociationHandler:
                         ),
                         course_code=course_code,
                         course_language=course_language,
-                        essay_instructions="Instructions pending context integration.",
+                        student_prompt_ref=batch_ready_event_from_tracker.student_prompt_ref,
                         class_type="REGULAR",  # Always REGULAR for this flow
                     )
 

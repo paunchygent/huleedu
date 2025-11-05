@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from common_core.api_models.batch_registration import BatchRegistrationRequestV1
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
-from common_core.events.client_commands import ClientBatchPipelineRequestV1
+from common_core.events.client_commands import ClientBatchPipelineRequestV1, PipelinePromptPayload
 from common_core.events.envelope import EventEnvelope
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import raise_kafka_publish_error, raise_validation_error
@@ -57,6 +57,12 @@ class BatchPipelineRequest(BaseModel):
         description="Optional user-provided reason for the retry.",
         max_length=500,
     )
+    prompt_payload: PipelinePromptPayload | None = Field(
+        default=None,
+        description=(
+            "Prompt selection metadata: either canonical assignment_id or cms prompt reference."
+        ),
+    )
 
 
 class ClientBatchRegistrationRequest(BaseModel):
@@ -69,7 +75,6 @@ class ClientBatchRegistrationRequest(BaseModel):
     expected_essay_count: int = Field(..., gt=0)
     essay_ids: list[str] | None = Field(default=None, min_length=1)
     course_code: CourseCode
-    essay_instructions: str
     class_id: str | None = None
     enable_cj_assessment: bool = False
     cj_default_llm_model: str | None = None
@@ -102,7 +107,6 @@ async def register_batch(
             expected_essay_count=registration_request.expected_essay_count,
             essay_ids=registration_request.essay_ids,
             course_code=registration_request.course_code,
-            essay_instructions=registration_request.essay_instructions,
             user_id=user_id,
             org_id=org_id,
             class_id=registration_request.class_id,
@@ -361,6 +365,7 @@ async def request_pipeline_execution(
                 user_id=user_id,  # From authentication
                 is_retry=pipeline_request.is_retry,
                 retry_reason=pipeline_request.retry_reason,
+                prompt_payload=pipeline_request.prompt_payload,
             )
 
             # Create proper EventEnvelope with ClientBatchPipelineRequestV1 data

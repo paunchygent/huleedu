@@ -92,3 +92,30 @@ The objective is to decouple student prompt payloads from registration forms whi
 - Modifying event envelope format or observability infrastructure beyond new metrics.  
 - Redesigning Content Service storage semantics or BOS/BCS core architecture.  
 - Altering canonical CJ anchor datasets beyond exposing existing metadata.
+
+## Progress Log
+- **2025-11-05** – Core contract refactor kicked off  
+  - Updated `libs/common_core` events and batch service models to replace `essay_instructions` with `student_prompt_ref`; added `ContentType.STUDENT_PROMPT_TEXT`.  
+  - Gateway/BOS registration, pipeline DTOs, and persistence now operate on prompt references; pipeline requests carry a `prompt_payload` union and BOS emits `batch_metadata` when calling BCS.  
+  - BCS accepts the new metadata, enforces prompt prerequisites via `validate_pipeline_compatibility`, and records violations with `huleedu_bcs_prompt_prerequisite_blocked_total`.  
+- **2025-11-05** – ELS persistence wired for prompt references  
+  - `BatchExpectation` and database persistence now store `student_prompt_ref`, and recovery paths deserialize references from `batch_metadata`.  
+  - `BatchEssaysReady` events emitted by ELS carry `student_prompt_ref`, ensuring downstream consumers receive the reference during readiness handoff.  
+  - Added targeted BOS unit tests to verify prompt metadata plumbing and fixed the pipeline guard regression that blocked sequential runs.  
+  - Remaining work: hydrate prompt text through ELS dispatchers using Content Service, adapt NLP/CJ services to consume references directly, update fixtures/docs, and retire bridging/legacy `essay_instructions` support as soon as downstream migrations are complete.
+
+- **2025-11-05** – ELS dispatcher bridging complete (Step 3)
+  - Implemented Content Service prompt hydration in `DefaultSpecializedServiceRequestDispatcher` with fallback to legacy text
+  - Added `ContentServiceClient` to ELS DI container (APP scope) with proper configuration from settings
+  - Updated command handlers (NLP, CJ) to retrieve `student_prompt_ref` from batch context via `BatchEssayTracker.get_batch_status()`
+  - Enhanced `get_batch_status()` to deserialize and expose `student_prompt_ref` from `batch_metadata`
+  - Implemented `_fetch_prompt_text()` helper with structured error handling, logging, and metric tracking
+  - Added `huleedu_els_prompt_fetch_failures_total{context="nlp|cj"}` metric for observability
+  - Updated dispatcher protocols to accept optional `student_prompt_ref` parameter
+  - Fixed all 3 target test suites: `test_nlp_command_handler.py`, `test_cj_assessment_command_handler.py`, `test_kafka_circuit_breaker_business_impact.py`
+  - **Next**: Migrate NLP and CJ services to consume `student_prompt_ref` natively, then remove dispatcher bridging
+
+### Dispatcher Bridging Rules
+- Fetch prompt text in `DefaultSpecializedServiceRequestDispatcher` using the injected Content Service client.
+- On fetch failure, log a structured warning, increment `huleedu_els_prompt_fetch_failures_total{context="nlp|cj"}`, and fall back to the legacy `essay_instructions` string stored on `BatchExpectation` (trimmed). If no legacy text exists, send an empty string while still emitting the metric.
+- Populate both `student_prompt_ref` and `student_prompt_text` in dispatcher payloads. Remove this bridging layer immediately after both NLP and CJ services are reference-native.

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from common_core.domain_enums import CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 
 """Inter-service HTTP contract models for batch registration.
 
@@ -42,10 +43,9 @@ class BatchRegistrationRequestV1(BaseModel):
     course_code: CourseCode = Field(
         ..., description="Course code associated with this batch (e.g., SV1, ENG5)."
     )
-    essay_instructions: str = Field(
-        ...,
-        description="Instructions provided for the essay assignment.",
-        min_length=1,
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Optional Content Service reference for the student prompt (attached later).",
     )
     user_id: str = Field(
         ..., description="The ID of the user who owns this batch (from API Gateway JWT)."
@@ -86,11 +86,3 @@ class BatchRegistrationRequestV1(BaseModel):
                 )
             )
         return self
-
-    @field_validator("essay_instructions")
-    @classmethod
-    def validate_essay_instructions(cls, value: str) -> str:
-        trimmed = value.strip()
-        if not trimmed:
-            raise ValueError("essay_instructions must be a non-empty string.")
-        return trimmed

@@ -406,8 +406,9 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essay_instructions: str,
         correlation_id: UUID,
         session: AsyncSession | None = None,
+        student_prompt_ref: Any | None = None,  # StorageReferenceMetadata
     ) -> None:
-        """Dispatch NLP requests to NLP Service."""
+        """Dispatch NLP requests to NLP Service with optional prompt hydration."""
         ...
 
     async def dispatch_ai_feedback_requests(
@@ -431,8 +432,9 @@ class SpecializedServiceRequestDispatcher(Protocol):
         org_id: str | None,
         correlation_id: UUID,
         session: AsyncSession | None = None,
+        student_prompt_ref: Any | None = None,  # StorageReferenceMetadata
     ) -> None:
-        """Dispatch CJ assessment requests to CJ Assessment Service."""
+        """Dispatch CJ assessment requests to CJ Assessment Service with optional prompt hydration."""
         ...
 
 

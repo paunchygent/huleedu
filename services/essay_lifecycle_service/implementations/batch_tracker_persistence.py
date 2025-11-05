@@ -10,6 +10,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from common_core.domain_enums import CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import delete, func, select
@@ -172,6 +173,12 @@ class BatchTrackerPersistence:
         """Persist batch expectation to database (dual-write pattern)."""
         try:
             async with self._session_factory() as session:
+                metadata_payload: dict[str, object] | None = None
+                if expectation.student_prompt_ref:
+                    metadata_payload = {
+                        "student_prompt_ref": expectation.student_prompt_ref.model_dump(mode="json")
+                    }
+
                 # Create database record
                 tracker_db = BatchEssayTrackerDB(
                     batch_id=expectation.batch_id,
@@ -186,6 +193,7 @@ class BatchTrackerPersistence:
                     org_id=expectation.org_id,
                     correlation_id=str(expectation.correlation_id),
                     timeout_seconds=expectation.timeout_seconds,
+                    batch_metadata=metadata_payload,
                 )
 
                 session.add(tracker_db)
@@ -395,6 +403,17 @@ class BatchTrackerPersistence:
     def expectation_from_db(self, tracker_db: BatchEssayTrackerDB) -> BatchExpectation:
         """Convert database model to memory BatchExpectation."""
         # Create expectation
+        metadata = getattr(tracker_db, "batch_metadata", None) or {}
+        student_prompt_ref: StorageReferenceMetadata | None = None
+        prompt_payload = metadata.get("student_prompt_ref") if isinstance(metadata, dict) else None
+        if isinstance(prompt_payload, dict):
+            try:
+                student_prompt_ref = StorageReferenceMetadata.model_validate(prompt_payload)
+            except Exception:
+                self._logger.warning(
+                    "Failed to deserialize student_prompt_ref for batch %s", tracker_db.batch_id
+                )
+
         expectation = BatchExpectation(
             batch_id=tracker_db.batch_id,
             expected_essay_ids=frozenset(
@@ -402,11 +421,12 @@ class BatchTrackerPersistence:
             ),  # Convert list to immutable frozenset
             expected_count=tracker_db.expected_count,  # Fixed: Added missing required field
             course_code=CourseCode(tracker_db.course_code),
-            essay_instructions=tracker_db.essay_instructions,
             user_id=tracker_db.user_id,
             org_id=tracker_db.org_id if hasattr(tracker_db, "org_id") else None,
             correlation_id=UUID(tracker_db.correlation_id),
             created_at=tracker_db.created_at,  # Fixed: Added missing required field
+            student_prompt_ref=student_prompt_ref,
+            essay_instructions=getattr(tracker_db, "essay_instructions", ""),
             timeout_seconds=tracker_db.timeout_seconds,
         )
 

@@ -140,7 +140,7 @@ class BatchProcessingServiceImpl:
             metadata=event_metadata,
             # Course context for ELS to use in BatchEssaysReady events
             course_code=registration_data.course_code,
-            essay_instructions=registration_data.essay_instructions,
+            student_prompt_ref=registration_data.student_prompt_ref,
             user_id=registration_data.user_id,
             org_id=registration_data.org_id,
             # Class context for GUEST vs REGULAR batch determination
