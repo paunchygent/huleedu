@@ -7,11 +7,11 @@ the Batch Orchestrator Service sends to ELS to initiate various processing phase
 
 from __future__ import annotations
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from .domain_enums import CourseCode
 from .events.base_event_models import BaseEventData
-from .metadata_models import EssayProcessingInputRefV1
+from .metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
 
 __all__ = [
     "BatchServiceAIFeedbackInitiateCommandDataV1",
@@ -84,15 +84,7 @@ class BatchServiceNLPInitiateCommandDataV2(BaseEventData):
 
     essays_to_process: list[EssayProcessingInputRefV1]
     language: str  # inferred from course_code
-    essay_instructions: str  # required for context-aware analysis
-
-    @field_validator("essay_instructions")
-    @classmethod
-    def validate_essay_instructions(cls, value: str) -> str:
-        trimmed = value.strip()
-        if not trimmed:
-            raise ValueError("essay_instructions must be a non-empty string.")
-        return trimmed
+    student_prompt_ref: StorageReferenceMetadata | None = None  # Content Service reference
 
 
 class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
@@ -103,7 +95,7 @@ class BatchServiceAIFeedbackInitiateCommandDataV1(BaseEventData):
 
     # Orchestration context (from BOS lean registration)
     course_code: CourseCode  # from batch registration
-    essay_instructions: str  # from batch registration
+    student_prompt_ref: StorageReferenceMetadata | None = None  # Content Service reference
 
     # Personalization context (from Class Management Service via enhanced BatchEssaysReady)
     class_type: str  # GUEST or REGULAR - determines AI feedback template selection
@@ -123,7 +115,7 @@ class BatchServiceCJAssessmentInitiateCommandDataV1(BaseEventData):
 
     # Orchestration context (from BOS lean registration)
     course_code: CourseCode  # from batch registration
-    essay_instructions: str  # from batch registration
+    student_prompt_ref: StorageReferenceMetadata | None = None  # Content Service reference
 
     # Educational context (from Class Management Service via enhanced BatchEssaysReady)
     # Note: CJ assessment works identically for GUEST and REGULAR classes

@@ -18,7 +18,7 @@ import pytest
 from common_core.domain_enums import CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.error_handling import HuleEduError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -305,7 +305,9 @@ class TestAtomicBatchCreationIntegration:
             expected_essay_count=3,
             essay_ids=["essay_001", "essay_002", "essay_003"],
             course_code=CourseCode.ENG5,
-            essay_instructions="Write a test essay",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "test-integration-prompt", "path": ""}}
+            ),
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
                 entity_id="integration-test-batch",
@@ -400,13 +402,18 @@ class TestAtomicBatchCreationIntegration:
         from services.essay_lifecycle_service.models_db import BatchEssayTracker
 
         async with postgres_repository.get_session_factory()() as session:
+            # Store student_prompt_ref in batch_metadata following Phase 3.2 pattern
+            batch_metadata = {}
+            if sample_batch_event.student_prompt_ref:
+                batch_metadata["student_prompt_ref"] = sample_batch_event.student_prompt_ref.model_dump()
+
             batch_tracker_record = BatchEssayTracker(
                 batch_id=sample_batch_event.entity_id,
                 expected_essay_ids=sample_batch_event.essay_ids,
                 available_slots=sample_batch_event.essay_ids,
                 expected_count=len(sample_batch_event.essay_ids),
                 course_code=sample_batch_event.course_code.value,
-                essay_instructions=sample_batch_event.essay_instructions,
+                batch_metadata=batch_metadata,
                 user_id=sample_batch_event.user_id,
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,

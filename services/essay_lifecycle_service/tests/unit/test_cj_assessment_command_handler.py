@@ -16,6 +16,7 @@ from common_core.batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
+from common_core.domain_enums import ContentType
 from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent
 from common_core.status_enums import EssayStatus
@@ -31,6 +32,7 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
+from common_core.metadata_models import StorageReferenceMetadata
 
 if TYPE_CHECKING:
     pass
@@ -112,6 +114,11 @@ class TestCJAssessmentCommandHandler:
         self, batch_id: str, essay_processing_ref: EssayProcessingInputRefV1
     ) -> BatchServiceCJAssessmentInitiateCommandDataV1:
         """Sample CJ assessment command data."""
+        student_prompt_ref = StorageReferenceMetadata(
+            references={
+                ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-abc", "path": ""}
+            }
+        )
         return BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
             entity_id=batch_id,
@@ -119,7 +126,7 @@ class TestCJAssessmentCommandHandler:
             language="en",
             course_code=CourseCode.ENG5,
             class_type="REGULAR",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=student_prompt_ref,
         )
 
     # Test: Successful CJ Assessment Command Processing
@@ -198,13 +205,13 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=cj_assessment_command_data.essays_to_process,
                 language=cj_assessment_command_data.language,
                 course_code=cj_assessment_command_data.course_code,
-                essay_instructions=cj_assessment_command_data.essay_instructions,
+                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=cj_assessment_command_data.entity_id,
                 user_id="test-user-123",
                 org_id="test-org-456",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
-                student_prompt_ref=None,  # Phase 3.2 bridging parameter
+                student_prompt_ref=cj_assessment_command_data.student_prompt_ref,
             )
 
     # Test: State Machine Transition Failure
@@ -295,7 +302,14 @@ class TestCJAssessmentCommandHandler:
             language="en",
             course_code=CourseCode.ENG6,
             class_type="REGULAR",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-multi",
+                        "path": "",
+                    }
+                }
+            ),
         )
 
         # Setup essay states - all found and can transition
@@ -370,7 +384,7 @@ class TestCJAssessmentCommandHandler:
             language="sv",
             course_code=CourseCode.SV3,
             class_type="REGULAR",
-            essay_instructions="Skriv om din semester",
+            student_prompt_ref=None,
         )
 
         # Setup essay state
@@ -401,13 +415,13 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=[essay_ref],
                 language=Language.SWEDISH,
                 course_code=CourseCode.SV3,
-                essay_instructions="Skriv om din semester",
+                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=batch_id,
                 user_id="swedish-user-789",
                 org_id="stockholm-school",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
-                student_prompt_ref=None,  # Phase 3.2 bridging parameter
+                student_prompt_ref=None,  # Command data has None, dispatcher would hydrate if present
             )
 
     # Test: Create command with course code
@@ -432,8 +446,15 @@ class TestCJAssessmentCommandHandler:
             ],
             language="en",
             course_code=CourseCode.ENG5,
-            essay_instructions="Write about your experience",
             class_type="REGULAR",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-course",
+                        "path": "",
+                    }
+                }
+            ),
         )
 
         # Setup essay states - all found and can transition
@@ -509,8 +530,15 @@ class TestCJAssessmentCommandHandler:
             ],
             language="sv",
             course_code=CourseCode.SV1,
-            essay_instructions="Minimal instructions",
             class_type="GUEST",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-min",
+                        "path": "",
+                    }
+                }
+            ),
         )
 
         # Setup essay state
@@ -543,13 +571,13 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=[command_data.essays_to_process[0]],
                 language=Language.SWEDISH,
                 course_code=command_data.course_code,
-                essay_instructions=command_data.essay_instructions,
+                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=batch_id,
                 user_id="minimal-user-456",
                 org_id="minimal-org-789",
                 correlation_id=correlation_id,
                 session=ANY,  # session parameter
-                student_prompt_ref=None,  # Phase 3.2 bridging parameter
+                student_prompt_ref=command_data.student_prompt_ref,
             )
 
     # Test: Create command that should fail validation
@@ -570,8 +598,8 @@ class TestCJAssessmentCommandHandler:
             essays_to_process=[],  # Empty essays list should cause validation failure
             language="en",
             course_code=CourseCode.ENG7,
-            essay_instructions="Test validation",
             class_type="REGULAR",
+            student_prompt_ref=None,
         )
 
         # No essay state setup needed since essays_to_process is empty

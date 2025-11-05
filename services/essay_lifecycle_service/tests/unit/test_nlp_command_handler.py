@@ -8,7 +8,8 @@ from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV
 from common_core.event_enums import ProcessingEvent
 from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
-from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
+from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
 from pydantic import ValidationError
 
@@ -71,6 +72,12 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     repo.get_essay_state.return_value = essay_state
     repo.update_essay_status_via_machine.return_value = None
 
+    student_prompt_ref = StorageReferenceMetadata(
+        references={
+            ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-123", "path": ""}
+        }
+    )
+
     command = BatchServiceNLPInitiateCommandDataV2(
         event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         entity_id="batch-1",
@@ -80,7 +87,7 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
             EssayProcessingInputRefV1(essay_id="essay-1", text_storage_id="storage-1")
         ],
         language="en",
-        essay_instructions="Analyze the impact of renewable energy adoption.",
+        student_prompt_ref=student_prompt_ref,
     )
 
     await handler.process_initiate_nlp_command(command, uuid4())
@@ -91,6 +98,6 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     assert len(essays) == 1
     assert essays[0].spellcheck_metrics is not None
     assert essays[0].spellcheck_metrics.total_corrections == metrics.total_corrections
-    assert (
-        dispatched_args["essay_instructions"] == "Analyze the impact of renewable energy adoption."
-    )
+    # Phase 3.2: Command handler passes empty string; dispatcher hydrates from student_prompt_ref
+    assert dispatched_args["essay_instructions"] == ""
+    assert dispatched_args["student_prompt_ref"] == student_prompt_ref

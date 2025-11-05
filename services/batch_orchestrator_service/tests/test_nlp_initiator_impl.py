@@ -17,10 +17,9 @@ from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import HuleEduError
-from pydantic import ValidationError
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.nlp_initiator_impl import NLPInitiatorImpl
@@ -47,7 +46,9 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
         course_code=CourseCode.ENG5,
-        essay_instructions="Write a 500-word essay on climate change.",
+        student_prompt_ref=StorageReferenceMetadata(
+            references={"student_prompt_text": {"storage_id": "test-prompt-id", "path": ""}}
+        ),
         user_id="test_user_nlp",
         essay_ids=["essay1", "essay2"],
     )
@@ -76,27 +77,6 @@ def sample_correlation_id() -> UUID:
 
 class TestNLPInitiatorImpl:
     """Test suite for NLP initiator implementation."""
-
-    def test_batch_registration_request_requires_non_empty_instructions(self) -> None:
-        with pytest.raises(ValidationError):
-            BatchRegistrationRequestV1(
-                expected_essay_count=1,
-                course_code=CourseCode.ENG5,
-                essay_instructions="   ",
-                user_id="teacher",
-                essay_ids=["essay-1"],
-            )
-
-    def test_batch_service_nlp_command_requires_instructions(self) -> None:
-        with pytest.raises(ValidationError):
-            BatchServiceNLPInitiateCommandDataV2(
-                event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
-                entity_id="batch-test",
-                entity_type="batch",
-                essays_to_process=[],
-                language="en",
-                essay_instructions="   ",
-            )
 
     async def test_initiate_phase_success(
         self,
@@ -138,7 +118,7 @@ class TestNLPInitiatorImpl:
         assert command_data.entity_type == "batch"
         assert command_data.essays_to_process == sample_essay_refs
         assert command_data.language == "en"  # Inferred from ENG5
-        assert command_data.essay_instructions == sample_batch_context.essay_instructions
+        assert command_data.student_prompt_ref == sample_batch_context.student_prompt_ref
         assert command_data.event_name == ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2
 
     async def test_initiate_phase_wrong_phase_validation(
@@ -187,7 +167,9 @@ class TestNLPInitiatorImpl:
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code=CourseCode.SV1,  # Swedish course
-            essay_instructions="Skriv en uppsats om miljöfrågor.",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "swedish-prompt", "path": ""}}
+            ),
             user_id="test_user_swedish_nlp",
             essay_ids=["essay1"],
         )
@@ -203,7 +185,7 @@ class TestNLPInitiatorImpl:
         # Verify Swedish language was inferred
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "sv"
-        assert published_envelope.data.essay_instructions == swedish_context.essay_instructions
+        assert published_envelope.data.student_prompt_ref == swedish_context.student_prompt_ref
 
     async def test_language_inference_unknown_defaults_to_english(
         self,
@@ -216,7 +198,9 @@ class TestNLPInitiatorImpl:
         english_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code=CourseCode.ENG6,  # Valid English course code
-            essay_instructions="Write something.",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "english-prompt", "path": ""}}
+            ),
             user_id="test_user_english_nlp",
             essay_ids=["essay1"],
         )
@@ -232,7 +216,7 @@ class TestNLPInitiatorImpl:
         # Verify English language (ENG6 maps to English via get_course_language)
         published_envelope = mock_event_publisher.publish_batch_event.call_args[0][0]
         assert published_envelope.data.language == "en"
-        assert published_envelope.data.essay_instructions == english_context.essay_instructions
+        assert published_envelope.data.student_prompt_ref == english_context.student_prompt_ref
 
     async def test_event_publisher_exception_propagation(
         self,

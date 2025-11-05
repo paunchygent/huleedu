@@ -47,7 +47,11 @@ class MockBatchConductorClient:
         self.endpoint = f"{base_url}/internal/v1/pipelines/define"
 
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+        self,
+        batch_id: str,
+        requested_pipeline: PhaseName,
+        correlation_id: str,
+        batch_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Resolve pipeline using real HTTP call to BCS."""
         # Build URL for BCS pipeline resolution endpoint

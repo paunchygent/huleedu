@@ -113,7 +113,11 @@ class _MockRepo(BatchRepositoryProtocol):
 
 class _MockBCS(BatchConductorClientProtocol):
     async def resolve_pipeline(
-        self, batch_id: str, requested_pipeline: PhaseName, correlation_id: str
+        self,
+        batch_id: str,
+        requested_pipeline: PhaseName,
+        correlation_id: str,
+        batch_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Echo back a simple resolution that includes requested phase and a fixed follow-up
         return {"final_pipeline": [requested_pipeline.value, PhaseName.AI_FEEDBACK.value]}

@@ -7,7 +7,7 @@ the anchor management API endpoints across multiple test files.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any, AsyncContextManager, AsyncIterator
+from typing import Any, AsyncContextManager, AsyncIterator, Sequence
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,7 +86,7 @@ class MockAsyncSession(AsyncSession):
         if self.repository.behavior == "database_failure":
             raise RuntimeError("Database commit failed")
 
-    async def flush(self) -> None:
+    async def flush(self, objects: Sequence[object] | None = None) -> None:
         """Mock session flush operation."""
         if self.repository.behavior == "database_failure":
             raise RuntimeError("Database flush failed")

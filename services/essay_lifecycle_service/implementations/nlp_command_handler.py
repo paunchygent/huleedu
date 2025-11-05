@@ -173,20 +173,16 @@ class NlpCommandHandler:
                         )
                         return
 
-                    # Retrieve student_prompt_ref from batch context (Phase 3.2 bridging)
-                    student_prompt_ref = None
-                    batch_status = await self.batch_tracker.get_batch_status(batch_id)
-                    if batch_status:
-                        student_prompt_ref = batch_status.get("student_prompt_ref")
-
+                    # Phase 3.2: Pass student_prompt_ref from command data
+                    # Dispatcher will hydrate prompt text from Content Service
                     await self.request_dispatcher.dispatch_nlp_requests(
                         essays_to_process=successfully_transitioned,
                         language=Language(command_data.language),
                         batch_id=batch_id,
-                        essay_instructions=command_data.essay_instructions,
+                        essay_instructions="",  # Bridging: dispatcher hydrates from student_prompt_ref
                         correlation_id=correlation_id,
                         session=session,
-                        student_prompt_ref=student_prompt_ref,
+                        student_prompt_ref=command_data.student_prompt_ref,
                     )
 
                 logger.info(

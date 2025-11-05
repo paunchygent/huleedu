@@ -49,7 +49,7 @@ class BatchConductorClientImpl(BatchConductorClientProtocol):
             ValueError: If BCS returns an error response
         """
         # Prepare request payload following BCS API contract
-        request_data = {
+        request_data: dict[str, Any] = {
             "batch_id": batch_id,
             "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
             "correlation_id": correlation_id,  # Pass correlation_id to BCS for event tracking

@@ -34,13 +34,13 @@ class TestAnchorRegistrationEndpoint:
         return MockContentClient(behavior="success", storage_id="content-abc123")
 
     @pytest.fixture
-    def mock_repository(self) -> CJRepositoryProtocol:
+    def mock_repository(self) -> MockCJRepository:
         """Create successful repository mock."""
         return MockCJRepository(behavior="success")
 
     @pytest.fixture
     def test_app(
-        self, mock_content_client: ContentClientProtocol, mock_repository: CJRepositoryProtocol
+        self, mock_content_client: ContentClientProtocol, mock_repository: MockCJRepository
     ) -> Any:
         """Create test app with mock dependencies."""
 
@@ -72,7 +72,7 @@ class TestAnchorRegistrationEndpoint:
         self,
         client: QuartTestClient,
         mock_content_client: ContentClientProtocol,
-        mock_repository: CJRepositoryProtocol,
+        mock_repository: MockCJRepository,
     ) -> None:
         """Test successful anchor essay registration."""
         # Arrange
@@ -117,7 +117,7 @@ class TestAnchorRegistrationEndpoint:
     async def test_register_anchor_essay_grade_validation(
         self,
         client: QuartTestClient,
-        mock_repository: CJRepositoryProtocol,
+        mock_repository: MockCJRepository,
         grade: str,
         expected_success: bool,
     ) -> None:
@@ -150,7 +150,7 @@ class TestAnchorRegistrationEndpoint:
         self,
         client: QuartTestClient,
         mock_content_client: ContentClientProtocol,
-        mock_repository: CJRepositoryProtocol,
+        mock_repository: MockCJRepository,
     ) -> None:
         """Test that essay content is successfully processed."""
         # Arrange

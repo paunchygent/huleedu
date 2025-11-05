@@ -104,7 +104,7 @@ class TestBatchServiceCommandContracts:
         assert deserialized_command.entity_id == original_command.entity_id
         assert deserialized_command.course_code == original_command.course_code
         assert deserialized_command.class_type == original_command.class_type
-        assert deserialized_command.essay_instructions == original_command.essay_instructions
+        assert deserialized_command.student_prompt_ref == original_command.student_prompt_ref
         assert len(deserialized_command.essays_to_process) == len(
             original_command.essays_to_process,
         )

@@ -17,7 +17,7 @@ from common_core.batch_service_models import BatchServiceAIFeedbackInitiateComma
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import HuleEduError
 
@@ -48,7 +48,9 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
         course_code=CourseCode.ENG5,
-        essay_instructions="Write a 500-word essay analyzing the themes in Shakespeare's Hamlet.",
+        student_prompt_ref=StorageReferenceMetadata(
+            references={"student_prompt_text": {"storage_id": "test-ai-feedback-prompt", "path": ""}}
+        ),
         user_id="user_123",
         essay_ids=["essay1", "essay2"],
     )
@@ -122,7 +124,7 @@ class TestAIFeedbackInitiatorImpl:
 
         # Verify AI feedback specific context fields
         assert command_data.course_code == sample_batch_context.course_code
-        assert command_data.essay_instructions == sample_batch_context.essay_instructions
+        assert command_data.student_prompt_ref == sample_batch_context.student_prompt_ref
         # Educational context fields use placeholder
         # values until Class Management Service integration
         assert command_data.class_type == "GUEST"
@@ -260,8 +262,8 @@ class TestAIFeedbackInitiatorImpl:
         comprehensive_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code=CourseCode.SV1,
-            essay_instructions=(
-                "Examine the ethical implications of artificial intelligence in 1000 words."
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "comprehensive-prompt-id", "path": ""}}
             ),
             user_id="user_123",
             essay_ids=["essay1", "essay2"],
@@ -280,9 +282,8 @@ class TestAIFeedbackInitiatorImpl:
         command_data = published_envelope.data
 
         assert command_data.course_code == CourseCode.SV1
-        assert command_data.essay_instructions == (
-            "Examine the ethical implications of artificial intelligence in 1000 words."
-        )
+        assert command_data.student_prompt_ref is not None
+        assert command_data.student_prompt_ref.references["student_prompt_text"]["storage_id"] == "comprehensive-prompt-id"
         # Educational context uses placeholder values until Class Management Service integration
         assert command_data.class_type == "GUEST"
         assert command_data.owner_user_id == "user_123"
