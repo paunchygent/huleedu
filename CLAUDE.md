@@ -5,9 +5,10 @@
 ### 1. Initial Setup
 
 ```markdown
-- FIRST ACTION Read `.cursor/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards.
+- FIRST ACTION Read `.claude/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
-- Key architectural documents in this order:
+- THIRD ACTION Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
+- WHEN IMPLEMENTING NEW CODE using library dependencies: always use Context7 to ensure updated library API context.
 
 ### 2. Task Execution
 
@@ -16,7 +17,7 @@
 2. **Select Mode**: Use `.claude/rules/110-ai-agent-interaction-modes.mdc` to choose mode (Planning, Coding, Debugging)
 3. **Rule Reference**: Consult `.claude/rules/000-rule-index.mdc` for relevant rules
 cross-service task context.
-4. **Update**: Update `.claude/HANDOFF.md` and `.claude/README_FIRST.md` with any new information.
+4. **Update**: After each task phase, Always stop to update `.claude/HANDOFF.md` and `.claude/README_FIRST.md` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 ```
 
 ### 3. Error Resolution Protocol
