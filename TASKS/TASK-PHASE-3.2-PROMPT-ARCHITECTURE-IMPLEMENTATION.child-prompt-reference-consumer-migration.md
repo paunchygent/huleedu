@@ -34,11 +34,18 @@ Complete the downstream prompt-reference migration by shifting all services from
 - [x] Step 2 – Essay Lifecycle dispatcher now forwards references only (2025-11-06 session kickoff).
 - [x] Step 3 – NLP service hydrates prompt text locally, exposes `huleedu_nlp_prompt_fetch_failures_total`, and propagates `student_prompt_text`/`student_prompt_storage_id` via event metadata. Updated handler, protocols, event publisher, and unit tests (`pdm run pytest-root services/nlp_service/tests -k batch_nlp_analysis_handler`).
 - [x] Step 4 – CJ assessment service now hydrates prompts, emits `huleedu_cj_prompt_fetch_failures_total{reason=…}`, stores nullable prompt metadata, and ships Alembic migration `20251106_1845_make_cj_prompt_nullable.py`. Updated workflow/repository/protocols/tests; validated with `pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'` and `pdm run typecheck-all`.
-- [ ] Step 5 – Cross-service validation, documentation refresh, and residual search still outstanding.
+- [ ] Step 5 – Cross-service validation, documentation refresh, and residual search.
+  - Docs updated (2025-11-06): `services/nlp_service/README.md`, `services/cj_assessment_service/README.md`, and `documentation/OPERATIONS/01-Grafana-Playbook.md` now cover prompt hydration flow + new counters.
+  - Remaining: broader pytest sweep, downstream `essay_instructions` audit, handoff/task log updates.
 
 **Post-migration cleanup TODO (after all producers use enum keys + backfill complete):**
 - Remove the temporary string-key fallback in NLP/CJ prompt hydration once storage refs are guaranteed to be keyed by `ContentType`.
 - Reset CJ dev databases after deploying the nullable migration instead of backfilling legacy `essay_instructions` rows (sandbox data only).
+
+### Residual `essay_instructions` Usage Audit (2025-11-06)
+- `libs/common_core/src/common_core/events/ai_feedback_events.py`: `AIFeedbackInputDataV1` still requires inline `essay_instructions`. **Plan**: extend AI Feedback contract to accept `student_prompt_ref` + update downstream notebook/tooling before removing the field.
+- `services/essay_lifecycle_service` (BatchExpectation + batch_tracker persistence): retains nullable `essay_instructions` for legacy batches; Content Service reference now in `batch_metadata`. **Plan**: keep until AI Feedback + analytics consumers migrate, then drop column/dataclass field.
+- Result Aggregator + functional tests: fixtures populate `essay_instructions` for backwards compatibility; no production code dependence. **Plan**: flip fixtures to prompt metadata once AI Feedback contracts migrate.
 
 ## Deliverables
 - Updated common-core event contracts and dependent fixtures.

@@ -108,7 +108,9 @@ class DistributedTestEventGenerator:
                 "expected_essay_count": essay_count,
                 "essay_ids": [f"essay_{i:03d}" for i in range(essay_count)],
                 "course_code": "ENG5",
-                "essay_instructions": "Distributed test essay",
+                "student_prompt_ref": {
+                    "student_prompt_text": {"storage_id": "distributed-test-prompt", "path": ""}
+                },
                 "user_id": "test_user_distributed",
             }
 

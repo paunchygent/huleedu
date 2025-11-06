@@ -168,6 +168,11 @@ pdm run typecheck-all # Run MyPy
 - CJ repository/models now allow nullable `essay_instructions`; metadata captures `student_prompt_storage_id` for batch auditing (migration `20251106_1845_make_cj_prompt_nullable.py`).
 - Tests updated to cover success/failure hydration paths (`pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'`) with type safety validated via `pdm run typecheck-all`.
 
+### 11. Prompt Reference Migration Step 5 Docs & Observability (2025-11-06)
+- Service READMEs (`services/nlp_service/README.md`, `services/cj_assessment_service/README.md`) describe Content Service prompt hydration, fallback semantics, and required metrics wiring.
+- `Documentation/OPERATIONS/01-Grafana-Playbook.md` adds a Prompt Hydration Reliability dashboard guide with PromQL for `huleedu_{nlp|cj}_prompt_fetch_failures_total`.
+- Child task Step 5 documents residual `essay_instructions` usage (AI Feedback event contracts, Essay Lifecycle persistence, Result Aggregator fixtures) to sequence the final cleanup.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

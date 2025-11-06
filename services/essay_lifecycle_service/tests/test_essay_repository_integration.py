@@ -124,7 +124,6 @@ class TestPostgreSQLEssayRepositoryIntegration:
                 available_slots=essay_ids.copy(),
                 expected_count=len(essay_ids),
                 course_code=CourseCode.ENG5.value,
-                essay_instructions="Test essay instructions",
                 user_id="test-user",
                 correlation_id=str(uuid4()),
                 timeout_seconds=300,

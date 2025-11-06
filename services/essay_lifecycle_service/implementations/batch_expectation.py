@@ -35,5 +35,4 @@ class BatchExpectation:
     correlation_id: UUID  # Original correlation ID from registration
     created_at: datetime
     student_prompt_ref: StorageReferenceMetadata | None = None
-    essay_instructions: str = ""
     timeout_seconds: int = 86400  # 24 hours for complex processing including overnight LLM batches

@@ -32,6 +32,22 @@ description: This document serves as the team's shared brain for observability. 
 - What's the processing throughput?
 - Are there bottlenecks between services?
 
+### Prompt Hydration Reliability
+
+**Purpose**: Ensure downstream services successfully fetch student prompts from Content Service
+**Key Questions Answered**:
+
+- Are NLP or CJ services repeatedly failing to hydrate prompt references?
+- Which failure modes (missing reference vs Content Service error) are most common?
+- Did a deployment introduce sustained prompt fetch regressions?
+
+**Key Panels**:
+
+- Prompt Fetch Failures (rate): `sum(rate(huleedu_nlp_prompt_fetch_failures_total[5m])) by (reason)`
+- CJ Prompt Failures (rate): `sum(rate(huleedu_cj_prompt_fetch_failures_total[5m])) by (reason)`
+- Prompt Failure Burn-down: `increase(huleedu_nlp_prompt_fetch_failures_total[1h])` and `increase(huleedu_cj_prompt_fetch_failures_total[1h])`
+- Alert Threshold Example: fire when `sum(rate(huleedu_cj_prompt_fetch_failures_total[15m])) > 0.05`
+
 ## Key Query Library
 
 ### Essential PromQL Queries
@@ -48,6 +64,16 @@ rate({__name__=~".*_http_requests_total",status_code=~"5.."}[5m])
 
 # Memory Usage by Container
 container_memory_usage_bytes{name=~"huleedu_.*"}
+
+# Prompt Hydration Failure Rate (NLP)
+sum(rate(huleedu_nlp_prompt_fetch_failures_total[5m])) by (reason)
+
+# Prompt Hydration Failure Rate (CJ)
+sum(rate(huleedu_cj_prompt_fetch_failures_total[5m])) by (reason)
+
+# Prompt Failure Spike Detection (combined)
+sum(increase(huleedu_nlp_prompt_fetch_failures_total[1h]))
+  + sum(increase(huleedu_cj_prompt_fetch_failures_total[1h]))
 ```
 
 ### Essential LogQL Queries
@@ -139,5 +165,5 @@ When running comprehensive tests:
 
 ---
 
-**Last Updated**: Phase 2A Implementation
+**Last Updated**: 2025-11-06 – Phase 3.2 Prompt Reference Migration
 **Next Review**: After API Gateway integration

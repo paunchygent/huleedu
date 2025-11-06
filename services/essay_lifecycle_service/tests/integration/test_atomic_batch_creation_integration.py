@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
@@ -477,7 +477,14 @@ class TestAtomicBatchCreationIntegration:
             expected_essay_count=0,
             essay_ids=[],  # Empty list
             course_code=CourseCode.ENG5,
-            essay_instructions="Test empty batch",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-empty",
+                        "path": "",
+                    }
+                }
+            ),
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
                 entity_id="empty-batch",

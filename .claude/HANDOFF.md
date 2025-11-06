@@ -7,6 +7,26 @@
 
 ---
 
+## Session Summary (2025-11-06, later) – Prompt Reference Migration (Step 5)
+
+**Status**: Step 5 documentation + validation tasks executed. Service READMEs, Grafana playbook, and child task notes now reflect prompt hydration flow; cross-service smoke tests run. Residual contract updates captured for next phase.
+
+### What Changed Today
+- Refreshed downstream docs: `services/nlp_service/README.md`, `services/cj_assessment_service/README.md`, and `Documentation/OPERATIONS/01-Grafana-Playbook.md` now document `student_prompt_ref` resolution and the new `huleedu_{nlp|cj}_prompt_fetch_failures_total` counters.
+- Extended child plan Step 5 entry with completion notes + residual audit section covering AI Feedback contract, Essay Lifecycle persistence, and Result Aggregator fixtures.
+- Recorded dashboard guidance + PromQL snippets so observability teams can chart prompt failure metrics immediately.
+
+### Validation / Tooling
+- `pdm run pytest-root services/result_aggregator_service/tests/unit/test_event_processor_impl.py::TestProcessBatchRegistered::test_successful_batch_registration -q`
+- `pdm run pytest-root services/essay_lifecycle_service/tests/unit/test_nlp_command_handler.py -q`
+
+### Outstanding Follow-Ups
+- Update AI Feedback event (`AIFeedbackInputDataV1`) + service plan to accept `student_prompt_ref` before deleting residual `essay_instructions` fields.
+- Flip Essay Lifecycle `BatchExpectation` + database persistence away from `essay_instructions` once downstream consumers are reference-native.
+- Retool Result Aggregator fixtures to exercise prompt metadata after AI Feedback migration.
+
+---
+
 ## Session Summary (2025-11-06) – NLP Service Consumer Migration (Step 3)
 
 **Status**: Step 3 complete. NLP service now hydrates prompt text locally, emits prompt-fetch failure telemetry, and preserves prompt metadata for downstream consumers. CJ migration (Step 4) remains.

@@ -6,12 +6,13 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.events.batch_coordination_events import (
     BatchEssaysReady,
 )
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 
@@ -43,6 +44,9 @@ class TestEnhancedBatchEssaysReadyLean:
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady with REGULAR class type."""
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, "prompt_123")
+
         event = BatchEssaysReady(
             batch_id="batch_regular",
             ready_essays=sample_ready_essays,
@@ -50,7 +54,7 @@ class TestEnhancedBatchEssaysReadyLean:
             # Lean registration fields from BOS
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Write about your role model",
+            student_prompt_ref=prompt_ref,
             # Educational context from Class Management Service
             class_type="REGULAR",
         )
@@ -67,6 +71,9 @@ class TestEnhancedBatchEssaysReadyLean:
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady with GUEST class type."""
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, "prompt_sv")
+
         event = BatchEssaysReady(
             batch_id="batch_guest",
             ready_essays=sample_ready_essays,
@@ -74,7 +81,7 @@ class TestEnhancedBatchEssaysReadyLean:
             # Lean registration fields from BOS
             course_code=CourseCode.SV1,
             course_language="sv",
-            essay_instructions="Skriv om din förebild",
+            student_prompt_ref=prompt_ref,
             # Educational context
             class_type="GUEST",
         )
@@ -90,6 +97,9 @@ class TestEnhancedBatchEssaysReadyLean:
         sample_metadata: SystemProcessingMetadata,
     ) -> None:
         """Test BatchEssaysReady serialization and deserialization with lean registration fields."""
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, "prompt_serialized")
+
         event = BatchEssaysReady(
             batch_id="batch_serialization",
             ready_essays=sample_ready_essays,
@@ -97,7 +107,7 @@ class TestEnhancedBatchEssaysReadyLean:
             # Lean registration fields from BOS
             course_code=CourseCode.ENG6,
             course_language="en",
-            essay_instructions="Analyze the character development in your chosen novel",
+            student_prompt_ref=prompt_ref,
             # Educational context from Class Management Service
             class_type="REGULAR",
         )

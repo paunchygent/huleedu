@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from ..domain_enums import CourseCode
 from ..event_enums import ProcessingEvent
+from ..metadata_models import StorageReferenceMetadata
 from .base_event_models import ProcessingUpdate
 
 __all__ = [
@@ -36,7 +37,10 @@ class AIFeedbackInputDataV1(BaseModel):
 
     text_storage_id: str
     course_code: CourseCode
-    essay_instructions: str
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for the student-facing prompt text",
+    )
     language: str
     class_designation: str | None = None
     user_id_of_batch_owner: str | None = None

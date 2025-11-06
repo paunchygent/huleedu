@@ -5,7 +5,8 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -17,6 +18,12 @@ from services.essay_lifecycle_service.implementations.batch_tracker_persistence 
 )
 from services.essay_lifecycle_service.metrics import get_metrics
 from services.essay_lifecycle_service.models_db import Base
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 @pytest.mark.integration
@@ -38,11 +45,11 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             expected_essay_ids=frozenset(["e1"]),
             expected_count=1,
             course_code=CourseCode.ENG5,
-            essay_instructions="Write about environmental policy.",
             user_id="u1",
             org_id=None,
             correlation_id=uuid4(),
             created_at=datetime.now(UTC),
+            student_prompt_ref=make_prompt_ref("prompt-guest-active"),
             timeout_seconds=3600,
         )
         await persistence.persist_batch_expectation(guest_active)
@@ -52,11 +59,11 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             expected_essay_ids=frozenset(["e2"]),
             expected_count=1,
             course_code=CourseCode.ENG5,
-            essay_instructions="Discuss the impact of urbanization.",
             user_id="u2",
             org_id=None,
             correlation_id=uuid4(),
             created_at=datetime.now(UTC) - timedelta(days=2),
+            student_prompt_ref=make_prompt_ref("prompt-guest-completed"),
             timeout_seconds=3600,
         )
         await persistence.persist_batch_expectation(guest_completed)
@@ -67,11 +74,11 @@ async def test_refresh_batch_metrics_updates_gauges() -> None:
             expected_essay_ids=frozenset(["e3"]),
             expected_count=1,
             course_code=CourseCode.ENG5,
-            essay_instructions="Analyze modern poetry themes.",
             user_id="u3",
             org_id="org-1",
             correlation_id=uuid4(),
             created_at=datetime.now(UTC),
+            student_prompt_ref=make_prompt_ref("prompt-regular-active"),
             timeout_seconds=3600,
         )
         await persistence.persist_batch_expectation(regular_active)

@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
@@ -238,7 +239,14 @@ class TestPendingContentRaceCondition:
             user_id="test_user",
             course_code=CourseCode.ENG5,
             class_id=None,  # GUEST batch
-            essay_instructions="Test instructions",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-race-condition",
+                        "path": "",
+                    }
+                }
+            ),
             essay_ids=essay_ids,
             expected_essay_count=len(essay_ids),
             metadata=SystemProcessingMetadata(
@@ -329,7 +337,14 @@ class TestPendingContentRaceCondition:
             user_id="test_user",
             course_code=CourseCode.ENG5,
             class_id=None,
-            essay_instructions="Test instructions",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={
+                    ContentType.STUDENT_PROMPT_TEXT: {
+                        "storage_id": "prompt-normal-flow",
+                        "path": "",
+                    }
+                }
+            ),
             essay_ids=[essay_id],
             expected_essay_count=1,
             metadata=SystemProcessingMetadata(

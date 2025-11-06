@@ -22,7 +22,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
   - **`scoring_ranking.py`**: Handles Bradley-Terry scoring using the `choix` library and ranking calculations
 - **`protocols.py`**: Defines behavioral contracts using `typing.Protocol` for all major dependencies
 - **`implementations/`**: Concrete implementations of all protocols (database, LLM providers, event publishing, content fetching)
-- **`event_processor.py`**: Processes individual Kafka messages and delegates to core workflow
+- **`event_processor.py`**: Processes individual Kafka messages, hydrates `student_prompt_ref` via Content Service, records `huleedu_cj_prompt_fetch_failures_total{reason}` on failures, and delegates to core workflow
 - **`worker_main.py`**: Kafka consumer lifecycle management and message processing
 - **`app.py`**: Lean Quart HTTP API application with health and metrics endpoints
 - **`run_service.py`**: Main service runner that orchestrates concurrent Kafka worker and HTTP API
@@ -143,8 +143,9 @@ class LLMConfigOverrides(BaseModel):
 - **`ELS_CJAssessmentRequestV1`**: Incoming requests from Essay Lifecycle Service containing:
   - BOS batch reference (`entity_ref`)
   - List of essays for CJ assessment (`essays_for_cj`)
-  - Assessment metadata (language, course_code, essay_instructions)
-  - **NEW**: Optional `llm_config_overrides` for runtime LLM parameter customization
+  - Assessment metadata (language, `course_code`, optional `essay_instructions` for legacy backfill scenarios)
+  - Optional `student_prompt_ref` (Content Service reference hydrated locally before comparisons)
+  - Optional `llm_config_overrides` for runtime LLM parameter customization
 
 ### Events Produced
 
@@ -211,6 +212,8 @@ LOG_LEVEL=INFO
   - `bos_batch_id` (str): Reference to originating BOS batch
   - `status` (enum): Current processing state
   - `expected_essay_count` (int): Number of essays to process
+  - `essay_instructions` (text, nullable): Retained for backward compatibility; prefer hydrated prompt metadata
+  - `processing_metadata`: Includes `student_prompt_storage_id` and a boolean `student_prompt_text_present` to signal successful prompt retrieval
 
 #### `cj_processed_essays`
 
@@ -325,6 +328,8 @@ pdm run python app.py
 ### Observability Features
 
 - **Metrics**: Prometheus metrics exposed on configured `METRICS_PORT` (default: 9090)
+  - `huleedu_cj_prompt_fetch_failures_total{reason}` tracks prompt hydration failures (Content Service errors, missing refs, legacy fallbacks)
+  - Existing counters/histograms for CJ workflow throughput, callbacks, retries, and circuit breakers remain unchanged
 - **Logging**: Structured logging via `huleedu_service_libs.logging_utils`
 - **Health Checks**: Service responsiveness (extensible to database/Kafka connectivity)
 - **Correlation IDs**: Full request tracing across service boundaries
@@ -350,8 +355,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 ### Upstream Dependencies
 
-- **Essay Lifecycle Service**: Publishes CJ assessment requests
-- **Content Service**: Provides spellchecked essay content via HTTP
+- **Essay Lifecycle Service**: Publishes CJ assessment requests (with optional `student_prompt_ref`)
+- **Content Service**: Provides spellchecked essay content and hydrated student prompt text/storage references via HTTP
 
 ### Downstream Consumers
 

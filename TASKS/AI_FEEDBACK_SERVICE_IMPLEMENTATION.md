@@ -725,7 +725,8 @@ class AggregatedEssayData(BaseModel):
     # Context
     owner_user_id: str  # For teacher name resolution via Identity Service
     course_code: CourseCode
-    essay_instructions: str
+    student_prompt_storage_id: Optional[str]
+    student_prompt_text: Optional[str]
     class_designation: Optional[str]
     # Note: student_name and teacher_name removed - resolved via HTTP clients
     
@@ -1356,7 +1357,8 @@ class AIFeedbackEventProcessor:
             feedback_text = await llm_workflows.generate_feedback(
                 essay_text=corrected_text,
                 student_name=student_name,
-                instructions=aggregated_data.essay_instructions,
+                prompt_text=aggregated_data.student_prompt_text,
+                prompt_storage_id=aggregated_data.student_prompt_storage_id,
                 course_code=aggregated_data.course_code,
                 context=feedback_context,
                 llm_client=self.llm_client,

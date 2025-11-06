@@ -188,7 +188,6 @@ class BatchTrackerPersistence:
                     ),  # Initialize with all slots available
                     expected_count=expectation.expected_count,
                     course_code=expectation.course_code.value,
-                    essay_instructions=expectation.essay_instructions,
                     user_id=expectation.user_id,
                     org_id=expectation.org_id,
                     correlation_id=str(expectation.correlation_id),
@@ -426,7 +425,6 @@ class BatchTrackerPersistence:
             correlation_id=UUID(tracker_db.correlation_id),
             created_at=tracker_db.created_at,  # Fixed: Added missing required field
             student_prompt_ref=student_prompt_ref,
-            essay_instructions=getattr(tracker_db, "essay_instructions", ""),
             timeout_seconds=tracker_db.timeout_seconds,
         )
 

@@ -10,7 +10,7 @@ The NLP Service is a dual-phase Kafka worker service responsible for natural lan
 - **Stack**: Python 3.11, aiokafka, aiohttp, Dishka, thefuzz
 - **Phase 1 Input**: `BATCH_STUDENT_MATCHING_REQUESTED` events via Kafka
 - **Phase 1 Output**: `BATCH_AUTHOR_MATCHES_SUGGESTED` events via Kafka
-- **Phase 2 Input**: `BATCH_NLP_INITIATE_COMMAND_V2` events via Kafka
+- **Phase 2 Input**: `BatchNlpProcessingRequestedV2` events via Kafka (ELS → NLP) carrying optional `student_prompt_ref`
 - **Phase 2 Output**: Analysis results (future implementation)
 - **Dependencies**: File Service (HTTP), Class Management Service (HTTP), Redis (caching)
 - **Database**: PostgreSQL with outbox pattern for reliable event publishing
@@ -27,9 +27,11 @@ The NLP Service is a dual-phase Kafka worker service responsible for natural lan
 
 ### Phase 2: Text Analysis (Post-Readiness)
 - **Feature Pipeline**: Shared `FeaturePipeline` abstraction normalises text, aggregates spell/grammar metrics, and produces the canonical 50-feature vector consumed by both runtime and offline tooling.
+- **Prompt Hydration**: Each batch resolves `student_prompt_ref` via the Content Service; prompt text and storage IDs are forwarded to downstream consumers in `processing_metadata`.
+- **Failure Telemetry**: Prompt hydration issues increment `huleedu_nlp_prompt_fetch_failures_total{reason="content_service_error|missing_reference|legacy_fallback"}` while continuing with safe fallbacks when possible.
 - **Spell Metrics Propagation**: Essay Lifecycle Service forwards `SpellcheckResultV1.correction_metrics`, allowing the NLP handler to reuse Spellchecker totals without re-running the normaliser.
 - **Language Tool Integration**: Grammar analysis runs on the spell-normalised text and feeds grammar-related feature extractors.
-- **Outputs**: `EssayNlpCompletedV1` rich events include the feature map in `processing_metadata["feature_outputs"]`; thin batch completion events remain unchanged.
+- **Outputs**: `EssayNlpCompletedV1` rich events include the feature map in `processing_metadata["feature_outputs"]` plus hydrated prompt metadata; thin batch completion events remain unchanged.
 
 ### Performance Optimizations
 - **Header-First Message Processing**: Benefits from zero-parse idempotency when processing events with complete Kafka headers (event_id, event_type, trace_id)
@@ -108,6 +110,7 @@ pdm run pytest tests/
   - `nlp_phase1_batch_processing_seconds`: Processing time per batch
   - `nlp_match_confidence_score`: Match confidence distribution
   - `nlp_phase1_batch_match_outcomes_total`: Match/no-match/error counts
+  - `huleedu_nlp_prompt_fetch_failures_total{reason}`: Prompt hydration failure counter (Content Service reference issues)
 - **Logging**: Structured logging with correlation IDs
 - **Tracing**: OpenTelemetry integration for distributed tracing
 

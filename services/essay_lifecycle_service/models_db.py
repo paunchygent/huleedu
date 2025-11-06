@@ -133,7 +133,6 @@ class BatchEssayTracker(Base):
 
     # Course context from BOS
     course_code: Mapped[str] = mapped_column(String(50), nullable=False)
-    essay_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     org_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
