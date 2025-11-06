@@ -16,6 +16,7 @@ alwaysApply: false
 
 ### 2.1. Mandatory Service READMEs
 - Every microservice directory under `services/` **MUST** have a `README.md` file
+- Always review relevant READMEs and .claude/rules/ After any major or minor change in behavior.
 
 ### 2.2. Content Requirements
 Service READMEs **MUST** include:
