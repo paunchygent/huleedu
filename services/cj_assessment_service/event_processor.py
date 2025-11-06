@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from aiokafka import ConsumerRecord
 from common_core.error_enums import ErrorCode
+from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
     CJAssessmentFailedV1,
@@ -18,7 +19,7 @@ from common_core.events.cj_assessment_events import (
 )
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
 from huleedu_service_libs.error_handling import HuleEduError
@@ -189,6 +190,7 @@ async def _process_cj_assessment_impl(
     comparisons_metric = business_metrics.get("cj_comparisons_made")
     duration_metric = business_metrics.get("cj_assessment_duration_seconds")
     kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
+    prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
 
     try:
         logger.info(f"Processing CJ assessment message: {msg.topic}:{msg.partition}:{msg.offset}")
@@ -196,6 +198,34 @@ async def _process_cj_assessment_impl(
         request_event_data: ELS_CJAssessmentRequestV1 = ELS_CJAssessmentRequestV1.model_validate(
             envelope.data
         )
+
+        prompt_storage_id = _extract_prompt_storage_id(
+            request_event_data.student_prompt_ref,
+            correlation_id=envelope.correlation_id,
+            log_extra={
+                "event_id": str(envelope.event_id),
+                "bos_batch_id": str(request_event_data.entity_id),
+            },
+            prompt_failure_metric=prompt_failure_metric,
+        )
+
+        prompt_text = await _hydrate_prompt_text(
+            storage_id=prompt_storage_id,
+            content_client=content_client,
+            correlation_id=envelope.correlation_id,
+            log_extra={
+                "event_id": str(envelope.event_id),
+                "bos_batch_id": str(request_event_data.entity_id),
+            },
+            prompt_failure_metric=prompt_failure_metric,
+        )
+        log_extra: dict[str, Any] = {
+            "correlation_id": str(envelope.correlation_id),
+            "event_id": str(envelope.event_id),
+            "bos_batch_id": str(request_event_data.entity_id),
+        }
+        if prompt_storage_id:
+            log_extra["prompt_storage_id"] = prompt_storage_id
 
         # Record queue latency metric if available
         if (
@@ -215,14 +245,13 @@ async def _process_cj_assessment_impl(
         # Use correlation_id from envelope
         correlation_id = envelope.correlation_id
 
-        log_extra = {
-            "correlation_id": str(correlation_id),
-            "event_id": str(envelope.event_id),
-            "bos_batch_id": str(request_event_data.entity_id),
-            "essay_count": len(request_event_data.essays_for_cj),
-            "language": request_event_data.language,
-            "course_code": request_event_data.course_code,
-        }
+        log_extra.update(
+            {
+                "essay_count": len(request_event_data.essays_for_cj),
+                "language": request_event_data.language,
+                "course_code": request_event_data.course_code,
+            }
+        )
 
         logger.info("Received CJ assessment request from ELS", extra=log_extra)
         logger.info(
@@ -245,7 +274,13 @@ async def _process_cj_assessment_impl(
             "essays_to_process": essays_to_process,
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
-            "essay_instructions": request_event_data.essay_instructions,
+            "essay_instructions": (
+                prompt_text
+                if prompt_text is not None
+                else getattr(request_event_data, "essay_instructions", "")
+            ),
+            "student_prompt_text": prompt_text,
+            "student_prompt_storage_id": prompt_storage_id,
             "llm_config_overrides": request_event_data.llm_config_overrides,
             # Identity fields for credit attribution (Phase 3: Entitlements integration)
             "user_id": request_event_data.user_id,
@@ -395,6 +430,122 @@ async def _process_cj_assessment_impl(
             )
 
         return False  # Don't commit failed messages
+
+
+def _record_prompt_failure(metric: Any, reason: str) -> None:
+    """Increment prompt fetch failure metric with defensive guards."""
+    if metric is None:
+        return
+    try:
+        metric.labels(reason=reason).inc()
+    except Exception:
+        try:
+            metric.inc()
+        except Exception:  # pragma: no cover - defensive guardrail
+            logger.debug("Unable to increment CJ prompt failure metric", exc_info=True)
+
+
+def _extract_prompt_storage_id(
+    prompt_ref: StorageReferenceMetadata | None,
+    *,
+    correlation_id: UUID,
+    log_extra: dict[str, Any],
+    prompt_failure_metric: Any,
+) -> str | None:
+    """Extract Content Service storage ID for student prompt reference."""
+    if prompt_ref is None:
+        logger.debug(
+            "No student prompt reference provided for CJ batch",
+            extra={**log_extra, "correlation_id": str(correlation_id)},
+        )
+        return None
+
+    references = cast(dict[Any, dict[str, str]], prompt_ref.references or {})
+    storage_entry = references.get(ContentType.STUDENT_PROMPT_TEXT)
+    if storage_entry is None:
+        storage_entry = references.get(ContentType.STUDENT_PROMPT_TEXT.value)  # type: ignore[arg-type]
+
+    if not isinstance(storage_entry, dict):
+        logger.warning(
+            "Student prompt reference missing expected storage entry for CJ batch",
+            extra={**log_extra, "correlation_id": str(correlation_id), "reference_keys": list(references.keys())},
+        )
+        _record_prompt_failure(prompt_failure_metric, "missing_entry")
+        return None
+
+    storage_id = storage_entry.get("storage_id")
+    if not storage_id:
+        logger.warning(
+            "Student prompt reference missing storage_id for CJ batch",
+            extra={**log_extra, "correlation_id": str(correlation_id), "reference_keys": list(references.keys())},
+        )
+        _record_prompt_failure(prompt_failure_metric, "missing_storage_id")
+        return None
+
+    return cast(str, storage_id)
+
+
+async def _hydrate_prompt_text(
+    *,
+    storage_id: str | None,
+    content_client: ContentClientProtocol,
+    correlation_id: UUID,
+    log_extra: dict[str, Any],
+    prompt_failure_metric: Any,
+) -> str | None:
+    """Fetch prompt text from Content Service for CJ assessment."""
+    if storage_id is None:
+        return None
+
+    try:
+        prompt_text = await content_client.fetch_content(storage_id, correlation_id)
+        if prompt_text:
+            logger.debug(
+                "Hydrated student prompt text for CJ assessment batch",
+                extra={
+                    **log_extra,
+                    "correlation_id": str(correlation_id),
+                    "prompt_storage_id": storage_id,
+                    "prompt_preview": prompt_text[:100],
+                },
+            )
+            return prompt_text
+
+        logger.warning(
+            "Hydrated student prompt text is empty for CJ assessment batch",
+            extra={
+                **log_extra,
+                "correlation_id": str(correlation_id),
+                "prompt_storage_id": storage_id,
+            },
+        )
+        return ""
+
+    except HuleEduError as error:
+        _record_prompt_failure(prompt_failure_metric, "content_service_error")
+        logger.warning(
+            "Failed to fetch student prompt text from Content Service for CJ assessment",
+            extra={
+                **log_extra,
+                "correlation_id": str(correlation_id),
+                "prompt_storage_id": storage_id,
+                "error": getattr(error, "error_detail", str(error)),
+            },
+        )
+    except Exception as error:  # pragma: no cover - defensive guardrail
+        _record_prompt_failure(prompt_failure_metric, "unexpected_error")
+        logger.error(
+            "Unexpected error hydrating student prompt text for CJ assessment",
+            exc_info=True,
+            extra={
+                **log_extra,
+                "correlation_id": str(correlation_id),
+                "prompt_storage_id": storage_id,
+                "error": str(error),
+            },
+        )
+
+    return None
 
 
 # Helper functions for structured error handling

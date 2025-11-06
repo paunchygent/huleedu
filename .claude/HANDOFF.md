@@ -7,6 +7,65 @@
 
 ---
 
+## Session Summary (2025-11-06) – NLP Service Consumer Migration (Step 3)
+
+**Status**: Step 3 complete. NLP service now hydrates prompt text locally, emits prompt-fetch failure telemetry, and preserves prompt metadata for downstream consumers. CJ migration (Step 4) remains.
+
+### What Changed Today
+- `services/nlp_service/command_handlers/batch_nlp_analysis_handler.py`: hydrate `student_prompt_ref` via Content Service, capture `prompt_storage_id`, record `huleedu_nlp_prompt_fetch_failures_total{reason=…}`, and pass prompt text/id into the feature pipeline and event publisher.
+- `services/nlp_service/implementations/event_publisher_impl.py` & `protocols.py`: rename publisher argument to `prompt_text`, add optional `prompt_storage_id`, populate `student_prompt_text`/`student_prompt_storage_id` in `processing_metadata` while retaining legacy `essay_instructions` for compatibility.
+- `services/nlp_service/metrics.py`: register `huleedu_nlp_prompt_fetch_failures_total` Counter (label `reason`), expose through `get_metrics()`.
+- Unit fixtures/tests (`services/nlp_service/tests/...`) updated to supply `StorageReferenceMetadata`, assert prompt propagation, and verify metric increments on hydration failure.
+
+### Test Results
+- `pdm run pytest-root services/nlp_service/tests -k batch_nlp_analysis_handler`
+
+### Temporary Impact / Follow-Ups
+- CJ Assessment service still expects inline `essay_instructions`; Step 4 must replicate prompt hydration, surface `huleedu_cj_prompt_fetch_failures_total`, and make DB columns nullable.
+- Update dashboards/alerts to read `huleedu_nlp_prompt_fetch_failures_total` and remove dependence on the retired ELS counter.
+- After CJ migration, audit downstream consumers (AI Feedback, analytics) for residual `essay_instructions` usage before removing the compatibility metadata.
+
+---
+
+## Session Summary (2025-11-06) – Prompt Reference Migration Kickoff (Steps 1-2)
+
+**Status**: Child task created and linked. Common-core contracts now reference-only; ELS dispatcher bridge removed and metrics trimmed. Downstream NLP/CJ consumers pending migration.
+
+### What Changed Today
+- Created child execution plan [`TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.child-prompt-reference-consumer-migration.md`](../TASKS/TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.child-prompt-reference-consumer-migration.md) and linked it from the parent Phase 3.2 task + this handoff.
+- Updated `BatchNlpProcessingRequestedV2` and `ELS_CJAssessmentRequestV1` to drop `essay_instructions` and carry optional `student_prompt_ref`.
+- Simplified `DefaultSpecializedServiceRequestDispatcher`: removed Content Service hydration helper and `huleedu_els_prompt_fetch_failures_total`; dispatcher now forwards references only.
+- Adjusted ELS DI, protocols, command handlers, and unit tests to match the new dispatcher signatures and reference-first flow.
+
+### Temporary Impact / Follow-Ups
+- CJ service still references `essay_instructions`; migrate in Step 4 (see latest session summary above).
+- Defer sector-wide suites until CJ updates land; NLP-specific tests now pass against prompt references.
+- Metrics dashboards should drop the retired `huleedu_els_prompt_fetch_failures_total`; ensure new downstream counters (`huleedu_nlp_prompt_fetch_failures_total`, forthcoming CJ equivalent) are charted.
+
+---
+
+## Session Summary (2025-11-06, later) – CJ Service Prompt Migration (Step 4)
+
+**Status**: CJ assessment service now resolves `student_prompt_ref` locally, records prompt-fetch failures, and persists prompt metadata. Migration, type checks, and unit suites updated; documentation pending (Step 5).
+
+### What Changed Today
+- `services/cj_assessment_service/event_processor.py`: hydrate prompt references, forward `student_prompt_text`/`student_prompt_storage_id`, and log `huleedu_cj_prompt_fetch_failures_total{reason=…}`.
+- `services/cj_assessment_service/cj_core_logic/batch_preparation.py`, repository/models/protocols/mocks: allow nullable `essay_instructions`, stash prompt metadata, and propagate through workflow.
+- Added Alembic migration `services/cj_assessment_service/alembic/versions/20251106_1845_make_cj_prompt_nullable.py`.
+- Updated unit fixtures/tests (prompt hydration success + failure paths) and metrics wiring.
+- Mirrored reference-handling fixes in NLP handler (typed lookups, prompt ID propagation).
+
+### Test / Tooling Results
+- `pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'`
+- `pdm run typecheck-all`
+
+### Follow-Ups
+- Update docs/README/Handoff checklists (Step 5) and search for residual `essay_instructions` usage post-migration.
+- Coordinate dashboard updates for `huleedu_cj_prompt_fetch_failures_total`.
+- Plan Step 5 validation sweep + AI Feedback/analytics consumers after documentation refresh.
+
+---
+
 ## Session Summary (2025-11-05) – Phase 3.2 ELS Dispatcher Bridging Complete (Step 3)
 
 **Status**: ELS dispatcher bridging implemented and tested; ready for downstream service migrations (NLP, CJ).
@@ -58,6 +117,8 @@
 
 ### Outstanding Work Before Next Session
 **Critical Path**: Migrate downstream services to consume `student_prompt_ref` natively, then remove ELS dispatcher bridging.
+
+**Execution Tracker**: See child task plan [TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.child-prompt-reference-consumer-migration.md](../TASKS/TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.child-prompt-reference-consumer-migration.md) for phase-by-phase breakdown linked to this handoff.
 
 1. **NLP Service Migration**:
    - Update event handlers to fetch prompt text from Content Service using `student_prompt_ref`

@@ -478,16 +478,10 @@ class TestServiceRequestDispatchBusinessImpact:
         # Arrange: Set up outbox to fail when storing spellcheck requests
         mock_outbox_repository.add_event.side_effect = Exception("Database unavailable")
 
-        # Mock Content Service client and metrics registry
-        mock_content_service_client = AsyncMock()
-        mock_metrics_registry = Mock()
-
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
             outbox_repository=mock_outbox_repository,
-            content_service_client=mock_content_service_client,
-            metrics_registry=mock_metrics_registry,
         )
 
         essays_to_process = [
@@ -554,16 +548,10 @@ class TestServiceRequestDispatchBusinessImpact:
         # Create a mock Kafka bus (won't be used directly with outbox pattern)
         failing_kafka_bus = AsyncMock(spec=KafkaPublisherProtocol)
 
-        # Mock Content Service client and metrics registry
-        mock_content_service_client = AsyncMock()
-        mock_metrics_registry = Mock()
-
         dispatcher = DefaultSpecializedServiceRequestDispatcher(
             kafka_bus=failing_kafka_bus,
             settings=mock_settings,
             outbox_repository=mock_outbox_repository,
-            content_service_client=mock_content_service_client,
-            metrics_registry=mock_metrics_registry,
         )
 
         essays_to_process = [
@@ -584,7 +572,6 @@ class TestServiceRequestDispatchBusinessImpact:
                 essays_to_process=essays_to_process,
                 language=Language.ENGLISH,
                 course_code=CourseCode.ENG5,  # Use valid enum value
-                essay_instructions="Write about the topic",
                 batch_id=business_context.batch_id,
                 user_id="test-user",
                 org_id=None,
@@ -954,19 +941,6 @@ class TestBusinessImpactIntegrationScenarios:
             pending_content_ops=mock_pending_content_ops,
             content_assignment_service=content_assignment_service,
             session_factory=mock_session_factory,
-        )
-
-        # Create dispatcher for potential use in extended test scenarios
-        # Mock Content Service client and metrics registry
-        mock_content_service_client = AsyncMock()
-        mock_metrics_registry = Mock()
-
-        _dispatcher = DefaultSpecializedServiceRequestDispatcher(
-            kafka_bus=kafka_bus,
-            settings=mock_settings,
-            outbox_repository=mock_outbox_repository,
-            content_service_client=mock_content_service_client,
-            metrics_registry=mock_metrics_registry,
         )
 
         # Act: Execute complete business workflow with failures

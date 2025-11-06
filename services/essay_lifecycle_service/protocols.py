@@ -403,12 +403,11 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_id: str,
-        essay_instructions: str,
         correlation_id: UUID,
         session: AsyncSession | None = None,
         student_prompt_ref: Any | None = None,  # StorageReferenceMetadata
     ) -> None:
-        """Dispatch NLP requests to NLP Service with optional prompt hydration."""
+        """Dispatch NLP requests to NLP Service with optional prompt reference."""
         ...
 
     async def dispatch_ai_feedback_requests(
@@ -426,7 +425,6 @@ class SpecializedServiceRequestDispatcher(Protocol):
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         course_code: CourseCode,
-        essay_instructions: str,
         batch_id: str,
         user_id: str,
         org_id: str | None,
@@ -434,7 +432,7 @@ class SpecializedServiceRequestDispatcher(Protocol):
         session: AsyncSession | None = None,
         student_prompt_ref: Any | None = None,  # StorageReferenceMetadata
     ) -> None:
-        """Dispatch CJ assessment requests to CJ Assessment Service with optional prompt hydration."""
+        """Dispatch CJ assessment requests to CJ Assessment Service with optional prompt reference."""
         ...
 
 

@@ -13,7 +13,11 @@ from pydantic import BaseModel, Field
 
 from ..domain_enums import CourseCode
 from ..event_enums import ProcessingEvent
-from ..metadata_models import EssayProcessingInputRefV1, SystemProcessingMetadata
+from ..metadata_models import (
+    EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
+    SystemProcessingMetadata,
+)
 from .base_event_models import BaseEventData, ProcessingUpdate
 
 __all__ = [
@@ -107,7 +111,10 @@ class ELS_CJAssessmentRequestV1(BaseEventData):
     essays_for_cj: list[EssayProcessingInputRefV1]
     language: str
     course_code: CourseCode
-    essay_instructions: str
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for the student prompt text",
+    )
     llm_config_overrides: LLMConfigOverrides | None = Field(
         default=None,
         description="Optional LLM configuration overrides for this assessment batch",

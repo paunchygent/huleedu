@@ -373,13 +373,9 @@ class ServiceClientsProvider(Provider):
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         outbox_repository: OutboxRepositoryProtocol,
-        content_service_client: ContentServiceClientProtocol,
-        registry: CollectorRegistry,
     ) -> SpecializedServiceRequestDispatcher:
-        """Provide specialized service request dispatcher implementation with Content Service hydration."""
-        return DefaultSpecializedServiceRequestDispatcher(
-            kafka_bus, settings, outbox_repository, content_service_client, registry
-        )
+        """Provide specialized service request dispatcher implementation."""
+        return DefaultSpecializedServiceRequestDispatcher(kafka_bus, settings, outbox_repository)
 
     @provide(scope=Scope.APP)
     def provide_kafka_consumer_health_monitor(

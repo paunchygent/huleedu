@@ -9,13 +9,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
+from common_core.error_enums import ErrorCode
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
+from common_core.models.error_models import ErrorDetail
+
+from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.event_processor import process_single_message
 from services.cj_assessment_service.protocols import (
@@ -23,6 +27,10 @@ from services.cj_assessment_service.protocols import (
     ContentClientProtocol,
     LLMInteractionProtocol,
 )
+
+PROMPT_TEXT = "Prompt text for CJ assessment."
+ESSAY_TEXT = "Sample essay content for testing."
+DEFAULT_INSTRUCTIONS = "Compare the quality of these essays."
 
 
 class TestEventProcessorIdentityThreading:
@@ -39,7 +47,13 @@ class TestEventProcessorIdentityThreading:
     def mock_content_client(self) -> AsyncMock:
         """Create mock content client."""
         client = AsyncMock(spec=ContentClientProtocol)
-        client.fetch_content = AsyncMock(return_value="Sample essay content for testing.")
+
+        async def fetch_effect(storage_id: str, correlation_id: Any) -> str:
+            if "prompt" in storage_id:
+                return PROMPT_TEXT
+            return ESSAY_TEXT
+
+        client.fetch_content = AsyncMock(side_effect=fetch_effect)
         return client
 
     @pytest.fixture
@@ -60,7 +74,7 @@ class TestEventProcessorIdentityThreading:
     def mock_workflow_function(self, monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
         """Mock the run_cj_assessment_workflow function."""
         workflow_mock = AsyncMock()
-        workflow_mock.return_value = Mock(rankings=[])
+        workflow_mock.return_value = Mock(rankings=[], batch_id=12345)
         monkeypatch.setattr(
             "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
             workflow_mock,
@@ -163,6 +177,16 @@ class TestEventProcessorIdentityThreading:
 
         assert converted_request_data["user_id"] == expected_user_id
         assert converted_request_data["org_id"] == expected_org_id
+        assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+        assert (
+            converted_request_data["student_prompt_storage_id"]
+            == "prompt-storage-with-overrides"
+        )
+        assert converted_request_data["essay_instructions"] == PROMPT_TEXT
+
+        mock_content_client.fetch_content.assert_any_await(
+            "prompt-storage-with-overrides", envelope.correlation_id
+        )
 
     @pytest.mark.asyncio
     async def test_converted_request_data_structure_completeness(
@@ -221,6 +245,8 @@ class TestEventProcessorIdentityThreading:
             "language",
             "course_code",
             "essay_instructions",
+            "student_prompt_text",
+            "student_prompt_storage_id",
             "llm_config_overrides",
             "user_id",
             "org_id",
@@ -239,7 +265,12 @@ class TestEventProcessorIdentityThreading:
         assert len(converted_request_data["essays_to_process"]) > 0
         assert converted_request_data["language"] == event_data.language
         assert converted_request_data["course_code"] == event_data.course_code
-        assert converted_request_data["essay_instructions"] == event_data.essay_instructions
+        assert converted_request_data["essay_instructions"] == PROMPT_TEXT
+        assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+        assert (
+            converted_request_data["student_prompt_storage_id"]
+            == "prompt-storage-with-overrides"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -309,6 +340,83 @@ class TestEventProcessorIdentityThreading:
             converted_request_data = call_args.kwargs["request_data"]
             assert converted_request_data["user_id"] == user_id
             assert converted_request_data["org_id"] == org_id
+            assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
+
+    @pytest.mark.asyncio
+    async def test_prompt_fetch_failure_records_metric(
+        self,
+        cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
+        mock_cj_repository: Any,
+        mock_content_client: AsyncMock,
+        mock_event_publisher: AsyncMock,
+        mock_llm_interaction: AsyncMock,
+        mock_workflow_function: AsyncMock,
+        test_settings: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure prompt fetch failures increment the dedicated metric."""
+
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.CONTENT_SERVICE_ERROR,
+            message="Prompt fetch failed",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(UTC),
+            service="cj_assessment_service",
+            operation="fetch_content",
+            details={},
+        )
+        mock_content_client.fetch_content = AsyncMock(
+            side_effect=[HuleEduError(error_detail), ESSAY_TEXT, ESSAY_TEXT]
+        )
+
+        prompt_counter = MagicMock()
+        label_mock = MagicMock()
+        prompt_counter.labels.return_value = label_mock
+
+        monkeypatch.setattr(
+            "services.cj_assessment_service.event_processor.get_business_metrics",
+            lambda: {
+                "cj_comparisons_made": None,
+                "cj_assessment_duration_seconds": None,
+                "kafka_queue_latency_seconds": None,
+                "prompt_fetch_failures": prompt_counter,
+            },
+        )
+
+        envelope: EventEnvelope[ELS_CJAssessmentRequestV1] = EventEnvelope(
+            event_id=uuid4(),
+            event_type="els.cj_assessment.requested.v1",
+            event_timestamp=datetime.now(UTC),
+            source_service="essay_lifecycle_service",
+            correlation_id=uuid4(),
+            data=cj_assessment_request_data_with_overrides,
+        )
+
+        kafka_msg = self.create_kafka_message(envelope.model_dump(mode="json"))
+
+        await process_single_message(
+            msg=kafka_msg,
+            database=mock_cj_repository,
+            content_client=mock_content_client,
+            event_publisher=mock_event_publisher,
+            llm_interaction=mock_llm_interaction,
+            settings_obj=test_settings,
+        )
+
+        label_mock.inc.assert_called_once()
+        prompt_counter.labels.assert_called_with(reason="content_service_error")
+
+        mock_workflow_function.assert_called_once()
+        converted_request_data = mock_workflow_function.call_args.kwargs["request_data"]
+        assert converted_request_data["student_prompt_text"] is None
+        assert (
+            converted_request_data["student_prompt_storage_id"]
+            == "prompt-storage-with-overrides"
+        )
+        assert (
+            converted_request_data["essay_instructions"]
+            == DEFAULT_INSTRUCTIONS
+        )
 
     @pytest.mark.asyncio
     async def test_correlation_id_preservation_with_identities(

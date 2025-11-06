@@ -241,7 +241,7 @@ class MockDatabase(CJRepositoryProtocol):
         event_correlation_id: str,  # Keep as str to match protocol
         language: str,
         course_code: str,
-        essay_instructions: str,
+        essay_instructions: str | None,
         initial_status: Any,
         expected_essay_count: int,
         # Identity fields for credit attribution (Phase 3)
@@ -272,6 +272,8 @@ class MockDatabase(CJRepositoryProtocol):
                 # Add identity fields from stored data
                 self.user_id = batch_data.get("user_id")
                 self.org_id = batch_data.get("org_id")
+                self.processing_metadata: dict[str, Any] = {}
+                self.assignment_id = None
 
         return Batch(batch_id, self.batches[batch_id])
 

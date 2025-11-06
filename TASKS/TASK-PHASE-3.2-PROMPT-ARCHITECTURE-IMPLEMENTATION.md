@@ -6,15 +6,18 @@
 **Assignee**: TBD
 
 ## Quick Reference
+
 - **Parent**: `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`
 - **Depends On**: Phase 3.1 – Grade Scale Registry (COMPLETE)
 - **Blocks**: Phase 3.3 – ENG5 NP Batch Tooling
 - **Decision Baseline**: Registration must *not* require `assignment_id` or inline prompts; student prompts are stored as Content Service references; canonical CJ owns system prompts and assignments.
 
 ## Executive Summary
+
 The objective is to decouple student prompt payloads from registration forms while preserving canonical CJ integrity and respecting service ownership boundaries. BOS and Gateway inputs will accept either canonical CJ assignments (`assignment_id`) or CMS-owned Content Service references (`cms_prompt_ref`), with prompt-dependent phases gated by BCS until a reference is attached. CMS manages ad-hoc prompt references, CJ exposes canonical prompt metadata, and downstream services (NLP, AI Feedback) consume prompt references rather than raw text.
 
 ## Discovery Checklist
+
 - [ ] Locate registration DTOs in API Gateway (`docs/api-types.ts`, FastAPI handlers) and BOS to confirm current `assignment_id` / `essay_instructions` requirements; capture file paths.
 - [ ] Inspect CJ data access (`assessment_instructions`, repositories, migrations) for canonical prompt storage and versioning.
 - [ ] Audit prompt usage in NLP and AI Feedback services to map where raw prompt text is propagated.
@@ -24,6 +27,7 @@ The objective is to decouple student prompt payloads from registration forms whi
 - [ ] Persist findings in `TASKS/notes/phase_3_2_discovery.md`.
 
 ## Implementation Plan
+
 1. **Gateway & BOS DTO Adjustments** (1.0–1.5 weeks)  
    - Make registration time `assignment_id` optional; replace inline prompt payloads with Content Service references.  
    - Introduce prompt-dependent pipeline discriminated union (`{assignment_id}` vs `{cms_prompt_ref}`) using canonical `PhaseName`.  
@@ -50,6 +54,7 @@ The objective is to decouple student prompt payloads from registration forms whi
 5. **Downstream Consumer Updates (NLP, AI Feedback)** (0.5 week)  
    - Adapt services to resolve Content Service references on demand and discard blobs after use.  
    - Add fake-client unit tests ensuring only references cross service boundaries.
+   - Detailed migration steps for NLP & CJ services tracked in [child prompt-reference consumer migration plan](TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.child-prompt-reference-consumer-migration.md).
 
 6. **Event & Observability Updates** (0.5 week)  
    - Ensure new events use `EventEnvelope` and `StorageReferenceMetadata`.  
@@ -57,9 +62,10 @@ The objective is to decouple student prompt payloads from registration forms whi
    - Draft ADR “Prompt Ownership and Content References” in `documentation/`.
 
 ## Testing Strategy
+
 - Unit tests for Gateway DTO parsing, BOS validation paths, BCS gating logic, CMS prompt endpoints, CJ read endpoints, and downstream reference consumers.
 - Contract / schema tests for any new or broadened events.  
-- Integration tests simulating batch registration through prompt-dependent phase start (happy path and invariant violation).  
+- Integration tests simulating batch registration through prompt-dependent phase start (happy path and invariant violation).
 - Manual smoke: run `pdm run dev-start bos_service bcs_service class_management_service cj_assessment_service content_service` and execute representative API flows with prompt attachment/locking.
 - CI commands:  
   - `pdm run pytest-root services/batch_orchestrator_service -k prompt --maxfail=1`  
@@ -68,6 +74,7 @@ The objective is to decouple student prompt payloads from registration forms whi
   - `pdm run pytest-root services/cj_assessment_service -k assignment --maxfail=1`
 
 ## Acceptance Criteria
+
 - Registration APIs accept optional `assignment_id`; inline prompts removed from canonical payloads.  
 - Prompt-dependent pipelines require either canonical assignment or CMS reference; violating requests are rejected with explicit BOS errors.  
 - BCS enforces `prompt_attached` gating prior to starting `cj_assessment`, `ai_feedback`, or prompt-dependent NLP phases.  
@@ -78,6 +85,7 @@ The objective is to decouple student prompt payloads from registration forms whi
 - Prototype scope confirmed: no backward-compat path required; a single cutover to reference-based payloads is acceptable.
 
 ## Risks & Mitigations
+
 - **BCS State Ambiguity**: Clarify during discovery whether BOS or BCS owns the new flag; document and align storage early to avoid double writes.  
   *Mitigation*: Prototype flag propagation in a feature branch once discovery confirms data flow.  
 - **Content Service Auth/Hash Drift**: Incorrect reference validation could block prompts.  
@@ -88,12 +96,14 @@ The objective is to decouple student prompt payloads from registration forms whi
   *Mitigation*: Stage a single branch/PR that updates contracts, fixtures, and service consumers together; communicate timing to all contributors.
 
 ## Out of Scope
+
 - Changes to Phase 1 student matching workflows.  
 - Modifying event envelope format or observability infrastructure beyond new metrics.  
 - Redesigning Content Service storage semantics or BOS/BCS core architecture.  
 - Altering canonical CJ anchor datasets beyond exposing existing metadata.
 
 ## Progress Log
+
 - **2025-11-05** – Core contract refactor kicked off  
   - Updated `libs/common_core` events and batch service models to replace `essay_instructions` with `student_prompt_ref`; added `ContentType.STUDENT_PROMPT_TEXT`.  
   - Gateway/BOS registration, pipeline DTOs, and persistence now operate on prompt references; pipeline requests carry a `prompt_payload` union and BOS emits `batch_metadata` when calling BCS.  
@@ -116,6 +126,7 @@ The objective is to decouple student prompt payloads from registration forms whi
   - **Next**: Migrate NLP and CJ services to consume `student_prompt_ref` natively, then remove dispatcher bridging
 
 ### Dispatcher Bridging Rules
+
 - Fetch prompt text in `DefaultSpecializedServiceRequestDispatcher` using the injected Content Service client.
 - On fetch failure, log a structured warning, increment `huleedu_els_prompt_fetch_failures_total{context="nlp|cj"}`, and fall back to the legacy `essay_instructions` string stored on `BatchExpectation` (trimmed). If no legacy text exists, send an empty string while still emitting the metric.
 - Populate both `student_prompt_ref` and `student_prompt_text` in dispatcher payloads. Remove this bridging layer immediately after both NLP and CJ services are reference-native.

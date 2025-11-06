@@ -191,6 +191,12 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 ["batch_id"],
                 registry=REGISTRY,
             ),
+            "prompt_fetch_failures": Counter(
+                "huleedu_cj_prompt_fetch_failures_total",
+                "Total number of prompt hydration failures in CJ Assessment Service",
+                ["reason"],
+                registry=REGISTRY,
+            ),
         }
 
         # Add database metrics if provided
@@ -257,6 +263,7 @@ def _get_existing_metrics() -> dict[str, Any]:
         "cj_successful_retries_total": "cj_successful_retries_total",
         "cj_permanently_failed_comparisons_total": "cj_permanently_failed_comparisons_total",
         "cj_failed_pool_size": "cj_failed_pool_size",
+        "prompt_fetch_failures": "huleedu_cj_prompt_fetch_failures_total",
     }
 
     existing: dict[str, Any] = {}
@@ -319,6 +326,7 @@ def get_business_metrics() -> dict[str, Any]:
             "cj_permanently_failed_comparisons_total"
         ),
         "cj_failed_pool_size": all_metrics.get("cj_failed_pool_size"),
+        "prompt_fetch_failures": all_metrics.get("prompt_fetch_failures"),
     }
 
 

@@ -112,7 +112,8 @@ class NlpEventPublisherProtocol(Protocol):
         grammar_analysis: GrammarAnalysis,
         correlation_id: UUID,
         feature_outputs: dict[str, Any] | None = None,
-        essay_instructions: str | None = None,
+        prompt_text: str | None = None,
+        prompt_storage_id: str | None = None,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
 
@@ -125,7 +126,8 @@ class NlpEventPublisherProtocol(Protocol):
             grammar_analysis: Grammar analysis from Language Tool
             correlation_id: Correlation ID for tracking
             feature_outputs: Optional feature outputs from the pipeline
-            essay_instructions: Prompt provided for the batch being processed
+            prompt_text: Hydrated student prompt text for the batch being processed
+            prompt_storage_id: Storage identifier for the student prompt reference
         """
         ...
 

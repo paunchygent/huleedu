@@ -11,7 +11,7 @@ Implements dual event pattern:
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -19,10 +19,12 @@ if TYPE_CHECKING:
 
 import aiohttp
 from aiokafka import ConsumerRecord
+from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
+from common_core.metadata_models import StorageReferenceMetadata
 from huleedu_nlp_shared.feature_pipeline import FeaturePipelineProtocol
 from huleedu_service_libs.error_handling import (
     HuleEduError,
@@ -33,12 +35,14 @@ from huleedu_service_libs.error_handling import (
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
 from pydantic import ValidationError
+from prometheus_client import Counter
 
 from services.nlp_service.protocols import (
     CommandHandlerProtocol,
     ContentClientProtocol,
     NlpEventPublisherProtocol,
 )
+from services.nlp_service.metrics import get_metrics
 
 logger = create_service_logger("nlp_service.command_handlers.batch_nlp_analysis")
 
@@ -70,6 +74,128 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
         self.outbox_repository = outbox_repository
         self.feature_pipeline = feature_pipeline
         self.tracer = tracer
+        metrics: dict[str, Any] = get_metrics()
+        prompt_counter = metrics.get("prompt_fetch_failures")
+        self._prompt_fetch_failures: Counter | None = (
+            prompt_counter if isinstance(prompt_counter, Counter) else None
+        )
+
+    def _record_prompt_fetch_failure(self, reason: str) -> None:
+        """Increment prompt fetch failure metric with provided reason."""
+        if self._prompt_fetch_failures is None:
+            return
+        try:
+            self._prompt_fetch_failures.labels(reason=reason).inc()
+        except Exception:
+            # If labels are not configured as expected, fall back to direct increment.
+            try:
+                self._prompt_fetch_failures.inc()
+            except Exception:  # pragma: no cover - defensive guardrail
+                logger.debug("Unable to increment prompt fetch failure metric", exc_info=True)
+
+    def _extract_prompt_storage_id(
+        self,
+        prompt_ref: StorageReferenceMetadata | None,
+        *,
+        batch_id: str,
+        correlation_id: UUID,
+    ) -> str | None:
+        """Extract student prompt storage identifier from provided metadata."""
+        if prompt_ref is None:
+            logger.debug(
+                "No student prompt reference supplied; continuing without prompt text",
+                extra={"batch_id": batch_id, "correlation_id": str(correlation_id)},
+            )
+            return None
+
+        references = cast(dict[Any, dict[str, str]], prompt_ref.references or {})
+        storage_entry: Any | None = references.get(ContentType.STUDENT_PROMPT_TEXT)
+        if storage_entry is None:
+            storage_entry = references.get(ContentType.STUDENT_PROMPT_TEXT.value)  # type: ignore[arg-type]
+
+        if not isinstance(storage_entry, dict):
+            logger.warning(
+                "Student prompt reference missing expected storage entry",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "reference_keys": list(references.keys()),
+                },
+            )
+            self._record_prompt_fetch_failure("missing_entry")
+            return None
+
+        storage_id = storage_entry.get("storage_id")
+        if not storage_id:
+            logger.warning(
+                "Student prompt reference missing storage_id",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "reference_keys": list(references.keys()),
+                },
+            )
+            self._record_prompt_fetch_failure("missing_storage_id")
+            return None
+
+        return cast(str, storage_id)
+
+    async def _hydrate_prompt_text(
+        self,
+        *,
+        storage_id: str | None,
+        http_session: aiohttp.ClientSession,
+        correlation_id: UUID,
+        batch_id: str,
+    ) -> str | None:
+        """Fetch prompt text from Content Service when a storage id is available."""
+        if storage_id is None:
+            return None
+
+        try:
+            prompt_text: str = await self.content_client.fetch_content(
+                storage_id=storage_id,
+                http_session=http_session,
+                correlation_id=correlation_id,
+            )
+            if prompt_text:
+                return prompt_text
+
+            logger.warning(
+                "Hydrated student prompt text is empty",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "prompt_storage_id": storage_id,
+                },
+            )
+            return ""
+
+        except HuleEduError as error:
+            self._record_prompt_fetch_failure("content_service_error")
+            logger.warning(
+                "Failed to fetch student prompt text from Content Service",
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "prompt_storage_id": storage_id,
+                    "error": getattr(error, "error_detail", str(error)),
+                },
+            )
+        except Exception as error:  # pragma: no cover - defensive guardrail
+            self._record_prompt_fetch_failure("unexpected_error")
+            logger.error(
+                "Unexpected error hydrating student prompt text",
+                exc_info=True,
+                extra={
+                    "batch_id": batch_id,
+                    "correlation_id": str(correlation_id),
+                    "prompt_storage_id": storage_id,
+                    "error": str(error),
+                },
+            )
+
+        return None
 
     async def can_handle(self, event_type: str) -> bool:
         """Check if this handler can process the given event type.
@@ -109,6 +235,17 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
             # Log event processing
             # Get batch_id from command_data
             batch_id = command_data.batch_id
+            prompt_storage_id = self._extract_prompt_storage_id(
+                command_data.student_prompt_ref,
+                batch_id=batch_id,
+                correlation_id=correlation_id,
+            )
+            prompt_text = await self._hydrate_prompt_text(
+                storage_id=prompt_storage_id,
+                http_session=http_session,
+                correlation_id=correlation_id,
+                batch_id=batch_id,
+            )
 
             log_event_processing(
                 logger=logger,
@@ -126,17 +263,20 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                     "batch_id": batch_id,
                     "essay_count": len(command_data.essays_to_process),
                     "correlation_id": str(correlation_id),
+                    "prompt_reference_present": bool(prompt_storage_id),
                 },
             )
 
-            logger.debug(
-                "Received essay instructions for batch",
-                extra={
-                    "batch_id": batch_id,
-                    "correlation_id": str(correlation_id),
-                    "instructions_preview": command_data.essay_instructions[:100],
-                },
-            )
+            if prompt_text:
+                logger.debug(
+                    "Hydrated student prompt text for batch",
+                    extra={
+                        "batch_id": batch_id,
+                        "correlation_id": str(correlation_id),
+                        "prompt_storage_id": prompt_storage_id,
+                        "prompt_preview": prompt_text[:100],
+                    },
+                )
 
             # Track batch processing start time
             batch_start_time = time.time()
@@ -216,7 +356,8 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         pipeline_result = await self.feature_pipeline.extract_features(
                             normalized_text=essay_text,
                             spellcheck_metrics=spellcheck_metrics,
-                            prompt_text=command_data.essay_instructions,
+                            prompt_text=prompt_text,
+                            prompt_id=prompt_storage_id,
                             essay_id=essay_ref.essay_id,
                             batch_id=batch_id,
                             language=language,
@@ -295,7 +436,8 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                         grammar_analysis=grammar_analysis,
                         correlation_id=correlation_id,
                         feature_outputs=pipeline_result.features,
-                        essay_instructions=command_data.essay_instructions,
+                        prompt_text=prompt_text,
+                        prompt_storage_id=prompt_storage_id,
                     )
 
                     processed_count += 1

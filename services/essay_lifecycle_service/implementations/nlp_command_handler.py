@@ -174,12 +174,10 @@ class NlpCommandHandler:
                         return
 
                     # Phase 3.2: Pass student_prompt_ref from command data
-                    # Dispatcher will hydrate prompt text from Content Service
                     await self.request_dispatcher.dispatch_nlp_requests(
                         essays_to_process=successfully_transitioned,
                         language=Language(command_data.language),
                         batch_id=batch_id,
-                        essay_instructions="",  # Bridging: dispatcher hydrates from student_prompt_ref
                         correlation_id=correlation_id,
                         session=session,
                         student_prompt_ref=command_data.student_prompt_ref,

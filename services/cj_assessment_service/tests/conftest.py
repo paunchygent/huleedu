@@ -17,7 +17,7 @@ import pytest
 from aiokafka import AIOKafkaProducer, ConsumerRecord
 
 # CRITICAL: Import ALL enum types FIRST
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 
 # Import models that need rebuilding
@@ -34,6 +34,7 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.status_enums import ProcessingStage
@@ -136,6 +137,14 @@ def cj_assessment_request_data_with_overrides(
         essay_id=str(uuid4()),
         text_storage_id=str(uuid4()),
     )
+    student_prompt_ref = StorageReferenceMetadata(
+        references={
+            ContentType.STUDENT_PROMPT_TEXT: {
+                "storage_id": "prompt-storage-with-overrides",
+                "path": "",
+            }
+        }
+    )
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         entity_id=sample_batch_id,
@@ -150,6 +159,7 @@ def cj_assessment_request_data_with_overrides(
         # Identity fields for credit attribution (Phase 3)
         user_id="test-user-123",
         org_id="test-org-456",
+        student_prompt_ref=student_prompt_ref,
     )
 
 
@@ -166,6 +176,14 @@ def cj_assessment_request_data_no_overrides(
         essay_id=str(uuid4()),
         text_storage_id=str(uuid4()),
     )
+    student_prompt_ref = StorageReferenceMetadata(
+        references={
+            ContentType.STUDENT_PROMPT_TEXT: {
+                "storage_id": "prompt-storage-no-overrides",
+                "path": "",
+            }
+        }
+    )
     return ELS_CJAssessmentRequestV1(
         event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
         entity_id=sample_batch_id,
@@ -180,6 +198,7 @@ def cj_assessment_request_data_no_overrides(
         # Identity fields for credit attribution (Phase 3)
         user_id="test-user-456",
         org_id=None,  # Test both with and without org
+        student_prompt_ref=student_prompt_ref,
     )
 
 

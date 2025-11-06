@@ -16,6 +16,7 @@ import aiohttp
 import pytest
 from aiokafka import ConsumerRecord
 from common_core.batch_service_models import BatchServiceNLPInitiateCommandDataV2
+from common_core.domain_enums import ContentType
 from common_core.event_enums import ProcessingEvent
 
 # Import base event models that need rebuilding
@@ -29,6 +30,7 @@ from common_core.events.base_event_models import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 
@@ -103,6 +105,14 @@ def nlp_initiate_command(
     system_metadata: SystemProcessingMetadata,
 ) -> BatchServiceNLPInitiateCommandDataV2:
     """Provide sample BatchServiceNLPInitiateCommandDataV2 for testing."""
+    prompt_ref = StorageReferenceMetadata(
+        references={
+            ContentType.STUDENT_PROMPT_TEXT: {
+                "storage_id": "prompt-123",
+                "path": "",
+            }
+        }
+    )
     return BatchServiceNLPInitiateCommandDataV2(
         event_name=ProcessingEvent.BATCH_NLP_INITIATE_COMMAND_V2,
         entity_id=sample_batch_id,
@@ -110,7 +120,7 @@ def nlp_initiate_command(
         parent_id=sample_parent_id,
         essays_to_process=[],  # Empty list for testing
         language="en",
-        essay_instructions="Test instructions",
+        student_prompt_ref=prompt_ref,
     )
 
 

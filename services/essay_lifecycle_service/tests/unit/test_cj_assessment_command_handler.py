@@ -205,7 +205,6 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=cj_assessment_command_data.essays_to_process,
                 language=cj_assessment_command_data.language,
                 course_code=cj_assessment_command_data.course_code,
-                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=cj_assessment_command_data.entity_id,
                 user_id="test-user-123",
                 org_id="test-org-456",
@@ -415,7 +414,6 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=[essay_ref],
                 language=Language.SWEDISH,
                 course_code=CourseCode.SV3,
-                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=batch_id,
                 user_id="swedish-user-789",
                 org_id="stockholm-school",
@@ -571,7 +569,6 @@ class TestCJAssessmentCommandHandler:
                 essays_to_process=[command_data.essays_to_process[0]],
                 language=Language.SWEDISH,
                 course_code=command_data.course_code,
-                essay_instructions="",  # Phase 3.2: dispatcher hydrates from student_prompt_ref
                 batch_id=batch_id,
                 user_id="minimal-user-456",
                 org_id="minimal-org-789",

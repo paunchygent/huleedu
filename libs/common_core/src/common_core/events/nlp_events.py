@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.base_event_models import BaseEventData, ProcessingUpdate
-from common_core.metadata_models import EssayProcessingInputRefV1
+from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
 
 
 class StudentMatchSuggestion(BaseModel):
@@ -106,24 +106,17 @@ class BatchNlpProcessingRequestedV1(BaseEventData):
 
 
 class BatchNlpProcessingRequestedV2(BaseEventData):
-    """Request from ELS to NLP Service for batch text analysis with required instructions."""
+    """Request from ELS to NLP Service for batch text analysis with optional prompt reference."""
 
     essays_to_process: list[EssayProcessingInputRefV1] = Field(
         description="List of essays to analyze with their text storage references"
     )
     language: str = Field(description="Language code for processing (e.g., 'en', 'sv')")
     batch_id: str = Field(description="Batch identifier for tracking")
-    essay_instructions: str = Field(
-        description="Essay instructions used for context-aware analysis"
+    student_prompt_ref: StorageReferenceMetadata | None = Field(
+        default=None,
+        description="Content Service reference for the student-facing prompt text",
     )
-
-    @field_validator("essay_instructions")
-    @classmethod
-    def validate_essay_instructions(cls, value: str) -> str:
-        trimmed = value.strip()
-        if not trimmed:
-            raise ValueError("essay_instructions must be a non-empty string.")
-        return trimmed
 
 
 class NlpMetrics(BaseModel):

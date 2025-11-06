@@ -158,6 +158,16 @@ pdm run typecheck-all # Run MyPy
 - CLI/TUI output CSVs contain only newly scheduled comparisons while summaries/report JSON highlight baseline consumption, mandatory new-slot components (adjacency, locked, coverage), and combined totals.
 - Tests expanded (`test_load_dynamic_spec_canonicalizes_previous_comparisons`, multi-session assertions on `new_design`) with automation via `pdm run pytest-root scripts/bayesian_consensus_model/tests/test_redistribute.py`; manual CLI/TUI smoke passes are still recommended per handoff notes.
 
+### 9. NLP Prompt Hydration (Nov 2025)
+- `BatchNlpAnalysisHandler` now hydrates `student_prompt_ref` through the Content Service, records failures via `huleedu_nlp_prompt_fetch_failures_total{reason=...}`, and passes `prompt_text`/`prompt_storage_id` into downstream pipelines.
+- `EssayNlpCompletedV1.processing_metadata` includes `student_prompt_text` and `student_prompt_storage_id` (legacy `essay_instructions` retained temporarily for backward compatibility).
+- Unit coverage added (`pdm run pytest-root services/nlp_service/tests -k batch_nlp_analysis_handler`) to ensure prompt propagation and metric instrumentation.
+
+### 10. CJ Prompt Hydration (Nov 2025)
+- CJ event processor fetches `student_prompt_ref` locally, increments `huleedu_cj_prompt_fetch_failures_total{reason=…}`, and forwards prompt metadata into workflow orchestration.
+- CJ repository/models now allow nullable `essay_instructions`; metadata captures `student_prompt_storage_id` for batch auditing (migration `20251106_1845_make_cj_prompt_nullable.py`).
+- Tests updated to cover success/failure hydration paths (`pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'`) with type safety validated via `pdm run typecheck-all`.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

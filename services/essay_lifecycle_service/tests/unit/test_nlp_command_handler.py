@@ -11,8 +11,6 @@ from common_core.events.spellcheck_models import SpellcheckMetricsV1
 from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
 from common_core.domain_enums import ContentType
 from common_core.status_enums import EssayStatus
-from pydantic import ValidationError
-
 from services.essay_lifecycle_service.constants import MetadataKey
 from services.essay_lifecycle_service.implementations.nlp_command_handler import (
     NlpCommandHandler,
@@ -24,17 +22,17 @@ from services.essay_lifecycle_service.protocols import (
 )
 
 
-def test_batch_nlp_processing_requested_requires_instructions() -> None:
-    with pytest.raises(ValidationError):
-        BatchNlpProcessingRequestedV2(
-            event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
-            entity_id="batch-1",
-            entity_type="batch",
-            essays_to_process=[],
-            language="en",
-            batch_id="batch-1",
-            essay_instructions="   ",
-        )
+def test_batch_nlp_processing_requested_allows_optional_prompt_ref() -> None:
+    event = BatchNlpProcessingRequestedV2(
+        event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
+        entity_id="batch-1",
+        entity_type="batch",
+        essays_to_process=[],
+        language="en",
+        batch_id="batch-1",
+        student_prompt_ref=None,
+    )
+    assert event.student_prompt_ref is None
 
 
 @pytest.mark.asyncio
@@ -98,6 +96,4 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     assert len(essays) == 1
     assert essays[0].spellcheck_metrics is not None
     assert essays[0].spellcheck_metrics.total_corrections == metrics.total_corrections
-    # Phase 3.2: Command handler passes empty string; dispatcher hydrates from student_prompt_ref
-    assert dispatched_args["essay_instructions"] == ""
     assert dispatched_args["student_prompt_ref"] == student_prompt_ref

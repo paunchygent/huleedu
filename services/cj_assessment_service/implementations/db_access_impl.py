@@ -97,7 +97,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         event_correlation_id: str,
         language: str,
         course_code: str,
-        essay_instructions: str,
+        essay_instructions: str | None,
         initial_status: CJBatchStatusEnum,
         expected_essay_count: int,
         user_id: str | None = None,

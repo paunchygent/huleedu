@@ -7,16 +7,14 @@ Implements SpecializedServiceRequestDispatcher protocol for dispatching requests
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
     from common_core.events.ai_feedback_events import AIFeedbackInputDataV1
     from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
-    from huleedu_service_libs.http_client.protocols import ContentServiceClientProtocol
     from huleedu_service_libs.outbox import OutboxRepositoryProtocol
     from huleedu_service_libs.protocols import KafkaPublisherProtocol
-    from prometheus_client import CollectorRegistry
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from services.essay_lifecycle_service.config import Settings
@@ -40,111 +38,10 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         kafka_bus: KafkaPublisherProtocol,
         settings: Settings,
         outbox_repository: OutboxRepositoryProtocol,
-        content_service_client: ContentServiceClientProtocol,
-        metrics_registry: CollectorRegistry,
     ) -> None:
         self.kafka_bus = kafka_bus
         self.settings = settings
         self.outbox_repository = outbox_repository
-        self.content_service_client = content_service_client
-
-        # Get metrics from registry
-        from services.essay_lifecycle_service.metrics import get_metrics
-
-        metrics = get_metrics()
-        self.prompt_fetch_failures_counter = metrics.get("prompt_fetch_failures")
-
-    async def _fetch_prompt_text(
-        self,
-        student_prompt_ref: StorageReferenceMetadata | None,
-        fallback_text: str,
-        context: str,
-        correlation_id: UUID,
-    ) -> str:
-        """Fetch prompt text from Content Service with fallback to legacy text.
-
-        Args:
-            student_prompt_ref: Storage reference for prompt content
-            fallback_text: Legacy text to use if fetch fails
-            context: Context label for metrics (e.g., "nlp", "cj")
-            correlation_id: Request correlation ID for tracing
-
-        Returns:
-            Hydrated prompt text or fallback text
-
-        Note:
-            Logs warnings and increments metrics on fetch failure.
-            Never raises exceptions - always returns fallback on error.
-        """
-        logger = create_service_logger("specialized_service_dispatcher")
-
-        # If no reference provided, use fallback
-        if not student_prompt_ref:
-            logger.debug(
-                f"{context.upper()}: No prompt reference provided, using fallback text",
-                extra={"correlation_id": str(correlation_id), "fallback_length": len(fallback_text)},
-            )
-            return fallback_text
-
-        # Extract storage_id from reference
-        from common_core.domain_enums import ContentType
-
-        storage_id = None
-        try:
-            prompt_ref_data = student_prompt_ref.references.get(ContentType.STUDENT_PROMPT_TEXT)
-            if prompt_ref_data:
-                storage_id = prompt_ref_data.get("storage_id")
-        except (AttributeError, KeyError):
-            pass
-
-        if not storage_id:
-            logger.warning(
-                f"{context.upper()}: Prompt reference missing storage_id, using fallback",
-                extra={"correlation_id": str(correlation_id)},
-            )
-            if self.prompt_fetch_failures_counter:
-                self.prompt_fetch_failures_counter.labels(context=context).inc()
-            return fallback_text
-
-        # Fetch from Content Service
-        try:
-            prompt_text = await self.content_service_client.fetch_content(
-                storage_id=storage_id,
-                correlation_id=correlation_id,
-                essay_id=None,  # Prompt is batch-level, not essay-specific
-            )
-
-            logger.info(
-                f"{context.upper()}: Successfully fetched prompt text from Content Service",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "storage_id": storage_id,
-                    "prompt_preview": prompt_text[:100]
-                    + ("..." if len(prompt_text) > 100 else ""),
-                },
-            )
-
-            return prompt_text
-
-        except Exception as e:
-            # Log failure with structured context
-            logger.warning(
-                f"{context.upper()}: Content Service fetch failed, using fallback text",
-                extra={
-                    "correlation_id": str(correlation_id),
-                    "storage_id": storage_id,
-                    "error_type": e.__class__.__name__,
-                    "error_message": str(e),
-                    "fallback_length": len(fallback_text),
-                },
-            )
-
-            # Increment failure metric
-            if self.prompt_fetch_failures_counter:
-                self.prompt_fetch_failures_counter.labels(context=context).inc()
-
-            # Return fallback text (trimmed if needed)
-            return fallback_text
 
     async def dispatch_spellcheck_requests(
         self,
@@ -269,12 +166,11 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         batch_id: str,
-        essay_instructions: str,
         correlation_id: UUID,
         session: AsyncSession | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
     ) -> None:
-        """Dispatch NLP processing request to NLP Service with prompt hydration.
+        """Dispatch NLP processing request to NLP Service with optional prompt reference.
 
         Following the architectural pattern established by spellcheck,
         ELS forwards the batch request to NLP service for processing.
@@ -283,10 +179,9 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
             essays_to_process: List of essays to process
             language: Language of the essays
             batch_id: Batch identifier
-            essay_instructions: Fallback essay instructions text
             correlation_id: Request correlation ID
             session: Optional database session
-            student_prompt_ref: Storage reference for prompt (Phase 3.2 bridging)
+            student_prompt_ref: Storage reference for prompt text (if provided)
         """
 
         from common_core.event_enums import ProcessingEvent, topic_name
@@ -295,14 +190,6 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
         logger = create_service_logger("specialized_service_dispatcher")
 
-        # Hydrate prompt text from Content Service
-        hydrated_instructions = await self._fetch_prompt_text(
-            student_prompt_ref=student_prompt_ref,
-            fallback_text=essay_instructions,
-            context="nlp",
-            correlation_id=correlation_id,
-        )
-
         logger.info(
             "Dispatching NLP processing request to NLP Service",
             extra={
@@ -310,9 +197,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "essay_count": len(essays_to_process),
                 "language": language.value,
                 "correlation_id": str(correlation_id),
-                "prompt_source": "content_service"
-                if student_prompt_ref
-                else "legacy_fallback",
+                "prompt_reference_present": bool(student_prompt_ref),
             },
         )
 
@@ -325,7 +210,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 essays_to_process=essays_to_process,
                 language=language.value,
                 batch_id=batch_id,
-                essay_instructions=hydrated_instructions,
+                student_prompt_ref=student_prompt_ref,
             )
 
             # Create event envelope
@@ -398,7 +283,6 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         essays_to_process: list[EssayProcessingInputRefV1],
         language: Language,
         course_code: CourseCode,
-        essay_instructions: str,
         batch_id: str,
         user_id: str,
         org_id: str | None,
@@ -406,20 +290,7 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
         session: AsyncSession | None = None,
         student_prompt_ref: StorageReferenceMetadata | None = None,
     ) -> None:
-        """Dispatch CJ assessment request to CJ Assessment Service with prompt hydration.
-
-        Args:
-            essays_to_process: List of essays to assess
-            language: Language of the essays
-            course_code: Course code for assessment
-            essay_instructions: Fallback essay instructions text
-            batch_id: Batch identifier
-            user_id: User identifier for credit attribution
-            org_id: Organization identifier
-            correlation_id: Request correlation ID
-            session: Optional database session
-            student_prompt_ref: Storage reference for prompt (Phase 3.2 bridging)
-        """
+        """Dispatch CJ assessment request to CJ Assessment Service with optional prompt reference."""
         from datetime import UTC, datetime
 
         from common_core.event_enums import ProcessingEvent, topic_name
@@ -430,14 +301,6 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
 
         logger = create_service_logger("specialized_service_dispatcher")
 
-        # Hydrate prompt text from Content Service
-        hydrated_instructions = await self._fetch_prompt_text(
-            student_prompt_ref=student_prompt_ref,
-            fallback_text=essay_instructions,
-            context="cj",
-            correlation_id=correlation_id,
-        )
-
         logger.info(
             "Dispatching CJ assessment request to CJ Assessment Service",
             extra={
@@ -446,20 +309,12 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 "essay_ids": [essay.essay_id for essay in essays_to_process],
                 "language": language.value,
                 "course_code": course_code.value,
-                "prompt_preview": hydrated_instructions[:100]
-                + ("..." if len(hydrated_instructions) > 100 else ""),
                 "correlation_id": str(correlation_id),
-                "prompt_source": "content_service"
-                if student_prompt_ref
-                else "legacy_fallback",
+                "prompt_reference_present": bool(student_prompt_ref),
             },
         )
 
         try:
-            # EntityReference removed - using primitive parameters
-            # CJ assessment works on batches, not individual essays
-
-            # Create system metadata with primitive parameters
             system_metadata = SystemProcessingMetadata(
                 entity_id=batch_id,
                 entity_type="batch",
@@ -469,23 +324,20 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 processing_stage=ProcessingStage.PENDING,
             )
 
-            # Create CJ assessment request event data with hydrated instructions
             cj_request = ELS_CJAssessmentRequestV1(
                 entity_id=batch_id,
                 entity_type="batch",
                 parent_id=None,
                 system_metadata=system_metadata,
                 essays_for_cj=essays_to_process,
-                language=language.value,  # Use enum value for serialization
+                language=language.value,
                 course_code=course_code,
-                essay_instructions=hydrated_instructions,
-                llm_config_overrides=None,  # Use service defaults
-                # Identity fields for credit attribution - real values from batch context
+                student_prompt_ref=student_prompt_ref,
+                llm_config_overrides=None,
                 user_id=user_id,
                 org_id=org_id,
             )
 
-            # Create event envelope
             envelope = EventEnvelope[ELS_CJAssessmentRequestV1](
                 event_type=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
                 source_service=self.settings.SERVICE_NAME,
@@ -494,13 +346,10 @@ class DefaultSpecializedServiceRequestDispatcher(SpecializedServiceRequestDispat
                 metadata={},
             )
 
-            # Inject trace context for distributed tracing
             if envelope.metadata is not None:
                 inject_trace_context(envelope.metadata)
 
-            # Publish to outbox for reliable delivery
             topic = topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)
-            # For batch-level events, use batch_id as aggregate
             event_data = envelope.model_dump(mode="json")
             await self.outbox_repository.add_event(
                 aggregate_id=batch_id,

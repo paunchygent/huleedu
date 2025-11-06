@@ -207,7 +207,8 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         grammar_analysis: GrammarAnalysis,
         correlation_id: UUID,
         feature_outputs: dict[str, Any] | None = None,
-        essay_instructions: str | None = None,
+        prompt_text: str | None = None,
+        prompt_storage_id: str | None = None,
     ) -> None:
         """Publish NLP analysis completion event for a single essay.
 
@@ -220,7 +221,8 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
             grammar_analysis: Grammar analysis from Language Tool
             correlation_id: Correlation ID for tracking
             feature_outputs: Optional feature outputs emitted by the pipeline
-            essay_instructions: Prompt supplied with the batch for context-aware analysis
+            prompt_text: Hydrated student prompt text supplied with the batch
+            prompt_storage_id: Storage identifier backing the student prompt reference
         """
         logger.debug(
             f"Publishing NLP analysis completed for essay {essay_id} via outbox",
@@ -229,6 +231,7 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
                 "essay_id": essay_id,
                 "word_count": nlp_metrics.word_count,
                 "error_count": grammar_analysis.error_count,
+                "prompt_storage_id": prompt_storage_id,
             },
         )
 
@@ -239,8 +242,12 @@ class DefaultNlpEventPublisher(NlpEventPublisherProtocol):
         }
         if feature_outputs:
             processing_metadata["feature_outputs"] = feature_outputs
-        if essay_instructions is not None:
-            processing_metadata["essay_instructions"] = essay_instructions
+        if prompt_text is not None:
+            # Surface the new prompt metadata while retaining legacy field for compatibility.
+            processing_metadata["student_prompt_text"] = prompt_text
+            processing_metadata["essay_instructions"] = prompt_text
+        if prompt_storage_id is not None:
+            processing_metadata["student_prompt_storage_id"] = prompt_storage_id
 
         event_data = EssayNlpCompletedV1(
             event_name=ProcessingEvent.ESSAY_NLP_COMPLETED,

@@ -72,6 +72,12 @@ def _create_metrics() -> dict[str, Any]:
                 buckets=(1, 5, 10, 25, 50, 100, 250, 500),
                 registry=REGISTRY,
             ),
+            "prompt_fetch_failures": Counter(
+                "huleedu_nlp_prompt_fetch_failures_total",
+                "Total number of prompt hydration failures in NLP service",
+                ["reason"],
+                registry=REGISTRY,
+            ),
         }
 
         logger.info("Successfully created all metrics")
@@ -96,6 +102,7 @@ def _get_existing_metrics() -> dict[str, Any]:
         "student_matches_found": "nlp_student_matches_found",
         "kafka_queue_latency_seconds": "nlp_kafka_message_queue_latency_seconds",
         "nlp_batch_size": "nlp_batch_size",
+        "prompt_fetch_failures": "huleedu_nlp_prompt_fetch_failures_total",
     }
 
     existing: dict[str, Any] = {}

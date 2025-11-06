@@ -48,9 +48,11 @@ async def create_cj_batch(
         bos_batch_id = request_data.get("bos_batch_id")
         language = request_data.get("language", "en")
         course_code = request_data.get("course_code", "")
-        essay_instructions = request_data.get("essay_instructions", "")
+        essay_instructions = request_data.get("essay_instructions")
         essays_to_process = request_data.get("essays_to_process", [])
         assignment_id = request_data.get("assignment_id")  # For anchor essay lookup
+        prompt_storage_id = request_data.get("student_prompt_storage_id")
+        prompt_text = request_data.get("student_prompt_text")
         # Identity fields for credit attribution (Phase 3: Entitlements integration)
         user_id = request_data.get("user_id")
         org_id = request_data.get("org_id")
@@ -71,6 +73,14 @@ async def create_cj_batch(
             user_id=user_id,
             org_id=org_id,
         )
+
+        if prompt_storage_id:
+            metadata = cj_batch.processing_metadata or {}
+            metadata["student_prompt_storage_id"] = prompt_storage_id
+            if prompt_text is not None:
+                metadata["student_prompt_text_present"] = bool(prompt_text.strip())
+            cj_batch.processing_metadata = metadata
+            await session.flush()
 
         # Store assignment_id if provided
         if assignment_id:
