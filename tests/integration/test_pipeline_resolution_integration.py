@@ -61,6 +61,7 @@ class MockBatchConductorClient:
             "batch_id": batch_id,
             "requested_pipeline": requested_pipeline.value,  # Convert enum to string for API
             "correlation_id": correlation_id,
+            "batch_metadata": batch_metadata or {},  # Phase 3.2: Pass prompt metadata to BCS
         }
 
         async with aiohttp.ClientSession() as session:
@@ -106,12 +107,19 @@ class TestPipelineResolutionIntegration:
             "created_at": "2025-01-01T00:00:00Z",
         }
 
-        # Mock batch context to return valid context
-        mock_repo.get_batch_context.return_value = {
-            "batch_id": "test-batch-integration-001",
-            "course_code": "ENG5",
-            "class_type": "GUEST",
-        }
+        # Mock batch context to return valid context with prompt reference (Phase 3.2)
+        from common_core.metadata_models import StorageReferenceMetadata
+        from types import SimpleNamespace
+
+        batch_context = SimpleNamespace(
+            batch_id="test-batch-integration-001",
+            course_code="ENG5",
+            class_type="GUEST",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "test-prompt-123", "path": ""}}
+            ),
+        )
+        mock_repo.get_batch_context.return_value = batch_context
 
         # Mock successful batch update and pipeline state saving
         mock_repo.update_batch_status.return_value = True
@@ -465,12 +473,19 @@ class TestPipelineResolutionIntegration:
         - No duplicate BCS calls made
         - Idempotent response provided
         """
-        # Configure batch repository to return already-resolved pipeline
-        mock_batch_repository.get_batch_context.return_value = {
-            "batch_id": "test-batch-idempotent-001",
-            "requested_pipeline": "ai_feedback",
-            "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
-        }
+        # Configure batch repository to return already-resolved pipeline (Phase 3.2)
+        from common_core.metadata_models import StorageReferenceMetadata
+        from types import SimpleNamespace
+
+        batch_context = SimpleNamespace(
+            batch_id="test-batch-idempotent-001",
+            course_code="ENG5",
+            class_type="GUEST",
+            student_prompt_ref=StorageReferenceMetadata(
+                references={"student_prompt_text": {"storage_id": "test-prompt-123", "path": ""}}
+            ),
+        )
+        mock_batch_repository.get_batch_context.return_value = batch_context
 
         mock_batch_repository.get_batch_by_id.return_value = {
             "batch_id": "test-batch-idempotent-001",
@@ -546,16 +561,20 @@ class TestPipelineResolutionIntegration:
         - Each request resolved independently
         - No race conditions in batch state management
         """
+        # Phase 3.2: Import required models for prompt references
+        from common_core.metadata_models import StorageReferenceMetadata
+        from types import SimpleNamespace
 
         # Configure repository for multiple batches
         def mock_get_batch_context(batch_id: str):
-            return {
-                "batch_id": batch_id,
-                "requested_pipeline": "ai_feedback",
-                "status": BatchStatus.READY_FOR_PIPELINE_EXECUTION.value,
-                "resolved_pipeline": None,
-                "created_at": "2025-01-01T00:00:00Z",
-            }
+            return SimpleNamespace(
+                batch_id=batch_id,
+                course_code="ENG5",
+                class_type="GUEST",
+                student_prompt_ref=StorageReferenceMetadata(
+                    references={"student_prompt_text": {"storage_id": f"test-prompt-{batch_id}", "path": ""}}
+                ),
+            )
 
         def mock_get_batch_by_id(batch_id: str):
             return {
