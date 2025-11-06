@@ -25,6 +25,11 @@ from services.cj_assessment_service.tests.unit.anchor_api_test_helpers import (
     MockContentClient,
 )
 
+LONG_VALID_TEXT = (
+    "Valid essay text with sufficient length for testing validation requirements. "
+    "This extension ensures the essay passes the minimum length validator. "
+)
+
 
 class TestAnchorAPIRequestValidation:
     """Test anchor API request validation and business rules."""
@@ -37,7 +42,12 @@ class TestAnchorAPIRequestValidation:
     @pytest.fixture
     def mock_repository(self) -> CJRepositoryProtocol:
         """Create repository mock for validation tests."""
-        return MockCJRepository(behavior="success")
+        repo = MockCJRepository(behavior="success")
+        repo.register_assignment_context("test")
+        repo.register_assignment_context("length-test")
+        repo.register_assignment_context("boundary-test")
+        repo.register_assignment_context("assignment-456")
+        return repo
 
     @pytest.fixture
     def test_app(
@@ -79,10 +89,7 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "G",
-                    "essay_text": (
-                        "Valid essay text with sufficient length for testing "
-                        "validation requirements."
-                    ),
+                    "essay_text": LONG_VALID_TEXT,
                 },
                 "Invalid grade",
             ),
@@ -90,10 +97,7 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "A+",
-                    "essay_text": (
-                        "Valid essay text with sufficient length for testing "
-                        "validation requirements."
-                    ),
+                    "essay_text": LONG_VALID_TEXT,
                 },
                 "Invalid grade",
             ),
@@ -101,10 +105,7 @@ class TestAnchorAPIRequestValidation:
                 {
                     "assignment_id": "test",
                     "grade": "invalid",
-                    "essay_text": (
-                        "Valid essay text with sufficient length for testing "
-                        "validation requirements."
-                    ),
+                    "essay_text": LONG_VALID_TEXT,
                 },
                 "Invalid grade",
             ),

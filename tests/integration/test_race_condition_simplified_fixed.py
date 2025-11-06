@@ -26,14 +26,21 @@ from typing import Any, Awaitable, Union
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 from redis.asyncio import Redis
 
 logger = create_service_logger("test.race_condition_fixed")
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    """Create a StorageReferenceMetadata containing the prompt reference."""
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 async def _ensure_awaitable(result: Union[Awaitable[Any], Any]) -> Any:
@@ -316,7 +323,7 @@ class TestRaceConditionSimplified:
             expected_essay_count=expected_count,
             essay_ids=[f"essay_{i}" for i in range(expected_count)],
             course_code=CourseCode.ENG5,
-            essay_instructions="Test instructions",
+            student_prompt_ref=make_prompt_ref(f"prompt-{batch_id}"),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
                 entity_id=batch_id,

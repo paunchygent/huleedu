@@ -28,7 +28,8 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
     SpellcheckPhaseCompletedV1,
 )
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.domain_enums import ContentType
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from dishka import make_async_container
 from huleedu_service_libs.logging_utils import create_service_logger
@@ -56,6 +57,13 @@ from services.spellchecker_service.di import SpellCheckerServiceProvider
 from services.spellchecker_service.kafka_consumer import SpellCheckerKafkaConsumer
 
 logger = create_service_logger("test_dual_event_flow_integration")
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    """Create a StorageReferenceMetadata containing the prompt reference."""
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 class TestDualEventPatternIntegration:
@@ -499,12 +507,12 @@ class TestDualEventPatternIntegration:
                 text("""
                     INSERT INTO batch_essay_trackers (
                         batch_id, expected_essay_ids, available_slots, expected_count,
-                        course_code, essay_instructions, user_id, correlation_id,
-                        timeout_seconds, created_at, updated_at
+                        course_code, user_id, org_id, correlation_id,
+                        timeout_seconds, batch_metadata, created_at, updated_at
                     ) VALUES (
                         :batch_id, :expected_ids, :available_slots, :expected_count,
-                        :course_code, :essay_instructions, :user_id, :correlation_id,
-                        :timeout_seconds, NOW(), NOW()
+                        :course_code, :user_id, :org_id, :correlation_id,
+                        :timeout_seconds, :batch_metadata, NOW(), NOW()
                     )
                 """),
                 {
@@ -513,10 +521,17 @@ class TestDualEventPatternIntegration:
                     "available_slots": json.dumps([]),
                     "expected_count": 1,
                     "course_code": "ENG5",
-                    "essay_instructions": "Test essay for integration testing",
                     "user_id": "test-user",
+                    "org_id": None,
                     "correlation_id": str(correlation_id),
                     "timeout_seconds": 86400,  # 24 hours default
+                    "batch_metadata": json.dumps(
+                        {
+                            "student_prompt_ref": make_prompt_ref(
+                                "prompt-dual-event-metadata"
+                            ).model_dump(mode="json")
+                        }
+                    ),
                 },
             )
 
@@ -701,12 +716,12 @@ class TestDualEventPatternIntegration:
                 text("""
                     INSERT INTO batch_essay_trackers (
                         batch_id, expected_essay_ids, available_slots, expected_count,
-                        course_code, essay_instructions, user_id, correlation_id,
-                        timeout_seconds, created_at, updated_at
+                        course_code, user_id, org_id, correlation_id,
+                        timeout_seconds, batch_metadata, created_at, updated_at
                     ) VALUES (
                         :batch_id, :expected_ids, :available_slots, :expected_count,
-                        :course_code, :essay_instructions, :user_id, :correlation_id,
-                        :timeout_seconds, NOW(), NOW()
+                        :course_code, :user_id, :org_id, :correlation_id,
+                        :timeout_seconds, :batch_metadata, NOW(), NOW()
                     )
                 """),
                 {
@@ -715,10 +730,17 @@ class TestDualEventPatternIntegration:
                     "available_slots": json.dumps([]),
                     "expected_count": 1,
                     "course_code": "ENG5",
-                    "essay_instructions": "Test essay for integration testing",
                     "user_id": "test-user",
+                    "org_id": None,
                     "correlation_id": str(correlation_id),
                     "timeout_seconds": 86400,  # 24 hours default
+                    "batch_metadata": json.dumps(
+                        {
+                            "student_prompt_ref": make_prompt_ref(
+                                "prompt-dual-event-sizes"
+                            ).model_dump(mode="json")
+                        }
+                    ),
                 },
             )
 
@@ -851,12 +873,12 @@ class TestDualEventPatternIntegration:
                 text("""
                     INSERT INTO batch_essay_trackers (
                         batch_id, expected_essay_ids, available_slots, expected_count,
-                        course_code, essay_instructions, user_id, correlation_id,
-                        timeout_seconds, created_at, updated_at
+                        course_code, user_id, org_id, correlation_id,
+                        timeout_seconds, batch_metadata, created_at, updated_at
                     ) VALUES (
                         :batch_id, :expected_ids, :available_slots, :expected_count,
-                        :course_code, :essay_instructions, :user_id, :correlation_id,
-                        :timeout_seconds, NOW(), NOW()
+                        :course_code, :user_id, :org_id, :correlation_id,
+                        :timeout_seconds, :batch_metadata, NOW(), NOW()
                     )
                 """),
                 {
@@ -865,10 +887,17 @@ class TestDualEventPatternIntegration:
                     "available_slots": json.dumps([]),
                     "expected_count": 1,
                     "course_code": "TEST101",
-                    "essay_instructions": "Test essay for integration testing",
                     "user_id": "test-user",
+                    "org_id": None,
                     "correlation_id": str(correlation_id),
                     "timeout_seconds": 86400,  # 24 hours default
+                    "batch_metadata": json.dumps(
+                        {
+                            "student_prompt_ref": make_prompt_ref(
+                                "prompt-dual-event-topic-separation"
+                            ).model_dump(mode="json")
+                        }
+                    ),
                 },
             )
 

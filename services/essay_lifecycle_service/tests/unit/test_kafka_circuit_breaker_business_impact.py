@@ -48,6 +48,13 @@ from services.essay_lifecycle_service.protocols import (
 )
 
 
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    """Convenience helper to build prompt references for tests."""
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
+
+
 class BusinessWorkflowContext(BaseModel):
     """Context model for tracking business workflow state during testing."""
 
@@ -169,12 +176,6 @@ def business_context() -> BusinessWorkflowContext:
 class TestBatchCoordinationBusinessImpact:
     """Test business impact of batch coordination publishing failures."""
 
-    @staticmethod
-    def make_prompt_ref(label: str) -> StorageReferenceMetadata:
-        prompt_ref = StorageReferenceMetadata()
-        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
-        return prompt_ref
-
     @pytest.mark.asyncio
     async def test_batch_readiness_publishing_failure_prevents_phase_initiation(
         self,
@@ -245,7 +246,7 @@ class TestBatchCoordinationBusinessImpact:
             session_factory=mock_session_factory,
         )
 
-        prompt_ref = self.make_prompt_ref("prompt-batch-ready-failure")
+        prompt_ref = make_prompt_ref("prompt-batch-ready-failure")
         batch_registered_event = BatchEssaysRegistered(
             entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(business_context.essay_count)],
@@ -396,7 +397,7 @@ class TestBatchCoordinationBusinessImpact:
         ]
 
         # Create a proper BatchEssaysReady event that will be returned when batch is complete
-        prompt_ref = self.make_prompt_ref("prompt-slot-fulfillment")
+        prompt_ref = make_prompt_ref("prompt-slot-fulfillment")
         batch_ready_event = BatchEssaysReady(
             batch_id=business_context.batch_id,
             ready_essays=ready_essays,
@@ -956,7 +957,7 @@ class TestBusinessImpactIntegrationScenarios:
         correlation_id = uuid4()
 
         # Step 1: Batch registration (should succeed - index 0, False)
-        prompt_ref = self.make_prompt_ref("prompt-integration")
+        prompt_ref = make_prompt_ref("prompt-integration")
         batch_event = BatchEssaysRegistered(
             entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(3)],  # Small batch for testing

@@ -24,6 +24,7 @@ Event-driven microservice platform for automated essay processing and assessment
 - Grafana (3000), Prometheus (9091), Jaeger (16686), Loki (3100)
 
 ### Credits Preflight & Consumption
+
 - Preflight: API Gateway → BOS preflight → Entitlements bulk check.
   - BOS route: `POST /internal/v1/batches/{batch_id}/pipelines/{phase}/preflight` returns 200/402/429 with required/available and resource breakdown.
   - Entitlements bulk: `POST /v1/entitlements/check-credits/bulk` returns 200 allowed, 402 insufficient, 429 rate-limited.
@@ -31,6 +32,7 @@ Event-driven microservice platform for automated essay processing and assessment
 - Identity: Org-first selection; per-metric rate limits (user-scoped) prior to balance checks; correlation ID from `X-Correlation-ID` threaded end-to-end.
 
 See also:
+
 - `TASKS/ENTITLEMENT_SERVICE_IMPLEMENTATION_PLAN.md` (final reference + historical appendix)
 - `.cursor/rules/020.17-entitlements-service-architecture.mdc`
 - `libs/common_core/src/common_core/entitlements_models.py`

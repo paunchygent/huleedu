@@ -185,9 +185,10 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 
 ```bash
 # Development (hot-reload enabled)
-pdm run dev-start [service]          # Start with hot-reload
+pdm run dev-start [service]          # Start with hot-reload (no rebuild, fast)
+pdm run dev-build-start [service]    # Build with cache + start with hot-reload
 pdm run dev-logs [service]           # View logs
-pdm run dev-build-clean [service]    # Rebuild from scratch
+pdm run dev-build-clean [service]    # Rebuild from scratch (no cache)
 
 # Production (optimized)
 pdm run prod-deploy [service]        # Build + start + verify
@@ -251,5 +252,8 @@ pdm run prod-migrate               # Run production migrations
 - Document all environment variables
 - Include examples in documentation
 
-- For development services: only rebuild after changes to libs/ 
-- For internal code changes to development services: use pdm run restart [service]
+- For development services:
+  - Use `pdm run dev-start` for quick starts (no rebuild)
+  - Use `pdm run dev-build-start` after changes to libs/ (rebuild with cache)
+  - Use `pdm run dev-build-clean` for full rebuild when needed (no cache)
+- For internal code changes to development services: use `pdm run dev-restart [service]`

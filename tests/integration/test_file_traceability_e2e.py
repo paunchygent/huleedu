@@ -18,18 +18,25 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import EventEnvelope
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.utils.kafka_test_manager import KafkaTestManager, kafka_event_monitor
 from tests.utils.service_test_manager import ServiceTestManager
 
 logger = create_service_logger("test.file_traceability_e2e")
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    """Create a StorageReferenceMetadata containing the prompt reference."""
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 @pytest.mark.integration
@@ -93,7 +100,7 @@ class TestFileTraceabilityE2E:
             batch_event = BatchEssaysRegistered(
                 entity_id=batch_id,
                 course_code=CourseCode.ENG5,
-                essay_instructions="Test traceability essay",
+                student_prompt_ref=make_prompt_ref("prompt-traceability-single"),
                 essay_ids=essay_ids,
                 expected_essay_count=len(essay_ids),
                 user_id=user_id,
@@ -223,7 +230,7 @@ class TestFileTraceabilityE2E:
             batch_event = BatchEssaysRegistered(
                 entity_id=batch_id,
                 course_code=CourseCode.ENG5,
-                essay_instructions="Multi-file test",
+                student_prompt_ref=make_prompt_ref("prompt-traceability-multi"),
                 essay_ids=essay_ids,
                 expected_essay_count=len(essay_ids),
                 user_id=user_id,

@@ -299,6 +299,7 @@ class TestIdentityThreadingInBatchCreation:
         }
         mock_batch = Mock(spec=CJBatchUpload)
         mock_batch.id = 99999
+        mock_batch.processing_metadata = {}
         mock_database.create_new_cj_batch.return_value = mock_batch
         mock_session = mock_database.session.return_value.__aenter__.return_value
 
@@ -316,7 +317,7 @@ class TestIdentityThreadingInBatchCreation:
         assert call_args.kwargs["user_id"] == "user-with-assignment"
         assert call_args.kwargs["org_id"] == "org-with-assignment"
         assert mock_batch.assignment_id == "test-assignment-789"
-        mock_session.flush.assert_called_once()
+        assert mock_session.flush.call_count == 2
 
     @pytest.mark.asyncio
     async def test_complete_identity_threading_workflow(

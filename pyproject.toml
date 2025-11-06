@@ -15,9 +15,6 @@ dependencies = [
     "pypandoc",
     "aiohttp",
     "crossfiledialog",
-    "httpx",
-    "pytest",
-    "pytest-asyncio",
     "pytest-timeout",
     "pydantic",
     "pydantic-settings",
@@ -272,7 +269,7 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
-
+# Note: Update testpaths when adding new services or libs
 testpaths = [
     "tests",
     "libs/common_core/tests",
@@ -341,15 +338,16 @@ filterwarnings = [
 distribution = false
 
 [tool.pdm.scripts]
-# Monorepo: verify outbox indexes across curated services (disposable Postgres per service)
-db-verify-outbox-all = "python scripts/verify_outbox_all_services.py"
-# Monorepo-wide scripts
+# Database Verification (Monorepo-wide)
+db-verify-outbox-all = "python scripts/verify_outbox_all_services.py"  # Verify outbox indexes across all services
+
+# Code Quality & Testing (Monorepo-wide)
 format-all = "ruff format --force-exclude ."
 check-imports = "python scripts/check_import_patterns.py"
 lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
 lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml --follow-imports=silent services tests"
-typecheck-libs = {composite = ["cd libs && mypy -p common_core --show-error-codes", "cd libs && mypy -p huleedu_service_libs --show-error-codes"]}
+typecheck-libs = {shell = "cd libs && mypy -p common_core -p huleedu_service_libs --show-error-codes"}
 typecheck-common-core = {shell = "cd libs && mypy -p common_core --show-error-codes"}
 typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --show-error-codes"}
 test-all = "pytest"
@@ -364,7 +362,8 @@ pytest-root = "scripts/pytest-root.sh"
 dev = "scripts/dev.sh"  # Main dev script - type 'pdm run dev help' for all commands
 dev-build = {shell = "scripts/dev.sh build $@"}  # Build for development with cache
 dev-build-clean = {shell = "scripts/dev.sh build-clean $@"}  # Clean build for development
-dev-start = {shell = "scripts/dev.sh start $@"}  # Start development environment (builds + runs)
+dev-start = {shell = "scripts/dev.sh start-nobuild $@"}  # Start development environment (no rebuild, fast)
+dev-build-start = {shell = "scripts/dev.sh start $@"}  # Build with cache then start development environment
 dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers
 dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers
 dev-logs = {shell = "scripts/dev.sh logs $@"}  # Follow development logs
@@ -380,14 +379,6 @@ prod-restart = {shell = "scripts/prod.sh restart $@"}  # Restart production cont
 prod-logs = {shell = "scripts/prod.sh logs $@"}  # Follow production logs
 prod-health = "scripts/prod.sh health"  # Check production service health
 prod-deploy = {shell = "scripts/prod.sh deploy $@"}  # Full production deployment
-
-# Legacy shortcuts (kept for backwards compatibility)
-up = {shell = "scripts/dev.sh start $@"}  # Start dev environment (alias for dev-start)
-down = {shell = "scripts/dev.sh stop $@"}  # Stop dev environment (alias for dev-stop)
-logs = {shell = "scripts/dev.sh logs $@"}  # Follow dev logs (alias for dev-logs)
-restart = {shell = "scripts/dev.sh restart $@"}  # Restart dev (alias for dev-restart)
-restart-all = "scripts/dev.sh restart"  # Restart all dev containers
-
 # Database Management
 db-reset = "scripts/reset-dev-databases.sh"  # Reset development databases
 db-seed = "scripts/seed-dev-data.sh"  # Seed development data

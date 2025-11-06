@@ -10,6 +10,7 @@ Uses testcontainers for real infrastructure testing as per Rule 070.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
 from unittest.mock import AsyncMock
@@ -54,6 +55,9 @@ from services.essay_lifecycle_service.tests.distributed.test_sync_utils import (
     wait_for_condition,
 )
 from services.essay_lifecycle_service.tests.distributed.test_utils import PerformanceMetrics
+
+
+RUN_PERFORMANCE_TESTS = os.environ.get("HULEEDU_RUN_PERFORMANCE_TESTS") == "1"
 
 
 def make_prompt_ref(label: str) -> StorageReferenceMetadata:
@@ -352,6 +356,11 @@ class TestConcurrentSlotAssignment:
             f"Batch state may be corrupted."
         )
 
+    @pytest.mark.performance
+    @pytest.mark.skipif(
+        not RUN_PERFORMANCE_TESTS,
+        reason="Requires high-throughput runtime; set HULEEDU_RUN_PERFORMANCE_TESTS=1 to enable.",
+    )
     async def test_cross_instance_slot_assignment(
         self,
         distributed_coordinator_instances: list[
@@ -551,6 +560,10 @@ class TestConcurrentSlotAssignment:
         # proves the distributed system works correctly
 
     @pytest.mark.performance
+    @pytest.mark.skipif(
+        not RUN_PERFORMANCE_TESTS,
+        reason="Requires high-throughput runtime; set HULEEDU_RUN_PERFORMANCE_TESTS=1 to enable.",
+    )
     async def test_high_concurrency_slot_assignment_performance(
         self,
         distributed_coordinator_instances: list[

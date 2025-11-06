@@ -75,6 +75,9 @@ class TestAnchorAPIErrorHandling:
                 ),
             }
 
+            # Ensure assignment context exists so workflow reaches content storage call
+            mock_repository.register_assignment_context("content-failure-test")
+
             # Act
             response = await client.post("/api/v1/anchors/register", json=request_data)
 
@@ -116,6 +119,9 @@ class TestAnchorAPIErrorHandling:
                 ),
             }
 
+            # Register assignment context to reach storage-id handling logic
+            mock_repository.register_assignment_context("missing-storage-id-test")
+
             # Act
             response = await client.post("/api/v1/anchors/register", json=request_data)
 
@@ -154,6 +160,9 @@ class TestAnchorAPIErrorHandling:
                     "to ensure proper error handling coverage."
                 ),
             }
+
+            # Register assignment context to trigger database failure path
+            failing_repository.register_assignment_context("database-failure-test")
 
             # Act
             response = await client.post("/api/v1/anchors/register", json=request_data)

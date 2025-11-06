@@ -80,6 +80,24 @@ start_dev() {
     echo_info "Code changes will auto-reload"
 }
 
+# Start development environment without rebuilding (fast start)
+start_dev_nobuild() {
+    local services="$1"
+    echo_dev "Starting DEVELOPMENT environment (no rebuild): ${services:-all services}"
+    echo_info "Hot-reload enabled via volume mounts"
+    echo_info "Debug logging enabled"
+    echo_warning "Skipping build - using existing images"
+
+    # Start without building
+    echo_info "Starting containers..."
+    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build $services
+
+    echo_dev "Development environment running!"
+    echo_info "View logs: pdm run dev-logs ${services}"
+    echo_info "Code changes will auto-reload"
+    echo_info "If images are missing, use: pdm run dev-build-start"
+}
+
 # Stop development containers
 stop_dev() {
     local services="$1"
@@ -165,7 +183,8 @@ show_help() {
     echo "Commands:"
     echo "  build [services]         Build with cache (uses Dockerfile.dev)"
     echo "  build-clean [services]   Build without cache"
-    echo "  start [services]         Build if needed + start with hot-reload"
+    echo "  start [services]         Build with cache + start with hot-reload"
+    echo "  start-nobuild [services] Start with hot-reload (no rebuild, fast)"
     echo "  stop [services]          Stop containers"
     echo "  restart [services]       Restart containers"
     echo "  remove [services]        Remove containers (keeps images)"
@@ -180,9 +199,10 @@ show_help() {
     echo "  $0 build-clean                    # Rebuild everything from scratch"
     echo ""
     echo "PDM Shortcuts:"
-    echo "  pdm run dev-build [services]      # Same as: $0 build [services]"
-    echo "  pdm run dev-start [services]      # Same as: $0 start [services]"
-    echo "  pdm run dev-logs [services]       # Same as: $0 logs [services]"
+    echo "  pdm run dev-build [services]       # Same as: $0 build [services]"
+    echo "  pdm run dev-start [services]       # Same as: $0 start-nobuild [services] (fast)"
+    echo "  pdm run dev-build-start [services] # Same as: $0 start [services] (with rebuild)"
+    echo "  pdm run dev-logs [services]        # Same as: $0 logs [services]"
 }
 
 # Main command routing
@@ -195,6 +215,9 @@ case "$1" in
         ;;
     "start")
         start_dev "$2"
+        ;;
+    "start-nobuild")
+        start_dev_nobuild "$2"
         ;;
     "stop")
         stop_dev "$2"

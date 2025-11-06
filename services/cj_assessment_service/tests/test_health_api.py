@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
+from prometheus_client import CONTENT_TYPE_LATEST
 from quart.typing import TestClientProtocol as QuartTestClient
 
 from services.cj_assessment_service.app import create_app
@@ -50,7 +51,7 @@ class TestHealthAPI:
 
         # Check content type is Prometheus format
         content_type = response.headers.get("Content-Type")
-        assert content_type == "text/plain; version=0.0.4; charset=utf-8"
+        assert content_type == CONTENT_TYPE_LATEST
 
         # Check response is valid (empty metrics registry is acceptable for tests)
         content = await response.get_data(as_text=True)
