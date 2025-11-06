@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.pipeline_models import (
     PhaseName,
     PipelineExecutionStatus,
@@ -19,6 +19,7 @@ from common_core.pipeline_models import (
 )
 from common_core.status_enums import BatchStatus
 
+from common_core.metadata_models import StorageReferenceMetadata
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_pipeline_state_manager import (
     BatchPipelineStateManager,
@@ -32,6 +33,12 @@ from services.batch_orchestrator_service.implementations.notification_service im
 from services.batch_orchestrator_service.implementations.pipeline_phase_coordinator_impl import (
     DefaultPipelinePhaseCoordinator,
 )
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 class TestPipelineRealWorldScenarios:
@@ -121,7 +128,7 @@ class TestPipelineRealWorldScenarios:
         batch_context = BatchRegistrationRequestV1(
             expected_essay_count=25,
             course_code=CourseCode.ENG5,
-            essay_instructions="Write about the given topic",
+            student_prompt_ref=make_prompt_ref("prompt-bos-rca"),
             user_id="user_123",
             enable_cj_assessment=True,
         )

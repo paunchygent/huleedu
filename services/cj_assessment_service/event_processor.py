@@ -274,11 +274,6 @@ async def _process_cj_assessment_impl(
             "essays_to_process": essays_to_process,
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
-            "essay_instructions": (
-                prompt_text
-                if prompt_text is not None
-                else getattr(request_event_data, "essay_instructions", "")
-            ),
             "student_prompt_text": prompt_text,
             "student_prompt_storage_id": prompt_storage_id,
             "llm_config_overrides": request_event_data.llm_config_overrides,

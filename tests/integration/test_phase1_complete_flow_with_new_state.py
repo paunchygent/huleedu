@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import (
     BatchContentProvisioningCompletedV1,
@@ -31,6 +31,7 @@ from common_core.events.validation_events import (
 )
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus, ProcessingPipelineState
@@ -56,6 +57,13 @@ from services.batch_orchestrator_service.protocols import (
     PipelinePhaseInitiatorProtocol,
 )
 
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
+
+
 # Type aliases for cleaner function signatures
 ContentProvisioningHandler = batch_provisioning_handler.BatchContentProvisioningCompletedHandler
 StudentAssocHandler = student_assoc_handler.StudentAssociationsConfirmedHandler
@@ -77,7 +85,7 @@ class MockBatchContext:
             batch_name=f"Test Batch {batch_id[:8]}",
             class_id=class_id,
             course_code=course_code,
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=make_prompt_ref("prompt-phase1-mock"),
             expected_essay_count=3,
             requested_pipeline=PhaseName.SPELLCHECK,
             user_id=user_id,
@@ -448,7 +456,7 @@ class TestPhase1CompleteFlowWithNewState:
             metadata=metadata,
             course_code=course_code,
             course_language="English",
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=make_prompt_ref("prompt-phase1-ready"),
             class_type="REGULAR",
         )
 
@@ -667,7 +675,7 @@ class TestPhase1CompleteFlowWithNewState:
             metadata=metadata,
             course_code=CourseCode.ENG5,
             course_language="English",
-            essay_instructions="Test",
+            student_prompt_ref=make_prompt_ref("prompt-phase1-invalid"),
             class_type="REGULAR",
         )
 

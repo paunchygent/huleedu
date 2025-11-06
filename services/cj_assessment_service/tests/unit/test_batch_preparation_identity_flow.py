@@ -30,6 +30,8 @@ class TestIdentityThreadingInBatchCreation:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_batch = Mock(spec=CJBatchUpload)
         mock_batch.id = 12345
+        mock_batch.processing_metadata = {}
+        mock_batch.assignment_id = None
 
         # Mock session context manager
         mock_db.session.return_value.__aenter__.return_value = mock_session
@@ -47,7 +49,8 @@ class TestIdentityThreadingInBatchCreation:
             "bos_batch_id": "test-batch-123",
             "language": "en",
             "course_code": "ENG5",
-            "essay_instructions": "Compare essay quality",
+            "student_prompt_text": "Compare essay quality",
+            "student_prompt_storage_id": "prompt-storage-base",
             "essays_to_process": [
                 {"els_essay_id": "essay1", "text_storage_id": "storage1"},
                 {"els_essay_id": "essay2", "text_storage_id": "storage2"},
@@ -139,9 +142,17 @@ class TestIdentityThreadingInBatchCreation:
         assert call_args.kwargs["event_correlation_id"] == str(correlation_id)
         assert call_args.kwargs["language"] == "en"
         assert call_args.kwargs["course_code"] == "ENG5"
-        assert call_args.kwargs["essay_instructions"] == "Compare essay quality"
         assert call_args.kwargs["initial_status"] == CJBatchStatusEnum.PENDING
         assert call_args.kwargs["expected_essay_count"] == 2
+        assert mock_database.create_new_cj_batch.return_value.processing_metadata[
+            "student_prompt_storage_id"
+        ] == "prompt-storage-base"
+        assert (
+            mock_database.create_new_cj_batch.return_value.processing_metadata[
+                "student_prompt_text"
+            ]
+            == "Compare essay quality"
+        )
 
     @pytest.mark.asyncio
     async def test_missing_user_id_validation(
@@ -179,7 +190,7 @@ class TestIdentityThreadingInBatchCreation:
         request_data = {
             "language": "en",
             "course_code": "ENG5",
-            "essay_instructions": "Compare essays",
+            "student_prompt_text": "Compare essays",
             "essays_to_process": [{"els_essay_id": "essay1", "text_storage_id": "storage1"}],
             "user_id": "user-123",
             "org_id": "org-456",
@@ -357,6 +368,8 @@ class TestIdentityFieldDefaultBehavior:
         mock_session = AsyncMock(spec=AsyncSession)
         mock_batch = Mock(spec=CJBatchUpload)
         mock_batch.id = 54321
+        mock_batch.processing_metadata = {}
+        mock_batch.assignment_id = None
 
         mock_db.session.return_value.__aenter__.return_value = mock_session
         mock_db.session.return_value.__aexit__.return_value = None
@@ -375,7 +388,7 @@ class TestIdentityFieldDefaultBehavior:
             "bos_batch_id": "no-identity-batch",
             "language": "sv",
             "course_code": "SV1",
-            "essay_instructions": "Jämför uppsatserna",
+            "student_prompt_text": "Jämför uppsatserna",
             "essays_to_process": [{"els_essay_id": "essay1", "text_storage_id": "storage1"}],
             "assignment_id": "no-identity-assignment",
         }
@@ -418,7 +431,7 @@ class TestIdentityFieldDefaultBehavior:
             "bos_batch_id": "partial-identity-batch",
             "language": "en",
             "course_code": "ENG3",
-            "essay_instructions": "Compare these essays",
+            "student_prompt_text": "Compare these essays",
             "essays_to_process": [{"els_essay_id": "essay1", "text_storage_id": "storage1"}],
             "user_id": user_id,
             "org_id": org_id,

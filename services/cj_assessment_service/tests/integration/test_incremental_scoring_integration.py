@@ -79,10 +79,10 @@ class TestIncrementalScoring:
             event_correlation_id=str(uuid4()),
             language="en",
             course_code="ENG5",
-            essay_instructions="Test instructions",
             initial_status=CJBatchStatusEnum.PENDING,
             expected_essay_count=essay_count,
         )
+        cj_batch.processing_metadata = {"student_prompt_text": "Test instructions"}
 
         # Create essays
         essays: list[EssayForComparison] = []

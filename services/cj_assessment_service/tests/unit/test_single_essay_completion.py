@@ -116,13 +116,13 @@ async def test_finalize_single_essay_publishes_and_updates(monkeypatch: Any) -> 
     batch.event_correlation_id = str(correlation_id)
     batch.language = "sv"
     batch.course_code = "SV2"
-    batch.essay_instructions = "Assess writing"
     batch.expected_essay_count = 1
     batch.status = CJBatchStatusEnum.PENDING
     batch.created_at = datetime.now(UTC)
     batch.user_id = "test-user"
     batch.org_id = "test-org"
     batch.assignment_id = None
+    batch.processing_metadata = {"student_prompt_text": "Assess writing"}
 
     essay = ProcessedEssay()
     essay.els_essay_id = "student_1"

@@ -100,8 +100,8 @@ class TestBatchMonitorRecoveryStrategy:
             event_correlation_id=str(uuid4()),
             language="en",
             course_code="ENG5",
-            essay_instructions="Test instructions",
             expected_essay_count=10,
+            processing_metadata={"student_prompt_text": "Test instructions"},
         )
 
     def create_stuck_batch_state(

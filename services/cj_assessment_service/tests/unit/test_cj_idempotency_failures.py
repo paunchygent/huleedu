@@ -73,7 +73,14 @@ def sample_cj_request_event() -> dict:
             ],
             "language": "en",
             "course_code": CourseCode.ENG5.value,
-            "essay_instructions": "Compare and rank the essays.",
+            "student_prompt_ref": {
+                "references": {
+                    "student_prompt_text": {
+                        "storage_id": "prompt-storage-idempotency",
+                        "path": "",
+                    }
+                }
+            },
             "llm_config_overrides": None,
             # Identity fields for credit attribution (Phase 3)
             "user_id": "idempotency-test-user",

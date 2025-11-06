@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.batch_coordination_events import (
@@ -23,6 +23,7 @@ from common_core.events.batch_coordination_events import (
 )
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.models.error_models import ErrorDetail
@@ -79,6 +80,12 @@ def batch_lifecycle_publisher(
 class TestDualEventPublishing:
     """Test dual-event publishing pattern for clean separation of concerns."""
 
+    @staticmethod
+    def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+        return prompt_ref
+
     async def test_publish_batch_essays_ready_success_only(
         self,
         batch_lifecycle_publisher: BatchLifecyclePublisher,
@@ -112,7 +119,7 @@ class TestDualEventPublishing:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Write an essay",
+            student_prompt_ref=self.make_prompt_ref("prompt-dual-publish"),
             class_type="REGULAR",
         )
 
@@ -237,7 +244,7 @@ class TestDualEventPublishing:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Write an essay",
+            student_prompt_ref=self.make_prompt_ref("prompt-dual-separation"),
             class_type="GUEST",
         )
 

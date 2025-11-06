@@ -19,7 +19,7 @@ import pytest
 from common_core.domain_enums import ContentType, CourseCode
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
@@ -54,6 +54,12 @@ from services.essay_lifecycle_service.tests.distributed.test_sync_utils import (
     wait_for_condition,
 )
 from services.essay_lifecycle_service.tests.distributed.test_utils import PerformanceMetrics
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 @pytest.mark.docker
@@ -231,7 +237,7 @@ class TestConcurrentSlotAssignment:
             expected_essay_count=len(essay_ids),
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
-            essay_instructions="Race condition test",
+            student_prompt_ref=make_prompt_ref("prompt-race-condition"),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
                 entity_id=batch_id,
@@ -365,7 +371,7 @@ class TestConcurrentSlotAssignment:
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
-            essay_instructions="Cross-instance coordination test",
+            student_prompt_ref=make_prompt_ref("prompt-cross-instance"),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
                 entity_id=batch_id,
@@ -485,7 +491,7 @@ class TestConcurrentSlotAssignment:
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
-            essay_instructions="Completion test",
+            student_prompt_ref=make_prompt_ref("prompt-completion"),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
                 entity_id=batch_id,
@@ -564,7 +570,7 @@ class TestConcurrentSlotAssignment:
             expected_essay_count=essay_count,
             essay_ids=essay_ids,
             course_code=CourseCode.ENG5,
-            essay_instructions="Performance test",
+            student_prompt_ref=make_prompt_ref("prompt-performance"),
             user_id="test_user",
             metadata=SystemProcessingMetadata(
                 entity_id=batch_id,

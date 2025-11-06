@@ -17,8 +17,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.metadata_models import StorageReferenceMetadata
 
 from services.essay_lifecycle_service.batch_command_handlers import process_single_message
 from services.essay_lifecycle_service.protocols import (
@@ -80,6 +81,13 @@ class MockRedisClient:
         return True
 
 
+def prompt_ref_json(storage_id: str) -> dict[str, Any]:
+    """Create serialized StorageReferenceMetadata for prompts."""
+    metadata = StorageReferenceMetadata()
+    metadata.add_reference(ContentType.STUDENT_PROMPT_TEXT, storage_id)
+    return metadata.model_dump(mode="json")
+
+
 def create_mock_kafka_message(event_data: dict) -> ConsumerRecord:
     """Create a mock Kafka ConsumerRecord for testing."""
     return ConsumerRecord(
@@ -112,7 +120,7 @@ def sample_batch_registered_event() -> dict:
             "expected_essay_count": 3,
             "essay_ids": ["essay-1", "essay-2", "essay-3"],
             "course_code": CourseCode.ENG5.value,
-            "essay_instructions": "Write a test essay for idempotency testing.",
+            "student_prompt_ref": prompt_ref_json("prompt-idempotency-fixture"),
             "user_id": "test_user_idempotency",
             "metadata": {
                 "entity_id": "test-batch-001",
@@ -430,7 +438,7 @@ async def test_deterministic_event_id_generation(
             "expected_essay_count": 2,
             "essay_ids": ["essay-1", "essay-2"],
             "course_code": CourseCode.ENG5.value,
-            "essay_instructions": "Test essay for deterministic ID generation.",
+            "student_prompt_ref": prompt_ref_json("prompt-deterministic"),
             "user_id": "test_user_deterministic",
             "metadata": {
                 "entity_id": "same-batch-123",

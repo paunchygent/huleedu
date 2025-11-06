@@ -16,11 +16,12 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka.errors import KafkaError
-from common_core.domain_enums import CourseCode, Language
+from common_core.domain_enums import ContentType, CourseCode, Language
 from common_core.events.batch_coordination_events import BatchEssaysReady, BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.status_enums import EssayStatus
@@ -168,6 +169,12 @@ def business_context() -> BusinessWorkflowContext:
 class TestBatchCoordinationBusinessImpact:
     """Test business impact of batch coordination publishing failures."""
 
+    @staticmethod
+    def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+        return prompt_ref
+
     @pytest.mark.asyncio
     async def test_batch_readiness_publishing_failure_prevents_phase_initiation(
         self,
@@ -238,6 +245,7 @@ class TestBatchCoordinationBusinessImpact:
             session_factory=mock_session_factory,
         )
 
+        prompt_ref = self.make_prompt_ref("prompt-batch-ready-failure")
         batch_registered_event = BatchEssaysRegistered(
             entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(business_context.essay_count)],
@@ -248,7 +256,7 @@ class TestBatchCoordinationBusinessImpact:
                 entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=prompt_ref,
         )
 
         # Create a BatchEssaysReady event that will be returned by check_batch_completion
@@ -388,6 +396,7 @@ class TestBatchCoordinationBusinessImpact:
         ]
 
         # Create a proper BatchEssaysReady event that will be returned when batch is complete
+        prompt_ref = self.make_prompt_ref("prompt-slot-fulfillment")
         batch_ready_event = BatchEssaysReady(
             batch_id=business_context.batch_id,
             ready_essays=ready_essays,
@@ -397,7 +406,7 @@ class TestBatchCoordinationBusinessImpact:
             ),
             course_code=CourseCode.ENG5,
             course_language="English",
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=prompt_ref,
             class_type="GUEST",
             user_id="test_user_123",
         )
@@ -947,6 +956,7 @@ class TestBusinessImpactIntegrationScenarios:
         correlation_id = uuid4()
 
         # Step 1: Batch registration (should succeed - index 0, False)
+        prompt_ref = self.make_prompt_ref("prompt-integration")
         batch_event = BatchEssaysRegistered(
             entity_id=business_context.batch_id,
             essay_ids=[f"essay_{i}" for i in range(3)],  # Small batch for testing
@@ -957,7 +967,7 @@ class TestBusinessImpactIntegrationScenarios:
                 entity_type="batch",
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Integration test essay instructions",
+            student_prompt_ref=prompt_ref,
         )
 
         # Ensure check_batch_completion returns None during registration (batch not complete)

@@ -16,7 +16,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import (
     CJAssessmentCompletedV1,
@@ -25,6 +25,7 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.status_enums import BatchStatus, ProcessingStage
@@ -72,6 +73,15 @@ class TestRealDatabaseIntegration:
             event=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED.value,
         )
 
+        student_prompt_ref = StorageReferenceMetadata(
+            references={
+                ContentType.STUDENT_PROMPT_TEXT: {
+                    "storage_id": "prompt-storage-real-db",
+                    "path": "",
+                }
+            }
+        )
+
         request_data = ELS_CJAssessmentRequestV1(
             event_name=ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED,
             entity_id=batch_id,
@@ -81,11 +91,11 @@ class TestRealDatabaseIntegration:
             essays_for_cj=essays,
             language="en",
             course_code=CourseCode.ENG5,
-            essay_instructions="Compare the quality of these essays.",
             llm_config_overrides=None,
             # Identity fields for credit attribution (Phase 3)
             user_id="db-integration-test-user",
             org_id=None,  # Test scenario without org
+            student_prompt_ref=student_prompt_ref,
         )
 
         return EventEnvelope[ELS_CJAssessmentRequestV1](
@@ -224,10 +234,10 @@ class TestRealDatabaseIntegration:
                 event_correlation_id=str(uuid4()),
                 language="en",
                 course_code="ENG5",
-                essay_instructions="Test isolation",
                 initial_status=CJBatchStatusEnum.PENDING,
                 expected_essay_count=3,
             )
+            batch.processing_metadata = {"student_prompt_text": "Test isolation"}
 
             # Verify batch was created
             assert await db_verification_helpers.verify_batch_exists(session, batch.id)
@@ -261,10 +271,10 @@ class TestRealDatabaseIntegration:
                 event_correlation_id=str(uuid4()),
                 language="en",
                 course_code="ENG5",
-                essay_instructions="PostgreSQL test",
                 initial_status=CJBatchStatusEnum.PENDING,
                 expected_essay_count=5,
             )
+            batch.processing_metadata = {"student_prompt_text": "PostgreSQL test"}
 
             # Create essays
             essays = []

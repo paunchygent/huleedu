@@ -241,7 +241,6 @@ class MockDatabase(CJRepositoryProtocol):
         event_correlation_id: str,  # Keep as str to match protocol
         language: str,
         course_code: str,
-        essay_instructions: str | None,
         initial_status: Any,
         expected_essay_count: int,
         # Identity fields for credit attribution (Phase 3)
@@ -258,7 +257,6 @@ class MockDatabase(CJRepositoryProtocol):
             "event_correlation_id": event_correlation_id,
             "language": language,
             "course_code": course_code,
-            "essay_instructions": essay_instructions,
             "initial_status": initial_status,
             "expected_essay_count": expected_essay_count,
             # Identity fields for credit attribution (Phase 3)

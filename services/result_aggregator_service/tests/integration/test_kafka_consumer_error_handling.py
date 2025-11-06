@@ -8,18 +8,24 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
     EventEnvelope,
 )
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 
 from .conftest import create_kafka_record
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 class TestKafkaConsumerErrorHandling:
@@ -146,7 +152,7 @@ class TestKafkaConsumerErrorHandling:
                 parent_id=None,
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=make_prompt_ref("prompt-kafka-error-valid"),
         )
 
         valid_envelope1: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(

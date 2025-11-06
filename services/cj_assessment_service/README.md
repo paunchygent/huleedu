@@ -143,7 +143,7 @@ class LLMConfigOverrides(BaseModel):
 - **`ELS_CJAssessmentRequestV1`**: Incoming requests from Essay Lifecycle Service containing:
   - BOS batch reference (`entity_ref`)
   - List of essays for CJ assessment (`essays_for_cj`)
-  - Assessment metadata (language, `course_code`, optional `essay_instructions` for legacy backfill scenarios)
+  - Assessment metadata (language, `course_code`, and prompt metadata from Content Service references)
   - Optional `student_prompt_ref` (Content Service reference hydrated locally before comparisons)
   - Optional `llm_config_overrides` for runtime LLM parameter customization
 
@@ -212,7 +212,7 @@ LOG_LEVEL=INFO
   - `bos_batch_id` (str): Reference to originating BOS batch
   - `status` (enum): Current processing state
   - `expected_essay_count` (int): Number of essays to process
-  - `essay_instructions` (text, nullable): Retained for backward compatibility; prefer hydrated prompt metadata
+  - `processing_metadata`: Includes `student_prompt_storage_id` and optional `student_prompt_text` populated after hydration
   - `processing_metadata`: Includes `student_prompt_storage_id` and a boolean `student_prompt_text_present` to signal successful prompt retrieval
 
 #### `cj_processed_essays`

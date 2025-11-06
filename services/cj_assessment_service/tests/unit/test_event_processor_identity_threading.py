@@ -182,7 +182,6 @@ class TestEventProcessorIdentityThreading:
             converted_request_data["student_prompt_storage_id"]
             == "prompt-storage-with-overrides"
         )
-        assert converted_request_data["essay_instructions"] == PROMPT_TEXT
 
         mock_content_client.fetch_content.assert_any_await(
             "prompt-storage-with-overrides", envelope.correlation_id
@@ -244,7 +243,6 @@ class TestEventProcessorIdentityThreading:
             "essays_to_process",
             "language",
             "course_code",
-            "essay_instructions",
             "student_prompt_text",
             "student_prompt_storage_id",
             "llm_config_overrides",
@@ -265,7 +263,6 @@ class TestEventProcessorIdentityThreading:
         assert len(converted_request_data["essays_to_process"]) > 0
         assert converted_request_data["language"] == event_data.language
         assert converted_request_data["course_code"] == event_data.course_code
-        assert converted_request_data["essay_instructions"] == PROMPT_TEXT
         assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
         assert (
             converted_request_data["student_prompt_storage_id"]
@@ -412,10 +409,6 @@ class TestEventProcessorIdentityThreading:
         assert (
             converted_request_data["student_prompt_storage_id"]
             == "prompt-storage-with-overrides"
-        )
-        assert (
-            converted_request_data["essay_instructions"]
-            == DEFAULT_INSTRUCTIONS
         )
 
     @pytest.mark.asyncio

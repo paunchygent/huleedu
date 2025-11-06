@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
@@ -22,6 +22,7 @@ from common_core.events.spellcheck_models import (
 )
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.models.error_models import ErrorDetail
@@ -146,6 +147,12 @@ async def mock_cache_manager(test_provider: MockDIProvider) -> AsyncMock:
 class TestProcessBatchRegistered:
     """Tests for process_batch_registered method."""
 
+    @staticmethod
+    def _make_prompt_ref(label: str) -> StorageReferenceMetadata:
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+        return prompt_ref
+
     @pytest.mark.asyncio
     async def test_successful_batch_registration(
         self,
@@ -174,7 +181,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=essay_count,
             metadata=metadata,
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=self._make_prompt_ref("prompt-registered"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
@@ -222,7 +229,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=essay_count,
             metadata=metadata,
             course_code=CourseCode.ENG6,
-            essay_instructions="Write an essay",
+            student_prompt_ref=self._make_prompt_ref("prompt-registered-no-pipeline"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
@@ -272,7 +279,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=2,
             metadata=metadata,
             course_code=CourseCode.SV1,
-            essay_instructions="Write an essay",
+            student_prompt_ref=self._make_prompt_ref("prompt-registered-error"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(

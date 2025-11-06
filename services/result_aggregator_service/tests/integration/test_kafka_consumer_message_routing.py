@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
@@ -19,6 +19,7 @@ from common_core.events.cj_assessment_events import GradeProjectionSummary
 from common_core.events.spellcheck_models import SpellcheckMetricsV1, SpellcheckResultV1
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 from common_core.pipeline_models import PhaseName
@@ -27,6 +28,12 @@ from common_core.status_enums import BatchStatus, EssayStatus
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 
 from .conftest import create_kafka_record
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 def create_test_grade_projections(essay_ids: list[str] | None = None) -> GradeProjectionSummary:
@@ -69,7 +76,7 @@ class TestKafkaConsumerRouting:
                 entity_id=entity_id, entity_type=entity_type, parent_id=parent_id
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=make_prompt_ref("prompt-routing"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(

@@ -24,7 +24,7 @@ from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -55,6 +55,12 @@ from services.essay_lifecycle_service.models_db import Base
 from services.essay_lifecycle_service.protocols import SlotOperationsProtocol
 
 logger = create_service_logger("test.content_provisioned_flow")
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 @pytest.mark.integration
@@ -203,7 +209,7 @@ class TestContentProvisionedFlow:
         batch_event = BatchEssaysRegistered(
             entity_id=batch_id,
             course_code=CourseCode.ENG5,
-            essay_instructions="Test atomic assignment",
+            student_prompt_ref=make_prompt_ref("prompt-atomic-assignment"),
             essay_ids=essay_ids,
             expected_essay_count=len(essay_ids),
             user_id="test_user",
@@ -283,7 +289,7 @@ class TestContentProvisionedFlow:
         batch_event = BatchEssaysRegistered(
             entity_id=batch_id,
             course_code=CourseCode.ENG5,
-            essay_instructions="Concurrent test",
+            student_prompt_ref=make_prompt_ref("prompt-concurrent"),
             essay_ids=essay_ids,
             expected_essay_count=len(essay_ids),
             user_id="test_user",
@@ -390,7 +396,7 @@ class TestContentProvisionedFlow:
         batch_event = BatchEssaysRegistered(
             entity_id=batch_id,
             course_code=CourseCode.ENG5,
-            essay_instructions="Idempotency test",
+            student_prompt_ref=make_prompt_ref("prompt-idempotency"),
             essay_ids=essay_ids,
             expected_essay_count=len(essay_ids),
             user_id="test_user",
@@ -460,7 +466,7 @@ class TestContentProvisionedFlow:
         batch_event = BatchEssaysRegistered(
             entity_id=batch_id,
             course_code=CourseCode.ENG5,
-            essay_instructions="Publishing failure test",
+            student_prompt_ref=make_prompt_ref("prompt-publishing-failure"),
             essay_ids=essay_ids,
             expected_essay_count=len(essay_ids),
             user_id="test_user",

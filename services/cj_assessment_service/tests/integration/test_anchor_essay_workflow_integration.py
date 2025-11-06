@@ -105,10 +105,10 @@ class TestAnchorEssayWorkflow:
             event_correlation_id=str(uuid4()),
             language="en",
             course_code="ENG5",
-            essay_instructions="Write an argumentative essay",
             initial_status=CJBatchStatusEnum.PENDING,
             expected_essay_count=student_count + len(anchor_grades),
         )
+        cj_batch.processing_metadata = {"student_prompt_text": "Write an argumentative essay"}
 
         # Update batch with assignment_id
         cj_batch.assignment_id = assignment_id

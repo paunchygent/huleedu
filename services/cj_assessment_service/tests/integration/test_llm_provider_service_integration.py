@@ -13,7 +13,7 @@ import aiohttp
 import pytest
 from aiokafka import AIOKafkaProducer
 from common_core.config_enums import LLMProviderType
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import (
     ELS_CJAssessmentRequestV1,
@@ -22,6 +22,7 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
     SystemProcessingMetadata,
 )
 
@@ -125,6 +126,15 @@ class TestLLMProviderServiceIntegration:
         if not kafka_available:
             pytest.skip("Kafka not available for integration test")
 
+        student_prompt_ref = StorageReferenceMetadata(
+            references={
+                ContentType.STUDENT_PROMPT_TEXT: {
+                    "storage_id": "prompt-storage-llm",
+                    "path": "",
+                }
+            }
+        )
+
         # Create test event
         event_data = ELS_CJAssessmentRequestV1(
             entity_id="test-batch-123",
@@ -147,7 +157,6 @@ class TestLLMProviderServiceIntegration:
             ],
             language="en",
             course_code=CourseCode.ENG5,
-            essay_instructions="Write a clear argumentative essay",
             llm_config_overrides=LLMConfigOverrides(
                 provider_override=LLMProviderType.ANTHROPIC,
                 temperature_override=0.1,
@@ -155,6 +164,7 @@ class TestLLMProviderServiceIntegration:
             # Identity fields for credit attribution
             user_id="integration-test-user",
             org_id="integration-test-org",
+            student_prompt_ref=student_prompt_ref,
         )
 
         # Create event envelope

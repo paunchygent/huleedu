@@ -42,7 +42,6 @@ class CJBatchUpload(Base):
     event_correlation_id: Mapped[str] = mapped_column(String(36), nullable=False)
     language: Mapped[str] = mapped_column(String(10), nullable=False)
     course_code: Mapped[str] = mapped_column(String(50), nullable=False)
-    essay_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_essay_count: Mapped[int] = mapped_column(nullable=False)
 
     # Status tracking

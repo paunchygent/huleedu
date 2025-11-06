@@ -221,10 +221,10 @@ class TestErrorHandlingIntegration:
                 event_correlation_id=str(uuid4()),
                 language="en",
                 course_code="ENG5",
-                essay_instructions="Compare essays",
                 initial_status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
                 expected_essay_count=2,
             )
+            batch.processing_metadata = {"student_prompt_text": "Compare essays"}
 
             # Create essays that will be referenced by comparison pair
             await postgres_repository.create_or_update_cj_processed_essay(
@@ -334,10 +334,10 @@ class TestErrorHandlingIntegration:
                 event_correlation_id=str(batch_correlation_id),
                 language="en",
                 course_code="ENG5",
-                essay_instructions="Compare essays",
                 initial_status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
                 expected_essay_count=10,
             )
+            batch.processing_metadata = {"student_prompt_text": "Compare essays"}
 
             # Create essays first (before comparison pairs)
             for i in range(10):
@@ -586,10 +586,10 @@ class TestErrorHandlingIntegration:
                 event_correlation_id=str(correlation_id),
                 language="en",
                 course_code="TEST",
-                essay_instructions="Test instructions",
                 initial_status=CJBatchStatusEnum.PERFORMING_COMPARISONS,
                 expected_essay_count=2,
             )
+            batch.processing_metadata = {"student_prompt_text": "Test instructions"}
 
             # Create essays BEFORE comparison pair (foreign key requirement)
             await postgres_repository.create_or_update_cj_processed_essay(

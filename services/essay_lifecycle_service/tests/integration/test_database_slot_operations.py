@@ -10,7 +10,8 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -27,6 +28,12 @@ from services.essay_lifecycle_service.implementations.essay_repository_postgres_
     PostgreSQLEssayRepository,
 )
 from services.essay_lifecycle_service.models_db import Base
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 @pytest.mark.integration
@@ -56,7 +63,7 @@ async def test_option_b_assignment_idempotency_and_exhaustion() -> None:
             expected_essay_ids=frozenset(essay_ids),
             expected_count=len(essay_ids),
             course_code=CourseCode.ENG5,
-            essay_instructions="Test",
+            student_prompt_ref=make_prompt_ref("prompt-option-b"),
             user_id="user-1",
             org_id=None,
             correlation_id=uuid4(),

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from aiokafka import ConsumerRecord
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events import (
     BatchEssaysRegistered,
@@ -21,7 +21,7 @@ from common_core.events.spellcheck_models import (
     SpellcheckMetricsV1,
     SpellcheckResultV1,
 )
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,12 @@ from sqlalchemy.exc import IntegrityError
 from services.result_aggregator_service.kafka_consumer import ResultAggregatorKafkaConsumer
 
 from .conftest import create_kafka_record
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 class TestKafkaConsumerResilience:
@@ -179,7 +185,7 @@ class TestKafkaConsumerResilience:
                 parent_id=None,
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=make_prompt_ref("prompt-resilience-error"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
@@ -273,7 +279,7 @@ class TestEventOrderingIndependence:
                 parent_id=None,
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=make_prompt_ref("prompt-resilience-regular"),
         )
 
         batch_envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
@@ -358,7 +364,7 @@ class TestEventOrderingIndependence:
                 parent_id=None,
             ),
             course_code=CourseCode.ENG5,
-            essay_instructions="Write an essay",
+            student_prompt_ref=make_prompt_ref("prompt-resilience-mixed"),
         )
 
         # Create event envelopes

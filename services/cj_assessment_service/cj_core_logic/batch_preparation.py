@@ -48,7 +48,6 @@ async def create_cj_batch(
         bos_batch_id = request_data.get("bos_batch_id")
         language = request_data.get("language", "en")
         course_code = request_data.get("course_code", "")
-        essay_instructions = request_data.get("essay_instructions")
         essays_to_process = request_data.get("essays_to_process", [])
         assignment_id = request_data.get("assignment_id")  # For anchor essay lookup
         prompt_storage_id = request_data.get("student_prompt_storage_id")
@@ -67,7 +66,6 @@ async def create_cj_batch(
             event_correlation_id=str(correlation_id),
             language=language,
             course_code=course_code,
-            essay_instructions=essay_instructions,
             initial_status=CJBatchStatusEnum.PENDING,
             expected_essay_count=len(essays_to_process),
             user_id=user_id,
@@ -77,8 +75,8 @@ async def create_cj_batch(
         if prompt_storage_id:
             metadata = cj_batch.processing_metadata or {}
             metadata["student_prompt_storage_id"] = prompt_storage_id
-            if prompt_text is not None:
-                metadata["student_prompt_text_present"] = bool(prompt_text.strip())
+            if prompt_text:
+                metadata["student_prompt_text"] = prompt_text
             cj_batch.processing_metadata = metadata
             await session.flush()
 

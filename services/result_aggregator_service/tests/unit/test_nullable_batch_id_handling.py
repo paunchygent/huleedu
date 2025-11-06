@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
-from common_core.domain_enums import CourseCode
+from common_core.domain_enums import ContentType, CourseCode
 from common_core.events import BatchEssaysRegistered, EventEnvelope
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import ProcessingStage
 from dishka import AsyncContainer, Provider, Scope, make_async_container, provide
 
@@ -33,6 +33,12 @@ from services.result_aggregator_service.protocols import (
     EventPublisherProtocol,
     StateStoreProtocol,
 )
+
+
+def make_prompt_ref(label: str) -> StorageReferenceMetadata:
+    prompt_ref = StorageReferenceMetadata()
+    prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, label)
+    return prompt_ref
 
 
 def create_mock_session_factory(mock_session: AsyncMock) -> MagicMock:
@@ -453,7 +459,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=expected_essay_count,
             metadata=metadata,
             course_code=CourseCode.ENG5,
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=make_prompt_ref("prompt-nullable-batch"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
@@ -515,7 +521,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=expected_essay_count,
             metadata=metadata,
             course_code=CourseCode.ENG5,
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=make_prompt_ref("prompt-nullable-missing"),
         )
 
         # Remove essay_ids to simulate missing attribute
@@ -572,7 +578,7 @@ class TestProcessBatchRegistered:
             expected_essay_count=expected_essay_count,
             metadata=metadata,
             course_code=CourseCode.ENG5,
-            essay_instructions="Test essay instructions",
+            student_prompt_ref=make_prompt_ref("prompt-nullable-empty"),
         )
 
         envelope: EventEnvelope[BatchEssaysRegistered] = EventEnvelope(
