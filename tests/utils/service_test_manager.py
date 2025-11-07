@@ -19,9 +19,11 @@ from typing import Any, Dict, NamedTuple, Optional
 import aiohttp
 import httpx
 from common_core.domain_enums import CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.utils.auth_manager import AuthTestManager, AuthTestUser
+from tests.utils.prompt_reference import make_prompt_ref, serialize_prompt_ref
 
 logger = create_service_logger("test.service_manager")
 
@@ -218,6 +220,7 @@ class ServiceTestManager:
         essay_ids: list[str] | None = None,
         cj_default_llm_model: str | None = None,
         cj_default_temperature: float | None = None,
+        student_prompt_ref: StorageReferenceMetadata | None = None,
     ) -> tuple[str, str]:
         """
         Create a test batch via API Gateway (AGW).
@@ -256,13 +259,20 @@ class ServiceTestManager:
             course_code_enum = course_code
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        unique_instructions = f"Test batch via AGW at {timestamp} (corr: {correlation_id[:8]})"
+        prompt_label = f"Test batch prompt via AGW at {timestamp} (corr: {correlation_id[:8]})"
+        prompt_ref = student_prompt_ref
+        if prompt_ref is None:
+            prompt_text = (
+                f"{prompt_label}. This prompt was auto-generated for functional testing flows."
+            )
+            prompt_storage_id = await self.upload_content_directly(prompt_text, user=user)
+            prompt_ref = make_prompt_ref(prompt_storage_id)
 
         payload: dict[str, Any] = {
             "expected_essay_count": expected_essay_count,
             "course_code": course_code_enum.value,
-            "essay_instructions": unique_instructions,
             "enable_cj_assessment": enable_cj_assessment,
+            "student_prompt_ref": serialize_prompt_ref(prompt_ref),
         }
 
         if class_id is not None:
@@ -312,6 +322,7 @@ class ServiceTestManager:
         correlation_id: str | None = None,
         enable_cj_assessment: bool = False,
         class_id: str | None = None,
+        student_prompt_ref: StorageReferenceMetadata | None = None,
     ) -> tuple[str, str]:
         """
         Create a test batch via API Gateway.
@@ -337,6 +348,7 @@ class ServiceTestManager:
             correlation_id=correlation_id,
             enable_cj_assessment=enable_cj_assessment,
             class_id=class_id,
+            student_prompt_ref=student_prompt_ref,
         )
 
     async def upload_files(

@@ -20,6 +20,7 @@ from huleedu_service_libs.logging_utils import create_service_logger
 
 from tests.utils.auth_manager import AuthTestManager
 from tests.utils.kafka_test_manager import KafkaTestManager, create_kafka_test_config
+from tests.utils.prompt_reference import make_prompt_ref
 from tests.utils.service_test_manager import ServiceTestManager
 
 # Configure logging for debugging
@@ -48,7 +49,7 @@ async def create_validation_batch(
     course_code: str,
     essay_count: int,
     user_id: str = "validation_test_user",
-    essay_instructions: str = "Test validation coordination",
+    prompt_label: str = "validation-coordination-prompt",
 ) -> tuple[str, str]:
     """
     Create a validation test batch using modern ServiceTestManager with authentication.
@@ -69,6 +70,7 @@ async def create_validation_batch(
         expected_essay_count=essay_count,
         course_code=course_code,
         user=test_user,
+        student_prompt_ref=make_prompt_ref(prompt_label),
     )
 
     logger.info(f"✅ Created validation batch {batch_id} for {essay_count} essays")

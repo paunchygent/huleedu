@@ -22,13 +22,13 @@ import pytest
 from aiohttp import ClientSession
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from common_core.domain_enums import ContentType
 from common_core.essay_service_models import EssayLifecycleSpellcheckRequestV1
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
 from common_core.events.spellcheck_models import (
     SpellcheckPhaseCompletedV1,
 )
-from common_core.domain_enums import ContentType
 from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from dishka import make_async_container

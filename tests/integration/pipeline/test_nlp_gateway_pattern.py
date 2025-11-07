@@ -23,6 +23,7 @@ from common_core.events.envelope import EventEnvelope
 from tests.integration.pipeline.conftest import (
     send_event_to_topic,
 )
+from tests.utils.prompt_reference import make_prompt_ref_payload
 
 
 @pytest.mark.asyncio
@@ -119,7 +120,7 @@ class TestNlpGatewayPattern:
                     }
                 ],
                 "language": "en",
-                "essay_instructions": "Describe the main conflict in the narrative.",
+                "student_prompt_ref": make_prompt_ref_payload("describe-main-conflict"),
             },
         )
 
@@ -200,7 +201,7 @@ class TestNlpGatewayPattern:
                     for essay in realistic_essays
                 ],
                 "language": "en",
-                "essay_instructions": "Summarize the primary argument presented in the assigned reading.",
+                "student_prompt_ref": make_prompt_ref_payload("summarize-primary-argument"),
                 "metadata": {
                     "test_context": "realistic_structure_validation",
                     "course_code": "ENG5",
@@ -276,7 +277,7 @@ class TestNlpGatewayPattern:
                     }
                 ],
                 "language": "en",
-                "essay_instructions": "Outline the central thesis of the essay.",
+                "student_prompt_ref": make_prompt_ref_payload("outline-central-thesis"),
             },
         )
 

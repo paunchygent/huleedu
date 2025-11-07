@@ -25,8 +25,9 @@ from common_core.events.nlp_events import BatchNlpProcessingRequestedV2
 from common_core.metadata_models import EssayProcessingInputRefV1
 from structlog import get_logger
 
-from tests.utils.auth_manager import AuthTestManager
+from tests.utils.auth_manager import AuthTestManager, AuthTestUser
 from tests.utils.kafka_test_manager import KafkaTestManager
+from tests.utils.prompt_reference import make_prompt_ref
 from tests.utils.service_test_manager import ServiceTestManager
 
 logger = get_logger(__name__)
@@ -34,6 +35,19 @@ logger = get_logger(__name__)
 
 class TestNLPLanguageToolInteractionDiagnostic:
     """Diagnostic test to understand Language Tool response patterns."""
+
+    async def _create_prompt_reference(
+        self,
+        service_manager: ServiceTestManager,
+        prompt_text: str,
+        user: AuthTestUser | None = None,
+    ):
+        """Upload prompt text to Content Service and build reference metadata."""
+        prompt_storage_id = await service_manager.upload_content_directly(
+            prompt_text,
+            user=user,
+        )
+        return make_prompt_ref(prompt_storage_id)
 
     @pytest.mark.asyncio
     @pytest.mark.docker
@@ -238,7 +252,12 @@ class TestNLPLanguageToolInteractionDiagnostic:
                     for i in range(1)  # Just one essay for diagnostic
                 ]
 
-                essay_instructions = f"Diagnostic prompt for {test_case['name']}"
+                prompt_text = f"Diagnostic prompt for {test_case['name']}"
+                student_prompt_ref = await self._create_prompt_reference(
+                    service_manager,
+                    prompt_text,
+                    user=test_user,
+                )
 
                 nlp_request = BatchNlpProcessingRequestedV2(
                     event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
@@ -248,7 +267,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
                     timestamp=datetime.now(timezone.utc),
                     essays_to_process=essays_to_process,
                     language="en",  # Use simplified language code
-                    essay_instructions=essay_instructions,
+                    student_prompt_ref=student_prompt_ref,
                 )
 
                 envelope = EventEnvelope[BatchNlpProcessingRequestedV2](
@@ -513,6 +532,11 @@ class TestNLPLanguageToolInteractionDiagnostic:
                 )
             ]
 
+            prompt_ref = await self._create_prompt_reference(
+                service_manager,
+                "Diagnostic validation prompt for NLP pipeline end-to-end coverage",
+            )
+
             nlp_request = BatchNlpProcessingRequestedV2(
                 event_name=ProcessingEvent.BATCH_NLP_PROCESSING_REQUESTED_V2,
                 batch_id=test_batch_id,
@@ -521,7 +545,7 @@ class TestNLPLanguageToolInteractionDiagnostic:
                 timestamp=datetime.now(timezone.utc),
                 essays_to_process=essays_to_process,
                 language="en",  # Language field for NLP processing
-                essay_instructions="Diagnostic validation prompt",
+                student_prompt_ref=prompt_ref,
             )
 
             envelope = EventEnvelope[BatchNlpProcessingRequestedV2](

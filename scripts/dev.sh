@@ -30,6 +30,10 @@ echo_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
+echo_warning() {
+    echo_warn "$1"
+}
+
 echo_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
@@ -40,102 +44,170 @@ echo_dev() {
 
 # Build services for development with cache
 build_dev() {
-    local services="$1"
-    echo_dev "Building for DEVELOPMENT with cache: ${services:-all services}"
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Building for DEVELOPMENT with cache: ${display}"
     echo_info "Using Dockerfile.dev with 'development' target"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+    fi
 
     echo_dev "Development build complete!"
 }
 
 # Clean build for development (no cache)
 build_clean_dev() {
-    local services="$1"
-    echo_dev "Clean build for DEVELOPMENT (no cache): ${services:-all services}"
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Clean build for DEVELOPMENT (no cache): ${display}"
     echo_warn "This will take longer as all layers will be rebuilt"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel
+    fi
 
     echo_dev "Clean development build complete!"
 }
 
 # Start development environment (builds if needed, then starts with hot-reload)
 start_dev() {
-    local services="$1"
-    echo_dev "Starting DEVELOPMENT environment: ${services:-all services}"
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Starting DEVELOPMENT environment: ${display}"
     echo_info "Hot-reload enabled via volume mounts"
     echo_info "Debug logging enabled"
 
     # Build first if needed
     echo_info "Checking for required builds..."
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
+    fi
 
     # Then start
     echo_info "Starting containers..."
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+    fi
 
     echo_dev "Development environment running!"
-    echo_info "View logs: pdm run dev-logs ${services}"
+    echo_info "View logs: pdm run dev-logs ${display}"
     echo_info "Code changes will auto-reload"
 }
 
 # Start development environment without rebuilding (fast start)
 start_dev_nobuild() {
-    local services="$1"
-    echo_dev "Starting DEVELOPMENT environment (no rebuild): ${services:-all services}"
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Starting DEVELOPMENT environment (no rebuild): ${display}"
     echo_info "Hot-reload enabled via volume mounts"
     echo_info "Debug logging enabled"
     echo_warning "Skipping build - using existing images"
 
     # Start without building
     echo_info "Starting containers..."
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build
+    fi
 
     echo_dev "Development environment running!"
-    echo_info "View logs: pdm run dev-logs ${services}"
+    echo_info "View logs: pdm run dev-logs ${display}"
     echo_info "Code changes will auto-reload"
     echo_info "If images are missing, use: pdm run dev-build-start"
 }
 
 # Stop development containers
 stop_dev() {
-    local services="$1"
-    echo_dev "Stopping DEVELOPMENT containers: ${services:-all}"
+    local services=("$@")
+    local display="all containers"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Stopping DEVELOPMENT containers: ${display}"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml stop $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml stop "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml stop
+    fi
 
     echo_dev "Development containers stopped"
 }
 
 # Restart development containers
 restart_dev() {
-    local services="$1"
-    echo_dev "Restarting DEVELOPMENT containers: ${services:-all}"
+    local services=("$@")
+    local display="all containers"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Restarting DEVELOPMENT containers: ${display}"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart
+    fi
 
     echo_dev "Development containers restarted"
 }
 
 # Remove development containers (preserves images)
 remove_dev() {
-    local services="$1"
-    echo_dev "Removing DEVELOPMENT containers: ${services:-all}"
+    local services=("$@")
+    local display="all containers"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Removing DEVELOPMENT containers: ${display}"
     echo_warn "This will remove containers but preserve images"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml rm -f $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml rm -f "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml rm -f
+    fi
 
     echo_dev "Development containers removed"
 }
 
 # View development logs
 logs_dev() {
-    local services="$1"
-    echo_dev "Following DEVELOPMENT logs: ${services:-all services}"
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Following DEVELOPMENT logs: ${display}"
     echo_info "Press Ctrl+C to exit"
 
-    docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50 $services
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50 "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f --tail=50
+    fi
 }
 
 # Check what needs rebuilding
@@ -208,28 +280,28 @@ show_help() {
 # Main command routing
 case "$1" in
     "build")
-        build_dev "$2"
+        build_dev "${@:2}"
         ;;
     "build-clean")
-        build_clean_dev "$2"
+        build_clean_dev "${@:2}"
         ;;
     "start")
-        start_dev "$2"
+        start_dev "${@:2}"
         ;;
     "start-nobuild")
-        start_dev_nobuild "$2"
+        start_dev_nobuild "${@:2}"
         ;;
     "stop")
-        stop_dev "$2"
+        stop_dev "${@:2}"
         ;;
     "restart")
-        restart_dev "$2"
+        restart_dev "${@:2}"
         ;;
     "remove")
-        remove_dev "$2"
+        remove_dev "${@:2}"
         ;;
     "logs")
-        logs_dev "$2"
+        logs_dev "${@:2}"
         ;;
     "check")
         check_changes

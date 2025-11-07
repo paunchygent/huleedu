@@ -15,6 +15,7 @@ from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
+from tests.utils.prompt_reference import make_prompt_ref
 
 
 class TestELSBatchPhaseOutcomeContract:
@@ -86,7 +87,7 @@ class TestBatchServiceCommandContracts:
             language="sv",
             course_code=CourseCode.SV1,
             class_type="REGULAR",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=make_prompt_ref("write-about-your-summer-vacation"),
         )
 
         # Test serialization

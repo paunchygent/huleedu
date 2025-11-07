@@ -20,6 +20,7 @@ import pytest
 import redis.asyncio as redis
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.redis_client import RedisClient
+from tests.utils.prompt_reference import make_prompt_ref_payload
 
 
 class TestEndToEndFileEventKafkaFlow:
@@ -112,11 +113,12 @@ class TestEndToEndFileEventKafkaFlow:
         user_id: str,
     ) -> str:
         """Create a batch via Batch Orchestrator Service."""
+        prompt_label = f"file-event-kafka-flow-{user_id}"
         batch_data = {
             "user_id": user_id,
             "course_code": "ENG5",
-            "essay_instructions": "Test essay instructions for E2E testing",
             "expected_essay_count": 2,
+            "student_prompt_ref": make_prompt_ref_payload(prompt_label),
         }
 
         async with session.post(
