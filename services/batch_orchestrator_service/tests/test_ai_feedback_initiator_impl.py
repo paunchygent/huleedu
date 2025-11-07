@@ -49,7 +49,9 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
         expected_essay_count=2,
         course_code=CourseCode.ENG5,
         student_prompt_ref=StorageReferenceMetadata(
-            references={"student_prompt_text": {"storage_id": "test-ai-feedback-prompt", "path": ""}}
+            references={
+                "student_prompt_text": {"storage_id": "test-ai-feedback-prompt", "path": ""}
+            }
         ),
         user_id="user_123",
         essay_ids=["essay1", "essay2"],
@@ -263,7 +265,9 @@ class TestAIFeedbackInitiatorImpl:
             expected_essay_count=2,
             course_code=CourseCode.SV1,
             student_prompt_ref=StorageReferenceMetadata(
-                references={"student_prompt_text": {"storage_id": "comprehensive-prompt-id", "path": ""}}
+                references={
+                    "student_prompt_text": {"storage_id": "comprehensive-prompt-id", "path": ""}
+                }
             ),
             user_id="user_123",
             essay_ids=["essay1", "essay2"],
@@ -283,7 +287,10 @@ class TestAIFeedbackInitiatorImpl:
 
         assert command_data.course_code == CourseCode.SV1
         assert command_data.student_prompt_ref is not None
-        assert command_data.student_prompt_ref.references["student_prompt_text"]["storage_id"] == "comprehensive-prompt-id"
+        assert (
+            command_data.student_prompt_ref.references["student_prompt_text"]["storage_id"]
+            == "comprehensive-prompt-id"
+        )
         # Educational context uses placeholder values until Class Management Service integration
         assert command_data.class_type == "GUEST"
         assert command_data.owner_user_id == "user_123"

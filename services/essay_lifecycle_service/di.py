@@ -305,9 +305,7 @@ class ServiceClientsProvider(Provider):
         config: HttpClientConfig,
     ) -> HttpClientProtocol:
         """Provide base HTTP client for service communications."""
-        return BaseHttpClient(
-            session=session, service_name=settings.SERVICE_NAME, config=config
-        )
+        return BaseHttpClient(session=session, service_name=settings.SERVICE_NAME, config=config)
 
     @provide(scope=Scope.APP)
     def provide_content_service_config(self, settings: Settings) -> ContentServiceConfig:

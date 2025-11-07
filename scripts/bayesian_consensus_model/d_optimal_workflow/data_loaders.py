@@ -70,13 +70,9 @@ def load_dynamic_spec(
             comparison_type = record.comparison_type
 
             if essay_a not in essay_ids:
-                raise ValueError(
-                    f"Previous comparison references unknown essay ID: {essay_a}"
-                )
+                raise ValueError(f"Previous comparison references unknown essay ID: {essay_a}")
             if essay_b not in essay_ids:
-                raise ValueError(
-                    f"Previous comparison references unknown essay ID: {essay_b}"
-                )
+                raise ValueError(f"Previous comparison references unknown essay ID: {essay_b}")
 
             if comparison_type == "student_anchor":
                 a_is_anchor = essay_a in anchor_index
@@ -122,9 +118,7 @@ def load_dynamic_spec(
         if baseline_counts.get(pair.key(), 0) == 0
     )
 
-    locked_required = {
-        key for key in locked_list if baseline_counts.get(key, 0) == 0
-    }
+    locked_required = {key for key in locked_list if baseline_counts.get(key, 0) == 0}
 
     required_pairs = derive_required_student_anchor_pairs(
         students=student_list,

@@ -20,6 +20,7 @@ import numpy as np
 
 # --- Current Production Heuristics -------------------------------------------------
 
+
 def logistic_comparison_confidence(comparison_count: int) -> float:
     """Reproduce the comparison-count logistic used in `confidence_calculator`.
 
@@ -42,6 +43,7 @@ def logistic_confidence_label(confidence: float) -> str:
 
 
 # --- Bradley–Terry Information Approximations --------------------------------------
+
 
 def bt_standard_error_from_counts(
     comparison_count: int,
@@ -88,6 +90,7 @@ def boundary_crossing_confidence(
 
 # --- n log n versus Information Targets --------------------------------------------
 
+
 def comparison_budget_n_log_n(
     n_items: int,
     target_se: float,
@@ -103,6 +106,7 @@ def comparison_budget_n_log_n(
 
 
 # --- Summary Generation ------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class ConfidenceRow:

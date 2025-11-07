@@ -71,9 +71,7 @@ async def test_process_initiate_nlp_command_includes_spellcheck_metrics(
     repo.update_essay_status_via_machine.return_value = None
 
     student_prompt_ref = StorageReferenceMetadata(
-        references={
-            ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-123", "path": ""}
-        }
+        references={ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-123", "path": ""}}
     )
 
     command = BatchServiceNLPInitiateCommandDataV2(

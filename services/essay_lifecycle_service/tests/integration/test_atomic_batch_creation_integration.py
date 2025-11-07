@@ -306,7 +306,9 @@ class TestAtomicBatchCreationIntegration:
             essay_ids=["essay_001", "essay_002", "essay_003"],
             course_code=CourseCode.ENG5,
             student_prompt_ref=StorageReferenceMetadata(
-                references={"student_prompt_text": {"storage_id": "test-integration-prompt", "path": ""}}
+                references={
+                    "student_prompt_text": {"storage_id": "test-integration-prompt", "path": ""}
+                }
             ),
             user_id="test_user_123",
             metadata=SystemProcessingMetadata(
@@ -405,7 +407,9 @@ class TestAtomicBatchCreationIntegration:
             # Store student_prompt_ref in batch_metadata following Phase 3.2 pattern
             batch_metadata = {}
             if sample_batch_event.student_prompt_ref:
-                batch_metadata["student_prompt_ref"] = sample_batch_event.student_prompt_ref.model_dump()
+                batch_metadata["student_prompt_ref"] = (
+                    sample_batch_event.student_prompt_ref.model_dump()
+                )
 
             batch_tracker_record = BatchEssayTracker(
                 batch_id=sample_batch_event.entity_id,

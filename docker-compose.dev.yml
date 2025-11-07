@@ -19,7 +19,6 @@ services:
       - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       # Exclude __pycache__ and other build artifacts
       - /app/services/nlp_service/__pycache__
-      - /app/services/nlp_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -345,8 +344,3 @@ services:
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
 
-# Development-specific volumes for faster file watching
-volumes:
-  # Use local driver with better performance for development
-  nlp_dev_cache:
-    driver: local

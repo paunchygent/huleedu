@@ -139,8 +139,8 @@ def optimize_from_dynamic_spec(
 
     combined_items = list(students) + list(anchors)
     index_map = {item: idx for idx, item in enumerate(combined_items)}
-    baseline_log_det = compute_log_det(baseline_design, index_map) if baseline_design else float(
-        "-inf"
+    baseline_log_det = (
+        compute_log_det(baseline_design, index_map) if baseline_design else float("-inf")
     )
     optimized_log_det = compute_log_det(optimized_design, index_map)
 

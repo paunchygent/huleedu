@@ -222,9 +222,7 @@ class TestGetScale:
 
     def test_error_message_lists_available_scales(self) -> None:
         """Test that error message includes available scales."""
-        with pytest.raises(
-            ValueError, match="Available scales: eng5_np_legacy_9_step"
-        ):
+        with pytest.raises(ValueError, match="Available scales: eng5_np_legacy_9_step"):
             get_scale("invalid_scale")
 
 

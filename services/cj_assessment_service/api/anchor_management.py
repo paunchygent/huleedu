@@ -70,9 +70,7 @@ async def register_anchor_essay(
             )
 
             if not assignment_context:
-                return {
-                    "error": f"Unknown assignment_id '{register_request.assignment_id}'"
-                }, 400
+                return {"error": f"Unknown assignment_id '{register_request.assignment_id}'"}, 400
 
             grade_scale = assignment_context.get("grade_scale", "swedish_8_anchor")
 
@@ -94,10 +92,7 @@ async def register_anchor_essay(
 
             if not grade_is_valid:
                 return {
-                    "error": (
-                        f"Invalid grade '{register_request.grade}' for scale "
-                        f"'{grade_scale}'"
-                    )
+                    "error": (f"Invalid grade '{register_request.grade}' for scale '{grade_scale}'")
                 }, 400
 
             storage_response = await content_client.store_content(

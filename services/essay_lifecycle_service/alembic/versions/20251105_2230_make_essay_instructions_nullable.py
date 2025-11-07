@@ -44,6 +44,4 @@ def downgrade() -> None:
 
     This is architecturally incompatible with Phase 3.2 design.
     """
-    raise NotImplementedError(
-        "Phase 3.2 is a non-reversible cutover. Downgrade not supported."
-    )
+    raise NotImplementedError("Phase 3.2 is a non-reversible cutover. Downgrade not supported.")

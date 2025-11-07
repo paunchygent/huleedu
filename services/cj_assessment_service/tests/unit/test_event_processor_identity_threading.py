@@ -179,8 +179,7 @@ class TestEventProcessorIdentityThreading:
         assert converted_request_data["org_id"] == expected_org_id
         assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
         assert (
-            converted_request_data["student_prompt_storage_id"]
-            == "prompt-storage-with-overrides"
+            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
 
         mock_content_client.fetch_content.assert_any_await(
@@ -265,8 +264,7 @@ class TestEventProcessorIdentityThreading:
         assert converted_request_data["course_code"] == event_data.course_code
         assert converted_request_data["student_prompt_text"] == PROMPT_TEXT
         assert (
-            converted_request_data["student_prompt_storage_id"]
-            == "prompt-storage-with-overrides"
+            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
 
     @pytest.mark.asyncio
@@ -407,8 +405,7 @@ class TestEventProcessorIdentityThreading:
         converted_request_data = mock_workflow_function.call_args.kwargs["request_data"]
         assert converted_request_data["student_prompt_text"] is None
         assert (
-            converted_request_data["student_prompt_storage_id"]
-            == "prompt-storage-with-overrides"
+            converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
 
     @pytest.mark.asyncio

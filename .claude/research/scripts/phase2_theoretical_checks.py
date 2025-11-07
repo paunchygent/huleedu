@@ -50,9 +50,7 @@ def run_random_pair_simulation(
         counts[loser] += 1
 
     params = choix.ilsr_pairwise(n_items, comparisons, alpha=1e-3)
-    se = bt_inference.compute_bt_standard_errors(
-        n_items, comparisons, np.asarray(params)
-    )
+    se = bt_inference.compute_bt_standard_errors(n_items, comparisons, np.asarray(params))
 
     # Exclude reference item with SE=0.0
     positive_se = se[:-1]
@@ -87,9 +85,7 @@ def main() -> None:
     targets = (4, 8, 12, 20)
     results = run_experiments(targets)
 
-    print(
-        "target_min\tmean_comparisons\tmedian_se\ttheoretical_se\tinflation_ratio"
-    )
+    print("target_min\tmean_comparisons\tmedian_se\ttheoretical_se\tinflation_ratio")
     for r in results:
         ratio = r.median_se / r.theoretical_se if r.theoretical_se else float("inf")
         print(

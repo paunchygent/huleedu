@@ -103,7 +103,7 @@ class ClientBatchPipelineRequestV1(BaseModel):
                             "references": {
                                 "student_prompt_text": {
                                     "storage_id": "0123abcd4567ef890123abcd4567ef89",
-                                    "path": ""
+                                    "path": "",
                                 }
                             }
                         }

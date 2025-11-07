@@ -144,9 +144,12 @@ class TestIdentityThreadingInBatchCreation:
         assert call_args.kwargs["course_code"] == "ENG5"
         assert call_args.kwargs["initial_status"] == CJBatchStatusEnum.PENDING
         assert call_args.kwargs["expected_essay_count"] == 2
-        assert mock_database.create_new_cj_batch.return_value.processing_metadata[
-            "student_prompt_storage_id"
-        ] == "prompt-storage-base"
+        assert (
+            mock_database.create_new_cj_batch.return_value.processing_metadata[
+                "student_prompt_storage_id"
+            ]
+            == "prompt-storage-base"
+        )
         assert (
             mock_database.create_new_cj_batch.return_value.processing_metadata[
                 "student_prompt_text"

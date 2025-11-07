@@ -572,7 +572,9 @@ class TestPipelineResolutionIntegration:
                 course_code="ENG5",
                 class_type="GUEST",
                 student_prompt_ref=StorageReferenceMetadata(
-                    references={"student_prompt_text": {"storage_id": f"test-prompt-{batch_id}", "path": ""}}
+                    references={
+                        "student_prompt_text": {"storage_id": f"test-prompt-{batch_id}", "path": ""}
+                    }
                 ),
             )
 

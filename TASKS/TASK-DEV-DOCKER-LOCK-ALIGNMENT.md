@@ -129,6 +129,26 @@ COPY services/<service>/ /app/services/<service>/
 - Dev containers no longer persist `__pypackages__` between rebuilds; deleting/stopping a container is sufficient to guarantee a clean environment.
 - All services share the exact same dependency image slice, so docker layer caching remains effective even when building different services back-to-back.
 
+## Context7 Findings (PDM Behavior) – 2025-11-07
+
+Docs pulled via `/pdm-project/pdm` (Context7) reinforce the plan:
+
+- `pdm install` installs every locked dependency group by default; adding `--prod` or `-G` narrows scope, and `--frozen-lockfile` enforces that the lock is respected instead of regenerated. That is exactly what we need for both dev (`--dev --frozen-lockfile`) and prod (`--prod --frozen-lockfile`) layers.
+- Editable monorepo dependencies should use `-e file:///${PROJECT_ROOT}/…` in the root `pyproject.toml`. Those paths resolve correctly only when the install runs from the repo root (`${PROJECT_ROOT}=/app` inside containers). Running PDM from `services/<name>` breaks that resolution, which is why every dev Dockerfile currently re-locks.
+- `pdm config` lives at the project root and can be altered with `pdm config --local`; in our case we don’t need overrides, but the docs make it explicit that “project root + shared lockfile” is the intended workflow for multi-package repos.
+
+## Recommended Changes (Derived from PDM Docs)
+
+1. **Shared dependency stage** for every Dockerfile:
+   - `FROM python:3.11-slim AS deps`
+   - Set `WORKDIR /app` and `ENV PROJECT_ROOT=/app PDM_USE_VENV=false PYTHONPATH=/app`
+   - Copy `pyproject.toml`, `pdm.lock`, and the `pyproject.toml` + `src/` trees for every library that gets installed via editable `file:///${PROJECT_ROOT}/…`.
+   - Run `pdm install --dev --frozen-lockfile` (dev image) and `pdm install --prod --frozen-lockfile` (prod image) from `/app`, leveraging the shared lock.
+2. **Service stages** (`development` + `production`) simply `COPY services/<name>/ /app/services/<name>/` and reuse the deps stage—no more per-service `pdm lock`.
+3. **docker-compose.dev.yml**: remove all `/app/services/<service>/__pypackages__` named volumes. Rely on the baked dependency layer; keep only source bind mounts for hot reload.
+4. **Developer workflow**: emphasize that touching any `pyproject.toml` or `pdm.lock` requires `pdm run dev-build[-clean] <service>` so the shared deps layer is rebuilt (since the lock hash controls that cache layer).
+5. **Docs/Rules**: note in `.claude/rules/015` or `040` (and in `HANDOFF.md`) that `pdm` must run from repo root in Docker contexts, referencing the monorepo guidance from the official PDM docs to prevent regressions.
+
 ## Definition of Done
 
 - Dev and prod images for every service install dependencies using the shared lockfile without regenerating it.

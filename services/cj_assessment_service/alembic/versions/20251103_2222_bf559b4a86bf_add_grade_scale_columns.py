@@ -77,9 +77,7 @@ def downgrade() -> None:
     anchors/projections in the database.
     """
     # Drop indexes first
-    op.drop_index(
-        op.f("ix_grade_projections_grade_scale"), table_name="grade_projections"
-    )
+    op.drop_index(op.f("ix_grade_projections_grade_scale"), table_name="grade_projections")
     op.drop_index(
         op.f("ix_anchor_essay_references_grade_scale"),
         table_name="anchor_essay_references",

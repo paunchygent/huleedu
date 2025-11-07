@@ -459,9 +459,7 @@ def test_session2_workflow_with_previous_comparisons() -> None:
     assert result.baseline_slots_in_design == len(result.baseline_design)
     assert result.total_comparisons == len(result.baseline_design) + spec.total_slots
     assert result.new_comparisons == spec.total_slots
-    new_keys = {
-        (entry.candidate.essay_a, entry.candidate.essay_b) for entry in result.new_design
-    }
+    new_keys = {(entry.candidate.essay_a, entry.candidate.essay_b) for entry in result.new_design}
     assert ("JA24", "A1") not in new_keys
     assert ("JA24", "A2") not in new_keys
 

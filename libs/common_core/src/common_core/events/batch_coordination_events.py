@@ -19,7 +19,11 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from ..domain_enums import CourseCode
-from ..metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata, SystemProcessingMetadata
+from ..metadata_models import (
+    EssayProcessingInputRefV1,
+    StorageReferenceMetadata,
+    SystemProcessingMetadata,
+)
 from ..status_enums import BatchStatus
 
 # Import for structured error handling (forward reference resolution)

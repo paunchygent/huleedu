@@ -463,7 +463,11 @@ def _extract_prompt_storage_id(
     if not isinstance(storage_entry, dict):
         logger.warning(
             "Student prompt reference missing expected storage entry for CJ batch",
-            extra={**log_extra, "correlation_id": str(correlation_id), "reference_keys": list(references.keys())},
+            extra={
+                **log_extra,
+                "correlation_id": str(correlation_id),
+                "reference_keys": list(references.keys()),
+            },
         )
         _record_prompt_failure(prompt_failure_metric, "missing_entry")
         return None
@@ -472,7 +476,11 @@ def _extract_prompt_storage_id(
     if not storage_id:
         logger.warning(
             "Student prompt reference missing storage_id for CJ batch",
-            extra={**log_extra, "correlation_id": str(correlation_id), "reference_keys": list(references.keys())},
+            extra={
+                **log_extra,
+                "correlation_id": str(correlation_id),
+                "reference_keys": list(references.keys()),
+            },
         )
         _record_prompt_failure(prompt_failure_metric, "missing_storage_id")
         return None

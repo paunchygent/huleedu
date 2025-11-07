@@ -115,9 +115,7 @@ class TestCJAssessmentCommandHandler:
     ) -> BatchServiceCJAssessmentInitiateCommandDataV1:
         """Sample CJ assessment command data."""
         student_prompt_ref = StorageReferenceMetadata(
-            references={
-                ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-abc", "path": ""}
-            }
+            references={ContentType.STUDENT_PROMPT_TEXT: {"storage_id": "prompt-abc", "path": ""}}
         )
         return BatchServiceCJAssessmentInitiateCommandDataV1(
             event_name=ProcessingEvent.BATCH_CJ_ASSESSMENT_INITIATE_COMMAND,
