@@ -27,6 +27,7 @@ from services.batch_orchestrator_service.implementations.batch_database_infrastr
     BatchDatabaseInfrastructure,
 )
 from services.batch_orchestrator_service.models_db import Batch
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 class TestClassIdIntegration:
@@ -62,7 +63,7 @@ class TestClassIdIntegration:
         request = BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
             school_name="Lincoln High",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=make_prompt_ref("prompt-regular-class"),
             expected_essay_count=25,
             user_id="teacher_123",
             class_id="class_456",  # REGULAR batch
@@ -79,7 +80,7 @@ class TestClassIdIntegration:
         request = BatchRegistrationRequestV1(
             course_code=CourseCode.SV1,
             school_name="Guest School",
-            essay_instructions="Write a short story",
+            student_prompt_ref=make_prompt_ref("prompt-guest"),
             expected_essay_count=10,
             user_id="guest_teacher_789",
             # class_id is None by default for GUEST batches
@@ -214,7 +215,7 @@ class TestClassIdIntegration:
         registration_data = BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
             school_name="Lincoln High",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=make_prompt_ref("prompt-regular-store"),
             expected_essay_count=30,
             user_id="teacher_123",
             class_id="class_456",  # REGULAR batch
@@ -241,7 +242,7 @@ class TestClassIdIntegration:
         assert created_batch.id == batch_id
         assert created_batch.class_id == "class_456"
         assert created_batch.name == "ENG5 - teacher_123"
-        assert created_batch.description == "Write about your summer vacation"
+        assert created_batch.description is None
 
     @pytest.mark.asyncio
     async def test_context_operations_update_existing_batch_with_class_id(
@@ -256,7 +257,7 @@ class TestClassIdIntegration:
         registration_data = BatchRegistrationRequestV1(
             course_code=CourseCode.SV2,
             school_name="Stockholm Gymnasium",
-            essay_instructions="Skriv om din sommar",
+            student_prompt_ref=make_prompt_ref("prompt-swedish-store"),
             expected_essay_count=25,
             user_id="teacher_456",
             class_id="class_789",  # REGULAR batch

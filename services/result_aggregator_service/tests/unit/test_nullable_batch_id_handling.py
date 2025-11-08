@@ -474,11 +474,14 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation
+        expected_metadata = {
+            "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
+        }
         test_provider.mock_batch_repo.create_batch.assert_called_once_with(
             batch_id=batch_id,
             user_id=user_id,
             essay_count=expected_essay_count,
-            metadata=None,
+            metadata=expected_metadata,
         )
 
         # Verify orphaned essay associations
@@ -539,11 +542,14 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation still works
+        expected_metadata = {
+            "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
+        }
         test_provider.mock_batch_repo.create_batch.assert_called_once_with(
             batch_id=batch_id,
             user_id=user_id,
             essay_count=expected_essay_count,
-            metadata=None,
+            metadata=expected_metadata,
         )
 
         # Verify no essay associations attempted
@@ -593,11 +599,14 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation
+        expected_metadata = {
+            "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
+        }
         test_provider.mock_batch_repo.create_batch.assert_called_once_with(
             batch_id=batch_id,
             user_id=user_id,
             essay_count=expected_essay_count,
-            metadata=None,
+            metadata=expected_metadata,
         )
 
         # Verify no essay associations attempted

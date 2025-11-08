@@ -36,7 +36,6 @@ class TestSimplifiedRetryLogic:
         return BatchRegistrationRequestV1(
             expected_essay_count=3,
             course_code=CourseCode.ENG6,
-            essay_instructions="Write about your favorite book",
             user_id="user_retry_test",
             enable_cj_assessment=True,
         )

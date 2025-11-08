@@ -69,7 +69,6 @@ async def test_registration_proxy_injects_identity_and_calls_bos(client_with_org
         "expected_essay_count": 2,
         "essay_ids": ["e1", "e2"],
         "course_code": CourseCode.SV1.value,
-        "essay_instructions": "Write about your summer",
         "class_id": "class-1",
         "enable_cj_assessment": True,
         "cj_default_llm_model": "gpt-4o-mini",
@@ -101,7 +100,6 @@ async def test_registration_proxy_handles_bos_error_passthrough(client_with_org)
     payload = {
         "expected_essay_count": 1,
         "course_code": CourseCode.SV1.value,
-        "essay_instructions": "Short essay",
     }
 
     resp = client.post("/v1/batches/register", json=payload)

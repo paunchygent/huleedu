@@ -22,6 +22,10 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR=$(cd -- "$(dirname "$0")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+DEPS_IMAGE_TAG=""
+
 echo_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -42,6 +46,37 @@ echo_dev() {
     echo -e "${CYAN}[DEV]${NC} $1"
 }
 
+compute_deps_hash() {
+    python "$REPO_ROOT/scripts/compute_deps_hash.py"
+}
+
+ensure_deps_image() {
+    local mode="$1"
+    local deps_hash
+    deps_hash=$(compute_deps_hash)
+    DEPS_IMAGE_TAG="huledu-deps:${deps_hash}"
+    export DEPS_IMAGE_TAG
+
+    local needs_build=0
+    if [ "$mode" = "clean" ]; then
+        needs_build=1
+    elif ! docker image inspect "$DEPS_IMAGE_TAG" >/dev/null 2>&1; then
+        needs_build=1
+    fi
+
+    if [ $needs_build -eq 1 ]; then
+        echo_info "Building shared dependency image ${DEPS_IMAGE_TAG}"
+        local build_cmd=(docker build)
+        if [ "$mode" = "clean" ]; then
+            build_cmd+=(--no-cache)
+        fi
+        build_cmd+=(-f "$REPO_ROOT/Dockerfile.deps" -t "$DEPS_IMAGE_TAG" "$REPO_ROOT")
+        "${build_cmd[@]}"
+    else
+        echo_info "Using cached dependency image ${DEPS_IMAGE_TAG}"
+    fi
+}
+
 # Build services for development with cache
 build_dev() {
     local services=("$@")
@@ -51,6 +86,8 @@ build_dev() {
     fi
     echo_dev "Building for DEVELOPMENT with cache: ${display}"
     echo_info "Using Dockerfile.dev with 'development' target"
+
+    ensure_deps_image ""
 
     if [ ${#services[@]} -gt 0 ]; then
         docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
@@ -70,6 +107,8 @@ build_clean_dev() {
     fi
     echo_dev "Clean build for DEVELOPMENT (no cache): ${display}"
     echo_warn "This will take longer as all layers will be rebuilt"
+
+    ensure_deps_image "clean"
 
     if [ ${#services[@]} -gt 0 ]; then
         docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache --parallel "${services[@]}"
@@ -93,6 +132,7 @@ start_dev() {
 
     # Build first if needed
     echo_info "Checking for required builds..."
+    ensure_deps_image ""
     if [ ${#services[@]} -gt 0 ]; then
         docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel "${services[@]}"
     else

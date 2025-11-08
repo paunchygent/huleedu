@@ -30,6 +30,8 @@ from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
 from pydantic import ValidationError
 
+from services.batch_orchestrator_service.tests import make_prompt_ref
+
 # Rebuild models to resolve forward references
 EssayValidationError.model_rebuild()
 BatchValidationErrorsV1.model_rebuild()
@@ -63,7 +65,7 @@ class TestEventContractsV2:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Write about your favorite book",
+            student_prompt_ref=make_prompt_ref("prompt-essays-ready"),
             class_type="REGULAR",
         )
 
@@ -93,6 +95,7 @@ class TestEventContractsV2:
         assert essays_ready_data.batch_id == event_data.batch_id
         assert len(essays_ready_data.ready_essays) == 2
         assert essays_ready_data.course_code == CourseCode.ENG5
+        assert essays_ready_data.student_prompt_ref is not None
 
     def test_batch_validation_errors_model_validation(self) -> None:
         """Test BatchValidationErrorsV1 model validation with structured errors."""
@@ -244,7 +247,7 @@ class TestEventContractsV2:
             ),
             course_code=CourseCode.ENG5,  # Enum field
             course_language="en",
-            essay_instructions="Test instructions",
+            student_prompt_ref=make_prompt_ref("prompt-pydantic-v2"),
             class_type="GUEST",
         )
 

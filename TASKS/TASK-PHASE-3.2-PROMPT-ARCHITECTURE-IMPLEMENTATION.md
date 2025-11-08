@@ -18,13 +18,13 @@ The objective is to decouple student prompt payloads from registration forms whi
 
 ## Discovery Checklist
 
-- [ ] Locate registration DTOs in API Gateway (`docs/api-types.ts`, FastAPI handlers) and BOS to confirm current `assignment_id` / `essay_instructions` requirements; capture file paths.
-- [ ] Inspect CJ data access (`assessment_instructions`, repositories, migrations) for canonical prompt storage and versioning.
-- [ ] Audit prompt usage in NLP and AI Feedback services to map where raw prompt text is propagated.
-- [ ] Review BCS gating configuration to identify how batch prerequisites are stored (e.g., Redis projection vs. BOS state) and determine extension point for a `prompt_attached` flag.
-- [ ] Inventory Content Service client usage patterns, including required auth scopes and hash validation.
-- [ ] Document relevant service ports/endpoints for local manual testing.
-- [ ] Persist findings in `TASKS/notes/phase_3_2_discovery.md`.
+- [x] Locate registration DTOs in API Gateway (`docs/api-types.ts`, FastAPI handlers) and BOS to confirm current `assignment_id` / prompt reference requirements; capture file paths.
+- [x] Inspect CJ data access (`assessment_instructions`, repositories, migrations) for canonical prompt storage and versioning.
+- [x] Audit prompt usage in NLP and AI Feedback services to map where prompt references are propagated.
+- [x] Review BCS gating configuration to identify how batch prerequisites are stored (e.g., Redis projection vs. BOS state) and determine extension point for a `prompt_attached` flag.
+- [x] Inventory Content Service client usage patterns, including required auth scopes and hash validation.
+- [x] Document relevant service ports/endpoints for local manual testing.
+- [x] Persist findings in `TASKS/notes/phase_3_2_discovery.md`.
 
 ## Implementation Plan
 
@@ -112,7 +112,7 @@ The objective is to decouple student prompt payloads from registration forms whi
   - `BatchExpectation` and database persistence now store `student_prompt_ref`, and recovery paths deserialize references from `batch_metadata`.  
   - `BatchEssaysReady` events emitted by ELS carry `student_prompt_ref`, ensuring downstream consumers receive the reference during readiness handoff.  
   - Added targeted BOS unit tests to verify prompt metadata plumbing and fixed the pipeline guard regression that blocked sequential runs.  
-  - Remaining work: hydrate prompt text through ELS dispatchers using Content Service, adapt NLP/CJ services to consume references directly, update fixtures/docs, and retire bridging/legacy `essay_instructions` support as soon as downstream migrations are complete.
+  - Remaining work: hydrate prompt text through ELS dispatchers using Content Service, adapt NLP/CJ services to consume references directly, update fixtures/docs, and retire bridging/legacy `essay_instructions` support as soon as downstream migrations are complete. **(Superseded by 2025-11-06 / 2025-11-08 entries below.)**
 
 - **2025-11-05** – ELS dispatcher bridging complete (Step 3)
   - Implemented Content Service prompt hydration in `DefaultSpecializedServiceRequestDispatcher` with fallback to legacy text
@@ -125,8 +125,17 @@ The objective is to decouple student prompt payloads from registration forms whi
   - Fixed all 3 target test suites: `test_nlp_command_handler.py`, `test_cj_assessment_command_handler.py`, `test_kafka_circuit_breaker_business_impact.py`
   - **Next**: Migrate NLP and CJ services to consume `student_prompt_ref` natively, then remove dispatcher bridging
 
+- **2025-11-06** – Downstream consumer migration & dispatcher cleanup (Steps 3–4 wrap-up)
+  - NLP and CJ services now fetch prompts directly from Content Service, emit `huleedu_{nlp|cj}_prompt_fetch_failures_total`, and persist prompt metadata without inline strings.
+  - Essay Lifecycle dispatcher no longer hydrates prompt text; prompt metadata flows exclusively via `StorageReferenceMetadata`.
+  - Alembic migrations `20251106_1845_make_cj_prompt_nullable.py` and `20251106_2105_remove_essay_instructions.py` removed residual prompt columns.
+  - Service READMEs plus Grafana playbook updated with prompt reference flows and new metrics.
+
+- **2025-11-08** – Cross-service validation & doc/test refresh (Step 5)
+  - Updated discovery notes, handoff, and task plan to reflect the reference-only prompt architecture and completed validation.
+  - Refreshed API Gateway + BOS unit suites to build payloads with `student_prompt_ref`, eliminating silent acceptance of legacy `essay_instructions`.
+  - Executed targeted pytest runs (`services/api_gateway_service/tests/test_batch_registration_proxy.py`, `services/batch_orchestrator_service/tests -k "prompt or idempotency or batch_context"`) plus linted docs to enforce the new contract end-to-end.
+
 ### Dispatcher Bridging Rules
 
-- Fetch prompt text in `DefaultSpecializedServiceRequestDispatcher` using the injected Content Service client.
-- On fetch failure, log a structured warning, increment `huleedu_els_prompt_fetch_failures_total{context="nlp|cj"}`, and fall back to the legacy `essay_instructions` string stored on `BatchExpectation` (trimmed). If no legacy text exists, send an empty string while still emitting the metric.
-- Populate both `student_prompt_ref` and `student_prompt_text` in dispatcher payloads. Remove this bridging layer immediately after both NLP and CJ services are reference-native.
+Legacy bridging logic was removed on 2025-11-06 once NLP and CJ services became reference-native. ELS now forwards `student_prompt_ref` exclusively; no prompt hydration occurs within the dispatcher.

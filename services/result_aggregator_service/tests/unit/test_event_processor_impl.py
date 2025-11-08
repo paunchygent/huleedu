@@ -196,8 +196,11 @@ class TestProcessBatchRegistered:
         await event_processor.process_batch_registered(envelope, data)
 
         # Assert
+        expected_metadata = {
+            "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
+        }
         mock_batch_repository.create_batch.assert_called_once_with(
-            batch_id=batch_id, user_id=user_id, essay_count=essay_count, metadata=None
+            batch_id=batch_id, user_id=user_id, essay_count=essay_count, metadata=expected_metadata
         )
         mock_cache_manager.invalidate_user_batches.assert_called_once_with(user_id)
 
@@ -244,11 +247,14 @@ class TestProcessBatchRegistered:
         await event_processor.process_batch_registered(envelope, data)
 
         # Assert
+        expected_metadata = {
+            "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
+        }
         mock_batch_repository.create_batch.assert_called_once_with(
             batch_id=batch_id,
             user_id=user_id,
             essay_count=essay_count,
-            metadata=None,
+            metadata=expected_metadata,
         )
         mock_cache_manager.invalidate_user_batches.assert_called_once_with(user_id)
 

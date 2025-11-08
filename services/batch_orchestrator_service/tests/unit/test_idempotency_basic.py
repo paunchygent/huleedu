@@ -36,6 +36,7 @@ from services.batch_orchestrator_service.implementations.els_batch_phase_outcome
     ELSBatchPhaseOutcomeHandler,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 class MockRedisClient:
@@ -144,7 +145,9 @@ def sample_batch_essays_ready_event() -> dict:
             # Enhanced lean registration fields (required by updated BatchEssaysReady model)
             "course_code": CourseCode.ENG5.value,
             "course_language": "en",
-            "essay_instructions": "Test instructions for lean flow idempotency testing.",
+            "student_prompt_ref": make_prompt_ref(
+                "prompt-idempotency-basic"
+            ).model_dump(mode="json"),
             "class_type": "GUEST",
         },
     }

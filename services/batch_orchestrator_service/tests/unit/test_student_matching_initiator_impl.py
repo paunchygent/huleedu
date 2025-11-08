@@ -24,6 +24,7 @@ from services.batch_orchestrator_service.implementations.student_matching_initia
     StudentMatchingInitiatorImpl,
 )
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 class TestStudentMatchingInitiatorImpl:
@@ -56,7 +57,7 @@ class TestStudentMatchingInitiatorImpl:
         return BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
             school_name="Lincoln High",
-            essay_instructions="Write about your summer vacation",
+            student_prompt_ref=make_prompt_ref("prompt-regular-class"),
             expected_essay_count=3,
             user_id="teacher_123",
             class_id="class_456",  # REGULAR batch has class_id
@@ -68,7 +69,7 @@ class TestStudentMatchingInitiatorImpl:
         return BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
             school_name="Guest School",
-            essay_instructions="Write a short story",
+            student_prompt_ref=make_prompt_ref("prompt-guest"),
             expected_essay_count=2,
             user_id="guest_teacher_789",
             class_id=None,  # GUEST batch has no class_id

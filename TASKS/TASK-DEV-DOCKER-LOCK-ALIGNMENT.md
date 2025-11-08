@@ -149,6 +149,21 @@ Docs pulled via `/pdm-project/pdm` (Context7) reinforce the plan:
 4. **Developer workflow**: emphasize that touching any `pyproject.toml` or `pdm.lock` requires `pdm run dev-build[-clean] <service>` so the shared deps layer is rebuilt (since the lock hash controls that cache layer).
 5. **Docs/Rules**: note in `.claude/rules/015` or `040` (and in `HANDOFF.md`) that `pdm` must run from repo root in Docker contexts, referencing the monorepo guidance from the official PDM docs to prevent regressions.
 
+## Implementation Progress
+
+- **NLP Service (2025-11-07)**: Both `services/nlp_service/Dockerfile` and `Dockerfile.dev` now copy the root `pyproject.toml` + `pdm.lock`, include shared-library `pyproject`/`src` trees, and run `pdm install --prod/--dev --frozen-lockfile` from `/app`. `docker-compose.dev.yml` no longer mounts `/app/services/nlp_service/__pypackages__`. Clean BuildKit run via `pdm run dev-build-clean nlp_service` succeeded, `pdm run dev-start nlp_service` confirms hot-reload still propagates code edits, and the functional diagnostic (`pdm run pytest-root services/nlp_service/tests/functional/test_nlp_language_tool_interaction_diagnostic.py`) passes.
+- **All remaining services (2025-11-07)**: Added `scripts/update_service_dockerfiles.py` to generate consistent Dockerfile/Dockerfile.dev pairs that (a) share the root dependency install stage, (b) run `pdm install --dev/--prod --frozen-lockfile` from `/app`, and (c) invoke runtime entrypoints via `pdm run -p /app ...`. Regenerated every service Dockerfile except NLP to follow this pattern, preserving service-specific apt dependencies (e.g., `libmagic1`, `openjdk-21-jre-headless`) and default commands. Removed every `/app/services/<service>/__pypackages__` volume mapping from `docker-compose.dev.yml` and updated the `essay_lifecycle_service` worker/API overrides to call `pdm run -p /app python services/essay_lifecycle_service/{app,worker_main}.py`. Remaining work: run representative builds/tests for a subset of services to spot-check the new images, then document the new pattern in `.claude/HANDOFF.md` + rules.
+
+## Next Iteration: Shared Dependency Image
+
+1. **Root-level dep image**: Add `Dockerfile.deps` at repo root that copies `pyproject.toml`, `pdm.lock`, and all shared library `pyproject`/`src` trees, then runs `pdm install --dev --frozen-lockfile` (and optionally `--prod`) from `/app`. Tag the resulting image (e.g., `huledu-deps:<hash>`).
+2. **Hash-based invalidation**: Extend the existing `pdm run dev-build[-clean]` flow to compute a hash over all dependency inputs (root `pyproject.toml`, `pdm.lock`, `libs/common_core/**`, `libs/huleedu_service_libs/**`, `libs/huleedu_nlp_shared/**`, etc.). When the hash changes—or when `dev-build-clean` is invoked—rebuild the deps image once and retag it with the new hash before building services.
+3. **Service Dockerfiles inherit from deps image**: Regenerate every service Dockerfile so the `FROM` stage uses the shared deps image. Service Dockerfiles will only install additional OS packages (if needed), copy service code, and set `CMD`; no service-specific PDM install stages remain.
+4. **Compose wiring**: Ensure `docker-compose.dev.yml` references the deps image tag (e.g., via build args or env var) so service rebuilds automatically pick up updated deps whenever the hash changes.
+5. **No `__pypackages__` volumes**: Continue omitting per-service `__pypackages__` mounts—the shared deps image provides all packages.
+
+This restores clean-build performance (heavy install runs once per dependency change) while keeping the single-lockfile workflow and eliminating stale packages.
+
 ## Definition of Done
 
 - Dev and prod images for every service install dependencies using the shared lockfile without regenerating it.

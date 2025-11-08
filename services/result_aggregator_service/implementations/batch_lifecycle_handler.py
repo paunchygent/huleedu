@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1
@@ -78,13 +78,13 @@ class BatchLifecycleHandler:
             )
 
             # Create the initial batch record
+            metadata_payload = self._build_batch_metadata(data)
+
             await self.batch_repository.create_batch(
                 batch_id=data.entity_id,
                 user_id=data.user_id,
                 essay_count=data.expected_essay_count,
-                metadata={"requested_pipelines": data.requested_pipelines}
-                if hasattr(data, "requested_pipelines")
-                else None,
+                metadata=metadata_payload,
             )
 
             # Associate any orphaned essays with this batch
@@ -149,6 +149,19 @@ class BatchLifecycleHandler:
                 exc_info=True,
             )
             raise
+
+    def _build_batch_metadata(self, data: "BatchEssaysRegistered") -> dict[str, Any] | None:
+        """Capture relevant metadata (requested pipelines, prompt references) for Result Aggregator."""
+        metadata: dict[str, Any] = {}
+
+        if hasattr(data, "requested_pipelines") and getattr(data, "requested_pipelines"):
+            metadata["requested_pipelines"] = getattr(data, "requested_pipelines")
+
+        prompt_ref = getattr(data, "student_prompt_ref", None)
+        if prompt_ref is not None:
+            metadata["student_prompt_ref"] = prompt_ref.model_dump(mode="json")
+
+        return metadata or None
 
     async def process_batch_phase_outcome(
         self,

@@ -29,23 +29,23 @@ Complete the downstream prompt-reference migration by shifting all services from
    - Update service READMEs, metrics descriptions, and Phase 3.2 task checklist.
    - Update `.claude/HANDOFF.md` with completed steps, residual risks, and next actions.
 
-## Current Status (2025-11-06)
+## Current Status (2025-11-08)
 - [x] Step 1 – Common Core contracts updated to carry `student_prompt_ref` (2025-11-04 session).
 - [x] Step 2 – Essay Lifecycle dispatcher now forwards references only (2025-11-06 session kickoff).
 - [x] Step 3 – NLP service hydrates prompt text locally, exposes `huleedu_nlp_prompt_fetch_failures_total`, and propagates `student_prompt_text`/`student_prompt_storage_id` via event metadata. Updated handler, protocols, event publisher, and unit tests (`pdm run pytest-root services/nlp_service/tests -k batch_nlp_analysis_handler`).
 - [x] Step 4 – CJ assessment service now hydrates prompts, emits `huleedu_cj_prompt_fetch_failures_total{reason=…}`, stores nullable prompt metadata, and ships Alembic migration `20251106_1845_make_cj_prompt_nullable.py`. Updated workflow/repository/protocols/tests; validated with `pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'` and `pdm run typecheck-all`.
-- [ ] Step 5 – Cross-service validation, documentation refresh, and residual search.
-  - Docs updated (2025-11-06): `services/nlp_service/README.md`, `services/cj_assessment_service/README.md`, and `documentation/OPERATIONS/01-Grafana-Playbook.md` now cover prompt hydration flow + new counters.
-  - Remaining: broader pytest sweep, downstream `essay_instructions` audit, handoff/task log updates.
+- [x] Step 5 – Cross-service validation, documentation refresh, and residual search.
+  - Docs/tasks refreshed (2025-11-08): discovery notes, plan checklist, and `.claude/HANDOFF.md` all describe the reference-only architecture.
+  - BOS/API Gateway tests now construct payloads with `student_prompt_ref`; legacy `essay_instructions` fixtures removed.
+  - Validation commands: `pdm run pytest-root services/api_gateway_service/tests/test_batch_registration_proxy.py` and `pdm run pytest-root services/batch_orchestrator_service/tests -k "prompt or idempotency or batch_context"`.
 
 **Post-migration cleanup TODO (after all producers use enum keys + backfill complete):**
 - Remove the temporary string-key fallback in NLP/CJ prompt hydration once storage refs are guaranteed to be keyed by `ContentType`.
 - Reset CJ dev databases after deploying the nullable migration instead of backfilling legacy `essay_instructions` rows (sandbox data only).
 
-### Residual `essay_instructions` Usage Audit (2025-11-06)
-- `libs/common_core/src/common_core/events/ai_feedback_events.py`: `AIFeedbackInputDataV1` still requires inline `essay_instructions`. **Plan**: extend AI Feedback contract to accept `student_prompt_ref` + update downstream notebook/tooling before removing the field.
-- `services/essay_lifecycle_service` (BatchExpectation + batch_tracker persistence): retains nullable `essay_instructions` for legacy batches; Content Service reference now in `batch_metadata`. **Plan**: keep until AI Feedback + analytics consumers migrate, then drop column/dataclass field.
-- Result Aggregator + functional tests: fixtures populate `essay_instructions` for backwards compatibility; no production code dependence. **Plan**: flip fixtures to prompt metadata once AI Feedback contracts migrate.
+### Residual `essay_instructions` Usage Audit (2025-11-08)
+- All production services and contracts now rely on `student_prompt_ref`. Remaining usages exist only in historical migrations and documentation history.
+- Result Aggregator functional fixtures will migrate to prompt metadata alongside the AI Feedback notebook refresh (tracked separately).
 
 ## Deliverables
 - Updated common-core event contracts and dependent fixtures.

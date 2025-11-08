@@ -50,6 +50,7 @@ from services.batch_orchestrator_service.implementations.event_publisher_impl im
     DefaultBatchEventPublisherImpl,
 )
 from services.batch_orchestrator_service.protocols import BatchEventPublisherProtocol
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 class OutboxTestProvider(Provider):
@@ -415,7 +416,7 @@ class TestOutboxPatternIntegration:
                             ),
                         ],
                         language="en",
-                        essay_instructions="Test instructions",
+                        student_prompt_ref=make_prompt_ref(f"prompt-concurrent-{i}"),
                     )
 
                     event_envelope = EventEnvelope[BatchServiceNLPInitiateCommandDataV2](

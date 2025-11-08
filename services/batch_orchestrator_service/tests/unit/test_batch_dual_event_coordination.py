@@ -35,6 +35,7 @@ from services.batch_orchestrator_service.implementations.batch_essays_ready_hand
 from services.batch_orchestrator_service.implementations.batch_validation_errors_handler import (
     BatchValidationErrorsHandler,
 )
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 # Rebuild models to resolve forward references
 BatchValidationErrorsV1.model_rebuild()
@@ -116,7 +117,7 @@ class TestBatchDualEventCoordination:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Essay prompt",
+            student_prompt_ref=make_prompt_ref("prompt-dual-coordination"),
             class_type="GUEST",
         )
 
@@ -297,7 +298,7 @@ class TestBatchDualEventCoordination:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Write",
+            student_prompt_ref=make_prompt_ref("prompt-dual-coordination-2"),
             class_type="REGULAR",
         )
 

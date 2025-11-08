@@ -29,6 +29,7 @@ from services.batch_orchestrator_service.protocols import (
     BatchRepositoryProtocol,
     EntitlementsServiceProtocol,
 )
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 @dataclass
@@ -50,7 +51,7 @@ class _MockRepo(BatchRepositoryProtocol):
                 expected_essay_count=ctx.expected_essay_count,
                 essay_ids=None,
                 course_code=CourseCode.ENG5,
-                essay_instructions="Teacher provided instructions.",
+                student_prompt_ref=make_prompt_ref("teacher-provided"),
                 user_id=ctx.user_id,
                 org_id=ctx.org_id,
                 class_id=None,

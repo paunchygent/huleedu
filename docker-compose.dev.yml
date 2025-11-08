@@ -4,6 +4,10 @@
 # This file overrides ALL services to use development Dockerfiles and configurations.
 # It ensures that development containers are started instead of production ones.
 
+x-build-args-deps: &deps-build-args
+  args:
+    DEPS_IMAGE: ${DEPS_IMAGE_TAG:-huledu-deps:dev}
+
 services:
   # NLP Service with development optimizations
   nlp_service:
@@ -11,6 +15,7 @@ services:
       context: .
       dockerfile: services/nlp_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       # Mount source code for hot-reload
       - ./services/nlp_service:/app/services/nlp_service:cached
@@ -32,12 +37,12 @@ services:
       context: .
       dockerfile: services/batch_orchestrator_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/batch_orchestrator_service:/app/services/batch_orchestrator_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/batch_orchestrator_service/__pycache__
-      - /app/services/batch_orchestrator_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -49,13 +54,13 @@ services:
       context: .
       dockerfile: services/essay_lifecycle_service/Dockerfile.dev
       target: development
-    command: ["pdm", "run", "start_worker"]
+      <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "services/essay_lifecycle_service/worker_main.py"]
     volumes:
       - ./services/essay_lifecycle_service:/app/services/essay_lifecycle_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/essay_lifecycle_service/__pycache__
-      - /app/services/essay_lifecycle_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -67,13 +72,13 @@ services:
       context: .
       dockerfile: services/essay_lifecycle_service/Dockerfile.dev
       target: development
-    command: ["pdm", "run", "start"]
+      <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "services/essay_lifecycle_service/app.py"]
     volumes:
       - ./services/essay_lifecycle_service:/app/services/essay_lifecycle_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/essay_lifecycle_service/__pycache__
-      - /app/services/essay_lifecycle_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -85,12 +90,12 @@ services:
       context: .
       dockerfile: services/class_management_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/class_management_service:/app/services/class_management_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/class_management_service/__pycache__
-      - /app/services/class_management_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -102,12 +107,12 @@ services:
       context: .
       dockerfile: services/batch_conductor_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/batch_conductor_service:/app/services/batch_conductor_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/batch_conductor_service/__pycache__
-      - /app/services/batch_conductor_service/__pypackages__
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
@@ -119,12 +124,12 @@ services:
       context: .
       dockerfile: services/llm_provider_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/llm_provider_service:/app/services/llm_provider_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/llm_provider_service/__pycache__
-      - /app/services/llm_provider_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -136,12 +141,12 @@ services:
       context: .
       dockerfile: services/api_gateway_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/api_gateway_service:/app/services/api_gateway_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/api_gateway_service/__pycache__
-      - /app/services/api_gateway_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -154,12 +159,12 @@ services:
       context: .
       dockerfile: services/result_aggregator_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/result_aggregator_service:/app/services/result_aggregator_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/result_aggregator_service/__pycache__
-      - /app/services/result_aggregator_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -171,12 +176,12 @@ services:
       context: .
       dockerfile: services/websocket_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/websocket_service:/app/services/websocket_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/websocket_service/__pycache__
-      - /app/services/websocket_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -188,12 +193,12 @@ services:
       context: .
       dockerfile: services/cj_assessment_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/cj_assessment_service:/app/services/cj_assessment_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/cj_assessment_service/__pycache__
-      - /app/services/cj_assessment_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -205,13 +210,13 @@ services:
       context: .
       dockerfile: services/spellchecker_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/spellchecker_service:/app/services/spellchecker_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       - /app/services/spellchecker_service/__pycache__
-      - /app/services/spellchecker_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -223,12 +228,12 @@ services:
       context: .
       dockerfile: services/file_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/file_service:/app/services/file_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/file_service/__pycache__
-      - /app/services/file_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -240,12 +245,12 @@ services:
       context: .
       dockerfile: services/content_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/content_service:/app/services/content_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/content_service/__pycache__
-      - /app/services/content_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -257,12 +262,12 @@ services:
       context: .
       dockerfile: services/identity_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/identity_service:/app/services/identity_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/identity_service/__pycache__
-      - /app/services/identity_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -275,12 +280,12 @@ services:
       context: .
       dockerfile: services/email_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/email_service:/app/services/email_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/email_service/__pycache__
-      - /app/services/email_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -303,12 +308,12 @@ services:
       context: .
       dockerfile: services/entitlements_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/entitlements_service:/app/services/entitlements_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/entitlements_service/__pycache__
-      - /app/services/entitlements_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -327,12 +332,12 @@ services:
       context: .
       dockerfile: services/language_tool_service/Dockerfile.dev
       target: development
+      <<: *deps-build-args
     volumes:
       - ./services/language_tool_service:/app/services/language_tool_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/language_tool_service/__pycache__
-      - /app/services/language_tool_service/__pypackages__
     environment:
       - ENV_TYPE=development
       - ENVIRONMENT=development
@@ -343,4 +348,3 @@ services:
       - OTEL_SERVICE_NAME=language_tool_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
-

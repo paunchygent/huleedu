@@ -32,49 +32,21 @@ alwaysApply: false
 
 ## 2. Dockerfile Requirements
 
-### 2.1. Service Dockerfile Pattern
-**ALL services MUST have Dockerfile following repository pattern:**
+### 2.1. Shared Dependency Image
+- The repo root owns `Dockerfile.deps`. It copies `pyproject.toml`, `pdm.lock`, and every shared library (`libs/common_core`, `libs/huleedu_service_libs`, `libs/huleedu_nlp_shared`) plus service `pyproject.toml` metadata, then runs `pdm install --dev --frozen-lockfile` from `/app` and owns the tree as `appuser`.
+- `scripts/compute_deps_hash.py` hashes `pyproject.toml`, `pdm.lock`, `Dockerfile.deps`, and shared lib sources. `scripts/dev.sh` uses this hash to tag the deps image (`huledu-deps:<hash>`) and rebuilds it exactly once per dependency change or whenever `pdm run dev-build-clean …` is invoked.
 
-```dockerfile
-FROM python:3.11-slim
+### 2.2. Service Dockerfiles
+- Generated via `scripts/update_service_dockerfiles.py`. Each Dockerfile **MUST**:
+  - Declare `ARG DEPS_IMAGE=huledu-deps:dev` and `FROM ${DEPS_IMAGE}`.
+  - Set the standard env block (`PYTHONUNBUFFERED`, `PYTHONDONTWRITEBYTECODE`, `PDM_USE_VENV=false`, `PYTHONPATH=/app`, etc.).
+  - Copy service code with `COPY --chown=appuser:appuser services/<service>/ /app/services/<service>/`.
+  - Only add service-specific OS packages or data directories (e.g., LanguageTool JRE, content store folder). **FORBIDDEN**: running `pdm install` or recreating `appuser` per service.
+  - Drop legacy `__pypackages__` mounts—dependencies live exclusively in the deps image.
+  - `USER appuser` and set `WORKDIR /app` before the final `CMD` (which still uses `pdm run -p /app …`).
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    ENV_TYPE=docker \
-    PDM_USE_VENV=false
-
-WORKDIR /app
-
-# Install PDM globally
-RUN pip install --no-cache-dir pdm
-
-# Copy shared dependencies first
-COPY libs/common_core/ /app/libs/common_core/
-COPY libs/huleedu_service_libs/ /app/libs/huleedu_service_libs/
-
-# Copy service-specific code
-COPY services/{service_name}/ /app/services/{service_name}/
-
-# Switch to service directory
-WORKDIR /app/services/{service_name}
-
-# Install dependencies
-RUN pdm install --prod
-
-# Create non-root user
-RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser && \
-    chown -R appuser:appuser /app
-USER appuser
-
-# Service-specific CMD
-CMD ["pdm", "run", "start"]
-```
-
-### 2.2. Dual-Mode Services (HTTP + Worker)
-Services with both HTTP API and Kafka worker components:
-- **MUST** support both modes via different entry points
-- **HTTP Mode**: `CMD ["pdm", "run", "start"]` 
-- **Worker Mode**: `CMD ["pdm", "run", "start-worker"]`
+### 2.3. Dual-Mode Services (HTTP + Worker)
+Services with both HTTP API and Kafka worker components **MUST** expose both entry points (e.g., `python services/.../app.py` vs `python services/.../worker_main.py`). All container commands run through `pdm run -p /app …` to ensure the shared deps environment is active.
 
 ## 3. Environment Configuration
 
@@ -108,15 +80,19 @@ environment:
 
 ### 5.1. Build Commands
 ```bash
-# Clean rebuild (development)
-docker compose down --remove-orphans
-docker compose build --no-cache
-docker compose up -d
+# Normal rebuild (uses cached deps image)
+pdm run dev-build <service_a> <service_b>
 
-# Service-specific rebuild
-docker compose build {service_name} --no-cache
-docker compose up -d {service_name}
+# Force deps image + services to rebuild
+pdm run dev-build-clean <service_a> <service_b>
+
+# Start containers using previously built images
+pdm run dev-start
+
+# Start without rebuilding (images must already exist)
+pdm run dev-start-nobuild
 ```
+`dev-build` and `dev-build-clean` automatically compute the dependency hash, rebuild Dockerfile.deps when needed, and pass the resulting `DEPS_IMAGE_TAG` to `docker compose build` for the requested services.
 
 ### 5.2. Dependency Order
 **MUST respect startup dependencies:**

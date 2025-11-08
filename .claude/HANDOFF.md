@@ -5,7 +5,48 @@
 **To**: Next Assistant / Maintainer
 **Task**: `TASKS/TASK-CJ-CONFIDENCE-MATHEMATICAL-VALIDATION.md`
 
+
+## Session Summary (2025-11-08) – Prompt Reference Validation & Documentation
+
+**Status:** Phase 3.2 prompt architecture is fully reference-native across BOS, ELS, NLP, CJ, and Gateway callers. Documentation/tests updated to block regressions.
+
+### What Changed Today
+- Updated Phase 3.2 task plan, discovery notes, and child migration tracker to reflect completed work; removed references to legacy `essay_instructions` bridging.
+- Refreshed `.claude/HANDOFF.md` and TASK logs with the new validation baseline plus remaining fixture-only follow-ups.
+- Converted API Gateway + BOS unit suites to use `student_prompt_ref`, ensuring tests now fail if inline prompts reappear.
+- Added shared test helper for prompt references (`services/batch_orchestrator_service/tests/__init__.py::make_prompt_ref`) and rewired every BOS test fixture/contract instantiation to rely on Content Service references.
+- Ran targeted validations:
+  - `pdm run pytest-root services/api_gateway_service/tests/test_batch_registration_proxy.py`
+  - `pdm run pytest-root services/batch_orchestrator_service/tests -k "prompt or idempotency or batch_context"`
+
+### Validation / Tooling
+- BOS + API Gateway pytest targets above now pass with the new prompt reference fixtures.
+
+### Outstanding Follow-Ups
+- Result Aggregator functional fixtures still include legacy prompt text; update alongside AI Feedback notebook refresh so integration tests assert on `student_prompt_ref`.
+- Monitor AI Feedback and downstream analytics notebooks to ensure they consume `student_prompt_ref` once their datasets are regenerated (tracked in parent plan).
+
 ---
+
+## Session Summary (2025-11-07) – Dev Docker Shared Deps Image
+
+**Status:** Shared dependency-layer image + hash-based rebuild workflow landed; five services rebuilt on the new base and pass health checks.
+
+### What Changed Today
+- Added `Dockerfile.deps` to install the entire monorepo from `/app` once (root `pyproject.toml`, `pdm.lock`, and shared library sources) and own `/app` under `appuser`. The resulting image is tagged `huledu-deps:<hash>`.
+- Created `scripts/compute_deps_hash.py` and extended `scripts/dev.sh` so `pdm run dev-build[-clean] …` computes the dependency hash, builds the deps image if the hash changes (or `--no-cache` is requested), and exports the tag via `DEPS_IMAGE_TAG` for downstream builds.
+- Regenerated every service Dockerfile with `scripts/update_service_dockerfiles.py` so each file now `ARG DEPS_IMAGE` (default `huledu-deps:dev`), `FROM ${DEPS_IMAGE}`, and copies service code with `COPY --chown=appuser:appuser …`—no more per-service `pdm lock/install` or `__pypackages__` mounts.
+- `docker-compose.dev.yml` injects the deps tag through a shared build-args anchor, ensuring Compose rebuilds services atop the current deps image.
+- Clean builds now run in two stages: deps image first (only when inputs change), then the service layer (seconds). Routine `pdm run dev-build` calls reuse the cached deps layer automatically.
+
+### Validation / Tooling
+- `pdm run dev-build-clean content_service` → `docker compose exec content_service curl -sf http://localhost:8000/healthz`
+- `pdm run dev-build-clean class_management_service` → `docker compose exec class_management_service curl -sf http://localhost:5002/healthz`
+- Additional spot checks (email, entitlements, identity, language_tool) rebuilt + started cleanly on the new base.
+
+### Notes
+- `pdm run dev-build-clean …` intentionally rebuilds the deps image (hash + `--no-cache`) before rebuilding the requested services.
+- `docker compose up -d` may emit “No such container …” while pruning old containers after the compose hash change—harmless cleanup noise.
 
 ## Session Summary (2025-11-06, later) – Prompt Reference Migration (Step 5)
 
@@ -21,8 +62,6 @@
 - `pdm run pytest-root services/essay_lifecycle_service/tests/unit/test_nlp_command_handler.py -q`
 
 ### Outstanding Follow-Ups
-- Update AI Feedback event (`AIFeedbackInputDataV1`) + service plan to accept `student_prompt_ref` before deleting residual `essay_instructions` fields.
-- Flip Essay Lifecycle `BatchExpectation` + database persistence away from `essay_instructions` once downstream consumers are reference-native.
 - Retool Result Aggregator fixtures to exercise prompt metadata after AI Feedback migration.
 
 ---

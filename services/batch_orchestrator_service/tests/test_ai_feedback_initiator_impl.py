@@ -17,7 +17,7 @@ from common_core.batch_service_models import BatchServiceAIFeedbackInitiateComma
 from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.envelope import EventEnvelope
-from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
+from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling import HuleEduError
 
@@ -28,6 +28,7 @@ from services.batch_orchestrator_service.implementations.ai_feedback_initiator_i
 from services.batch_orchestrator_service.protocols import (
     BatchEventPublisherProtocol,
 )
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 
 @pytest.fixture
@@ -48,11 +49,7 @@ def sample_batch_context() -> BatchRegistrationRequestV1:
     return BatchRegistrationRequestV1(
         expected_essay_count=2,
         course_code=CourseCode.ENG5,
-        student_prompt_ref=StorageReferenceMetadata(
-            references={
-                "student_prompt_text": {"storage_id": "test-ai-feedback-prompt", "path": ""}
-            }
-        ),
+        student_prompt_ref=make_prompt_ref("test-ai-feedback-prompt"),
         user_id="user_123",
         essay_ids=["essay1", "essay2"],
     )
@@ -179,7 +176,7 @@ class TestAIFeedbackInitiatorImpl:
         custom_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code=CourseCode.ENG6,
-            essay_instructions="Analyze the use of symbolism in modern poetry.",
+            student_prompt_ref=make_prompt_ref("prompt-english-context"),
             user_id="user_123",
             essay_ids=["essay1"],
         )
@@ -208,7 +205,7 @@ class TestAIFeedbackInitiatorImpl:
         swedish_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code=CourseCode.SV2,  # Swedish course
-            essay_instructions="Analysera användningen av metaforer i Strindbergs verk.",
+            student_prompt_ref=make_prompt_ref("prompt-swedish-context"),
             user_id="user_123",
             essay_ids=["essay1"],
         )
@@ -236,7 +233,7 @@ class TestAIFeedbackInitiatorImpl:
         english_context = BatchRegistrationRequestV1(
             expected_essay_count=1,
             course_code=CourseCode.ENG7,  # Valid English course code
-            essay_instructions="Write an essay.",
+            student_prompt_ref=make_prompt_ref("prompt-english-default"),
             user_id="user_123",
             essay_ids=["essay1"],
         )
@@ -264,11 +261,7 @@ class TestAIFeedbackInitiatorImpl:
         comprehensive_context = BatchRegistrationRequestV1(
             expected_essay_count=2,
             course_code=CourseCode.SV1,
-            student_prompt_ref=StorageReferenceMetadata(
-                references={
-                    "student_prompt_text": {"storage_id": "comprehensive-prompt-id", "path": ""}
-                }
-            ),
+            student_prompt_ref=make_prompt_ref("comprehensive-prompt-id"),
             user_id="user_123",
             essay_ids=["essay1", "essay2"],
         )

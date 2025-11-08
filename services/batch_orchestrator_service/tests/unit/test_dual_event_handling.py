@@ -32,6 +32,8 @@ from common_core.metadata_models import (
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
 
+from services.batch_orchestrator_service.tests import make_prompt_ref
+
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -123,7 +125,7 @@ class TestDualEventHandling:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Test instructions",
+            student_prompt_ref=make_prompt_ref("prompt-dual-success"),
             class_type="REGULAR",
         )
 
@@ -258,7 +260,7 @@ class TestDualEventHandling:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Test",
+            student_prompt_ref=make_prompt_ref("prompt-idempotent"),
             class_type="GUEST",
         )
 
@@ -308,7 +310,7 @@ class TestDualEventHandling:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Test",
+            student_prompt_ref=make_prompt_ref("prompt-independent"),
             class_type="REGULAR",
         )
 
@@ -407,7 +409,7 @@ class TestDualEventHandling:
             ),
             course_code=CourseCode.ENG5,
             course_language="en",
-            essay_instructions="Test",
+            student_prompt_ref=make_prompt_ref("prompt-error-handler"),
             class_type="GUEST",
         )
 

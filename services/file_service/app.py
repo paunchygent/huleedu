@@ -40,3 +40,23 @@ async def shutdown() -> None:
 # Register Blueprints
 app.register_blueprint(file_bp)
 app.register_blueprint(health_bp)
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    import hypercorn.asyncio
+    from hypercorn import Config
+
+    # Import the hypercorn config module and convert to Config object
+    from services.file_service import hypercorn_config as hc
+
+    config = Config()
+    config.bind = [hc.bind]
+    config.workers = hc.workers
+    config.worker_class = hc.worker_class
+    config.loglevel = hc.loglevel
+    config.graceful_timeout = hc.graceful_timeout
+    config.keep_alive_timeout = hc.keepalive_timeout
+
+    asyncio.run(hypercorn.asyncio.serve(app, config))

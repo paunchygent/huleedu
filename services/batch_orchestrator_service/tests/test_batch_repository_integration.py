@@ -21,6 +21,7 @@ from common_core.status_enums import BatchStatus
 from testcontainers.postgres import PostgresContainer
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
+from services.batch_orchestrator_service.tests import make_prompt_ref
 from services.batch_orchestrator_service.implementations.batch_repository_postgres_impl import (
     PostgreSQLBatchRepositoryImpl,
 )
@@ -66,7 +67,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         """Sample batch registration for testing - lean registration model."""
         return BatchRegistrationRequestV1(
             course_code=CourseCode.ENG5,
-            essay_instructions="Write a 500-word essay about software engineering.",
+            student_prompt_ref=make_prompt_ref("prompt-software-engineering"),
             user_id="user_123",
             expected_essay_count=25,
             enable_cj_assessment=True,
@@ -78,7 +79,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         return BatchRegistrationRequestV1(
             expected_essay_count=5,
             course_code=CourseCode.SV2,
-            essay_instructions="Write about Swedish culture",
+            student_prompt_ref=make_prompt_ref("prompt-swedish-culture"),
             user_id="user_integration_test",
             enable_cj_assessment=True,
         )
