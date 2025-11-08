@@ -49,3 +49,7 @@ def opentelemetry_test_isolation() -> Generator[InMemorySpanExporter, None, None
         span_exporter.clear()
         # Note: TracerProvider doesn't have remove_span_processor,
         # but clearing the exporter is sufficient for test isolation
+
+
+# Import all test fixtures to register them with pytest
+from services.llm_provider_service.tests.fixtures import *  # noqa: F401,F403

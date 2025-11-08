@@ -308,8 +308,7 @@ class TestModelComparisonResult:
     def test_multiple_new_models(self) -> None:
         """ModelComparisonResult should handle multiple new models."""
         models = [
-            DiscoveredModel(model_id=f"model-{i}", display_name=f"Model {i}")
-            for i in range(5)
+            DiscoveredModel(model_id=f"model-{i}", display_name=f"Model {i}") for i in range(5)
         ]
 
         result = ModelComparisonResult(
