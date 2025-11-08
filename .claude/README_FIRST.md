@@ -141,6 +141,10 @@ pdm run typecheck-all # Type checking
 - Legacy `docs/` root was removed; canonical content now lives under `Documentation/` with four primary categories: `Documentation/apis/` (OpenAPI, WebSocket spec, API reference, TypeScript DTOs), `Documentation/guides/` (Claude plugin guide, frontend integration, shared code patterns, Svelte guide), `Documentation/research/` (historical Swedish materials and the rapport payloads), and `Documentation/adr/` (ADR-001/002).
 - All task references now point to the new paths, and helper scripts referencing the rapport assets have been re-aligned so future contributors only touch the structured locations.
 
+### 14. ENG5 Runner Scaffold (2025-11-08)
+- Added `.claude/research/scripts/eng5_np_batch_runner.py` plus `pdm run eng5-np-run` so engineers can inspect assets (`plan`), emit schema-compliant artefact stubs (`dry-run`), and publish real `ELS_CJAssessmentRequestV1` events via Kafka (`execute`, overridable with `--no-kafka`). Execute mode now supports `--llm-provider/--llm-model/--llm-temperature/--llm-max-tokens` overrides and optional `--await-completion` to tail `huleedu.cj_assessment.completed.v1`.
+- Contract-focused tests live at `.claude/research/scripts/test_eng5_np_batch_runner.py`, covering checksum helpers, directory snapshots, stub writer behaviour, real dataset detection, envelope generation, and override plumbing.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

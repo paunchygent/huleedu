@@ -399,6 +399,8 @@ obs-restart = "docker compose restart prometheus grafana loki jaeger promtail al
 obs-logs = "docker compose logs -f prometheus grafana loki jaeger promtail alertmanager"
 obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertmanager"
 
+eng5-np-run = "python .claude/research/scripts/eng5_np_batch_runner.py"
+
 [tool.pdm.dev-dependencies]
 dev = [
     "-e file:///${PROJECT_ROOT}/libs/common_core",

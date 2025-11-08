@@ -12,6 +12,7 @@
 
 ### What Changed Today
 - Scoped Phase 3.3 deliverables: documented the ENG5 NP runner/CLI, data-source mapping, validation plan, and JSON artefact manifest requirements in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (see new “Phase 3.3 Detailed Scope” section) and published the draft schema at `Documentation/schemas/eng5_np/assessment_run.schema.json`.
+- Delivered the initial runner scaffold (`pdm run eng5-np-run`) under `.claude/research/scripts/eng5_np_batch_runner.py` with plan/dry-run/execute modes, schema validation, deterministic artefact stubs, typed `ELS_CJAssessmentRequestV1` envelope generation, optional Kafka publishing, configurable LLM overrides, and — when `--await-completion` is supplied — completion-event capture. Unit coverage lives at `.claude/research/scripts/test_eng5_np_batch_runner.py`.
 - Consolidated the legacy `docs/` directory into structured `Documentation/` subtrees (`apis/`, `guides/`, `research/`, `adr/`) and updated all references/scripts so contributors have a single canonical location per documentation category.
 - Updated Phase 3.2 task plan, discovery notes, and child migration tracker to reflect completed work; removed references to legacy `essay_instructions` bridging.
 - Refreshed `.claude/HANDOFF.md` and TASK logs with the new validation baseline plus remaining fixture-only follow-ups.

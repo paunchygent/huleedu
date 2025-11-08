@@ -52,6 +52,7 @@
   - CLI/module (`.claude/research/scripts` or service CLI) to run ENG5 NP batches without persisting essays to prod DB.
   - JSON schema implemented at `Documentation/schemas/eng5_np/assessment_run.schema.json` (runner copies this into `.claude/research/data/eng5_np_2016/` alongside generated artefacts).
   - Stored artefacts: comparisons, BT stats, grade projections, metadata (instructions, prompts, correlation IDs).
+  - ✅ Initial scaffold complete: `pdm run eng5-np-run --mode plan|dry-run|execute` (see `.claude/research/scripts/eng5_np_batch_runner.py`). Execute now generates schema artefacts, writes a typed `ELS_CJAssessmentRequestV1` envelope, publishes it via `KafkaBus` (unless `--no-kafka`), accepts LLM overrides, and can optionally wait for `CJAssessmentCompleted` events for the batch.
 - **Steps**
   1. Build ingestion runner leveraging new scale registry; load essays/anchors from `test_uploads/...`.
   2. Launch dev Docker stack (rule 080) and execute CJ pipeline with full instructions/prompt metadata.
@@ -71,6 +72,7 @@
 - Loads grade-scale metadata from the registry introduced in Phase 3.1, defaulting to `eng5_np_legacy_9_step` while allowing overrides via `--grade-scale`.
 - Pulls anchors, student essays, prompt references, and instruction markdown from `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/**`, emitting structured diagnostics if any file is missing or unsupported.
 - Streams comparison callbacks to an artefact builder that records each comparison (`winner`, `loser`, `llm_provider`, `cost`) plus derived Bradley–Terry stats and the final GradeProjector output.
+- Execute mode now composes a full `ELS_CJAssessmentRequestV1` envelope (prompt references, course metadata, assignment context), stores it under `.claude/research/data/eng5_np_2016/requests/`, publishes it through `KafkaBus` unless `--no-kafka` is supplied (Kafka bootstrap/client id configurable), and can tail `huleedu.cj_assessment.completed.v1` to capture completion metadata (`--await-completion`, `--completion-timeout`).
 - Provides `--no-kafka` flag for offline fixture generation so we can unit-test ingestion logic without touching Kafka.
 
 **Data Sources & Preflight**
