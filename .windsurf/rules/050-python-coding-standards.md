@@ -88,7 +88,17 @@ class ConcreteImpl:
 ## 6. Code Structure
 - **Error Handling**: Catch specific exceptions, use domain-specific exceptions
 - **Line Length**: Max 100 characters (hard limit enforced by CI where possible).
-- **File Size**: Max 400 lines of code (LoC) per Python file (hard limit enforced by CI where possible, e.g., via `scripts/loc_guard.sh`).
+- **File Size Limits**:
+  - **Production Code**: HARD LIMIT 400-500 LoC per file
+    - **Rationale**: Enforces Single Responsibility Principle (SRP), improves maintainability and testability
+    - **When approaching limit**: Extract helper functions, split by feature/domain, create subdirectory for related files
+    - **Enforcement**: CI checks via `scripts/loc_guard.sh` where possible
+  - **Test Files**: SOFT LIMIT 800 LoC, HARD LIMIT 1,200 LoC per file
+    - **Rationale**: Test files naturally contain repetitive setup/assertions; multiple test cases for single component belong together
+    - **When approaching 800 LoC**: Consider extracting shared fixtures to test utilities
+    - **When approaching 1,000 LoC**: Consider splitting by feature or test category
+    - **When exceeding 1,200 LoC**: MUST refactor - split test suite
+    - **Exception**: Integration/E2E test suites may exceed limits if testing comprehensive workflows
 - **Blank Lines**: Per PEP 8
 - **Imports**: Prefer consistent patterns within services; actual import failures are usually service configuration issues
 

@@ -5,7 +5,6 @@ Follows async SQLAlchemy pattern with session management and basic CRUD operatio
 
 from __future__ import annotations
 
-import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncGenerator
 from uuid import uuid4
@@ -15,6 +14,7 @@ from huleedu_service_libs.error_handling import (
     raise_connection_error,
     raise_processing_error,
 )
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -27,7 +27,7 @@ from services.nlp_service.models_db import Base, NlpAnalysisJob
 if TYPE_CHECKING:
     pass
 
-_LOGGER = logging.getLogger("nlp_service.repository")
+_LOGGER = create_service_logger(__name__)
 
 
 class NlpRepository:

@@ -145,6 +145,8 @@ Outstanding next steps:
 1. Execute Phase 3.1 (grade-scale registry + migrations) per `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md`.
 2. Update CJ anchor API, GradeProjector, and helper CLI for scale awareness (Phase 3.2).
 3. Build/run the ENG5 NP ingestion CLI, capture outputs using the agreed JSON schema (Phase 3.3), then move to confidence recalibration/testing (Phase 4).
+   - Decision (2025-11-08): Runner will collect comparison callbacks and BT summaries exclusively via short-lived Kafka consumers (topics `huleedu.llm_provider.comparison_result.v1`, `huleedu.cj_assessment.completed.v1`, and the rich `AssessmentResultV1` topic) instead of querying CJ databases. This keeps us aligned with rule 020 (contract-only integration) and provides the per-comparison cost/token data missing from the artefact today.
+   - Implementation note: `--await-completion` will now spin up the consumer, persist every matching callback under `.claude/research/data/eng5_np_2016/events/comparisons/`, and merge the resulting `LLMComparisonResultV1` plus `AssessmentResultV1` payloads into `assessment_run.execute.json` (`llm_comparisons`, `bt_summary`, `grade_projections`, `costs`, validation manifest updates).
 
 ---
 

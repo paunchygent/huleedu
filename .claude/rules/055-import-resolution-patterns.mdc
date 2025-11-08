@@ -8,20 +8,60 @@ When all service directories are in PYTHONPATH (as they are in Docker containers
 
 ## The Solution: Full Module Path Imports (Mandatory)
 
-### Standard Pattern: Full Module Path Imports
-**All services MUST use full module paths for all imports that could potentially conflict:**
+### Relative Import Policy
+
+**Cross-Service/Cross-Package Imports (FORBIDDEN):**
+```python
+# ❌ NEVER use relative imports across services or major boundaries
+from ..common_core.events import EventEnvelope
+from ..other_service.module import SomeClass
+```
+
+**Always use full module paths for cross-boundary imports:**
+```python
+# ✅ CORRECT - Full paths for cross-service/library imports
+from libs.common_core.src.common_core.events import EventEnvelope
+from services.other_service.module import SomeClass
+```
+
+**Intra-Package Imports (ACCEPTABLE):**
+Within a single service or library package, relative imports are acceptable and encouraged for internal organization:
 
 ```python
-# Correct - Full path prevents ambiguity
+# ✅ ACCEPTABLE in __init__.py for package exports
+from .module import SomeClass
+from .subpackage import helper
+
+# ✅ ACCEPTABLE in domain packages for internal organization
+from .validators import validate_input
+from ..shared import common_utility
+```
+
+**Examples of acceptable relative import contexts:**
+- Service `__init__.py` files: `services/cj_assessment_service/__init__.py`
+- Feature packages: `services/nlp_service/features/student_matching/__init__.py`
+- Test fixtures: `tests/unit/__init__.py` or `tests/conftest.py`
+
+### Standard Pattern: Full Module Path Imports
+**All services MUST use full module paths for cross-service imports:**
+
+```python
+# ✅ CORRECT - Full path prevents ambiguity
 from services.result_aggregator_service.metrics import ResultAggregatorMetrics
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 from services.result_aggregator_service.di import ServiceProvider
+from libs.common_core.src.common_core.events import EventEnvelope
 
-# Incorrect - Can resolve to wrong service's module
+# ❌ INCORRECT - Can resolve to wrong service's module
 from metrics import ResultAggregatorMetrics
 from protocols import BatchRepositoryProtocol
 from di import ServiceProvider
 ```
+
+**Guideline:**
+- **Cross-boundary** (services ↔ services, services ↔ libs): Always use full paths
+- **Intra-package** (within single service/library): Relative imports acceptable for internal organization
+- **When in doubt**: Use full paths for clarity
 
 ### Test Import Consistency
 **Critical Rule**: Test imports must match the service's import pattern.

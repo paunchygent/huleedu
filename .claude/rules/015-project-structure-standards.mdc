@@ -8,12 +8,19 @@ alwaysApply: true
 ## 1. Root Directory Structure
 
 **Permitted Root Files:**
-- `README.md`, `LICENSE`, `pyproject.toml`, `pdm.lock`, `docker-compose.yml`
-- `.gitignore`, `.pdm-python`, `.dockerignore`, `AGENTS.md`
+- `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`, `pdm.lock`
+- `docker-compose.yml`, `docker-compose.*.yml` (env-specific overrides)
+- `Dockerfile.deps` (shared dependency image)
+- `.gitignore`, `.pdm-python`, `.dockerignore`
+- `AGENTS.md`, `CODEX.md`, `GEMINI.md` (AI assistant references - expected in root)
+- `CLAUDE.md`, `CLAUDE.local.md` (Claude Code instructions)
 
 **Permitted Root Directories:**
-- `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`
-- `libs/`, `services/`, `scripts/`, `documentation/`
+- `.git/`, `.venv/`, `.mypy_cache/`, `__pycache__/`, `.cursor/`, `.ruff_cache/`, `.windsurf/`, `.claude/`
+- `libs/`, `services/`, `scripts/`, `documentation/`, `TASKS/`
+- `frontend/` (frontend application), `observability/` (monitoring configs)
+- `test_uploads/` (test fixtures), `tests/` (cross-service integration tests)
+- `data/`, `output/`, `build/`, `dist/` (generated artifacts - gitignored)
 
 **FORBIDDEN**: Setup scripts, service-specific files, temporary files in root
 
@@ -76,26 +83,71 @@ services/essay_lifecycle_service/    # Hybrid HTTP + Kafka service
     └── tests/
 ```
 
-## 4. HTTP Service Blueprint Structure **MANDATORY**
+## 4. Service Architecture Patterns **MANDATORY**
 
-**For all HTTP services (Quart-based), the following structure is REQUIRED:**
+### 4.1. Quart Services (Internal APIs)
 
-### 4.1. app.py Structure Requirements
-- **MUST** be lean (< 150 lines) focused on:
-  - Quart app initialization
-  - Dependency injection setup
-  - Blueprint registration
-  - Global middleware (metrics, logging)
-  - Startup/shutdown hooks
-- **FORBIDDEN**: Direct route definitions in app.py
+**Use `api/` directory with Blueprint pattern**
 
-### 4.2. Standard Blueprint Files
+See **[041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc)** for complete HTTP service patterns including:
+- HuleEduApp initialization and requirements
+- Blueprint structure and registration
+- Health routes pattern
+- Dishka DI integration
 
-**Note on Worker Service Structure (e.g., `spellchecker_service`):**
-- `worker_main.py`: Handles service lifecycle (startup, shutdown), Kafka client management, signal handling, and the primary message consumption loop. Initializes DI container.
-- `event_processor.py`: Contains logic for deserializing incoming messages, implementing defined protocols (often by composing functions from `core_logic.py`), and orchestrating the processing flow for a single message.
-- `core_logic.py`: Houses the fundamental, reusable business logic, algorithms, and interactions with external systems (like HTTP calls to other services), implemented as standalone functions or simple classes.
-- `protocols.py`: Defines `typing.Protocol` interfaces for key internal dependencies and behavioral contracts, facilitating DI and testability.
+**Examples:** `content_service`, `file_service`, `batch_orchestrator_service`
+
+### 4.2. FastAPI Services (Client-facing APIs)
+
+**Use `routers/` directory with FastAPI router pattern**
+
+**Structure:**
+```
+services/{service_name}/
+├── app/
+│   ├── main.py              # FastAPI app entry (< 150 LoC)
+│   └── di.py                # Dependency injection
+├── routers/                 # FastAPI routers (NOT api/)
+│   ├── {domain}_routes.py
+│   └── status_routes.py
+├── implementations/
+├── protocols.py
+└── config.py
+```
+
+**See also:**
+- [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for core stack requirements
+- [042.2-http-proxy-service-patterns.mdc](mdc:042.2-http-proxy-service-patterns.mdc) for API Gateway proxy patterns
+
+**Examples:** `api_gateway_service`, `class_management_service`, `identity_service`, `entitlements_service`
+
+### 4.3. Worker Services (Kafka Consumers)
+
+**Simple Pattern** (business logic < 500 LoC):
+```
+services/{service_name}/
+├── worker_main.py          # Service lifecycle, Kafka management
+├── event_processor.py      # Message handling, routing
+├── core_logic.py           # Business logic (single file)
+├── protocols.py
+└── di.py
+```
+
+**Complex Pattern** (business logic > 500 LoC, multiple domains):
+```
+services/{service_name}/
+├── worker_main.py
+├── event_processor.py
+├── {domain}_logic/         # Domain-specific directory
+│   ├── {feature}_handler.py
+│   └── {feature}_validator.py
+├── protocols.py
+└── di.py
+```
+
+**Directory naming examples:** `cj_core_logic/`, `spell_logic/`, `command_handlers/`, `features/`
+
+**See also:** [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc) for Kafka integration requirements and `@idempotent_consumer` patterns
 
 ## 5. Common Core Structure
 

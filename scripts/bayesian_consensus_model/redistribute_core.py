@@ -272,6 +272,9 @@ def write_assignments(
         essay_id: f"essay_{idx:02d}" for idx, essay_id in enumerate(sorted_essays, start=1)
     }
 
+    # Ensure output directory exists
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     fieldnames = [
         "rater_name",
         "pair_id",

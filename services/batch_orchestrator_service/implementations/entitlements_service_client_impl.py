@@ -1,15 +1,15 @@
 """Implementation of EntitlementsServiceProtocol for HTTP-based credit checking."""
 
 import json
-import logging
 from typing import Any
 
 import aiohttp
+from huleedu_service_libs.logging_utils import create_service_logger
 from huleedu_service_libs.observability import get_tracer, trace_operation
 
 from services.batch_orchestrator_service.protocols import EntitlementsServiceProtocol
 
-logger = logging.getLogger(__name__)
+logger = create_service_logger(__name__)
 
 
 class EntitlementsServiceClientImpl(EntitlementsServiceProtocol):

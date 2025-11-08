@@ -14,8 +14,8 @@ try:
 except ImportError:  # pragma: no cover - compatibility with older Textual
     from textual.widgets import Log as TextLog  # type: ignore
 
-DEFAULT_PAIRS_OUTPUT = Path("cj_comparison_pairs.csv")
-DEFAULT_OUTPUT = Path("cj_rater_assignments.csv")
+DEFAULT_PAIRS_OUTPUT = Path("output/bayesian_consensus_model/cj_comparison_pairs.csv")
+DEFAULT_OUTPUT = Path("output/bayesian_consensus_model/cj_rater_assignments.csv")
 DEFAULT_RATER_COUNT = 14
 MAX_LOG_WIDTH = 82  # Fits within 90-column panel with padding
 

@@ -89,6 +89,17 @@ configure_service_logging("service-name", log_level=settings.LOG_LEVEL)
 logger = create_service_logger("component-name")
 ```
 
+**Exception - Alembic Migration Scripts:**
+- **File**: `services/{service}/alembic/env.py` ONLY
+- **Allowed**:
+```python
+import logging
+from logging.config import fileConfig
+logger = logging.getLogger(__name__)
+```
+- **Rationale**: Alembic runs outside service context (no DI container), migration logs don't need correlation IDs or structured format
+- **Restriction**: ONLY `alembic/env.py` - all other service code MUST use `create_service_logger()`
+
 ### 3.2. Mandatory Correlation IDs
 - For any operation chain (request/event), a `correlation_id` **MUST** be established or propagated
 - This `correlation_id` **MUST** be in all log messages across all involved services

@@ -35,35 +35,49 @@ COPY services/websocket_service/pyproject.toml services/websocket_service/pyproj
 SERVICES = {
     "api_gateway_service": {
         "cmd_dev": [
-            "python","-m","uvicorn",
-            "services.api_gateway_service.app.main:app","--host","0.0.0.0","--port","8080"
+            "python",
+            "-m",
+            "uvicorn",
+            "services.api_gateway_service.app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
         ],
     },
     "batch_conductor_service": {
         "cmd_dev": [
-            "python","-m","hypercorn",
-            "services.batch_conductor_service.app:app","--bind","0.0.0.0:4002","--worker-class","asyncio"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.batch_conductor_service.app:app",
+            "--bind",
+            "0.0.0.0:4002",
+            "--worker-class",
+            "asyncio",
         ],
     },
     "batch_orchestrator_service": {
-        "cmd_dev": [
-            "python","services/batch_orchestrator_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/batch_orchestrator_service/app.py"],
     },
     "cj_assessment_service": {
-        "cmd_dev": [
-            "python","services/cj_assessment_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/cj_assessment_service/app.py"],
     },
     "class_management_service": {
-        "cmd_dev": [
-            "python","services/class_management_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/class_management_service/app.py"],
     },
     "content_service": {
         "cmd_dev": [
-            "python","-m","hypercorn",
-            "services.content_service.app:app","--bind","0.0.0.0:8000","--workers","4","--worker-class","asyncio"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.content_service.app:app",
+            "--bind",
+            "0.0.0.0:8000",
+            "--workers",
+            "4",
+            "--worker-class",
+            "asyncio",
         ],
         "post_copy_dev": ["RUN mkdir -p /data/huleedu_content_store"],
         "post_copy_prod": ["RUN mkdir -p /data/huleedu_content_store"],
@@ -73,41 +87,50 @@ SERVICES = {
     },
     "email_service": {
         "cmd_dev": [
-            "python","-m","hypercorn",
-            "services.email_service.app:app","--bind","0.0.0.0:8080"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.email_service.app:app",
+            "--bind",
+            "0.0.0.0:8080",
         ],
     },
     "entitlements_service": {
         "cmd_dev": [
-            "python","-m","hypercorn",
-            "services.entitlements_service.app:app","--bind","0.0.0.0:8083"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.entitlements_service.app:app",
+            "--bind",
+            "0.0.0.0:8083",
         ],
     },
     "essay_lifecycle_service": {
-        "cmd_dev": [
-            "python","services/essay_lifecycle_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/essay_lifecycle_service/app.py"],
     },
     "file_service": {
-        "cmd_dev": [
-            "python","services/file_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/file_service/app.py"],
         "extra_packages": ["libmagic1", "pandoc"],
     },
     "identity_service": {
         "cmd_dev": [
-            "python","-m","hypercorn",
-            "services.identity_service.app:app","--bind","0.0.0.0:7005"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.identity_service.app:app",
+            "--bind",
+            "0.0.0.0:7005",
         ],
     },
     "language_tool_service": {
-        "cmd_dev": [
-            "python","services/language_tool_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/language_tool_service/app.py"],
         "cmd_prod": [
-            "python","-m","hypercorn",
-            "services.language_tool_service.app:app","--config",
-            "python:services.language_tool_service.hypercorn_config"
+            "python",
+            "-m",
+            "hypercorn",
+            "services.language_tool_service.app:app",
+            "--config",
+            "python:services.language_tool_service.hypercorn_config",
         ],
         "extra_packages": ["wget", "unzip", "openjdk-21-jre-headless"],
         "extra_base": [
@@ -120,27 +143,28 @@ SERVICES = {
         ],
     },
     "llm_provider_service": {
-        "cmd_dev": [
-            "python","services/llm_provider_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/llm_provider_service/app.py"],
     },
     "result_aggregator_service": {
-        "cmd_dev": [
-            "python","services/result_aggregator_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/result_aggregator_service/app.py"],
     },
     "spellchecker_service": {
-        "cmd_dev": [
-            "python","services/spellchecker_service/app.py"
-        ],
+        "cmd_dev": ["python", "services/spellchecker_service/app.py"],
     },
     "websocket_service": {
         "cmd_dev": [
-            "python","-m","uvicorn",
-            "services.websocket_service.main:app","--host","0.0.0.0","--port","8080"
+            "python",
+            "-m",
+            "uvicorn",
+            "services.websocket_service.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
         ],
     },
 }
+
 
 def render_env(extra_env=None):
     lines = [
@@ -169,7 +193,6 @@ def render_extra_packages(extra_packages: list[str] | None) -> str:
     lines.extend(f"    {pkg} \\" for pkg in extra_packages)
     lines.append("    && rm -rf /var/lib/apt/lists/*")
     return "\n".join(lines) + "\n"
-
 
 
 def format_cmd(cmd):

@@ -136,9 +136,9 @@ def sample_batch_essays_ready_event() -> dict:
             # Enhanced lean registration fields (required by updated BatchEssaysReady model)
             "course_code": CourseCode.ENG5.value,
             "course_language": "en",
-            "student_prompt_ref": make_prompt_ref(
-                "prompt-idempotency-outage"
-            ).model_dump(mode="json"),
+            "student_prompt_ref": make_prompt_ref("prompt-idempotency-outage").model_dump(
+                mode="json"
+            ),
             "class_type": "GUEST",
         },
     }

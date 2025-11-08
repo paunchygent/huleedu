@@ -6,7 +6,6 @@ engine, session management, and optional schema initialisation.
 
 from __future__ import annotations
 
-import logging
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -19,6 +18,7 @@ from huleedu_service_libs.error_handling import (
     raise_connection_error,
     raise_processing_error,
 )
+from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -39,7 +39,7 @@ from services.spellchecker_service.repository_protocol import SpellcheckReposito
 if TYPE_CHECKING:  # pragma: no cover
     pass
 
-_LOGGER = logging.getLogger("spell_checker.repository.postgres")
+_LOGGER = create_service_logger(__name__)
 
 
 class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):

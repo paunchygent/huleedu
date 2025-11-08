@@ -77,9 +77,7 @@ class RunnerPaths:
 
     @classmethod
     def from_repo_root(cls, repo_root: Path) -> "RunnerPaths":
-        role_models_root = (
-            repo_root / "test_uploads" / "ANCHOR ESSAYS" / "ROLE_MODELS_ENG5_NP_2016"
-        )
+        role_models_root = repo_root / "test_uploads" / "ANCHOR ESSAYS" / "ROLE_MODELS_ENG5_NP_2016"
         return cls(
             repo_root=repo_root,
             role_models_root=role_models_root,
@@ -94,11 +92,7 @@ class RunnerPaths:
             / "schemas"
             / "eng5_np"
             / "assessment_run.schema.json",
-            artefact_output_dir=repo_root
-            / ".claude"
-            / "research"
-            / "data"
-            / "eng5_np_2016",
+            artefact_output_dir=repo_root / ".claude" / "research" / "data" / "eng5_np_2016",
         )
 
 
@@ -333,12 +327,8 @@ def write_stub_artefact(
         "inputs": {
             "instructions": _record_to_json(inventory.instructions),
             "prompt_reference": _record_to_json(inventory.prompt),
-            "anchors": [
-                _record_to_json(record) for record in inventory.anchor_docs.files
-            ],
-            "students": [
-                _record_to_json(record) for record in inventory.student_docs.files
-            ],
+            "anchors": [_record_to_json(record) for record in inventory.anchor_docs.files],
+            "students": [_record_to_json(record) for record in inventory.student_docs.files],
         },
         "llm_comparisons": [],
         "bt_summary": [],
