@@ -135,6 +135,11 @@ The objective is to decouple student prompt payloads from registration forms whi
   - Updated discovery notes, handoff, and task plan to reflect the reference-only prompt architecture and completed validation.
   - Refreshed API Gateway + BOS unit suites to build payloads with `student_prompt_ref`, eliminating silent acceptance of legacy `essay_instructions`.
   - Executed targeted pytest runs (`services/api_gateway_service/tests/test_batch_registration_proxy.py`, `services/batch_orchestrator_service/tests -k "prompt or idempotency or batch_context"`) plus linted docs to enforce the new contract end-to-end.
+  - Result Aggregator now persists `student_prompt_ref` inside `batch_results.batch_metadata`, with documentation in `services/result_aggregator_service/README.md` and integration tests covering round-trips.
+
+### Next Steps
+- Result Aggregator API responses (`/internal/v1/batches/...`) now surface `student_prompt_ref`; coordinate with dashboard/BI owners if they need to render prompt provenance.
+- Align Result Aggregator functional fixtures (Result Aggregator + end-to-end suites) with the new metadata once AI Feedback notebooks consume `student_prompt_ref`.
 
 ### Dispatcher Bridging Rules
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -173,6 +173,7 @@ def create_mock_batch_result(
     overall_status: BatchStatus,
     essay_count: int,
     essays: Optional[List[AsyncMock]] = None,
+    batch_metadata: Optional[Dict[str, Any]] = None,
 ) -> AsyncMock:
     """Create a mock BatchResult for testing."""
     mock_batch = AsyncMock(spec=BatchResult)
@@ -193,6 +194,7 @@ def create_mock_batch_result(
     mock_batch.requested_pipeline = None  # Set to None or a string value
     mock_batch.processing_started_at = None
     mock_batch.processing_completed_at = None
+    mock_batch.batch_metadata = batch_metadata or {}
     return mock_batch
 
 
@@ -286,12 +288,24 @@ class TestQueryEndpoints:
             ),
         ]
 
+        prompt_metadata = {
+            "student_prompt_ref": {
+                "references": {
+                    "student_prompt_text": {
+                        "storage_id": "prompt-api",
+                        "path": "",
+                    }
+                }
+            }
+        }
+
         mock_batch: AsyncMock = create_mock_batch_result(
             batch_id=batch_id,
             user_id="user-456",
             overall_status=BatchStatus.COMPLETED_SUCCESSFULLY,
             essay_count=2,
             essays=mock_essays,
+            batch_metadata=prompt_metadata,
         )
 
         # Configure the mock query service
@@ -314,6 +328,10 @@ class TestQueryEndpoints:
         assert len(data["essays"]) == 2
         assert data["essays"][0]["essay_id"] == "essay-1"
         assert data["essays"][0]["spellcheck_status"] == "completed"
+        assert (
+            data["student_prompt_ref"]["references"]["student_prompt_text"]["storage_id"]
+            == "prompt-api"
+        )
 
     async def test_get_batch_status_not_found(
         self,

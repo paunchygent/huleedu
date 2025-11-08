@@ -27,6 +27,7 @@ models_db.py          # SQLAlchemy models + event_outbox
 
 - `GET /batches/{batch_id}/status`: Comprehensive batch status with internal `BatchStatus` enum values
 - `GET /batches/user/{user_id}`: User's batches with pagination
+- Responses include `student_prompt_ref` (serialized `StorageReferenceMetadata`) whenever BOS supplied a prompt reference during registration, enabling dashboards to display prompt provenance without additional joins.
 
 ### Status Integration
 
@@ -37,6 +38,10 @@ Provides detailed internal status tracking using 12-value `BatchStatus` enum. AP
 - `batch_results`: Batch-level aggregation
 - `essay_results`: Essay-level results per phase
 - Optimized indexes: (user_id, batch_id), status fields
+- `batch_metadata`: JSON column on `batch_results` used for BOS-derived metadata such as
+  `requested_pipelines` and `student_prompt_ref`. Prompt references are stored as serialized
+  `StorageReferenceMetadata` objects keyed by `student_prompt_ref`, enabling downstream
+  reporting tooling to recover the Content Service `storage_id` without querying other services.
 
 ## Kafka Integration
 

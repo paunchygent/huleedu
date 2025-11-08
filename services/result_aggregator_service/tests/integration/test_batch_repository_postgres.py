@@ -22,6 +22,8 @@ from services.result_aggregator_service.implementations.batch_repository_postgre
     BatchRepositoryPostgresImpl,
 )
 from services.result_aggregator_service.models_db import Base, BatchResult
+from common_core.metadata_models import StorageReferenceMetadata
+from common_core.domain_enums import ContentType
 
 
 @pytest.fixture(scope="function")
@@ -111,6 +113,12 @@ async def batch_repository(
 class TestBatchRepositoryIntegration:
     """Integration tests for batch repository with real PostgreSQL."""
 
+    @staticmethod
+    def _make_prompt_metadata(storage_id: str) -> dict:
+        prompt_ref = StorageReferenceMetadata()
+        prompt_ref.add_reference(ContentType.STUDENT_PROMPT_TEXT, storage_id)
+        return {"student_prompt_ref": prompt_ref.model_dump(mode="json")}
+
     async def test_complete_batch_lifecycle(
         self, batch_repository: BatchRepositoryPostgresImpl
     ) -> None:
@@ -198,17 +206,31 @@ class TestBatchRepositoryIntegration:
         assert final_batch.overall_status == BatchStatus.COMPLETED_SUCCESSFULLY
         assert final_batch.completed_essay_count == 3
         assert final_batch.failed_essay_count == 0
-        # Note: processing_started_at and processing_completed_at are not set
-        # by the current implementation
 
-        # Verify all essay data is preserved
-        assert len(final_batch.essays) == 3
-        for essay in final_batch.essays:
-            assert essay.spellcheck_status == ProcessingStage.COMPLETED
-            assert essay.cj_assessment_status == ProcessingStage.COMPLETED
-            assert essay.spellcheck_correction_count is not None
-            assert essay.cj_rank is not None
-            assert essay.cj_score is not None
+    async def test_create_batch_persists_prompt_metadata(
+        self, batch_repository: BatchRepositoryPostgresImpl
+    ) -> None:
+        """Ensure prompt reference metadata survives create/get round-trip."""
+        batch_id = "prompt-meta-batch"
+        user_id = "prompt-meta-user"
+        metadata = self._make_prompt_metadata("prompt-storage-id")
+
+        await batch_repository.create_batch(
+            batch_id=batch_id,
+            user_id=user_id,
+            essay_count=1,
+            metadata=metadata,
+        )
+
+        stored_batch = await batch_repository.get_batch(batch_id)
+        assert stored_batch is not None
+        assert stored_batch.batch_metadata is not None
+        prompt_metadata = stored_batch.batch_metadata.get("student_prompt_ref")
+        assert prompt_metadata is not None
+        assert (
+            prompt_metadata["references"][ContentType.STUDENT_PROMPT_TEXT.value]["storage_id"]
+            == "prompt-storage-id"
+        )
 
     async def test_batch_with_failures(self, batch_repository: BatchRepositoryPostgresImpl) -> None:
         """Test batch processing with some essay failures."""

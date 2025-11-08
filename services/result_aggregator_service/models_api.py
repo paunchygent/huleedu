@@ -62,6 +62,7 @@ class BatchStatusResponse(BaseModel):
     last_updated: datetime
     processing_started_at: Optional[datetime] = None
     processing_completed_at: Optional[datetime] = None
+    student_prompt_ref: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_domain(cls, batch_result: "BatchResult") -> "BatchStatusResponse":
@@ -86,6 +87,8 @@ class BatchStatusResponse(BaseModel):
             batch_result.overall_status.value,
             BatchClientStatus.PROCESSING,  # Default fallback
         )
+
+        metadata = batch_result.batch_metadata or {}
 
         return cls(
             batch_id=batch_result.batch_id,
@@ -121,6 +124,7 @@ class BatchStatusResponse(BaseModel):
             last_updated=batch_result.updated_at,
             processing_started_at=batch_result.processing_started_at,
             processing_completed_at=batch_result.processing_completed_at,
+            student_prompt_ref=metadata.get("student_prompt_ref"),
         )
 
 

@@ -11,10 +11,10 @@ HuleEdu is an educational assessment platform that processes student essays thro
 - **Event Pattern**: EventEnvelope wrapper with correlation tracking
 - **Reliability**: Transactional outbox pattern for critical events
 
-## Tech Stack (Exact Versions)
+## Tech Stack
 - **Python**: 3.11
 - **Frameworks**: Quart (internal), FastAPI (external APIs)
-- **Package Manager**: PDM 2.10.4
+- **Package Manager**: PDM
 - **Core Libraries**:
   - Pydantic v2 (data validation)
   - SQLAlchemy 2.0+ (async ORM)
@@ -52,8 +52,8 @@ HuleEdu is an educational assessment platform that processes student essays thro
 docker --version  # Should be 20.10+
 docker compose version  # Should be 2.x
 
-# Install PDM
-pip install pdm==2.10.4
+# Install PDM (or use your preferred method)
+pip install pdm
 ```
 
 ### Development Setup
@@ -64,53 +64,48 @@ cd huledu-reboot
 pdm install
 
 # 2. Start all services (development mode with hot-reload)
-pdm run dev-start
+pdm run dev-build-start
 
-# 3. Run database migrations
-pdm run db-migrate
-
-# 4. Seed test data
-pdm run db-seed
-
-# 5. Check service health
+# 3. Check service health
 docker ps | grep huleedu
-pdm run health-check
+
+# 4. View logs
+pdm run dev-logs
 ```
 
 ### Running Tests
 ```bash
 # Unit tests
-pdm run pytest services/<service_name>/tests/unit
+pdm run pytest-root services/<service_name>/tests/unit
 
 # Integration tests
-pdm run pytest services/<service_name>/tests/integration
+pdm run pytest-root services/<service_name>/tests/integration
 
 # Functional E2E tests (requires all services running)
 pdm run pytest-root tests/functional/test_e2e_cj_after_nlp_with_pruning.py -v
 
 # With specific markers
-pdm run pytest -m "not slow"  # Skip slow tests
-pdm run pytest -m integration  # Only integration tests
+pdm run pytest-root -m "not slow"  # Skip slow tests
+pdm run pytest-root -m integration  # Only integration tests
 ```
 
 ### Common Commands
 ```bash
 # Service management
-pdm run restart <service_name>  # Restart specific service
-pdm run restart-all             # Restart all services
-pdm run logs <service_name>     # View service logs
+pdm run dev-restart [service]    # Restart specific service
+pdm run dev-logs [service]        # View service logs
 
-# Docker shortcuts
+# Direct Docker commands
 docker logs huleedu_<service>_service --tail 50
 docker exec huleedu_<service>_db psql -U huleedu_user -d huleedu_<service>
 
 # Linting & formatting
-pdm run lint         # Run Ruff linter
-pdm run format-all   # Format all code
+pdm run lint-all      # Run Ruff linter
+pdm run format-all    # Format all code
 pdm run typecheck-all # Run MyPy
 ```
 
-## Recent Decisions & Changes (Dec 2024)
+## Recent Decisions & Changes
 
 ### 1. Redis Caching for BCS Duplicate Calls
 **Issue**: BOS makes duplicate calls to BCS (preflight + handler) 9ms apart.

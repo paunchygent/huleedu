@@ -185,14 +185,24 @@ When asked to launch two or more agents in parallel: launch all agents in a sing
 
 ```bash
 # Development (hot-reload enabled)
-pdm run dev-start [service]          # Start with hot-reload (no rebuild, fast)
-pdm run dev-build-start [service]    # Build with cache + start with hot-reload
-pdm run dev-logs [service]           # View logs
-pdm run dev-build-clean [service]    # Rebuild from scratch (no cache)
+pdm run dev-start [service]          # Start existing images without rebuilding (fast)
+pdm run dev-build [service]          # Build images with cache (doesn't start)
+pdm run dev-build-start [service]    # Build with cache then start
+pdm run dev-build-clean [service]    # Build without cache (slow, use when needed)
+pdm run dev-restart [service]        # Restart running containers (for volume-mounted code changes)
+pdm run dev-stop [service]           # Stop running containers
+pdm run dev-logs [service]           # Follow container logs
+pdm run dev-check                    # Check what files changed (hints at rebuild needs)
 
 # Production (optimized)
-pdm run prod-deploy [service]        # Build + start + verify
-pdm run prod-health                  # Check service health
+pdm run prod-build [service]         # Build for production with cache
+pdm run prod-build-clean [service]   # Build for production without cache
+pdm run prod-start [service]         # Start production containers
+pdm run prod-stop [service]          # Stop production containers
+pdm run prod-restart [service]       # Restart production containers
+pdm run prod-logs [service]          # Follow production logs
+pdm run prod-health                  # Check production service health
+pdm run prod-deploy [service]        # Full production deployment workflow
 ```
 
 ### Database Access (Common Issue)
@@ -251,9 +261,3 @@ pdm run prod-migrate               # Run production migrations
 - Use Google-style docstrings for all public interfaces
 - Document all environment variables
 - Include examples in documentation
-
-- For development services:
-  - Use `pdm run dev-start` for quick starts (no rebuild)
-  - Use `pdm run dev-build-start` after changes to libs/ (rebuild with cache)
-  - Use `pdm run dev-build-clean` for full rebuild when needed (no cache)
-- For internal code changes to development services: use `pdm run dev-restart [service]`
