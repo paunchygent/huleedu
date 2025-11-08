@@ -33,7 +33,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
   - [x] Complete Svelte 5 + Tailwind integration documentation and examples
 
 - [x] **Export OpenAPI specification**
-  - Generate: `curl http://localhost:4001/openapi.json > docs/api-gateway-openapi.json`
+- Generate: `curl http://localhost:4001/openapi.json > Documentation/apis/api-gateway-openapi.json`
   - Validate the exported specification
   - Version control the OpenAPI spec file
 
@@ -55,7 +55,7 @@ This checklist outlines the preparatory work needed to optimize the HuleEdu back
   - Enhanced batch pipeline, file upload, and status endpoints
 
 - [x] **WebSocket API documentation**
-  - Created comprehensive WebSocket API documentation (`docs/WEBSOCKET_API_DOCUMENTATION.md`)
+- Created comprehensive WebSocket API documentation (`Documentation/apis/WEBSOCKET_API_DOCUMENTATION.md`)
   - Documented connection patterns and authentication flow with JWT tokens
   - Provided client-side connection examples (JavaScript/TypeScript, Svelte 5 runes, Svelte stores)
   - Documented all 15 notification event types from TeacherNotificationRequestedV1

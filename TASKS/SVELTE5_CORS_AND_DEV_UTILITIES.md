@@ -204,9 +204,9 @@ if is_development_environment():
 
 #### 3.3 Documentation Updates
 Update the following files:
-- `docs/FRONTEND_INTEGRATION_INDEX.md` - Add new CORS ports and development utilities
-- `docs/API_REFERENCE.md` - Document new development endpoints
-- `docs/SVELTE_INTEGRATION_GUIDE.md` - Add examples using new mock endpoints
+- `Documentation/guides/FRONTEND_INTEGRATION_INDEX.md` - Add new CORS ports and development utilities
+- `Documentation/apis/API_REFERENCE.md` - Document new development endpoints
+- `Documentation/guides/SVELTE_INTEGRATION_GUIDE.md` - Add examples using new mock endpoints
 - Service READMEs - Update CORS configuration examples
 
 ## Acceptance Criteria

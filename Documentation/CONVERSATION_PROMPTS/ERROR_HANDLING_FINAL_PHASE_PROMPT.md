@@ -191,7 +191,7 @@ In the previous session, we also:
 1. Created Architecture Decision Records (ADRs) for Class Management Service
    - ADR-001: Course skill level architecture
    - ADR-002: Student to user account linking
-2. Established `/docs/adr/` directory structure
+2. Established `/Documentation/adr/` directory structure
 3. Updated service roadmap documentation
 
 These architectural improvements demonstrate the maturity of the codebase and should be considered when making migration decisions.

@@ -11,6 +11,8 @@
 **Status:** Phase 3.2 prompt architecture is fully reference-native across BOS, ELS, NLP, CJ, and Gateway callers. Documentation/tests updated to block regressions.
 
 ### What Changed Today
+- Scoped Phase 3.3 deliverables: documented the ENG5 NP runner/CLI, data-source mapping, validation plan, and JSON artefact manifest requirements in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (see new “Phase 3.3 Detailed Scope” section) and published the draft schema at `Documentation/schemas/eng5_np/assessment_run.schema.json`.
+- Consolidated the legacy `docs/` directory into structured `Documentation/` subtrees (`apis/`, `guides/`, `research/`, `adr/`) and updated all references/scripts so contributors have a single canonical location per documentation category.
 - Updated Phase 3.2 task plan, discovery notes, and child migration tracker to reflect completed work; removed references to legacy `essay_instructions` bridging.
 - Refreshed `.claude/HANDOFF.md` and TASK logs with the new validation baseline plus remaining fixture-only follow-ups.
 - Converted API Gateway + BOS unit suites to use `student_prompt_ref`, ensuring tests now fail if inline prompts reappear.

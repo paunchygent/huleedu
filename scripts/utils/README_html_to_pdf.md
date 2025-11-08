@@ -31,8 +31,8 @@ pdm run python scripts/utils/convert_html_to_pdf.py --check-backends
 ### Convert the Kalibrering Report
 ```bash
 pdm run python scripts/utils/convert_html_to_pdf.py \
-  docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html \
-  -o docs/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.pdf
+  Documentation/research/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.html \
+-o Documentation/research/rapport_till_kollegor/files/kalibrering_rapport_korrigerad.pdf
 ```
 
 ## Features

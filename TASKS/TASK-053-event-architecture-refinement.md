@@ -279,7 +279,7 @@ jobs:
 
 #### Task 4.1: Event Catalog
 
-**File:** Create `docs/event-catalog.md`
+**File:** Create `Documentation/apis/event-catalog.md`
 
 Generate from code with script that produces:
 

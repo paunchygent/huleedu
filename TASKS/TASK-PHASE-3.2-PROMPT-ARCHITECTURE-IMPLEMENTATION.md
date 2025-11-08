@@ -18,7 +18,7 @@ The objective is to decouple student prompt payloads from registration forms whi
 
 ## Discovery Checklist
 
-- [x] Locate registration DTOs in API Gateway (`docs/api-types.ts`, FastAPI handlers) and BOS to confirm current `assignment_id` / prompt reference requirements; capture file paths.
+- [x] Locate registration DTOs in API Gateway (`Documentation/apis/api-types.ts`, FastAPI handlers) and BOS to confirm current `assignment_id` / prompt reference requirements; capture file paths.
 - [x] Inspect CJ data access (`assessment_instructions`, repositories, migrations) for canonical prompt storage and versioning.
 - [x] Audit prompt usage in NLP and AI Feedback services to map where prompt references are propagated.
 - [x] Review BCS gating configuration to identify how batch prerequisites are stored (e.g., Redis projection vs. BOS state) and determine extension point for a `prompt_attached` flag.

@@ -1,34 +1,7 @@
 # HuleEdu Monorepo - README FIRST
 
 ## Purpose & Scope
-HuleEdu is an educational assessment platform that processes student essays through multiple AI-driven pipelines (spellcheck, NLP analysis, CJ assessment, AI feedback). Built as an event-driven microservices architecture with strict DDD principles.
-
-## Architecture Overview
-- **Pattern**: Event-driven microservices with Domain-Driven Design (DDD)
-- **Communication**: Kafka for async events, HTTP for synchronous queries
-- **State Management**: Each service owns its PostgreSQL database
-- **Service Boundaries**: No direct DB access between services
-- **Event Pattern**: EventEnvelope wrapper with correlation tracking
-- **Reliability**: Transactional outbox pattern for critical events
-
-## Tech Stack
-- **Python**: 3.11
-- **Frameworks**: Quart (internal), FastAPI (external APIs)
-- **Package Manager**: PDM
-- **Core Libraries**:
-  - Pydantic v2 (data validation)
-  - SQLAlchemy 2.0+ (async ORM)
-  - Dishka (dependency injection)
-  - aiohttp (HTTP client)
-- **Infrastructure**:
-  - PostgreSQL 15
-  - Kafka (Bitnami)
-  - Redis (caching/state)
-  - Docker & Docker Compose v2
-- **Observability**:
-  - Prometheus (metrics)
-  - Jaeger (tracing)
-  - Grafana + Loki (dashboards/logs)
+HuleEdu is an educational assessment platform that processes student essays through multiple AI-driven pipelines (spellcheck, NLP analysis, CJ assessment, AI feedback).
 
 ## Key Services
 1. **API Gateway** (FastAPI) - External API, JWT auth, rate limiting
@@ -47,14 +20,9 @@ HuleEdu is an educational assessment platform that processes student essays thro
 ## How to Run
 
 ### Prerequisites
-```bash
-# Ensure Docker & Docker Compose v2 are installed
-docker --version  # Should be 20.10+
-docker compose version  # Should be 2.x
-
-# Install PDM (or use your preferred method)
-pip install pdm
-```
+- Docker & Docker Compose v2
+- Python 3.11
+- PDM package manager
 
 ### Development Setup
 ```bash
@@ -92,17 +60,13 @@ pdm run pytest-root -m integration  # Only integration tests
 ### Common Commands
 ```bash
 # Service management
-pdm run dev-restart [service]    # Restart specific service
-pdm run dev-logs [service]        # View service logs
+pdm run dev-restart [service]    # Restart service
+pdm run dev-logs [service]        # View logs
 
-# Direct Docker commands
-docker logs huleedu_<service>_service --tail 50
-docker exec huleedu_<service>_db psql -U huleedu_user -d huleedu_<service>
-
-# Linting & formatting
-pdm run lint-all      # Run Ruff linter
-pdm run format-all    # Format all code
-pdm run typecheck-all # Run MyPy
+# Code quality
+pdm run lint-all      # Run linter
+pdm run format-all    # Format code
+pdm run typecheck-all # Type checking
 ```
 
 ## Recent Decisions & Changes
@@ -168,20 +132,23 @@ pdm run typecheck-all # Run MyPy
 - `Documentation/OPERATIONS/01-Grafana-Playbook.md` adds a Prompt Hydration Reliability dashboard guide with PromQL for `huleedu_{nlp|cj}_prompt_fetch_failures_total`.
 - Child task Step 5 documents residual `essay_instructions` usage (AI Feedback event contracts, Essay Lifecycle persistence, Result Aggregator fixtures) to sequence the final cleanup.
 
+### 12. Phase 3.3 – ENG5 NP Runner Planning (2025-11-08)
+- Phase 3.3 section in `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` now details the ENG5 NP runner/CLI (`pdm run eng5-np-run ...`), modes (`plan`, `dry-run`, `execute`), preflight expectations, and validation strategy aligned with rules 070/075.
+- Data-source mapping enumerates ENG5 instructions, prompt references, anchor metadata, and student essay folders under `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016`, plus dependency on `DEFAULT_ANCHOR_ORDER` from `scripts/bayesian_consensus_model/d_optimal_workflow/models.py`.
+- JSON artefact schema draft lives at `Documentation/schemas/eng5_np/assessment_run.schema.json`, covering metadata, inputs, comparisons, Bradley–Terry stats, grade projections, cost tracking, and manifest validation for reproducible research bundles.
+
+### 13. Documentation Taxonomy Restructure (2025-11-08)
+- Legacy `docs/` root was removed; canonical content now lives under `Documentation/` with four primary categories: `Documentation/apis/` (OpenAPI, WebSocket spec, API reference, TypeScript DTOs), `Documentation/guides/` (Claude plugin guide, frontend integration, shared code patterns, Svelte guide), `Documentation/research/` (historical Swedish materials and the rapport payloads), and `Documentation/adr/` (ADR-001/002).
+- All task references now point to the new paths, and helper scripts referencing the rapport assets have been re-aligned so future contributors only touch the structured locations.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts
 - `docker-compose.yml` - Production config
 - `docker-compose.dev.yml` - Development overrides
 - `.claude/rules/` - Development standards and patterns
-- `CLAUDE.md` - AI assistant instructions
+- `CLAUDE.md` - Detailed technical reference
 
-## Important Notes
-- Always use `pdm run pytest-root` for tests (handles monorepo paths)
-- Never use `--since` in Docker logs when searching correlation IDs
-- Services use APP-scoped DI for singletons, REQUEST-scoped for per-operation
-- All events use EventEnvelope wrapper with correlation tracking
-- Transactional outbox pattern ensures event delivery reliability
 ## Rater Metrics
 - `generate_reports.py` now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes posterior bias per rater on the grade-index scale.
 - Use `--bias-correction {on,off}` and `--compare-without-bias` to run EB and legacy consensus side-by-side; each invocation writes into `output/bayesian_consensus_model/<run_label or timestamp>/` by default (override with `--output-dir`), with comparison CSV/JSON saved alongside the bias-on results.

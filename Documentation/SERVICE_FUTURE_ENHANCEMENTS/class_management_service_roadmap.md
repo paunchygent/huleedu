@@ -93,7 +93,7 @@ CREATE TABLE shared_class_templates (
 **Complexity**: Medium  
 **Dependencies**: Additional language processing services
 
-**Architecture Decision**: See [ADR-001](../../../docs/adr/001-class-management-course-skill-level.md) for course skill level architecture
+**Architecture Decision**: See [ADR-001](../adr/001-class-management-course-skill-level.md) for course skill level architecture
 
 **Features**:
 - Support for multiple education levels (grundskola, gymnasium)
@@ -207,8 +207,8 @@ ADD COLUMN prerequisite_course_code VARCHAR(20);
 ## Architecture Decisions
 
 ### Documented ADRs
-- [ADR-001](../../../docs/adr/001-class-management-course-skill-level.md): Course Skill Level Architecture
-- [ADR-002](../../../docs/adr/002-student-record-to-user-account-linking.md): Student to User Account Linking
+- [ADR-001](../adr/001-class-management-course-skill-level.md): Course Skill Level Architecture
+- [ADR-002](../adr/002-student-record-to-user-account-linking.md): Student to User Account Linking
 
 ## Decision Points
 

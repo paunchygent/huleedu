@@ -50,7 +50,7 @@
 ### Phase 3.3 – Batch Tooling & Data Capture
 - **Deliverables**
   - CLI/module (`.claude/research/scripts` or service CLI) to run ENG5 NP batches without persisting essays to prod DB.
-  - JSON schema implemented at `.claude/research/data/eng5_np_2016/assessment_run.json`.
+  - JSON schema implemented at `Documentation/schemas/eng5_np/assessment_run.schema.json` (runner copies this into `.claude/research/data/eng5_np_2016/` alongside generated artefacts).
   - Stored artefacts: comparisons, BT stats, grade projections, metadata (instructions, prompts, correlation IDs).
 - **Steps**
   1. Build ingestion runner leveraging new scale registry; load essays/anchors from `test_uploads/...`.
@@ -63,6 +63,34 @@
   - JSON artefacts versioned + documented.
   - LLM cost tracked (metadata) for auditing.
   - Integration tests confirm CLI does not mutate persistent DB state.
+
+#### Phase 3.3 Detailed Scope (2025-11-08)
+
+**Runner / CLI (`.claude/research/scripts/eng5_np_batch_runner.py`)**
+- PDM entrypoint (`pdm run eng5-np-run --assignment-id ...`) that shells into the repo root per rule 080 and accepts three modes: `plan` (prints assets/cost estimate), `dry-run` (generates payloads + JSON only), and `execute` (publishes `ELS_CJAssessmentRequestV1` events and tails the batch until `CJAssessmentCompletedV1`).
+- Loads grade-scale metadata from the registry introduced in Phase 3.1, defaulting to `eng5_np_legacy_9_step` while allowing overrides via `--grade-scale`.
+- Pulls anchors, student essays, prompt references, and instruction markdown from `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/**`, emitting structured diagnostics if any file is missing or unsupported.
+- Streams comparison callbacks to an artefact builder that records each comparison (`winner`, `loser`, `llm_provider`, `cost`) plus derived Bradley–Terry stats and the final GradeProjector output.
+- Provides `--no-kafka` flag for offline fixture generation so we can unit-test ingestion logic without touching Kafka.
+
+**Data Sources & Preflight**
+- Instructions: `eng5_np_vt_2017_essay_instruction.md` drives assignment metadata and is embedded verbatim into batch context.
+- Prompt references: `llm_prompt_cj_assessment_eng5.md` supplies the rubric and JSON instructions fed to the LLM provider.
+- Anchors: `ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.(csv|xlsx)` map anchor IDs to grade labels and file names; runner cross-validates these entries with files under `anchor_essays/`.
+- Student submissions: `.docx` payloads in `student_essays/` become essay refs; each file is tagged with a deterministic `essay_id` and checksum for reproducibility.
+- Default anchor ordering: `scripts/bayesian_consensus_model/d_optimal_workflow/models.py::DEFAULT_ANCHOR_ORDER` seeds the runner’s anchor sequence to stay aligned with the Bayesian tooling.
+- Preflight script verifies Docker Compose state (`pdm run dev-ps | grep huleedu_cj_assessment_service`), ensures `USE_MOCK_LLM` toggles match the chosen mode, and requires `.env` to be sourced before executing cost-bearing runs.
+
+**JSON Artefact Schema (`Documentation/schemas/eng5_np/assessment_run.schema.json`)**
+- Top-level sections: `metadata` (assignment, runner version, timestamps, git SHA), `inputs` (instructions, prompt reference, grade scale, anchor roster, student registry), `llm_comparisons` (ordered list with prompt hash + provider cost), `bt_summary` (per-essay θ, standard error, rank, anchor flags), `grade_projections` (GradeProjector payload echoing service output), `costs` (token + USD by provider), and `validation` (checksums, schema version, CLI mode).
+- Each section will contain `schema_version` so later analyses can detect incompatible artefacts; plan to start at `1.0.0`.
+- Artefact builder writes a `manifest.json` containing relative paths and SHA256 digests for every generated file to guard against tampering.
+
+**Validation & Testing Strategy (Rules 070/075)**
+- Unit tests (`pdm run pytest-root .claude/research/scripts/tests/test_eng5_np_batch_runner.py -q`) cover ingest transforms, CLI flag parsing, and schema validation using synthetic essay fixtures under `.claude/research/scripts/tests/fixtures`.
+- Contract tests validate the JSON schema by round-tripping a fixture through `jsonschema.validate` plus our dataclass loader before and after serialization.
+- Integration smoke (`pdm run pytest-root services/cj_assessment_service/tests/integration/test_eng5_np_runner.py -m "not slow"`) spins up the runner in `--no-kafka` mode with mocked Dishka providers to guarantee no real LLM calls while still asserting event payloads conform to `ELS_CJAssessmentRequestV1`.
+- Every CLI test run must call `pdm run typecheck-all` first (Rule 070 §4.1) and re-run it after modifications. We will also add a `lint-runner` target once implementation begins to keep the new script inside Ruff coverage.
 
 ## Dependencies & Integration
 - **Prerequisites**: Phase 2 theoretical model (already complete) informs boundary-stay probability outputs.

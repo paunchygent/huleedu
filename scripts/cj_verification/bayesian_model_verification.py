@@ -226,7 +226,7 @@ if __name__ == "__main__":
         epilog="""
 Example:
     python bayesian_model_verification.py \\
-        --data-path ../../docs/rapport_till_kollegor/BAYESIAN_ANALYSIS_GPT_5_PRO/ \\
+        --data-path ../../Documentation/research/rapport_till_kollegor/BAYESIAN_ANALYSIS_GPT_5_PRO/ \\
         --focus-essay JA24 \\
         --output-dir ./verification_output/
         """,
