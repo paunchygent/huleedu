@@ -52,6 +52,7 @@ class MockLLMProvider:
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
+        request_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Test implementation that records calls and simulates behavior."""
         self.call_count += 1
@@ -63,6 +64,7 @@ class MockLLMProvider:
             "temperature_override": temperature_override,
             "max_tokens_override": max_tokens_override,
             "provider_override": provider_override,
+            "request_metadata": request_metadata or {},
         }
 
         if self.behavior == "failure":
@@ -162,6 +164,10 @@ class TestLLMInteractionImplProtocolCompliance:
         assert successful_provider.call_count == 1
         assert successful_provider.last_call_params["correlation_id"] == correlation_id
         assert successful_provider.last_call_params["user_prompt"] == sample_comparison_task.prompt
+        assert successful_provider.last_call_params["request_metadata"] == {
+            "essay_a_id": sample_comparison_task.essay_a.id,
+            "essay_b_id": sample_comparison_task.essay_b.id,
+        }
 
     @pytest.mark.asyncio
     async def test_protocol_compliance_with_parameter_overrides(
@@ -194,6 +200,10 @@ class TestLLMInteractionImplProtocolCompliance:
         assert params["temperature_override"] == 0.7
         assert params["max_tokens_override"] == 500
         assert params["system_prompt_override"] is None
+        assert params["request_metadata"] == {
+            "essay_a_id": sample_comparison_task.essay_a.id,
+            "essay_b_id": sample_comparison_task.essay_b.id,
+        }
 
     @pytest.mark.asyncio
     async def test_error_handling_creates_structured_results(

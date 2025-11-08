@@ -106,6 +106,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
+        request_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Generate comparison via LLM Provider Service.
 
@@ -143,6 +144,7 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             "user_prompt": base_prompt,
             "essay_a": essay_a,
             "essay_b": essay_b,
+            "metadata": request_metadata or {},
             "llm_config_overrides": {
                 "provider_override": provider_override or self.settings.DEFAULT_LLM_PROVIDER.value,
                 "model_override": model_override or self.settings.DEFAULT_LLM_MODEL,

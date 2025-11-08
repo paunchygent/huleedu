@@ -112,6 +112,7 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
                 cost_estimate=cost_estimate_value,
                 correlation_id=correlation_id,
                 trace_id=None,  # Will be set by trace manager in integration layer
+                metadata=result.metadata,
             )
 
         except HuleEduError:

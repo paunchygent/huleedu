@@ -192,6 +192,28 @@ Please respond with a JSON object."""
         assert request_body["llm_config_overrides"]["temperature_override"] == 0.1
         assert "callback_topic" in request_body
         assert request_body["callback_topic"] == client.settings.LLM_PROVIDER_CALLBACK_TOPIC
+        assert request_body["metadata"] == {}
+
+    async def test_generate_comparison_passes_request_metadata(
+        self, client: LLMProviderServiceClient, mock_session: AsyncMock
+    ) -> None:
+        """Ensure request metadata is forwarded to the provider."""
+        mock_response = AsyncMock()
+        mock_response.status = 202
+        mock_response.text = AsyncMock(return_value=json.dumps({"queue_id": str(uuid4())}))
+        mock_session.post.return_value.__aenter__.return_value = mock_response
+
+        prompt = """Compare essays\nEssay A (ID: 1):\nA\n\nEssay B (ID: 2):\nB"""
+        metadata = {"essay_a_id": "1", "essay_b_id": "2"}
+
+        await client.generate_comparison(
+            user_prompt=prompt,
+            correlation_id=uuid4(),
+            request_metadata=metadata,
+        )
+
+        request_body = mock_session.post.call_args[1]["json"]
+        assert request_body["metadata"] == metadata
 
     async def test_generate_comparison_rejects_sync_response(
         self, client: LLMProviderServiceClient, mock_session: AsyncMock

@@ -85,6 +85,7 @@ class LLMProviderProtocol(Protocol):
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
         provider_override: str | None = None,
+        request_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Generate a comparison assessment using the LLM.
 
@@ -96,6 +97,7 @@ class LLMProviderProtocol(Protocol):
             temperature_override: Optional temperature override (0.0-2.0)
             max_tokens_override: Optional max tokens override
             provider_override: Optional provider name override
+            request_metadata: Arbitrary metadata to echo back in callbacks
 
         Returns:
             The LLM response data containing the comparison result

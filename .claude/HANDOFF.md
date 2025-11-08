@@ -149,6 +149,7 @@ Outstanding next steps:
    - Implementation note: `--await-completion` will now spin up the consumer, persist every matching callback under `.claude/research/data/eng5_np_2016/events/comparisons/`, and merge the resulting `LLMComparisonResultV1` plus `AssessmentResultV1` payloads into `assessment_run.execute.json` (`llm_comparisons`, `bt_summary`, `grade_projections`, `costs`, validation manifest updates).
    - Current status (2025-11-08 evening): CLI now ships with the described watcher + hydrator flow. `AssessmentEventCollector` listens to the three topics above, commits offsets manually, hydrates artefacts via `AssessmentRunHydrator`, and rebuilds the validation manifest/artefact checksum once events land. `--await-completion` automatically boots the collector before publishing; `--no-kafka` skips both publish and consumer startup.
    - Next refinement: Move the runner into `scripts/cj_experiments_runners/eng5_np_batch_runner.py` and break out shared modules (e.g., collector, hydrator, CLI entry) so additional CJ experiment runners can reuse the components without violating SRP file-size constraints.
+   - Metadata fix shipped (2025-11-08): CJ now injects `essay_a_id`/`essay_b_id` into every LLM request’s metadata, and the LLM Provider appends `prompt_sha256` before publishing callbacks (OpenAI, Anthropic, Google, OpenRouter, Mock). `request_metadata` therefore always contains the three fields the ENG5 runner needs to hydrate artefacts.
 
 ---
 

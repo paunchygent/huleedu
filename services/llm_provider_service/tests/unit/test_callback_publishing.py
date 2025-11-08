@@ -140,6 +140,7 @@ def successful_llm_response() -> LLMOrchestratorResponse:
         cost_estimate=0.012,
         correlation_id=uuid4(),
         trace_id="trace123",
+        metadata={"prompt_sha256": "abc123"},
     )
 
 
@@ -289,7 +290,8 @@ class TestSuccessCallbackPublishing:
         assert event_data.requested_at == sample_request.queued_at
         assert event_data.completed_at is not None
         assert event_data.trace_id == "trace123"
-        assert event_data.request_metadata == {"test": "metadata"}
+        assert event_data.request_metadata["test"] == "metadata"
+        assert event_data.request_metadata["prompt_sha256"] == "abc123"
 
 
 class TestErrorCallbackPublishing:

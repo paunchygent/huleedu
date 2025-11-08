@@ -431,6 +431,11 @@ class QueueProcessorImpl:
             result: The successful result
         """
         try:
+            request_meta = dict(request.request_data.metadata or {})
+            prompt_hash = result.metadata.get("prompt_sha256") if result.metadata else None
+            if prompt_hash:
+                request_meta.setdefault("prompt_sha256", prompt_hash)
+
             # Create success callback event
             callback_event = LLMComparisonResultV1(
                 request_id=str(request.queue_id),
@@ -453,7 +458,7 @@ class QueueProcessorImpl:
                 requested_at=request.queued_at,
                 completed_at=datetime.now(timezone.utc),
                 trace_id=result.trace_id,
-                request_metadata=request.request_data.metadata or {},
+                request_metadata=request_meta,
             )
 
             # Create event envelope and publish

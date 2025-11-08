@@ -1,6 +1,8 @@
 """Google Gemini LLM provider implementation."""
 
+import hashlib
 import json
+from typing import Any
 from uuid import UUID
 
 import aiohttp
@@ -96,6 +98,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
 
         # Prepare the full prompt with essays
         full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
+        prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
@@ -122,6 +125,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
+                prompt_sha256=prompt_sha256,
             )
             # Type assert since retry manager returns Any
             return result  # type: ignore
@@ -143,6 +147,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        prompt_sha256: str | None = None,
     ) -> LLMProviderResponse:
         """Make API request to Google Gemini.
 
@@ -247,6 +252,10 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                 total_tokens = prompt_tokens + completion_tokens
 
                                 # Create response model
+                                metadata: dict[str, Any] = {}
+                                if prompt_sha256:
+                                    metadata["prompt_sha256"] = prompt_sha256
+
                                 response_model = LLMProviderResponse(
                                     winner=winner,
                                     justification=validated_response.justification,
@@ -257,6 +266,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
                                     completion_tokens=completion_tokens,
                                     total_tokens=total_tokens,
                                     raw_response=response_data,
+                                    metadata=metadata,
                                 )
 
                                 return response_model

@@ -29,6 +29,7 @@ class LLMProviderResponse(BaseModel):
 
     # Additional metadata
     raw_response: Dict[str, Any] = Field(default_factory=dict, description="Raw provider response")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional provider metadata")
 
 
 class LLMOrchestratorResponse(BaseModel):

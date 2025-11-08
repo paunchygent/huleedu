@@ -1,6 +1,8 @@
 """OpenAI LLM provider implementation."""
 
+import hashlib
 import json
+from typing import Any
 from uuid import UUID
 
 import aiohttp
@@ -85,6 +87,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
 
         # Prepare the full prompt with essays
         full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
+        prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
@@ -111,6 +114,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                 model_override=model_override,
                 temperature_override=temperature_override,
                 max_tokens_override=max_tokens_override,
+                prompt_sha256=prompt_sha256,
             )
             # Type assert since retry manager returns Any
             return result  # type: ignore
@@ -132,6 +136,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         model_override: str | None = None,
         temperature_override: float | None = None,
         max_tokens_override: int | None = None,
+        prompt_sha256: str | None = None,
     ) -> LLMProviderResponse:
         """Make API request to OpenAI.
 
@@ -233,6 +238,10 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                             total_tokens = prompt_tokens + completion_tokens
 
                             # Create response model
+                            metadata: dict[str, Any] = {}
+                            if prompt_sha256:
+                                metadata["prompt_sha256"] = prompt_sha256
+
                             response_model = LLMProviderResponse(
                                 winner=winner,
                                 justification=validated_response.justification,
@@ -243,6 +252,7 @@ class OpenAIProviderImpl(LLMProviderProtocol):
                                 completion_tokens=completion_tokens,
                                 total_tokens=total_tokens,
                                 raw_response=response_data,
+                                metadata=metadata,
                             )
 
                             return response_model

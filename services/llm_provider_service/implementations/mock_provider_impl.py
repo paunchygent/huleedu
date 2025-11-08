@@ -1,6 +1,8 @@
 """Mock LLM provider implementation for testing."""
 
+import hashlib
 import random
+from typing import Any
 from uuid import UUID
 
 from common_core import EssayComparisonWinner, LLMProviderType
@@ -71,6 +73,10 @@ class MockProviderImpl(LLMProviderProtocol):
                 details={"provider": "mock", "error_simulation": True},
             )
 
+        # Build deterministic prompt hash for downstream auditing
+        full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
+        prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
+
         # Randomly select winner with slight bias towards Essay B
         winner = (
             EssayComparisonWinner.ESSAY_A
@@ -104,6 +110,8 @@ class MockProviderImpl(LLMProviderProtocol):
         completion_tokens = len(justification.split()) + 10  # Add some for structure
         total_tokens = prompt_tokens + completion_tokens
 
+        metadata: dict[str, Any] = {"prompt_sha256": prompt_sha256}
+
         response = LLMProviderResponse(
             winner=winner,
             justification=justification,
@@ -119,9 +127,18 @@ class MockProviderImpl(LLMProviderProtocol):
                     "seed": random.getstate()[1][0] if hasattr(random, "getstate") else None,
                 }
             },
+            metadata=metadata,
         )
 
         logger.debug(
             f"Mock provider generated response: winner={winner.value}, confidence={confidence}"
         )
         return response
+
+    def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:
+        """Format the comparison prompt similarly to production providers."""
+
+        formatted = user_prompt.replace("{essay_a}", essay_a).replace("{essay_b}", essay_b)
+        if "{essay_a}" not in user_prompt and "{essay_b}" not in user_prompt:
+            formatted = f"{user_prompt}\n\nEssay A:\n{essay_a}\n\nEssay B:\n{essay_b}"
+        return formatted

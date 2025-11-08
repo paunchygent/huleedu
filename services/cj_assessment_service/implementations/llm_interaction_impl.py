@@ -154,6 +154,10 @@ class LLMInteractionImpl(LLMInteractionProtocol):
 
                 # Make direct LLM API request - no caching
                 try:
+                    request_metadata = {
+                        "essay_a_id": task.essay_a.id,
+                        "essay_b_id": task.essay_b.id,
+                    }
                     response_data = await provider.generate_comparison(
                         user_prompt=task.prompt,
                         correlation_id=task_correlation_id,  # Use unique correlation ID
@@ -161,6 +165,7 @@ class LLMInteractionImpl(LLMInteractionProtocol):
                         model_override=model_override,
                         temperature_override=temperature_override,
                         max_tokens_override=max_tokens_override,
+                        request_metadata=request_metadata,
                     )
 
                     # ALL LLM calls are async - response_data is ALWAYS None

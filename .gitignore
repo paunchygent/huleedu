@@ -19,6 +19,9 @@ data/
 datasets/
 /*.xml
 
+# Repomix packages (generated AI analysis artifacts)
+.claude/repomix_packages/
+
 # Security - JWT and other secrets
 secrets/
 *.pem
