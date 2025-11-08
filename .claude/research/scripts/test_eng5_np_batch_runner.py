@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sys
 import uuid
@@ -11,9 +12,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.append(str(SCRIPT_DIR))
 
+from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, Language
+from common_core.event_enums import ProcessingEvent, topic_name
+from common_core.events.cj_assessment_events import AssessmentResultV1, EssayResultV1
+from common_core.events.envelope import EventEnvelope
+from common_core.events.llm_provider_events import EssayComparisonWinner, LLMComparisonResultV1, TokenUsage
 
 from eng5_np_batch_runner import (
+    AssessmentRunHydrator,
     FileRecord,
     RunnerMode,
     RunnerPaths,
@@ -29,6 +36,44 @@ from eng5_np_batch_runner import (
     write_cj_request_envelope,
     write_stub_artefact,
 )
+
+
+def _write_base_artefact(tmp_path: Path) -> Path:
+    artefact = {
+        "schema_version": "1.0.0",
+        "metadata": {
+            "assignment_id": str(uuid.uuid4()),
+            "course_id": str(uuid.uuid4()),
+            "grade_scale": "eng5_np_legacy_9_step",
+            "runner_version": "0.1.0",
+            "git_sha": "deadbeef",
+            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "runner_mode": "execute",
+        },
+        "inputs": {
+            "instructions": {"source_path": "instructions.md", "checksum": None, "exists": True, "size_bytes": 1},
+            "prompt_reference": {"source_path": "prompt.md", "checksum": None, "exists": True, "size_bytes": 1},
+            "anchors": [],
+            "students": [],
+        },
+        "llm_comparisons": [],
+        "bt_summary": [],
+        "grade_projections": [],
+        "costs": {"total_usd": 0.0, "token_counts": []},
+        "validation": {
+            "artefact_checksum": "",
+            "manifest": [],
+            "cli_environment": {
+                "python": "3.11",
+                "pdm": "test",
+                "os": "posix",
+                "docker_compose": "n/a",
+            },
+        },
+    }
+    target = tmp_path / "assessment_run.execute.json"
+    target.write_text(json.dumps(artefact, indent=2), encoding="utf-8")
+    return target
 
 
 def test_sha256_round_trip(tmp_path: Path) -> None:
@@ -170,3 +215,105 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
     assert envelope.data.language == Language.ENGLISH.value
     path = write_cj_request_envelope(envelope=envelope, output_dir=settings.output_dir)
     assert path.exists()
+
+
+def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
+    artefact_path = _write_base_artefact(tmp_path)
+    hydrator = AssessmentRunHydrator(
+        artefact_path=artefact_path,
+        output_dir=tmp_path,
+        grade_scale="eng5_np_legacy_9_step",
+        batch_id="batch-llm",
+    )
+
+    llm_event = LLMComparisonResultV1(
+        request_id="req-1",
+        correlation_id=uuid.uuid4(),
+        winner=EssayComparisonWinner.ESSAY_A,
+        justification="Winner",
+        confidence=3.5,
+        error_detail=None,
+        provider=LLMProviderType.OPENAI,
+        model="gpt-4o-mini",
+        response_time_ms=500,
+        token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+        cost_estimate=0.25,
+        requested_at=dt.datetime.now(dt.timezone.utc),
+        completed_at=dt.datetime.now(dt.timezone.utc),
+        trace_id="trace",
+        request_metadata={
+            "batch_id": "batch-llm",
+            "essay_a_id": "A1",
+            "essay_b_id": "B1",
+            "prompt_sha256": "a" * 64,
+        },
+    )
+    envelope = EventEnvelope[LLMComparisonResultV1](
+        event_type=topic_name(ProcessingEvent.LLM_COMPARISON_RESULT),
+        event_timestamp=dt.datetime.now(dt.timezone.utc),
+        source_service="test",
+        correlation_id=llm_event.correlation_id,
+        data=llm_event,
+    )
+
+    hydrator.apply_llm_comparison(envelope)
+
+    data = json.loads(artefact_path.read_text(encoding="utf-8"))
+    assert len(data["llm_comparisons"]) == 1
+    comparison = data["llm_comparisons"][0]
+    assert comparison["winner_id"] == "A1"
+    assert data["costs"]["total_usd"] == pytest.approx(0.25)
+    assert data["validation"]["manifest"]  # manifest populated
+
+
+def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
+    artefact_path = _write_base_artefact(tmp_path)
+    hydrator = AssessmentRunHydrator(
+        artefact_path=artefact_path,
+        output_dir=tmp_path,
+        grade_scale="eng5_np_legacy_9_step",
+        batch_id="batch-results",
+    )
+
+    essay = EssayResultV1(
+        essay_id="student-1",
+        normalized_score=0.9,
+        letter_grade="A",
+        confidence_score=0.8,
+        confidence_label="HIGH",
+        bt_score=1.2,
+        rank=1,
+        is_anchor=False,
+        feedback_uri=None,
+        metrics_uri=None,
+        display_name=None,
+    )
+
+    assessment_event = AssessmentResultV1(
+        batch_id="batch-results",
+        cj_assessment_job_id="cj-1",
+        assessment_method="cj_assessment",
+        model_used="claude",
+        model_provider="anthropic",
+        model_version=None,
+        essay_results=[essay],
+        assessment_metadata={
+            "comparison_count": 3,
+            "grade_projection_summary": {
+                "grade_probabilities": {"student-1": {"A": 0.8, "B": 0.2}},
+            },
+        },
+    )
+    envelope = EventEnvelope[AssessmentResultV1](
+        event_type=topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),
+        event_timestamp=dt.datetime.now(dt.timezone.utc),
+        source_service="test",
+        correlation_id=uuid.uuid4(),
+        data=assessment_event,
+    )
+
+    hydrator.apply_assessment_result(envelope)
+
+    data = json.loads(artefact_path.read_text(encoding="utf-8"))
+    assert data["bt_summary"][0]["comparison_count"] == 3
+    assert data["grade_projections"][0]["probabilities"]["A"] == pytest.approx(0.8)

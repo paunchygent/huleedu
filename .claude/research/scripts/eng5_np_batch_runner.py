@@ -1,22 +1,29 @@
-"""ENG5 NP batch runner scaffolding.
+"""ENG5 NP batch runner tooling.
 
-This module wires up a CLI (`pdm run eng5-np-run`) with three operating modes:
+CLI entry-point (`pdm run eng5-np-run`) modes:
 
-* `plan` – Inspect source assets (instructions, prompts, anchors, students) and
-  validate schema availability without generating any artefacts.
-* `dry-run` – Produce a schema-compliant placeholder artefact bundle without
-  publishing Kafka events (deterministic output for contract tests).
-* `execute` – Entry point for the full pipeline (currently stubs to `dry-run` and
-  raises `NotImplementedError` for the event emission stage).
+* `plan` – inventory ENG5 assets and validate schema availability.
+* `dry-run` – emit deterministic artefact stubs for contract tests.
+* `execute` – build + publish `ELS_CJAssessmentRequestV1`, then (optionally)
+  capture comparison callbacks and completion/rich result events to hydrate the
+  ENG5 assessment artefact (`assessment_run.execute.json`).
 
-The implementation focuses on deterministic file discovery, schema validation,
-and manifest generation so downstream phases can extend it with CJ service
-integrations.
+Behaviour highlights:
+* Deterministic file discovery + schema validation per Phase 3.3 plan.
+* Async Kafka publisher plus scoped consumer that listens to
+  `huleedu.llm_provider.comparison_result.v1`,
+  `huleedu.cj_assessment.completed.v1`, and
+  `huleedu.assessment.result.published.v1` to persist raw events and populate
+  `llm_comparisons`, `bt_summary`, `grade_projections`, and `costs` in the
+  artefact.
+* Validation manifest + checksum recomputed as new events arrive (guards
+  reproducibility requirements).
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import dataclasses
 import datetime as dt
 import json
@@ -27,18 +34,20 @@ import uuid
 from enum import Enum
 from hashlib import sha256
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Any, Iterable, List, Sequence
 
 import typer
 
 from common_core.domain_enums import ContentType, CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import (
+    AssessmentResultV1,
     CJAssessmentCompletedV1,
     ELS_CJAssessmentRequestV1,
     LLMConfigOverrides,
 )
 from common_core.events.envelope import EventEnvelope
+from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import (
     EssayProcessingInputRefV1,
     StorageReferenceMetadata,
@@ -446,77 +455,61 @@ def write_cj_request_envelope(
     return path
 
 
-def publish_envelope_to_kafka(
+async def publish_envelope_to_kafka(
     *,
     envelope: EventEnvelope[ELS_CJAssessmentRequestV1],
     settings: RunnerSettings,
 ) -> None:
     """Publish the CJ request envelope to Kafka using KafkaBus."""
 
-    async def _send() -> None:
-        kafka_bus = KafkaBus(
-            client_id=settings.kafka_client_id,
-            bootstrap_servers=settings.kafka_bootstrap,
+    kafka_bus = KafkaBus(
+        client_id=settings.kafka_client_id,
+        bootstrap_servers=settings.kafka_bootstrap,
+    )
+    await kafka_bus.start()
+    try:
+        await kafka_bus.publish(
+            topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
+            envelope=envelope,
+            key=envelope.data.entity_id,
         )
-        try:
-            await kafka_bus.start()
-            await kafka_bus.publish(
-                topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
-                envelope=envelope,
-                key=envelope.data.entity_id,
-            )
-        finally:
-            await kafka_bus.stop()
-
-    asyncio.run(_send())
+    finally:
+        await kafka_bus.stop()
 
 
-def await_completion_event(
+async def run_publish_and_capture(
     *,
-    batch_id: str,
+    envelope: EventEnvelope[ELS_CJAssessmentRequestV1],
     settings: RunnerSettings,
-) -> EventEnvelope | None:
-    """Listen for CJ completion events for the given batch id."""
+    hydrator: AssessmentRunHydrator | None,
+) -> None:
+    collector: AssessmentEventCollector | None = None
+    collector_task: asyncio.Task[None] | None = None
 
-    async def _consume() -> EventEnvelope | None:
-        from aiokafka import AIOKafkaConsumer
-
-        topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
-        consumer = AIOKafkaConsumer(
-            topic,
-            bootstrap_servers=settings.kafka_bootstrap,
-            group_id=f"{settings.kafka_client_id}-completion",
-            enable_auto_commit=False,
-            auto_offset_reset="latest",
-        )
-        await consumer.start()
-        try:
-            timeout = settings.completion_timeout
-            end_time = asyncio.get_event_loop().time() + timeout
-            while asyncio.get_event_loop().time() < end_time:
-                result = await consumer.getmany(timeout_ms=1000, max_records=20)
-                for records in result.values():
-                    for record in records:
-                        try:
-                            envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(
-                                record.value.decode("utf-8")
-                            )
-                        except Exception:
-                            continue
-                        if envelope.data.entity_id == batch_id:
-                            return envelope
-            return None
-        finally:
-            await consumer.stop()
+    if hydrator and settings.use_kafka and settings.await_completion:
+        collector = AssessmentEventCollector(settings=settings, hydrator=hydrator)
+        collector_task = asyncio.create_task(collector.consume())
+        await collector.wait_until_ready()
 
     try:
-        return asyncio.run(_consume())
-    except ImportError:
-        typer.echo(
-            "aiokafka not available; skipping completion wait. Install aiokafka to enable.",
-            err=True,
-        )
-        return None
+        if settings.use_kafka:
+            await publish_envelope_to_kafka(envelope=envelope, settings=settings)
+            typer.echo(
+                "Kafka publish succeeded -> topic "
+                f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+            )
+        else:
+            typer.echo("--no-kafka supplied; skipping publish and event capture.")
+
+        if collector:
+            await collector.wait_for_completion()
+
+    finally:
+        if collector:
+            collector.request_stop()
+        if collector_task:
+            with contextlib.suppress(Exception):
+                await collector_task
 
 
 def write_completion_event(
@@ -530,6 +523,353 @@ def write_completion_event(
     path = completions_dir / f"cj_completion_{timestamp}.json"
     path.write_text(envelope.model_dump_json(indent=2), encoding="utf-8")
     return path
+
+
+def write_assessment_result_event(
+    *,
+    envelope: EventEnvelope[AssessmentResultV1],
+    output_dir: Path,
+) -> Path:
+    results_dir = output_dir / "events" / "assessment_results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    path = results_dir / f"assessment_result_{timestamp}.json"
+    path.write_text(envelope.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+def write_llm_comparison_event(
+    *,
+    envelope: EventEnvelope[LLMComparisonResultV1],
+    output_dir: Path,
+) -> Path:
+    comparisons_dir = output_dir / "events" / "comparisons"
+    comparisons_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    path = comparisons_dir / f"llm_comparison_{timestamp}.json"
+    path.write_text(envelope.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+class AssessmentRunHydrator:
+    """Updates ENG5 NP artefacts with live comparison + result data."""
+
+    def __init__(
+        self,
+        *,
+        artefact_path: Path,
+        output_dir: Path,
+        grade_scale: str,
+        batch_id: str,
+    ) -> None:
+        self.artefact_path = artefact_path
+        self.output_dir = output_dir
+        self.grade_scale = grade_scale
+        self.batch_id = batch_id
+        (self.output_dir / "events").mkdir(parents=True, exist_ok=True)
+
+    def apply_llm_comparison(self, envelope: EventEnvelope[LLMComparisonResultV1]) -> None:
+        """Persist LLM callback and append it to the artefact if it matches the batch."""
+
+        metadata = envelope.data.request_metadata or {}
+        batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
+        if batch_hint and batch_hint != self.batch_id:
+            return
+
+        write_llm_comparison_event(envelope=envelope, output_dir=self.output_dir)
+
+        artefact = self._load_artefact()
+        record = self._build_comparison_record(artefact, envelope)
+        if record is None:
+            return
+        artefact.setdefault("llm_comparisons", []).append(record)
+        self._update_costs(artefact, envelope)
+        self._write_artefact(artefact)
+
+    def apply_assessment_result(self, envelope: EventEnvelope[AssessmentResultV1]) -> None:
+        """Persist and hydrate Bradley–Terry + grade projection outputs."""
+
+        if envelope.data.batch_id != self.batch_id:
+            return
+
+        write_assessment_result_event(envelope=envelope, output_dir=self.output_dir)
+
+        artefact = self._load_artefact()
+        artefact["bt_summary"] = self._build_bt_entries(envelope)
+        artefact["grade_projections"] = self._build_grade_projections(envelope)
+        self._write_artefact(artefact)
+
+    def _load_artefact(self) -> dict[str, Any]:
+        return json.loads(self.artefact_path.read_text(encoding="utf-8"))
+
+    def _write_artefact(self, artefact: dict[str, Any]) -> None:
+        manifest_entries = []
+        for rel_path in sorted(self._manifest_targets()):
+            abs_path = self.output_dir / rel_path
+            manifest_entries.append(
+                {
+                    "path": rel_path,
+                    "sha256": sha256_of_file(abs_path),
+                    "bytes": abs_path.stat().st_size,
+                }
+            )
+
+        validation_block = artefact.setdefault("validation", {})
+        validation_block["manifest"] = manifest_entries
+        validation_block["artefact_checksum"] = ""
+
+        serialized = json.dumps(artefact, indent=2)
+        checksum = sha256(serialized.encode("utf-8")).hexdigest()
+        validation_block["artefact_checksum"] = checksum
+        self.artefact_path.write_text(json.dumps(artefact, indent=2), encoding="utf-8")
+
+    def _manifest_targets(self) -> list[str]:
+        targets: list[str] = []
+        for subdir in ("requests", "events"):
+            base = self.output_dir / subdir
+            if not base.exists():
+                continue
+            for path in base.rglob("*.json"):
+                targets.append(str(path.relative_to(self.output_dir)))
+        return targets
+
+    def _build_comparison_record(
+        self,
+        artefact: dict[str, Any],
+        envelope: EventEnvelope[LLMComparisonResultV1],
+    ) -> dict[str, Any] | None:
+        metadata = envelope.data.request_metadata or {}
+        essay_a = metadata.get("essay_a_id")
+        essay_b = metadata.get("essay_b_id")
+        if not essay_a or not essay_b:
+            typer.echo(
+                "Skipping LLM comparison with missing essay metadata; "
+                f"correlation={envelope.correlation_id}",
+                err=True,
+            )
+            return None
+
+        winner_value = (envelope.data.winner.value if envelope.data.winner else "").lower()
+        if "essay a" in winner_value:
+            winner_id, loser_id = essay_a, essay_b
+        elif "essay b" in winner_value:
+            winner_id, loser_id = essay_b, essay_a
+        else:
+            winner_id, loser_id = "error", essay_a
+
+        prompt_hash = metadata.get("prompt_sha256") or sha256(
+            metadata.get("prompt_text", "").encode("utf-8")
+        ).hexdigest()
+
+        sequence = len(artefact.get("llm_comparisons", [])) + 1
+        record = {
+            "sequence": sequence,
+            "correlation_id": str(envelope.correlation_id),
+            "winner_id": winner_id,
+            "loser_id": loser_id,
+            "prompt_hash": prompt_hash,
+            "provider": envelope.data.provider.value,
+            "model": envelope.data.model,
+            "tokens_prompt": envelope.data.token_usage.prompt_tokens,
+            "tokens_completion": envelope.data.token_usage.completion_tokens,
+            "cost_usd": envelope.data.cost_estimate,
+            "started_at": envelope.data.requested_at.isoformat(),
+            "completed_at": envelope.data.completed_at.isoformat(),
+            "status": "succeeded" if not envelope.data.is_error else "failed",
+        }
+
+        if envelope.data.is_error and envelope.data.error_detail:
+            record["error_code"] = envelope.data.error_detail.error_code.value
+            record["error_message"] = envelope.data.error_detail.message
+
+        return record
+
+    def _build_bt_entries(self, envelope: EventEnvelope[AssessmentResultV1]) -> list[dict[str, Any]]:
+        comparison_count = envelope.data.assessment_metadata.get("comparison_count", 0)
+        entries: list[dict[str, Any]] = []
+        for essay in envelope.data.essay_results:
+            entries.append(
+                {
+                    "essay_id": essay.essay_id,
+                    "theta": essay.bt_score,
+                    "standard_error": 0.0,
+                    "rank": essay.rank,
+                    "comparison_count": comparison_count,
+                    "is_anchor": essay.is_anchor,
+                    "anchor_grade": essay.letter_grade if essay.is_anchor else None,
+                    "grade_projection": essay.letter_grade,
+                }
+            )
+        return entries
+
+    def _build_grade_projections(
+        self, envelope: EventEnvelope[AssessmentResultV1]
+    ) -> list[dict[str, Any]]:
+        metadata = envelope.data.assessment_metadata or {}
+        summary = metadata.get("grade_projection_summary", {})
+        probabilities = summary.get("grade_probabilities", {})
+
+        projections: list[dict[str, Any]] = []
+        for essay in envelope.data.essay_results:
+            probs = probabilities.get(essay.essay_id, {essay.letter_grade: 1.0})
+            projections.append(
+                {
+                    "essay_id": essay.essay_id,
+                    "grade_scale": self.grade_scale,
+                    "grade": essay.letter_grade,
+                    "probabilities": probs,
+                    "primary_anchor_id": None,
+                    "anchor_alignment": None,
+                }
+            )
+        return projections
+
+    def _update_costs(
+        self,
+        artefact: dict[str, Any],
+        envelope: EventEnvelope[LLMComparisonResultV1],
+    ) -> None:
+        costs = artefact.setdefault("costs", {"total_usd": 0.0, "token_counts": []})
+        costs["total_usd"] = round(costs.get("total_usd", 0.0) + envelope.data.cost_estimate, 6)
+        totals = {
+            (entry["provider"], entry["model"]): entry
+            for entry in costs.get("token_counts", [])
+        }
+        key = (envelope.data.provider.value, envelope.data.model)
+        entry = totals.get(key)
+        if not entry:
+            entry = {
+                "provider": key[0],
+                "model": key[1],
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "usd": 0.0,
+            }
+            costs["token_counts"].append(entry)
+            totals[key] = entry
+
+        entry["prompt_tokens"] += envelope.data.token_usage.prompt_tokens
+        entry["completion_tokens"] += envelope.data.token_usage.completion_tokens
+        entry["usd"] = round(entry["usd"] + envelope.data.cost_estimate, 6)
+
+
+class AssessmentEventCollector:
+    """Async Kafka consumer that captures callbacks for a single ENG5 batch."""
+
+    def __init__(self, settings: RunnerSettings, hydrator: AssessmentRunHydrator) -> None:
+        self.settings = settings
+        self.hydrator = hydrator
+        self._ready = asyncio.Event()
+        self._done = asyncio.Event()
+        self._stop = asyncio.Event()
+        self._rich_observed = False
+        self._completion_observed = False
+        self._error: Exception | None = None
+
+    async def consume(self) -> None:
+        from aiokafka import AIOKafkaConsumer
+
+        topics = (
+            topic_name(ProcessingEvent.LLM_COMPARISON_RESULT),
+            topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED),
+            topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED),
+        )
+
+        consumer = AIOKafkaConsumer(
+            *topics,
+            bootstrap_servers=self.settings.kafka_bootstrap,
+            group_id=f"{self.settings.kafka_client_id}-eng5np-{self.settings.batch_id}",
+            enable_auto_commit=False,
+            auto_offset_reset="latest",
+            session_timeout_ms=45000,
+            max_poll_records=50,
+        )
+
+        await consumer.start()
+        self._ready.set()
+        deadline = asyncio.get_event_loop().time() + self.settings.completion_timeout
+
+        try:
+            while not self._stop.is_set():
+                if self._rich_observed:
+                    break
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    typer.echo(
+                        "Timed out waiting for CJ assessment results; captured partial data.",
+                        err=True,
+                    )
+                    break
+
+                batches = await consumer.getmany(timeout_ms=1000, max_records=50)
+                if not batches:
+                    continue
+
+                commit_needed = False
+                for records in batches.values():
+                    for record in records:
+                        handled = await self._handle_record(record)
+                        commit_needed = commit_needed or handled
+
+                if commit_needed:
+                    await consumer.commit()
+
+        except Exception as exc:  # pragma: no cover - defensive guard
+            self._error = exc
+            raise
+        finally:
+            await consumer.stop()
+            self._done.set()
+
+    async def _handle_record(self, record: Any) -> bool:
+        from aiokafka.structs import ConsumerRecord
+
+        if not isinstance(record, ConsumerRecord):
+            return False
+
+        try:
+            payload = record.value.decode("utf-8") if record.value else "{}"
+        except Exception:
+            return False
+
+        topic = record.topic
+        if topic == topic_name(ProcessingEvent.LLM_COMPARISON_RESULT):
+            envelope = EventEnvelope[LLMComparisonResultV1].model_validate_json(payload)
+            metadata = envelope.data.request_metadata or {}
+            batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
+            if batch_hint and batch_hint != self.settings.batch_id:
+                return False
+            self.hydrator.apply_llm_comparison(envelope)
+            return True
+
+        if topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
+            envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
+            if envelope.data.entity_id != self.settings.batch_id:
+                return False
+            write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
+            self._completion_observed = True
+            return True
+
+        if topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
+            envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
+            if envelope.data.batch_id != self.settings.batch_id:
+                return False
+            self.hydrator.apply_assessment_result(envelope)
+            self._rich_observed = True
+            return True
+
+        return False
+
+    async def wait_until_ready(self) -> None:
+        await self._ready.wait()
+
+    async def wait_for_completion(self) -> None:
+        await self._done.wait()
+        if self._error:
+            raise self._error
+
+    def request_stop(self) -> None:
+        self._stop.set()
 
 
 @dataclasses.dataclass
@@ -698,7 +1038,15 @@ def main(
         completion_timeout=completion_timeout,
     )
 
-    write_stub_artefact(settings=settings, inventory=inventory, schema=schema)
+    artefact_path = write_stub_artefact(settings=settings, inventory=inventory, schema=schema)
+    hydrator_for_capture: AssessmentRunHydrator | None = None
+    if settings.await_completion and settings.use_kafka:
+        hydrator_for_capture = AssessmentRunHydrator(
+            artefact_path=artefact_path,
+            output_dir=settings.output_dir,
+            grade_scale=settings.grade_scale,
+            batch_id=settings.batch_id,
+        )
 
     if mode is RunnerMode.EXECUTE:
         ensure_execute_requirements(inventory)
@@ -717,39 +1065,33 @@ def main(
             output_dir=settings.output_dir,
         )
         typer.echo(f"CJ request envelope written to {request_path}")
-        if settings.use_kafka:
-            try:
-                publish_envelope_to_kafka(envelope=envelope, settings=settings)
+        if settings.await_completion and not settings.use_kafka:
+            typer.echo("--await-completion ignored because Kafka publishing is disabled.", err=True)
+
+        try:
+            if settings.await_completion and settings.use_kafka:
+                asyncio.run(
+                    run_publish_and_capture(
+                        envelope=envelope,
+                        settings=settings,
+                        hydrator=hydrator_for_capture,
+                    )
+                )
+            elif settings.use_kafka:
+                asyncio.run(publish_envelope_to_kafka(envelope=envelope, settings=settings))
                 typer.echo(
-                    "Kafka publish succeeded -> topic"
-                    f" {topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+                    "Kafka publish succeeded -> topic "
+                    f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
                 )
-            except Exception as exc:  # pragma: no cover - best-effort side effect
-                typer.echo(
-                    f"Kafka publish failed ({exc.__class__.__name__}: {exc}). "
-                    "Use --no-kafka to skip publishing.",
-                    err=True,
-                )
-                raise
-        if settings.await_completion:
-            typer.echo(
-                f"Waiting up to {settings.completion_timeout:.0f}s for CJ completion events..."
-            )
-            completion_envelope = await_completion_event(
-                batch_id=settings.batch_id,
-                settings=settings,
-            )
-            if completion_envelope:
-                event_path = write_completion_event(
-                    envelope=completion_envelope,
-                    output_dir=settings.output_dir,
-                )
-                typer.echo(f"Completion event captured: {event_path}")
             else:
-                typer.echo(
-                    "Completion event not observed before timeout. Use --completion-timeout to adjust.",
-                    err=True,
-                )
+                typer.echo("Kafka disabled; request not published.")
+        except Exception as exc:  # pragma: no cover - best-effort side effect
+            typer.echo(
+                f"Kafka publish failed ({exc.__class__.__name__}: {exc}). "
+                "Use --no-kafka to skip publishing.",
+                err=True,
+            )
+            raise
 
 
 APP.command()(main)
