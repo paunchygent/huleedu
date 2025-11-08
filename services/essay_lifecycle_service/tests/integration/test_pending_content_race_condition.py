@@ -20,11 +20,10 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
-from common_core.metadata_models import StorageReferenceMetadata
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.batch_coordination_events import BatchEssaysRegistered
 from common_core.events.file_events import EssayContentProvisionedV1
-from common_core.metadata_models import SystemProcessingMetadata
+from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.status_enums import EssayStatus
 from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

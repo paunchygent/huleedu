@@ -176,7 +176,6 @@ class CJAssessmentCommandHandler:
                         # Prefer identity from envelope metadata (canonical source)
                         user_id = None
                         org_id = None
-                        student_prompt_ref = None
                         batch_status = None
 
                         if envelope_metadata:

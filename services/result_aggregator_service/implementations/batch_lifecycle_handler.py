@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from common_core.error_enums import ErrorCode
 from common_core.events.batch_coordination_events import BatchPipelineCompletedV1

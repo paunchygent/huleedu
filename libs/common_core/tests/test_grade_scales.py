@@ -7,7 +7,6 @@ Tests grade scale metadata, validation, and helper functions.
 from __future__ import annotations
 
 import pytest
-
 from common_core.grade_scales import (
     GRADE_SCALES,
     GradeScaleMetadata,

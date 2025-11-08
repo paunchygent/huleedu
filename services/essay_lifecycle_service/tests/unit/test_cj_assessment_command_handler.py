@@ -16,9 +16,9 @@ from common_core.batch_service_models import (
     BatchServiceCJAssessmentInitiateCommandDataV1,
     EssayProcessingInputRefV1,
 )
-from common_core.domain_enums import ContentType
-from common_core.domain_enums import CourseCode, Language
+from common_core.domain_enums import ContentType, CourseCode, Language
 from common_core.event_enums import ProcessingEvent
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.status_enums import EssayStatus
 
 from services.essay_lifecycle_service.essay_state_machine import (
@@ -32,7 +32,6 @@ from services.essay_lifecycle_service.protocols import (
     EssayRepositoryProtocol,
     SpecializedServiceRequestDispatcher,
 )
-from common_core.metadata_models import StorageReferenceMetadata
 
 if TYPE_CHECKING:
     pass

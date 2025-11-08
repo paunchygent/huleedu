@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -15,7 +16,6 @@ from common_core.events.envelope import EventEnvelope
 from common_core.metadata_models import StorageReferenceMetadata
 from common_core.pipeline_models import PhaseName, PipelineExecutionStatus
 from common_core.status_enums import BatchStatus
-from unittest.mock import AsyncMock
 
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.client_pipeline_request_handler import (

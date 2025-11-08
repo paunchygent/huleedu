@@ -34,15 +34,15 @@ from huleedu_service_libs.error_handling import (
 )
 from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 from huleedu_service_libs.outbox import OutboxRepositoryProtocol
-from pydantic import ValidationError
 from prometheus_client import Counter
+from pydantic import ValidationError
 
+from services.nlp_service.metrics import get_metrics
 from services.nlp_service.protocols import (
     CommandHandlerProtocol,
     ContentClientProtocol,
     NlpEventPublisherProtocol,
 )
-from services.nlp_service.metrics import get_metrics
 
 logger = create_service_logger("nlp_service.command_handlers.batch_nlp_analysis")
 

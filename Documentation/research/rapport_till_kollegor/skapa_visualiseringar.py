@@ -4,9 +4,9 @@ Visualiseringar för bedömarpanelrapporten
 Skapar pedagogiska diagram för att illustrera resultaten
 """
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 
 # Konfigurera svenska teckenuppsättning och stil
@@ -311,7 +311,7 @@ ax1.grid(axis="x", alpha=0.3)
 # Panel 2: Nyckeltal
 ax2 = fig.add_subplot(gs[0, 2])
 ax2.axis("off")
-metrics_text = f"""
+metrics_text = """
 NYCKELTAL
 
 Krippendorffs α: 0.56

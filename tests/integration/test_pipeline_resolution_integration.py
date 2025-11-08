@@ -108,8 +108,9 @@ class TestPipelineResolutionIntegration:
         }
 
         # Mock batch context to return valid context with prompt reference (Phase 3.2)
-        from common_core.metadata_models import StorageReferenceMetadata
         from types import SimpleNamespace
+
+        from common_core.metadata_models import StorageReferenceMetadata
 
         batch_context = SimpleNamespace(
             batch_id="test-batch-integration-001",
@@ -474,8 +475,9 @@ class TestPipelineResolutionIntegration:
         - Idempotent response provided
         """
         # Configure batch repository to return already-resolved pipeline (Phase 3.2)
-        from common_core.metadata_models import StorageReferenceMetadata
         from types import SimpleNamespace
+
+        from common_core.metadata_models import StorageReferenceMetadata
 
         batch_context = SimpleNamespace(
             batch_id="test-batch-idempotent-001",
@@ -562,8 +564,9 @@ class TestPipelineResolutionIntegration:
         - No race conditions in batch state management
         """
         # Phase 3.2: Import required models for prompt references
-        from common_core.metadata_models import StorageReferenceMetadata
         from types import SimpleNamespace
+
+        from common_core.metadata_models import StorageReferenceMetadata
 
         # Configure repository for multiple batches
         def mock_get_batch_context(batch_id: str):

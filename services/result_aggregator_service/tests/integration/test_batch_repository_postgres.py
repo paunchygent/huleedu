@@ -6,7 +6,9 @@ from typing import AsyncGenerator, Optional
 from uuid import uuid4
 
 import pytest
+from common_core.domain_enums import ContentType
 from common_core.error_enums import ErrorCode
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
 from sqlalchemy.ext.asyncio import (
@@ -22,8 +24,6 @@ from services.result_aggregator_service.implementations.batch_repository_postgre
     BatchRepositoryPostgresImpl,
 )
 from services.result_aggregator_service.models_db import Base, BatchResult
-from common_core.metadata_models import StorageReferenceMetadata
-from common_core.domain_enums import ContentType
 
 
 @pytest.fixture(scope="function")

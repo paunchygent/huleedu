@@ -18,6 +18,7 @@ from services.llm_provider_service.exceptions import (
     raise_rate_limit_error,
 )
 from services.llm_provider_service.internal_models import LLMProviderResponse
+from services.llm_provider_service.model_manifest import ProviderName
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
 
@@ -45,6 +46,27 @@ class AnthropicProviderImpl(LLMProviderProtocol):
         self.retry_manager = retry_manager
         self.api_key = settings.ANTHROPIC_API_KEY.get_secret_value()
         self.api_base = "https://api.anthropic.com/v1"
+
+        # Log default model configuration from manifest
+        try:
+            default_config = settings.get_model_from_manifest(ProviderName.ANTHROPIC)
+            logger.info(
+                "Anthropic provider initialized with manifest configuration",
+                extra={
+                    "default_model": default_config.model_id,
+                    "display_name": default_config.display_name,
+                    "api_version": default_config.api_version,
+                    "structured_output_method": default_config.structured_output_method.value,
+                    "max_tokens": default_config.max_tokens,
+                    "context_window": default_config.context_window,
+                    "capabilities": default_config.capabilities,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to load manifest configuration; using hardcoded defaults",
+                extra={"error": str(e)},
+            )
 
     async def generate_comparison(
         self,
@@ -156,14 +178,44 @@ You will use the comparison_result tool to provide your analysis."""
             HuleEduError: On any failure to make API request
         """
         endpoint = f"{self.api_base}/messages"
+
+        # Determine model and get manifest configuration
+        model = model_override or self.settings.ANTHROPIC_DEFAULT_MODEL
+
+        # Get API version and configuration from manifest
+        api_version = "2023-06-01"  # Fallback
+        try:
+            model_config = self.settings.get_model_from_manifest(ProviderName.ANTHROPIC, model)
+            api_version = model_config.api_version
+
+            # Log model selection
+            logger.info(
+                "Using Anthropic model from manifest",
+                extra={
+                    "model_id": model_config.model_id,
+                    "display_name": model_config.display_name,
+                    "api_version": api_version,
+                    "using_override": model_override is not None,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+        except ValueError:
+            # Model not in manifest - log warning and use fallback
+            logger.warning(
+                "Model not found in manifest; using hardcoded API version",
+                extra={
+                    "model": model,
+                    "fallback_api_version": api_version,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
         headers = {
             "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01",
+            "anthropic-version": api_version,
             "content-type": "application/json",
         }
 
-        # Determine model and parameters
-        model = model_override or self.settings.ANTHROPIC_DEFAULT_MODEL
         temperature = (
             temperature_override
             if temperature_override is not None

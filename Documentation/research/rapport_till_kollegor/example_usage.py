@@ -5,18 +5,16 @@ Demonstrates integration with async microservices and Swedish essay data.
 """
 
 import asyncio
-import json
-from typing import List
 from datetime import datetime
+from typing import List
 
 from ordinal_essay_scoring import (
     GradeScale,
-    RatingData,
-    OrdinalScoringService,
     ManyFacetRaschModel,
+    OrdinalScoringService,
+    RatingData,
     design_optimal_rating_schedule,
 )
-
 
 # =============================================================================
 # Swedish Essay Data from your CSV
@@ -299,7 +297,7 @@ async def run_async_service():
         tune=500,
     )
 
-    print(f"\n✅ Model fitted successfully")
+    print("\n✅ Model fitted successfully")
     print(f"   - {len(results.essay_scores)} essays scored")
     print(f"   - {len(results.rater_effects)} raters calibrated")
 
@@ -316,7 +314,7 @@ async def run_async_service():
             f"   - 95% HDI: [{score.latent_ability.hdi_lower:.3f}, "
             f"{score.latent_ability.hdi_upper:.3f}]"
         )
-        print(f"   - Grade Probabilities:")
+        print("   - Grade Probabilities:")
         for grade, prob in sorted(
             score.grade_probabilities.items(), key=lambda x: x[1], reverse=True
         )[:5]:
@@ -362,13 +360,13 @@ scoring_service = OrdinalScoringService()
 async def fit_model():
     '''Fit MFRM model to rating data.'''
     data = await request.get_json()
-    
+
     # Convert JSON to RatingData objects
     ratings = [RatingData(**r) for r in data['ratings']]
-    
+
     # Fit model
     results = await scoring_service.fit_model(ratings)
-    
+
     return jsonify({
         'success': True,
         'n_essays': len(results.essay_scores),
@@ -380,7 +378,7 @@ async def fit_model():
 async def get_essay_score(essay_id: str):
     '''Get score for specific essay.'''
     score = await scoring_service.score_essay(essay_id, [], use_cached_model=True)
-    
+
     return jsonify({
         'essay_id': essay_id,
         'predicted_grade': score.predicted_grade.name,
@@ -392,7 +390,7 @@ async def get_essay_score(essay_id: str):
 async def get_rater_effect(rater_id: str):
     '''Get rater bias estimate.'''
     effect = await scoring_service.get_rater_bias(rater_id)
-    
+
     if effect:
         return jsonify(effect.dict())
     else:
@@ -417,7 +415,7 @@ def demonstrate_rating_design():
     n_raters = 10
     essays_per_rater = 15
 
-    print(f"\nDesigning schedule for:")
+    print("\nDesigning schedule for:")
     print(f"  - {n_essays} essays")
     print(f"  - {n_raters} raters")
     print(f"  - {essays_per_rater} essays per rater")
@@ -443,7 +441,7 @@ def demonstrate_rating_design():
         essays_per_rater_actual[rater] += 1
         raters_per_essay[essay] += 1
 
-    print(f"\nSchedule statistics:")
+    print("\nSchedule statistics:")
     print(f"  - Min raters per essay: {min(raters_per_essay.values())}")
     print(f"  - Max raters per essay: {max(raters_per_essay.values())}")
     print(f"  - Avg raters per essay: {np.mean(list(raters_per_essay.values())):.1f}")
@@ -476,7 +474,7 @@ def main():
 
     # 3. Rating schedule design
     print("\n3️⃣ DEMONSTRATING OPTIMAL RATING DESIGN")
-    schedule = demonstrate_rating_design()
+    demonstrate_rating_design()
 
     print("\n" + "=" * 60)
     print("✅ ALL EXAMPLES COMPLETED")

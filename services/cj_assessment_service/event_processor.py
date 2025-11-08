@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
 from aiokafka import ConsumerRecord
-from common_core.error_enums import ErrorCode
 from common_core.domain_enums import ContentType
+from common_core.error_enums import ErrorCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.cj_assessment_events import (
     CJAssessmentFailedV1,

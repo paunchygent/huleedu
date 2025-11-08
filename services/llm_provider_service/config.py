@@ -10,6 +10,13 @@ from huleedu_service_libs.config import SecureServiceSettings
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Model Manifest Integration
+from services.llm_provider_service.model_manifest import (
+    ModelConfig,
+    ProviderName,
+    get_model_config,
+)
+
 
 class ProviderConfig(BaseSettings):
     """Per-provider configuration with dynamic override support."""
@@ -101,12 +108,21 @@ class Settings(SecureServiceSettings):
     LLM_DEFAULT_TEMPERATURE: float = 0.7
     LLM_DEFAULT_MAX_TOKENS: int = 4096
 
+    # Model Manifest Configuration
+    USE_MANIFEST_MODEL_SELECTION: bool = Field(
+        default=False,
+        description="When enabled, validate that callers use manifest-based model selection. "
+        "Logs warnings when llm_config_overrides is None.",
+    )
+
     # Provider-specific configurations
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: SecretStr = Field(
         default=SecretStr(""), description="Anthropic API key for Claude models"
     )
     ANTHROPIC_BASE_URL: Optional[str] = None
+    # DEPRECATED: Prefer using model manifest via llm_config_overrides
+    # Fallback when no override specified. To be removed in future versions.
     ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-haiku-20241022"
     ANTHROPIC_ENABLED: bool = True
 
@@ -114,6 +130,8 @@ class Settings(SecureServiceSettings):
         default=SecretStr(""), description="OpenAI API key for GPT models"
     )
     OPENAI_BASE_URL: Optional[str] = None
+    # DEPRECATED: Prefer using model manifest via llm_config_overrides
+    # Fallback when no override specified. To be removed in future versions.
     OPENAI_DEFAULT_MODEL: str = "gpt-5-mini-2025-08-07"
     OPENAI_ORG_ID: Optional[str] = None
     OPENAI_ENABLED: bool = True
@@ -122,6 +140,8 @@ class Settings(SecureServiceSettings):
         default=SecretStr(""), description="Google API key for Gemini models"
     )
     GOOGLE_PROJECT_ID: str = ""
+    # DEPRECATED: Prefer using model manifest via llm_config_overrides
+    # Fallback when no override specified. To be removed in future versions.
     GOOGLE_DEFAULT_MODEL: str = "gemini-2.5-flash-preview-05-20"
     GOOGLE_ENABLED: bool = True
 
@@ -129,6 +149,8 @@ class Settings(SecureServiceSettings):
         default=SecretStr(""), description="OpenRouter API key for various models"
     )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    # DEPRECATED: Prefer using model manifest via llm_config_overrides
+    # Fallback when no override specified. To be removed in future versions.
     OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-5-haiku-20241022"
     OPENROUTER_ENABLED: bool = True
 
@@ -272,6 +294,29 @@ class Settings(SecureServiceSettings):
             timeout=self.LLM_REQUEST_TIMEOUT,
             max_concurrent_requests=self.LLM_MAX_CONCURRENT_REQUESTS,
         )
+
+    def get_model_from_manifest(
+        self, provider: ProviderName, model_id: str | None = None
+    ) -> ModelConfig:
+        """Get model configuration from manifest.
+
+        Args:
+            provider: The LLM provider (from ProviderName enum)
+            model_id: Specific model ID. If None, returns provider's default.
+
+        Returns:
+            ModelConfig from the centralized manifest
+
+        Raises:
+            ValueError: If provider or model_id is invalid
+
+        Examples:
+            >>> settings = Settings()
+            >>> config = settings.get_model_from_manifest(ProviderName.ANTHROPIC)
+            >>> config.model_id
+            'claude-3-5-haiku-20241022'
+        """
+        return get_model_config(provider, model_id)
 
 
 # Create a single instance for the application to use

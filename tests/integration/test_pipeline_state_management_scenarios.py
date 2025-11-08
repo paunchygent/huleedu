@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 from common_core.domain_enums import ContentType, CourseCode
+from common_core.metadata_models import StorageReferenceMetadata
 from common_core.pipeline_models import (
     PhaseName,
     PipelineExecutionStatus,
@@ -19,7 +20,6 @@ from common_core.pipeline_models import (
 )
 from common_core.status_enums import BatchStatus
 
-from common_core.metadata_models import StorageReferenceMetadata
 from services.batch_orchestrator_service.api_models import BatchRegistrationRequestV1
 from services.batch_orchestrator_service.implementations.batch_pipeline_state_manager import (
     BatchPipelineStateManager,

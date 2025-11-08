@@ -2,40 +2,37 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import sys
 import uuid
 from pathlib import Path
 
 import pytest
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.append(str(SCRIPT_DIR))
-
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, Language
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.cj_assessment_events import AssessmentResultV1, EssayResultV1
 from common_core.events.envelope import EventEnvelope
-from common_core.events.llm_provider_events import EssayComparisonWinner, LLMComparisonResultV1, TokenUsage
-
-from eng5_np_batch_runner import (
-    AssessmentRunHydrator,
-    FileRecord,
-    RunnerMode,
-    RunnerPaths,
-    RunnerSettings,
-    build_essay_refs,
-    build_prompt_reference,
-    collect_inventory,
-    compose_cj_assessment_request,
-    ensure_schema_available,
-    repo_root_from_this_file,
-    snapshot_directory,
-    sha256_of_file,
-    write_cj_request_envelope,
-    write_stub_artefact,
+from common_core.events.llm_provider_events import (
+    EssayComparisonWinner,
+    LLMComparisonResultV1,
+    TokenUsage,
 )
+
+from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
+from scripts.cj_experiments_runners.eng5_np.environment import repo_root_from_package
+from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
+from scripts.cj_experiments_runners.eng5_np.inventory import (
+    FileRecord,
+    build_essay_refs,
+    collect_inventory,
+    snapshot_directory,
+)
+from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
+from scripts.cj_experiments_runners.eng5_np.requests import (
+    compose_cj_assessment_request,
+    write_cj_request_envelope,
+)
+from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
+from scripts.cj_experiments_runners.eng5_np.utils import sha256_of_file
 
 
 def _write_base_artefact(tmp_path: Path) -> Path:
@@ -51,8 +48,18 @@ def _write_base_artefact(tmp_path: Path) -> Path:
             "runner_mode": "execute",
         },
         "inputs": {
-            "instructions": {"source_path": "instructions.md", "checksum": None, "exists": True, "size_bytes": 1},
-            "prompt_reference": {"source_path": "prompt.md", "checksum": None, "exists": True, "size_bytes": 1},
+            "instructions": {
+                "source_path": "instructions.md",
+                "checksum": None,
+                "exists": True,
+                "size_bytes": 1,
+            },
+            "prompt_reference": {
+                "source_path": "prompt.md",
+                "checksum": None,
+                "exists": True,
+                "size_bytes": 1,
+            },
             "anchors": [],
             "students": [],
         },
@@ -148,7 +155,7 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
     output_file = write_stub_artefact(
         settings=settings,
         inventory=inventory,
-        schema=ensure_schema_available(schema_path),
+        schema={"schema_version": "1.0.0"},
     )
 
     data = json.loads(output_file.read_text(encoding="utf-8"))
@@ -158,11 +165,11 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(
-    not (repo_root_from_this_file() / "test_uploads").exists(),
+    not (repo_root_from_package() / "test_uploads").exists(),
     reason="ENG5 role-model assets not available",
 )
 def test_collect_inventory_matches_real_dataset() -> None:
-    paths = RunnerPaths.from_repo_root(repo_root_from_this_file())
+    paths = RunnerPaths.from_repo_root(repo_root_from_package())
     inventory = collect_inventory(paths)
 
     assert inventory.instructions.exists is True
@@ -178,7 +185,7 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
     essay_file = student_dir / "JA24.docx"
     essay_file.write_text("essay", encoding="utf-8")
 
-    prompt_record = FileRecord.from_path(prompt)
+    FileRecord.from_path(prompt)
     essay_records = [FileRecord.from_path(essay_file)]
     essay_refs = build_essay_refs(anchors=[], students=essay_records)
 
@@ -204,11 +211,10 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
         completion_timeout=1.0,
     )
 
-    prompt_ref = build_prompt_reference(prompt_record)
     envelope = compose_cj_assessment_request(
         settings=settings,
         essay_refs=essay_refs,
-        prompt_reference=prompt_ref,
+        prompt_reference=None,
     )
 
     assert envelope.data.user_id == "user-42"
@@ -263,7 +269,7 @@ def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
     comparison = data["llm_comparisons"][0]
     assert comparison["winner_id"] == "A1"
     assert data["costs"]["total_usd"] == pytest.approx(0.25)
-    assert data["validation"]["manifest"]  # manifest populated
+    assert data["validation"]["manifest"]
 
 
 def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:

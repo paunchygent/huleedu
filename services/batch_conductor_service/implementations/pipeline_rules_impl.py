@@ -12,13 +12,13 @@ from collections import defaultdict, deque
 
 import structlog
 
+from common_core.pipeline_models import PhaseName
 from huleedu_service_libs.error_handling.batch_conductor_factories import (
     raise_pipeline_compatibility_failed,
 )
 from huleedu_service_libs.error_handling.factories import (
     raise_resource_not_found,
 )
-from common_core.pipeline_models import PhaseName
 from services.batch_conductor_service.pipeline_definitions import PipelineDefinition, PipelineStep
 from services.batch_conductor_service.protocols import (
     BatchStateRepositoryProtocol,

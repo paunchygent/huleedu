@@ -1,7 +1,7 @@
 ---
 name: lead-dev-code-reviewer
 description: Whenever it has implemented new code, files, functions, methods, and tests t
-model: opus
+model: sonnet
 ---
 
 ---

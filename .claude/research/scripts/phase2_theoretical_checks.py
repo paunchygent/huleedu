@@ -15,8 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-import numpy as np
 import choix  # type: ignore
+import numpy as np
 
 from services.cj_assessment_service.cj_core_logic import bt_inference
 

@@ -8,7 +8,6 @@ different assessment contexts (Swedish national exams, ENG5 NP variants, etc.).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass(frozen=True)

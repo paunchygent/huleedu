@@ -56,7 +56,6 @@ from services.essay_lifecycle_service.tests.distributed.test_sync_utils import (
 )
 from services.essay_lifecycle_service.tests.distributed.test_utils import PerformanceMetrics
 
-
 RUN_PERFORMANCE_TESTS = os.environ.get("HULEEDU_RUN_PERFORMANCE_TESTS") == "1"
 
 

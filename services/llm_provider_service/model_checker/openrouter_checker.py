@@ -1,0 +1,307 @@
+"""OpenRouter model version checker implementation.
+
+This module implements the ModelCheckerProtocol for OpenRouter's aggregated models.
+It queries the OpenRouter REST API /api/v1/models endpoint to discover available models
+and compares them with the model manifest.
+
+Usage:
+    import aiohttp
+    from services.llm_provider_service.model_checker import OpenRouterModelChecker
+
+    async with aiohttp.ClientSession() as session:
+        checker = OpenRouterModelChecker(
+            session=session,
+            api_key="...",
+            logger=logger
+        )
+
+        # Discover latest models from OpenRouter API
+        models = await checker.check_latest_models()
+
+        # Compare with manifest
+        result = await checker.compare_with_manifest()
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import aiohttp
+
+from services.llm_provider_service.model_checker.base import (
+    DiscoveredModel,
+    ModelComparisonResult,
+)
+from services.llm_provider_service.model_manifest import (
+    ModelConfig,
+    ProviderName,
+    list_models,
+)
+
+
+class OpenRouterModelChecker:
+    """OpenRouter model version checker.
+
+    Queries OpenRouter's REST API /api/v1/models endpoint to discover available models
+    and compares them with the manifest.
+
+    Attributes:
+        session: aiohttp ClientSession for API requests
+        api_key: OpenRouter API key for authentication
+        logger: Structured logger for observability
+        provider: Always ProviderName.OPENROUTER
+        api_base: OpenRouter API base URL
+    """
+
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        api_key: str,
+        logger: logging.Logger,
+    ):
+        """Initialize OpenRouter model checker.
+
+        Args:
+            session: Configured aiohttp ClientSession
+            api_key: OpenRouter API key
+            logger: Logger for structured logging
+        """
+        self.session = session
+        self.api_key = api_key
+        self.logger = logger
+        self.provider = ProviderName.OPENROUTER
+        self.api_base = "https://openrouter.ai/api/v1"
+
+    async def check_latest_models(self) -> list[DiscoveredModel]:
+        """Query OpenRouter API and discover available models.
+
+        Queries the /api/v1/models endpoint and parses the response into
+        DiscoveredModel instances. Filters out legacy models that are
+        no longer relevant.
+
+        Returns:
+            List of models discovered from OpenRouter API
+
+        Raises:
+            aiohttp.ClientError: If API request fails
+        """
+        self.logger.info(
+            "Checking latest models from OpenRouter API",
+            extra={"provider": self.provider.value},
+        )
+
+        try:
+            # Query OpenRouter models API
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+
+            async with self.session.get(
+                f"{self.api_base}/models",
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+
+            # Parse response
+            models_data = data.get("data", [])
+            discovered: list[DiscoveredModel] = []
+
+            for model_data in models_data:
+                # Parse model data into DiscoveredModel
+                discovered_model = self._parse_model_data(model_data)
+
+                # Filter out legacy/deprecated models we don't care about
+                if self._should_include_model(discovered_model):
+                    discovered.append(discovered_model)
+
+            self.logger.info(
+                "Successfully discovered models from OpenRouter",
+                extra={
+                    "provider": self.provider.value,
+                    "total_models": len(models_data),
+                    "filtered_models": len(discovered),
+                },
+            )
+
+            return discovered
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to check latest models from OpenRouter",
+                extra={
+                    "provider": self.provider.value,
+                    "error": str(e),
+                },
+            )
+            raise
+
+    async def compare_with_manifest(self) -> ModelComparisonResult:
+        """Compare discovered models with manifest and identify changes.
+
+        Identifies:
+        - New models: in API but not in manifest
+        - Deprecated models: in manifest but deprecated by provider
+        - Updated models: metadata changes (API version, capabilities)
+        - Breaking changes: incompatible changes requiring manifest update
+
+        Returns:
+            ModelComparisonResult with delta information
+
+        Raises:
+            ValueError: If manifest lookup fails
+        """
+        self.logger.info(
+            "Comparing discovered models with manifest",
+            extra={"provider": self.provider.value},
+        )
+
+        # Get discovered models from API
+        discovered = await self.check_latest_models()
+
+        # Get manifest models for OpenRouter
+        manifest_models = list_models(self.provider)
+
+        # Build lookup maps
+        discovered_by_id = {m.model_id: m for m in discovered}
+        manifest_by_id = {m.model_id: m for m in manifest_models}
+
+        # Identify new models (in API but not in manifest)
+        new_models = [
+            model for model_id, model in discovered_by_id.items() if model_id not in manifest_by_id
+        ]
+
+        # Identify deprecated models (in manifest but not in API anymore)
+        deprecated_models = [
+            model_id for model_id in manifest_by_id.keys() if model_id not in discovered_by_id
+        ]
+
+        # Identify updated models (metadata changes)
+        updated_models: list[tuple[str, DiscoveredModel]] = []
+        breaking_changes: list[str] = []
+
+        for model_id, manifest_model in manifest_by_id.items():
+            if model_id in discovered_by_id:
+                discovered_model = discovered_by_id[model_id]
+
+                # Check for capability changes (non-breaking but notable)
+                if self._has_capability_changes(manifest_model, discovered_model):
+                    updated_models.append((model_id, discovered_model))
+
+        # Determine if manifest is up-to-date
+        is_up_to_date = (
+            len(new_models) == 0
+            and len(deprecated_models) == 0
+            and len(updated_models) == 0
+            and len(breaking_changes) == 0
+        )
+
+        result = ModelComparisonResult(
+            provider=self.provider,
+            new_models=new_models,
+            deprecated_models=deprecated_models,
+            updated_models=updated_models,
+            breaking_changes=breaking_changes,
+            is_up_to_date=is_up_to_date,
+        )
+
+        self.logger.info(
+            "Comparison complete",
+            extra={
+                "provider": self.provider.value,
+                "new_models_count": len(new_models),
+                "deprecated_models_count": len(deprecated_models),
+                "updated_models_count": len(updated_models),
+                "breaking_changes_count": len(breaking_changes),
+                "is_up_to_date": is_up_to_date,
+            },
+        )
+
+        return result
+
+    def _parse_model_data(self, model_data: dict[str, Any]) -> DiscoveredModel:
+        """Parse OpenRouter model data into DiscoveredModel.
+
+        Args:
+            model_data: Model data dict from OpenRouter API
+
+        Returns:
+            DiscoveredModel instance
+        """
+        # OpenRouter returns: id, name, context_length, pricing, etc.
+        model_id = model_data.get("id", "")
+        name = model_data.get("name", model_id)
+        context_length = model_data.get("context_length")
+
+        # Infer capabilities (OpenRouter is a pass-through)
+        capabilities: list[str] = []
+
+        # Check if model supports various features
+        if "function" in name.lower() or "tool" in name.lower():
+            capabilities.append("function_calling")
+
+        # Most modern models support JSON mode
+        capabilities.append("json_mode")
+
+        return DiscoveredModel(
+            model_id=model_id,
+            display_name=name,
+            api_version="v1",  # OpenRouter uses v1
+            capabilities=capabilities,
+            max_tokens=model_data.get("top_provider", {}).get("max_completion_tokens"),
+            context_window=context_length,
+            supports_tool_use="function_calling" in capabilities,
+            supports_streaming=True,  # OpenRouter supports streaming
+            release_date=None,  # Not exposed in API
+            is_deprecated=False,  # Not exposed in API
+            deprecation_date=None,
+            notes=model_data.get("description", ""),
+        )
+
+    def _should_include_model(self, model: DiscoveredModel) -> bool:
+        """Determine if a discovered model should be included in results.
+
+        Filters out legacy models that are no longer relevant for comparison.
+        Only include Anthropic models routed through OpenRouter.
+
+        Args:
+            model: Discovered model to evaluate
+
+        Returns:
+            True if model should be included
+        """
+        # Only include Anthropic models (our focus for OpenRouter)
+        model_id_lower = model.model_id.lower()
+
+        # Include Anthropic Claude models
+        if "anthropic" in model_id_lower and "claude" in model_id_lower:
+            # Only Claude 3+ models
+            if any(x in model_id_lower for x in ["claude-3", "claude-4"]):
+                return True
+
+        return False
+
+    def _has_capability_changes(
+        self,
+        manifest_model: ModelConfig,
+        discovered_model: DiscoveredModel,
+    ) -> bool:
+        """Check if capabilities have changed between manifest and discovered model.
+
+        Args:
+            manifest_model: Model from manifest
+            discovered_model: Model from API
+
+        Returns:
+            True if capabilities differ
+        """
+        # Convert manifest capabilities dict to set of strings
+        manifest_caps = set(key for key, value in manifest_model.capabilities.items() if value)
+
+        # Convert discovered capabilities list to set
+        discovered_caps = set(discovered_model.capabilities)
+
+        # Check if sets differ
+        return manifest_caps != discovered_caps

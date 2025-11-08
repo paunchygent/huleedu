@@ -4,12 +4,13 @@ Skapa korrigerade figurer för bedömarpanelrapporten
 Läser data från Bayesiansk konsensusmodell och genererar figurer med korrekt tolkning
 """
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
 from pathlib import Path
+
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 # Konfigurera matplotlib för svensk text
 plt.rcParams["font.family"] = "DejaVu Sans"
@@ -69,7 +70,7 @@ def create_figure1_essay_ranking(essays):
 
     # Skapa horisontellt stapeldiagram
     y_pos = np.arange(len(essays_sorted))
-    bars = ax.barh(
+    ax.barh(
         y_pos, essays_sorted["ability"], color=colors, alpha=0.8, edgecolor="black", linewidth=0.5
     )
 
@@ -272,13 +273,6 @@ def create_figure3_grade_thresholds():
     fig, ax = plt.subplots(figsize=(14, 6))
 
     # Faktiska medelvärden från data
-    grade_means = {
-        "E+": 3.43,  # Endast JP24
-        "D+": 4.84,  # Medel av 4 uppsatser
-        "C-": 5.80,  # Medel av 3 uppsatser
-        "C+": 7.06,  # Medel av 2 uppsatser
-        "B": 8.16,  # Medel av 2 uppsatser
-    }
 
     # Faktiska övergångar i data
     # E+ till D+ hoppar över D- (1 mellanliggande betygssteg)
@@ -414,7 +408,7 @@ def create_figure4_inter_rater_agreement(inter_rater):
         else:
             colors.append("#E74C3C")  # Röd = stor oenighet
 
-    bars = ax1.barh(
+    ax1.barh(
         y_pos,
         inter_sorted["grade_range"],
         color=colors,

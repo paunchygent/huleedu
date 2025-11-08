@@ -19,8 +19,8 @@ from common_core.events.nlp_events import (
     NlpMetrics,
 )
 from common_core.events.spellcheck_models import SpellcheckMetricsV1
-from common_core.models.error_models import ErrorDetail
 from common_core.metadata_models import EssayProcessingInputRefV1, StorageReferenceMetadata
+from common_core.models.error_models import ErrorDetail
 from huleedu_nlp_shared.feature_pipeline.feature_context import FeatureContext
 from huleedu_nlp_shared.feature_pipeline.protocols import FeaturePipelineResult
 from huleedu_service_libs.error_handling import HuleEduError

@@ -18,7 +18,6 @@ from common_core.error_enums import ErrorCode
 from common_core.events.cj_assessment_events import ELS_CJAssessmentRequestV1
 from common_core.events.envelope import EventEnvelope
 from common_core.models.error_models import ErrorDetail
-
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.event_processor import process_single_message

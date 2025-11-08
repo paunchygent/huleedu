@@ -32,8 +32,6 @@ from common_core.metadata_models import (
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import ProcessingStage
 
-from services.batch_orchestrator_service.tests import make_prompt_ref
-
 from services.batch_orchestrator_service.implementations.batch_essays_ready_handler import (
     BatchEssaysReadyHandler,
 )
@@ -41,6 +39,7 @@ from services.batch_orchestrator_service.implementations.batch_validation_errors
     BatchValidationErrorsHandler,
 )
 from services.batch_orchestrator_service.kafka_consumer import BatchKafkaConsumer
+from services.batch_orchestrator_service.tests import make_prompt_ref
 
 # Rebuild models to resolve forward references
 EssayValidationError.model_rebuild()

@@ -474,6 +474,7 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation
+        assert data.student_prompt_ref is not None
         expected_metadata = {
             "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
         }
@@ -542,6 +543,7 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation still works
+        assert data.student_prompt_ref is not None
         expected_metadata = {
             "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
         }
@@ -599,6 +601,7 @@ class TestProcessBatchRegistered:
         await mock_event_processor.process_batch_registered(envelope, data)
 
         # Assert - Verify batch creation
+        assert data.student_prompt_ref is not None
         expected_metadata = {
             "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
         }

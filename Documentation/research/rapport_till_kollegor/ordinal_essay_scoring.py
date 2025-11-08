@@ -11,20 +11,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Dict, List, Optional, Tuple, Union, Protocol, TypeVar, Generic, Any
+from typing import Any, Dict, List, Optional, Protocol, Tuple, TypeVar
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
-from scipy.special import expit, logit
+from scipy.special import expit
 
 # For Bayesian inference
 try:
-    import pymc as pm
     import arviz as az
+    import pymc as pm
 
     PYMC_AVAILABLE = True
 except ImportError:
@@ -756,7 +755,7 @@ class OrdinalScoringService:
             raise ValueError("No model fitted. Call fit_model first.")
 
         # Create rating data
-        ratings = [
+        [
             RatingData(essay_id=essay_id, rater_id=rater_id, grade=grade)
             for rater_id, grade in rater_scores
         ]
@@ -799,7 +798,7 @@ class OrdinalScoringService:
 
         for train_idx, test_idx in kf.split(rating_array):
             train_ratings = rating_array[train_idx].tolist()
-            test_ratings = rating_array[test_idx].tolist()
+            rating_array[test_idx].tolist()
 
             # Fit on train
             results = await self.fit_model(train_ratings, **kwargs)
@@ -822,11 +821,11 @@ data {
   int<lower=1> N_essays;       // Number of essays
   int<lower=1> N_raters;       // Number of raters
   int<lower=2> K;              // Number of categories
-  
+
   int<lower=1,upper=N_essays> essay[N];
   int<lower=1,upper=N_raters> rater[N];
   int<lower=1,upper=K> grade[N];
-  
+
   // Prior hyperparameters
   real<lower=0> sigma_ability_prior;
   real<lower=0> sigma_rater_prior;
@@ -835,17 +834,17 @@ data {
 parameters {
   // Thresholds (ordered)
   ordered[K-1] thresholds;
-  
+
   // Essay abilities
   real mu_ability;
   real<lower=0> sigma_ability;
   vector[N_essays] essay_ability_raw;
-  
+
   // Rater severities with horseshoe prior
   real<lower=0> tau_global;
   vector<lower=0>[N_raters] tau_local;
   vector[N_raters] rater_severity_raw;
-  
+
   // Robust errors (optional)
   real<lower=1> nu;  // Student-t degrees of freedom
 }
@@ -853,13 +852,13 @@ parameters {
 transformed parameters {
   vector[N_essays] essay_ability;
   vector[N_raters] rater_severity;
-  
+
   // Non-centered parameterization
   essay_ability = mu_ability + sigma_ability * essay_ability_raw;
-  
+
   // Horseshoe prior for rater effects
   rater_severity = rater_severity_raw .* tau_local * tau_global;
-  
+
   // Sum-to-zero constraint
   rater_severity = rater_severity - mean(rater_severity);
 }
@@ -867,21 +866,21 @@ transformed parameters {
 model {
   // Priors
   thresholds ~ normal(0, 3);
-  
+
   mu_ability ~ normal(0, 1);
   sigma_ability ~ exponential(1);
   essay_ability_raw ~ std_normal();
-  
+
   tau_global ~ student_t(3, 0, 1);
   tau_local ~ student_t(3, 0, 1);
   rater_severity_raw ~ std_normal();
-  
+
   nu ~ gamma(2, 0.1);
-  
+
   // Likelihood
   for (n in 1:N) {
     real eta = essay_ability[essay[n]] - rater_severity[rater[n]];
-    
+
     // Robust ordered logistic (approximate with Student-t)
     grade[n] ~ ordered_logistic(eta, thresholds);
   }
@@ -890,7 +889,7 @@ model {
 generated quantities {
   vector[N] log_lik;
   int grade_rep[N];
-  
+
   for (n in 1:N) {
     real eta = essay_ability[essay[n]] - rater_severity[rater[n]];
     log_lik[n] = ordered_logistic_lpmf(grade[n] | eta, thresholds);
@@ -917,8 +916,9 @@ def design_optimal_rating_schedule(
 
     Returns list of (essay_id, rater_id) assignments.
     """
-    import networkx as nx
     from itertools import combinations
+
+    import networkx as nx
 
     # Create bipartite graph
     G = nx.Graph()

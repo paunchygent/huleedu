@@ -1,14 +1,8 @@
 ---
 name: lead-architect-planner
 description: Use this agent for pure architectural planning and review of implementation plans and tasks. This agent specializes in analyzing existing patterns, creating comprehensive implementation plans, and reviewing architectural decisions without writing any code. Perfect for: planning new microservices, reviewing implementation plans, assessing architectural compliance, and ensuring alignment with established patterns and principles. <example>Context: User needs to plan a new microservice implementation.
-user: "I need to plan a new notification service that will handle email and SMS notifications"
-assistant: "I'll use the lead-architect-planner agent to analyze existing patterns and create a comprehensive architectural plan"
-<commentary>Since this involves architectural planning for a new microservice, the lead-architect-planner agent should analyze patterns and create a detailed plan.</commentary></example> <example>Context: User wants architectural review of an implementation plan.
-user: "Review this implementation plan for the batch processing service"
-assistant: "Let me engage the lead-architect-planner agent to perform a thorough architectural review of your implementation plan"
-<commentary>The user needs architectural review of a plan, which is perfect for the lead-architect-planner agent.</commentary></example>
 tools: Glob, Grep, Read, WebFetch, TodoWrite, WebSearch
-model: opus
+model: sonnet
 color: red
 ---
 

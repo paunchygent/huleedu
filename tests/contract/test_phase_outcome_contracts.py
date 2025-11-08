@@ -15,6 +15,7 @@ from common_core.events.els_bos_events import ELSBatchPhaseOutcomeV1
 from common_core.metadata_models import EssayProcessingInputRefV1
 from common_core.pipeline_models import PhaseName
 from common_core.status_enums import BatchStatus
+
 from tests.utils.prompt_reference import make_prompt_ref
 
 

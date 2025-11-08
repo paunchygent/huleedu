@@ -20,6 +20,7 @@ import pytest
 import redis.asyncio as redis
 from aiokafka import AIOKafkaConsumer
 from huleedu_service_libs.redis_client import RedisClient
+
 from tests.utils.prompt_reference import make_prompt_ref_payload
 
 

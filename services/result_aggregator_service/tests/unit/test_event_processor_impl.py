@@ -196,6 +196,7 @@ class TestProcessBatchRegistered:
         await event_processor.process_batch_registered(envelope, data)
 
         # Assert
+        assert data.student_prompt_ref is not None
         expected_metadata = {
             "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
         }
@@ -247,6 +248,7 @@ class TestProcessBatchRegistered:
         await event_processor.process_batch_registered(envelope, data)
 
         # Assert
+        assert data.student_prompt_ref is not None
         expected_metadata = {
             "student_prompt_ref": data.student_prompt_ref.model_dump(mode="json"),
         }
