@@ -372,7 +372,8 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                             operation="feature_pipeline",
                             external_service="language_tool_service",
                             message=(
-                                f"Language Tool request failed for essay {essay_ref.essay_id}: {str(e)}"
+                                f"Language Tool request failed for essay "
+                                f"{essay_ref.essay_id}: {str(e)}"
                             ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,
@@ -384,7 +385,8 @@ class BatchNlpAnalysisHandler(CommandHandlerProtocol):
                             operation="feature_pipeline",
                             stage="extract_features",
                             message=(
-                                f"Unexpected error running feature pipeline for essay {essay_ref.essay_id}: {str(e)}"
+                                f"Unexpected error running feature pipeline for essay "
+                                f"{essay_ref.essay_id}: {str(e)}"
                             ),
                             correlation_id=correlation_id,
                             essay_id=essay_ref.essay_id,

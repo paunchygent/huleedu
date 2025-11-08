@@ -129,7 +129,8 @@ class SpellNormalizer:
 
         l2_time = time.time() - l2_start
         self._logger.info(
-            f"{log_prefix}L2 corrections completed: {len(l2_corrections)} corrections in {l2_time:.3f}s",
+            f"{log_prefix}L2 corrections completed: {len(l2_corrections)} "
+            f"corrections in {l2_time:.3f}s",
             extra={
                 **log_extra,
                 "l2_corrections_count": len(l2_corrections),
@@ -237,7 +238,8 @@ class SpellNormalizer:
                 )
 
             self._logger.info(
-                f"{log_prefix}Using parallel processing for {len(words_needing_correction)} corrections",
+                f"{log_prefix}Using parallel processing for "
+                f"{len(words_needing_correction)} corrections",
                 extra={
                     **log_extra,
                     "parallel_mode": True,
@@ -300,7 +302,8 @@ class SpellNormalizer:
 
         else:
             self._logger.info(
-                f"{log_prefix}Using sequential processing for {len(words_needing_correction)} corrections",
+                f"{log_prefix}Using sequential processing for "
+                f"{len(words_needing_correction)} corrections",
                 extra={
                     **log_extra,
                     "parallel_mode": False,
@@ -332,8 +335,9 @@ class SpellNormalizer:
 
                         if correction_time > 0.1:
                             self._logger.warning(
-                                f"{log_prefix}Slow correction: '{original_word}' -> '{corrected_word}' "
-                                f"took {correction_time:.3f}s (distance={optimal_distance})",
+                                f"{log_prefix}Slow correction: '{original_word}' -> "
+                                f"'{corrected_word}' took {correction_time:.3f}s "
+                                f"(distance={optimal_distance})",
                                 extra={
                                     **log_extra,
                                     "slow_word": original_word,
@@ -343,8 +347,8 @@ class SpellNormalizer:
                             )
                         else:
                             self._logger.debug(
-                                f"{log_prefix}Corrected '{original_word}' using distance={optimal_distance} "
-                                f"in {correction_time:.3f}s",
+                                f"{log_prefix}Corrected '{original_word}' using "
+                                f"distance={optimal_distance} in {correction_time:.3f}s",
                                 extra={
                                     **log_extra,
                                     "word": original_word,

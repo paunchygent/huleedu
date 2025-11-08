@@ -40,7 +40,10 @@ def upgrade() -> None:
             sa.String(length=50),
             nullable=False,
             server_default="swedish_8_anchor",
-            comment="Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, eng5_np_national_9_step)",
+            comment=(
+                "Grade scale identifier (swedish_8_anchor, eng5_np_legacy_9_step, "
+                "eng5_np_national_9_step)"
+            ),
         ),
     )
     op.create_index(

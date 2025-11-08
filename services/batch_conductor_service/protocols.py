@@ -268,7 +268,8 @@ class PipelineResolutionServiceProtocol(Protocol):
             batch_id: Batch identifier for pipeline resolution
             requested_pipeline: Name of the requested pipeline
             correlation_id: Correlation ID for request tracing
-            batch_metadata: Optional metadata (e.g., prompt attachment flags) to influence validation
+            batch_metadata: Optional metadata (e.g., prompt attachment flags)
+                to influence validation
 
         Returns:
             List of resolved pipeline steps in execution order

@@ -484,7 +484,9 @@ class TestConfigurationIntegration:
         swedish_values = {
             "LANGUAGE_TOOL_SERVICE_SERVICE_NAME": "språkverktyg-tjänst-åäö",
             "LANGUAGE_TOOL_SERVICE_HOST": "språkserver-malmö.example.com",
-            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_JAR_PATH": "/app/språkverktyg/språkverktyg-åäö.jar",
+            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_JAR_PATH": (
+                "/app/språkverktyg/språkverktyg-åäö.jar"
+            ),
             "LANGUAGE_TOOL_SERVICE_GRAMMAR_CATEGORIES_ALLOWED": (
                 '["SVENSKA_GRAMMATIK", "KATEGORI_ÅÄÖ"]'
             ),
@@ -604,10 +606,12 @@ class TestConfigurationIntegration:
         # Test boundary values for numeric fields
         boundary_cases = {
             "LANGUAGE_TOOL_SERVICE_HTTP_PORT": "65535",  # Max valid port
-            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_PORT": "1024",  # Min non-privileged port
+            # Min non-privileged port
+            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_PORT": "1024",
             "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_TIMEOUT_SECONDS": "3600",  # 1 hour
             "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_RETRIES": "100",  # High retry count
-            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS": "1000",  # High concurrency
+            # High concurrency
+            "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_MAX_CONCURRENT_REQUESTS": "1000",
             "LANGUAGE_TOOL_SERVICE_LANGUAGE_TOOL_HEAP_SIZE": "8g",  # Large heap
         }
 

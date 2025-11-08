@@ -307,14 +307,12 @@ async def main() -> None:
         print(f"Essays processed: {len(df)}")
         print(f"Total corrections: {total_corrections}")
         print(f"  - L2 dictionary: {total_l2} ({total_l2 / max(total_corrections, 1) * 100:.1f}%)")
-        print(
-            f"  - Spellchecker: {total_spell} ({total_spell / max(total_corrections, 1) * 100:.1f}%)"
-        )
+        spell_pct = total_spell / max(total_corrections, 1) * 100
+        print(f"  - Spellchecker: {total_spell} ({spell_pct:.1f}%)")
         print(f"Average corrections per essay: {total_corrections / max(len(df), 1):.1f}")
         print(f"Average correction density: {avg_density:.2f} per 100 words")
-        print(
-            f"Processing time: {elapsed_time:.1f} seconds ({len(df) / max(elapsed_time, 0.1):.1f} essays/sec)"
-        )
+        essays_per_sec = len(df) / max(elapsed_time, 0.1)
+        print(f"Processing time: {elapsed_time:.1f} seconds ({essays_per_sec:.1f} essays/sec)")
         print(f"{'=' * 60}")
 
     except HuleEduError:

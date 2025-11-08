@@ -124,7 +124,8 @@ class FeaturePipeline(FeaturePipelineProtocol):
         if self._language_tool_client is not None:
             if http_session is None:
                 raise ValueError(
-                    "FeaturePipeline requires an aiohttp.ClientSession when using a LanguageTool client"
+                    "FeaturePipeline requires an aiohttp.ClientSession when using a "
+                    "LanguageTool client"
                 )
             context.grammar_analysis = await self._language_tool_client.check_grammar(
                 text=normalized_text,

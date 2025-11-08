@@ -155,7 +155,9 @@ Despite a clear majority of A ratings (71%), the model's severity adjustments ef
 - **Constraint detected**: {"Yes" if constraint_diag.get("has_sum_to_zero_constraint", False) else "No"}
 - **Severity sum**: {constraint_diag.get("severity_sum", 0):.4f}
 - **Distribution is bimodal**: {"Yes" if constraint_diag.get("is_bimodal", False) else "No"}
-- **Forced balancing likely**: {"Yes" if constraint_diag.get("forced_balancing_likely", False) else "No"}
+- **Forced balancing likely**: {
+    "Yes" if constraint_diag.get("forced_balancing_likely", False) else "No"
+}
 
 ### Model Complexity
 - **Total parameters**: {identifiability.get("n_parameters", 0)}

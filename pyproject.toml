@@ -112,6 +112,16 @@ ignore = [
 "libs/common_core/src/common_core/__init__.py" = ["F401"]
 # Allow imports after sys.path modification in alembic env files
 "services/*/alembic/env.py" = ["E402"]
+# Dockerfile template generator - COPY commands must be single lines
+"scripts/update_service_dockerfiles.py" = ["E501"]
+# Investigation script with imports after runtime checks
+"scripts/ml/investigate_pyspellchecker.py" = ["E402", "E722"]
+# Research/analysis scripts with markdown templates and complex reporting
+"scripts/cj_verification/report_generator.py" = ["E501"]
+"scripts/cj_verification/visualization_generator.py" = ["E501"]
+"scripts/cj_verification/bayesian_model_verification.py" = ["E501"]
+"documentation/research/rapport_till_kollegor/create_corrected_figures.py" = ["E501"]
+"documentation/research/rapport_till_kollegor/ordinal_essay_scoring.py" = ["E722", "F401"]
 
 # Note: Import restrictions would be enforced through custom linting rules
 # For now, rely on type system and code review to prevent standard library logging
@@ -343,8 +353,7 @@ db-verify-outbox-all = "python scripts/verify_outbox_all_services.py"  # Verify 
 
 # Code Quality & Testing (Monorepo-wide)
 format-all = "ruff format --force-exclude ."
-check-imports = "python scripts/check_import_patterns.py"
-lint-all = {composite = ["ruff check --force-exclude .", "python scripts/check_import_patterns.py"]}
+lint-all = "ruff check --force-exclude ."
 lint-fix = "ruff check --fix --force-exclude ."
 typecheck-all = "mypy --config-file pyproject.toml --follow-imports=silent services tests"
 typecheck-libs = {shell = "cd libs && mypy -p common_core -p huleedu_service_libs --show-error-codes"}

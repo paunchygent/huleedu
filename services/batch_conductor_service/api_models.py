@@ -37,7 +37,10 @@ class BCSPipelineDefinitionRequestV1(BaseModel):
     )
     batch_metadata: dict[str, Any] | None = Field(
         default=None,
-        description="Optional metadata (prompt attachment, assignment context, etc.) for validation",
+        description=(
+            "Optional metadata (prompt attachment, assignment context, etc.) "
+            "for validation"
+        ),
     )
 
     model_config = {

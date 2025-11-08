@@ -151,7 +151,10 @@ class BatchLifecycleHandler:
             raise
 
     def _build_batch_metadata(self, data: "BatchEssaysRegistered") -> dict[str, Any] | None:
-        """Capture relevant metadata (requested pipelines, prompt references) for Result Aggregator."""
+        """Capture relevant metadata (requested pipelines, prompt references).
+
+        For Result Aggregator.
+        """
         metadata: dict[str, Any] = {}
 
         if hasattr(data, "requested_pipelines") and getattr(data, "requested_pipelines"):

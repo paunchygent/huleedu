@@ -324,7 +324,8 @@ class LanguageToolManager:
                 error_lines = recent_logs["stderr"] or recent_logs["stdout"]
                 error_msg = "\n".join(error_lines) if error_lines else "Unknown error"
                 raise RuntimeError(
-                    f"LanguageTool process died during startup (code={self.process.returncode}): {error_msg}"
+                    f"LanguageTool process died during startup "
+                    f"(code={self.process.returncode}): {error_msg}"
                 )
 
             await asyncio.sleep(0.5)

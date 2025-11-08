@@ -64,9 +64,10 @@ least_corrected = normalized.nsmallest(5, "total_corrections")[
 ]
 print("Essays with fewest corrections:")
 for idx, row in least_corrected.iterrows():
-    print(
-        f"  Essay {idx}: {int(row['total_corrections'])} total ({int(row['l2_corrections'])} L2, {int(row['spell_corrections'])} spell)"
-    )
+    total = int(row["total_corrections"])
+    l2 = int(row["l2_corrections"])
+    spell = int(row["spell_corrections"])
+    print(f"  Essay {idx}: {total} total ({l2} L2, {spell} spell)")
 
 # Check for any remaining suspicious corrections
 print("\n=== Checking for Suspicious Corrections ===")
