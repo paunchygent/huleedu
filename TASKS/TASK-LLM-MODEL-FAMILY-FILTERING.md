@@ -107,6 +107,48 @@ Based on analysis of `services/llm_provider_service/model_manifest.py`:
 
 ## Phase Breakdown
 
+## ⚠️ CRITICAL: Implementation Order
+
+**Phase 0 MUST be completed before Phase 1.** The manifest currently has duplicate type definitions:
+- `manifest/types.py` - **Canonical source** (modular, correct)
+- `model_manifest.py` - **Legacy duplicate definitions** (must be converted to pure re-export)
+
+Phase 0 converts `model_manifest.py` to a pure re-export facade. If you add `model_family` to `model_manifest.py` before Phase 0 cleanup, you'll create further schema drift and make the cleanup significantly harder.
+
+**Correct Order:**
+1. **Phase 0**: Clean up `model_manifest.py` duplicates → convert to pure re-export facade
+2. **Phase 1**: Add `model_family` to `manifest/types.py` (the canonical source)
+3. **Phase 2+**: Implement family-aware logic using the canonical types
+
+**Why This Matters:**
+- `manifest/types.py` already exists and contains the real ModelConfig definition
+- `model_manifest.py` duplicates these definitions while claiming to be a facade
+- Adding fields to the duplicate creates version skew
+- Phase 0 eliminates this technical debt before we extend the schema
+
+---
+
+### Phase 0: Manifest Re-export Facade (Pre-work - MANDATORY)
+
+#### Goal
+
+- Convert `services/llm_provider_service/model_manifest.py` into a thin facade that re-exports from `services/llm_provider_service/manifest/__init__.py` to prevent schema drift.
+
+#### Rationale
+
+- Current `model_manifest.py` contains **duplicate type and model definitions** while also claiming to re-export. This creates risk of divergence from the modular manifest in `manifest/`.
+- The canonical source is `manifest/types.py`, but `model_manifest.py` shadows it with local definitions.
+- **This phase is NOT optional** - schema changes in Phase 1 must target the canonical source.
+
+#### Steps
+
+- Replace local type and model definitions in `model_manifest.py` with imports and re-exports of:
+  - `ModelConfig`, `ModelRegistry`, `ProviderName`, `StructuredOutputMethod`
+  - `SUPPORTED_MODELS`, `MODEL_VALIDATORS`
+  - `get_model_config`, `list_models`, `get_default_model_id`, `validate_model_capability`
+- Keep public API stable to avoid breaking callers.
+- Verify no local ModelConfig definition remains in `model_manifest.py`.
+
 ### Phase 1: Schema & Configuration Updates (Week 1, Day 1-2)
 
 #### Deliverables
@@ -120,8 +162,9 @@ Based on analysis of `services/llm_provider_service/model_manifest.py`:
 
 **1.1. Update ModelConfig Schema**
 
-- **File**: `services/llm_provider_service/manifest/types.py`
-- **Location**: Lines 60-110 (ModelConfig class)
+- **File**: `services/llm_provider_service/manifest/types.py` (**CANONICAL LOCATION**)
+- **Location**: Lines 39-100+ (ModelConfig class)
+- **Important**: This is the canonical type definition. After Phase 0 cleanup, `model_manifest.py` will re-export this type.
 - **Change**:
 
   ```python
@@ -140,13 +183,9 @@ Based on analysis of `services/llm_provider_service/model_manifest.py`:
       # ... existing fields
   ```
 
-**1.2. Backfill Existing Models**
+**Verification**: After this change, `model_manifest.py` will automatically expose the new field through re-exports (completed in Phase 0).
 
-- **Files**:
-  - `services/llm_provider_service/manifest/anthropic.py`
-  - `services/llm_provider_service/manifest/openai.py`
-  - `services/llm_provider_service/manifest/google.py`
-  - `services/llm_provider_service/manifest/openrouter.py`
+**1.2. Backfill Existing Models**
 
 **Anthropic Models** (`manifest/anthropic.py:31-75`):
 
@@ -216,16 +255,19 @@ ModelConfig(
       # ... existing fields ...
 
       # Model Family Tracking Configuration
-      ACTIVE_MODEL_FAMILIES: Dict[ProviderName, List[str]] = Field(
+      # NOTE: Declared as dict[str, list[str]] for robust JSON env var parsing.
+      # Validator coerces string keys to ProviderName enums.
+      ACTIVE_MODEL_FAMILIES: dict[str, list[str]] = Field(
           default_factory=lambda: {
-              ProviderName.ANTHROPIC: ["claude-haiku", "claude-sonnet"],
-              ProviderName.OPENAI: ["gpt-5", "gpt-4.1", "gpt-4o"],
-              ProviderName.GOOGLE: ["gemini-2.5-flash"],
-              ProviderName.OPENROUTER: ["claude-haiku-openrouter"],
+              "anthropic": ["claude-haiku", "claude-sonnet"],
+              "openai": ["gpt-5", "gpt-4.1", "gpt-4o"],
+              "google": ["gemini-2.5-flash"],
+              "openrouter": ["claude-haiku-openrouter"],
           },
           description="Model families to actively track per provider. "
           "New models within these families trigger actionable alerts (exit code 4). "
-          "Models from other families are shown as informational only (exit code 5)."
+          "Models from other families are shown as informational only (exit code 5). "
+          "Keys are provider names (lowercase strings), coerced to ProviderName enums."
       )
 
       FLAG_NEW_MODEL_FAMILIES: bool = Field(
@@ -233,7 +275,57 @@ ModelConfig(
           description="If True, new model families are shown in informational section. "
           "If False, untracked families are silently ignored."
       )
+
+      @field_validator("ACTIVE_MODEL_FAMILIES", mode="before")
+      @classmethod
+      def coerce_active_families_keys(
+          cls,
+          v: dict[str, list[str]] | None,
+      ) -> dict[ProviderName, list[str]]:
+          """Coerce env-loaded dict keys (str) to ProviderName enum.
+
+          This two-step approach handles JSON environment variables robustly:
+          1. JSON parses as dict[str, list[str]] (string keys)
+          2. Validator coerces string keys to ProviderName enums
+          3. Type system sees dict[ProviderName, list[str]] after validation
+
+          Supports env like:
+            LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"openai":["gpt-5"],"anthropic":["claude-haiku"]}'
+
+          Args:
+              v: Raw value from settings (JSON string → dict[str, list[str]])
+
+          Returns:
+              Coerced dict with ProviderName enum keys
+
+          Raises:
+              ValueError: If provider name is invalid
+          """
+          if v is None:
+              return {}
+
+          coerced: dict[ProviderName, list[str]] = {}
+          for k, families in v.items():
+              key_str = str(k).lower()
+              try:
+                  provider = ProviderName(key_str)
+                  coerced[provider] = families
+              except ValueError:
+                  # Log invalid provider names but don't fail validation
+                  import logging
+                  logging.getLogger(__name__).warning(
+                      f"Invalid provider name '{k}' in ACTIVE_MODEL_FAMILIES, skipping"
+                  )
+                  continue
+
+          return coerced
   ```
+
+**Rationale for dict[str, list[str]]**:
+- JSON environment variables parse with string keys, not enum keys
+- Declaring as `dict[ProviderName, list[str]]` would require manual pre-parsing
+- The validator approach is cleaner: accept strings, coerce to enums, type-safe after validation
+- Follows existing Pydantic v2 patterns in the codebase
 
 **Environment Variable Override**:
 
@@ -255,12 +347,148 @@ LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude
 
 #### Deliverables
 
-- ✅ ModelComparisonResult extended with family-aware fields
+- ✅ Centralized family extraction utilities
+- ✅ ModelComparisonResult extended with family-aware fields (old field removed)
+- ✅ Settings wired into all 4 checkers
 - ✅ Family extraction logic in all 4 checkers
 - ✅ Updated comparison algorithms
-- ✅ Backward compatibility maintained
+- ✅ Clean implementation (no legacy support)
 
 #### Implementation Steps
+
+**2.0. Create Centralized Family Extraction Utilities**
+
+**Rationale**: Centralizing family extraction logic prevents code duplication across 4 checkers, ensures consistent extraction patterns, and simplifies testing. Each provider uses slightly different naming conventions, so provider-specific functions are needed.
+
+- **File**: `services/llm_provider_service/model_checker/family_utils.py` (NEW)
+- **Purpose**: Shared utilities for extracting model family identifiers
+
+```python
+"""Centralized model family extraction utilities.
+
+Each provider uses different naming conventions for model IDs. These utilities
+extract the "family" portion consistently across the codebase.
+
+Examples:
+    OpenAI: gpt-5-mini-2025-08-07 → gpt-5
+    Anthropic: claude-haiku-4-5-20251001 → claude-haiku
+    Google: gemini-2.5-flash-preview-05-20 → gemini-2.5-flash
+    OpenRouter: anthropic/claude-haiku-4-5-20251001 → claude-haiku-openrouter
+"""
+
+from __future__ import annotations
+
+
+def extract_openai_family(model_id: str) -> str:
+    """Extract model family from OpenAI model_id.
+
+    Handles various OpenAI naming patterns:
+    - GPT decimal versions: gpt-4.1-mini-2025-04-14 → gpt-4.1
+    - GPT standard: gpt-5-mini-2025-08-07 → gpt-5
+    - Other families: dall-e-3 → dall-e, whisper-1 → whisper
+
+    Args:
+        model_id: Full model identifier from OpenAI API
+
+    Returns:
+        Family identifier (e.g., "gpt-5", "gpt-4.1", "dall-e")
+    """
+    parts = model_id.split("-")
+
+    # Special case: gpt-4.1 (decimal version)
+    if len(parts) >= 2 and parts[0] == "gpt" and "." in parts[1]:
+        return f"{parts[0]}-{parts[1]}"  # e.g., "gpt-4.1"
+
+    # Standard GPT case: gpt-5, gpt-4o
+    if len(parts) >= 2 and parts[0] == "gpt":
+        return f"{parts[0]}-{parts[1]}"  # e.g., "gpt-5", "gpt-4o"
+
+    # Other families (dall-e, whisper, o1, o3, etc.)
+    return parts[0] if parts else model_id
+
+
+def extract_anthropic_family(model_id: str) -> str:
+    """Extract model family from Anthropic model_id.
+
+    Handles Anthropic tier-based naming:
+    - claude-haiku-4-5-20251001 → claude-haiku
+    - claude-sonnet-4-5-20250929 → claude-sonnet
+
+    Args:
+        model_id: Full model identifier from Anthropic API
+
+    Returns:
+        Family identifier (e.g., "claude-haiku", "claude-sonnet")
+    """
+    parts = model_id.split("-")
+
+    # Pattern: claude-{tier}-{version}-{date}
+    if len(parts) >= 2 and parts[0] == "claude":
+        return f"{parts[0]}-{parts[1]}"  # e.g., "claude-haiku"
+
+    # Fallback
+    return parts[0] if parts else model_id
+
+
+def extract_google_family(model_id: str) -> str:
+    """Extract model family from Google model_id.
+
+    Handles Gemini version-tier naming:
+    - gemini-2.5-flash-preview-05-20 → gemini-2.5-flash
+    - gemini-2.0-pro → gemini-2.0-pro
+
+    Args:
+        model_id: Full model identifier from Google API
+
+    Returns:
+        Family identifier (e.g., "gemini-2.5-flash")
+    """
+    parts = model_id.split("-")
+
+    # Pattern: gemini-{version}-{tier}-{variant}
+    if len(parts) >= 3 and parts[0] == "gemini":
+        return f"{parts[0]}-{parts[1]}-{parts[2]}"  # e.g., "gemini-2.5-flash"
+
+    # Fallback: use full model_id
+    return model_id
+
+
+def extract_openrouter_family(model_id: str) -> str:
+    """Extract model family from OpenRouter model_id.
+
+    OpenRouter uses provider-prefixed IDs: {provider}/{model-id}.
+    We extract the underlying family and append "-openrouter" suffix.
+
+    Examples:
+    - anthropic/claude-haiku-4-5-20251001 → claude-haiku-openrouter
+    - openai/gpt-5-mini → gpt-5-openrouter
+
+    Args:
+        model_id: Full model identifier from OpenRouter API
+
+    Returns:
+        Family identifier with -openrouter suffix
+    """
+    if "/" not in model_id:
+        return model_id
+
+    provider, base_id = model_id.split("/", 1)
+
+    # Extract family using provider-specific logic
+    if provider == "anthropic":
+        base_family = extract_anthropic_family(base_id)
+        # Only append suffix if we successfully extracted a family
+        if base_family and not base_family.endswith("-openrouter"):
+            return f"{base_family}-openrouter"
+
+    elif provider == "openai":
+        base_family = extract_openai_family(base_id)
+        if base_family and not base_family.endswith("-openrouter"):
+            return f"{base_family}-openrouter"
+
+    # Fallback: use full model_id
+    return model_id
+```
 
 **2.1. Update ModelComparisonResult**
 
@@ -284,12 +512,6 @@ LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude
           description="Models from entirely new families not in active tracking (informational)",
       )
 
-      # DEPRECATED but maintained for backward compatibility
-      new_models: list[DiscoveredModel] = Field(
-          default_factory=list,
-          description="[DEPRECATED] Use new_models_in_tracked_families + new_untracked_families",
-      )
-
       # Existing fields
       deprecated_models: list[str] = Field(default_factory=list, ...)
       updated_models: list[tuple[str, DiscoveredModel]] = Field(default_factory=list, ...)
@@ -298,160 +520,250 @@ LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude
       checked_at: date = Field(default_factory=date.today, ...)
   ```
 
-**2.2. Implement Family Extraction Logic**
+**REMOVED**: `new_models` field (no backward compatibility needed in development)
+
+**2.1.a. Wire Settings into Checkers and Factory** ⚠️ **CRITICAL STEP**
+
+**Why This Matters**: Family filtering requires access to `ACTIVE_MODEL_FAMILIES` from Settings. Without this step, checkers cannot determine which families are tracked, causing runtime `AttributeError`.
+
+- **Files to Update**:
+  - `services/llm_provider_service/model_checker/anthropic_checker.py`
+  - `services/llm_provider_service/model_checker/openai_checker.py`
+  - `services/llm_provider_service/model_checker/google_checker.py`
+  - `services/llm_provider_service/model_checker/openrouter_checker.py`
+  - `services/llm_provider_service/cli_check_models.py` (CheckerFactory)
+
+**Step 1: Update Checker Constructors**
+
+Add `settings: Settings` parameter to all 4 checker `__init__` methods:
+
+```python
+# Example: OpenAIModelChecker
+from services.llm_provider_service.config import Settings
+
+class OpenAIModelChecker:
+    def __init__(self, client: AsyncOpenAI, logger: logging.Logger, settings: Settings):
+        """Initialize OpenAI model checker.
+
+        Args:
+            client: Authenticated OpenAI API client
+            logger: Structured logger instance
+            settings: Service configuration (provides ACTIVE_MODEL_FAMILIES)
+        """
+        self.client = client
+        self.logger = logger
+        self.settings = settings  # CRITICAL: Store for family filtering
+        self.provider = ProviderName.OPENAI
+```
+
+Repeat for `AnthropicModelChecker`, `GoogleModelChecker`, and `OpenRouterModelChecker`.
+
+**Step 2: Update CheckerFactory Methods**
+
+Modify factory methods in `cli_check_models.py` to pass `settings`:
+
+```python
+# cli_check_models.py → CheckerFactory class
+class CheckerFactory:
+    def __init__(self, settings: Settings, logger: logging.Logger):
+        self.settings = settings
+        self.logger = logger
+
+    async def _create_openai_checker(self) -> OpenAIModelChecker | None:
+        """Create OpenAI checker with settings."""
+        if not self.settings.OPENAI_ENABLED:
+            return None
+
+        api_key = self.settings.OPENAI_API_KEY.get_secret_value()
+        if not api_key:
+            self.logger.warning("OpenAI API key not configured")
+            return None
+
+        client = AsyncOpenAI(api_key=api_key)
+        return OpenAIModelChecker(
+            client=client,
+            logger=self.logger,
+            settings=self.settings  # Pass settings here
+        )
+```
+
+Repeat for `_create_anthropic_checker`, `_create_google_checker`, and `_create_openrouter_checker`.
+
+**Step 3: Update Test Fixtures**
+
+Update all test files that instantiate checkers:
+
+```python
+# tests/unit/test_openai_checker.py
+import pytest
+from services.llm_provider_service.config import Settings
+
+@pytest.fixture
+def settings():
+    """Minimal settings for testing."""
+    return Settings(
+        _env_file=None,  # Don't load .env in tests
+        OPENAI_API_KEY="test-key",
+        ACTIVE_MODEL_FAMILIES={
+            "openai": ["gpt-5", "gpt-4o"],
+            "anthropic": ["claude-haiku"]
+        }
+    )
+
+@pytest.fixture
+def openai_checker(mock_client, logger, settings):
+    """OpenAI checker with test settings."""
+    return OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
+```
+
+**Verification**:
+- Run `pdm run typecheck-all` - should pass with no Settings-related errors
+- Run unit tests - checkers should access `self.settings.ACTIVE_MODEL_FAMILIES`
+
+**2.2. Implement Family Extraction Logic in Checkers**
+
+**Pattern**: Each checker adds two methods that delegate to the centralized utilities:
+1. `_extract_family()` - Calls the appropriate utility function
+2. `_get_active_families()` - Reads from `self.settings.ACTIVE_MODEL_FAMILIES`
 
 Add to each checker implementation:
-
 - `services/llm_provider_service/model_checker/openai_checker.py`
 - `services/llm_provider_service/model_checker/anthropic_checker.py`
 - `services/llm_provider_service/model_checker/google_checker.py`
 - `services/llm_provider_service/model_checker/openrouter_checker.py`
 
-**OpenAI Family Extraction** (`openai_checker.py`):
+**OpenAI** (`openai_checker.py`):
 
 ```python
-def _extract_family(self, model_id: str) -> str:
-    """Extract model family from OpenAI model_id.
+from services.llm_provider_service.model_checker.family_utils import extract_openai_family
 
-    Examples:
-        gpt-5-mini-2025-08-07 → gpt-5
-        gpt-4.1-2025-04-14 → gpt-4.1
-        gpt-4o-mini-2024-07-18 → gpt-4o
-        dall-e-3 → dall-e
-        whisper-1 → whisper
+class OpenAIModelChecker:
+    # ... existing methods ...
 
-    Args:
-        model_id: Full model identifier from OpenAI API
+    def _extract_family(self, model_id: str) -> str:
+        """Extract model family using centralized utility.
 
-    Returns:
-        Family identifier (prefix before first variant indicator)
-    """
-    # Pattern: Extract base family name before version/date suffix
-    # gpt-5-mini-2025-08-07 → gpt-5
-    # gpt-4.1-nano-2025-04-14 → gpt-4.1
-    # gpt-4o-mini-2024-07-18 → gpt-4o
+        Examples:
+            gpt-5-mini-2025-08-07 → gpt-5
+            gpt-4.1-2025-04-14 → gpt-4.1
+            dall-e-3 → dall-e
 
-    parts = model_id.split("-")
+        Args:
+            model_id: Full model identifier from OpenAI API
 
-    # Special case: gpt-4.1 (decimal version)
-    if len(parts) >= 2 and parts[0] == "gpt" and "." in parts[1]:
-        return f"{parts[0]}-{parts[1]}"  # e.g., "gpt-4.1"
+        Returns:
+            Family identifier (e.g., "gpt-5", "dall-e")
+        """
+        return extract_openai_family(model_id)
 
-    # Standard case: gpt-5, gpt-4o
-    if len(parts) >= 2 and parts[0] == "gpt":
-        return f"{parts[0]}-{parts[1]}"  # e.g., "gpt-5", "gpt-4o"
+    def _get_active_families(self) -> set[str]:
+        """Get configured active families for OpenAI from settings.
 
-    # Other families: dall-e, whisper, o1, o3, o4
-    # Use first token as family
-    return parts[0]
-
-def _get_active_families(self) -> set[str]:
-    """Get configured active families for OpenAI from settings."""
-    return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.OPENAI, []))
+        Returns:
+            Set of family identifiers being tracked (e.g., {"gpt-5", "gpt-4o"})
+        """
+        return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.OPENAI, []))
 ```
 
-**Anthropic Family Extraction** (`anthropic_checker.py`):
+**Anthropic** (`anthropic_checker.py`):
 
 ```python
-def _extract_family(self, model_id: str) -> str:
-    """Extract model family from Anthropic model_id.
+from services.llm_provider_service.model_checker.family_utils import extract_anthropic_family
 
-    Examples:
-        claude-haiku-4-5-20251001 → claude-haiku
-        claude-sonnet-4-5-20250929 → claude-sonnet
-        claude-opus-4-20250514 → claude-opus
+class AnthropicModelChecker:
+    # ... existing methods ...
 
-    Args:
-        model_id: Full model identifier from Anthropic API
+    def _extract_family(self, model_id: str) -> str:
+        """Extract model family using centralized utility.
 
-    Returns:
-        Family identifier (claude-{tier})
-    """
-    # Pattern: claude-{tier}-{version}-{date}
-    # Extract first two tokens: claude-haiku, claude-sonnet, claude-opus
-    parts = model_id.split("-")
-    if len(parts) >= 2 and parts[0] == "claude":
-        return f"{parts[0]}-{parts[1]}"  # e.g., "claude-haiku"
+        Examples:
+            claude-haiku-4-5-20251001 → claude-haiku
+            claude-sonnet-4-5-20250929 → claude-sonnet
 
-    # Fallback: use first token
-    return parts[0]
+        Args:
+            model_id: Full model identifier from Anthropic API
 
-def _get_active_families(self) -> set[str]:
-    """Get configured active families for Anthropic from settings."""
-    return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.ANTHROPIC, []))
+        Returns:
+            Family identifier (e.g., "claude-haiku")
+        """
+        return extract_anthropic_family(model_id)
+
+    def _get_active_families(self) -> set[str]:
+        """Get configured active families for Anthropic from settings.
+
+        Returns:
+            Set of family identifiers being tracked
+        """
+        return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.ANTHROPIC, []))
 ```
 
-**Google Family Extraction** (`google_checker.py`):
+**Google** (`google_checker.py`):
 
 ```python
-def _extract_family(self, model_id: str) -> str:
-    """Extract model family from Google model_id.
+from services.llm_provider_service.model_checker.family_utils import extract_google_family
 
-    Examples:
-        gemini-2.5-flash-preview-05-20 → gemini-2.5-flash
-        gemini-2.0-pro → gemini-2.0-pro
-        gemini-1.5-flash → gemini-1.5-flash
+class GoogleModelChecker:
+    # ... existing methods ...
 
-    Args:
-        model_id: Full model identifier from Google API
+    def _extract_family(self, model_id: str) -> str:
+        """Extract model family using centralized utility.
 
-    Returns:
-        Family identifier (gemini-{version}-{tier})
-    """
-    # Pattern: gemini-{version}-{tier}-{variant}
-    # Extract first three tokens: gemini-2.5-flash
-    parts = model_id.split("-")
-    if len(parts) >= 3 and parts[0] == "gemini":
-        return f"{parts[0]}-{parts[1]}-{parts[2]}"  # e.g., "gemini-2.5-flash"
+        Examples:
+            gemini-2.5-flash-preview-05-20 → gemini-2.5-flash
 
-    # Fallback: use full id
-    return model_id
+        Args:
+            model_id: Full model identifier from Google API
 
-def _get_active_families(self) -> set[str]:
-    """Get configured active families for Google from settings."""
-    return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.GOOGLE, []))
+        Returns:
+            Family identifier (e.g., "gemini-2.5-flash")
+        """
+        return extract_google_family(model_id)
+
+    def _get_active_families(self) -> set[str]:
+        """Get configured active families for Google from settings.
+
+        Returns:
+            Set of family identifiers being tracked
+        """
+        return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.GOOGLE, []))
 ```
 
-**OpenRouter Family Extraction** (`openrouter_checker.py`):
+**OpenRouter** (`openrouter_checker.py`):
 
 ```python
-def _extract_family(self, model_id: str) -> str:
-    """Extract model family from OpenRouter model_id.
+from services.llm_provider_service.model_checker.family_utils import extract_openrouter_family
 
-    OpenRouter uses provider-prefixed IDs: provider/model-id
+class OpenRouterModelChecker:
+    # ... existing methods ...
 
-    Examples:
-        anthropic/claude-haiku-4-5-20251001 → claude-haiku-openrouter
-        openai/gpt-5-mini → gpt-5-openrouter
+    def _extract_family(self, model_id: str) -> str:
+        """Extract model family using centralized utility.
 
-    Args:
-        model_id: Full model identifier from OpenRouter API
+        Examples:
+            anthropic/claude-haiku-4-5-20251001 → claude-haiku-openrouter
 
-    Returns:
-        Family identifier with -openrouter suffix
-    """
-    # Pattern: {provider}/{model-id}
-    if "/" in model_id:
-        provider, base_id = model_id.split("/", 1)
+        Args:
+            model_id: Full model identifier from OpenRouter API
 
-        # Extract family from base_id using provider-specific logic
-        if provider == "anthropic":
-            parts = base_id.split("-")
-            if len(parts) >= 2 and parts[0] == "claude":
-                return f"{parts[0]}-{parts[1]}-openrouter"
+        Returns:
+            Family identifier with -openrouter suffix
+        """
+        return extract_openrouter_family(model_id)
 
-        elif provider == "openai":
-            parts = base_id.split("-")
-            if len(parts) >= 2 and parts[0] == "gpt":
-                return f"{parts[0]}-{parts[1]}-openrouter"
+    def _get_active_families(self) -> set[str]:
+        """Get configured active families for OpenRouter from settings.
 
-    # Fallback: use full id
-    return model_id
-
-def _get_active_families(self) -> set[str]:
-    """Get configured active families for OpenRouter from settings."""
-    return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.OPENROUTER, []))
+        Returns:
+            Set of family identifiers being tracked
+        """
+        return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.OPENROUTER, []))
 ```
+
+**Benefits of This Approach**:
+- ✅ Single source of truth for extraction logic in `family_utils.py`
+- ✅ Easier to test: test utilities once, not in 4 places
+- ✅ Prevents drift: all checkers use identical extraction patterns
+- ✅ Simpler maintenance: fix bugs in one file
 
 **2.3. Update Comparison Logic**
 
@@ -508,14 +820,10 @@ async def compare_with_manifest(self) -> ModelComparisonResult:
         and len(breaking_changes) == 0
     )
 
-    # Populate both new and legacy fields
-    all_new = new_in_tracked + new_untracked
-
     return ModelComparisonResult(
         provider=self.provider,
         new_models_in_tracked_families=new_in_tracked,
         new_untracked_families=new_untracked,
-        new_models=all_new,  # Deprecated but maintained for compatibility
         deprecated_models=deprecated_models,
         updated_models=updated_models,
         breaking_changes=breaking_changes,
@@ -534,7 +842,7 @@ Apply similar changes to:
 1. Run `pdm run typecheck-all` from repository root
 2. Verify family extraction logic with unit tests
 3. Test comparison categorization with mock data
-4. Ensure backward compatibility (old `new_models` field still populated)
+4. Verify `new_models` field is NOT present in ModelComparisonResult
 
 ---
 
@@ -546,6 +854,35 @@ Apply similar changes to:
 - ✅ Updated exit code determination logic
 - ✅ Two-tier output formatting
 - ✅ Updated CLI docstrings
+- ✅ All exit code touchpoints verified
+
+#### Exit Code Update Checklist ⚠️
+
+**ALL of the following must be updated to avoid inconsistencies:**
+
+- [ ] **ExitCode enum definition** (`cli_check_models.py:74-80`)
+  - Remove `NEW_MODELS_AVAILABLE = 1` entirely
+  - Add `IN_FAMILY_UPDATES = 4`
+  - Add `UNTRACKED_FAMILIES = 5`
+
+- [ ] **determine_exit_code() logic** (`cli_check_models.py:186-205`)
+  - Update to check `new_models_in_tracked_families` (not `new_models`)
+  - Add priority order: breaking > in-family > untracked
+
+- [ ] **CLI end messages** (`cli_check_models.py:373-383`)
+  - Add message for exit code 4 (in-family updates)
+  - Add message for exit code 5 (untracked families)
+  - Remove any references to exit code 1
+
+- [ ] **Module docstring** (`cli_check_models.py:19-23`)
+  - Update exit codes table
+  - Remove code 1 documentation entirely
+  - Document codes 4 and 5
+
+**Failure to update all touchpoints will cause:**
+- Runtime errors if old code references removed fields
+- Confusing error messages
+- Documentation drift
 
 #### Implementation Steps
 
@@ -560,11 +897,10 @@ Apply similar changes to:
       """CLI exit codes."""
 
       UP_TO_DATE = 0
-      # NEW_MODELS_AVAILABLE = 1  # DEPRECATED - removed
       API_ERROR = 2
       BREAKING_CHANGES = 3
-      IN_FAMILY_UPDATES = 4  # NEW - new variants in tracked families
-      UNTRACKED_FAMILIES = 5  # NEW - informational only
+      IN_FAMILY_UPDATES = 4  # New variants in tracked families (actionable)
+      UNTRACKED_FAMILIES = 5  # New families detected (informational)
   ```
 
 **3.2. Update determine_exit_code()**
@@ -607,6 +943,7 @@ Apply similar changes to:
       # Deprecated or updated models don't trigger warnings
       return ExitCode.UP_TO_DATE
   ```
+
 
 **3.3. Update CLI Exit Messages**
 
@@ -666,6 +1003,10 @@ def format_comparison_table(
 ) -> Table:
     """Format comparison result as Rich table with family-aware sections.
 
+    Displays models in two priority sections:
+    1. Tracked Family Updates: New variants in actively tracked families (actionable)
+    2. Untracked Families: Models from families not currently tracked (informational)
+
     Args:
         result: Comparison result to format
         verbose: Include detailed metadata
@@ -707,7 +1048,7 @@ def format_comparison_table(
     # ... (keep existing logic)
 
     return table
-```
+  ```
 
 **3.6. Update Summary Formatter**
 
@@ -841,9 +1182,9 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
           # Setup: manifest has no dalle models, API returns dall-e-3
           # Expected: dall-e-3 in new_untracked_families
 
-      async def test_backward_compatibility_new_models_field_populated(self):
-          """Deprecated new_models field contains both categories."""
-          # Expected: new_models = in_tracked + untracked
+      async def test_new_models_field_removed(self):
+          """Verify new_models field no longer exists."""
+          # Expected: AttributeError when accessing result.new_models
 
       async def test_empty_active_families_treats_all_as_untracked(self):
           """When no active families configured, all new models are untracked."""
@@ -941,14 +1282,15 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
 - **Changes Needed**:
 
   ```python
-  # OLD assertion (deprecated)
-  assert len(result.new_models) == expected_count
+  # OLD assertion (REMOVED)
+  # assert len(result.new_models) == expected_count
 
   # NEW assertions
   assert len(result.new_models_in_tracked_families) == expected_tracked
   assert len(result.new_untracked_families) == expected_untracked
-  # Verify backward compatibility
-  assert len(result.new_models) == expected_tracked + expected_untracked
+
+  # Verify field was removed
+  assert not hasattr(result, 'new_models'), "new_models field should be removed"
   ```
 
 #### Validation Steps
@@ -971,6 +1313,87 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
 
 ---
 
+### Phase 5: Final Verification Checkpoint (Week 1, Day 7)
+
+#### Deliverables
+
+- ✅ Verification that NO code references removed fields
+- ✅ Codebase-wide grep for removed patterns
+- ✅ Final integration test pass
+
+#### Implementation Steps
+
+**5.1. Verify No References to Removed Fields**
+
+Run comprehensive grep to ensure no code still references the removed `new_models` field:
+
+```bash
+# From repository root
+
+# Check for new_models field access in Python files
+echo "Checking for new_models field references..."
+grep -r "\.new_models\b" services/llm_provider_service/ --include="*.py" | grep -v "new_models_in_tracked" | grep -v "# REMOVED"
+
+# Check for NEW_MODELS_AVAILABLE exit code
+echo "Checking for NEW_MODELS_AVAILABLE exit code..."
+grep -r "NEW_MODELS_AVAILABLE" services/llm_provider_service/ --include="*.py"
+
+# Check for exit code 1 assumptions
+echo "Checking for hardcoded exit code 1..."
+grep -r "exit.*1\|ExitCode.*1" services/llm_provider_service/ --include="*.py" | grep -v "gpt-4.1" | grep -v "# Comment"
+
+# Check for CLI_LEGACY_EXIT_CODES references
+echo "Checking for CLI_LEGACY_EXIT_CODES..."
+grep -r "CLI_LEGACY_EXIT_CODES" services/llm_provider_service/ --include="*.py"
+```
+
+**Expected Results**:
+- ❌ NO matches for `result.new_models` (except in comments marked REMOVED)
+- ❌ NO matches for `NEW_MODELS_AVAILABLE`
+- ❌ NO matches for `CLI_LEGACY_EXIT_CODES`
+- ✅ Exit code 1 only appears in:
+  - Historical comments
+  - Model IDs like `gpt-4.1`
+  - Unrelated error codes
+
+**5.2. Verify Type Safety**
+
+```bash
+# Run type checker to catch any lingering references
+pdm run typecheck-all
+```
+
+**Expected**: No type errors related to removed fields
+
+**5.3. Final Integration Test**
+
+```bash
+# Run full test suite
+pdm run pytest-root services/llm_provider_service/tests/ -v
+
+# Run CLI manually to verify exit codes
+pdm run llm-check-models --provider anthropic
+echo "Exit code: $?"  # Should be 0, 2, 3, 4, or 5 (NOT 1)
+```
+
+**5.4. Manual Verification Checklist**
+
+- [ ] Run CLI with each provider, verify exit codes make sense
+- [ ] Check output formatting shows two sections (Tracked/Untracked)
+- [ ] Verify Settings loads ACTIVE_MODEL_FAMILIES from env correctly
+- [ ] Test with empty ACTIVE_MODEL_FAMILIES (all models → untracked)
+- [ ] Verify extraction logic works for all model naming patterns
+
+#### Validation Steps
+
+1. All grep commands return NO matches for removed fields
+2. Type checking passes with zero errors
+3. Full test suite passes (100% pass rate)
+4. CLI manual testing confirms correct behavior
+5. No runtime AttributeError exceptions for removed fields
+
+---
+
 ## Success Criteria
 
 ### Functional Requirements
@@ -986,9 +1409,10 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
 1. ✅ All 12 existing models have `model_family` field
 2. ✅ `ACTIVE_MODEL_FAMILIES` configuration loads correctly
 3. ✅ Family extraction logic works for all 4 providers
-4. ✅ Backward compatibility maintained (`new_models` field populated)
+4. ✅ `new_models` field completely removed from codebase
 5. ✅ 100% test pass rate
 6. ✅ Type checking passes (`pdm run typecheck-all`)
+7. ✅ No references to removed fields in any code
 
 ### User Experience
 
@@ -1045,23 +1469,50 @@ Summary
 
 ## Risk Mitigation
 
-### Backward Compatibility
+### Clean Break Implementation
 
-- **Risk**: Breaking existing workflows relying on `new_models` field
-- **Mitigation**: Maintain `new_models` field populated with combined results
-- **Validation**: Test existing code paths still work
+- **Status**: This is a new implementation in pure development with no production dependencies
+- **Approach**: Complete removal of old patterns without backward compatibility
+- **Verification**: Phase 5 checkpoint ensures no lingering references
 
 ### Configuration Management
 
-- **Risk**: Users accidentally disable family tracking
-- **Mitigation**: Sensible defaults, clear documentation, env var override
-- **Validation**: Test with empty configuration
+- **Risk**: Users accidentally disable family tracking via env var typos
+- **Impact**: LOW - Models categorized incorrectly, but system continues to function
+- **Mitigation**:
+  - Sensible defaults that match current production families
+  - Clear documentation with JSON examples
+  - Env var validator that logs warnings for invalid provider names (graceful degradation)
+  - Field validator coerces string keys to ProviderName enums
+- **Validation**:
+  - Test with empty configuration (should use defaults)
+  - Test with malformed JSON (should log warning, use defaults)
+  - Test with invalid provider name (should skip invalid, use valid entries)
 
 ### False Categorization
 
-- **Risk**: Model incorrectly categorized as tracked/untracked
-- **Mitigation**: Comprehensive unit tests for family extraction logic
-- **Validation**: Test with edge cases (special characters, unusual patterns)
+- **Risk**: Model incorrectly categorized as tracked/untracked due to extraction bugs
+- **Impact**: MEDIUM - Actionable updates treated as informational (or vice versa)
+- **Mitigation**:
+  - Comprehensive unit tests for all extraction patterns (15+ test cases per provider)
+  - Centralized extraction logic prevents drift across checkers
+  - Test with real API responses from each provider
+  - Documented family patterns in appendix for manual verification
+- **Validation**:
+  - Test with edge cases (decimal versions like `gpt-4.1`, special chars)
+  - Test with unusual patterns (legacy models, preview variants)
+  - Test with new model families that appear in APIs
+
+---
+
+## Observability
+
+- **Metrics**: Add counters per provider
+  - `llm_check_new_models_in_tracked_total`
+  - `llm_check_new_models_untracked_total`
+- **Logs**: Structured fields per run
+  - `provider`, `new_tracked_count`, `new_untracked_count`, `updated_count`, `breaking_count`
+- **Dashboards**: Simple panel showing tracked vs untracked trends over time.
 
 ---
 
@@ -1092,10 +1543,11 @@ Summary
 
 ### Week 1
 
-- **Day 1-2**: Phase 1 (Schema & Configuration)
-- **Day 3-4**: Phase 2 (Comparison Logic)
+- **Day 1-2**: Phase 0 (Manifest Cleanup) + Phase 1 (Schema & Configuration)
+- **Day 3-4**: Phase 2 (Comparison Logic with Centralized Utilities)
 - **Day 5**: Phase 3 (CLI & Exit Codes)
-- **Day 6-7**: Phase 4 (Testing)
+- **Day 6**: Phase 4 (Testing)
+- **Day 7**: Phase 5 (Final Verification Checkpoint)
 
 ### Total Effort: 5-7 days
 
@@ -1105,7 +1557,7 @@ Summary
 
 ### Internal
 
-- Model manifest modularization (completed)
+- Model manifest modularization (pre-work: convert `model_manifest.py` to re-export facade)
 - Model checker CLI infrastructure (completed)
 - Pydantic v2 settings configuration (completed)
 
@@ -1188,7 +1640,40 @@ export LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"openai":["gpt-5"],"anthropi
 
 ---
 
-**Task Document Version**: 1.0
+## Document Change Log
+
+### Version 1.3 (2025-11-09)
+**Clean Implementation (No Legacy Support)**:
+- ✅ Removed `new_models` field entirely (no backward compatibility)
+- ✅ Removed `CLI_LEGACY_EXIT_CODES` flag (not needed in development)
+- ✅ Simplified Settings validator (no dual-type handling)
+- ✅ Removed all backward compatibility strategy sections
+- ✅ Added Phase 5: Final Verification Checkpoint (grep for removed patterns)
+- ✅ Updated all test assertions to verify field removal
+- ✅ Streamlined risk mitigation (no CI/automation migration concerns)
+
+**Rationale**: Since this is a new implementation in pure development with no production dependencies, backward compatibility is unnecessary complexity. Clean break approach with verification checkpoint ensures no lingering references.
+
+### Version 1.2 (2025-11-09)
+**Enhancements from Junior Developer Code Review**:
+- ✅ Added mandatory Phase 0 prerequisite warning (file structure clarification)
+- ✅ Added centralized family extraction utilities (`family_utils.py`)
+- ✅ Improved Settings env parsing (dict[str, list[str]] → ProviderName coercion)
+- ✅ Enhanced Settings wiring instructions with explicit examples
+- ✅ Added exit code touchpoint checklist (comprehensive update guide)
+- ✅ Expanded risk mitigation with implementation details
+- ✅ Clarified canonical source locations (manifest/types.py)
+
+**Rationale**: Junior developer identified critical implementation risks and suggested architectural improvements that prevent code duplication, improve robustness, and reduce deployment risk.
+
+### Version 1.1 (2025-11-09)
+- Initial version with family filtering design
+
+---
+
+**Task Document Version**: 1.3
 **Created**: 2025-11-09
+**Last Updated**: 2025-11-09
 **Author**: Claude Code (Sonnet 4.5)
-**Status**: Ready for Implementation
+**Contributors**: Junior Developer (code review improvements)
+**Status**: Ready for Implementation (Clean Break - No Legacy Support)
