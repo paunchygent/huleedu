@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 from common_core import LLMProviderType
 from common_core.config_enums import Environment
 from huleedu_service_libs.config import SecureServiceSettings
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Model Manifest Integration
@@ -119,7 +119,10 @@ class Settings(SecureServiceSettings):
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias="ANTHROPIC_API_KEY",  # Accept unprefixed for compatibility
+        validation_alias=AliasChoices(
+            "LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY",  # Prefixed (Docker container)
+            "ANTHROPIC_API_KEY",  # Unprefixed (backward compatibility)
+        ),
         description="Anthropic API key for Claude models",
     )
     ANTHROPIC_BASE_URL: Optional[str] = None
@@ -130,7 +133,10 @@ class Settings(SecureServiceSettings):
 
     OPENAI_API_KEY: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias="OPENAI_API_KEY",  # Accept unprefixed for compatibility
+        validation_alias=AliasChoices(
+            "LLM_PROVIDER_SERVICE_OPENAI_API_KEY",  # Prefixed (Docker container)
+            "OPENAI_API_KEY",  # Unprefixed (backward compatibility)
+        ),
         description="OpenAI API key for GPT models",
     )
     OPENAI_BASE_URL: Optional[str] = None
@@ -142,7 +148,10 @@ class Settings(SecureServiceSettings):
 
     GOOGLE_API_KEY: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias="GOOGLE_API_KEY",  # Accept unprefixed for compatibility
+        validation_alias=AliasChoices(
+            "LLM_PROVIDER_SERVICE_GOOGLE_API_KEY",  # Prefixed (Docker container)
+            "GOOGLE_API_KEY",  # Unprefixed (backward compatibility)
+        ),
         description="Google API key for Gemini models",
     )
     GOOGLE_PROJECT_ID: str = ""
@@ -153,7 +162,10 @@ class Settings(SecureServiceSettings):
 
     OPENROUTER_API_KEY: SecretStr = Field(
         default=SecretStr(""),
-        validation_alias="OPENROUTER_API_KEY",  # Accept unprefixed for compatibility
+        validation_alias=AliasChoices(
+            "LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY",  # Prefixed (Docker container)
+            "OPENROUTER_API_KEY",  # Unprefixed (backward compatibility)
+        ),
         description="OpenRouter API key for various models",
     )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"

@@ -264,6 +264,7 @@ OPENAI_MODELS = [
         "cost-sensitive workloads. 272K context window.",
     ),
     ModelConfig(
+        model_id="gpt-4.1-2025-04-14",
         provider=ProviderName.OPENAI,
         display_name="GPT-4.1",
         api_version="v1",

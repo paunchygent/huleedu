@@ -9,6 +9,7 @@
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
 - WHEN IMPLEMENTING NEW CODE using library dependencies: always use Context7 to ensure updated library API context.
+- WHEN PERFORMING A **CODE REVIEW**: If task is **code review** create a new file in `.claude/code-reviews/` using <WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>. After each task phase, Always stop to update `.claude/code-reviews/<WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 
 ### 2. Task Execution
 
