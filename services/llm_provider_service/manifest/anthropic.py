@@ -16,7 +16,6 @@ from services.llm_provider_service.manifest.types import (
     StructuredOutputMethod,
 )
 
-
 # =============================================================================
 # Claude 4.5 Models - FULL PARAMETER SUPPORT
 # =============================================================================
@@ -26,6 +25,7 @@ ANTHROPIC_MODELS = [
         model_id="claude-haiku-4-5-20251001",
         provider=ProviderName.ANTHROPIC,
         display_name="Claude Haiku 4.5",
+        model_family="claude-haiku",
         api_version="2023-06-01",
         structured_output_method=StructuredOutputMethod.TOOL_USE,
         # Claude supports all sampling parameters
@@ -63,6 +63,7 @@ ANTHROPIC_MODELS = [
         model_id="claude-sonnet-4-5-20250929",
         provider=ProviderName.ANTHROPIC,
         display_name="Claude Sonnet 4.5",
+        model_family="claude-sonnet",
         api_version="2023-06-01",
         structured_output_method=StructuredOutputMethod.TOOL_USE,
         # Claude supports all sampling parameters

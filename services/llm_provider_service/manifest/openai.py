@@ -19,7 +19,6 @@ from services.llm_provider_service.manifest.types import (
     StructuredOutputMethod,
 )
 
-
 # =============================================================================
 # GPT-5 Family - NO SAMPLING PARAMETER SUPPORT
 # =============================================================================
@@ -29,6 +28,7 @@ OPENAI_MODELS = [
         model_id="gpt-5-2025-08-07",
         provider=ProviderName.OPENAI,
         display_name="GPT-5",
+        model_family="gpt-5",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-5 does NOT support sampling parameters
@@ -58,6 +58,7 @@ OPENAI_MODELS = [
         model_id="gpt-5-mini-2025-08-07",
         provider=ProviderName.OPENAI,
         display_name="GPT-5 Mini",
+        model_family="gpt-5",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-5 does NOT support sampling parameters
@@ -87,6 +88,7 @@ OPENAI_MODELS = [
         model_id="gpt-5-nano-2025-08-07",
         provider=ProviderName.OPENAI,
         display_name="GPT-5 Nano",
+        model_family="gpt-5",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-5 does NOT support sampling parameters
@@ -119,6 +121,7 @@ OPENAI_MODELS = [
         model_id="gpt-4.1-2025-04-14",  # FIXED: Added missing model_id
         provider=ProviderName.OPENAI,
         display_name="GPT-4.1",
+        model_family="gpt-4.1",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-4.1 supports all sampling parameters
@@ -146,6 +149,7 @@ OPENAI_MODELS = [
         model_id="gpt-4.1-mini-2025-04-14",
         provider=ProviderName.OPENAI,
         display_name="GPT-4.1 Mini",
+        model_family="gpt-4.1",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-4.1 supports all sampling parameters
@@ -174,6 +178,7 @@ OPENAI_MODELS = [
         model_id="gpt-4.1-nano-2025-04-14",
         provider=ProviderName.OPENAI,
         display_name="GPT-4.1 Nano",
+        model_family="gpt-4.1",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-4.1 supports all sampling parameters
@@ -205,6 +210,7 @@ OPENAI_MODELS = [
         model_id="gpt-4o-2024-11-20",
         provider=ProviderName.OPENAI,
         display_name="GPT-4o",
+        model_family="gpt-4o",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-4o supports all sampling parameters
@@ -233,6 +239,7 @@ OPENAI_MODELS = [
         model_id="gpt-4o-mini-2024-07-18",
         provider=ProviderName.OPENAI,
         display_name="GPT-4o Mini",
+        model_family="gpt-4o",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         # GPT-4o supports all sampling parameters

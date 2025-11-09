@@ -242,6 +242,57 @@ class Settings(SecureServiceSettings):
             raise ValueError("Response recording only allowed in development environment")
         return v
 
+    @field_validator("ACTIVE_MODEL_FAMILIES", mode="before")
+    @classmethod
+    def coerce_active_families_keys(
+        cls,
+        v: dict[str, list[str]] | dict[ProviderName, list[str]] | None,
+    ) -> dict[ProviderName, list[str]]:
+        """Coerce env-loaded dict keys (str) to ProviderName enum.
+
+        This two-step approach handles JSON environment variables robustly:
+        1. JSON parses as dict[str, list[str]] (string keys)
+        2. Validator coerces string keys to ProviderName enums
+        3. Type system sees dict[ProviderName, list[str]] after validation
+
+        Supports env like:
+          LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"openai":["gpt-5"],"anthropic":["claude-haiku"]}'
+
+        Args:
+            v: Raw value from settings (JSON string → dict[str, list[str]])
+
+        Returns:
+            Coerced dict with ProviderName enum keys
+
+        Raises:
+            ValueError: If provider name is invalid (logs warning and skips)
+        """
+        if v is None:
+            return {}
+
+        coerced: dict[ProviderName, list[str]] = {}
+        for k, families in v.items():
+            # Already a ProviderName enum?
+            if isinstance(k, ProviderName):
+                coerced[k] = families
+                continue
+
+            # String key - coerce to ProviderName
+            key_str = str(k).lower()
+            try:
+                provider = ProviderName(key_str)
+                coerced[provider] = families
+            except ValueError:
+                # Log invalid provider names but don't fail validation
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"Invalid provider name '{k}' in ACTIVE_MODEL_FAMILIES, skipping"
+                )
+                continue
+
+        return coerced
+
     # Event Publishing
     PUBLISH_LLM_USAGE_EVENTS: bool = True
     PUBLISH_DETAILED_METRICS: bool = True
@@ -270,6 +321,25 @@ class Settings(SecureServiceSettings):
     ENABLE_COST_TRACKING: bool = True
     COST_ALERT_THRESHOLD_USD: float = 100.0
     COST_LIMIT_USD_PER_DAY: Optional[float] = None
+
+    # Model Family Tracking Configuration (for model checker CLI)
+    ACTIVE_MODEL_FAMILIES: dict[ProviderName, list[str]] = Field(
+        default_factory=lambda: {
+            ProviderName.ANTHROPIC: ["claude-haiku", "claude-sonnet"],
+            ProviderName.OPENAI: ["gpt-5", "gpt-4.1", "gpt-4o"],
+            ProviderName.GOOGLE: ["gemini-2.5-flash"],
+            ProviderName.OPENROUTER: ["claude-haiku-openrouter"],
+        },
+        description="Model families to actively track per provider. "
+        "New models within these families trigger actionable alerts (exit code 4). "
+        "Models from other families are shown as informational only (exit code 5). "
+        "Keys are provider names (lowercase strings in env vars), coerced to ProviderName enums.",
+    )
+    FLAG_NEW_MODEL_FAMILIES: bool = Field(
+        default=True,
+        description="If True, new model families are shown in informational section. "
+        "If False, untracked families are silently ignored.",
+    )
 
     # Request Routing Rules
     ROUTING_RULES_ENABLED: bool = True

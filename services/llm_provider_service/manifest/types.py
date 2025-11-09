@@ -63,6 +63,12 @@ class ModelConfig(BaseModel):
     display_name: str = Field(
         ..., description="Human-readable model name (e.g., 'Claude 3.5 Haiku')"
     )
+    model_family: str = Field(
+        ...,
+        description="Model family identifier for grouping related models "
+        "(e.g., 'gpt-5', 'claude-haiku', 'gemini-2.5-flash'). "
+        "Used for family-aware filtering in model checker.",
+    )
 
     # API Configuration
     api_version: str = Field(
@@ -90,7 +96,9 @@ class ModelConfig(BaseModel):
     )
     uses_max_completion_tokens: bool = Field(
         default=False,
-        description="Model uses max_completion_tokens instead of max_tokens (reasoning models: True)",
+        description=(
+            "Model uses max_completion_tokens instead of max_tokens (reasoning models: True)"
+        ),
     )
 
     # Capabilities

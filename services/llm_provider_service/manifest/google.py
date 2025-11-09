@@ -16,7 +16,6 @@ from services.llm_provider_service.manifest.types import (
     StructuredOutputMethod,
 )
 
-
 # =============================================================================
 # Gemini 2.5 Models - FULL PARAMETER SUPPORT
 # =============================================================================
@@ -26,6 +25,7 @@ GOOGLE_MODELS = [
         model_id="gemini-2.5-flash-preview-05-20",
         provider=ProviderName.GOOGLE,
         display_name="Gemini 2.5 Flash (Preview)",
+        model_family="gemini-2.5-flash",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_MIME_TYPE,
         # Gemini supports all sampling parameters

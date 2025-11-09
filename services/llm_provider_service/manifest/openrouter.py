@@ -17,7 +17,6 @@ from services.llm_provider_service.manifest.types import (
     StructuredOutputMethod,
 )
 
-
 # =============================================================================
 # OpenRouter Models - PARAMETER SUPPORT VARIES BY UNDERLYING MODEL
 # =============================================================================
@@ -27,6 +26,7 @@ OPENROUTER_MODELS = [
         model_id="anthropic/claude-haiku-4-5-20251001",
         provider=ProviderName.OPENROUTER,
         display_name="Claude Haiku 4.5 (via OpenRouter)",
+        model_family="claude-haiku-openrouter",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_OBJECT,
         # Claude via OpenRouter supports all sampling parameters
@@ -66,5 +66,7 @@ def validate_model_capability__anthropic_claude_haiku_4_5_20251001(capability: s
 
 # Validator registry mapping model_id to validator function
 MODEL_VALIDATORS: dict[str, Callable[[str], bool]] = {
-    "anthropic/claude-haiku-4-5-20251001": validate_model_capability__anthropic_claude_haiku_4_5_20251001,
+    "anthropic/claude-haiku-4-5-20251001": (
+        validate_model_capability__anthropic_claude_haiku_4_5_20251001
+    ),
 }
