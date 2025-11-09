@@ -17,6 +17,18 @@ By session end we should have:
 2. **Artefact completeness**: `assessment_run.execute.json` includes fully populated `llm_comparisons`, `bt_summary`, `grade_projections`, and `costs` sections that align with `Documentation/schemas/eng5_np/assessment_run.schema.json`.
 3. **Operational runbook**: Documented checklist for executing `pdm run eng5-np-run --mode execute` against the dev stack, including how to verify Kafka consumers, metrics, and manifest outputs.
 
+## 2.1 Current Progress (2025-11-09)
+
+- CJ service and LLM provider callbacks now propagate `essay_a_id`, `essay_b_id`, and `prompt_sha256`; unit coverage in the admin/interaction suites confirms the metadata contract.
+- `AssessmentEventCollector` and `AssessmentRunHydrator` enforce metadata presence, halt consumption on missing fields, and hydrate artefacts (comparisons, BT summary, grade projections, cost rollups) using the modularized runner package.
+- ENG5 runner (`pdm run eng5-np-run`) supports plan/dry-run/execute modes, maintains manifest hashing, and writes schema-aligned stubs; documentation and Grafana playbook entries cover admin/JWT enablement and metadata counters.
+
+## 2.2 Immediate Next Steps
+
+1. Execute runner dry-run validation and full execute-mode capture to generate ENG5 artefacts per schema, retaining events/requests in the manifest.
+2. Expand tests to cover ENG5 legacy vs national scale flows, JSON artefact schema validation, and non-mutating DB behavior for the runner.
+3. Finalize operational guidance by adding the execute-mode checklist and monitoring cues to the README/runbook, including completion timeout handling and rerun guidance.
+
 ## 3. Critical Decisions & Considerations
 
 | Area | Decision Points | Considerations |
