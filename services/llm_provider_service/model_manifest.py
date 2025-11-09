@@ -264,29 +264,6 @@ OPENAI_MODELS = [
         "cost-sensitive workloads. 272K context window.",
     ),
     ModelConfig(
-        model_id="gpt-5-pro-2025-10-06",
-        provider=ProviderName.OPENAI,
-        display_name="GPT-5 Pro",
-        api_version="v1",
-        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
-        capabilities={
-            "function_calling": True,
-            "json_mode": True,
-            "response_format_schema": True,
-        },
-        max_tokens=16384,
-        context_window=272_000,  # 272K context window
-        supports_streaming=True,
-        release_date=date(2025, 10, 6),
-        is_deprecated=False,
-        cost_per_1k_input_tokens=0.01500,  # $15.00 per million
-        cost_per_1k_output_tokens=0.12000,  # $120.00 per million
-        recommended_for=["complex_reasoning", "expert_analysis", "premium_quality"],
-        notes="Premium flagship GPT-5 model. Highest quality and reasoning. "
-        "Use when quality matters more than cost.",
-    ),
-    ModelConfig(
-        model_id="gpt-4.1-2025-04-14",
         provider=ProviderName.OPENAI,
         display_name="GPT-4.1",
         api_version="v1",
@@ -304,8 +281,7 @@ OPENAI_MODELS = [
         cost_per_1k_input_tokens=0.00200,  # $2.00 per million
         cost_per_1k_output_tokens=0.00800,  # $8.00 per million
         recommended_for=["long_context", "analysis", "general_purpose"],
-        notes="GPT-4.1 with 1M context window. 26% less expensive than GPT-4o "
-        "for median queries.",
+        notes="GPT-4.1 with 1M context window. 26% less expensive than GPT-4o for median queries.",
     ),
     ModelConfig(
         model_id="gpt-4.1-mini-2025-04-14",

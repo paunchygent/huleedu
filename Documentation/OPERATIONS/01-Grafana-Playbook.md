@@ -48,6 +48,18 @@ description: This document serves as the team's shared brain for observability. 
 - Prompt Failure Burn-down: `increase(huleedu_nlp_prompt_fetch_failures_total[1h])` and `increase(huleedu_cj_prompt_fetch_failures_total[1h])`
 - Alert Threshold Example: fire when `sum(rate(huleedu_cj_prompt_fetch_failures_total[15m])) > 0.05`
 
+### ENG5 NP Runner (Phase 3.3)
+
+For the end-to-end batch workflow (plan/dry-run/execute, CLI flags, failure handling) follow
+`Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md`. Complement that runbook with the following dashboards:
+
+- LLM throughput/cost: `sum(rate(llm_requests_total{request_type="comparison"}[5m])) by (provider,model)`
+- Prompt hydration health: reuse the panels above to ensure ENG5 batches pull instructions/prompts successfully.
+- Admin readiness: `cj_admin_instruction_operations_total` spike detector—ENG5 instructions must exist before executing the runner.
+
+After each run, cross-check the CLI summary and the artefact’s
+`validation.runner_status` fields to confirm no partial data.
+
 ### CJ Admin Instruction Operations (Phase 3.2)
 
 **Purpose**: Track authenticated admin CRUD activity for assignment instructions.

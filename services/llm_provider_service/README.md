@@ -355,11 +355,12 @@ After deploying the updated manifest:
    llm_structured_output_failures_total{provider="anthropic", model="..."}
    ```
 
-4. **Initial Production Testing**: Run a small batch comparison
-   ```bash
-   # Use ENG5 batch runner with specific model
-   pdm run eng5-np submit --llm-model claude-3-5-sonnet-20250101 --batch-size 10
-   ```
+4. **Initial Production Testing**: Run a small batch comparison (see
+   `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` for the end-to-end checklist)
+  ```bash
+  # Use ENG5 batch runner with specific model
+  pdm run eng5-np submit --llm-model claude-3-5-sonnet-20250101 --batch-size 10
+  ```
 
 #### Breaking Changes
 

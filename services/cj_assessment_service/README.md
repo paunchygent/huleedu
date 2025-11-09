@@ -75,6 +75,9 @@ To work with a non-default scale (for example ENG5 NP variants):
 3. Trigger CJ batches as usual. All downstream consumers (context builder,
    projector, events/tests) will operate with the chosen scale.
 
+👉  For the full ENG5 NP batch-run procedure (plan/dry-run/execute, monitoring,
+and failure handling) follow `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md`.
+
 > **Note**: If you register anchors before inserting the instruction row the API
 > will respond with `400 Unknown assignment_id`—seed instructions first, then add
 > anchors.
