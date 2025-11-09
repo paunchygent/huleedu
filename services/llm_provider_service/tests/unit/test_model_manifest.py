@@ -137,7 +137,7 @@ class TestModelRegistry:
         assert len(anthropic_models) >= 1
 
         # Check primary model exists
-        haiku_exists = any(m.model_id == "claude-3-5-haiku-20241022" for m in anthropic_models)
+        haiku_exists = any(m.model_id == "claude-haiku-4-5-20251001" for m in anthropic_models)
         assert haiku_exists, "Primary Anthropic model (Haiku) should be in manifest"
 
     def test_all_providers_have_defaults(self) -> None:
@@ -175,16 +175,16 @@ class TestGetModelConfig:
         config = get_model_config(ProviderName.ANTHROPIC)
 
         assert config.provider == ProviderName.ANTHROPIC
-        assert config.model_id == "claude-3-5-haiku-20241022"
+        assert config.model_id == "claude-haiku-4-5-20251001"
         assert config.display_name == "Claude 3.5 Haiku"
         assert config.api_version == "2023-06-01"
         assert config.structured_output_method == StructuredOutputMethod.TOOL_USE
 
     def test_get_specific_anthropic_model(self) -> None:
         """Should return specific model when ID provided."""
-        config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+        config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
-        assert config.model_id == "claude-3-5-haiku-20241022"
+        assert config.model_id == "claude-haiku-4-5-20251001"
         assert config.provider == ProviderName.ANTHROPIC
 
     def test_get_default_openai_model(self) -> None:
@@ -206,7 +206,7 @@ class TestGetModelConfig:
         config = get_model_config(ProviderName.OPENROUTER)
 
         assert config.provider == ProviderName.OPENROUTER
-        assert config.model_id == "anthropic/claude-3-5-haiku-20241022"
+        assert config.model_id == "anthropic/claude-haiku-4-5-20251001"
 
     def test_unknown_provider_raises_error(self) -> None:
         """Should raise ValueError for unknown provider."""
@@ -226,7 +226,7 @@ class TestGetModelConfig:
 
         error_msg = str(exc_info.value)
         assert "Available models:" in error_msg
-        assert "claude-3-5-haiku-20241022" in error_msg
+        assert "claude-haiku-4-5-20251001" in error_msg
 
 
 class TestGetDefaultModelId:
@@ -235,7 +235,7 @@ class TestGetDefaultModelId:
     def test_get_anthropic_default_id(self) -> None:
         """Should return correct default ID for Anthropic."""
         model_id = get_default_model_id(ProviderName.ANTHROPIC)
-        assert model_id == "claude-3-5-haiku-20241022"
+        assert model_id == "claude-haiku-4-5-20251001"
 
     def test_get_openai_default_id(self) -> None:
         """Should return correct default ID for OpenAI."""
@@ -250,7 +250,7 @@ class TestGetDefaultModelId:
     def test_get_openrouter_default_id(self) -> None:
         """Should return correct default ID for OpenRouter."""
         model_id = get_default_model_id(ProviderName.OPENROUTER)
-        assert model_id == "anthropic/claude-3-5-haiku-20241022"
+        assert model_id == "anthropic/claude-haiku-4-5-20251001"
 
     def test_unknown_provider_raises_error(self) -> None:
         """Should raise ValueError for unknown provider."""
@@ -308,7 +308,7 @@ class TestValidateModelCapability:
     def test_anthropic_haiku_supports_tool_use(self) -> None:
         """Anthropic Haiku should support tool_use capability."""
         result = validate_model_capability(
-            ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022", "tool_use"
+            ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001", "tool_use"
         )
 
         assert result is True
@@ -316,7 +316,7 @@ class TestValidateModelCapability:
     def test_anthropic_haiku_supports_vision(self) -> None:
         """Anthropic Haiku should support vision capability."""
         result = validate_model_capability(
-            ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022", "vision"
+            ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001", "vision"
         )
 
         assert result is True
@@ -325,7 +325,7 @@ class TestValidateModelCapability:
         """Should return False for unsupported capability."""
         result = validate_model_capability(
             ProviderName.ANTHROPIC,
-            "claude-3-5-haiku-20241022",
+            "claude-haiku-4-5-20251001",
             "nonexistent_capability",
         )
 
@@ -347,7 +347,7 @@ class TestModelMetadata:
 
     def test_anthropic_haiku_metadata(self) -> None:
         """Anthropic Haiku should have complete metadata."""
-        config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+        config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
         assert config.release_date == date(2024, 10, 22)
         assert config.is_deprecated is False
@@ -359,7 +359,7 @@ class TestModelMetadata:
 
     def test_anthropic_haiku_capabilities(self) -> None:
         """Anthropic Haiku should have correct capabilities."""
-        config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+        config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
         assert config.capabilities["tool_use"] is True
         assert config.capabilities["vision"] is True
@@ -368,7 +368,7 @@ class TestModelMetadata:
 
     def test_anthropic_haiku_context_window(self) -> None:
         """Anthropic Haiku should have 200K context window."""
-        config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+        config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
         assert config.context_window == 200_000
         assert config.max_tokens == 8192

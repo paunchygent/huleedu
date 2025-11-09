@@ -417,7 +417,7 @@ services:
       # Testing configuration handled by LLM Provider Service
       # Default LLM configuration (passed to LLM Provider Service)
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=anthropic
-      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=claude-3-5-haiku-20241022
+      - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_MODEL=claude-haiku-4-5-20251001
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=cj_assessment_service
       - OTEL_TRACES_EXPORTER=otlp

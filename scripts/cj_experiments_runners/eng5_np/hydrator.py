@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from scripts.cj_experiments_runners.eng5_np.events import (
     write_llm_comparison_event,
 )
 from scripts.cj_experiments_runners.eng5_np.utils import sha256_of_file
+
+_HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class AssessmentRunHydrator:
@@ -35,9 +38,41 @@ class AssessmentRunHydrator:
         self.grade_scale = grade_scale
         self.batch_id = batch_id
         (self.output_dir / "events").mkdir(parents=True, exist_ok=True)
+        self._seen_request_ids: set[str] = set()
+        self._runner_status: dict[str, Any] = {
+            "partial_data": False,
+            "timeout_seconds": 0.0,
+            "observed_events": {
+                "llm_comparisons": 0,
+                "assessment_results": 0,
+                "completions": 0,
+            },
+        }
+
+    def mark_timeout(self, elapsed: float) -> None:
+        self._runner_status["partial_data"] = True
+        self._runner_status["timeout_seconds"] = round(max(elapsed, 0.0), 2)
+
+    def record_completion_seen(self) -> None:
+        self._runner_status["observed_events"]["completions"] += 1
+
+    def _increment_event(self, key: str) -> None:
+        self._runner_status["observed_events"][key] += 1
 
     def apply_llm_comparison(self, envelope: EventEnvelope[LLMComparisonResultV1]) -> None:
         """Persist LLM callback and append it to the artefact if it matches the batch."""
+
+        request_id = envelope.data.request_id
+        if not request_id:
+            raise ValueError(
+                "LLMComparisonResultV1 missing request_id; cannot hydrate artefact",
+            )
+        if request_id in self._seen_request_ids:
+            typer.echo(
+                f"Skipping duplicate LLM comparison callback for request_id={request_id}",
+                err=True,
+            )
+            return
 
         metadata = envelope.data.request_metadata or {}
         batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
@@ -48,10 +83,10 @@ class AssessmentRunHydrator:
 
         artefact = self._load_artefact()
         record = self._build_comparison_record(artefact, envelope)
-        if record is None:
-            return
         artefact.setdefault("llm_comparisons", []).append(record)
+        self._increment_event("llm_comparisons")
         self._update_costs(artefact, envelope)
+        self._seen_request_ids.add(request_id)
         self._write_artefact(artefact)
 
     def apply_assessment_result(self, envelope: EventEnvelope[AssessmentResultV1]) -> None:
@@ -65,6 +100,7 @@ class AssessmentRunHydrator:
         artefact = self._load_artefact()
         artefact["bt_summary"] = self._build_bt_entries(envelope)
         artefact["grade_projections"] = self._build_grade_projections(envelope)
+        self._increment_event("assessment_results")
         self._write_artefact(artefact)
 
     def _load_artefact(self) -> dict[str, Any]:
@@ -85,6 +121,7 @@ class AssessmentRunHydrator:
         validation_block = artefact.setdefault("validation", {})
         validation_block["manifest"] = manifest_entries
         validation_block["artefact_checksum"] = ""
+        validation_block["runner_status"] = self._runner_status
 
         serialized = json.dumps(artefact, indent=2)
         checksum = sha256(serialized.encode("utf-8")).hexdigest()
@@ -105,37 +142,40 @@ class AssessmentRunHydrator:
         self,
         artefact: dict[str, Any],
         envelope: EventEnvelope[LLMComparisonResultV1],
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         metadata = envelope.data.request_metadata or {}
         essay_a = metadata.get("essay_a_id")
         essay_b = metadata.get("essay_b_id")
+        prompt_hash = metadata.get("prompt_sha256")
         if not essay_a or not essay_b:
-            typer.echo(
-                "Skipping LLM comparison with missing essay metadata; "
+            raise ValueError(
+                "Comparison callback missing essay identifiers; "
                 f"correlation={envelope.correlation_id}",
-                err=True,
             )
-            return None
+        if not prompt_hash or not _HEX_64.fullmatch(str(prompt_hash)):
+            raise ValueError(
+                "Comparison callback missing prompt hash; "
+                f"correlation={envelope.correlation_id}",
+            )
 
-        winner_value = (envelope.data.winner.value if envelope.data.winner else "").lower()
-        if "essay a" in winner_value:
+        winner = envelope.data.winner
+        if winner and winner.value.lower() == "essay_a":
             winner_id, loser_id = essay_a, essay_b
-        elif "essay b" in winner_value:
+        elif winner and winner.value.lower() == "essay_b":
             winner_id, loser_id = essay_b, essay_a
         else:
-            winner_id, loser_id = "error", essay_a
-
-        prompt_hash = (
-            metadata.get("prompt_sha256")
-            or sha256(metadata.get("prompt_text", "").encode("utf-8")).hexdigest()
-        )
+            winner_id, loser_id = essay_a, essay_b
 
         sequence = len(artefact.get("llm_comparisons", [])) + 1
-        record = {
+        status = "failed" if envelope.data.is_error else "succeeded"
+        record: dict[str, Any] = {
             "sequence": sequence,
+            "request_id": envelope.data.request_id,
             "correlation_id": str(envelope.correlation_id),
             "winner_id": winner_id,
             "loser_id": loser_id,
+            "essay_a_id": essay_a,
+            "essay_b_id": essay_b,
             "prompt_hash": prompt_hash,
             "provider": envelope.data.provider.value,
             "model": envelope.data.model,
@@ -144,12 +184,12 @@ class AssessmentRunHydrator:
             "cost_usd": envelope.data.cost_estimate,
             "started_at": envelope.data.requested_at.isoformat(),
             "completed_at": envelope.data.completed_at.isoformat(),
-            "status": "succeeded" if not envelope.data.is_error else "failed",
+            "status": status,
         }
 
         if envelope.data.is_error and envelope.data.error_detail:
+            record["failure_reason"] = envelope.data.error_detail.message
             record["error_code"] = envelope.data.error_detail.error_code.value
-            record["error_message"] = envelope.data.error_detail.message
 
         return record
 

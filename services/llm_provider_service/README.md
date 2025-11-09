@@ -195,6 +195,188 @@ CLI/Service → validate_llm_overrides() → ELS_CJAssessmentRequestV1(llm_confi
 - CLI validation: `scripts/cj_experiments_runners/eng5_np/cli.py:45-169`
 - Tests: `services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py`
 
+## Updating LLM Models
+
+### Manual Update Workflow
+
+This workflow is used to check for new models from providers and update the model manifest when new compatible models become available.
+
+#### 1. Check for New Models
+
+Run the model version checker CLI to discover newly available models from provider APIs:
+
+```bash
+# Check specific provider
+pdm run llm-check-models --provider anthropic
+
+# Check all providers
+pdm run llm-check-models --provider all
+
+# Generate compatibility report
+pdm run llm-check-models --provider anthropic --report compatibility_report.json
+```
+
+**Exit codes**:
+- `0`: All up-to-date (no changes needed)
+- `1`: New models available (non-breaking updates)
+- `2`: API error or authentication failure
+- `3`: Breaking changes detected (requires manual intervention)
+
+#### 2. Review Compatibility Report
+
+When the CLI returns exit code `1` or `3`, review the generated report:
+
+**JSON Report** (for CI/CD automation):
+```json
+{
+  "check_date": "2025-11-09T02:30:00Z",
+  "provider": "anthropic",
+  "current_model": {
+    "model_id": "claude-3-5-haiku-20241022",
+    "status": "compatible"
+  },
+  "discovered_models": [
+    {
+      "model_id": "claude-3-5-sonnet-20250101",
+      "compatibility_status": "unknown",
+      "recommendation": "requires_testing"
+    }
+  ],
+  "breaking_changes": []
+}
+```
+
+**Markdown Report** (for human review):
+```bash
+pdm run llm-check-models --provider anthropic --report report.md --format markdown
+```
+
+#### 3. Run Compatibility Tests
+
+Before adding new models to the manifest, validate they work correctly with CJ assessment prompts:
+
+```bash
+# Run integration tests with new model checking enabled
+CHECK_NEW_MODELS=1 pdm run pytest-root services/llm_provider_service/tests/integration/test_model_compatibility.py -v -m "financial"
+```
+
+**WARNING**: These tests make real API calls and incur costs. Tests validate:
+- Structured output parsing (winner, justification, confidence)
+- Response quality and format compliance
+- Error handling and API compatibility
+
+#### 4. Update Model Manifest
+
+If compatibility tests pass, add the new model to `model_manifest.py`:
+
+```python
+# services/llm_provider_service/model_manifest.py
+
+ANTHROPIC_MODELS = [
+    # Existing models...
+
+    # Add new model
+    ModelConfig(
+        model_id="claude-3-5-sonnet-20250101",  # From compatibility report
+        provider=ProviderName.ANTHROPIC,
+        display_name="Claude 3.5 Sonnet (January 2025)",
+        api_version="2023-06-01",
+        structured_output_method=StructuredOutputMethod.TOOL_USE,
+        capabilities={
+            "tool_use": True,
+            "vision": True,
+            "function_calling": True,
+            "json_mode": True,
+        },
+        max_tokens=8192,
+        context_window=200_000,
+        supports_streaming=True,
+        release_date=date(2025, 1, 1),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.0008,  # Check provider pricing
+        cost_per_1k_output_tokens=0.004,
+        recommended_for=["comparison", "analysis"],
+        notes="Updated Sonnet model with improved reasoning.",
+    ),
+]
+
+# Optionally update default model
+SUPPORTED_MODELS = ModelRegistry(
+    models={...},
+    default_models={
+        ProviderName.ANTHROPIC: "claude-3-5-sonnet-20250101",  # New default
+        ...
+    },
+)
+```
+
+#### 5. Update Configuration (if changing default)
+
+If switching the default model, update environment variables:
+
+```bash
+# .env or production secrets
+LLM_PROVIDER_SERVICE_ANTHROPIC_MODEL_ID=claude-3-5-sonnet-20250101
+```
+
+**Note**: The manifest takes precedence. Environment variables are only used for debugging/overrides.
+
+#### 6. Validate Changes
+
+```bash
+# Run typecheck
+pdm run typecheck-all
+
+# Run all LLM provider service tests
+pdm run pytest-root services/llm_provider_service/tests/unit/ -v
+pdm run pytest-root services/llm_provider_service/tests/integration/ -v -k "not financial"
+
+# Verify manifest integration tests pass
+pdm run pytest-root services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py -v
+```
+
+#### 7. Deploy and Monitor
+
+After deploying the updated manifest:
+
+1. **Health Check**: Verify service starts correctly
+   ```bash
+   curl http://llm-provider-service:8090/healthz
+   ```
+
+2. **Grafana Dashboards**: Monitor for anomalies
+   - LLM request error rates
+   - Response time percentiles (p50, p95, p99)
+   - Token usage and cost trends
+   - Circuit breaker state
+
+3. **Structured Output Parsing**: Watch for validation failures
+   ```
+   llm_structured_output_failures_total{provider="anthropic", model="..."}
+   ```
+
+4. **Initial Production Testing**: Run a small batch comparison
+   ```bash
+   # Use ENG5 batch runner with specific model
+   pdm run eng5-np submit --llm-model claude-3-5-sonnet-20250101 --batch-size 10
+   ```
+
+#### Breaking Changes
+
+If the CLI reports breaking changes (exit code `3`), **DO NOT** proceed automatically:
+
+1. **Review breaking changes** in the compatibility report
+2. **Update provider implementations** if API contracts changed
+3. **Update integration tests** to reflect new behavior
+4. **Coordinate deployment** with dependent services
+
+Common breaking changes:
+- API version requirements change
+- Structured output method changes (json → tool_use)
+- Default model deprecation
+- Maximum token limits reduced
+- New required authentication headers
+
 ## Monitoring
 
 ### Prometheus Metrics

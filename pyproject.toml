@@ -52,6 +52,7 @@ monorepo-tools = [
     "reportlab",
     "types-reportlab",
     "aiosmtplib>=4.0.1",
+    "jsonschema",
     # Verification and analysis tools
     "pandas",
     "matplotlib",

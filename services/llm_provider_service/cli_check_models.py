@@ -7,11 +7,14 @@ Usage:
     # Check all providers
     pdm run llm-check-models --provider all
 
-    # Check specific provider
+    # Check specific provider with verbose output
     pdm run llm-check-models --provider anthropic --verbose
 
-    # Check with detailed output
-    pdm run llm-check-models --provider openai --verbose
+    # Generate JSON compatibility report
+    pdm run llm-check-models --provider anthropic --report report.json
+
+    # Generate markdown compatibility report
+    pdm run llm-check-models --provider openai --report report.md --format markdown
 
 Exit Codes:
     0: All up-to-date (no changes needed)
@@ -25,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from enum import Enum
+from pathlib import Path
 
 import aiohttp
 import typer
@@ -37,6 +41,7 @@ from services.llm_provider_service.cli_output_formatter import (
     format_comparison_table,
     format_summary,
 )
+from services.llm_provider_service.compatibility_reporter import CompatibilityReporter
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.anthropic_checker import (
     AnthropicModelChecker,
@@ -73,6 +78,13 @@ class ExitCode(int, Enum):
     NEW_MODELS_AVAILABLE = 1
     API_ERROR = 2
     BREAKING_CHANGES = 3
+
+
+class ReportFormat(str, Enum):
+    """Report output format options."""
+
+    JSON = "json"
+    MARKDOWN = "markdown"
 
 
 class CheckerFactory:
@@ -121,7 +133,7 @@ class CheckerFactory:
         if not api_key:
             console.print(
                 "[yellow]⚠️  Anthropic API key not found. "
-                "Set ANTHROPIC_API_KEY environment variable.[/yellow]"
+                "Set LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY environment variable.[/yellow]"
             )
             return None
 
@@ -134,7 +146,7 @@ class CheckerFactory:
         if not api_key:
             console.print(
                 "[yellow]⚠️  OpenAI API key not found. "
-                "Set OPENAI_API_KEY environment variable.[/yellow]"
+                "Set LLM_PROVIDER_SERVICE_OPENAI_API_KEY environment variable.[/yellow]"
             )
             return None
 
@@ -147,7 +159,7 @@ class CheckerFactory:
         if not api_key:
             console.print(
                 "[yellow]⚠️  Google API key not found. "
-                "Set GOOGLE_API_KEY environment variable.[/yellow]"
+                "Set LLM_PROVIDER_SERVICE_GOOGLE_API_KEY environment variable.[/yellow]"
             )
             return None
 
@@ -163,7 +175,7 @@ class CheckerFactory:
         if not api_key:
             console.print(
                 "[yellow]⚠️  OpenRouter API key not found. "
-                "Set OPENROUTER_API_KEY environment variable.[/yellow]"
+                "Set LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY environment variable.[/yellow]"
             )
             return None
 
@@ -279,6 +291,18 @@ def check_models(
         "-v",
         help="Show detailed model metadata",
     ),
+    report: Path | None = typer.Option(
+        None,
+        "--report",
+        "-r",
+        help="Generate compatibility report to file (e.g., report.json or report.md)",
+    ),
+    report_format: ReportFormat = typer.Option(
+        ReportFormat.JSON,
+        "--format",
+        "-f",
+        help="Report format (json or markdown)",
+    ),
 ) -> None:
     """Check LLM provider model versions against the manifest.
 
@@ -300,6 +324,12 @@ def check_models(
 
         # Show detailed information
         pdm run llm-check-models --provider openai --verbose
+
+        # Generate JSON report
+        pdm run llm-check-models --provider anthropic --report report.json
+
+        # Generate markdown report
+        pdm run llm-check-models --provider anthropic --report report.md --format markdown
     """
     try:
         results = asyncio.run(_async_check_models(provider, verbose))
@@ -307,6 +337,29 @@ def check_models(
         if not results:
             console.print("[yellow]No providers were checked[/yellow]")
             raise typer.Exit(code=ExitCode.API_ERROR.value)
+
+        # Generate reports if requested
+        if report:
+            reporter = CompatibilityReporter()
+
+            for result in results:
+                # Generate report content based on format
+                if report_format == ReportFormat.JSON:
+                    report_content = reporter.generate_json_report(result)
+                else:
+                    report_content = reporter.generate_markdown_report(result)
+
+                # Construct filename with provider name
+                if len(results) > 1:
+                    # Multiple providers: add provider suffix
+                    report_path = report.parent / f"{report.stem}_{result.provider.value}{report.suffix}"
+                else:
+                    # Single provider: use provided path as-is
+                    report_path = report
+
+                # Write report to file
+                report_path.write_text(report_content, encoding="utf-8")
+                console.print(f"[green]✓ Report saved to {report_path}[/green]")
 
         # Display summary
         format_summary(results)
@@ -331,6 +384,9 @@ def check_models(
 
         raise typer.Exit(code=exit_code.value)
 
+    except typer.Exit:
+        # Re-raise typer.Exit to preserve intended exit codes
+        raise
     except Exception as exc:
         logger.error("Model check failed", exc_info=True)
         console.print(f"\n[red]Error: {exc}[/red]")

@@ -49,9 +49,17 @@ CLI/Batch Runner
 
 ## Next Actions
 
-- New architect brief: see `TASKS/TASK-CJ-PHASE3-ARCHITECT-NEXT-SESSION.md` for the Phase 3.3 ENG5 runner session plan (metadata enforcement, artefact validation, and execute-mode runbook).
+- ENG5 runner now enforces metadata + schema compliance; consult `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` for the execute-mode checklist.
+- Architect brief (`TASKS/TASK-CJ-PHASE3-ARCHITECT-NEXT-SESSION.md`) stays as the coordination point for remaining Phase 3.3 validation + observability polish.
+- Phase 2.5 remains complete; Phase 3.3 work proceeds per the brief + runbook.
 
-Phase 2.5 remains complete; Phase 3.3 work proceeds per the architect brief.
+## Session Summary (2025-11-09) – Phase 3.3 Metadata & Artefact Hardening
+
+- **LLM Provider parity**: Added `prompt_utils.compute_prompt_sha256()` and updated the queue processor error path so every `LLMComparisonResultV1` now echoes `essay_a_id`/`essay_b_id` plus a deterministic `prompt_sha256`, even when the provider fails before returning metadata. `services/llm_provider_service/tests/unit/test_callback_publishing.py` now asserts the new behavior.
+- **Runner guarantees**: `scripts/cj_experiments_runners/eng5_np/*` now fail fast on missing metadata, dedupe comparison callbacks, annotate runner status/partial data, and emit cost + prompt-hash summaries via the CLI. Artefacts are serialized as true document blobs (instructions/prompt contents, anchor/student records with SHA256s) and idempotent manifests.
+- **Schema validation**: Added `jsonschema` dependency plus test coverage (`scripts/tests/test_eng5_np_runner.py`) to validate artefacts against `Documentation/schemas/eng5_np/assessment_run.schema.json` and to enforce the new behaviors (fail-fast, dedupe, timeout flags).
+- **Operational doc**: Authored `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md`, covering prerequisites, command sequences, monitoring hooks, and failure/retry guidance for execute mode.
+- **Tests executed**: `pdm run pytest-root services/llm_provider_service/tests/unit/test_callback_publishing.py` and `pdm run pytest-root scripts/tests/test_eng5_np_runner.py`.
 
 ## Critical Files for Next Developer
 

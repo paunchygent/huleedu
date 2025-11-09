@@ -38,7 +38,10 @@ from services.llm_provider_service.model_checker.base import (
     DiscoveredModel,
     ModelComparisonResult,
 )
-from services.llm_provider_service.model_manifest import get_manifest
+from services.llm_provider_service.model_manifest import (
+    SUPPORTED_MODELS,
+    get_model_config,
+)
 
 
 class CompatibilityReporter:
@@ -78,8 +81,10 @@ class CompatibilityReporter:
                 "breaking_changes": ["API version changed from..."]
             }
         """
-        manifest = get_manifest()
-        current_default = manifest.default_models.get(result.provider)
+        default_model_id = SUPPORTED_MODELS.default_models.get(result.provider)
+        current_default = (
+            get_model_config(result.provider, default_model_id) if default_model_id else None
+        )
 
         report: dict[str, Any] = {
             "check_date": datetime.now().isoformat() + "Z",
@@ -127,8 +132,10 @@ class CompatibilityReporter:
             - **Recommendation**: Requires compatibility testing
             - **Capabilities**: tool_use, vision, function_calling
         """
-        manifest = get_manifest()
-        current_default = manifest.default_models.get(result.provider)
+        default_model_id = SUPPORTED_MODELS.default_models.get(result.provider)
+        current_default = (
+            get_model_config(result.provider, default_model_id) if default_model_id else None
+        )
 
         lines: list[str] = [
             "# LLM Model Compatibility Report",

@@ -118,16 +118,20 @@ class Settings(SecureServiceSettings):
     # Provider-specific configurations
     # These can be overridden via environment variables or API calls
     ANTHROPIC_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="Anthropic API key for Claude models"
+        default=SecretStr(""),
+        validation_alias="ANTHROPIC_API_KEY",  # Accept unprefixed for compatibility
+        description="Anthropic API key for Claude models",
     )
     ANTHROPIC_BASE_URL: Optional[str] = None
     # DEPRECATED: Prefer using model manifest via llm_config_overrides
     # Fallback when no override specified. To be removed in future versions.
-    ANTHROPIC_DEFAULT_MODEL: str = "claude-3-5-haiku-20241022"
+    ANTHROPIC_DEFAULT_MODEL: str = "claude-haiku-4-5-20251001"
     ANTHROPIC_ENABLED: bool = True
 
     OPENAI_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="OpenAI API key for GPT models"
+        default=SecretStr(""),
+        validation_alias="OPENAI_API_KEY",  # Accept unprefixed for compatibility
+        description="OpenAI API key for GPT models",
     )
     OPENAI_BASE_URL: Optional[str] = None
     # DEPRECATED: Prefer using model manifest via llm_config_overrides
@@ -137,7 +141,9 @@ class Settings(SecureServiceSettings):
     OPENAI_ENABLED: bool = True
 
     GOOGLE_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="Google API key for Gemini models"
+        default=SecretStr(""),
+        validation_alias="GOOGLE_API_KEY",  # Accept unprefixed for compatibility
+        description="Google API key for Gemini models",
     )
     GOOGLE_PROJECT_ID: str = ""
     # DEPRECATED: Prefer using model manifest via llm_config_overrides
@@ -146,12 +152,14 @@ class Settings(SecureServiceSettings):
     GOOGLE_ENABLED: bool = True
 
     OPENROUTER_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="OpenRouter API key for various models"
+        default=SecretStr(""),
+        validation_alias="OPENROUTER_API_KEY",  # Accept unprefixed for compatibility
+        description="OpenRouter API key for various models",
     )
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     # DEPRECATED: Prefer using model manifest via llm_config_overrides
     # Fallback when no override specified. To be removed in future versions.
-    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-3-5-haiku-20241022"
+    OPENROUTER_DEFAULT_MODEL: str = "anthropic/claude-haiku-4-5-20251001"
     OPENROUTER_ENABLED: bool = True
 
     # Internal/Self-hosted Model Support

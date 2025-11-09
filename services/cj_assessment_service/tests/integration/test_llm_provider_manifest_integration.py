@@ -75,7 +75,7 @@ class TestLLMProviderManifestIntegration:
         settings.LLM_PROVIDER_SERVICE_URL = "http://localhost:8090/api/v1"
         # Note: These defaults are deprecated in favor of manifest-based selection
         settings.DEFAULT_LLM_PROVIDER = LLMProviderType.ANTHROPIC
-        settings.DEFAULT_LLM_MODEL = "claude-3-5-haiku-20241022"
+        settings.DEFAULT_LLM_MODEL = "claude-haiku-4-5-20251001"
         settings.DEFAULT_LLM_TEMPERATURE = 0.3
         return settings
 

@@ -18,13 +18,14 @@ from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
 from common_core.models.error_models import ErrorDetail
 
-from services.llm_provider_service.api_models import LLMComparisonRequest
+from services.llm_provider_service.api_models import LLMComparisonRequest, LLMConfigOverrides
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
 from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
+from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 
 
 @pytest.fixture
@@ -106,6 +107,7 @@ def sample_request() -> QueuedRequest:
         callback_topic="test.callback.topic",
         correlation_id=correlation_id,
         metadata={"test": "metadata"},
+        llm_config_overrides=LLMConfigOverrides(provider_override=LLMProviderType.OPENAI),
     )
 
     return QueuedRequest(
@@ -454,6 +456,40 @@ class TestErrorCallbackPublishing:
         event_data = envelope.data
 
         assert event_data.provider == LLMProviderType.ANTHROPIC
+
+    @pytest.mark.asyncio
+    async def test_error_callback_populates_prompt_hash_when_missing(
+        self,
+        queue_processor: QueueProcessorImpl,
+        sample_request: QueuedRequest,
+        mock_event_publisher: AsyncMock,
+    ) -> None:
+        """Ensure error callbacks synthesize prompt hashes when providers fail early."""
+
+        error_detail = ErrorDetail(
+            error_code=ErrorCode.RATE_LIMIT,
+            message="Provider throttled",
+            correlation_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            service="llm_provider_service",
+            operation="generate_comparison",
+            details={"provider": "openai"},
+        )
+        sample_error = HuleEduError(error_detail=error_detail)
+        sample_request.request_data.metadata = {}
+
+        await queue_processor._publish_callback_event_error(sample_request, sample_error)
+
+        envelope = mock_event_publisher.publish_to_topic.call_args[1]["envelope"]
+        event_data = envelope.data
+        expected_hash = compute_prompt_sha256(
+            provider=LLMProviderType.OPENAI,
+            user_prompt=sample_request.request_data.user_prompt,
+            essay_a=sample_request.request_data.essay_a,
+            essay_b=sample_request.request_data.essay_b,
+        )
+
+        assert event_data.request_metadata["prompt_sha256"] == expected_hash
 
 
 class TestCallbackTopicValidation:

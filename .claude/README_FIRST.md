@@ -161,6 +161,11 @@ pdm run typecheck-all # Type checking
 - `TASKS/TASK-CJ-PHASE3-ARCHITECT-NEXT-SESSION.md` defines the next architect-led session for Phase 3.3 (metadata enforcement, artefact validation, execute-mode runbook).
 - Critical focus: ensure `LLMComparisonResultV1` metadata is mandatory end-to-end, keep runner artefacts schema-compliant, and document the operational steps before the next ENG5 NP execute run.
 
+### 18. ENG5 Metadata Hardening & Runbook (2025-11-09)
+- Queue processor now injects `prompt_sha256` even on error callbacks via `services/llm_provider_service/prompt_utils.py` + `_publish_callback_event_error`, and unit tests cover the regression.
+- `scripts/cj_experiments_runners/eng5_np/{artefact_io,hydrator,kafka_flow,cli}.py` implement fail-fast metadata handling, duplicate suppression, manifest hashing, cost summaries, and schema-compliant document blobs; tests live in `scripts/tests/test_eng5_np_runner.py` (with `jsonschema` validation).
+- Execute-mode guidance consolidated into `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` (prereqs, commands, monitoring, failure modes).
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

@@ -32,6 +32,7 @@ from services.llm_provider_service.protocols import (
     LLMEventPublisherProtocol,
     QueueManagerProtocol,
 )
+from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.queue_models import QueuedRequest
 
 logger = create_service_logger("llm_provider_service.queue_processor")
@@ -507,6 +508,40 @@ class QueueProcessorImpl:
                 except ValueError:
                     pass
 
+            request_meta = dict(request.request_data.metadata or {})
+
+            # Ensure prompt hash is always available so downstream runners can
+            # correlate callbacks even when providers fail before returning
+            # metadata. Prefer the configured provider override, fall back to
+            # the provider embedded in the error, then the default.
+            provider_hint = fallback_provider
+            overrides = request.request_data.llm_config_overrides
+            if overrides and overrides.provider_override:
+                provider_hint = overrides.provider_override
+            elif "provider" in error.error_detail.details:
+                try:
+                    provider_hint = LLMProviderType(error.error_detail.details["provider"])
+                except ValueError:
+                    provider_hint = fallback_provider
+
+            if "prompt_sha256" not in request_meta:
+                try:
+                    request_meta["prompt_sha256"] = compute_prompt_sha256(
+                        provider=provider_hint,
+                        user_prompt=request.request_data.user_prompt,
+                        essay_a=request.request_data.essay_a,
+                        essay_b=request.request_data.essay_b,
+                    )
+                except Exception as exc:  # pragma: no cover - defensive guard
+                    logger.warning(
+                        "Failed to compute prompt hash for error callback",
+                        extra={
+                            "queue_id": str(request.queue_id),
+                            "correlation_id": str(request.correlation_id or ""),
+                            "reason": str(exc),
+                        },
+                    )
+
             # Create error callback event
             callback_event = LLMComparisonResultV1(
                 request_id=str(request.queue_id),
@@ -523,7 +558,7 @@ class QueueProcessorImpl:
                 requested_at=request.queued_at,
                 completed_at=datetime.now(timezone.utc),
                 trace_id=None,
-                request_metadata=request.request_data.metadata or {},
+                request_metadata=request_meta,
             )
 
             # Create event envelope and publish

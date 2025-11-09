@@ -41,12 +41,12 @@ class TestValidateLLMOverrides:
         """Verify validation passes for models that exist in manifest."""
         # Create a mock ModelConfig that will be returned by get_model_config
         mock_config = ModelConfig(
-            model_id="claude-3-5-haiku-20241022",
+            model_id="claude-haiku-4-5-20251001",
             provider=ProviderName.ANTHROPIC,
-            display_name="Claude 3.5 Haiku",
+            display_name="Claude Haiku 4.5",
             api_version="2023-06-01",
             structured_output_method="tool_use",  # type: ignore[arg-type]
-            max_tokens=8192,
+            max_tokens=64_000,
             release_date=None,
             is_deprecated=False,
         )
@@ -58,13 +58,13 @@ class TestValidateLLMOverrides:
         ):
             # Should not raise exception
             validate_llm_overrides(
-                provider="anthropic", model="claude-3-5-haiku-20241022"
+                provider="anthropic", model="claude-haiku-4-5-20251001"
             )
 
         # Verify manifest was queried with correct parameters (behavioral verification)
         mock_get_config.assert_called_once_with(
             ProviderName.ANTHROPIC,
-            "claude-3-5-haiku-20241022",
+            "claude-haiku-4-5-20251001",
         )
 
     def test_validate_rejects_invalid_model_id(self) -> None:
@@ -156,7 +156,7 @@ class TestBuildLLMOverrides:
         """Verify _build_llm_overrides creates valid LLMConfigOverrides."""
         result = _build_llm_overrides(
             provider="anthropic",
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             temperature=0.3,
             max_tokens=2000,
         )
@@ -164,7 +164,7 @@ class TestBuildLLMOverrides:
         assert result is not None
         assert isinstance(result, LLMConfigOverrides)
         assert result.provider_override == LLMProviderType.ANTHROPIC
-        assert result.model_override == "claude-3-5-haiku-20241022"
+        assert result.model_override == "claude-haiku-4-5-20251001"
         assert result.temperature_override == 0.3
         assert result.max_tokens_override == 2000
 
@@ -180,11 +180,11 @@ class TestBuildLLMOverrides:
         """Verify _build_llm_overrides handles partial parameter sets."""
         # Only model specified
         result = _build_llm_overrides(
-            provider=None, model="claude-3-5-haiku-20241022", temperature=None, max_tokens=None
+            provider=None, model="claude-haiku-4-5-20251001", temperature=None, max_tokens=None
         )
 
         assert result is not None
-        assert result.model_override == "claude-3-5-haiku-20241022"
+        assert result.model_override == "claude-haiku-4-5-20251001"
         assert result.provider_override is None
         assert result.temperature_override is None
         assert result.max_tokens_override is None
@@ -226,7 +226,7 @@ class TestEventComposition:
             kafka_client_id="test-client",
             llm_overrides=LLMConfigOverrides(
                 provider_override=LLMProviderType.ANTHROPIC,
-                model_override="claude-3-5-haiku-20241022",
+                model_override="claude-haiku-4-5-20251001",
                 temperature_override=0.3,
                 max_tokens_override=2000,
             ),
@@ -270,7 +270,7 @@ class TestEventComposition:
         )
         assert (
             envelope.data.llm_config_overrides.model_override
-            == "claude-3-5-haiku-20241022"
+            == "claude-haiku-4-5-20251001"
         )
         assert envelope.data.llm_config_overrides.temperature_override == 0.3
         assert envelope.data.llm_config_overrides.max_tokens_override == 2000

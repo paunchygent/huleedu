@@ -5,6 +5,7 @@ import json
 import uuid
 from pathlib import Path
 
+import jsonschema
 import pytest
 from common_core import LLMProviderType
 from common_core.domain_enums import CourseCode, Language
@@ -50,18 +51,31 @@ def _write_base_artefact(tmp_path: Path) -> Path:
         "inputs": {
             "instructions": {
                 "source_path": "instructions.md",
-                "checksum": None,
-                "exists": True,
-                "size_bytes": 1,
+                "checksum": "0" * 64,
+                "content": "instructions",
             },
             "prompt_reference": {
                 "source_path": "prompt.md",
-                "checksum": None,
-                "exists": True,
-                "size_bytes": 1,
+                "checksum": "f" * 64,
+                "content": "prompt",
             },
-            "anchors": [],
-            "students": [],
+            "anchors": [
+                {
+                    "anchor_id": "ANCHOR_1",
+                    "file_name": "anchor.docx",
+                    "grade": "A",
+                    "source_path": "anchor.docx",
+                    "checksum": "1" * 64,
+                }
+            ],
+            "students": [
+                {
+                    "essay_id": "STUDENT_1",
+                    "file_name": "student.docx",
+                    "source_path": "student.docx",
+                    "checksum": "2" * 64,
+                }
+            ],
         },
         "llm_comparisons": [],
         "bt_summary": [],
@@ -75,6 +89,15 @@ def _write_base_artefact(tmp_path: Path) -> Path:
                 "pdm": "test",
                 "os": "posix",
                 "docker_compose": "n/a",
+            },
+            "runner_status": {
+                "partial_data": False,
+                "timeout_seconds": 0.0,
+                "observed_events": {
+                    "llm_comparisons": 0,
+                    "assessment_results": 0,
+                    "completions": 0,
+                },
             },
         },
     }
@@ -161,7 +184,11 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
     data = json.loads(output_file.read_text(encoding="utf-8"))
 
     assert data["metadata"]["runner_mode"] == RunnerMode.DRY_RUN.value
-    assert data["inputs"]["instructions"]["exists"] is True
+    assert data["inputs"]["instructions"]["content"] == "instructions"
+    assert data["inputs"]["prompt_reference"]["checksum"]
+    assert len(data["inputs"]["anchors"]) >= 1
+    assert len(data["inputs"]["students"]) >= 1
+    assert data["validation"]["runner_status"]["partial_data"] is False
 
 
 @pytest.mark.skipif(
@@ -268,8 +295,13 @@ def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
     assert len(data["llm_comparisons"]) == 1
     comparison = data["llm_comparisons"][0]
     assert comparison["winner_id"] == "A1"
+    assert comparison["request_id"] == "req-1"
+    assert comparison["status"] == "succeeded"
     assert data["costs"]["total_usd"] == pytest.approx(0.25)
     assert data["validation"]["manifest"]
+    assert (
+        data["validation"]["runner_status"]["observed_events"]["llm_comparisons"] == 1
+    )
 
 
 def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
@@ -323,3 +355,162 @@ def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
     data = json.loads(artefact_path.read_text(encoding="utf-8"))
     assert data["bt_summary"][0]["comparison_count"] == 3
     assert data["grade_projections"][0]["probabilities"]["A"] == pytest.approx(0.8)
+    assert (
+        data["validation"]["runner_status"]["observed_events"]["assessment_results"] == 1
+    )
+
+
+def test_hydrator_deduplicates_comparison_events(tmp_path: Path) -> None:
+    artefact_path = _write_base_artefact(tmp_path)
+    hydrator = AssessmentRunHydrator(
+        artefact_path=artefact_path,
+        output_dir=tmp_path,
+        grade_scale="eng5_np_legacy_9_step",
+        batch_id="batch-dup",
+    )
+
+    llm_event = LLMComparisonResultV1(
+        request_id="req-dup",
+        correlation_id=uuid.uuid4(),
+        winner=EssayComparisonWinner.ESSAY_B,
+        justification="B wins",
+        confidence=3.1,
+        error_detail=None,
+        provider=LLMProviderType.OPENAI,
+        model="gpt-4o-mini",
+        response_time_ms=400,
+        token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+        cost_estimate=0.05,
+        requested_at=dt.datetime.now(dt.timezone.utc),
+        completed_at=dt.datetime.now(dt.timezone.utc),
+        trace_id="trace",
+        request_metadata={
+            "batch_id": "batch-dup",
+            "essay_a_id": "A1",
+            "essay_b_id": "B1",
+            "prompt_sha256": "b" * 64,
+        },
+    )
+    envelope = EventEnvelope[LLMComparisonResultV1](
+        event_type=topic_name(ProcessingEvent.LLM_COMPARISON_RESULT),
+        event_timestamp=dt.datetime.now(dt.timezone.utc),
+        source_service="test",
+        correlation_id=llm_event.correlation_id,
+        data=llm_event,
+    )
+
+    hydrator.apply_llm_comparison(envelope)
+    hydrator.apply_llm_comparison(envelope)
+
+    data = json.loads(artefact_path.read_text(encoding="utf-8"))
+    assert len(data["llm_comparisons"]) == 1
+
+
+def test_hydrator_raises_when_prompt_hash_missing(tmp_path: Path) -> None:
+    artefact_path = _write_base_artefact(tmp_path)
+    hydrator = AssessmentRunHydrator(
+        artefact_path=artefact_path,
+        output_dir=tmp_path,
+        grade_scale="eng5_np_legacy_9_step",
+        batch_id="batch-missing",
+    )
+
+    llm_event = LLMComparisonResultV1(
+        request_id="req-missing",
+        correlation_id=uuid.uuid4(),
+        winner=EssayComparisonWinner.ESSAY_A,
+        justification="A wins",
+        confidence=4.2,
+        error_detail=None,
+        provider=LLMProviderType.OPENAI,
+        model="gpt-4o-mini",
+        response_time_ms=500,
+        token_usage=TokenUsage(prompt_tokens=20, completion_tokens=10, total_tokens=30),
+        cost_estimate=0.1,
+        requested_at=dt.datetime.now(dt.timezone.utc),
+        completed_at=dt.datetime.now(dt.timezone.utc),
+        trace_id="trace",
+        request_metadata={
+            "batch_id": "batch-missing",
+            "essay_a_id": "A1",
+            "essay_b_id": "B1",
+        },
+    )
+    envelope = EventEnvelope[LLMComparisonResultV1](
+        event_type=topic_name(ProcessingEvent.LLM_COMPARISON_RESULT),
+        event_timestamp=dt.datetime.now(dt.timezone.utc),
+        source_service="test",
+        correlation_id=llm_event.correlation_id,
+        data=llm_event,
+    )
+
+    with pytest.raises(ValueError):
+        hydrator.apply_llm_comparison(envelope)
+
+
+def test_stub_validates_against_schema(tmp_path: Path) -> None:
+    repo_root = repo_root_from_package()
+    schema_path = (
+        repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
+    )
+    if not schema_path.exists():
+        pytest.skip("Schema file missing")
+
+    role_models_root = tmp_path / "ROLE_MODELS"
+    role_models_root.mkdir(parents=True)
+    instructions = role_models_root / "instructions.md"
+    instructions.write_text("instructions", encoding="utf-8")
+    prompt = role_models_root / "prompt.md"
+    prompt.write_text("prompt", encoding="utf-8")
+    anchors_dir = role_models_root / "anchor_essays"
+    anchors_dir.mkdir()
+    (anchors_dir / "A1.docx").write_text("anchor", encoding="utf-8")
+    students_dir = role_models_root / "student_essays"
+    students_dir.mkdir()
+    (students_dir / "S1.docx").write_text("student", encoding="utf-8")
+
+    paths = RunnerPaths(
+        repo_root=tmp_path,
+        role_models_root=role_models_root,
+        instructions_path=instructions,
+        prompt_path=prompt,
+        anchors_csv=role_models_root / "ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.csv",
+        anchors_xlsx=role_models_root / "ANCHOR_ESSAYS_BAYESIAN_INFERENCE_DATA.xlsx",
+        anchor_docs_dir=anchors_dir,
+        student_docs_dir=students_dir,
+        schema_path=schema_path,
+        artefact_output_dir=tmp_path / "output",
+    )
+
+    inventory = collect_inventory(paths)
+    settings = RunnerSettings(
+        assignment_id=uuid.uuid4(),
+        course_id=uuid.uuid4(),
+        grade_scale="eng5_np_legacy_9_step",
+        mode=RunnerMode.DRY_RUN,
+        use_kafka=False,
+        output_dir=tmp_path / "output",
+        runner_version="0.1.0",
+        git_sha="deadbeef",
+        batch_id="batch-schema",
+        user_id="user",
+        org_id="org",
+        course_code=CourseCode.ENG5,
+        language=Language.ENGLISH,
+        correlation_id=uuid.uuid4(),
+        kafka_bootstrap="kafka:9092",
+        kafka_client_id="test-client",
+        llm_overrides=None,
+        await_completion=False,
+        completion_timeout=1.0,
+    )
+
+    artefact_path = write_stub_artefact(
+        settings=settings,
+        inventory=inventory,
+        schema=json.loads(schema_path.read_text(encoding="utf-8")),
+    )
+
+    instance = json.loads(artefact_path.read_text(encoding="utf-8"))
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    jsonschema.validate(instance=instance, schema=schema)

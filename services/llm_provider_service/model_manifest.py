@@ -129,37 +129,9 @@ class ModelRegistry(BaseModel):
 
 ANTHROPIC_MODELS = [
     ModelConfig(
-        model_id="claude-3-5-haiku-20241022",
+        model_id="claude-haiku-4-5-20251001",
         provider=ProviderName.ANTHROPIC,
-        display_name="Claude 3.5 Haiku",
-        api_version="2023-06-01",
-        structured_output_method=StructuredOutputMethod.TOOL_USE,
-        capabilities={
-            "tool_use": True,
-            "vision": True,
-            "function_calling": True,
-            "json_mode": True,
-        },
-        max_tokens=8192,
-        context_window=200_000,
-        supports_streaming=True,
-        release_date=date(2024, 10, 22),
-        is_deprecated=False,
-        cost_per_1k_input_tokens=0.00080,  # $0.80 per million
-        cost_per_1k_output_tokens=0.00400,  # $4.00 per million
-        recommended_for=[
-            "comparison",
-            "analysis",
-            "structured_output",
-            "cost_sensitive_workloads",
-        ],
-        notes="Fast, cost-effective model with strong reasoning capabilities. "
-        "Excellent for essay comparisons and structured output tasks.",
-    ),
-    ModelConfig(
-        model_id="claude-3-5-sonnet-20241022",
-        provider=ProviderName.ANTHROPIC,
-        display_name="Claude 3.5 Sonnet",
+        display_name="Claude Haiku 4.5",
         api_version="2023-06-01",
         structured_output_method=StructuredOutputMethod.TOOL_USE,
         capabilities={
@@ -169,16 +141,54 @@ ANTHROPIC_MODELS = [
             "json_mode": True,
             "extended_thinking": True,
         },
-        max_tokens=8192,
-        context_window=200_000,
+        max_tokens=64_000,  # 64K max output
+        context_window=200_000,  # 200K context
         supports_streaming=True,
-        release_date=date(2024, 10, 22),
+        release_date=date(2025, 10, 1),
         is_deprecated=False,
-        cost_per_1k_input_tokens=0.00300,  # $3.00 per million
-        cost_per_1k_output_tokens=0.01500,  # $15.00 per million
-        recommended_for=["complex_analysis", "high_quality_comparison", "reasoning"],
-        notes="Higher quality model with enhanced reasoning. Use when quality "
-        "matters more than cost.",
+        cost_per_1k_input_tokens=0.001,  # $1 per million
+        cost_per_1k_output_tokens=0.005,  # $5 per million
+        recommended_for=[
+            "comparison",
+            "analysis",
+            "structured_output",
+            "cost_sensitive_workloads",
+            "high_volume",
+        ],
+        notes="Fastest model with near-frontier intelligence. 64K max output, "
+        "vision support, and extended thinking. Ideal for cost-effective "
+        "high-volume essay comparisons.",
+    ),
+    ModelConfig(
+        model_id="claude-sonnet-4-5-20250929",
+        provider=ProviderName.ANTHROPIC,
+        display_name="Claude Sonnet 4.5",
+        api_version="2023-06-01",
+        structured_output_method=StructuredOutputMethod.TOOL_USE,
+        capabilities={
+            "tool_use": True,
+            "vision": True,
+            "function_calling": True,
+            "json_mode": True,
+            "extended_thinking": True,
+        },
+        max_tokens=64_000,  # 64K max output
+        context_window=200_000,  # 200K context (1M beta available)
+        supports_streaming=True,
+        release_date=date(2025, 9, 29),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.003,  # $3 per million
+        cost_per_1k_output_tokens=0.015,  # $15 per million
+        recommended_for=[
+            "complex_analysis",
+            "high_quality_comparison",
+            "reasoning",
+            "complex_agents",
+            "coding",
+        ],
+        notes="Smartest model for complex agents and coding. 64K max output, "
+        "vision support, extended thinking. Use when quality and advanced "
+        "reasoning matter more than cost.",
     ),
 ]
 
@@ -187,6 +197,28 @@ ANTHROPIC_MODELS = [
 # =============================================================================
 
 OPENAI_MODELS = [
+    ModelConfig(
+        model_id="gpt-5-2025-08-07",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-5",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=272_000,  # 272K context window
+        supports_streaming=True,
+        release_date=date(2025, 8, 7),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00125,  # $1.25 per million
+        cost_per_1k_output_tokens=0.01000,  # $10.00 per million
+        recommended_for=["complex_analysis", "reasoning", "general_purpose"],
+        notes="Latest GPT-5 flagship model. 272K context window, "
+        "strong reasoning and analysis capabilities.",
+    ),
     ModelConfig(
         model_id="gpt-5-mini-2025-08-07",
         provider=ProviderName.OPENAI,
@@ -199,14 +231,170 @@ OPENAI_MODELS = [
             "response_format_schema": True,
         },
         max_tokens=16384,
-        context_window=128_000,
+        context_window=272_000,  # 272K context window
         supports_streaming=True,
         release_date=date(2025, 8, 7),
         is_deprecated=False,
-        cost_per_1k_input_tokens=0.00150,  # Placeholder - verify actual pricing
-        cost_per_1k_output_tokens=0.00600,  # Placeholder - verify actual pricing
-        recommended_for=["comparison", "general_purpose"],
-        notes="Fast, cost-effective model. Pricing to be verified against OpenAI pricing page.",
+        cost_per_1k_input_tokens=0.00025,  # $0.25 per million
+        cost_per_1k_output_tokens=0.00200,  # $2.00 per million
+        recommended_for=["comparison", "general_purpose", "cost_effective"],
+        notes="Cost-effective GPT-5 model. Best balance of performance and price. "
+        "272K context window.",
+    ),
+    ModelConfig(
+        model_id="gpt-5-nano-2025-08-07",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-5 Nano",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=272_000,  # 272K context window
+        supports_streaming=True,
+        release_date=date(2025, 8, 7),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00005,  # $0.05 per million
+        cost_per_1k_output_tokens=0.00040,  # $0.40 per million
+        recommended_for=["high_volume", "cost_sensitive_workloads", "simple_tasks"],
+        notes="Smallest, cheapest GPT-5 model. Ideal for high-volume, "
+        "cost-sensitive workloads. 272K context window.",
+    ),
+    ModelConfig(
+        model_id="gpt-5-pro-2025-10-06",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-5 Pro",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=272_000,  # 272K context window
+        supports_streaming=True,
+        release_date=date(2025, 10, 6),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.01500,  # $15.00 per million
+        cost_per_1k_output_tokens=0.12000,  # $120.00 per million
+        recommended_for=["complex_reasoning", "expert_analysis", "premium_quality"],
+        notes="Premium flagship GPT-5 model. Highest quality and reasoning. "
+        "Use when quality matters more than cost.",
+    ),
+    ModelConfig(
+        model_id="gpt-4.1-2025-04-14",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-4.1",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=1_047_576,  # ~1M context window
+        supports_streaming=True,
+        release_date=date(2025, 4, 14),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00200,  # $2.00 per million
+        cost_per_1k_output_tokens=0.00800,  # $8.00 per million
+        recommended_for=["long_context", "analysis", "general_purpose"],
+        notes="GPT-4.1 with 1M context window. 26% less expensive than GPT-4o "
+        "for median queries.",
+    ),
+    ModelConfig(
+        model_id="gpt-4.1-mini-2025-04-14",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-4.1 Mini",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=1_047_576,  # ~1M context window
+        supports_streaming=True,
+        release_date=date(2025, 4, 14),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00040,  # $0.40 per million
+        cost_per_1k_output_tokens=0.00160,  # $1.60 per million
+        recommended_for=["long_context", "cost_effective", "general_purpose"],
+        notes="Cost-effective GPT-4.1 with 1M context window. Good balance "
+        "of performance and price.",
+    ),
+    ModelConfig(
+        model_id="gpt-4.1-nano-2025-04-14",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-4.1 Nano",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+        },
+        max_tokens=16384,
+        context_window=1_047_576,  # ~1M context window
+        supports_streaming=True,
+        release_date=date(2025, 4, 14),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00010,  # $0.10 per million
+        cost_per_1k_output_tokens=0.00040,  # $0.40 per million
+        recommended_for=["long_context", "high_volume", "cost_sensitive_workloads"],
+        notes="Cheapest GPT-4.1 model with 1M context window. Ideal for "
+        "cost-sensitive long-context workloads.",
+    ),
+    ModelConfig(
+        model_id="gpt-4o-2024-11-20",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-4o",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+            "vision": True,
+        },
+        max_tokens=16384,
+        context_window=128_000,
+        supports_streaming=True,
+        release_date=date(2024, 11, 20),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00250,  # $2.50 per million
+        cost_per_1k_output_tokens=0.01000,  # $10.00 per million
+        recommended_for=["multimodal", "vision", "analysis"],
+        notes="Latest GPT-4o multimodal model. Supports vision and image understanding.",
+    ),
+    ModelConfig(
+        model_id="gpt-4o-mini-2024-07-18",
+        provider=ProviderName.OPENAI,
+        display_name="GPT-4o Mini",
+        api_version="v1",
+        structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
+        capabilities={
+            "function_calling": True,
+            "json_mode": True,
+            "response_format_schema": True,
+            "vision": True,
+        },
+        max_tokens=16384,
+        context_window=128_000,
+        supports_streaming=True,
+        release_date=date(2024, 7, 18),
+        is_deprecated=False,
+        cost_per_1k_input_tokens=0.00015,  # $0.15 per million
+        cost_per_1k_output_tokens=0.00060,  # $0.60 per million
+        recommended_for=["multimodal", "vision", "cost_effective"],
+        notes="Cost-effective GPT-4o model with vision support. Over 60% cheaper "
+        "than GPT-3.5 Turbo.",
     ),
 ]
 
@@ -245,22 +433,22 @@ GOOGLE_MODELS = [
 
 OPENROUTER_MODELS = [
     ModelConfig(
-        model_id="anthropic/claude-3-5-haiku-20241022",
+        model_id="anthropic/claude-haiku-4-5-20251001",
         provider=ProviderName.OPENROUTER,
-        display_name="Claude 3.5 Haiku (via OpenRouter)",
+        display_name="Claude Haiku 4.5 (via OpenRouter)",
         api_version="v1",
         structured_output_method=StructuredOutputMethod.JSON_OBJECT,
         capabilities={
             "tool_use": False,  # OpenRouter may not support all features
             "json_mode": True,
         },
-        max_tokens=8192,
+        max_tokens=64_000,
         context_window=200_000,
         supports_streaming=True,
-        release_date=date(2024, 10, 22),
+        release_date=date(2025, 10, 1),
         is_deprecated=False,
-        cost_per_1k_input_tokens=0.00080,  # OpenRouter pricing may differ
-        cost_per_1k_output_tokens=0.00400,  # OpenRouter pricing may differ
+        cost_per_1k_input_tokens=0.001,  # OpenRouter pricing may differ
+        cost_per_1k_output_tokens=0.005,  # OpenRouter pricing may differ
         recommended_for=["fallback", "redundancy"],
         notes="Access to Anthropic models via OpenRouter. Conditional feature support "
         "based on model capabilities.",
@@ -280,10 +468,10 @@ SUPPORTED_MODELS: ModelRegistry = ModelRegistry(
         ProviderName.MOCK: [],  # Mock provider has no real models
     },
     default_models={
-        ProviderName.ANTHROPIC: "claude-3-5-haiku-20241022",
+        ProviderName.ANTHROPIC: "claude-haiku-4-5-20251001",
         ProviderName.OPENAI: "gpt-5-mini-2025-08-07",
         ProviderName.GOOGLE: "gemini-2.5-flash-preview-05-20",
-        ProviderName.OPENROUTER: "anthropic/claude-3-5-haiku-20241022",
+        ProviderName.OPENROUTER: "anthropic/claude-haiku-4-5-20251001",
         ProviderName.MOCK: "",  # Mock has no default
     },
 )
@@ -311,12 +499,12 @@ def get_model_config(provider: ProviderName, model_id: str | None = None) -> Mod
         >>> # Get default Anthropic model
         >>> config = get_model_config(ProviderName.ANTHROPIC)
         >>> config.model_id
-        'claude-3-5-haiku-20241022'
+        'claude-haiku-4-5-20251001'
 
         >>> # Get specific model
-        >>> config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-sonnet-20241022")
+        >>> config = get_model_config(ProviderName.ANTHROPIC, "claude-sonnet-4-5-20250929")
         >>> config.display_name
-        'Claude 3.5 Sonnet'
+        'Claude Sonnet 4.5'
     """
     if provider not in SUPPORTED_MODELS.models:
         raise ValueError(

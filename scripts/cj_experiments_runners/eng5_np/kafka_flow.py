@@ -91,6 +91,7 @@ class AssessmentEventCollector:
         self._rich_observed = False
         self._completion_observed = False
         self._error: Exception | None = None
+        self._started_at: float | None = None
 
     async def consume(self) -> None:
         from aiokafka import AIOKafkaConsumer
@@ -112,19 +113,24 @@ class AssessmentEventCollector:
         )
 
         await consumer.start()
+        loop = asyncio.get_event_loop()
+        self._started_at = loop.time()
         self._ready.set()
-        deadline = asyncio.get_event_loop().time() + self.settings.completion_timeout
+        deadline = loop.time() + self.settings.completion_timeout
 
         try:
             while not self._stop.is_set():
                 if self._rich_observed:
                     break
-                remaining = deadline - asyncio.get_event_loop().time()
+                remaining = deadline - loop.time()
                 if remaining <= 0:
                     typer.echo(
                         "Timed out waiting for CJ assessment results; captured partial data.",
                         err=True,
                     )
+                    elapsed = self._elapsed_time()
+                    if elapsed is not None:
+                        self.hydrator.mark_timeout(elapsed)
                     break
 
                 batches = await consumer.getmany(timeout_ms=1000, max_records=50)
@@ -174,6 +180,7 @@ class AssessmentEventCollector:
                 return False
             write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
             self._completion_observed = True
+            self.hydrator.record_completion_seen()
             return True
 
         if topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
@@ -185,6 +192,11 @@ class AssessmentEventCollector:
             return True
 
         return False
+
+    def _elapsed_time(self) -> float | None:
+        if self._started_at is None:
+            return None
+        return asyncio.get_event_loop().time() - self._started_at
 
     async def wait_until_ready(self) -> None:
         await self._ready.wait()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 from pathlib import Path
@@ -321,30 +322,73 @@ def main(
         if settings.await_completion and not settings.use_kafka:
             typer.echo("--await-completion ignored because Kafka publishing is disabled.", err=True)
 
-        try:
-            if settings.await_completion and settings.use_kafka:
-                asyncio.run(
-                    run_publish_and_capture(
-                        envelope=envelope,
-                        settings=settings,
-                        hydrator=hydrator,
+        if settings.use_kafka:
+            try:
+                if settings.await_completion:
+                    asyncio.run(
+                        run_publish_and_capture(
+                            envelope=envelope,
+                            settings=settings,
+                            hydrator=hydrator,
+                        )
                     )
-                )
-            elif settings.use_kafka:
-                asyncio.run(publish_envelope_to_kafka(envelope=envelope, settings=settings))
+                    _print_run_summary(artefact_path)
+                else:
+                    asyncio.run(publish_envelope_to_kafka(envelope=envelope, settings=settings))
+                    typer.echo(
+                        "Kafka publish succeeded -> topic "
+                        f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+                    )
+            except Exception as exc:  # pragma: no cover - side effect only
                 typer.echo(
-                    "Kafka publish succeeded -> topic "
-                    f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+                    f"Kafka publish failed ({exc.__class__.__name__}: {exc}). "
+                    "Use --no-kafka to skip publishing.",
+                    err=True,
                 )
-            else:
-                typer.echo("Kafka disabled; request not published.")
-        except Exception as exc:  # pragma: no cover - side effect only
+                raise
+        else:
+            typer.echo("Kafka disabled; request not published.")
+
+
+def _print_run_summary(artefact_path: Path) -> None:
+    """Emit a concise summary of the hydrated artefact for operator awareness."""
+
+    try:
+        data = json.loads(artefact_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:  # pragma: no cover - defensive
+        typer.echo(f"⚠️  Artefact {artefact_path} missing; skipping summary", err=True)
+        return
+
+    comparisons = len(data.get("llm_comparisons", []))
+    total_cost = data.get("costs", {}).get("total_usd", 0.0)
+    typer.echo(
+        f"ENG5 NP run captured {comparisons} comparisons; total LLM cost ${total_cost:.4f}"
+    )
+
+    for entry in data.get("costs", {}).get("token_counts", []):
+        provider = entry.get("provider")
+        model = entry.get("model")
+        typer.echo(
+            "  · "
+            f"{provider}::{model}: {entry.get('prompt_tokens', 0)} prompt / "
+            f"{entry.get('completion_tokens', 0)} completion tokens, ${entry.get('usd', 0.0):.4f}"
+        )
+
+    runner_status = data.get("validation", {}).get("runner_status")
+    if runner_status:
+        if runner_status.get("partial_data"):
             typer.echo(
-                f"Kafka publish failed ({exc.__class__.__name__}: {exc}). "
-                "Use --no-kafka to skip publishing.",
+                "⚠️  Runner exited with partial data; timeout "
+                f"{runner_status.get('timeout_seconds', 0.0)}s",
                 err=True,
             )
-            raise
+        observed = runner_status.get("observed_events", {})
+        typer.echo(
+            "Observed events -> "
+            f"comparisons: {observed.get('llm_comparisons', 0)}, "
+            f"assessment_results: {observed.get('assessment_results', 0)}, "
+            f"completions: {observed.get('completions', 0)}"
+        )
 
 
 if __name__ == "__main__":
