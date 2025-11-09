@@ -18,6 +18,7 @@ from services.llm_provider_service.exceptions import (
     raise_rate_limit_error,
 )
 from services.llm_provider_service.internal_models import LLMProviderResponse
+from services.llm_provider_service.model_manifest import ProviderName, get_model_config
 from services.llm_provider_service.protocols import LLMProviderProtocol, LLMRetryManagerProtocol
 from services.llm_provider_service.response_validator import validate_and_normalize_response
 
@@ -169,33 +170,72 @@ class OpenAIProviderImpl(LLMProviderProtocol):
         )
         max_tokens = max_tokens_override or self.settings.LLM_DEFAULT_MAX_TOKENS
 
-        # Configure structured output with simplified JSON schema
-        payload = {
+        # Get model configuration to check parameter compatibility
+        model_config = get_model_config(ProviderName.OPENAI, model)
+
+        # Build base payload with required fields
+        payload: dict[str, Any] = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "comparison",
-                    "strict": False,  # Allow flexible parsing for faster processing
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
-                            "justification": {
-                                "type": "string",
-                                "maxLength": 50,
-                                "description": "Brief explanation (max 50 chars)",
-                            },
-                            "confidence": {"type": "number", "minimum": 1, "maximum": 5},
+        }
+
+        # Conditionally add max_tokens parameter based on model capability
+        if model_config.uses_max_completion_tokens:
+            payload["max_completion_tokens"] = max_tokens
+            logger.info(
+                "Using max_completion_tokens parameter for model",
+                extra={
+                    "model": model,
+                    "max_completion_tokens": max_tokens,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+        else:
+            payload["max_tokens"] = max_tokens
+
+        # Conditionally add temperature if model supports it
+        if model_config.supports_temperature:
+            payload["temperature"] = temperature
+        else:
+            logger.info(
+                "Omitting temperature parameter - model does not support it",
+                extra={
+                    "model": model,
+                    "requested_temperature": temperature,
+                    "correlation_id": str(correlation_id),
+                },
+            )
+
+        # Conditionally add top_p if model supports it (if we ever add it to the API)
+        # Note: Currently we don't expose top_p in the API, but this is here for completeness
+        if model_config.supports_top_p:
+            # payload["top_p"] = top_p  # Uncomment when we add top_p parameter
+            pass
+        else:
+            # Log if we try to use top_p with a model that doesn't support it
+            pass
+
+        # Add response_format for structured output
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "comparison",
+                "strict": False,  # Allow flexible parsing for faster processing
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "winner": {"type": "string", "enum": ["Essay A", "Essay B"]},
+                        "justification": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "description": "Brief explanation (max 50 chars)",
                         },
-                        "required": ["winner", "justification", "confidence"],
+                        "confidence": {"type": "number", "minimum": 1, "maximum": 5},
                     },
+                    "required": ["winner", "justification", "confidence"],
                 },
             },
         }

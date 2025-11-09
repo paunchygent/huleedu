@@ -161,14 +161,62 @@ async with session.post(
     # result contains: winner, justification, confidence (1-5 scale)
 ```
 
-## Model Manifest Integration
+## Model Manifest
 
-### Manifest Query (`model_manifest.py:74-350`)
+### Structure (Modularized)
+```
+manifest/
+  types.py          # ModelConfig, ProviderName, StructuredOutputMethod
+  openai.py         # 9 OpenAI models + validators
+  anthropic.py      # 2 Claude models + validators
+  google.py         # 1 Gemini model + validators
+  openrouter.py     # 1 OpenRouter model + validators
+  __init__.py       # Aggregator + helper functions
+model_manifest.py   # Backward-compatible re-export layer
+```
+
+### Parameter Compatibility (NEW)
+```python
+# ModelConfig now includes parameter support flags
+config.supports_temperature         # bool - GPT-5: False, GPT-4.1/4o: True
+config.supports_top_p               # bool
+config.supports_frequency_penalty   # bool
+config.supports_presence_penalty    # bool
+config.uses_max_completion_tokens   # bool - reasoning models: True
+```
+
+### Provider Implementation
+```python
+# OpenAI provider conditionally sends parameters based on model capabilities
+# openai_provider_impl.py:173-241
+model_config = get_model_config(ProviderName.OPENAI, model)
+if model_config.supports_temperature:
+    payload["temperature"] = temperature  # GPT-5: omitted
+else:
+    logger.info("Omitting temperature - model does not support")
+```
+
+### Query API
 ```python
 from services.llm_provider_service.model_manifest import get_model_config, ProviderName
 
-config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
-# Returns: ModelConfig(model_id, display_name, max_tokens, release_date, is_deprecated, ...)
+config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
+# Returns: ModelConfig with all capabilities, pricing, performance metadata
+```
+
+### Admin CLI
+```bash
+# List models with parameter compatibility
+pdm run llm-admin list-models --provider openai
+
+# Show detailed capabilities for specific model
+pdm run llm-admin show-capabilities --provider openai --model gpt-5-mini-2025-08-07
+
+# Dry-run: preview API payload (no network call)
+pdm run llm-admin dry-run-payload --provider openai --model gpt-5-mini-2025-08-07 --temperature 0.7
+
+# Test model with real API call (requires OPENAI_API_KEY)
+pdm run llm-admin call --provider openai --model gpt-4o-mini-2024-07-18 --essay-a "A" --essay-b "B"
 ```
 
 ### Building LLMConfigOverrides

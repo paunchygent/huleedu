@@ -176,7 +176,7 @@ class TestGetModelConfig:
 
         assert config.provider == ProviderName.ANTHROPIC
         assert config.model_id == "claude-haiku-4-5-20251001"
-        assert config.display_name == "Claude 3.5 Haiku"
+        assert config.display_name == "Claude Haiku 4.5"
         assert config.api_version == "2023-06-01"
         assert config.structured_output_method == StructuredOutputMethod.TOOL_USE
 
@@ -349,11 +349,11 @@ class TestModelMetadata:
         """Anthropic Haiku should have complete metadata."""
         config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
-        assert config.release_date == date(2024, 10, 22)
+        assert config.release_date == date(2025, 10, 1)
         assert config.is_deprecated is False
         assert config.deprecation_date is None
-        assert config.cost_per_1k_input_tokens == 0.00080
-        assert config.cost_per_1k_output_tokens == 0.00400
+        assert config.cost_per_1k_input_tokens == 0.001
+        assert config.cost_per_1k_output_tokens == 0.005
         assert "comparison" in config.recommended_for
         assert len(config.notes) > 0
 
@@ -371,5 +371,5 @@ class TestModelMetadata:
         config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 
         assert config.context_window == 200_000
-        assert config.max_tokens == 8192
+        assert config.max_tokens == 64_000
         assert config.supports_streaming is True

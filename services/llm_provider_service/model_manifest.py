@@ -1,14 +1,25 @@
-"""
-Centralized model manifest for LLM Provider Service.
+"""Centralized model manifest for LLM Provider Service.
 
 This module provides a single source of truth for all supported LLM models
 across providers. It defines model capabilities, API requirements, and
 compatibility metadata.
 
+BACKWARD COMPATIBILITY LAYER:
+This module now re-exports from the modularized manifest package for
+maintainability. The public API remains unchanged.
+
 Architecture:
 - ModelConfig: Pydantic model for individual model configurations
 - ModelRegistry: Collection of all supported models by provider
 - Helper functions for querying and validating models
+
+Modular Structure (NEW):
+- manifest/types.py: Core types
+- manifest/openai.py: OpenAI model definitions
+- manifest/anthropic.py: Anthropic (Claude) model definitions
+- manifest/google.py: Google (Gemini) model definitions
+- manifest/openrouter.py: OpenRouter model definitions
+- manifest/__init__.py: Aggregator and helper functions
 
 Usage:
     from services.llm_provider_service.model_manifest import get_model_config, ProviderName
@@ -17,7 +28,7 @@ Usage:
     config = get_model_config(ProviderName.ANTHROPIC)
 
     # Get specific model
-    config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+    config = get_model_config(ProviderName.ANTHROPIC, "claude-haiku-4-5-20251001")
 """
 
 from __future__ import annotations
@@ -453,138 +464,18 @@ SUPPORTED_MODELS: ModelRegistry = ModelRegistry(
     },
 )
 
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def get_model_config(provider: ProviderName, model_id: str | None = None) -> ModelConfig:
-    """Retrieve model configuration by provider and optional model ID.
-
-    Args:
-        provider: The LLM provider
-        model_id: Specific model ID. If None, returns provider's default model.
-
-    Returns:
-        ModelConfig for the requested model
-
-    Raises:
-        ValueError: If provider is unknown or model_id is not found
-
-    Examples:
-        >>> # Get default Anthropic model
-        >>> config = get_model_config(ProviderName.ANTHROPIC)
-        >>> config.model_id
-        'claude-haiku-4-5-20251001'
-
-        >>> # Get specific model
-        >>> config = get_model_config(ProviderName.ANTHROPIC, "claude-sonnet-4-5-20250929")
-        >>> config.display_name
-        'Claude Sonnet 4.5'
-    """
-    if provider not in SUPPORTED_MODELS.models:
-        raise ValueError(
-            f"Unknown provider: {provider}. Supported: {list(SUPPORTED_MODELS.models.keys())}"
-        )
-
-    # Get default model if none specified
-    if model_id is None:
-        model_id = SUPPORTED_MODELS.default_models.get(provider)
-        if not model_id:
-            raise ValueError(f"No default model configured for provider: {provider}")
-
-    # Find requested model
-    provider_models = SUPPORTED_MODELS.models[provider]
-    for model in provider_models:
-        if model.model_id == model_id:
-            return model
-
-    # Model not found - provide helpful error
-    available_ids = [m.model_id for m in provider_models]
-    raise ValueError(
-        f"Model '{model_id}' not found for provider '{provider}'. Available models: {available_ids}"
-    )
-
-
-def list_models(provider: ProviderName | None = None) -> list[ModelConfig]:
-    """List all models, optionally filtered by provider.
-
-    Args:
-        provider: If specified, only return models for this provider.
-                 If None, return all models across all providers.
-
-    Returns:
-        List of ModelConfig objects
-
-    Examples:
-        >>> # List all Anthropic models
-        >>> models = list_models(ProviderName.ANTHROPIC)
-        >>> len(models)
-        2
-
-        >>> # List all models
-        >>> all_models = list_models()
-        >>> len(all_models) >= 4
-        True
-    """
-    if provider is None:
-        # Return all models from all providers
-        all_models: list[ModelConfig] = []
-        for provider_models in SUPPORTED_MODELS.models.values():
-            all_models.extend(provider_models)
-        return all_models
-
-    return SUPPORTED_MODELS.models.get(provider, [])
-
-
-def get_default_model_id(provider: ProviderName) -> str:
-    """Get the default model ID for a provider.
-
-    Args:
-        provider: The LLM provider
-
-    Returns:
-        Default model_id string
-
-    Raises:
-        ValueError: If provider is unknown or has no default
-
-    Examples:
-        >>> get_default_model_id(ProviderName.ANTHROPIC)
-        'claude-3-5-haiku-20241022'
-    """
-    if provider not in SUPPORTED_MODELS.default_models:
-        raise ValueError(f"Unknown provider: {provider}")
-
-    model_id = SUPPORTED_MODELS.default_models[provider]
-    if not model_id:
-        raise ValueError(f"No default model configured for provider: {provider}")
-
-    return model_id
-
-
-def validate_model_capability(provider: ProviderName, model_id: str, capability: str) -> bool:
-    """Check if a specific model supports a capability.
-
-    Args:
-        provider: The LLM provider
-        model_id: The model identifier
-        capability: Capability to check (e.g., 'tool_use', 'vision')
-
-    Returns:
-        True if capability is supported, False otherwise
-
-    Raises:
-        ValueError: If provider or model_id is invalid
-
-    Examples:
-        >>> validate_model_capability(
-        ...     ProviderName.ANTHROPIC,
-        ...     "claude-3-5-haiku-20241022",
-        ...     "tool_use"
-        ... )
-        True
-    """
-    config = get_model_config(provider, model_id)
-    return config.capabilities.get(capability, False)
+__all__ = [
+    # Types
+    "ModelConfig",
+    "ModelRegistry",
+    "ProviderName",
+    "StructuredOutputMethod",
+    # Registry
+    "SUPPORTED_MODELS",
+    "MODEL_VALIDATORS",
+    # Helper Functions
+    "get_model_config",
+    "list_models",
+    "get_default_model_id",
+    "validate_model_capability",
+]

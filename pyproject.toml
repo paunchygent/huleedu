@@ -412,6 +412,7 @@ obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertman
 eng5-np-run = "python -m scripts.cj_experiments_runners.eng5_np.cli"
 cj-admin = "python -m services.cj_assessment_service.cli_admin"
 llm-check-models = "python -m services.llm_provider_service.cli_check_models"
+llm-admin = "python -m services.llm_provider_service.admin_cli"
 
 [tool.pdm.dev-dependencies]
 dev = [

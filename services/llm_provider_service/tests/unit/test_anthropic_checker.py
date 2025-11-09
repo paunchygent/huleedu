@@ -241,8 +241,8 @@ class TestCompareWithManifest:
 
         # Mock discovered model marked as deprecated
         deprecated_model = DiscoveredModel(
-            model_id="claude-3-5-haiku-20241022",
-            display_name="Claude 3.5 Haiku",
+            model_id="claude-haiku-4-5-20251001",
+            display_name="Claude Haiku 4.5",
             is_deprecated=True,
         )
 
@@ -259,7 +259,7 @@ class TestCompareWithManifest:
 
         # Verify deprecated model was detected
         if deprecated_model.is_deprecated:
-            assert "claude-3-5-haiku-20241022" in result.deprecated_models
+            assert "claude-haiku-4-5-20251001" in result.deprecated_models
 
     @pytest.mark.asyncio
     async def test_is_up_to_date_when_no_changes(self, mocker: Mock) -> None:

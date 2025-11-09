@@ -165,7 +165,7 @@ class TestCompatibilityReporterJSON:
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
             new_models=[],
-            deprecated_models=["claude-3-5-haiku-20241022"],  # Current default
+            deprecated_models=["claude-haiku-4-5-20251001"],  # Current default
             updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
@@ -176,7 +176,7 @@ class TestCompatibilityReporterJSON:
         json_output = reporter.generate_json_report(result)
         report = json.loads(json_output)
 
-        assert report["current_model"]["model_id"] == "claude-3-5-haiku-20241022"
+        assert report["current_model"]["model_id"] == "claude-haiku-4-5-20251001"
         assert report["current_model"]["status"] == "deprecated"
 
 
