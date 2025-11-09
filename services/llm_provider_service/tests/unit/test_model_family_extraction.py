@@ -61,9 +61,7 @@ class TestOpenAIFamilyExtraction:
             ("", ""),  # Empty string
         ],
     )
-    def test_extract_openai_family_patterns(
-        self, model_id: str, expected_family: str
-    ) -> None:
+    def test_extract_openai_family_patterns(self, model_id: str, expected_family: str) -> None:
         """OpenAI family extraction handles various naming patterns correctly.
 
         Tests verify that the extraction logic correctly handles:
@@ -79,8 +77,7 @@ class TestOpenAIFamilyExtraction:
         """
         family = extract_openai_family(model_id)
         assert family == expected_family, (
-            f"Expected family '{expected_family}' for model '{model_id}', "
-            f"got '{family}'"
+            f"Expected family '{expected_family}' for model '{model_id}', got '{family}'"
         )
 
     def test_extract_openai_family_preserves_decimal_versions(self) -> None:
@@ -107,9 +104,7 @@ class TestOpenAIFamilyExtraction:
             "gpt-5-turbo-2025-08-07",
         ]
         families = [extract_openai_family(v) for v in variants]
-        assert all(f == "gpt-5" for f in families), (
-            "All variants should extract to same family"
-        )
+        assert all(f == "gpt-5" for f in families), "All variants should extract to same family"
 
     def test_extract_openai_family_non_gpt_models(self) -> None:
         """Non-GPT models extract base family correctly.
@@ -142,9 +137,7 @@ class TestAnthropicFamilyExtraction:
             ("", ""),  # Empty string
         ],
     )
-    def test_extract_anthropic_family_patterns(
-        self, model_id: str, expected_family: str
-    ) -> None:
+    def test_extract_anthropic_family_patterns(self, model_id: str, expected_family: str) -> None:
         """Anthropic family extraction handles tier-based naming correctly.
 
         Anthropic uses a consistent pattern: claude-{tier}-{version}-{date}
@@ -157,8 +150,7 @@ class TestAnthropicFamilyExtraction:
         """
         family = extract_anthropic_family(model_id)
         assert family == expected_family, (
-            f"Expected family '{expected_family}' for model '{model_id}', "
-            f"got '{family}'"
+            f"Expected family '{expected_family}' for model '{model_id}', got '{family}'"
         )
 
     def test_extract_anthropic_family_tier_grouping(self) -> None:
@@ -215,9 +207,7 @@ class TestGoogleFamilyExtraction:
             ("", ""),  # Empty string
         ],
     )
-    def test_extract_google_family_patterns(
-        self, model_id: str, expected_family: str
-    ) -> None:
+    def test_extract_google_family_patterns(self, model_id: str, expected_family: str) -> None:
         """Google family extraction handles version-tier naming correctly.
 
         Google uses pattern: gemini-{version}-{tier}-{variant?}
@@ -229,8 +219,7 @@ class TestGoogleFamilyExtraction:
         """
         family = extract_google_family(model_id)
         assert family == expected_family, (
-            f"Expected family '{expected_family}' for model '{model_id}', "
-            f"got '{family}'"
+            f"Expected family '{expected_family}' for model '{model_id}', got '{family}'"
         )
 
     def test_extract_google_family_version_tier_grouping(self) -> None:
@@ -288,9 +277,7 @@ class TestOpenRouterFamilyExtraction:
             ("", ""),
         ],
     )
-    def test_extract_openrouter_family_patterns(
-        self, model_id: str, expected_family: str
-    ) -> None:
+    def test_extract_openrouter_family_patterns(self, model_id: str, expected_family: str) -> None:
         """OpenRouter family extraction handles provider-prefixed IDs correctly.
 
         OpenRouter uses {provider}/{model-id} format. Family extraction:
@@ -304,8 +291,7 @@ class TestOpenRouterFamilyExtraction:
         """
         family = extract_openrouter_family(model_id)
         assert family == expected_family, (
-            f"Expected family '{expected_family}' for model '{model_id}', "
-            f"got '{family}'"
+            f"Expected family '{expected_family}' for model '{model_id}', got '{family}'"
         )
 
     def test_extract_openrouter_family_appends_suffix(self) -> None:
@@ -316,9 +302,7 @@ class TestOpenRouterFamilyExtraction:
         """
         model_id = "anthropic/claude-haiku-4-5-20251001"
         family = extract_openrouter_family(model_id)
-        assert family.endswith("-openrouter"), (
-            "OpenRouter families should have -openrouter suffix"
-        )
+        assert family.endswith("-openrouter"), "OpenRouter families should have -openrouter suffix"
 
     def test_extract_openrouter_family_uses_provider_specific_logic(self) -> None:
         """Base model family extraction uses provider-specific rules.

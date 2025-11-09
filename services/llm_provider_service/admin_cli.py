@@ -95,9 +95,7 @@ def list_models_cmd(
             )
 
         console.print(table)
-        console.print(
-            f"\n[dim]Total: {len(models)} models[/dim]"
-        )
+        console.print(f"\n[dim]Total: {len(models)} models[/dim]")
 
 
 @app.command("show-capabilities")
@@ -272,9 +270,7 @@ def call_cmd(
         raise typer.Exit(code=1)
 
     if provider_enum != ProviderName.OPENAI:
-        console.print(
-            f"[red]Currently only OpenAI provider is supported for 'call' command[/red]"
-        )
+        console.print(f"[red]Currently only OpenAI provider is supported for 'call' command[/red]")
         raise typer.Exit(code=1)
 
     # Run async call

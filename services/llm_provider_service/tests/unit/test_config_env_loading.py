@@ -61,7 +61,9 @@ class TestAPIKeyEnvironmentLoading:
         prefixed_key = "sk-ant-prefixed-test"
 
         # Test prefixed
-        with patch.dict(os.environ, {"LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY": prefixed_key}, clear=True):
+        with patch.dict(
+            os.environ, {"LLM_PROVIDER_SERVICE_ANTHROPIC_API_KEY": prefixed_key}, clear=True
+        ):
             settings = Settings()
             assert settings.ANTHROPIC_API_KEY.get_secret_value() == prefixed_key
 
@@ -76,7 +78,9 @@ class TestAPIKeyEnvironmentLoading:
         prefixed_key = "google-prefixed-test-key"
 
         # Test prefixed
-        with patch.dict(os.environ, {"LLM_PROVIDER_SERVICE_GOOGLE_API_KEY": prefixed_key}, clear=True):
+        with patch.dict(
+            os.environ, {"LLM_PROVIDER_SERVICE_GOOGLE_API_KEY": prefixed_key}, clear=True
+        ):
             settings = Settings()
             assert settings.GOOGLE_API_KEY.get_secret_value() == prefixed_key
 
@@ -91,7 +95,9 @@ class TestAPIKeyEnvironmentLoading:
         prefixed_key = "sk-or-prefixed-test"
 
         # Test prefixed
-        with patch.dict(os.environ, {"LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY": prefixed_key}, clear=True):
+        with patch.dict(
+            os.environ, {"LLM_PROVIDER_SERVICE_OPENROUTER_API_KEY": prefixed_key}, clear=True
+        ):
             settings = Settings()
             assert settings.OPENROUTER_API_KEY.get_secret_value() == prefixed_key
 

@@ -37,6 +37,7 @@ class TestModelConfigSchema:
             provider=ProviderName.ANTHROPIC,
             display_name="Test Model",
             api_version="2023-06-01",
+            model_family="test-model",
             structured_output_method=StructuredOutputMethod.TOOL_USE,
             capabilities={"tool_use": True, "vision": False},
             max_tokens=4096,
@@ -65,6 +66,7 @@ class TestModelConfigSchema:
             provider=ProviderName.OPENAI,
             display_name="Minimal Model",
             api_version="v1",
+            model_family="minimal",
             structured_output_method=StructuredOutputMethod.JSON_SCHEMA,
         )
 
@@ -86,6 +88,7 @@ class TestModelConfigSchema:
             provider=ProviderName.ANTHROPIC,
             display_name="Frozen Test",
             api_version="2023-06-01",
+            model_family="frozen",
             structured_output_method=StructuredOutputMethod.TOOL_USE,
         )
 

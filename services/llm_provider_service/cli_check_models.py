@@ -165,10 +165,10 @@ class CheckerFactory:
             )
             return None
 
-        # Import at runtime to avoid type-checking issues
-        from google import genai  # type: ignore[import-untyped,attr-defined]
+        # Import at runtime to avoid issues with optional dependency
+        from google import genai
 
-        client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
+        client = genai.Client(api_key=api_key)
         return GoogleModelChecker(client=client, logger=self.logger, settings=self.settings)
 
     async def _create_openrouter_checker(self) -> OpenRouterModelChecker | None:
@@ -368,7 +368,9 @@ def check_models(
                 # Construct filename with provider name
                 if len(results) > 1:
                     # Multiple providers: add provider suffix
-                    report_path = report.parent / f"{report.stem}_{result.provider.value}{report.suffix}"
+                    report_path = (
+                        report.parent / f"{report.stem}_{result.provider.value}{report.suffix}"
+                    )
                 else:
                     # Single provider: use provided path as-is
                     report_path = report
@@ -397,8 +399,7 @@ def check_models(
             )
         elif exit_code == ExitCode.UNTRACKED_FAMILIES:
             console.print(
-                "\n[blue]ℹ️  New model families detected. "
-                "Review separately if needed.[/blue]"
+                "\n[blue]ℹ️  New model families detected. Review separately if needed.[/blue]"
             )
         else:
             console.print("\n[green]✅ All providers are up-to-date![/green]")

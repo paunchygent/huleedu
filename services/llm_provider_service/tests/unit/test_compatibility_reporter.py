@@ -32,7 +32,8 @@ class TestCompatibilityReporterJSON:
         """JSON report should show up-to-date status when no changes detected."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -63,7 +64,8 @@ class TestCompatibilityReporterJSON:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[new_model],
+            new_models_in_tracked_families=[new_model],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -99,7 +101,8 @@ class TestCompatibilityReporterJSON:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[deprecated_model],
+            new_models_in_tracked_families=[deprecated_model],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -120,7 +123,8 @@ class TestCompatibilityReporterJSON:
         """JSON report should include breaking changes list."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[
@@ -144,7 +148,8 @@ class TestCompatibilityReporterJSON:
         # Use MOCK provider which has no default model
         result = ModelComparisonResult(
             provider=ProviderName.MOCK,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -164,7 +169,8 @@ class TestCompatibilityReporterJSON:
         """JSON report should mark current model as deprecated if in deprecated list."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=["claude-haiku-4-5-20251001"],  # Current default
             updated_models=[],
             breaking_changes=[],
@@ -187,7 +193,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should have proper heading structure."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -217,7 +224,8 @@ class TestCompatibilityReporterMarkdown:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[new_model],
+            new_models_in_tracked_families=[new_model],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -241,7 +249,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should list deprecated models."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=["claude-2-old", "claude-instant-deprecated"],
             updated_models=[],
             breaking_changes=[],
@@ -265,7 +274,8 @@ class TestCompatibilityReporterMarkdown:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[("claude-3-5-haiku-20241022", updated_model)],
             breaking_changes=[],
@@ -285,7 +295,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should highlight breaking changes."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[
@@ -308,7 +319,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should show no action when up to date."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -330,7 +342,8 @@ class TestCompatibilityReporterMarkdown:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[new_model],
+            new_models_in_tracked_families=[new_model],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=[],
@@ -349,7 +362,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should suggest manifest update for deprecated models."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=["old-model"],
             updated_models=[],
             breaking_changes=[],
@@ -366,7 +380,8 @@ class TestCompatibilityReporterMarkdown:
         """Markdown report should prioritize breaking changes."""
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[],
+            new_models_in_tracked_families=[],
+            new_untracked_families=[],
             deprecated_models=[],
             updated_models=[],
             breaking_changes=["Critical API change"],

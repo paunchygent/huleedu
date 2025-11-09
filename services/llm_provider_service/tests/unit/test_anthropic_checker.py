@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from anthropic.types import ModelInfo
 
+from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.anthropic_checker import (
     AnthropicModelChecker,
 )
@@ -24,25 +25,31 @@ from services.llm_provider_service.model_checker.base import DiscoveredModel
 from services.llm_provider_service.model_manifest import ProviderName
 
 
+@pytest.fixture
+def settings() -> Settings:
+    """Create Settings instance for tests."""
+    return Settings()
+
+
 class TestAnthropicCheckerInit:
     """Tests for AnthropicModelChecker initialization."""
 
-    def test_init_stores_client_and_logger(self) -> None:
+    def test_init_stores_client_and_logger(self, settings: Settings) -> None:
         """Checker should store AsyncAnthropic client and logger."""
         mock_client = Mock()
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
 
         assert checker.client is mock_client
         assert checker.logger is logger
 
-    def test_provider_is_anthropic(self) -> None:
+    def test_provider_is_anthropic(self, settings: Settings) -> None:
         """Provider attribute should be ProviderName.ANTHROPIC."""
         mock_client = Mock()
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
 
         assert checker.provider == ProviderName.ANTHROPIC
 
@@ -51,7 +58,7 @@ class TestCheckLatestModels:
     """Tests for check_latest_models() method."""
 
     @pytest.mark.asyncio
-    async def test_queries_anthropic_api(self, mocker: Mock) -> None:
+    async def test_queries_anthropic_api(self, mocker: Mock, settings: Settings) -> None:
         """Should call client.models.list()."""
         mock_client = Mock()
         mock_response = Mock()
@@ -59,13 +66,13 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_response)
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         await checker.check_latest_models()
 
         mock_client.models.list.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_parses_model_info_correctly(self, mocker: Mock) -> None:
+    async def test_parses_model_info_correctly(self, mocker: Mock, settings: Settings) -> None:
         """Should parse Anthropic ModelInfo into DiscoveredModel."""
         mock_client = Mock()
         mock_model_info = ModelInfo(
@@ -79,7 +86,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_response)
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         assert len(models) == 1
@@ -87,7 +94,7 @@ class TestCheckLatestModels:
         assert models[0].display_name == "Claude 3.5 Haiku"
 
     @pytest.mark.asyncio
-    async def test_filters_claude_2_models(self, mocker: Mock) -> None:
+    async def test_filters_claude_2_models(self, mocker: Mock, settings: Settings) -> None:
         """Should exclude Claude 2.x models from results."""
         mock_client = Mock()
         mock_models = [
@@ -109,7 +116,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_response)
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         # Should only include Claude 3+ model
@@ -117,7 +124,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "claude-3-5-haiku-20241022"
 
     @pytest.mark.asyncio
-    async def test_filters_claude_instant_models(self, mocker: Mock) -> None:
+    async def test_filters_claude_instant_models(self, mocker: Mock, settings: Settings) -> None:
         """Should exclude claude-instant models from results."""
         mock_client = Mock()
         mock_models = [
@@ -139,7 +146,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_response)
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         # Should only include Claude 3+ model
@@ -147,7 +154,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "claude-3-5-haiku-20241022"
 
     @pytest.mark.asyncio
-    async def test_includes_claude_3_models(self, mocker: Mock) -> None:
+    async def test_includes_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
         """Should include all Claude 3.x models."""
         mock_client = Mock()
         mock_models = [
@@ -175,7 +182,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_response)
         logger = logging.getLogger(__name__)
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         # Should include all 3 Claude 3.x models
@@ -186,14 +193,14 @@ class TestCheckLatestModels:
         assert "claude-3-5-haiku-20241022" in model_ids
 
     @pytest.mark.asyncio
-    async def test_handles_api_error_gracefully(self, mocker: Mock) -> None:
+    async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:
         """Should raise exception and log error on API failure."""
         mock_client = Mock()
         mock_client.models.list = AsyncMock(side_effect=Exception("API authentication failed"))
         logger = logging.getLogger(__name__)
         mock_logger = mocker.patch.object(logger, "error")
 
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
 
         with pytest.raises(Exception, match="API authentication failed"):
             await checker.check_latest_models()
@@ -206,7 +213,7 @@ class TestCompareWithManifest:
     """Tests for compare_with_manifest() method."""
 
     @pytest.mark.asyncio
-    async def test_identifies_new_models(self, mocker: Mock) -> None:
+    async def test_identifies_new_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in API but not in manifest."""
         mock_client = Mock()
 
@@ -224,7 +231,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # Verify new model was detected
@@ -233,15 +240,13 @@ class TestCompareWithManifest:
         total_new = len(result.new_models_in_tracked_families) + len(result.new_untracked_families)
         assert total_new >= 1
         # The new model should be in either tracked or untracked list
-        all_new_model_ids = {
-            m.model_id for m in result.new_models_in_tracked_families
-        } | {
+        all_new_model_ids = {m.model_id for m in result.new_models_in_tracked_families} | {
             m.model_id for m in result.new_untracked_families
         }
         assert "claude-4-opus-20250101" in all_new_model_ids
 
     @pytest.mark.asyncio
-    async def test_identifies_deprecated_models(self, mocker: Mock) -> None:
+    async def test_identifies_deprecated_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in manifest marked as deprecated by API."""
         mock_client = Mock()
 
@@ -260,7 +265,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # Verify deprecated model was detected
@@ -268,7 +273,7 @@ class TestCompareWithManifest:
             assert "claude-haiku-4-5-20251001" in result.deprecated_models
 
     @pytest.mark.asyncio
-    async def test_is_up_to_date_when_no_changes(self, mocker: Mock) -> None:
+    async def test_is_up_to_date_when_no_changes(self, mocker: Mock, settings: Settings) -> None:
         """Should set is_up_to_date=True when manifest matches API."""
         mock_client = Mock()
 
@@ -288,7 +293,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # When no changes, should be up-to-date
@@ -297,7 +302,7 @@ class TestCompareWithManifest:
         assert isinstance(result.is_up_to_date, bool)
 
     @pytest.mark.asyncio
-    async def test_returns_correct_provider(self, mocker: Mock) -> None:
+    async def test_returns_correct_provider(self, mocker: Mock, settings: Settings) -> None:
         """Should return ANTHROPIC as provider in result."""
         mock_client = Mock()
 
@@ -309,13 +314,13 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         assert result.provider == ProviderName.ANTHROPIC
 
     @pytest.mark.asyncio
-    async def test_sets_checked_at_date(self, mocker: Mock) -> None:
+    async def test_sets_checked_at_date(self, mocker: Mock, settings: Settings) -> None:
         """Should set checked_at to today's date."""
         mock_client = Mock()
 
@@ -327,7 +332,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = AnthropicModelChecker(client=mock_client, logger=logger)
+        checker = AnthropicModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         assert result.checked_at == date.today()

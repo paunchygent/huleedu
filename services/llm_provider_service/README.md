@@ -89,7 +89,12 @@ LLM_PROVIDER_SERVICE_LLM_CIRCUIT_BREAKER_RECOVERY_TIMEOUT=120
 # Cache Configuration
 LLM_PROVIDER_SERVICE_LLM_CACHE_ENABLED=true
 LLM_PROVIDER_SERVICE_LLM_CACHE_TTL=3600
+
+# Model Family Tracking (for CLI model checker)
+LLM_PROVIDER_SERVICE_ACTIVE_MODEL_FAMILIES='{"anthropic":["claude-haiku","claude-sonnet"],"openai":["gpt-5","gpt-4.1","gpt-4o"],"google":["gemini-2.5-flash"]}'
 ```
+
+**Model Family Tracking**: Configure which model families trigger actionable alerts (exit code 4) in the model checker CLI. New models in tracked families are prioritized for testing and manifest updates, while untracked families are shown as informational only (exit code 5). Use JSON format with lowercase provider names as keys.
 
 ## Development
 
@@ -138,6 +143,8 @@ The service expects requests with the following structure:
   "metadata": {}                             // Optional
 }
 ```
+
+> **Prompt hash source of truth**: The queue processor appends `prompt_sha256` to every callback—success and error alike. Downstream consumers (CJ Assessment, ENG5 runner, analytics scripts) must treat this hash as authoritative and avoid recomputing prompt digests locally to prevent checksum drift.
 
 ### Integration Example (CJ Assessment Service)
 
@@ -266,13 +273,16 @@ pdm run llm-check-models --provider anthropic --report compatibility_report.json
 
 **Exit codes**:
 - `0`: All up-to-date (no changes needed)
-- `1`: New models available (non-breaking updates)
 - `2`: API error or authentication failure
 - `3`: Breaking changes detected (requires manual intervention)
+- `4`: In-family updates (new model variants in tracked families - actionable)
+- `5`: Untracked families detected (informational only)
+
+**Note**: Exit codes prioritize actionable issues. Code 4 (tracked family updates) takes precedence over code 5 (untracked families). Use `ACTIVE_MODEL_FAMILIES` configuration to control which families trigger actionable alerts.
 
 #### 2. Review Compatibility Report
 
-When the CLI returns exit code `1` or `3`, review the generated report:
+When the CLI returns exit code `3`, `4`, or `5`, review the generated report:
 
 **JSON Report** (for CI/CD automation):
 ```json

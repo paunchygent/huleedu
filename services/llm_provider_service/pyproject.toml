@@ -26,7 +26,7 @@ dependencies = [
     # LLM provider SDKs
     "anthropic",
     "openai",
-    "google-generativeai",
+    "google-genai",  # Modern unified Google Gen AI SDK (replaces deprecated google-generativeai)
     # Performance testing dependencies
     "psutil",
 ]
@@ -56,7 +56,7 @@ check_untyped_defs = true
 module = [
     "dishka.*",
     "anthropic.*",
-    "google.generativeai.*",
+    "google.genai.*",  # Modern Google Gen AI SDK
     "diskcache.*",
     "tenacity.*",
     "cachetools.*",

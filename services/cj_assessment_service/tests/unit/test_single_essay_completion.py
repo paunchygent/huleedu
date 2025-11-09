@@ -21,7 +21,11 @@ from services.cj_assessment_service.cj_core_logic.batch_finalizer import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchUpload, ProcessedEssay
+from services.cj_assessment_service.models_db import (
+    AssessmentInstruction,
+    CJBatchUpload,
+    ProcessedEssay,
+)
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,

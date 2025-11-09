@@ -59,7 +59,11 @@ def extract_openai_family(model_id: str) -> str:
     if len(parts) >= 2 and parts[0] == "gpt":
         return f"{parts[0]}-{parts[1]}"  # e.g., "gpt-5", "gpt-4o"
 
-    # Other families (dall-e, whisper, o1, o3, etc.)
+    # Special case: dall-e (compound name)
+    if len(parts) >= 2 and parts[0] == "dall" and parts[1] == "e":
+        return "dall-e"
+
+    # Other families (whisper, o1, o3, etc.)
     return parts[0] if parts else model_id
 
 

@@ -428,6 +428,4 @@ class TestExitCodeEdgeCases:
         }
 
         enum_names = {code.name for code in ExitCode}
-        assert required_codes == enum_names, (
-            f"Missing exit codes: {required_codes - enum_names}"
-        )
+        assert required_codes == enum_names, f"Missing exit codes: {required_codes - enum_names}"

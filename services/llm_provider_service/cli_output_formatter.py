@@ -83,7 +83,12 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
 
     # Section 1: Tracked Family Updates (actionable)
     if result.new_models_in_tracked_families:
-        table.add_row("[bold yellow]Tracked Family Updates[/bold yellow]", "", "", *[""] * (3 if verbose else 0))
+        table.add_row(
+            "[bold yellow]Tracked Family Updates[/bold yellow]",
+            "",
+            "",
+            *[""] * (3 if verbose else 0),
+        )
         for model in result.new_models_in_tracked_families:
             seen_model_ids.add(model.model_id)
             row = ["🔄 In-family", model.model_id, model.display_name]
@@ -101,7 +106,12 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
         if result.new_models_in_tracked_families:
             # Add separator row if we already had tracked family updates
             table.add_row("", "", "", *[""] * (3 if verbose else 0))
-        table.add_row("[bold blue]Untracked Families (Informational)[/bold blue]", "", "", *[""] * (3 if verbose else 0))
+        table.add_row(
+            "[bold blue]Untracked Families (Informational)[/bold blue]",
+            "",
+            "",
+            *[""] * (3 if verbose else 0),
+        )
         for model in result.new_untracked_families:
             seen_model_ids.add(model.model_id)
             row = ["ℹ️  Untracked", model.model_id, model.display_name]
@@ -133,7 +143,11 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
 
     # Add deprecated models
     if result.deprecated_models:
-        if result.new_models_in_tracked_families or result.new_untracked_families or result.updated_models:
+        if (
+            result.new_models_in_tracked_families
+            or result.new_untracked_families
+            or result.updated_models
+        ):
             table.add_row("", "", "", *[""] * (3 if verbose else 0))
         table.add_row("[bold]Deprecated Models[/bold]", "", "", *[""] * (3 if verbose else 0))
         for model_id in result.deprecated_models:

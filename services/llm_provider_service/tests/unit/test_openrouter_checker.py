@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.base import DiscoveredModel
 from services.llm_provider_service.model_checker.openrouter_checker import (
     OpenRouterModelChecker,
@@ -23,10 +24,16 @@ from services.llm_provider_service.model_checker.openrouter_checker import (
 from services.llm_provider_service.model_manifest import ProviderName
 
 
+@pytest.fixture
+def settings() -> Settings:
+    """Create Settings instance for tests."""
+    return Settings()
+
+
 class TestOpenRouterCheckerInit:
     """Tests for OpenRouterModelChecker initialization."""
 
-    def test_init_stores_session_api_key_and_logger(self) -> None:
+    def test_init_stores_session_api_key_and_logger(self, settings: Settings) -> None:
         """Checker should store session, API key, and logger."""
         mock_session = Mock()
         api_key = "test-api-key"
@@ -36,13 +43,14 @@ class TestOpenRouterCheckerInit:
             session=mock_session,
             api_key=api_key,
             logger=logger,
+            settings=settings,
         )
 
         assert checker.session is mock_session
         assert checker.api_key == api_key
         assert checker.logger is logger
 
-    def test_provider_is_openrouter(self) -> None:
+    def test_provider_is_openrouter(self, settings: Settings) -> None:
         """Provider attribute should be ProviderName.OPENROUTER."""
         mock_session = Mock()
         logger = logging.getLogger(__name__)
@@ -51,11 +59,12 @@ class TestOpenRouterCheckerInit:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
 
         assert checker.provider == ProviderName.OPENROUTER
 
-    def test_api_base_url_is_correct(self) -> None:
+    def test_api_base_url_is_correct(self, settings: Settings) -> None:
         """API base URL should be set correctly."""
         mock_session = Mock()
         logger = logging.getLogger(__name__)
@@ -64,6 +73,7 @@ class TestOpenRouterCheckerInit:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
 
         assert checker.api_base == "https://openrouter.ai/api/v1"
@@ -73,7 +83,7 @@ class TestCheckLatestModels:
     """Tests for check_latest_models() method."""
 
     @pytest.mark.asyncio
-    async def test_queries_openrouter_api(self, mocker: Mock) -> None:
+    async def test_queries_openrouter_api(self, mocker: Mock, settings: Settings) -> None:
         """Should call session.get() with correct URL and headers."""
         mock_session = Mock()
         mock_response = AsyncMock()
@@ -90,6 +100,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         await checker.check_latest_models()
 
@@ -97,7 +108,7 @@ class TestCheckLatestModels:
         mock_session.get.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_parses_model_data_correctly(self, mocker: Mock) -> None:
+    async def test_parses_model_data_correctly(self, mocker: Mock, settings: Settings) -> None:
         """Should parse OpenRouter model data into DiscoveredModel."""
         mock_session = Mock()
         mock_response = AsyncMock()
@@ -124,6 +135,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         models = await checker.check_latest_models()
 
@@ -131,7 +143,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
 
     @pytest.mark.asyncio
-    async def test_filters_non_anthropic_models(self, mocker: Mock) -> None:
+    async def test_filters_non_anthropic_models(self, mocker: Mock, settings: Settings) -> None:
         """Should exclude non-Anthropic models from results."""
         mock_session = Mock()
         mock_response = AsyncMock()
@@ -162,6 +174,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         models = await checker.check_latest_models()
 
@@ -170,7 +183,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
 
     @pytest.mark.asyncio
-    async def test_filters_claude_2_models(self, mocker: Mock) -> None:
+    async def test_filters_claude_2_models(self, mocker: Mock, settings: Settings) -> None:
         """Should exclude Claude 2.x models from results."""
         mock_session = Mock()
         mock_response = AsyncMock()
@@ -201,6 +214,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         models = await checker.check_latest_models()
 
@@ -209,7 +223,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "anthropic/claude-3-5-haiku-20241022"
 
     @pytest.mark.asyncio
-    async def test_includes_all_claude_3_models(self, mocker: Mock) -> None:
+    async def test_includes_all_claude_3_models(self, mocker: Mock, settings: Settings) -> None:
         """Should include all Anthropic Claude 3.x models."""
         mock_session = Mock()
         mock_response = AsyncMock()
@@ -245,6 +259,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         models = await checker.check_latest_models()
 
@@ -256,7 +271,7 @@ class TestCheckLatestModels:
         assert "anthropic/claude-3-5-haiku-20241022" in model_ids
 
     @pytest.mark.asyncio
-    async def test_handles_api_error_gracefully(self, mocker: Mock) -> None:
+    async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:
         """Should raise exception and log error on API failure."""
         mock_session = Mock()
         mock_session.get = Mock(side_effect=Exception("API authentication failed"))
@@ -268,6 +283,7 @@ class TestCheckLatestModels:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
 
         with pytest.raises(Exception, match="API authentication failed"):
@@ -281,7 +297,7 @@ class TestCompareWithManifest:
     """Tests for compare_with_manifest() method."""
 
     @pytest.mark.asyncio
-    async def test_identifies_new_models(self, mocker: Mock) -> None:
+    async def test_identifies_new_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in API but not in manifest."""
         mock_session = Mock()
 
@@ -303,6 +319,7 @@ class TestCompareWithManifest:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         result = await checker.compare_with_manifest()
 
@@ -312,15 +329,13 @@ class TestCompareWithManifest:
         total_new = len(result.new_models_in_tracked_families) + len(result.new_untracked_families)
         assert total_new >= 1
         # The new model should be in either tracked or untracked list
-        all_new_model_ids = {
-            m.model_id for m in result.new_models_in_tracked_families
-        } | {
+        all_new_model_ids = {m.model_id for m in result.new_models_in_tracked_families} | {
             m.model_id for m in result.new_untracked_families
         }
         assert "anthropic/claude-4-opus-20250101" in all_new_model_ids
 
     @pytest.mark.asyncio
-    async def test_identifies_deprecated_models(self, mocker: Mock) -> None:
+    async def test_identifies_deprecated_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in manifest but not in API (deprecated)."""
         mock_session = Mock()
 
@@ -336,6 +351,7 @@ class TestCompareWithManifest:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         result = await checker.compare_with_manifest()
 
@@ -344,7 +360,7 @@ class TestCompareWithManifest:
         assert len(result.deprecated_models) >= 1
 
     @pytest.mark.asyncio
-    async def test_is_up_to_date_when_no_changes(self, mocker: Mock) -> None:
+    async def test_is_up_to_date_when_no_changes(self, mocker: Mock, settings: Settings) -> None:
         """Should set is_up_to_date=True when manifest matches API."""
         mock_session = Mock()
 
@@ -368,6 +384,7 @@ class TestCompareWithManifest:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         result = await checker.compare_with_manifest()
 
@@ -377,7 +394,7 @@ class TestCompareWithManifest:
         assert isinstance(result.is_up_to_date, bool)
 
     @pytest.mark.asyncio
-    async def test_returns_correct_provider(self, mocker: Mock) -> None:
+    async def test_returns_correct_provider(self, mocker: Mock, settings: Settings) -> None:
         """Should return OPENROUTER as provider in result."""
         mock_session = Mock()
 
@@ -393,13 +410,14 @@ class TestCompareWithManifest:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         result = await checker.compare_with_manifest()
 
         assert result.provider == ProviderName.OPENROUTER
 
     @pytest.mark.asyncio
-    async def test_sets_checked_at_date(self, mocker: Mock) -> None:
+    async def test_sets_checked_at_date(self, mocker: Mock, settings: Settings) -> None:
         """Should set checked_at to today's date."""
         mock_session = Mock()
 
@@ -415,6 +433,7 @@ class TestCompareWithManifest:
             session=mock_session,
             api_key="test-key",
             logger=logger,
+            settings=settings,
         )
         result = await checker.compare_with_manifest()
 

@@ -317,18 +317,19 @@ class AnthropicModelChecker:
     ) -> bool:
         """Check if capabilities have changed between manifest and discovered model.
 
+        Anthropic's models API does not expose capability information (tool_use, vision, etc).
+        The API only returns: id, display_name, type, created_at.
+
+        Comparing empty discovered capabilities against manifest capabilities would
+        produce false positives for every model. Since capabilities are static
+        (determined by model architecture, not dynamic API data), we skip this comparison.
+
         Args:
             manifest_model: Model from manifest
-            discovered_model: Model from API
+            discovered_model: Model from API (with empty capabilities)
 
         Returns:
-            True if capabilities differ
+            False (capabilities comparison disabled for Anthropic)
         """
-        # Convert manifest capabilities dict to set of strings
-        manifest_caps = set(key for key, value in manifest_model.capabilities.items() if value)
-
-        # Convert discovered capabilities list to set
-        discovered_caps = set(discovered_model.capabilities)
-
-        # Check if sets differ
-        return manifest_caps != discovered_caps
+        # Anthropic API doesn't expose capabilities - skip comparison to avoid false positives
+        return False

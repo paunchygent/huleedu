@@ -30,6 +30,7 @@ import pytest
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
+from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.anthropic_checker import (
     AnthropicModelChecker,
 )
@@ -43,12 +44,18 @@ from services.llm_provider_service.model_manifest import ProviderName
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture
+def settings() -> Settings:
+    """Create Settings instance for tests."""
+    return Settings()
+
+
 class TestAnthropicFinancial:
     """Financial integration tests for Anthropic model checker."""
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_create_client_with_real_key(self) -> None:
+    async def test_create_client_with_real_key(self, settings: Settings) -> None:
         """Should create AsyncAnthropic client with real API key."""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
@@ -61,14 +68,14 @@ class TestAnthropicFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_discover_models_from_real_api(self) -> None:
+    async def test_discover_models_from_real_api(self, settings: Settings) -> None:
         """Should discover models from real Anthropic API."""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             pytest.skip("ANTHROPIC_API_KEY not set")
 
         client = AsyncAnthropic(api_key=api_key)
-        checker = AnthropicModelChecker(client=client, logger=logger)
+        checker = AnthropicModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -80,14 +87,14 @@ class TestAnthropicFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_parse_real_api_response(self) -> None:
+    async def test_parse_real_api_response(self, settings: Settings) -> None:
         """Should correctly parse real Anthropic API response."""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             pytest.skip("ANTHROPIC_API_KEY not set")
 
         client = AsyncAnthropic(api_key=api_key)
-        checker = AnthropicModelChecker(client=client, logger=logger)
+        checker = AnthropicModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -101,14 +108,14 @@ class TestAnthropicFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_compare_with_manifest_real_data(self) -> None:
+    async def test_compare_with_manifest_real_data(self, settings: Settings) -> None:
         """Should compare real API data with manifest."""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             pytest.skip("ANTHROPIC_API_KEY not set")
 
         client = AsyncAnthropic(api_key=api_key)
-        checker = AnthropicModelChecker(client=client, logger=logger)
+        checker = AnthropicModelChecker(client=client, logger=logger, settings=settings)
 
         result = await checker.compare_with_manifest()
 
@@ -127,7 +134,7 @@ class TestOpenAIFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_create_client_with_real_key(self) -> None:
+    async def test_create_client_with_real_key(self, settings: Settings) -> None:
         """Should create AsyncOpenAI client with real API key."""
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -140,14 +147,14 @@ class TestOpenAIFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_discover_models_from_real_api(self) -> None:
+    async def test_discover_models_from_real_api(self, settings: Settings) -> None:
         """Should discover models from real OpenAI API."""
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             pytest.skip("OPENAI_API_KEY not set")
 
         client = AsyncOpenAI(api_key=api_key)
-        checker = OpenAIModelChecker(client=client, logger=logger)
+        checker = OpenAIModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -156,20 +163,19 @@ class TestOpenAIFinancial:
         # Should include GPT-4+ or O1/O3 models
         model_ids = {m.model_id for m in models}
         assert any(
-            "gpt-4" in mid or "gpt-5" in mid or "o1" in mid or "o3" in mid
-            for mid in model_ids
+            "gpt-4" in mid or "gpt-5" in mid or "o1" in mid or "o3" in mid for mid in model_ids
         )
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_parse_real_api_response(self) -> None:
+    async def test_parse_real_api_response(self, settings: Settings) -> None:
         """Should correctly parse real OpenAI API response."""
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             pytest.skip("OPENAI_API_KEY not set")
 
         client = AsyncOpenAI(api_key=api_key)
-        checker = OpenAIModelChecker(client=client, logger=logger)
+        checker = OpenAIModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -183,14 +189,14 @@ class TestOpenAIFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_compare_with_manifest_real_data(self) -> None:
+    async def test_compare_with_manifest_real_data(self, settings: Settings) -> None:
         """Should compare real API data with manifest."""
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             pytest.skip("OPENAI_API_KEY not set")
 
         client = AsyncOpenAI(api_key=api_key)
-        checker = OpenAIModelChecker(client=client, logger=logger)
+        checker = OpenAIModelChecker(client=client, logger=logger, settings=settings)
 
         result = await checker.compare_with_manifest()
 
@@ -209,32 +215,32 @@ class TestGoogleFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_create_client_with_real_key(self) -> None:
+    async def test_create_client_with_real_key(self, settings: Settings) -> None:
         """Should create genai.Client with real API key."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             pytest.skip("GOOGLE_API_KEY not set")
 
-        # Import at runtime to avoid type issues
-        from google import genai  # type: ignore[import-untyped,attr-defined]
+        # Import at runtime to avoid issues with optional dependency
+        from google import genai
 
-        client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
+        client = genai.Client(api_key=api_key)
 
         assert client is not None
         assert hasattr(client, "aio")
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_discover_models_from_real_api(self) -> None:
+    async def test_discover_models_from_real_api(self, settings: Settings) -> None:
         """Should discover models from real Google API."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             pytest.skip("GOOGLE_API_KEY not set")
 
-        from google import genai  # type: ignore[import-untyped,attr-defined]
+        from google import genai
 
-        client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-        checker = GoogleModelChecker(client=client, logger=logger)
+        client = genai.Client(api_key=api_key)
+        checker = GoogleModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -246,16 +252,16 @@ class TestGoogleFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_parse_real_api_response(self) -> None:
+    async def test_parse_real_api_response(self, settings: Settings) -> None:
         """Should correctly parse real Google API response."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             pytest.skip("GOOGLE_API_KEY not set")
 
-        from google import genai  # type: ignore[import-untyped,attr-defined]
+        from google import genai
 
-        client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-        checker = GoogleModelChecker(client=client, logger=logger)
+        client = genai.Client(api_key=api_key)
+        checker = GoogleModelChecker(client=client, logger=logger, settings=settings)
 
         models = await checker.check_latest_models()
 
@@ -269,16 +275,16 @@ class TestGoogleFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_compare_with_manifest_real_data(self) -> None:
+    async def test_compare_with_manifest_real_data(self, settings: Settings) -> None:
         """Should compare real API data with manifest."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             pytest.skip("GOOGLE_API_KEY not set")
 
-        from google import genai  # type: ignore[import-untyped,attr-defined]
+        from google import genai
 
-        client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-        checker = GoogleModelChecker(client=client, logger=logger)
+        client = genai.Client(api_key=api_key)
+        checker = GoogleModelChecker(client=client, logger=logger, settings=settings)
 
         result = await checker.compare_with_manifest()
 
@@ -297,7 +303,7 @@ class TestOpenRouterFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_create_client_with_real_key(self) -> None:
+    async def test_create_client_with_real_key(self, settings: Settings) -> None:
         """Should create aiohttp session for OpenRouter."""
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
@@ -313,7 +319,7 @@ class TestOpenRouterFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_discover_models_from_real_api(self) -> None:
+    async def test_discover_models_from_real_api(self, settings: Settings) -> None:
         """Should discover models from real OpenRouter API."""
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
@@ -323,7 +329,7 @@ class TestOpenRouterFinancial:
 
         try:
             checker = OpenRouterModelChecker(
-                session=session, api_key=api_key, logger=logger
+                session=session, api_key=api_key, logger=logger, settings=settings
             )
             models = await checker.check_latest_models()
 
@@ -337,7 +343,7 @@ class TestOpenRouterFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_parse_real_api_response(self) -> None:
+    async def test_parse_real_api_response(self, settings: Settings) -> None:
         """Should correctly parse real OpenRouter API response."""
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
@@ -347,7 +353,7 @@ class TestOpenRouterFinancial:
 
         try:
             checker = OpenRouterModelChecker(
-                session=session, api_key=api_key, logger=logger
+                session=session, api_key=api_key, logger=logger, settings=settings
             )
             models = await checker.check_latest_models()
 
@@ -363,7 +369,7 @@ class TestOpenRouterFinancial:
 
     @pytest.mark.asyncio
     @pytest.mark.financial
-    async def test_compare_with_manifest_real_data(self) -> None:
+    async def test_compare_with_manifest_real_data(self, settings: Settings) -> None:
         """Should compare real API data with manifest."""
         api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
@@ -373,7 +379,7 @@ class TestOpenRouterFinancial:
 
         try:
             checker = OpenRouterModelChecker(
-                session=session, api_key=api_key, logger=logger
+                session=session, api_key=api_key, logger=logger, settings=settings
             )
             result = await checker.compare_with_manifest()
 
