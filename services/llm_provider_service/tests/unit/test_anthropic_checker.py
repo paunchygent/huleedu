@@ -229,10 +229,16 @@ class TestCompareWithManifest:
 
         # Verify new model was detected
         assert result.is_up_to_date is False
-        assert len(result.new_models) >= 1
-        # The new model should be in the list
-        new_model_ids = {m.model_id for m in result.new_models}
-        assert "claude-4-opus-20250101" in new_model_ids
+        # Check combined count of tracked and untracked families
+        total_new = len(result.new_models_in_tracked_families) + len(result.new_untracked_families)
+        assert total_new >= 1
+        # The new model should be in either tracked or untracked list
+        all_new_model_ids = {
+            m.model_id for m in result.new_models_in_tracked_families
+        } | {
+            m.model_id for m in result.new_untracked_families
+        }
+        assert "claude-4-opus-20250101" in all_new_model_ids
 
     @pytest.mark.asyncio
     async def test_identifies_deprecated_models(self, mocker: Mock) -> None:

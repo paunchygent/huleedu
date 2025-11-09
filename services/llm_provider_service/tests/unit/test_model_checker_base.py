@@ -165,7 +165,8 @@ class TestModelComparisonResult:
         assert result.provider == ProviderName.ANTHROPIC
         assert result.is_up_to_date is True
         # Check default factories
-        assert result.new_models == []
+        assert result.new_models_in_tracked_families == []
+        assert result.new_untracked_families == []
         assert result.deprecated_models == []
         assert result.updated_models == []
         assert result.breaking_changes == []
@@ -181,7 +182,8 @@ class TestModelComparisonResult:
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=[new_model],
+            new_models_in_tracked_families=[new_model],
+            new_untracked_families=[],
             deprecated_models=["old-model-123"],
             updated_models=[("updated-model", new_model)],
             breaking_changes=["API version changed from v1 to v2"],
@@ -190,8 +192,8 @@ class TestModelComparisonResult:
         )
 
         assert result.provider == ProviderName.ANTHROPIC
-        assert len(result.new_models) == 1
-        assert result.new_models[0].model_id == "new-model"
+        assert len(result.new_models_in_tracked_families) == 1
+        assert result.new_models_in_tracked_families[0].model_id == "new-model"
         assert result.deprecated_models == ["old-model-123"]
         assert len(result.updated_models) == 1
         assert result.updated_models[0][0] == "updated-model"
@@ -269,13 +271,14 @@ class TestModelComparisonResult:
         )
 
         # Verify all lists are empty but distinct instances
-        assert result.new_models == []
+        assert result.new_models_in_tracked_families == []
+        assert result.new_untracked_families == []
         assert result.deprecated_models == []
         assert result.updated_models == []
         assert result.breaking_changes == []
 
         # Verify they're independent instances
-        assert id(result.new_models) != id(result.deprecated_models)
+        assert id(result.new_models_in_tracked_families) != id(result.deprecated_models)
 
     @pytest.mark.parametrize(
         "provider",
@@ -306,19 +309,20 @@ class TestModelComparisonResult:
         assert result.checked_at == date.today()
 
     def test_multiple_new_models(self) -> None:
-        """ModelComparisonResult should handle multiple new models."""
+        """ModelComparisonResult should handle multiple new models in tracked families."""
         models = [
             DiscoveredModel(model_id=f"model-{i}", display_name=f"Model {i}") for i in range(5)
         ]
 
         result = ModelComparisonResult(
             provider=ProviderName.ANTHROPIC,
-            new_models=models,
+            new_models_in_tracked_families=models,
+            new_untracked_families=[],
             is_up_to_date=False,
         )
 
-        assert len(result.new_models) == 5
-        assert all(isinstance(m, DiscoveredModel) for m in result.new_models)
+        assert len(result.new_models_in_tracked_families) == 5
+        assert all(isinstance(m, DiscoveredModel) for m in result.new_models_in_tracked_families)
 
     def test_multiple_updated_models(self) -> None:
         """ModelComparisonResult should handle multiple updated models."""

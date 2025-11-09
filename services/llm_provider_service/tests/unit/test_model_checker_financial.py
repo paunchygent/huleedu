@@ -115,7 +115,8 @@ class TestAnthropicFinancial:
         # Verify result structure
         assert result.provider == ProviderName.ANTHROPIC
         assert isinstance(result.is_up_to_date, bool)
-        assert isinstance(result.new_models, list)
+        assert isinstance(result.new_models_in_tracked_families, list)
+        assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
         assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
@@ -196,7 +197,8 @@ class TestOpenAIFinancial:
         # Verify result structure
         assert result.provider == ProviderName.OPENAI
         assert isinstance(result.is_up_to_date, bool)
-        assert isinstance(result.new_models, list)
+        assert isinstance(result.new_models_in_tracked_families, list)
+        assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
         assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
@@ -283,7 +285,8 @@ class TestGoogleFinancial:
         # Verify result structure
         assert result.provider == ProviderName.GOOGLE
         assert isinstance(result.is_up_to_date, bool)
-        assert isinstance(result.new_models, list)
+        assert isinstance(result.new_models_in_tracked_families, list)
+        assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
         assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
@@ -377,7 +380,8 @@ class TestOpenRouterFinancial:
             # Verify result structure
             assert result.provider == ProviderName.OPENROUTER
             assert isinstance(result.is_up_to_date, bool)
-            assert isinstance(result.new_models, list)
+            assert isinstance(result.new_models_in_tracked_families, list)
+            assert isinstance(result.new_untracked_families, list)
             assert isinstance(result.deprecated_models, list)
             assert isinstance(result.updated_models, list)
             assert isinstance(result.breaking_changes, list)
