@@ -50,14 +50,18 @@ def format_model_status(
 
 
 def format_comparison_table(result: ModelComparisonResult, verbose: bool = False) -> Table:
-    """Format comparison result as Rich table.
+    """Format comparison result as Rich table with family-aware sections.
+
+    Displays models in two priority sections:
+    1. Tracked Family Updates: New variants in actively tracked families (actionable)
+    2. Untracked Families: Models from families not currently tracked (informational)
 
     Args:
         result: Comparison result to format
         verbose: Whether to include detailed metadata
 
     Returns:
-        Rich Table with comparison data
+        Rich Table with two sections: tracked families and untracked families
     """
     table = Table(
         title=f"[bold]{result.provider.value.upper()}[/bold] Models",
@@ -65,7 +69,7 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
         header_style="bold cyan",
     )
 
-    table.add_column("Status", style="dim", width=8)
+    table.add_column("Status", style="dim", width=12)
     table.add_column("Model ID", style="cyan")
     table.add_column("Display Name", style="white")
 
@@ -77,72 +81,76 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
     # Track which models we've seen
     seen_model_ids: set[str] = set()
 
-    # Add new models
-    for model in result.new_models:
-        seen_model_ids.add(model.model_id)
-        emoji, status = format_model_status(
-            discovered=model,
-            in_manifest=False,
-            is_new=True,
-            is_deprecated=False,
-            is_updated=False,
-        )
-
-        row = [f"{emoji} {status}", model.model_id, model.display_name]
-
-        if verbose:
-            api_ver = model.api_version or "N/A"
-            max_tok = str(model.max_tokens) if model.max_tokens else "N/A"
-            caps = ", ".join(model.capabilities[:3]) if model.capabilities else "N/A"
-            row.extend([api_ver, max_tok, caps])
-
-        table.add_row(*row)
-
-    # Add updated models
-    for model_id, discovered in result.updated_models:
-        seen_model_ids.add(model_id)
-        emoji, status = format_model_status(
-            discovered=discovered,
-            in_manifest=True,
-            is_new=False,
-            is_deprecated=False,
-            is_updated=True,
-        )
-
-        row = [f"{emoji} {status}", model_id, discovered.display_name]
-
-        if verbose:
-            api_ver = discovered.api_version or "N/A"
-            max_tok = str(discovered.max_tokens) if discovered.max_tokens else "N/A"
-            caps = ", ".join(discovered.capabilities[:3]) if discovered.capabilities else "N/A"
-            row.extend([api_ver, max_tok, caps])
-
-        table.add_row(*row)
-
-    # Add deprecated models
-    for model_id in result.deprecated_models:
-        if model_id not in seen_model_ids:
-            seen_model_ids.add(model_id)
-            emoji, status = format_model_status(
-                discovered=None,
-                in_manifest=True,
-                is_new=False,
-                is_deprecated=True,
-                is_updated=False,
-            )
-
-            row = [f"{emoji} {status}", model_id, "N/A"]
+    # Section 1: Tracked Family Updates (actionable)
+    if result.new_models_in_tracked_families:
+        table.add_row("[bold yellow]Tracked Family Updates[/bold yellow]", "", "", *[""] * (3 if verbose else 0))
+        for model in result.new_models_in_tracked_families:
+            seen_model_ids.add(model.model_id)
+            row = ["🔄 In-family", model.model_id, model.display_name]
 
             if verbose:
-                row.extend(["N/A", "N/A", "N/A"])
+                api_ver = model.api_version or "N/A"
+                max_tok = str(model.max_tokens) if model.max_tokens else "N/A"
+                caps = ", ".join(model.capabilities[:3]) if model.capabilities else "N/A"
+                row.extend([api_ver, max_tok, caps])
 
             table.add_row(*row)
+
+    # Section 2: Untracked Families (informational)
+    if result.new_untracked_families:
+        if result.new_models_in_tracked_families:
+            # Add separator row if we already had tracked family updates
+            table.add_row("", "", "", *[""] * (3 if verbose else 0))
+        table.add_row("[bold blue]Untracked Families (Informational)[/bold blue]", "", "", *[""] * (3 if verbose else 0))
+        for model in result.new_untracked_families:
+            seen_model_ids.add(model.model_id)
+            row = ["ℹ️  Untracked", model.model_id, model.display_name]
+
+            if verbose:
+                api_ver = model.api_version or "N/A"
+                max_tok = str(model.max_tokens) if model.max_tokens else "N/A"
+                caps = ", ".join(model.capabilities[:3]) if model.capabilities else "N/A"
+                row.extend([api_ver, max_tok, caps])
+
+            table.add_row(*row)
+
+    # Add updated models
+    if result.updated_models:
+        if result.new_models_in_tracked_families or result.new_untracked_families:
+            table.add_row("", "", "", *[""] * (3 if verbose else 0))
+        table.add_row("[bold]Updated Models[/bold]", "", "", *[""] * (3 if verbose else 0))
+        for model_id, discovered in result.updated_models:
+            seen_model_ids.add(model_id)
+            row = ["⚠️  Updated", model_id, discovered.display_name]
+
+            if verbose:
+                api_ver = discovered.api_version or "N/A"
+                max_tok = str(discovered.max_tokens) if discovered.max_tokens else "N/A"
+                caps = ", ".join(discovered.capabilities[:3]) if discovered.capabilities else "N/A"
+                row.extend([api_ver, max_tok, caps])
+
+            table.add_row(*row)
+
+    # Add deprecated models
+    if result.deprecated_models:
+        if result.new_models_in_tracked_families or result.new_untracked_families or result.updated_models:
+            table.add_row("", "", "", *[""] * (3 if verbose else 0))
+        table.add_row("[bold]Deprecated Models[/bold]", "", "", *[""] * (3 if verbose else 0))
+        for model_id in result.deprecated_models:
+            if model_id not in seen_model_ids:
+                seen_model_ids.add(model_id)
+                row = ["🗑️  Deprecated", model_id, "N/A"]
+
+                if verbose:
+                    row.extend(["N/A", "N/A", "N/A"])
+
+                table.add_row(*row)
 
     return table
 
 
 def format_summary(results: list[ModelComparisonResult]) -> None:
-    """Print summary of all comparison results.
+    """Print summary of all comparison results with family-aware counts.
 
     Args:
         results: List of comparison results
@@ -150,12 +158,14 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
     console.print("\n[bold]Summary[/bold]")
     console.print("=" * 50)
 
-    total_new = sum(len(r.new_models) for r in results)
-    total_deprecated = sum(len(r.deprecated_models) for r in results)
+    total_in_family = sum(len(r.new_models_in_tracked_families) for r in results)
+    total_untracked = sum(len(r.new_untracked_families) for r in results)
     total_updated = sum(len(r.updated_models) for r in results)
+    total_deprecated = sum(len(r.deprecated_models) for r in results)
     total_breaking = sum(len(r.breaking_changes) for r in results)
 
-    console.print(f"🆕 New models: {total_new}")
+    console.print(f"🔄 In-family updates: {total_in_family}")
+    console.print(f"ℹ️  Untracked families: {total_untracked}")
     console.print(f"⚠️  Updated models: {total_updated}")
     console.print(f"🗑️  Deprecated models: {total_deprecated}")
     console.print(f"⛔ Breaking changes: {total_breaking}")

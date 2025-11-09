@@ -848,7 +848,9 @@ Apply similar changes to:
 
 ---
 
-### Phase 3: CLI & Exit Code Updates (Week 1, Day 5)
+### Phase 3: CLI & Exit Code Updates (Week 1, Day 5) ✅ COMPLETED
+
+**Completion Date**: November 9, 2025
 
 #### Deliverables
 
@@ -857,34 +859,49 @@ Apply similar changes to:
 - ✅ Two-tier output formatting
 - ✅ Updated CLI docstrings
 - ✅ All exit code touchpoints verified
+- ✅ compatibility_reporter.py updated to use new fields
+- ✅ test_cli_check_models.py updated with new test cases
 
 #### Exit Code Update Checklist ⚠️
 
 **ALL of the following must be updated to avoid inconsistencies:**
 
-- [ ] **ExitCode enum definition** (`cli_check_models.py:74-80`)
-  - Remove `NEW_MODELS_AVAILABLE = 1` entirely
-  - Add `IN_FAMILY_UPDATES = 4`
-  - Add `UNTRACKED_FAMILIES = 5`
+- [x] **ExitCode enum definition** (`cli_check_models.py:74-82`)
+  - ✅ Removed `NEW_MODELS_AVAILABLE = 1` entirely
+  - ✅ Added `IN_FAMILY_UPDATES = 4`
+  - ✅ Added `UNTRACKED_FAMILIES = 5`
 
-- [ ] **determine_exit_code() logic** (`cli_check_models.py:186-205`)
-  - Update to check `new_models_in_tracked_families` (not `new_models`)
-  - Add priority order: breaking > in-family > untracked
+- [x] **determine_exit_code() logic** (`cli_check_models.py:188-221`)
+  - ✅ Updated to check `new_models_in_tracked_families` (not `new_models`)
+  - ✅ Added priority order: breaking > in-family > untracked
 
-- [ ] **CLI end messages** (`cli_check_models.py:373-383`)
-  - Add message for exit code 4 (in-family updates)
-  - Add message for exit code 5 (untracked families)
-  - Remove any references to exit code 1
+- [x] **CLI end messages** (`cli_check_models.py:386-405`)
+  - ✅ Added message for exit code 4 (in-family updates)
+  - ✅ Added message for exit code 5 (untracked families)
+  - ✅ Removed references to exit code 1
 
-- [ ] **Module docstring** (`cli_check_models.py:19-23`)
-  - Update exit codes table
-  - Remove code 1 documentation entirely
-  - Document codes 4 and 5
+- [x] **Module docstring** (`cli_check_models.py:19-24`)
+  - ✅ Updated exit codes table
+  - ✅ Removed code 1 documentation entirely
+  - ✅ Documented codes 4 and 5
 
-**Failure to update all touchpoints will cause:**
-- Runtime errors if old code references removed fields
-- Confusing error messages
-- Documentation drift
+#### Files Modified
+
+1. **cli_check_models.py**: Updated ExitCode enum, determine_exit_code() logic, CLI messages, and module docstring
+2. **cli_output_formatter.py**: Updated format_comparison_table() and format_summary() with family-aware sections
+3. **compatibility_reporter.py**: Updated to combine tracked and untracked families for reporting
+4. **test_cli_check_models.py**: Updated test cases to use new fields and exit codes
+
+#### Remaining Test Files (Phase 4 work)
+
+The following test files still reference `result.new_models` and need to be updated in Phase 4:
+- `test_google_checker.py`: Lines 319, 321
+- `test_openai_checker.py`: Lines 271, 273
+- `test_model_checker_financial.py`: Lines 118, 199, 286, 380
+- `test_anthropic_checker.py`: Lines 232, 234
+- `test_openrouter_checker.py`: Lines 311, 313
+- `test_model_checker_base.py`: Lines 168, 193-194, 272, 278, 320-321
+- `test_model_compatibility.py`: Lines 239, 243-244
 
 #### Implementation Steps
 

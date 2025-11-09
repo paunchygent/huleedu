@@ -223,7 +223,8 @@ class TestDetermineExitCode:
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[],
+                new_models_in_tracked_families=[],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=[],
@@ -235,8 +236,8 @@ class TestDetermineExitCode:
 
         assert exit_code == ExitCode.UP_TO_DATE
 
-    def test_exit_code_new_models(self) -> None:
-        """Should return NEW_MODELS_AVAILABLE when new models present."""
+    def test_exit_code_in_family_updates(self) -> None:
+        """Should return IN_FAMILY_UPDATES when new models in tracked families present."""
         new_model = DiscoveredModel(
             model_id="new-model",
             display_name="New Model",
@@ -245,7 +246,8 @@ class TestDetermineExitCode:
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[new_model],
+                new_models_in_tracked_families=[new_model],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=[],
@@ -255,21 +257,22 @@ class TestDetermineExitCode:
 
         exit_code = determine_exit_code(results)
 
-        assert exit_code == ExitCode.NEW_MODELS_AVAILABLE
+        assert exit_code == ExitCode.IN_FAMILY_UPDATES
 
-    def test_exit_code_updated_models(self) -> None:
-        """Should return NEW_MODELS_AVAILABLE when models updated."""
-        updated_model = DiscoveredModel(
-            model_id="updated-model",
-            display_name="Updated Model",
+    def test_exit_code_untracked_families(self) -> None:
+        """Should return UNTRACKED_FAMILIES when only untracked families present."""
+        untracked_model = DiscoveredModel(
+            model_id="untracked-model",
+            display_name="Untracked Model",
         )
 
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[],
+                new_models_in_tracked_families=[],
+                new_untracked_families=[untracked_model],
                 deprecated_models=[],
-                updated_models=[("updated-model", updated_model)],
+                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             )
@@ -277,14 +280,15 @@ class TestDetermineExitCode:
 
         exit_code = determine_exit_code(results)
 
-        assert exit_code == ExitCode.NEW_MODELS_AVAILABLE
+        assert exit_code == ExitCode.UNTRACKED_FAMILIES
 
     def test_exit_code_breaking_changes(self) -> None:
         """Should return BREAKING_CHANGES when breaking changes present."""
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[],
+                new_models_in_tracked_families=[],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=["API version changed from v1 to v2"],
@@ -306,7 +310,8 @@ class TestDetermineExitCode:
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[new_model],
+                new_models_in_tracked_families=[new_model],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=["API version changed"],
@@ -324,7 +329,8 @@ class TestDetermineExitCode:
         results = [
             ModelComparisonResult(
                 provider=ProviderName.ANTHROPIC,
-                new_models=[],
+                new_models_in_tracked_families=[],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=[],
@@ -332,9 +338,10 @@ class TestDetermineExitCode:
             ),
             ModelComparisonResult(
                 provider=ProviderName.OPENAI,
-                new_models=[
+                new_models_in_tracked_families=[
                     DiscoveredModel(model_id="new-model", display_name="New")
                 ],
+                new_untracked_families=[],
                 deprecated_models=[],
                 updated_models=[],
                 breaking_changes=[],
@@ -344,5 +351,5 @@ class TestDetermineExitCode:
 
         exit_code = determine_exit_code(results)
 
-        # At least one provider has new models
-        assert exit_code == ExitCode.NEW_MODELS_AVAILABLE
+        # At least one provider has new models in tracked families
+        assert exit_code == ExitCode.IN_FAMILY_UPDATES

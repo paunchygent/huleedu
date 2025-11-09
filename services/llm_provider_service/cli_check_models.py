@@ -18,9 +18,10 @@ Usage:
 
 Exit Codes:
     0: All up-to-date (no changes needed)
-    1: New models available (non-breaking)
     2: API error or authentication failure
     3: Breaking changes detected (requires manifest update)
+    4: In-family updates (new variants in tracked families)
+    5: Untracked families detected (informational only)
 """
 
 from __future__ import annotations
@@ -75,9 +76,10 @@ class ExitCode(int, Enum):
     """CLI exit codes."""
 
     UP_TO_DATE = 0
-    NEW_MODELS_AVAILABLE = 1
     API_ERROR = 2
     BREAKING_CHANGES = 3
+    IN_FAMILY_UPDATES = 4  # New variants in tracked families (actionable)
+    UNTRACKED_FAMILIES = 5  # New families detected (informational)
 
 
 class ReportFormat(str, Enum):
@@ -188,22 +190,34 @@ class CheckerFactory:
 def determine_exit_code(results: list[ModelComparisonResult]) -> ExitCode:
     """Determine appropriate exit code based on results.
 
+    Priority order:
+    1. BREAKING_CHANGES (3): API incompatibilities requiring manual intervention
+    2. IN_FAMILY_UPDATES (4): New variants in tracked families (actionable)
+    3. UNTRACKED_FAMILIES (5): New families detected (informational)
+    4. UP_TO_DATE (0): No changes
+
     Args:
         results: List of comparison results
 
     Returns:
         Exit code enum value
     """
+    # Highest priority: Breaking changes
     has_breaking = any(len(r.breaking_changes) > 0 for r in results)
     if has_breaking:
         return ExitCode.BREAKING_CHANGES
 
-    has_new = any(len(r.new_models) > 0 for r in results)
-    has_updates = any(len(r.updated_models) > 0 for r in results)
+    # Second priority: In-family updates (actionable)
+    has_in_family = any(len(r.new_models_in_tracked_families) > 0 for r in results)
+    if has_in_family:
+        return ExitCode.IN_FAMILY_UPDATES
 
-    if has_new or has_updates:
-        return ExitCode.NEW_MODELS_AVAILABLE
+    # Third priority: Untracked families (informational)
+    has_untracked = any(len(r.new_untracked_families) > 0 for r in results)
+    if has_untracked:
+        return ExitCode.UNTRACKED_FAMILIES
 
+    # Deprecated or updated models don't trigger warnings
     return ExitCode.UP_TO_DATE
 
 
@@ -376,10 +390,15 @@ def check_models(
             console.print(
                 "\n[red]⛔ Breaking changes detected! Update the manifest before proceeding.[/red]"
             )
-        elif exit_code == ExitCode.NEW_MODELS_AVAILABLE:
+        elif exit_code == ExitCode.IN_FAMILY_UPDATES:
             console.print(
-                "\n[yellow]⚠️  New models or updates available. "
-                "Consider updating the manifest.[/yellow]"
+                "\n[yellow]🔄 New variants detected in tracked families. "
+                "Consider updating manifest.[/yellow]"
+            )
+        elif exit_code == ExitCode.UNTRACKED_FAMILIES:
+            console.print(
+                "\n[blue]ℹ️  New model families detected. "
+                "Review separately if needed.[/blue]"
             )
         else:
             console.print("\n[green]✅ All providers are up-to-date![/green]")

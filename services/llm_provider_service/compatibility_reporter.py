@@ -86,6 +86,9 @@ class CompatibilityReporter:
             get_model_config(result.provider, default_model_id) if default_model_id else None
         )
 
+        # Combine both tracked and untracked families for reporting
+        all_new_models = result.new_models_in_tracked_families + result.new_untracked_families
+
         report: dict[str, Any] = {
             "check_date": datetime.now().isoformat() + "Z",
             "provider": result.provider.value,
@@ -94,7 +97,7 @@ class CompatibilityReporter:
                 result,
             ),
             "discovered_models": [
-                self._format_discovered_model(model) for model in result.new_models
+                self._format_discovered_model(model) for model in all_new_models
             ],
             "breaking_changes": result.breaking_changes,
             "is_up_to_date": result.is_up_to_date,
@@ -171,8 +174,9 @@ class CompatibilityReporter:
                 ]
             )
 
-        # New models section
-        if result.new_models:
+        # New models section (combine tracked and untracked families)
+        all_new_models = result.new_models_in_tracked_families + result.new_untracked_families
+        if all_new_models:
             lines.extend(
                 [
                     "## New Models Discovered",
@@ -180,7 +184,7 @@ class CompatibilityReporter:
                 ]
             )
 
-            for model in result.new_models:
+            for model in all_new_models:
                 lines.extend(self._format_model_markdown(model))
 
         # Deprecated models section
@@ -250,7 +254,8 @@ class CompatibilityReporter:
             lines.append("📋 Review the changes above and:")
             lines.append("")
 
-            if result.new_models:
+            all_new_models = result.new_models_in_tracked_families + result.new_untracked_families
+            if all_new_models:
                 lines.append("1. Run compatibility tests for new models:")
                 lines.append("   ```bash")
                 lines.append(
