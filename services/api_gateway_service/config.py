@@ -11,10 +11,11 @@ from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import SettingsConfigDict
 
 from common_core.config_enums import Environment
+from huleedu_service_libs.auth import JWTValidationSettings
 from huleedu_service_libs.config import SecureServiceSettings
 
 
-class Settings(SecureServiceSettings):
+class Settings(SecureServiceSettings, JWTValidationSettings):
     """Configuration settings for API Gateway Service."""
 
     model_config = SettingsConfigDict(

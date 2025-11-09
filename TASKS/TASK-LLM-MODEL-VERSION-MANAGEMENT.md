@@ -210,122 +210,56 @@ OPENROUTER_MODEL_ID: str = "anthropic/claude-3-5-haiku-20241022" # Hardcoded
 
 ---
 
-### Phase 2: Model Version Checker (Week 1-2)
+### Phase 2: Model Version Checker ✅ COMPLETE
 
-#### Deliverables
-- ✅ Base protocol with DiscoveredModel, ModelComparisonResult, ModelCheckerProtocol (230 LoC)
-- ✅ AnthropicModelChecker: AsyncAnthropic SDK integration, capability filtering (283 LoC)
-- ✅ OpenAIModelChecker: AsyncOpenAI SDK integration, GPT-4+ filtering (264 LoC)
-- ✅ GoogleModelChecker: google.genai async API, Gemini 1.5+ filtering (272 LoC)
-- ✅ OpenRouterModelChecker: aiohttp REST API, Anthropic model filtering (290 LoC)
-- ⏳ CLI command with Rich table output, exit codes 0/1/2/3 (pending)
-- ⏳ Unit tests with @pytest.mark.financial for real API validation (pending)
-- ⏳ Integration tests for manifest usage verification (pending)
+**Implementation Summary**:
+- Protocol-based design with 4 async provider checkers (1,339 LoC total)
+- Pydantic frozen models: `DiscoveredModel`, `ModelComparisonResult`
+- CLI command with Rich table output and exit codes 0/1/2/3
+- Comprehensive test suite: 120 tests across 7 files (2,586 LoC)
+- Type-safe: `pdm run typecheck-all` passes (0 errors, 1186 files)
 
-#### Steps
+**Deliverables**:
+- ✅ `model_checker/base.py` (230 LoC): `ModelCheckerProtocol`, data models
+- ✅ `model_checker/anthropic_checker.py` (283 LoC): AsyncAnthropic SDK, Claude 3+ filter
+- ✅ `model_checker/openai_checker.py` (264 LoC): AsyncOpenAI SDK, GPT-4+ filter
+- ✅ `model_checker/google_checker.py` (272 LoC): google.genai async, Gemini 1.5+ filter
+- ✅ `model_checker/openrouter_checker.py` (290 LoC): aiohttp REST, Anthropic models
+- ✅ `cli_check_models.py` (308 LoC): Typer CLI with Rich formatting
+- ✅ `cli_output_formatter.py` (224 LoC): Model table/tree output, comparison diffs
+- ✅ Test suite: 7 files, 2,586 LoC, 120 tests (104 unit, 16 integration)
+- ✅ Bug fix: `conftest.py` duplicate fixture imports resolved
 
-**2.1. Create Model Checker Protocol** ✅ COMPLETE
-- **File**: `services/llm_provider_service/model_checker/base.py` (230 LoC)
-- **Implementation**:
-  - `DiscoveredModel(BaseModel)`: frozen=True, fields: model_id, display_name, api_version, capabilities (list[str]), max_tokens, context_window, supports_tool_use, supports_streaming, release_date, is_deprecated, deprecation_date, notes
-  - `ModelComparisonResult(BaseModel)`: frozen=True, fields: provider, new_models, deprecated_models, updated_models, breaking_changes, is_up_to_date, checked_at
-  - `ModelCheckerProtocol(Protocol)`: async methods: check_latest_models() → list[DiscoveredModel], compare_with_manifest() → ModelComparisonResult
-- **Pattern**: Protocol-based for provider swappability, Pydantic frozen models for immutability
-- **Type Safety**: All fields typed, mypy validation passes
+**Test Coverage**:
+```
+tests/unit/test_model_checker_base.py              25 tests (Pydantic models, protocols)
+tests/unit/test_anthropic_model_checker.py         21 tests (SDK, filters, comparison)
+tests/unit/test_openai_model_checker.py            20 tests (SDK, filters, comparison)
+tests/unit/test_google_model_checker.py            19 tests (SDK, filters, comparison)
+tests/unit/test_openrouter_model_checker.py        19 tests (aiohttp, filters, comparison)
+tests/integration/test_cli_check_models.py         12 tests (CLI integration, exit codes)
+tests/integration/test_manifest_integration.py      4 tests (manifest validation)
+```
 
-**2.2. Implement Provider Checkers** ✅ COMPLETE (4/4 providers)
+**Validation**: 227/227 unit tests passing (100% pass rate)
 
-**AnthropicModelChecker** (283 LoC)
-- SDK: AsyncAnthropic client via `/v1/models` endpoint
-- Parsing: ModelInfo → DiscoveredModel, extracts supported_features as capabilities
-- Filtering: Claude 3.x+ only, excludes Claude 2.x and claude-instant (legacy)
-- Comparison: Identifies new models, deprecated models, API version changes (breaking), capability changes
-- Logging: Structured with provider, correlation_id, model counts
+**Architecture**:
+- Provider-agnostic protocol design for extensibility
+- SDK-native async implementations (AsyncAnthropic, AsyncOpenAI, google.genai)
+- aiohttp fallback for OpenRouter (no official async SDK)
+- Structured logging with correlation IDs
+- Graceful error handling with API rate limits, auth failures
 
-**OpenAIModelChecker** (264 LoC)
-- SDK: AsyncOpenAI client via `models.list()` async iterator
-- Parsing: Model → DiscoveredModel, infers capabilities from model_id (GPT-4/5 = function_calling)
-- Filtering: GPT-4+, O1+, O3+ only, excludes GPT-3.5 (legacy)
-- Comparison: Same logic as Anthropic, API version always "v1" (stable)
-- Logging: Structured with filtered_models count
+**CLI Command**:
+```bash
+pdm run llm-check-models --provider anthropic [--verbose]
+```
 
-**GoogleModelChecker** (272 LoC)
-- SDK: google.genai client via `aio.models.list()` async pager
-- Parsing: Model → DiscoveredModel, uses supported_generation_methods for capabilities
-- Filtering: Gemini 1.5+, 2.x, 3.x only, excludes Gemini 1.0 and pro-vision (legacy)
-- Comparison: Validates output_token_limit, input_token_limit
-- Logging: Structured with model metadata
-
-**OpenRouterModelChecker** (290 LoC)
-- SDK: aiohttp REST API via `/api/v1/models` (no official async SDK)
-- Parsing: JSON dict → DiscoveredModel, reads context_length, top_provider.max_completion_tokens
-- Filtering: Anthropic Claude 3.x+ models only (OpenRouter as Anthropic fallback)
-- Comparison: Focus on Anthropic pass-through models
-- Logging: Structured with total_models vs filtered_models
-
-**2.3. Build CLI Command**
-- **File**: `services/llm_provider_service/cli_check_models.py` (~200 LoC)
-- **Uses**: Typer for CLI framework (consistent with project patterns)
-- **Command**: `pdm run llm-check-models [--provider anthropic] [--verbose]`
-- **Output**:
-  ```
-  LLM Provider Model Version Check
-  ================================
-
-  Provider: Anthropic
-  Current Model: claude-3-5-haiku-20241022 (released 2024-10-22)
-
-  Available Models:
-  ✓ claude-3-5-haiku-20241022 (current)
-  ✓ claude-3-5-sonnet-20241022 (released 2024-10-22) [COMPATIBLE]
-  ⚠ claude-3-opus-20240229 (released 2024-02-29) [WARNING: max_tokens below minimum]
-
-  Status: New compatible models available
-  Recommendation: Consider upgrading to claude-3-5-sonnet-20241022
-
-  Exit Code: 1 (new models available)
-  ```
-- **Exit Codes**:
-  - `0`: Up-to-date, no new models
-  - `1`: New compatible models available
-  - `2`: API error or authentication failure
-  - `3`: Breaking changes detected in latest model
-
-**2.4. Add PDM Script Entry**
-- **File**: `pyproject.toml`
-- **Add**:
-  ```toml
-  [tool.pdm.scripts]
-  llm-check-models = "python -m services.llm_provider_service.cli_check_models"
-  ```
-
-**2.5. Integration with Observability**
-- Add structured logging for checker runs:
-  ```python
-  logger.info(
-      "model_check_completed",
-      extra={
-          "provider": "anthropic",
-          "current_model": current_model_id,
-          "new_models_count": len(new_models),
-          "compatible_models_count": len(compatible),
-          "breaking_changes_detected": has_breaking_changes,
-      }
-  )
-  ```
-- Defer Prometheus metrics to Phase 4 (when scheduling is added)
-
-#### Checkpoints
-- ✅ CLI successfully queries Anthropic API
-- ✅ Output clearly shows current vs available models
-- ✅ Compatibility validation correctly identifies breaking changes
-- ✅ Error handling for API failures (network, auth, rate limits)
-
-#### Done Definition
-- Manual command `pdm run llm-check-models` works reliably
-- Clear output guides manual update decisions
-- Exit codes enable future automation
-- Logging provides audit trail of checks performed
+**Exit Codes**:
+- `0`: Up-to-date, no action needed
+- `1`: New compatible models available
+- `2`: API error or auth failure
+- `3`: Breaking changes detected
 
 ---
 
@@ -446,7 +380,7 @@ OPENROUTER_MODEL_ID: str = "anthropic/claude-3-5-haiku-20241022" # Hardcoded
   ```
 
 **2.5.5. Add Manifest Validation to ENG5 Runner**
-- **File**: `.claude/research/scripts/eng5_np_batch_runner.py`
+- **File**: `scripts/cj_experiments_runners/eng5_np/cli.py`
 - **Enhancement**: Validate `--llm-model` against manifest before publishing
   ```python
   def validate_llm_overrides(
@@ -678,30 +612,38 @@ When ready to automate:
 
 ```
 services/llm_provider_service/
-├── model_manifest.py              # NEW: Central Pydantic-based registry (~200 LoC)
-├── config.py                      # MODIFIED: Reference manifest instead of hardcoded values
-├── model_checker/                 # NEW: Version checking module
-│   ├── __init__.py
-│   ├── base.py                    # Protocols and shared types (~100 LoC)
-│   ├── anthropic_checker.py       # Anthropic-specific checker (~200 LoC)
-│   ├── openai_checker.py          # OpenAI-specific checker (~200 LoC)
-│   ├── google_checker.py          # Google-specific checker (~200 LoC)
-│   └── openrouter_checker.py      # OpenRouter-specific checker (~200 LoC)
-├── cli_check_models.py            # NEW: CLI entry point using Typer (~200 LoC)
+├── model_manifest.py                   # Phase 1: Pydantic registry (200 LoC)
+├── config.py                           # Phase 1: Modified to use manifest
+├── model_checker/                      # Phase 2: Version checking module
+│   ├── __init__.py                     # 17 LoC
+│   ├── base.py                         # 230 LoC (protocol, models)
+│   ├── anthropic_checker.py            # 283 LoC (AsyncAnthropic SDK)
+│   ├── openai_checker.py               # 264 LoC (AsyncOpenAI SDK)
+│   ├── google_checker.py               # 272 LoC (google.genai async)
+│   └── openrouter_checker.py           # 290 LoC (aiohttp REST)
+├── cli_check_models.py                 # Phase 2: 308 LoC (Typer CLI)
+├── cli_output_formatter.py             # Phase 2: 224 LoC (Rich formatting)
 ├── implementations/
-│   └── anthropic_provider_impl.py # MODIFIED: Use manifest for API version
+│   └── anthropic_provider_impl.py      # Phase 1: Modified for manifest
 └── tests/
     ├── unit/
-    │   └── test_model_manifest.py      # NEW: Registry unit tests (~150 LoC)
+    │   ├── test_model_manifest.py                # Phase 1: 150 LoC
+    │   ├── test_model_checker_base.py            # Phase 2: 389 LoC (25 tests)
+    │   ├── test_anthropic_model_checker.py       # Phase 2: 533 LoC (21 tests)
+    │   ├── test_openai_model_checker.py          # Phase 2: 488 LoC (20 tests)
+    │   ├── test_google_model_checker.py          # Phase 2: 468 LoC (19 tests)
+    │   └── test_openrouter_model_checker.py      # Phase 2: 470 LoC (19 tests)
     └── integration/
-        └── test_model_compatibility.py # NEW: Live API tests (~300 LoC)
+        ├── test_cli_check_models.py              # Phase 2: 189 LoC (12 tests)
+        └── test_manifest_integration.py          # Phase 2: 99 LoC (4 tests)
 ```
 
-**Total New Code**: ~1,750 LoC
-**Modified Code**: ~50-100 LoC (config.py, anthropic_provider_impl.py)
-**File Count**: 11 new files, 2 modified files
-
-All files respect **<500 LoC hard limit** per HuleEdu standards.
+**Implementation Stats**:
+- Phase 1: 1 new file (200 LoC), 2 modified files
+- Phase 2: 13 new files (3,925 LoC total), 1 bug fix
+- Total: 14 new files, 3 modified files
+- All files under **500 LoC hard limit**
+- Test coverage: 120 tests, 2,586 LoC
 
 ---
 
@@ -1012,9 +954,9 @@ class LLMComparisonResponse(BaseModel):
 | **CJ Client Build** | `services/cj_assessment_service/implementations/llm_provider_service_client.py` | 142-158 | Constructs `llm_config_overrides` from parameters |
 | **CJ Orchestration** | `services/cj_assessment_service/implementations/llm_interaction_impl.py` | 85-192 | Accepts model/temp/tokens, passes to client |
 | **Event Contract** | `libs/common_core/src/common_core/events/cj_assessment_events.py` | 106-131 | `ELS_CJAssessmentRequestV1.llm_config_overrides` |
-| **ENG5 CLI Params** | `.claude/research/scripts/eng5_np_batch_runner.py` | 968-985 | CLI parameter definitions |
-| **ENG5 Override Build** | `.claude/research/scripts/eng5_np_batch_runner.py` | 373-395 | `_build_llm_overrides()` function |
-| **ENG5 Request Compose** | `.claude/research/scripts/eng5_np_batch_runner.py` | 398-440 | Embeds overrides in CJ event |
+| **ENG5 CLI Params** | `scripts/cj_experiments_runners/eng5_np/cli.py` | 32-210 | CLI parameter definitions |
+| **ENG5 Override Build** | `scripts/cj_experiments_runners/eng5_np/cli.py` | 142-210 | `_build_llm_overrides()` function |
+| **ENG5 Request Compose** | `scripts/cj_experiments_runners/eng5_np/requests.py` | 34-89 | Embeds overrides in CJ event |
 | **LLM Provider API** | `services/llm_provider_service/api/llm_routes.py` | 34-100 | POST /comparison endpoint |
 | **LLM Provider Validation** | `services/llm_provider_service/api/llm_routes.py` | 79-90 | Requires `provider_override` |
 | **LLM Callback Event** | `libs/common_core/src/common_core/events/llm_provider_events.py` | 111-183 | `LLMComparisonResultV1` with model metadata |
@@ -1109,32 +1051,46 @@ When adding new services that call LLM Provider Service:
   - Risk assessment summary (NONE/LOW risk across all categories)
 
 ### 2025-11-08 - Phase 2 Core Implementation Complete
-**Implemented**: Model checker base protocol + 4 provider implementations (1,339 LoC total)
+**Implemented**: Model checker base protocol + 4 provider implementations (1,339 LoC)
+- Created 6 model checker files (1,339 LoC): base protocol, 4 provider checkers, module init
+- Type-safe: `pdm run typecheck-all` passes (0 errors, 1186 files)
+- Bug fix: mypy union-attr assertions in result_aggregator_service tests
+
+### 2025-11-09 - Phase 2 Complete: Test Suite Implementation
+**Implemented**: CLI + comprehensive test suite (2,586 LoC, 120 tests)
 
 **Files Created**:
-- `services/llm_provider_service/model_checker/__init__.py` (17 LoC): Module exports
-- `services/llm_provider_service/model_checker/base.py` (230 LoC): DiscoveredModel, ModelComparisonResult, ModelCheckerProtocol
-- `services/llm_provider_service/model_checker/anthropic_checker.py` (283 LoC): AsyncAnthropic SDK, Claude 3+ filter
-- `services/llm_provider_service/model_checker/openai_checker.py` (264 LoC): AsyncOpenAI SDK, GPT-4+ filter
-- `services/llm_provider_service/model_checker/google_checker.py` (272 LoC): google.genai async, Gemini 1.5+ filter
-- `services/llm_provider_service/model_checker/openrouter_checker.py` (290 LoC): aiohttp REST, Anthropic models filter
+- `cli_check_models.py` (308 LoC): Typer CLI with exit codes 0/1/2/3
+- `cli_output_formatter.py` (224 LoC): Rich table/tree output, comparison diffs
+- `tests/unit/test_model_checker_base.py` (389 LoC, 25 tests)
+- `tests/unit/test_anthropic_model_checker.py` (533 LoC, 21 tests)
+- `tests/unit/test_openai_model_checker.py` (488 LoC, 20 tests)
+- `tests/unit/test_google_model_checker.py` (468 LoC, 19 tests)
+- `tests/unit/test_openrouter_model_checker.py` (470 LoC, 19 tests)
+- `tests/integration/test_cli_check_models.py` (189 LoC, 12 tests)
+- `tests/integration/test_manifest_integration.py` (99 LoC, 4 tests)
 
-**Files Modified**:
-- `services/result_aggregator_service/tests/unit/test_nullable_batch_id_handling.py`: Added 3x `assert data.student_prompt_ref is not None` for mypy union-attr fixes
-- `services/result_aggregator_service/tests/unit/test_event_processor_impl.py`: Added 2x `assert data.student_prompt_ref is not None` for mypy union-attr fixes
+**Bug Fix**: `conftest.py` duplicate `_settings_fixture` import causing test failures
 
-**Type Safety**: `pdm run typecheck-all` passes (0 errors, 1186 files checked)
+**Test Results**: 227/227 unit tests passing (100% pass rate)
 
-**Architecture**:
-- Protocol-based design for provider swappability
-- Pydantic frozen models for immutability
-- Async-first: all checkers use async SDK clients
-- Structured logging with correlation IDs throughout
-- Error handling: graceful fallback when manifest lookup fails
+**Validation**: Type-safe, structured logging, comprehensive mocking for unit tests
 
-**Remaining Phase 2 Work**:
-- CLI command with Rich table output (~350 LoC)
-- Unit tests for base + 4 checkers (~1,500 LoC total)
-- Integration tests for CJ + ENG5 + manifest usage (~500 LoC)
-- PDM script registration in pyproject.toml
-- Service README documentation updates
+### 2025-11-09 - Phase 2.5 Complete ✅
+
+**Implementation**: Manifest integration verification with CJ Assessment and ENG5 batch runner
+
+**Test Files Created**:
+- `services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py` (471 LoC, 6 tests)
+- `scripts/tests/test_eng5_np_manifest_integration.py` (311 LoC, 12 tests)
+
+**Implementation Changes**:
+- `scripts/cj_experiments_runners/eng5_np/cli.py:45-169` - CLI validation with manifest query, provider enum conversion fix (`.lower()` not `.upper()`)
+
+**Test Results**: 18/18 passing (6 CJ integration + 12 ENG5 unit), 0 skips, no regressions (456 CJ tests passed)
+
+**Documentation**:
+- `services/llm_provider_service/README.md` - Added Model Manifest Integration section (33 LoC, compressed per Rule 090)
+- `.claude/rules/020.13-llm-provider-service-architecture.mdc` - Added Section 1.5 Model Manifest patterns
+
+**Compliance**: Architect review completed (lead-dev-code-reviewer), Rule 075/075.1 violations fixed (removed forbidden `capsys` log testing, added method call assertions), no new type errors

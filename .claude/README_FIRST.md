@@ -145,6 +145,22 @@ pdm run typecheck-all # Type checking
 - Added `.claude/research/scripts/eng5_np_batch_runner.py` plus `pdm run eng5-np-run` so engineers can inspect assets (`plan`), emit schema-compliant artefact stubs (`dry-run`), and publish real `ELS_CJAssessmentRequestV1` events via Kafka (`execute`, overridable with `--no-kafka`). Execute mode now supports `--llm-provider/--llm-model/--llm-temperature/--llm-max-tokens` overrides and optional `--await-completion` to tail `huleedu.cj_assessment.completed.v1`.
 - Contract-focused tests live at `.claude/research/scripts/test_eng5_np_batch_runner.py`, covering checksum helpers, directory snapshots, stub writer behaviour, real dataset detection, envelope generation, and override plumbing.
 
+### 15. CJ Admin Auth & CLI (2025-11-09)
+- `/admin/v1/assessment-instructions` blueprint is live with the shared JWT validator (Identity-issued tokens, `roles` must include `admin`, permissions claim follow-up). Metrics counter `cj_admin_instruction_operations_total` tracks CRUD outcomes.
+- `Settings` inherits the `JWTValidationSettings` mixin (new module under `libs/huleedu_service_libs/auth/`) plus `ENABLE_ADMIN_ENDPOINTS` gating (default on outside prod, opt-in for prod).
+- API Gateway now imports the shared `decode_and_validate_jwt` helper, so all services share one JWT validation path.
+- `pdm run cj-admin …` Typer CLI authenticates via Identity `/v1/auth/login`, caches/refreshes tokens (with optional `CJ_ADMIN_TOKEN` override), and exposes `instructions create/list/get/delete` + `scales list` commands for seeding ENG5 NP instructions.
+
+### 16. Phase 3.2 Typing & Test Hardening (2025-11-09)
+- Introduced an `AssessmentInstructionStore` test helper and updated every CJ repository mock (admin routes, shared mocks, anchor helpers, callback manager scenarios, workflow continuation, single-essay finalizer) so they return concrete `AssessmentInstruction` instances without `Any` leakage.
+- Tightened the CJ admin Typer CLI by adding JSON type aliases plus a `TokenCache` `TypedDict`, giving `_load_cache`, `_refresh`, `_admin_request`, etc., precise signatures.
+- API Gateway middleware/providers now call the shared JWT helpers with explicit `correlation_id`, `service`, and `operation` keywords to satisfy the new signature.
+- Added a dedicated `CorrelationContext` fixture for the admin route tests and reran `pdm run typecheck-all` plus the anchor/callback/admin CLI/unit suites to verify the type-safe surface.
+
+### 17. ENG5 Runner Architect Brief (2025-11-09)
+- `TASKS/TASK-CJ-PHASE3-ARCHITECT-NEXT-SESSION.md` defines the next architect-led session for Phase 3.3 (metadata enforcement, artefact validation, execute-mode runbook).
+- Critical focus: ensure `LLMComparisonResultV1` metadata is mandatory end-to-end, keep runner artefacts schema-compliant, and document the operational steps before the next ENG5 NP execute run.
+
 ## Configuration Files
 - `.env` - Environment variables (not in git)
 - `pyproject.toml` - PDM dependencies and scripts

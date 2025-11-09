@@ -21,12 +21,13 @@ from services.cj_assessment_service.cj_core_logic.batch_finalizer import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_db import CJBatchUpload, ProcessedEssay
+from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchUpload, ProcessedEssay
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
     ContentClientProtocol,
 )
+from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
 
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ class RepoMock(CJRepositoryProtocol):
         self._essays = essays
         self.status_updates: list[tuple[int, CJBatchStatusEnum]] = []
         self.score_updates: list[dict[str, float]] = []
+        self._instruction_store = AssessmentInstructionStore()
 
     def session(self) -> Any:
         return session_ctx(self._session)
@@ -58,8 +60,8 @@ class RepoMock(CJRepositoryProtocol):
     # Unused protocol methods for this test
     async def get_assessment_instruction(
         self, session: Any, assignment_id: str | None, course_id: str | None
-    ) -> Any | None:  # noqa: E501
-        return None
+    ) -> AssessmentInstruction | None:  # noqa: E501
+        return self._instruction_store.get(assignment_id=assignment_id, course_id=course_id)
 
     async def get_cj_batch_upload(self, session: Any, cj_batch_id: int) -> Any | None:
         return self._session._batch
@@ -100,6 +102,44 @@ class RepoMock(CJRepositoryProtocol):
 
     async def get_final_cj_rankings(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         return []
+
+    async def upsert_assessment_instruction(
+        self,
+        session: Any,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+    ) -> AssessmentInstruction:
+        return self._instruction_store.upsert(
+            assignment_id=assignment_id,
+            course_id=course_id,
+            instructions_text=instructions_text,
+            grade_scale=grade_scale,
+        )
+
+    async def list_assessment_instructions(
+        self,
+        session: Any,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[AssessmentInstruction], int]:
+        return self._instruction_store.list(limit=limit, offset=offset, grade_scale=grade_scale)
+
+    async def delete_assessment_instruction(
+        self,
+        session: Any,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        return self._instruction_store.delete(
+            assignment_id=assignment_id,
+            course_id=course_id,
+        )
 
     async def initialize_db_schema(self) -> None:
         return None

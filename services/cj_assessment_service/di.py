@@ -9,6 +9,10 @@ from aiokafka.errors import KafkaError
 from common_core import LLMProviderType
 from dishka import Provider, Scope, provide
 from huleedu_service_libs.database import DatabaseMetrics
+from huleedu_service_libs.error_handling.correlation import (
+    CorrelationContext,
+    extract_correlation_context_from_request,
+)
 from huleedu_service_libs.kafka.resilient_kafka_bus import ResilientKafkaPublisher
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.outbox.manager import OutboxManager
@@ -151,6 +155,20 @@ class CJAssessmentServiceProvider(Provider):
     def provide_retry_manager(self, settings: Settings) -> RetryManagerProtocol:
         """Provide retry manager for LLM API calls."""
         return RetryManagerImpl(settings)
+
+    @provide(scope=Scope.REQUEST)
+    def provide_correlation_context(self) -> CorrelationContext:
+        """Provide correlation context for request-scoped operations."""
+
+        from quart import g, request
+
+        ctx = getattr(g, "correlation_context", None)
+        if isinstance(ctx, CorrelationContext):
+            return ctx
+
+        context = extract_correlation_context_from_request(request)
+        setattr(g, "correlation_context", context)
+        return context
 
     # LLM Provider Service Client
     @provide(scope=Scope.APP)

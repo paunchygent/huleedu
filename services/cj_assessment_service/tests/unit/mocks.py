@@ -14,7 +14,9 @@ from unittest.mock import AsyncMock
 from huleedu_service_libs.protocols import RedisClientProtocol
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.models_db import AssessmentInstruction
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
 
 
 class MockRedisClient(RedisClientProtocol):
@@ -87,6 +89,7 @@ class MockDatabase(CJRepositoryProtocol):
         self.comparison_pairs: dict[int, list] = {}  # Store comparison pairs by cj_batch_id
         self.next_batch_id = 1
         self.should_fail_create_batch = False
+        self._instruction_store = AssessmentInstructionStore()
 
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Provide async database session context manager."""
@@ -365,10 +368,9 @@ class MockDatabase(CJRepositoryProtocol):
         session: AsyncSession,
         assignment_id: str | None,
         course_id: str | None,
-    ) -> Any | None:
+    ) -> AssessmentInstruction | None:
         """Get assessment instruction by assignment or course ID."""
-        # Mock implementation - return None for tests
-        return None
+        return self._instruction_store.get(assignment_id=assignment_id, course_id=course_id)
 
     async def get_cj_batch_upload(
         self,
@@ -398,6 +400,44 @@ class MockDatabase(CJRepositoryProtocol):
             "instructions_text": "Mock instructions",
             "grade_scale": "swedish_8_anchor",
         }
+
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+    ) -> AssessmentInstruction:
+        return self._instruction_store.upsert(
+            assignment_id=assignment_id,
+            course_id=course_id,
+            instructions_text=instructions_text,
+            grade_scale=grade_scale,
+        )
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[AssessmentInstruction], int]:
+        return self._instruction_store.list(limit=limit, offset=offset, grade_scale=grade_scale)
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        return self._instruction_store.delete(
+            assignment_id=assignment_id,
+            course_id=course_id,
+        )
 
     async def get_anchor_essay_references(
         self,

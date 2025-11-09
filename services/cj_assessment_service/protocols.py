@@ -132,6 +132,39 @@ class CJRepositoryProtocol(Protocol):
         """Fetch assignment-level metadata including instructions and grade scale."""
         ...
 
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+    ) -> Any:  # AssessmentInstruction
+        """Create or update assessment instructions for an assignment/course."""
+        ...
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[Any], int]:  # list[AssessmentInstruction], total_count
+        """List assessment instructions with pagination support."""
+        ...
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        """Delete assessment instructions scoped to assignment or course."""
+        ...
+
     async def get_cj_batch_upload(
         self,
         session: AsyncSession,

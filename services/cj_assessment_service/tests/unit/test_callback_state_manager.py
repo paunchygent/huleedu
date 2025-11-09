@@ -36,8 +36,9 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_api import ComparisonTask
-from services.cj_assessment_service.models_db import CJBatchState, ComparisonPair
+from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchState, ComparisonPair
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
 
 
 class MockSession:
@@ -92,6 +93,7 @@ class MockRepository(CJRepositoryProtocol):
     def __init__(self, session: MockSession):
         """Initialize with mock session."""
         self._session = session
+        self._instruction_store = AssessmentInstructionStore()
 
     def session(self) -> AsyncContextManager[AsyncSession]:
         """Return session context manager."""
@@ -100,8 +102,8 @@ class MockRepository(CJRepositoryProtocol):
     # Minimal implementations for unused methods
     async def get_assessment_instruction(
         self, session: AsyncSession, assignment_id: str | None, course_id: str | None
-    ) -> Any | None:
-        return None
+    ) -> AssessmentInstruction | None:
+        return self._instruction_store.get(assignment_id=assignment_id, course_id=course_id)
 
     async def get_cj_batch_upload(self, session: AsyncSession, cj_batch_id: int) -> Any | None:
         return None
@@ -165,6 +167,44 @@ class MockRepository(CJRepositoryProtocol):
         self, session: AsyncSession, results: list[Any], cj_batch_id: int
     ) -> None:
         pass
+
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+    ) -> AssessmentInstruction:
+        return self._instruction_store.upsert(
+            assignment_id=assignment_id,
+            course_id=course_id,
+            instructions_text=instructions_text,
+            grade_scale=grade_scale,
+        )
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[AssessmentInstruction], int]:
+        return self._instruction_store.list(limit=limit, offset=offset, grade_scale=grade_scale)
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        return self._instruction_store.delete(
+            assignment_id=assignment_id,
+            course_id=course_id,
+        )
 
     async def update_essay_scores_in_batch(
         self, session: AsyncSession, cj_batch_id: int, scores: dict[str, float]

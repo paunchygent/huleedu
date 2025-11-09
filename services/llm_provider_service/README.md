@@ -4,22 +4,17 @@ Centralized LLM provider abstraction and management service for HuleEdu platform
 
 ## Overview
 
-The LLM Provider Service provides a unified interface for interacting with multiple LLM providers (Anthropic, OpenAI, Google, OpenRouter) with built-in resilience, caching, and observability.
-
-**Recent Updates (2025-07-02)**:
-- ✅ Fixed response format for CJ Assessment compatibility (`winner`/`justification` format)
-- ✅ All 4 providers fully implemented with real API integrations
-- ✅ Redis resilience with local cache fallback validated in production
-- ✅ Circuit breaker protection on all external calls
+Centralized LLM provider abstraction with queue-based resilience, model manifest management, and NO response caching (preserves psychometric validity).
 
 ## Key Features
 
-- **Multi-Provider Support**: Anthropic/Claude, OpenAI/GPT, Google/Gemini, OpenRouter
-- **Circuit Breaker Protection**: Automatic failure detection and recovery
-- **Response Caching**: Redis-based caching to reduce costs and latency
-- **Event-Driven Observability**: Publishes usage events for monitoring and analytics
+- **Multi-Provider Support**: Anthropic, OpenAI, Google, OpenRouter with manifest-based model selection
+- **Queue Resilience**: Redis → Local queue fallback with 200/202 response pattern
+- **Circuit Breaker Protection**: Automatic provider failure detection and recovery
+- **Model Manifest**: Centralized single source of truth for all model versions
+- **NO Caching**: Fresh LLM responses for every request (psychometric validity)
 - **Cost Tracking**: Token usage and cost estimation per request
-- **Distributed Tracing**: Full OpenTelemetry integration
+- **OpenTelemetry**: Full distributed tracing across queue operations
 
 ## Architecture
 
@@ -166,6 +161,40 @@ async with session.post(
     # result contains: winner, justification, confidence (1-5 scale)
 ```
 
+## Model Manifest Integration
+
+### Manifest Query (`model_manifest.py:74-350`)
+```python
+from services.llm_provider_service.model_manifest import get_model_config, ProviderName
+
+config = get_model_config(ProviderName.ANTHROPIC, "claude-3-5-haiku-20241022")
+# Returns: ModelConfig(model_id, display_name, max_tokens, release_date, is_deprecated, ...)
+```
+
+### Building LLMConfigOverrides
+```python
+from common_core.events.cj_assessment_events import LLMConfigOverrides
+
+overrides = LLMConfigOverrides(
+    provider_override=LLMProviderType.ANTHROPIC,
+    model_override=config.model_id,  # From manifest
+    temperature_override=0.3,
+)
+```
+
+### Event Integration Flow
+```
+CLI/Service → validate_llm_overrides() → ELS_CJAssessmentRequestV1(llm_config_overrides)
+  → Kafka → CJ Service → HTTP POST /api/v1/comparison → LLM Provider Service
+  → LLMComparisonResultV1 callback (includes actual model/provider/cost)
+```
+
+**Files**:
+- Manifest: `services/llm_provider_service/model_manifest.py`
+- Client: `services/cj_assessment_service/implementations/llm_provider_service_client.py:44-234`
+- CLI validation: `scripts/cj_experiments_runners/eng5_np/cli.py:45-169`
+- Tests: `services/cj_assessment_service/tests/integration/test_llm_provider_manifest_integration.py`
+
 ## Monitoring
 
 ### Prometheus Metrics
@@ -185,31 +214,6 @@ async with session.post(
 ## Testing
 
 ```bash
-# Unit tests
-pdm run test-unit
-
-# Integration tests
-pdm run test-integration
-
-# Test coverage
-pdm run test-coverage
+pdm run pytest-root services/llm_provider_service/tests/unit/ -v       # Unit tests
+pdm run pytest-root services/llm_provider_service/tests/integration/ -v  # Integration tests
 ```
-
-## CJ Assessment Integration Status
-
-### ✅ Completed (Phase 1)
-1. LLM Provider Service deployed and operational
-2. CJ Assessment HTTP client implemented (`LLMProviderServiceClient`)
-3. Dependency injection updated to route through centralized service
-4. Configuration and Docker dependencies added
-
-### 🚧 Next Steps
-1. Integration testing with both services running together
-2. Verify enum usage (replace string literals with `LLMProviderType`)
-3. Performance testing and monitoring
-4. Remove old provider implementations from CJ Assessment after validation
-
-### Important Notes
-- Provider configuration is now **required** in all requests (no defaults)
-- Response format is CJ Assessment compatible (1-5 confidence scale)
-- All 4 providers (Anthropic, OpenAI, Google, OpenRouter) available

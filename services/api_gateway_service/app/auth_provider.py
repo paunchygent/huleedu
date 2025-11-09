@@ -3,14 +3,13 @@ from __future__ import annotations
 from typing import NewType
 from uuid import UUID, uuid4
 
-import jwt
 from dishka import Provider, Scope, from_context, provide
 from fastapi import Request
 
+from huleedu_service_libs.auth import decode_and_validate_jwt
 from huleedu_service_libs.error_handling import raise_authentication_error
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.api_gateway_service.app.jwt_utils import decode_and_validate_jwt
 from services.api_gateway_service.config import Settings
 
 # Custom type to avoid circular dependency with str
@@ -76,7 +75,13 @@ class AuthProvider(Provider):
             # Reuse payload from bridge when available to avoid re-decoding
             payload = getattr(request.state, "jwt_payload", None)
             if not isinstance(payload, dict):
-                payload = decode_and_validate_jwt(token, settings, correlation_id)
+                payload = decode_and_validate_jwt(
+                    token,
+                    settings,
+                    correlation_id=correlation_id,
+                    service="api_gateway_service",
+                    operation="provide_user_id",
+                )
 
             # Extract user ID
             user_id = payload.get("sub")
@@ -93,22 +98,6 @@ class AuthProvider(Provider):
             logger.debug(f"Successfully validated token for user {user_id}")
             return user_id
 
-        except jwt.ExpiredSignatureError:
-            raise_authentication_error(
-                service="api_gateway_service",
-                operation="validate_jwt",
-                message="Token has expired",
-                correlation_id=correlation_id,
-                reason="jwt_expired",
-            )
-        except jwt.InvalidTokenError as e:
-            raise_authentication_error(
-                service="api_gateway_service",
-                operation="validate_jwt",
-                message=f"Could not validate credentials: {str(e)}",
-                correlation_id=correlation_id,
-                reason="jwt_invalid",
-            )
         except HuleEduError:
             # Re-raise HuleEduError without wrapping it
             raise
@@ -139,7 +128,13 @@ class AuthProvider(Provider):
             # Reuse payload from bridge when available to avoid re-decoding
             payload = getattr(request.state, "jwt_payload", None)
             if not isinstance(payload, dict):
-                payload = decode_and_validate_jwt(token, settings, correlation_id)
+                payload = decode_and_validate_jwt(
+                    token,
+                    settings,
+                    correlation_id=correlation_id,
+                    service="api_gateway_service",
+                    operation="provide_org_id",
+                )
 
             # Try configured org_id claim names in order
             for claim_name in settings.JWT_ORG_ID_CLAIM_NAMES:
@@ -159,22 +154,6 @@ class AuthProvider(Provider):
             logger.debug("No org_id claim present; proceeding without organizational context")
             return None
 
-        except jwt.ExpiredSignatureError:
-            raise_authentication_error(
-                service="api_gateway_service",
-                operation="validate_jwt",
-                message="Token has expired",
-                correlation_id=correlation_id,
-                reason="jwt_expired",
-            )
-        except jwt.InvalidTokenError as e:
-            raise_authentication_error(
-                service="api_gateway_service",
-                operation="validate_jwt",
-                message=f"Could not validate credentials: {str(e)}",
-                correlation_id=correlation_id,
-                reason="jwt_invalid",
-            )
         except HuleEduError:
             raise
         except Exception as e:

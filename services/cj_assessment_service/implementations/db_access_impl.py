@@ -13,7 +13,7 @@ from typing import Any, AsyncIterator, Optional
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from huleedu_service_libs.database import DatabaseMetrics, setup_database_monitoring
 from huleedu_service_libs.logging_utils import create_service_logger
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from services.cj_assessment_service.config import Settings
@@ -76,6 +76,16 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         self.logger.info("CJ Assessment Service database schema initialized")
+
+    @staticmethod
+    def _validate_instruction_scope(
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> None:
+        """Ensure exactly one of assignment_id or course_id is provided."""
+
+        if bool(assignment_id) == bool(course_id):
+            raise ValueError("Provide exactly one of assignment_id or course_id")
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
@@ -434,6 +444,103 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             "grade_scale": instruction.grade_scale,
             "instruction_id": instruction.id,
         }
+
+    async def upsert_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+        instructions_text: str,
+        grade_scale: str,
+    ) -> AssessmentInstruction:
+        """Create or update assessment instructions for an assignment/course."""
+
+        self._validate_instruction_scope(assignment_id, course_id)
+
+        stmt = select(AssessmentInstruction)
+        if assignment_id:
+            stmt = stmt.where(AssessmentInstruction.assignment_id == assignment_id)
+        else:
+            stmt = stmt.where(
+                AssessmentInstruction.course_id == course_id,
+                AssessmentInstruction.assignment_id.is_(None),
+            )
+
+        result = await session.execute(stmt)
+        instruction = result.scalars().first()
+
+        if instruction:
+            instruction.instructions_text = instructions_text
+            instruction.grade_scale = grade_scale
+        else:
+            instruction = AssessmentInstruction(
+                assignment_id=assignment_id,
+                course_id=course_id,
+                instructions_text=instructions_text,
+                grade_scale=grade_scale,
+            )
+            session.add(instruction)
+
+        await session.flush()
+        await session.refresh(instruction)
+        return instruction
+
+    async def list_assessment_instructions(
+        self,
+        session: AsyncSession,
+        *,
+        limit: int,
+        offset: int,
+        grade_scale: str | None = None,
+    ) -> tuple[list[AssessmentInstruction], int]:
+        """List assessment instructions with pagination and optional scale filter."""
+
+        stmt = select(AssessmentInstruction).order_by(AssessmentInstruction.created_at.desc())
+        count_stmt = select(func.count()).select_from(AssessmentInstruction)
+
+        if grade_scale:
+            stmt = stmt.where(AssessmentInstruction.grade_scale == grade_scale)
+            count_stmt = count_stmt.where(AssessmentInstruction.grade_scale == grade_scale)
+
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await session.execute(stmt)
+        items = list(result.scalars().all())
+
+        total_result = await session.execute(count_stmt)
+        total = int(total_result.scalar_one())
+
+        return items, total
+
+    async def delete_assessment_instruction(
+        self,
+        session: AsyncSession,
+        *,
+        assignment_id: str | None,
+        course_id: str | None,
+    ) -> bool:
+        """Delete assessment instructions scoped by assignment or course."""
+
+        self._validate_instruction_scope(assignment_id, course_id)
+
+        stmt = select(AssessmentInstruction)
+        if assignment_id:
+            stmt = stmt.where(AssessmentInstruction.assignment_id == assignment_id)
+        else:
+            stmt = stmt.where(
+                AssessmentInstruction.course_id == course_id,
+                AssessmentInstruction.assignment_id.is_(None),
+            )
+
+        result = await session.execute(stmt)
+        instruction = result.scalars().first()
+        if instruction is None:
+            return False
+
+        await session.delete(instruction)
+        await session.flush()
+        return True
 
     async def get_cj_batch_upload(
         self,

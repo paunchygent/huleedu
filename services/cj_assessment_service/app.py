@@ -27,7 +27,7 @@ from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from services.cj_assessment_service.api import anchor_management
+from services.cj_assessment_service.api import anchor_management, admin_routes
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider
@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
             "DEBUG": settings.LOG_LEVEL == "DEBUG",
         },
     )
+    app.config["settings"] = settings
 
     # Initialize guaranteed infrastructure immediately
     app.database_engine = create_async_engine(
@@ -98,6 +99,8 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
     # Register mandatory health Blueprint
     app.register_blueprint(health_bp)
     app.register_blueprint(anchor_management.bp)
+    if settings.ENABLE_ADMIN_ENDPOINTS:
+        app.register_blueprint(admin_routes.bp)
 
     @app.before_serving
     async def startup() -> None:

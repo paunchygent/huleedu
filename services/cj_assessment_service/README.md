@@ -94,6 +94,68 @@ To work with a non-default scale (for example ENG5 NP variants):
   `grade_scale`, `primary_anchor_grade`, and scale-specific boundary metadata to
   simplify analytics and export tooling.
 
+## Admin API & CLI
+
+Phase 3.2 adds an authenticated admin surface for managing
+`assessment_instructions` without manual SQL:
+
+- **HTTP blueprint**: `/admin/v1/assessment-instructions` (POST upsert, GET
+  list, GET/DELETE per assignment, DELETE per course). Requests must include an
+  Identity-issued JWT with `roles` containing `admin`. Validation reuses the
+  shared helper in `libs/huleedu_service_libs/auth/`, and the blueprint only
+  registers when `CJ_ASSESSMENT_SERVICE_ENABLE_ADMIN_ENDPOINTS` is `true`.
+- **Observability**: Structured errors use Rule 048 factories and the Prometheus
+  counter `cj_admin_instruction_operations_total{operation,status}` records CRUD
+  outcomes.
+- **Typer CLI**: `pdm run cj-admin …` authenticates via Identity
+  `/v1/auth/login`, caches/refreshes tokens under
+  `~/.huleedu/cj_admin_token.json`, supports `CJ_ADMIN_TOKEN` overrides for
+  automation, and exposes `instructions create|list|get|delete` plus
+  `scales list` commands.
+
+### Admin API Endpoints
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `POST` | `/admin/v1/assessment-instructions` | Create or update instructions for an assignment or course (body mirrors `AssessmentInstructionUpsertRequest`) |
+| `GET` | `/admin/v1/assessment-instructions` | Paginated list with optional `grade_scale` filter |
+| `GET` | `/admin/v1/assessment-instructions/assignment/{assignment_id}` | Fetch the latest instructions for an assignment |
+| `DELETE` | `/admin/v1/assessment-instructions/assignment/{assignment_id}` | Remove assignment-scoped instructions |
+| `DELETE` | `/admin/v1/assessment-instructions/course/{course_id}` | Remove course fallback instructions |
+
+**Enablement checklist**
+
+1. Set `CJ_ASSESSMENT_SERVICE_ENABLE_ADMIN_ENDPOINTS=true` (default outside production) **and**
+   supply the shared JWT configuration (`JWT_SECRET_KEY` or `JWT_PUBLIC_KEY` plus `JWT_ISSUER`/`JWT_AUDIENCE`).
+2. Issue Identity Service tokens that include `roles: ["admin", …]` (future work may add fine-grained permissions).
+3. Expose `/admin/v1/**` through the API Gateway or a secure tunnel—these routes are not meant for public traffic.
+
+### Observability
+
+- Metric: `cj_admin_instruction_operations_total{operation,status}` increments on every CRUD call.
+  - Example success panel: `sum(rate(cj_admin_instruction_operations_total{status="success"}[5m])) by (operation)`
+  - Example failure alert: fire if `sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) > 0.05`
+- Logs: structured via Rule 048 factories. Find auth failures with
+  `{service="cj_assessment_service"} | json | request_path="/admin/v1/assessment-instructions"`
+- Traces: every request carries `CorrelationContext.uuid` so you can stitch admin activity to downstream anchor/grade actions.
+
+Examples:
+
+```bash
+# Obtain a token interactively (stores access + refresh tokens locally)
+pdm run cj-admin login --email ops@example.com
+
+# Create ENG5 NP instructions for a specific assignment
+pdm run cj-admin instructions create \
+  --assignment-id 11111111-1111-1111-1111-111111111111 \
+  --grade-scale eng5_np_legacy_9_step \
+  --instructions-file \
+    test_uploads/ANCHOR\ ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md
+
+# List ENG5 NP instructions
+pdm run cj-admin instructions list --grade-scale eng5_np_legacy_9_step
+```
+
 ## LLM Configuration & Dynamic Overrides
 
 ### Multi-Provider Support

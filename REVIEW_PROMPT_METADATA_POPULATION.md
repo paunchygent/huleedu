@@ -16,7 +16,7 @@
 
 ### Current State (As-Is)
 
-The ENG5 NP batch runner (`.claude/research/scripts/eng5_np_batch_runner.py`) implements an `AssessmentEventCollector` that:
+The ENG5 NP batch runner package (`scripts/cj_experiments_runners/eng5_np/`, with `kafka_flow.py` hosting the collector) implements an `AssessmentEventCollector` that:
 
 1. Spins up a short-lived Kafka consumer listening to three topics:
    - `huleedu.llm_provider.comparison_result.v1` (LLM comparison callbacks)
@@ -33,7 +33,7 @@ The ENG5 NP batch runner (`.claude/research/scripts/eng5_np_batch_runner.py`) im
 
 4. Recomputes validation manifest checksums to ensure reproducibility
 
-### The Blocker (Lines 636-650 in `eng5_np_batch_runner.py`)
+### The Blocker (Lines 104-154 in `scripts/cj_experiments_runners/eng5_np/hydrator.py`)
 
 ```python
 def _build_comparison_record(
@@ -98,7 +98,7 @@ Per `.claude/rules/020-architectural-mandates.mdc`:
 
 **Reference Implementation:**
 - `services/cj_assessment_service/kafka_consumer.py` (1,641 tokens) - Pattern for consumer lifecycle management
-- `.claude/research/scripts/eng5_np_batch_runner.py` (8,440 tokens) - Consumer that needs the metadata
+- `scripts/cj_experiments_runners/eng5_np/kafka_flow.py` - Consumer that needs the metadata
 
 ### Key Questions to Answer
 
@@ -271,7 +271,7 @@ A successful review will enable the development team to:
 
 For questions or clarifications, please reference:
 - Task document: `TASKS/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md` (lines 56-59)
-- Runner implementation: `.claude/research/scripts/eng5_np_batch_runner.py` (lines 636-662)
+- Runner implementation: `scripts/cj_experiments_runners/eng5_np/hydrator.py` (lines 104-154)
 - Event contracts: `libs/common_core/src/common_core/events/llm_provider_events.py`
 
 **Reviewer**: Please ensure your analysis is grounded in the actual codebase structure visible in the review package, not hypothetical patterns. This is a production system with strict architectural boundaries—solutions must respect existing DDD/event-driven patterns.

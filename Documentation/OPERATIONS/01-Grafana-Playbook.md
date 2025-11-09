@@ -48,6 +48,22 @@ description: This document serves as the team's shared brain for observability. 
 - Prompt Failure Burn-down: `increase(huleedu_nlp_prompt_fetch_failures_total[1h])` and `increase(huleedu_cj_prompt_fetch_failures_total[1h])`
 - Alert Threshold Example: fire when `sum(rate(huleedu_cj_prompt_fetch_failures_total[15m])) > 0.05`
 
+### CJ Admin Instruction Operations (Phase 3.2)
+
+**Purpose**: Track authenticated admin CRUD activity for assignment instructions.
+**Key Questions Answered**:
+
+- Are admin users creating/updating instructions successfully?
+- Are there spikes in failed operations (e.g., missing roles, invalid grade scale)?
+- Which operations (create/list/get/delete) are exercised most often?
+
+**Key Panels**:
+
+- Success rate: `sum(rate(cj_admin_instruction_operations_total{status="success"}[5m])) by (operation)`
+- Failure drill-down: `sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) by (operation)`
+- Rolling volume: `increase(cj_admin_instruction_operations_total[1h])`
+- Alert example: trigger at `sum(rate(cj_admin_instruction_operations_total{status="failure"}[10m])) > 0.05`
+
 ## Key Query Library
 
 ### Essential PromQL Queries
@@ -74,6 +90,12 @@ sum(rate(huleedu_cj_prompt_fetch_failures_total[5m])) by (reason)
 # Prompt Failure Spike Detection (combined)
 sum(increase(huleedu_nlp_prompt_fetch_failures_total[1h]))
   + sum(increase(huleedu_cj_prompt_fetch_failures_total[1h]))
+
+# CJ Admin Instruction Success Rate
+sum(rate(cj_admin_instruction_operations_total{status="success"}[5m])) by (operation)
+
+# CJ Admin Instruction Failures
+sum(rate(cj_admin_instruction_operations_total{status="failure"}[5m])) by (operation)
 ```
 
 ### Essential LogQL Queries
@@ -165,5 +187,5 @@ When running comprehensive tests:
 
 ---
 
-**Last Updated**: 2025-11-06 – Phase 3.2 Prompt Reference Migration
-**Next Review**: After API Gateway integration
+**Last Updated**: 2025-11-09 – Phase 3.2 Admin Docs & Observability
+**Next Review**: After CJ admin login/Identity rollout

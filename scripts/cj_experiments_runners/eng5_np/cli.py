@@ -42,6 +42,103 @@ from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSe
 app = typer.Typer(help="ENG5 NP batch runner tooling (plan, dry-run, execute)")
 
 
+def validate_llm_overrides(
+    provider: str | None,
+    model: str | None,
+) -> None:
+    """Validate LLM overrides against model manifest.
+
+    This function checks that the specified model exists in the manifest
+    and logs model metadata for transparency. If validation fails, it
+    provides helpful guidance to the user.
+
+    Args:
+        provider: Provider name (e.g., "anthropic", "openai")
+        model: Model identifier to validate
+
+    Raises:
+        typer.BadParameter: If model is not found in manifest
+
+    Note:
+        This function validates only when model is specified. If model is None,
+        no validation is performed (service will use its default).
+    """
+    if model is None:
+        # No model override specified; service will use default
+        typer.echo(
+            "ℹ️  No --llm-model specified; LLM Provider Service will use default model",
+            err=True,
+        )
+        return
+
+    # Import manifest modules (lazy import to avoid circular dependencies)
+    try:
+        from services.llm_provider_service.model_manifest import (
+            ProviderName,
+            get_model_config,
+        )
+    except ImportError as e:
+        typer.echo(
+            f"⚠️  Warning: Cannot import model manifest for validation: {e}",
+            err=True,
+        )
+        typer.echo(
+            "   Proceeding without validation; service will validate at runtime.",
+            err=True,
+        )
+        return
+
+    # Determine provider (default to Anthropic if not specified)
+    provider_name = provider.upper() if provider else "ANTHROPIC"
+    try:
+        provider_enum = ProviderName(provider_name.lower())
+    except ValueError:
+        raise typer.BadParameter(
+            f"Invalid provider '{provider_name}'. "
+            f"Valid providers: {', '.join(p.value for p in ProviderName if p != ProviderName.MOCK)}\n"
+            f"Run 'pdm run llm-check-models' to see available models."
+        )
+
+    # Validate model against manifest
+    try:
+        config = get_model_config(provider_enum, model)
+
+        # Log successful validation with model metadata
+        typer.echo(
+            f"✅ Model validated against manifest:",
+            err=True,
+        )
+        typer.echo(f"   Provider: {config.provider.value}", err=True)
+        typer.echo(f"   Model ID: {config.model_id}", err=True)
+        typer.echo(f"   Display Name: {config.display_name}", err=True)
+        typer.echo(f"   API Version: {config.api_version}", err=True)
+        typer.echo(f"   Release Date: {config.release_date}", err=True)
+        typer.echo(f"   Max Tokens: {config.max_tokens}", err=True)
+
+        if config.is_deprecated:
+            typer.echo(
+                f"⚠️  WARNING: Model '{model}' is deprecated (since {config.deprecation_date})",
+                err=True,
+            )
+            if config.notes:
+                typer.echo(f"   Note: {config.notes}", err=True)
+
+    except ValueError as e:
+        raise typer.BadParameter(
+            f"Model '{model}' not found in manifest for provider '{provider_name}'.\n"
+            f"Error: {e}\n\n"
+            f"To see available models, run:\n"
+            f"  pdm run llm-check-models --provider {provider_name.lower()}\n"
+        )
+    except KeyError as e:
+        raise typer.BadParameter(
+            f"Provider '{provider_name}' not found in manifest.\n"
+            f"Error: {e}\n\n"
+            f"To see available providers, run:\n"
+            f"  pdm run llm-check-models\n"
+        )
+
+
 def _build_llm_overrides(
     *,
     provider: str | None,
@@ -52,12 +149,18 @@ def _build_llm_overrides(
     if not any([provider, model, temperature, max_tokens]):
         return None
 
-    provider_value: LLMProviderType | str | None = None
+    provider_value: LLMProviderType | None = None
     if provider:
         try:
-            provider_value = LLMProviderType(provider.upper())
-        except Exception:
-            provider_value = provider
+            # Normalize to lowercase to match enum values
+            provider_value = LLMProviderType(provider.lower())
+        except ValueError as e:
+            # This should have been caught by validate_llm_overrides(), but raise clear error anyway
+            raise typer.BadParameter(
+                f"Invalid provider '{provider}'. "
+                f"Valid providers: {', '.join(p.value for p in LLMProviderType if p != LLMProviderType.MOCK)}\n"
+                f"Run 'pdm run llm-check-models' to see available models."
+            ) from e
 
     return LLMConfigOverrides(
         provider_override=provider_value,
@@ -157,6 +260,9 @@ def main(
         return
 
     schema = ensure_schema_available(paths.schema_path)
+
+    # Validate LLM model override against manifest before proceeding
+    validate_llm_overrides(provider=llm_provider, model=llm_model)
 
     settings = RunnerSettings(
         assignment_id=assignment_id,

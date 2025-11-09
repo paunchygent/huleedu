@@ -97,6 +97,12 @@ def _create_metrics(database_metrics: Optional[DatabaseMetrics] = None) -> dict[
                 ["status"],  # success/error
                 registry=REGISTRY,
             ),
+            "admin_instruction_operations": Counter(
+                "cj_admin_instruction_operations_total",
+                "Admin assessment instruction operations",
+                ["operation", "status"],
+                registry=REGISTRY,
+            ),
             "cj_callback_latency_seconds": Histogram(
                 "cj_callback_latency_seconds",
                 "Time between LLM callback sent and received in seconds",

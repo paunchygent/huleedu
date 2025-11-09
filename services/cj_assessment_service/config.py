@@ -5,15 +5,16 @@ from __future__ import annotations
 from common_core import Environment, LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from dotenv import find_dotenv, load_dotenv
+from huleedu_service_libs.auth import JWTValidationSettings
 from huleedu_service_libs.config import SecureServiceSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 # Load .env file from repository root, regardless of current working directory
 load_dotenv(find_dotenv(".env"))
 
 
-class Settings(SecureServiceSettings):
+class Settings(SecureServiceSettings, JWTValidationSettings):
     """Configuration settings for the CJ Assessment Service."""
 
     # Basic service configuration
@@ -25,6 +26,12 @@ class Settings(SecureServiceSettings):
         description="Runtime environment for the service",
     )
     VERSION: str = "1.0.0"
+    ENABLE_ADMIN_ENDPOINTS: bool = Field(
+        default=True,
+        description=(
+            "Enable /admin/v1 routes. Forced to False in production unless explicitly set."
+        ),
+    )
 
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: str = Field(
@@ -284,6 +291,15 @@ argument quality, and writing mechanics. Always respond with valid JSON.
         extra="ignore",
         env_prefix="CJ_ASSESSMENT_SERVICE_",
     )
+
+    @model_validator(mode="after")
+    def _enforce_admin_toggle(self) -> "Settings":
+        """Disable admin endpoints by default in production unless explicitly enabled."""
+
+        if self.is_production() and "ENABLE_ADMIN_ENDPOINTS" not in self.model_fields_set:
+            object.__setattr__(self, "ENABLE_ADMIN_ENDPOINTS", False)
+
+        return self
 
 
 settings = Settings()

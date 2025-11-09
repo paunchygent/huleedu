@@ -7,8 +7,8 @@ from fastapi import Request
 from prometheus_client import REGISTRY, Counter
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from huleedu_service_libs.auth import try_decode_and_validate_jwt
 from huleedu_service_libs.logging_utils import create_service_logger
-from services.api_gateway_service.app.jwt_utils import try_decode_and_validate_jwt
 from services.api_gateway_service.config import settings
 
 logger = create_service_logger("api_gateway.middleware")
@@ -123,7 +123,13 @@ class AuthBridgeMiddleware(BaseHTTPMiddleware):
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 token = parts[1]
                 correlation_id = getattr(request.state, "correlation_id", uuid4())
-                payload = try_decode_and_validate_jwt(token, settings, correlation_id)
+                payload = try_decode_and_validate_jwt(
+                    token,
+                    settings,
+                    correlation_id=correlation_id,
+                    service="api_gateway_service",
+                    operation="auth_bridge_middleware",
+                )
                 if isinstance(payload, dict):
                     # Cache payload for DI to reuse and avoid re-decode
                     try:
