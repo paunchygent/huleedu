@@ -25,10 +25,12 @@ import logging
 from anthropic import AsyncAnthropic
 from anthropic.types import ModelInfo
 
+from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.base import (
     DiscoveredModel,
     ModelComparisonResult,
 )
+from services.llm_provider_service.model_checker.family_utils import extract_anthropic_family
 from services.llm_provider_service.model_manifest import (
     ModelConfig,
     ProviderName,
@@ -45,6 +47,7 @@ class AnthropicModelChecker:
     Attributes:
         client: Async Anthropic SDK client
         logger: Structured logger for observability
+        settings: Service configuration (provides ACTIVE_MODEL_FAMILIES)
         provider: Always ProviderName.ANTHROPIC
     """
 
@@ -52,15 +55,18 @@ class AnthropicModelChecker:
         self,
         client: AsyncAnthropic,
         logger: logging.Logger,
+        settings: Settings,
     ):
         """Initialize Anthropic model checker.
 
         Args:
             client: Configured AsyncAnthropic client
             logger: Logger for structured logging
+            settings: Service configuration (provides ACTIVE_MODEL_FAMILIES)
         """
         self.client = client
         self.logger = logger
+        self.settings = settings
         self.provider = ProviderName.ANTHROPIC
 
     async def check_latest_models(self) -> list[DiscoveredModel]:
@@ -115,6 +121,29 @@ class AnthropicModelChecker:
             )
             raise
 
+    def _extract_family(self, model_id: str) -> str:
+        """Extract model family using centralized utility.
+
+        Examples:
+            claude-haiku-4-5-20251001 → claude-haiku
+            claude-sonnet-4-5-20250929 → claude-sonnet
+
+        Args:
+            model_id: Full model identifier from Anthropic API
+
+        Returns:
+            Family identifier (e.g., "claude-haiku")
+        """
+        return extract_anthropic_family(model_id)
+
+    def _get_active_families(self) -> set[str]:
+        """Get configured active families for Anthropic from settings.
+
+        Returns:
+            Set of family identifiers being tracked
+        """
+        return set(self.settings.ACTIVE_MODEL_FAMILIES.get(ProviderName.ANTHROPIC, []))
+
     async def compare_with_manifest(self) -> ModelComparisonResult:
         """Compare discovered models with manifest and identify changes.
 
@@ -144,11 +173,20 @@ class AnthropicModelChecker:
         # Build lookup maps
         discovered_by_id = {m.model_id: m for m in discovered}
         manifest_by_id = {m.model_id: m for m in manifest_models}
+        active_families = self._get_active_families()
 
-        # Identify new models (in API but not in manifest)
-        new_models = [
-            model for model_id, model in discovered_by_id.items() if model_id not in manifest_by_id
-        ]
+        # Categorize new models by family
+        new_in_tracked = []
+        new_untracked = []
+
+        for model_id, discovered_model in discovered_by_id.items():
+            if model_id not in manifest_by_id:
+                family = self._extract_family(model_id)
+
+                if family in active_families:
+                    new_in_tracked.append(discovered_model)
+                else:
+                    new_untracked.append(discovered_model)
 
         # Identify deprecated models (in manifest but deprecated by provider)
         deprecated_models = [
@@ -184,7 +222,8 @@ class AnthropicModelChecker:
 
         # Determine if manifest is up-to-date
         is_up_to_date = (
-            len(new_models) == 0
+            len(new_in_tracked) == 0
+            and len(new_untracked) == 0
             and len(deprecated_models) == 0
             and len(updated_models) == 0
             and len(breaking_changes) == 0
@@ -192,7 +231,8 @@ class AnthropicModelChecker:
 
         result = ModelComparisonResult(
             provider=self.provider,
-            new_models=new_models,
+            new_models_in_tracked_families=new_in_tracked,
+            new_untracked_families=new_untracked,
             deprecated_models=deprecated_models,
             updated_models=updated_models,
             breaking_changes=breaking_changes,
@@ -203,7 +243,8 @@ class AnthropicModelChecker:
             "Comparison complete",
             extra={
                 "provider": self.provider.value,
-                "new_models_count": len(new_models),
+                "new_in_tracked_count": len(new_in_tracked),
+                "new_untracked_count": len(new_untracked),
                 "deprecated_models_count": len(deprecated_models),
                 "updated_models_count": len(updated_models),
                 "breaking_changes_count": len(breaking_changes),
