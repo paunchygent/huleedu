@@ -233,19 +233,26 @@ class TestAnthropicModelCompatibility:
         tests on them.
         """
         # Create model checker and discover new models
-        checker = AnthropicModelChecker(client=anthropic_client, logger=logger)
+        settings = Settings()
+        checker = AnthropicModelChecker(client=anthropic_client, logger=logger, settings=settings)
         comparison_result = await checker.compare_with_manifest()
 
-        if not comparison_result.new_models:
+        # Combine tracked and untracked families for compatibility testing
+        all_new_models = (
+            comparison_result.new_models_in_tracked_families
+            + comparison_result.new_untracked_families
+        )
+
+        if not all_new_models:
             pytest.skip("No new models discovered, skipping compatibility test")
 
         logger.info(
-            f"Found {len(comparison_result.new_models)} new Anthropic models to test",
-            extra={"new_models": [m.model_id for m in comparison_result.new_models]},
+            f"Found {len(all_new_models)} new Anthropic models to test",
+            extra={"new_models": [m.model_id for m in all_new_models]},
         )
 
         # Test each new model with a simple prompt
-        for discovered_model in comparison_result.new_models[:2]:  # Limit to 2 to control costs
+        for discovered_model in all_new_models[:2]:  # Limit to 2 to control costs
             logger.info(f"Testing new model: {discovered_model.model_id}")
 
             # Create a minimal comparison request
@@ -264,7 +271,9 @@ class TestAnthropicModelCompatibility:
                 )
 
                 # Basic validation: response should complete successfully
-                assert response.content, f"New model {discovered_model.model_id} returned empty response"
+                assert response.content, (
+                    f"New model {discovered_model.model_id} returned empty response"
+                )
 
                 logger.info(
                     f"New model {discovered_model.model_id} responded successfully",

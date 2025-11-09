@@ -37,7 +37,11 @@ from services.cj_assessment_service.cj_core_logic.callback_state_manager import 
     update_comparison_result,
 )
 from services.cj_assessment_service.config import Settings
-from services.cj_assessment_service.models_db import AssessmentInstruction, CJBatchState, ComparisonPair
+from services.cj_assessment_service.models_db import (
+    AssessmentInstruction,
+    CJBatchState,
+    ComparisonPair,
+)
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
 

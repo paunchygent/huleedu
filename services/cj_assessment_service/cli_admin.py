@@ -202,7 +202,9 @@ def create_instruction(
     instructions_file: Path | None = typer.Option(
         None, help="Path to a markdown/text file containing the instructions"
     ),
-    instructions_text: str = typer.Option("", help="Inline instructions text when no file is given"),
+    instructions_text: str = typer.Option(
+        "", help="Inline instructions text when no file is given"
+    ),
     grade_scale: str = typer.Option(..., help="Registered grade scale ID"),
 ) -> None:
     """Create or update assessment instructions."""
@@ -264,7 +266,9 @@ def delete_instruction(
 
 
 @instructions_app.command("get")
-def get_instruction(assignment_id: str = typer.Argument(..., help="Assignment ID to fetch")) -> None:
+def get_instruction(
+    assignment_id: str = typer.Argument(..., help="Assignment ID to fetch"),
+) -> None:
     """Retrieve instructions for a specific assignment."""
 
     data = _admin_request(

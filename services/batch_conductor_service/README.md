@@ -40,6 +40,7 @@ The Batch Conductor Service (BCS) is an internal Quart-based microservice respon
 - **Cache Persistence**: Redis cache persists across pipeline completions (7-day TTL) for cross-pipeline pruning
 - **Phase Skipped Events**: Publishes events for observability when phases are pruned
 - **Dependency Rules**: ai_feedback/cj_assessment → requires spellcheck
+- **Prompt Attachment Gating (Phase 3.2)**: For prompt-dependent phases (`cj_assessment`, `ai_feedback`, prompt-driven NLP stages), BCS inspects `batch_metadata.prompt_attached`. Pipelines are blocked until BOS signals that prompt references are attached, and failures increment `huleedu_bcs_prompt_prerequisite_blocked_total{phase=...}` for observability.
 
 ### Production Resilience
 

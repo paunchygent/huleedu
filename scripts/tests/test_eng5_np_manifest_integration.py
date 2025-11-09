@@ -57,9 +57,7 @@ class TestValidateLLMOverrides:
             mock_get_config,
         ):
             # Should not raise exception
-            validate_llm_overrides(
-                provider="anthropic", model="claude-haiku-4-5-20251001"
-            )
+            validate_llm_overrides(provider="anthropic", model="claude-haiku-4-5-20251001")
 
         # Verify manifest was queried with correct parameters (behavioral verification)
         mock_get_config.assert_called_once_with(
@@ -74,9 +72,7 @@ class TestValidateLLMOverrides:
             side_effect=ValueError("Unknown model: anthropic/invalid-model-id"),
         ):
             with pytest.raises(typer.BadParameter) as exc_info:
-                validate_llm_overrides(
-                    provider="anthropic", model="invalid-model-id"
-                )
+                validate_llm_overrides(provider="anthropic", model="invalid-model-id")
 
             # Verify error message is helpful
             error_msg = str(exc_info.value)
@@ -170,9 +166,7 @@ class TestBuildLLMOverrides:
 
     def test_build_returns_none_when_no_overrides(self) -> None:
         """Verify _build_llm_overrides returns None when no parameters specified."""
-        result = _build_llm_overrides(
-            provider=None, model=None, temperature=None, max_tokens=None
-        )
+        result = _build_llm_overrides(provider=None, model=None, temperature=None, max_tokens=None)
 
         assert result is None
 
@@ -264,14 +258,8 @@ class TestEventComposition:
 
         # Verify LLM config overrides are included
         assert envelope.data.llm_config_overrides is not None
-        assert (
-            envelope.data.llm_config_overrides.provider_override
-            == LLMProviderType.ANTHROPIC
-        )
-        assert (
-            envelope.data.llm_config_overrides.model_override
-            == "claude-haiku-4-5-20251001"
-        )
+        assert envelope.data.llm_config_overrides.provider_override == LLMProviderType.ANTHROPIC
+        assert envelope.data.llm_config_overrides.model_override == "claude-haiku-4-5-20251001"
         assert envelope.data.llm_config_overrides.temperature_override == 0.3
         assert envelope.data.llm_config_overrides.max_tokens_override == 2000
 

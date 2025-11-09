@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import uuid
 from pathlib import Path
@@ -30,6 +29,12 @@ from scripts.cj_experiments_runners.eng5_np.inventory import (
 from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
     publish_envelope_to_kafka,
     run_publish_and_capture,
+)
+from scripts.cj_experiments_runners.eng5_np.logging_support import (
+    configure_cli_logging,
+    log_validation_state,
+    print_run_summary,
+    setup_cli_logger,
 )
 from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
 from scripts.cj_experiments_runners.eng5_np.requests import (
@@ -94,10 +99,13 @@ def validate_llm_overrides(
     try:
         provider_enum = ProviderName(provider_name.lower())
     except ValueError:
+        valid_providers = ", ".join(p.value for p in ProviderName if p != ProviderName.MOCK)
         raise typer.BadParameter(
-            f"Invalid provider '{provider_name}'. "
-            f"Valid providers: {', '.join(p.value for p in ProviderName if p != ProviderName.MOCK)}\n"
-            f"Run 'pdm run llm-check-models' to see available models."
+            (
+                f"Invalid provider '{provider_name}'. "
+                f"Valid providers: {valid_providers}\n"
+                "Run 'pdm run llm-check-models' to see available models."
+            )
         )
 
     # Validate model against manifest
@@ -106,7 +114,7 @@ def validate_llm_overrides(
 
         # Log successful validation with model metadata
         typer.echo(
-            f"✅ Model validated against manifest:",
+            "✅ Model validated against manifest:",
             err=True,
         )
         typer.echo(f"   Provider: {config.provider.value}", err=True)
@@ -156,11 +164,16 @@ def _build_llm_overrides(
             # Normalize to lowercase to match enum values
             provider_value = LLMProviderType(provider.lower())
         except ValueError as e:
+            valid_providers = ", ".join(
+                p.value for p in LLMProviderType if p != LLMProviderType.MOCK
+            )
             # This should have been caught by validate_llm_overrides(), but raise clear error anyway
             raise typer.BadParameter(
-                f"Invalid provider '{provider}'. "
-                f"Valid providers: {', '.join(p.value for p in LLMProviderType if p != LLMProviderType.MOCK)}\n"
-                f"Run 'pdm run llm-check-models' to see available models."
+                (
+                    f"Invalid provider '{provider}'. "
+                    f"Valid providers: {valid_providers}\n"
+                    "Run 'pdm run llm-check-models' to see available models."
+                )
             ) from e
 
     return LLMConfigOverrides(
@@ -251,16 +264,15 @@ def main(
         1800.0,
         help="Timeout (seconds) when waiting for completion events",
     ),
+    verbose: bool = typer.Option(
+        False,
+        help="Enable debug-level logging for troubleshooting",
+    ),
 ) -> None:
     repo_root = repo_root_from_package()
     paths = RunnerPaths.from_repo_root(repo_root)
-    inventory = collect_inventory(paths)
 
-    if mode is RunnerMode.PLAN:
-        print_inventory(inventory)
-        return
-
-    schema = ensure_schema_available(paths.schema_path)
+    configure_cli_logging(verbose=verbose)
 
     # Validate LLM model override against manifest before proceeding
     validate_llm_overrides(provider=llm_provider, model=llm_model)
@@ -292,6 +304,33 @@ def main(
         completion_timeout=completion_timeout,
     )
 
+    logger = setup_cli_logger(settings=settings)
+
+    logger.info(
+        "runner_invocation",
+        assignment_id=str(settings.assignment_id),
+        course_id=str(settings.course_id),
+        use_kafka=settings.use_kafka,
+        await_completion=settings.await_completion,
+        output_dir=str(settings.output_dir),
+        kafka_bootstrap=settings.kafka_bootstrap,
+        verbose=verbose,
+    )
+
+    inventory = collect_inventory(paths)
+
+    if mode is RunnerMode.PLAN:
+        logger.info(
+            "runner_plan_inventory",
+            anchor_count=inventory.anchor_docs.count,
+            student_count=inventory.student_docs.count,
+            prompt_path=str(inventory.prompt.path),
+        )
+        print_inventory(inventory)
+        return
+
+    schema = ensure_schema_available(paths.schema_path)
+
     artefact_path = write_stub_artefact(settings=settings, inventory=inventory, schema=schema)
     hydrator: AssessmentRunHydrator | None = None
     if settings.await_completion and settings.use_kafka:
@@ -301,6 +340,14 @@ def main(
             grade_scale=settings.grade_scale,
             batch_id=settings.batch_id,
         )
+
+    if mode is RunnerMode.DRY_RUN:
+        logger.info(
+            "runner_dry_run_stub_created",
+            artefact_path=str(artefact_path),
+        )
+        log_validation_state(logger=logger, artefact_path=artefact_path)
+        return
 
     if mode is RunnerMode.EXECUTE:
         ensure_execute_requirements(inventory)
@@ -321,6 +368,7 @@ def main(
         typer.echo(f"CJ request envelope written to {request_path}")
         if settings.await_completion and not settings.use_kafka:
             typer.echo("--await-completion ignored because Kafka publishing is disabled.", err=True)
+            logger.warning("await_completion_ignored", reason="no_kafka")
 
         if settings.use_kafka:
             try:
@@ -332,12 +380,27 @@ def main(
                             hydrator=hydrator,
                         )
                     )
-                    _print_run_summary(artefact_path)
+                    summary = print_run_summary(artefact_path)
+                    logger.info(
+                        "runner_execution_complete",
+                        artefact_path=str(artefact_path),
+                        runner_status=hydrator.runner_status() if hydrator else None,
+                    )
+                    log_validation_state(
+                        logger=logger,
+                        artefact_path=artefact_path,
+                        artefact_data=summary,
+                    )
                 else:
                     asyncio.run(publish_envelope_to_kafka(envelope=envelope, settings=settings))
                     typer.echo(
                         "Kafka publish succeeded -> topic "
                         f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
+                    )
+                    logger.info(
+                        "runner_request_published",
+                        topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
+                        await_completion=settings.await_completion,
                     )
             except Exception as exc:  # pragma: no cover - side effect only
                 typer.echo(
@@ -345,50 +408,16 @@ def main(
                     "Use --no-kafka to skip publishing.",
                     err=True,
                 )
+                logger.exception(
+                    "runner_publish_failed",
+                    error_type=exc.__class__.__name__,
+                )
                 raise
         else:
             typer.echo("Kafka disabled; request not published.")
+            logger.info("runner_request_skipped", reason="no_kafka")
 
-
-def _print_run_summary(artefact_path: Path) -> None:
-    """Emit a concise summary of the hydrated artefact for operator awareness."""
-
-    try:
-        data = json.loads(artefact_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:  # pragma: no cover - defensive
-        typer.echo(f"⚠️  Artefact {artefact_path} missing; skipping summary", err=True)
-        return
-
-    comparisons = len(data.get("llm_comparisons", []))
-    total_cost = data.get("costs", {}).get("total_usd", 0.0)
-    typer.echo(
-        f"ENG5 NP run captured {comparisons} comparisons; total LLM cost ${total_cost:.4f}"
-    )
-
-    for entry in data.get("costs", {}).get("token_counts", []):
-        provider = entry.get("provider")
-        model = entry.get("model")
-        typer.echo(
-            "  · "
-            f"{provider}::{model}: {entry.get('prompt_tokens', 0)} prompt / "
-            f"{entry.get('completion_tokens', 0)} completion tokens, ${entry.get('usd', 0.0):.4f}"
-        )
-
-    runner_status = data.get("validation", {}).get("runner_status")
-    if runner_status:
-        if runner_status.get("partial_data"):
-            typer.echo(
-                "⚠️  Runner exited with partial data; timeout "
-                f"{runner_status.get('timeout_seconds', 0.0)}s",
-                err=True,
-            )
-        observed = runner_status.get("observed_events", {})
-        typer.echo(
-            "Observed events -> "
-            f"comparisons: {observed.get('llm_comparisons', 0)}, "
-            f"assessment_results: {observed.get('assessment_results', 0)}, "
-            f"completions: {observed.get('completions', 0)}"
-        )
+    log_validation_state(logger=logger, artefact_path=artefact_path)
 
 
 if __name__ == "__main__":

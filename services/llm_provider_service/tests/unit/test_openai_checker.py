@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from openai.types import Model
 
+from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.base import DiscoveredModel
 from services.llm_provider_service.model_checker.openai_checker import (
     OpenAIModelChecker,
@@ -25,25 +26,31 @@ from services.llm_provider_service.model_checker.openai_checker import (
 from services.llm_provider_service.model_manifest import ProviderName
 
 
+@pytest.fixture
+def settings() -> Settings:
+    """Create Settings instance for tests."""
+    return Settings()
+
+
 class TestOpenAICheckerInit:
     """Tests for OpenAIModelChecker initialization."""
 
-    def test_init_stores_client_and_logger(self) -> None:
+    def test_init_stores_client_and_logger(self, settings: Settings) -> None:
         """Checker should store AsyncOpenAI client and logger."""
         mock_client = Mock()
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
 
         assert checker.client is mock_client
         assert checker.logger is logger
 
-    def test_provider_is_openai(self) -> None:
+    def test_provider_is_openai(self, settings: Settings) -> None:
         """Provider attribute should be ProviderName.OPENAI."""
         mock_client = Mock()
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
 
         assert checker.provider == ProviderName.OPENAI
 
@@ -52,7 +59,7 @@ class TestCheckLatestModels:
     """Tests for check_latest_models() method."""
 
     @pytest.mark.asyncio
-    async def test_queries_openai_api(self, mocker: Mock) -> None:
+    async def test_queries_openai_api(self, mocker: Mock, settings: Settings) -> None:
         """Should call client.models.list()."""
         mock_client = Mock()
 
@@ -64,13 +71,13 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         await checker.check_latest_models()
 
         mock_client.models.list.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_parses_model_correctly(self, mocker: Mock) -> None:
+    async def test_parses_model_correctly(self, mocker: Mock, settings: Settings) -> None:
         """Should parse OpenAI Model into DiscoveredModel."""
         mock_client = Mock()
         mock_model = Model(
@@ -87,14 +94,14 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         assert len(models) == 1
         assert models[0].model_id == "gpt-5-mini-2025-08-07"
 
     @pytest.mark.asyncio
-    async def test_filters_gpt_3_models(self, mocker: Mock) -> None:
+    async def test_filters_gpt_3_models(self, mocker: Mock, settings: Settings) -> None:
         """Should exclude GPT-3.5 and earlier models from results."""
         mock_client = Mock()
         mock_models = [
@@ -120,7 +127,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         # Should only include GPT-4 model
@@ -128,7 +135,7 @@ class TestCheckLatestModels:
         assert models[0].model_id == "gpt-4-turbo"
 
     @pytest.mark.asyncio
-    async def test_includes_gpt_4_models(self, mocker: Mock) -> None:
+    async def test_includes_gpt_4_models(self, mocker: Mock, settings: Settings) -> None:
         """Should include all GPT-4 models."""
         mock_client = Mock()
         mock_models = [
@@ -153,7 +160,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         # Should include both GPT-4 models
@@ -163,7 +170,7 @@ class TestCheckLatestModels:
         assert "gpt-4-vision-preview" in model_ids
 
     @pytest.mark.asyncio
-    async def test_includes_gpt_5_models(self, mocker: Mock) -> None:
+    async def test_includes_gpt_5_models(self, mocker: Mock, settings: Settings) -> None:
         """Should include GPT-5 models."""
         mock_client = Mock()
         mock_model = Model(
@@ -179,14 +186,14 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         assert len(models) == 1
         assert models[0].model_id == "gpt-5-mini-2025-08-07"
 
     @pytest.mark.asyncio
-    async def test_includes_o1_and_o3_models(self, mocker: Mock) -> None:
+    async def test_includes_o1_and_o3_models(self, mocker: Mock, settings: Settings) -> None:
         """Should include O1 and O3 reasoning models."""
         mock_client = Mock()
         mock_models = [
@@ -211,7 +218,7 @@ class TestCheckLatestModels:
         mock_client.models.list = AsyncMock(return_value=mock_async_iter())
         logger = logging.getLogger(__name__)
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         models = await checker.check_latest_models()
 
         assert len(models) == 2
@@ -220,7 +227,7 @@ class TestCheckLatestModels:
         assert "o3-mini" in model_ids
 
     @pytest.mark.asyncio
-    async def test_handles_api_error_gracefully(self, mocker: Mock) -> None:
+    async def test_handles_api_error_gracefully(self, mocker: Mock, settings: Settings) -> None:
         """Should raise exception and log error on API failure."""
         mock_client = Mock()
 
@@ -232,7 +239,7 @@ class TestCheckLatestModels:
         logger = logging.getLogger(__name__)
         mock_logger = mocker.patch.object(logger, "error")
 
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
 
         with pytest.raises(Exception, match="API authentication failed"):
             await checker.check_latest_models()
@@ -245,7 +252,7 @@ class TestCompareWithManifest:
     """Tests for compare_with_manifest() method."""
 
     @pytest.mark.asyncio
-    async def test_identifies_new_models(self, mocker: Mock) -> None:
+    async def test_identifies_new_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in API but not in manifest."""
         mock_client = Mock()
 
@@ -263,18 +270,22 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # Verify new model was detected
         assert result.is_up_to_date is False
-        assert len(result.new_models) >= 1
-        # The new model should be in the list
-        new_model_ids = {m.model_id for m in result.new_models}
-        assert "gpt-6-preview" in new_model_ids
+        # Check combined count of tracked and untracked families
+        total_new = len(result.new_models_in_tracked_families) + len(result.new_untracked_families)
+        assert total_new >= 1
+        # The new model should be in either tracked or untracked list
+        all_new_model_ids = {m.model_id for m in result.new_models_in_tracked_families} | {
+            m.model_id for m in result.new_untracked_families
+        }
+        assert "gpt-6-preview" in all_new_model_ids
 
     @pytest.mark.asyncio
-    async def test_identifies_deprecated_models(self, mocker: Mock) -> None:
+    async def test_identifies_deprecated_models(self, mocker: Mock, settings: Settings) -> None:
         """Should detect models in manifest but not in API (deprecated)."""
         mock_client = Mock()
 
@@ -286,7 +297,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # If no models returned, all manifest models are deprecated
@@ -294,7 +305,7 @@ class TestCompareWithManifest:
         assert len(result.deprecated_models) >= 1
 
     @pytest.mark.asyncio
-    async def test_is_up_to_date_when_no_changes(self, mocker: Mock) -> None:
+    async def test_is_up_to_date_when_no_changes(self, mocker: Mock, settings: Settings) -> None:
         """Should set is_up_to_date=True when manifest matches API."""
         mock_client = Mock()
 
@@ -314,7 +325,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         # When no changes, should be up-to-date
@@ -323,7 +334,7 @@ class TestCompareWithManifest:
         assert isinstance(result.is_up_to_date, bool)
 
     @pytest.mark.asyncio
-    async def test_returns_correct_provider(self, mocker: Mock) -> None:
+    async def test_returns_correct_provider(self, mocker: Mock, settings: Settings) -> None:
         """Should return OPENAI as provider in result."""
         mock_client = Mock()
 
@@ -335,13 +346,13 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         assert result.provider == ProviderName.OPENAI
 
     @pytest.mark.asyncio
-    async def test_sets_checked_at_date(self, mocker: Mock) -> None:
+    async def test_sets_checked_at_date(self, mocker: Mock, settings: Settings) -> None:
         """Should set checked_at to today's date."""
         mock_client = Mock()
 
@@ -353,7 +364,7 @@ class TestCompareWithManifest:
         )
 
         logger = logging.getLogger(__name__)
-        checker = OpenAIModelChecker(client=mock_client, logger=logger)
+        checker = OpenAIModelChecker(client=mock_client, logger=logger, settings=settings)
         result = await checker.compare_with_manifest()
 
         assert result.checked_at == date.today()

@@ -96,9 +96,7 @@ class CompatibilityReporter:
                 current_default.model_id if current_default else None,
                 result,
             ),
-            "discovered_models": [
-                self._format_discovered_model(model) for model in all_new_models
-            ],
+            "discovered_models": [self._format_discovered_model(model) for model in all_new_models],
             "breaking_changes": result.breaking_changes,
             "is_up_to_date": result.is_up_to_date,
             "checked_at": result.checked_at.isoformat(),

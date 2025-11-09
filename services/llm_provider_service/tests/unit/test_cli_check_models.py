@@ -76,9 +76,7 @@ class TestCheckerFactoryCreate:
         logger = logging.getLogger(__name__)
 
         # Mock console to suppress warning output
-        mock_console = mocker.patch(
-            "services.llm_provider_service.cli_check_models.console"
-        )
+        mock_console = mocker.patch("services.llm_provider_service.cli_check_models.console")
 
         factory = CheckerFactory(settings=mock_settings, logger=logger)
         checker = await factory.create_checker(ProviderName.ANTHROPIC)
@@ -115,9 +113,7 @@ class TestCheckerFactoryCreate:
         logger = logging.getLogger(__name__)
 
         # Mock console
-        mock_console = mocker.patch(
-            "services.llm_provider_service.cli_check_models.console"
-        )
+        mock_console = mocker.patch("services.llm_provider_service.cli_check_models.console")
 
         factory = CheckerFactory(settings=mock_settings, logger=logger)
         checker = await factory.create_checker(ProviderName.OPENAI)
@@ -152,9 +148,7 @@ class TestCheckerFactoryCreate:
         logger = logging.getLogger(__name__)
 
         # Mock console
-        mock_console = mocker.patch(
-            "services.llm_provider_service.cli_check_models.console"
-        )
+        mock_console = mocker.patch("services.llm_provider_service.cli_check_models.console")
 
         factory = CheckerFactory(settings=mock_settings, logger=logger)
         checker = await factory.create_checker(ProviderName.GOOGLE)
@@ -191,9 +185,7 @@ class TestCheckerFactoryCreate:
         logger = logging.getLogger(__name__)
 
         # Mock console
-        mock_console = mocker.patch(
-            "services.llm_provider_service.cli_check_models.console"
-        )
+        mock_console = mocker.patch("services.llm_provider_service.cli_check_models.console")
 
         factory = CheckerFactory(settings=mock_settings, logger=logger)
         checker = await factory.create_checker(ProviderName.OPENROUTER)

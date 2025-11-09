@@ -102,6 +102,7 @@ alwaysApply: false
   - [110.3-testing-mode.mdc](mdc:110.3-testing-mode.mdc): Your guidelines for test creation and execution
   - [110.4-debugging-mode.mdc](mdc:110.4-debugging-mode.mdc): Your guidelines for debugging
   - [110.5-refactoring-linting-mode.mdc](mdc:110.5-refactoring-linting-mode.mdc): Your guidelines for refactoring and linting
+  - [111-cloud-vm-execution-standards.mdc](mdc:111-cloud-vm-execution-standards.mdc): Claude cloud sandbox workflow and limitations
 
 ## Rule Management
 - [999-rule-management.mdc](mdc:999-rule-management.mdc): Updating or proposing changes to these rules

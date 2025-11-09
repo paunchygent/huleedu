@@ -330,18 +330,21 @@ class OpenRouterModelChecker:
     ) -> bool:
         """Check if capabilities have changed between manifest and discovered model.
 
+        OpenRouter's models API does not expose capability information (tool_use, vision, etc).
+        The API returns supported_parameters (API parameters like 'temperature', 'top_p'),
+        not model capabilities. Discovered capabilities are inferred heuristically from
+        model names, not from actual API data.
+
+        Comparing heuristic capabilities against manifest capabilities produces
+        false positives. Since capabilities are static (determined by upstream provider
+        and model architecture), we skip this comparison.
+
         Args:
             manifest_model: Model from manifest
-            discovered_model: Model from API
+            discovered_model: Model from API (with heuristic capabilities)
 
         Returns:
-            True if capabilities differ
+            False (capabilities comparison disabled for OpenRouter)
         """
-        # Convert manifest capabilities dict to set of strings
-        manifest_caps = set(key for key, value in manifest_model.capabilities.items() if value)
-
-        # Convert discovered capabilities list to set
-        discovered_caps = set(discovered_model.capabilities)
-
-        # Check if sets differ
-        return manifest_caps != discovered_caps
+        # OpenRouter API doesn't expose capabilities - skip comparison to avoid false positives
+        return False

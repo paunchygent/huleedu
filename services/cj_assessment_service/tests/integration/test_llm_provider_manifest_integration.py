@@ -345,9 +345,7 @@ Please respond with a JSON object containing:
             )
             # If no error raised, service may queue request (callback will fail)
             # This is acceptable for async architecture
-            print(
-                "\n⚠️  Invalid model request queued (validation happens during processing)"
-            )
+            print("\n⚠️  Invalid model request queued (validation happens during processing)")
         except HuleEduError as e:
             # Service performed synchronous validation - this is also acceptable
             print(f"\n✅ Invalid Model Rejection Test Passed:")

@@ -16,10 +16,13 @@ from common_core.events.cj_assessment_events import (
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
 from huleedu_service_libs.kafka_client import KafkaBus
+from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 
 from scripts.cj_experiments_runners.eng5_np.events import write_completion_event
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerSettings
+
+_LOGGER = create_service_logger("eng5_np_kafka_flow")
 
 
 async def publish_envelope_to_kafka(
@@ -39,6 +42,11 @@ async def publish_envelope_to_kafka(
             topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
             envelope=envelope,
             key=envelope.data.entity_id,
+        )
+        _LOGGER.info(
+            "kafka_publish_success",
+            batch_id=settings.batch_id,
+            topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
         )
     finally:
         await kafka_bus.stop()
@@ -70,6 +78,11 @@ async def run_publish_and_capture(
 
         if collector:
             await collector.wait_for_completion()
+            _LOGGER.info(
+                "collector_completed",
+                batch_id=settings.batch_id,
+                event_counts=collector.observed_counts,
+            )
 
     finally:
         if collector:
@@ -92,6 +105,15 @@ class AssessmentEventCollector:
         self._completion_observed = False
         self._error: Exception | None = None
         self._started_at: float | None = None
+        self._logger = _LOGGER.bind(
+            batch_id=settings.batch_id,
+            kafka_group=f"{settings.kafka_client_id}-eng5np-{settings.batch_id}",
+        )
+        self._observed_counts = {
+            "llm_comparisons": 0,
+            "assessment_results": 0,
+            "completions": 0,
+        }
 
     async def consume(self) -> None:
         from aiokafka import AIOKafkaConsumer
@@ -117,6 +139,11 @@ class AssessmentEventCollector:
         self._started_at = loop.time()
         self._ready.set()
         deadline = loop.time() + self.settings.completion_timeout
+        self._logger.info(
+            "collector_started",
+            topics=topics,
+            completion_timeout=self.settings.completion_timeout,
+        )
 
         try:
             while not self._stop.is_set():
@@ -127,6 +154,11 @@ class AssessmentEventCollector:
                     typer.echo(
                         "Timed out waiting for CJ assessment results; captured partial data.",
                         err=True,
+                    )
+                    self._logger.warning(
+                        "collector_timeout",
+                        elapsed=self._elapsed_time(),
+                        event_counts=self._observed_counts,
                     )
                     elapsed = self._elapsed_time()
                     if elapsed is not None:
@@ -148,10 +180,18 @@ class AssessmentEventCollector:
 
         except Exception as exc:  # pragma: no cover - defensive guard
             self._error = exc
+            self._logger.exception(
+                "collector_error",
+                error_type=exc.__class__.__name__,
+            )
             raise
         finally:
             await consumer.stop()
             self._done.set()
+            self._logger.info(
+                "collector_stopped",
+                event_counts=self._observed_counts,
+            )
 
     async def _handle_record(self, record: Any) -> bool:
         from aiokafka.structs import ConsumerRecord
@@ -170,25 +210,59 @@ class AssessmentEventCollector:
             metadata = envelope.data.request_metadata or {}
             batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
             if batch_hint and batch_hint != self.settings.batch_id:
+                self._logger.debug(
+                    "comparison_event_skipped",
+                    request_id=envelope.data.request_id,
+                    comparison_batch=batch_hint,
+                )
                 return False
             self.hydrator.apply_llm_comparison(envelope)
+            self._observed_counts["llm_comparisons"] += 1
+            log_event_processing(
+                logger=self._logger,
+                message="collector_llm_comparison_applied",
+                envelope=envelope,
+                event_count=self._observed_counts["llm_comparisons"],
+            )
             return True
 
         if topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
             envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
             if envelope.data.entity_id != self.settings.batch_id:
+                self._logger.debug(
+                    "completion_event_skipped",
+                    event_batch=envelope.data.entity_id,
+                )
                 return False
             write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
             self._completion_observed = True
             self.hydrator.record_completion_seen()
+            self._observed_counts["completions"] += 1
+            log_event_processing(
+                logger=self._logger,
+                message="collector_completion_applied",
+                envelope=envelope,
+                event_count=self._observed_counts["completions"],
+            )
             return True
 
         if topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
             envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
             if envelope.data.batch_id != self.settings.batch_id:
+                self._logger.debug(
+                    "assessment_result_skipped",
+                    event_batch=envelope.data.batch_id,
+                )
                 return False
             self.hydrator.apply_assessment_result(envelope)
             self._rich_observed = True
+            self._observed_counts["assessment_results"] += 1
+            log_event_processing(
+                logger=self._logger,
+                message="collector_assessment_result_applied",
+                envelope=envelope,
+                event_count=self._observed_counts["assessment_results"],
+            )
             return True
 
         return False
@@ -208,3 +282,9 @@ class AssessmentEventCollector:
 
     def request_stop(self) -> None:
         self._stop.set()
+
+    @property
+    def observed_counts(self) -> dict[str, int]:
+        """Return a snapshot of observed event counters."""
+
+        return dict(self._observed_counts)

@@ -1,6 +1,7 @@
 # Result Aggregator Service
 
 ## Service Identity
+
 - **Port**: 4003 (API), 9096 (metrics)
 - **Purpose**: Event aggregation, publishing, and materialized view layer
 - **Pattern**: Event aggregation with transactional outbox and notification projection
@@ -8,7 +9,7 @@
 
 ## Architecture
 
-```
+```text
 app.py                  # HuleEduApp + Kafka consumer setup
 api/
   health_routes.py      # /healthz, /metrics
@@ -33,6 +34,12 @@ models_db.py          # SQLAlchemy models + event_outbox
 
 Provides detailed internal status tracking using 12-value `BatchStatus` enum. API Gateway consumes these endpoints and maps internal statuses to client-facing `BatchClientStatus` values for frontend consistency.
 
+#### Student Prompt Metadata Contract (Phase 3.2)
+
+- `student_prompt_ref` is always returned as serialized `StorageReferenceMetadata` when BOS provided a reference during registration.
+- Downstream consumers (dashboards, notebooks, BI scripts) must treat the reference as authoritative and resolve prompt text on demand via Content Service; static JSON fixtures are no longer curated.
+- Artefact hydration and execute-mode analytics rely on `student_prompt_ref.storage_id`; consumers may persist the storage identifier but must not expect inline prompt text in Result Aggregator payloads.
+
 ## Database Schema
 
 - `batch_results`: Batch-level aggregation
@@ -46,17 +53,20 @@ Provides detailed internal status tracking using 12-value `BatchStatus` enum. AP
 ## Kafka Integration
 
 **Subscribes to**:
+
 - `huleedu.els.batch.registered.v1`: Creates initial batch
 - `huleedu.els.batch.phase.outcome.v1`: Phase completions
 - `huleedu.essay.spellcheck.results.v1`: Rich spell check results with metrics
 - `huleedu.cj_assessment.completed.v1`: CJ rankings
 
 **Publishes**:
+
 - `huleedu.batch.results.ready.v1`: All processing phases complete (HIGH priority)
 - `huleedu.batch.assessment.completed.v1`: CJ assessment done (STANDARD priority)
 - `huleedu.notification.teacher.requested.v1`: Via notification projector
 
 **Features**:
+
 - Transactional outbox pattern for reliable event publishing
 - Redis idempotency with 24-hour TTL
 - Direct notification projector invocation (no Kafka round-trip)
@@ -65,6 +75,7 @@ Provides detailed internal status tracking using 12-value `BatchStatus` enum. AP
 ## Event Consumption Patterns
 
 ### Spellchecker Integration
+
 RAS consumes **rich events** from the spellchecker service for comprehensive business data:
 
 - **Event**: `SpellcheckResultV1`
@@ -78,6 +89,7 @@ This rich event pattern provides RAS with all necessary business data for analyt
 ## Cache Strategy
 
 **Redis Cache**:
+
 - 5-minute TTL
 - SET-based tracking: `ras:user:{user_id}:cache_keys`
 - Atomic invalidation on updates
@@ -86,6 +98,7 @@ This rich event pattern provides RAS with all necessary business data for analyt
 ## Key Patterns
 
 **Outbox with Notification Projection**:
+
 ```python
 # Canonical pattern: Store first, then direct invocation
 async def publish_batch_results_ready(event, correlation_id):
@@ -95,6 +108,7 @@ async def publish_batch_results_ready(event, correlation_id):
 ```
 
 **HuleEduApp with Kafka**:
+
 ```python
 app = HuleEduApp(__name__)
 app.container = container
@@ -103,6 +117,7 @@ app.consumer_task = asyncio.create_task(kafka_consumer())
 ```
 
 **Import Pattern** (CRITICAL):
+
 ```python
 # ALWAYS use full paths
 from services.result_aggregator_service.protocols import BatchRepositoryProtocol
@@ -110,6 +125,7 @@ from services.result_aggregator_service.protocols import BatchRepositoryProtocol
 ```
 
 **Cache Invalidation**:
+
 ```python
 async def invalidate_user_batches(self, user_id: str):
     keys = await self.redis_set_ops.smembers(f"ras:user:{user_id}:cache_keys")
@@ -119,7 +135,6 @@ async def invalidate_user_batches(self, user_id: str):
         pipe.delete(f"ras:user:{user_id}:cache_keys")
         await pipe.execute()
 ```
-
 ## Configuration
 
 Environment prefix: `RESULT_AGGREGATOR_SERVICE_`

@@ -9,7 +9,7 @@ Usage:
     from services.llm_provider_service.model_checker import GoogleModelChecker
 
     client = genai.Client(api_key="...")
-    checker = GoogleModelChecker(client, logger)
+    checker = GoogleModelChecker(client, logger, settings)
 
     # Discover latest models from Google API
     models = await checker.check_latest_models()
@@ -21,7 +21,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from google.genai import Client as GenAIClient
 
 from services.llm_provider_service.config import Settings
 from services.llm_provider_service.model_checker.base import (
@@ -51,7 +54,7 @@ class GoogleModelChecker:
 
     def __init__(
         self,
-        client: Any,  # genai.Client type not available at type-check time
+        client: GenAIClient,
         logger: logging.Logger,
         settings: Settings,
     ):
@@ -283,7 +286,7 @@ class GoogleModelChecker:
             release_date=None,  # Not exposed in API
             is_deprecated=False,  # Not exposed in API
             deprecation_date=None,
-            notes=model.description if hasattr(model, "description") else "",
+            notes=getattr(model, "description", "") or "",
         )
 
     def _should_include_model(self, model: DiscoveredModel) -> bool:
@@ -319,18 +322,21 @@ class GoogleModelChecker:
     ) -> bool:
         """Check if capabilities have changed between manifest and discovered model.
 
+        Google's models API does not expose capability information (tool_use, vision, etc).
+        The API returns supported_actions (API endpoints like 'generateContent'), not
+        model capabilities. Discovered capabilities are hard-coded assumptions
+        (function_calling, json_mode, multimodal), not actual API data.
+
+        Comparing hard-coded capabilities against manifest capabilities produces
+        false positives. Since capabilities are static (determined by model architecture),
+        we skip this comparison.
+
         Args:
             manifest_model: Model from manifest
-            discovered_model: Model from API
+            discovered_model: Model from API (with hard-coded capabilities)
 
         Returns:
-            True if capabilities differ
+            False (capabilities comparison disabled for Google)
         """
-        # Convert manifest capabilities dict to set of strings
-        manifest_caps = set(key for key, value in manifest_model.capabilities.items() if value)
-
-        # Convert discovered capabilities list to set
-        discovered_caps = set(discovered_model.capabilities)
-
-        # Check if sets differ
-        return manifest_caps != discovered_caps
+        # Google API doesn't expose capabilities - skip comparison to avoid false positives
+        return False

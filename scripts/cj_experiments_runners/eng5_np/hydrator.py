@@ -12,12 +12,15 @@ import typer
 from common_core.events.cj_assessment_events import AssessmentResultV1
 from common_core.events.envelope import EventEnvelope
 from common_core.events.llm_provider_events import LLMComparisonResultV1
+from huleedu_service_libs.logging_utils import create_service_logger, log_event_processing
 
 from scripts.cj_experiments_runners.eng5_np.events import (
     write_assessment_result_event,
     write_llm_comparison_event,
 )
 from scripts.cj_experiments_runners.eng5_np.utils import sha256_of_file
+
+_LOGGER = create_service_logger("eng5_np_hydrator")
 
 _HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -48,13 +51,35 @@ class AssessmentRunHydrator:
                 "completions": 0,
             },
         }
+        self._logger = _LOGGER.bind(
+            batch_id=batch_id,
+            grade_scale=grade_scale,
+            artefact_path=str(self.artefact_path),
+        )
+        self._logger.info(
+            "hydrator_initialized",
+            output_dir=str(self.output_dir),
+        )
 
     def mark_timeout(self, elapsed: float) -> None:
         self._runner_status["partial_data"] = True
         self._runner_status["timeout_seconds"] = round(max(elapsed, 0.0), 2)
+        self._logger.warning(
+            "hydrator_timeout_marked",
+            elapsed_seconds=self._runner_status["timeout_seconds"],
+        )
 
     def record_completion_seen(self) -> None:
         self._runner_status["observed_events"]["completions"] += 1
+        self._logger.info(
+            "completion_event_recorded",
+            total_completions=self._runner_status["observed_events"]["completions"],
+        )
+
+    def runner_status(self) -> dict[str, Any]:
+        """Expose current runner status for external logging."""
+
+        return self._runner_status
 
     def _increment_event(self, key: str) -> None:
         self._runner_status["observed_events"][key] += 1
@@ -72,11 +97,20 @@ class AssessmentRunHydrator:
                 f"Skipping duplicate LLM comparison callback for request_id={request_id}",
                 err=True,
             )
+            self._logger.warning(
+                "duplicate_llm_comparison_skipped",
+                request_id=request_id,
+            )
             return
 
         metadata = envelope.data.request_metadata or {}
         batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
         if batch_hint and batch_hint != self.batch_id:
+            self._logger.debug(
+                "comparison_batch_mismatch_skipped",
+                request_id=request_id,
+                comparison_batch=batch_hint,
+            )
             return
 
         write_llm_comparison_event(envelope=envelope, output_dir=self.output_dir)
@@ -88,11 +122,22 @@ class AssessmentRunHydrator:
         self._update_costs(artefact, envelope)
         self._seen_request_ids.add(request_id)
         self._write_artefact(artefact)
+        log_event_processing(
+            logger=self._logger,
+            message="llm_comparison_hydrated",
+            envelope=envelope,
+            request_id=request_id,
+            event_count=self._runner_status["observed_events"]["llm_comparisons"],
+        )
 
     def apply_assessment_result(self, envelope: EventEnvelope[AssessmentResultV1]) -> None:
         """Persist and hydrate Bradley–Terry and grade projection outputs."""
 
         if envelope.data.batch_id != self.batch_id:
+            self._logger.debug(
+                "assessment_result_batch_mismatch_skipped",
+                event_batch=envelope.data.batch_id,
+            )
             return
 
         write_assessment_result_event(envelope=envelope, output_dir=self.output_dir)
@@ -102,6 +147,12 @@ class AssessmentRunHydrator:
         artefact["grade_projections"] = self._build_grade_projections(envelope)
         self._increment_event("assessment_results")
         self._write_artefact(artefact)
+        log_event_processing(
+            logger=self._logger,
+            message="assessment_result_hydrated",
+            envelope=envelope,
+            event_count=self._runner_status["observed_events"]["assessment_results"],
+        )
 
     def _load_artefact(self) -> dict[str, Any]:
         return json.loads(self.artefact_path.read_text(encoding="utf-8"))
@@ -126,7 +177,13 @@ class AssessmentRunHydrator:
         serialized = json.dumps(artefact, indent=2)
         checksum = sha256(serialized.encode("utf-8")).hexdigest()
         validation_block["artefact_checksum"] = checksum
-        self.artefact_path.write_text(serialized, encoding="utf-8")
+        # Re-serialize with updated checksum to ensure integrity
+        self.artefact_path.write_text(json.dumps(artefact, indent=2), encoding="utf-8")
+        self._logger.debug(
+            "artefact_manifest_updated",
+            manifest_entries=len(manifest_entries),
+            checksum=checksum,
+        )
 
     def _manifest_targets(self) -> list[str]:
         targets: list[str] = []
@@ -154,8 +211,7 @@ class AssessmentRunHydrator:
             )
         if not prompt_hash or not _HEX_64.fullmatch(str(prompt_hash)):
             raise ValueError(
-                "Comparison callback missing prompt hash; "
-                f"correlation={envelope.correlation_id}",
+                f"Comparison callback missing prompt hash; correlation={envelope.correlation_id}",
             )
 
         winner = envelope.data.winner

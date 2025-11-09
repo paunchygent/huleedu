@@ -1,5 +1,7 @@
 # HuleEdu Developer Reference
 
+When operating in the Claude Code cloud sandbox (web, not access to local machine. To check if True: make tool call checking if local machine is available), apply `.claude/rules/111-cloud-vm-execution-standards.mdc` to understand tooling limits (no Docker/services) and required workflow.
+
 ## Core Workflow
 
 ### 1. Initial Setup
@@ -8,6 +10,7 @@
 - FIRST ACTION Read `.claude/rules/000-rule-index.mdc` first. The index contains onboard instructions for all services and project rules and standards. If the prompt contains a task description, use it to read and review all rule files related to the task at hand.
 - SECOND ACTION Use the user's task description to read and review all rule files related to the task at hand.
 - THIRD ACTION Read `.claude/HANDOFF.md` and `.claude/README_FIRST.md` for **critical** cross-service task context.
+
 - WHEN IMPLEMENTING NEW CODE using library dependencies: always use Context7 to ensure updated library API context.
 - WHEN PERFORMING A **CODE REVIEW**: If task is **code review** create a new file in `.claude/code-reviews/` using <WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>. After each task phase, Always stop to update `.claude/code-reviews/<WHAT_IS_BEING_REVIEWED_YEAR_MONTH_DAY.md>` with any new information + ask user any clarifying questions to retain alignment with user's intent.
 
