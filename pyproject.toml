@@ -29,6 +29,7 @@ dependencies = [
     "textual-filedrop",
     "numpy",
     "scipy",
+    "google-genai>=1.49.0",
 ]
 
 [dependency-groups]
