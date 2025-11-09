@@ -138,7 +138,7 @@ class CheckerFactory:
             return None
 
         client = AsyncAnthropic(api_key=api_key)
-        return AnthropicModelChecker(client=client, logger=self.logger)
+        return AnthropicModelChecker(client=client, logger=self.logger, settings=self.settings)
 
     async def _create_openai_checker(self) -> OpenAIModelChecker | None:
         """Create OpenAI model checker."""
@@ -151,7 +151,7 @@ class CheckerFactory:
             return None
 
         client = AsyncOpenAI(api_key=api_key)
-        return OpenAIModelChecker(client=client, logger=self.logger)
+        return OpenAIModelChecker(client=client, logger=self.logger, settings=self.settings)
 
     async def _create_google_checker(self) -> GoogleModelChecker | None:
         """Create Google model checker."""
@@ -167,7 +167,7 @@ class CheckerFactory:
         from google import genai  # type: ignore[import-untyped,attr-defined]
 
         client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-        return GoogleModelChecker(client=client, logger=self.logger)
+        return GoogleModelChecker(client=client, logger=self.logger, settings=self.settings)
 
     async def _create_openrouter_checker(self) -> OpenRouterModelChecker | None:
         """Create OpenRouter model checker."""
@@ -180,7 +180,9 @@ class CheckerFactory:
             return None
 
         session = aiohttp.ClientSession()
-        return OpenRouterModelChecker(session=session, api_key=api_key, logger=self.logger)
+        return OpenRouterModelChecker(
+            session=session, api_key=api_key, logger=self.logger, settings=self.settings
+        )
 
 
 def determine_exit_code(results: list[ModelComparisonResult]) -> ExitCode:

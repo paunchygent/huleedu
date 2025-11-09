@@ -127,9 +127,15 @@ class ModelComparisonResult(BaseModel):
     This captures the delta between what the provider API reports and
     what our manifest contains. Used by the CLI to display changes.
 
+    Family-Aware Filtering:
+        Models are categorized based on their model_family:
+        - new_models_in_tracked_families: New variants within actively tracked families (actionable)
+        - new_untracked_families: Models from families not in active tracking (informational)
+
     Attributes:
         provider: Which provider was checked
-        new_models: Models discovered but not in manifest
+        new_models_in_tracked_families: New models within families we're actively tracking (actionable)
+        new_untracked_families: Models from entirely new families not in active tracking (informational)
         deprecated_models: Model IDs in manifest but marked deprecated by provider
         updated_models: Models where metadata changed (model_id, discovered_model)
         breaking_changes: List of breaking change descriptions
@@ -143,9 +149,13 @@ class ModelComparisonResult(BaseModel):
         ...,
         description="Provider that was checked",
     )
-    new_models: list[DiscoveredModel] = Field(
+    new_models_in_tracked_families: list[DiscoveredModel] = Field(
         default_factory=list,
-        description="Models discovered but not in manifest",
+        description="New models within families we're actively tracking (actionable)",
+    )
+    new_untracked_families: list[DiscoveredModel] = Field(
+        default_factory=list,
+        description="Models from entirely new families not in active tracking (informational)",
     )
     deprecated_models: list[str] = Field(
         default_factory=list,
