@@ -299,9 +299,7 @@ def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
     assert comparison["status"] == "succeeded"
     assert data["costs"]["total_usd"] == pytest.approx(0.25)
     assert data["validation"]["manifest"]
-    assert (
-        data["validation"]["runner_status"]["observed_events"]["llm_comparisons"] == 1
-    )
+    assert data["validation"]["runner_status"]["observed_events"]["llm_comparisons"] == 1
 
 
 def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
@@ -355,9 +353,7 @@ def test_hydrator_applies_assessment_results(tmp_path: Path) -> None:
     data = json.loads(artefact_path.read_text(encoding="utf-8"))
     assert data["bt_summary"][0]["comparison_count"] == 3
     assert data["grade_projections"][0]["probabilities"]["A"] == pytest.approx(0.8)
-    assert (
-        data["validation"]["runner_status"]["observed_events"]["assessment_results"] == 1
-    )
+    assert data["validation"]["runner_status"]["observed_events"]["assessment_results"] == 1
 
 
 def test_hydrator_deduplicates_comparison_events(tmp_path: Path) -> None:
@@ -450,9 +446,7 @@ def test_hydrator_raises_when_prompt_hash_missing(tmp_path: Path) -> None:
 
 def test_stub_validates_against_schema(tmp_path: Path) -> None:
     repo_root = repo_root_from_package()
-    schema_path = (
-        repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
-    )
+    schema_path = repo_root / "Documentation" / "schemas" / "eng5_np" / "assessment_run.schema.json"
     if not schema_path.exists():
         pytest.skip("Schema file missing")
 
