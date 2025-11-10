@@ -12,7 +12,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **Framework**: Quart (HTTP API) + Direct `asyncio` and `aiokafka` for message processing
 - **Dependency Injection**: Dishka framework for clean architecture
 - **DI Initialization Order**: `QuartDishka(app, container)` is invoked *before* Blueprint registration to satisfy Dishka route injection requirements (see `app.py`)
-- **Concurrency**: Both HTTP API and Kafka worker run concurrently via `run_service.py`
+- **Concurrency**: Both HTTP API and Kafka worker run concurrently inside `app.py` via Quart lifecycle hooks
 
 ### Key Internal Modules
 
@@ -24,8 +24,7 @@ The CJ Assessment Service is a microservice dedicated to performing Comparative 
 - **`implementations/`**: Concrete implementations of all protocols (database, LLM providers, event publishing, content fetching)
 - **`event_processor.py`**: Processes individual Kafka messages, hydrates `student_prompt_ref` via Content Service, records `huleedu_cj_prompt_fetch_failures_total{reason}` on failures, and delegates to core workflow
 - **`worker_main.py`**: Kafka consumer lifecycle management and message processing
-- **`app.py`**: Lean Quart HTTP API application with health and metrics endpoints
-- **`run_service.py`**: Main service runner that orchestrates concurrent Kafka worker and HTTP API
+- **`app.py`**: Integrated Quart application that exposes health/metrics and starts the Kafka workflow via `before_serving`
 - **`api/health_routes.py`**: Blueprint containing `/healthz` and `/metrics` endpoints
 
 ### Dependencies
@@ -374,7 +373,7 @@ pdm run ruff check .
 pdm run mypy .
 
 # Run complete service locally
-pdm run python run_service.py
+pdm run start
 
 # Run only Kafka worker 
 pdm run python worker_main.py

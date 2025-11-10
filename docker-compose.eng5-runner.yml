@@ -18,7 +18,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=INFO
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CJ_ASSESSMENT_SERVICE_URL=http://cj_assessment_service:8082
+      - CJ_SERVICE_URL=http://cj_assessment_service:9090
       - LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8084
       - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
     volumes:

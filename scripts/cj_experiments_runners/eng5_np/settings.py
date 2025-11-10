@@ -38,7 +38,8 @@ class RunnerSettings:
     kafka_bootstrap: str
     kafka_client_id: str
     content_service_url: str
-    llm_overrides: LLMConfigOverrides | None
+    cj_service_url: str | None = None
+    llm_overrides: LLMConfigOverrides | None = None
     max_comparisons: int | None = None
     await_completion: bool = False
     completion_timeout: float = 1800.0

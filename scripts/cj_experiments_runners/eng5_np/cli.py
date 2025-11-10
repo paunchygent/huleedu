@@ -16,6 +16,10 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 from scripts.cj_experiments_runners.eng5_np import __version__
 from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
 from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
+from scripts.cj_experiments_runners.eng5_np.cj_client import (
+    AnchorRegistrationError,
+    register_anchor_essays,
+)
 from scripts.cj_experiments_runners.eng5_np.environment import (
     gather_git_sha,
     repo_root_from_package,
@@ -26,7 +30,9 @@ from scripts.cj_experiments_runners.eng5_np.inventory import (
     build_essay_refs,
     collect_inventory,
     ensure_execute_requirements,
+    FileRecord,
     print_inventory,
+    snapshot_directory,
 )
 from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
     publish_envelope_to_kafka,
@@ -49,6 +55,56 @@ from scripts.cj_experiments_runners.eng5_np.schema import ensure_schema_availabl
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
 
 app = typer.Typer(help="ENG5 NP batch runner tooling (plan, dry-run, execute)")
+
+
+@app.command("register-anchors")
+def register_anchors_command(
+    assignment_id: uuid.UUID = typer.Argument(..., help="Assignment ID to bind anchors to"),
+    cj_service_url: str = typer.Option(
+        os.getenv("CJ_SERVICE_URL", "http://localhost:9095"),
+        help="CJ Assessment Service base URL",
+    ),
+    anchor_dir: Path | None = typer.Option(
+        None,
+        help="Optional override directory containing anchor essays",
+    ),
+) -> None:
+    """One-time helper to register ENG5 anchors with the CJ service."""
+
+    if not cj_service_url:
+        typer.echo("CJ service URL is required for anchor registration", err=True)
+        raise typer.Exit(code=1)
+
+    repo_root = repo_root_from_package()
+    paths = RunnerPaths.from_repo_root(repo_root)
+
+    if anchor_dir:
+        anchor_snapshot = snapshot_directory(anchor_dir, ("*.docx", "*.txt"))
+        anchors = anchor_snapshot.files
+    else:
+        anchors = collect_inventory(paths).anchor_docs.files
+
+    if not anchors:
+        typer.echo("No anchor essays found for registration", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"Registering {len(anchors)} anchors with assignment {assignment_id}",
+        err=True,
+    )
+    try:
+        results = asyncio.run(
+            register_anchor_essays(
+                anchors=anchors,
+                assignment_id=assignment_id,
+                cj_service_url=cj_service_url,
+            )
+        )
+    except AnchorRegistrationError as exc:
+        typer.echo(f"Anchor registration failed: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Successfully registered {len(results)} anchors via {cj_service_url}")
 
 
 def validate_llm_overrides(
@@ -187,16 +243,18 @@ def _build_llm_overrides(
     )
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     mode: RunnerMode = typer.Option(RunnerMode.PLAN, case_sensitive=False),
     assignment_id: uuid.UUID = typer.Option(
-        uuid.UUID("11111111-1111-1111-1111-111111111111"),
-        help="Assignment ID for metadata (defaults to ENG5 placeholder)",
+        ...,
+        help="Assignment ID (REQUIRED). Must exist in CJ service assessment_instructions table. "
+        "Create via: POST /admin/v1/assessment-instructions",
     ),
     course_id: uuid.UUID = typer.Option(
-        uuid.UUID("22222222-2222-2222-2222-222222222222"),
-        help="Course ID for metadata (defaults to ENG5 placeholder)",
+        ...,
+        help="Course ID (REQUIRED). Used for metadata and scope context.",
     ),
     grade_scale: str = typer.Option(
         "eng5_np_legacy_9_step",
@@ -240,6 +298,10 @@ def main(
         "eng5-np-runner",
         help="Kafka client_id to use when publishing",
     ),
+    cj_service_url: str | None = typer.Option(
+        os.getenv("CJ_SERVICE_URL"),
+        help="CJ Assessment Service base URL for anchor registration",
+    ),
     content_service_url: str = typer.Option(
         os.getenv("CONTENT_SERVICE_URL", "http://localhost:8001/v1/content"),
         help="Content Service upload endpoint",
@@ -281,6 +343,8 @@ def main(
         help="Enable debug-level logging for troubleshooting",
     ),
 ) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
     repo_root = repo_root_from_package()
     paths = RunnerPaths.from_repo_root(repo_root)
 
@@ -306,6 +370,7 @@ def main(
         correlation_id=uuid.uuid4(),
         kafka_bootstrap=kafka_bootstrap,
         kafka_client_id=kafka_client_id,
+        cj_service_url=cj_service_url,
         content_service_url=content_service_url,
         llm_overrides=_build_llm_overrides(
             provider=llm_provider,
@@ -401,7 +466,41 @@ def main(
             max_comparisons=settings.max_comparisons,
             emit_notice=False,
         )
-        upload_targets = [*limited_anchors, *limited_students]
+        anchors_for_registration = inventory.anchor_docs.files
+        anchor_registration_used = False
+        if settings.cj_service_url and anchors_for_registration:
+            try:
+                registration_results = asyncio.run(
+                    register_anchor_essays(
+                        anchors=anchors_for_registration,
+                        assignment_id=settings.assignment_id,
+                        cj_service_url=settings.cj_service_url,
+                    )
+                )
+                if registration_results:
+                    anchor_registration_used = True
+                    typer.echo(
+                        f"Registered {len(registration_results)} anchors via CJ service",
+                        err=True,
+                    )
+                    logger.info(
+                        "anchor_registration_succeeded",
+                        registered=len(registration_results),
+                    )
+            except AnchorRegistrationError as exc:
+                typer.echo(
+                    f"⚠ Anchor registration failed: {exc}. Falling back to ephemeral anchors.",
+                    err=True,
+                )
+                logger.warning(
+                    "anchor_registration_failed",
+                    error=str(exc),
+                )
+
+        if anchor_registration_used:
+            upload_targets = limited_students
+        else:
+            upload_targets = [*limited_anchors, *limited_students]
         if not upload_targets:
             raise RuntimeError("No essays available for upload; ensure dataset is populated")
         typer.echo(
@@ -414,10 +513,17 @@ def main(
                 content_service_url=settings.content_service_url,
             )
         )
+        if anchor_registration_used:
+            essay_ref_anchors: list[FileRecord] = []
+            essay_ref_students = limited_students
+        else:
+            essay_ref_anchors = limited_anchors
+            essay_ref_students = limited_students
+
         essay_refs = build_essay_refs(
-            anchors=inventory.anchor_docs.files,
-            students=inventory.student_docs.files,
-            max_comparisons=settings.max_comparisons,
+            anchors=essay_ref_anchors,
+            students=essay_ref_students,
+            max_comparisons=None,
             storage_id_map=storage_id_map,
         )
         prompt_ref = build_prompt_reference(inventory.prompt)

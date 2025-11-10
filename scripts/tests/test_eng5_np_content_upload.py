@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from zipfile import ZipFile
 
 import aiohttp
 from aiohttp import web
@@ -36,6 +37,18 @@ async def _start_test_server(
     site = web.TCPSite(runner, "127.0.0.1", port)
     await site.start()
     return runner
+
+
+def _write_docx(path: Path, text: str) -> None:
+    document_xml = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>
+  <w:body>
+    <w:p><w:r><w:t>{text}</w:t></w:r></w:p>
+  </w:body>
+</w:document>
+"""
+    with ZipFile(path, "w") as archive:
+        archive.writestr("word/document.xml", document_xml)
 
 
 @pytest.mark.asyncio
@@ -81,6 +94,30 @@ async def test_upload_essay_content_raises_on_error(tmp_path: Path, unused_tcp_p
                 )
     finally:
         await runner.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_upload_docx_converts_to_text(tmp_path: Path, unused_tcp_port: int) -> None:
+    essay_path = tmp_path / "essay.docx"
+    _write_docx(essay_path, "Docx payload")
+
+    async def handler(request: web.Request) -> web.Response:
+        payload = await request.read()
+        assert payload.decode("utf-8") == "Docx payload"
+        return web.json_response({"storage_id": "storage-docx"}, status=201)
+
+    runner = await _start_test_server(handler, unused_tcp_port)
+    try:
+        async with aiohttp.ClientSession() as session:
+            storage_id = await upload_essay_content(
+                essay_path,
+                content_service_url=f"http://127.0.0.1:{unused_tcp_port}/content",
+                session=session,
+            )
+    finally:
+        await runner.cleanup()
+
+    assert storage_id == "storage-docx"
 
 
 @pytest.mark.asyncio

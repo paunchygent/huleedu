@@ -31,7 +31,11 @@ from scripts.cj_experiments_runners.eng5_np.cli import (
 )
 from scripts.cj_experiments_runners.eng5_np.requests import compose_cj_assessment_request
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerMode, RunnerSettings
-from services.llm_provider_service.model_manifest import ModelConfig, ProviderName
+from services.llm_provider_service.model_manifest import (
+    ModelConfig,
+    ProviderName,
+    StructuredOutputMethod,
+)
 
 
 class TestValidateLLMOverrides:
@@ -44,8 +48,9 @@ class TestValidateLLMOverrides:
             model_id="claude-haiku-4-5-20251001",
             provider=ProviderName.ANTHROPIC,
             display_name="Claude Haiku 4.5",
+            model_family="claude-haiku",
             api_version="2023-06-01",
-            structured_output_method="tool_use",  # type: ignore[arg-type]
+            structured_output_method=StructuredOutputMethod.TOOL_USE,
             max_tokens=64_000,
             release_date=None,
             is_deprecated=False,
@@ -112,8 +117,9 @@ class TestValidateLLMOverrides:
             model_id="claude-old-deprecated",
             provider=ProviderName.ANTHROPIC,
             display_name="Claude Old Deprecated",
+            model_family="claude-haiku",
             api_version="2023-01-01",
-            structured_output_method="tool_use",  # type: ignore[arg-type]
+            structured_output_method=StructuredOutputMethod.TOOL_USE,
             max_tokens=4096,
             release_date=None,
             is_deprecated=True,

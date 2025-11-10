@@ -12,6 +12,7 @@ from aiohttp.client_exceptions import ClientError, ContentTypeError
 import typer
 
 from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord
+from scripts.cj_experiments_runners.eng5_np.text_extraction import extract_text, TextExtractionError
 from scripts.cj_experiments_runners.eng5_np.utils import sha256_of_file
 
 _UPLOAD_CACHE: dict[str, str] = {}
@@ -32,9 +33,14 @@ async def upload_essay_content(
     if not path.exists():
         raise ContentUploadError(f"Essay file not found: {path}")
 
-    file_bytes = await asyncio.to_thread(path.read_bytes)
+    try:
+        text_content = await asyncio.to_thread(extract_text, path)
+    except TextExtractionError as exc:
+        raise ContentUploadError(str(exc)) from exc
+
+    file_bytes = text_content.encode("utf-8")
     if not file_bytes:
-        raise ContentUploadError(f"Essay file is empty: {path}")
+        raise ContentUploadError(f"Essay file is empty after text extraction: {path}")
 
     try:
         async with session.post(
