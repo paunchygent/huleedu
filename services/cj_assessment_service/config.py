@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote_plus
+
 from common_core import Environment, LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from dotenv import find_dotenv, load_dotenv
@@ -59,7 +61,22 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     CONTENT_SERVICE_URL: str = "http://content_service:8000/v1/content"
 
     # Database configuration - PostgreSQL only (no sqlite fallback)
-    # DATABASE_URL_CJ removed - use database_url property for consistent PostgreSQL access
+    DB_HOST: str = Field(
+        default="localhost",
+        description="PostgreSQL host when running outside Docker",
+    )
+    DB_PORT: int = Field(
+        default=5434,
+        description="PostgreSQL port when running outside Docker (mapped from container)",
+    )
+    DB_NAME: str = Field(
+        default="huleedu_cj_assessment",
+        description="Primary database name for CJ Assessment",
+    )
+    DB_USER: str = Field(
+        default="huleedu_user",
+        description="Database user name (falls back to HULEEDU_DB_USER env)",
+    )
 
     # Database Connection Pool Settings (following BOS/ELS pattern)
     DATABASE_POOL_SIZE: int = 5
@@ -78,7 +95,7 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
         import os
 
         # Check for explicit override first (Docker environment, manual config)
-        env_url = os.getenv("CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ")
+        env_url = os.getenv("CJ_ASSESSMENT_SERVICE_DATABASE_URL")
         if env_url:
             return env_url
 
@@ -96,12 +113,12 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
                 )
 
             return (
-                f"postgresql+asyncpg://{self._db_user}:{prod_password}@"
+                f"postgresql+asyncpg://{self._db_user}:{quote_plus(prod_password)}@"
                 f"{prod_host}:{prod_port}/huleedu_cj_assessment"
             )
         else:
             # Development: Docker container (existing pattern)
-            db_user = os.getenv("HULEEDU_DB_USER")
+            db_user = os.getenv("HULEEDU_DB_USER", self.DB_USER)
             db_password = os.getenv("HULEEDU_DB_PASSWORD")
 
             if not db_user or not db_password:
@@ -110,8 +127,18 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
                     "HULEEDU_DB_PASSWORD are set in your .env file."
                 )
 
+            env_type = os.getenv("ENV_TYPE", "development").lower()
+            if env_type == "docker":
+                host = os.getenv("CJ_ASSESSMENT_SERVICE_DB_HOST", "cj_assessment_db")
+                port = os.getenv("CJ_ASSESSMENT_SERVICE_DB_PORT", "5432")
+            else:
+                host = os.getenv("CJ_ASSESSMENT_SERVICE_DB_HOST", self.DB_HOST)
+                port = os.getenv("CJ_ASSESSMENT_SERVICE_DB_PORT", str(self.DB_PORT))
+
+            db_name = os.getenv("CJ_ASSESSMENT_SERVICE_DB_NAME", self.DB_NAME)
+
             return (
-                f"postgresql+asyncpg://{db_user}:{db_password}@localhost:5434/huleedu_cj_assessment"
+                f"postgresql+asyncpg://{db_user}:{quote_plus(db_password)}@{host}:{port}/{db_name}"
             )
 
     @property

@@ -106,11 +106,6 @@ async def postgres_session(postgres_engine: AsyncEngine) -> AsyncGenerator[Async
 @pytest.fixture
 def test_settings() -> Generator[Settings, None, None]:
     """Create test settings with database configuration."""
-    import os
-
-    # Override database URL for testing
-    os.environ["CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ"] = "sqlite+aiosqlite:///:memory:"
-
     settings = Settings()
     settings.DATABASE_POOL_SIZE = 5
     settings.DATABASE_MAX_OVERFLOW = 10
@@ -121,13 +116,18 @@ def test_settings() -> Generator[Settings, None, None]:
     settings.CJ_ASSESSMENT_FAILED_TOPIC = "huleedu.cj_assessment.failed.v1"
     settings.BATCH_TIMEOUT_HOURS = 4
     settings.BATCH_MONITOR_INTERVAL_MINUTES = 5
+    settings.DB_HOST = "sqlite"
+    settings.DB_PORT = 0
+    settings.DB_NAME = "cj_assessment_test"
 
-    # Clean up after test
+    import os
+
+    os.environ["CJ_ASSESSMENT_SERVICE_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+
     yield settings
 
-    # Clean up environment variable
-    if "CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ" in os.environ:
-        del os.environ["CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ"]
+    if "CJ_ASSESSMENT_SERVICE_DATABASE_URL" in os.environ:
+        del os.environ["CJ_ASSESSMENT_SERVICE_DATABASE_URL"]
 
 
 # real_repository fixture removed - consolidated into postgres_repository

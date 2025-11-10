@@ -413,7 +413,11 @@ services:
       - CJ_ASSESSMENT_SERVICE_REDIS_URL=redis://redis:6379
       - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080/api/v1
       # Database configuration
-      - CJ_ASSESSMENT_SERVICE_DATABASE_URL_CJ=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@cj_assessment_db:5432/huleedu_cj_assessment
+      - CJ_ASSESSMENT_SERVICE_DB_HOST=cj_assessment_db
+      - CJ_ASSESSMENT_SERVICE_DB_PORT=5432
+      - CJ_ASSESSMENT_SERVICE_DB_NAME=huleedu_cj_assessment
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       # Testing configuration handled by LLM Provider Service
       # Default LLM configuration (passed to LLM Provider Service)
       - CJ_ASSESSMENT_SERVICE_DEFAULT_LLM_PROVIDER=anthropic
