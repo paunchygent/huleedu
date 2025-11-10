@@ -8,11 +8,14 @@ from common_core.api_models.assessment_instructions import (
     AssessmentInstructionListResponse,
     AssessmentInstructionResponse,
     AssessmentInstructionUpsertRequest,
+    StudentPromptResponse,
+    StudentPromptUploadRequest,
 )
 from common_core.grade_scales import get_scale
 from dishka import FromDishka
 from huleedu_service_libs.auth import decode_and_validate_jwt
 from huleedu_service_libs.error_handling import (
+    HuleEduError,
     raise_authentication_error,
     raise_authorization_error,
     raise_processing_error,
@@ -31,7 +34,10 @@ from quart_dishka import inject
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_metrics
 from services.cj_assessment_service.models_db import AssessmentInstruction
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import (
+    CJRepositoryProtocol,
+    ContentClientProtocol,
+)
 
 logger = create_service_logger("cj_assessment_service.api.admin")
 
@@ -333,3 +339,239 @@ async def delete_course_instruction(  # type: ignore[override]
 
     _record_admin_metric("delete", "success")
     return {"status": "deleted", "course_id": course_id}, 200
+
+
+@bp.post("/student-prompts")
+@inject
+async def upload_student_prompt(  # type: ignore[override]
+    repository: FromDishka[CJRepositoryProtocol],
+    content_client: FromDishka[ContentClientProtocol],
+    corr: FromDishka[CorrelationContext],
+) -> tuple[dict[str, Any], int]:
+    """Upload student prompt for assignment and update instruction reference.
+
+    Requires pre-existing AssessmentInstruction. Uploads prompt to Content Service,
+    stores storage_id, preserves existing instructions_text and grade_scale.
+
+    Centralized admin workflow - avoids manual Content Service uploads.
+    """
+
+    payload = await request.get_json()
+    if not isinstance(payload, dict):
+        raise_validation_error(
+            service="cj_assessment_service",
+            operation="upload_student_prompt",
+            field="body",
+            message="JSON body required",
+            correlation_id=corr.uuid,
+        )
+
+    try:
+        req = StudentPromptUploadRequest.model_validate(payload)
+    except ValidationError as exc:
+        first_error = exc.errors()[0]
+        loc = first_error.get("loc", ("body",))
+        field_path = ".".join(str(part) for part in loc)
+        _record_admin_metric("prompt_upload", "failure")
+        raise_validation_error(
+            service="cj_assessment_service",
+            operation="upload_student_prompt",
+            field=field_path,
+            message=first_error.get("msg", "Invalid payload"),
+            correlation_id=corr.uuid,
+        )
+
+    async with repository.session() as session:
+        try:
+            # Fetch existing instruction (required)
+            existing = await repository.get_assessment_instruction(
+                session,
+                assignment_id=req.assignment_id,
+                course_id=None,
+            )
+
+            if not existing:
+                _record_admin_metric("prompt_upload", "failure")
+                raise_resource_not_found(
+                    service="cj_assessment_service",
+                    operation="upload_student_prompt",
+                    correlation_id=corr.uuid,
+                    resource_type="AssessmentInstruction",
+                    resource_id=req.assignment_id,
+                )
+
+            # Upload prompt to Content Service
+            storage_response = await content_client.store_content(
+                content=req.prompt_text,
+                content_type="text/plain",
+            )
+            storage_id = storage_response.get("content_id")
+
+            if not storage_id:
+                _record_admin_metric("prompt_upload", "failure")
+                raise_processing_error(
+                    service="cj_assessment_service",
+                    operation="upload_student_prompt",
+                    message="Content Service did not return storage_id",
+                    correlation_id=corr.uuid,
+                )
+
+            logger.info(
+                "Student prompt uploaded to Content Service",
+                extra={
+                    "assignment_id": req.assignment_id,
+                    "storage_id": storage_id,
+                    "correlation_id": str(corr.uuid),
+                    "admin_user": getattr(g, "admin_payload", {}).get("sub"),
+                },
+            )
+
+            # Upsert instruction preserving existing fields
+            updated = await repository.upsert_assessment_instruction(
+                session=session,
+                assignment_id=existing.assignment_id,
+                course_id=existing.course_id,
+                instructions_text=existing.instructions_text,
+                grade_scale=existing.grade_scale,
+                student_prompt_storage_id=storage_id,
+            )
+
+        except HuleEduError:
+            raise
+        except Exception as exc:
+            _record_admin_metric("prompt_upload", "failure")
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="upload_student_prompt",
+                message="Failed to upload student prompt",
+                correlation_id=corr.uuid,
+                error=str(exc),
+            )
+
+    # Enforce invariants for type safety
+    if updated.assignment_id is None or updated.student_prompt_storage_id is None:
+        _record_admin_metric("prompt_upload", "failure")
+        raise_processing_error(
+            service="cj_assessment_service",
+            operation="upload_student_prompt",
+            message="Upsert resulted in None values for required fields",
+            correlation_id=corr.uuid,
+        )
+
+    response = StudentPromptResponse(
+        assignment_id=updated.assignment_id,
+        student_prompt_storage_id=updated.student_prompt_storage_id,
+        prompt_text=req.prompt_text,
+        instructions_text=updated.instructions_text,
+        grade_scale=updated.grade_scale,
+        created_at=updated.created_at,
+    )
+
+    logger.info(
+        "Student prompt associated with assessment instruction",
+        extra={
+            "assignment_id": updated.assignment_id,
+            "storage_id": updated.student_prompt_storage_id,
+            "admin_user": getattr(g, "admin_payload", {}).get("sub"),
+        },
+    )
+
+    _record_admin_metric("prompt_upload", "success")
+    return response.model_dump(), 200
+
+
+@bp.get("/student-prompts/assignment/<string:assignment_id>")
+@inject
+async def get_student_prompt(  # type: ignore[override]
+    assignment_id: str,
+    repository: FromDishka[CJRepositoryProtocol],
+    content_client: FromDishka[ContentClientProtocol],
+    corr: FromDishka[CorrelationContext],
+) -> tuple[dict[str, Any], int]:
+    """Fetch student prompt with full instruction context.
+
+    Retrieves prompt from Content Service and returns with grade_scale, instructions_text.
+    Single-source visibility for admins to verify prompt alignment with assessment config.
+
+    Returns 404 if assignment has no instruction or no prompt configured.
+    """
+
+    async with repository.session() as session:
+        try:
+            # Fetch instruction
+            instruction = await repository.get_assessment_instruction(
+                session,
+                assignment_id=assignment_id,
+                course_id=None,
+            )
+
+            if not instruction:
+                _record_admin_metric("prompt_get", "failure")
+                raise_resource_not_found(
+                    service="cj_assessment_service",
+                    operation="get_student_prompt",
+                    correlation_id=corr.uuid,
+                    resource_type="AssessmentInstruction",
+                    resource_id=assignment_id,
+                )
+
+            # Check if prompt storage_id exists
+            if not instruction.student_prompt_storage_id:
+                _record_admin_metric("prompt_get", "failure")
+                raise_resource_not_found(
+                    service="cj_assessment_service",
+                    operation="get_student_prompt",
+                    correlation_id=corr.uuid,
+                    resource_type="StudentPrompt",
+                    resource_id=assignment_id,
+                    message="No prompt configured for assignment",
+                )
+
+            # Fetch prompt text from Content Service
+            prompt_text = await content_client.fetch_content(
+                storage_id=instruction.student_prompt_storage_id,
+                correlation_id=corr.uuid,
+            )
+
+        except HuleEduError:
+            raise
+        except Exception as exc:
+            _record_admin_metric("prompt_get", "failure")
+            raise_processing_error(
+                service="cj_assessment_service",
+                operation="get_student_prompt",
+                message="Failed to fetch student prompt",
+                correlation_id=corr.uuid,
+                error=str(exc),
+            )
+
+    # Enforce invariants for type safety (already validated above, but explicit for MyPy)
+    if instruction.assignment_id is None or instruction.student_prompt_storage_id is None:
+        _record_admin_metric("prompt_get", "failure")
+        raise_processing_error(
+            service="cj_assessment_service",
+            operation="get_student_prompt",
+            message="Instruction missing required fields",
+            correlation_id=corr.uuid,
+        )
+
+    response = StudentPromptResponse(
+        assignment_id=instruction.assignment_id,
+        student_prompt_storage_id=instruction.student_prompt_storage_id,
+        prompt_text=prompt_text,
+        instructions_text=instruction.instructions_text,
+        grade_scale=instruction.grade_scale,
+        created_at=instruction.created_at,
+    )
+
+    logger.info(
+        "Student prompt retrieved",
+        extra={
+            "assignment_id": assignment_id,
+            "storage_id": instruction.student_prompt_storage_id,
+            "admin_user": getattr(g, "admin_payload", {}).get("sub"),
+        },
+    )
+
+    _record_admin_metric("prompt_get", "success")
+    return response.model_dump(), 200

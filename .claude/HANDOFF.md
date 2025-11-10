@@ -1,8 +1,8 @@
 # Handoff: Student Prompt Admin Management Implementation
 
-## Status: 🔄 IN PROGRESS (Phase 1-3 Complete, Phase 4-7 Pending)
+## Status: 🔄 IN PROGRESS (Phase 1-4 Complete, Phase 5-7 Pending)
 **Date**: 2025-11-10
-**Effort**: ~3-4 days remaining (7/20 tasks complete)
+**Effort**: ~2-3 days remaining (9/20 tasks complete)
 
 ---
 
@@ -37,33 +37,31 @@
 
 ---
 
-## 📋 Remaining Work (Phase 4-7)
+### ✅ Phase 4: New Admin API Endpoints (Complete - 157 LoC)
+**Date**: 2025-11-10
 
-### Phase 4: New Admin API Endpoints (~150 LoC)
-**File**: `services/cj_assessment_service/api/admin_routes.py`
+**Files Modified**:
+- `libs/common_core/src/common_core/api_models/assessment_instructions.py:72-91` - Added `StudentPromptUploadRequest` and `StudentPromptResponse` models
+- `services/cj_assessment_service/api/admin_routes.py:343-556` - Added two endpoints
 
-**`POST /admin/v1/student-prompts`** (~60 LoC):
-- **Pattern**: Follow `anchor_management.py:21-140`
-- **Flow**: Validate → Upload to Content Service (`ContentClientImpl.store_content()`) → Upsert `AssessmentInstruction` with storage_id → Return
-- **Request**: `{"assignment_id": "...", "prompt_text": "..."}`
-- **Response**: `{"storage_id": "...", "assignment_id": "...", "status": "uploaded"}`
+**`POST /admin/v1/student-prompts`** (127 LoC at lines 343-469):
+- **Flow**: Validate JSON → Fetch existing instruction (404 if none) → Upload to Content Service → Upsert with preserved fields → Return response
+- **Request**: `{"assignment_id": "...", "prompt_text": "..."}` (min_length=10)
+- **Response**: `{"assignment_id": "...", "student_prompt_storage_id": "...", "prompt_text": "...", "instructions_text": "...", "grade_scale": "...", "created_at": "..."}`
+- **Status Code**: 200 OK (consistent with existing upsert endpoint)
 - **DI**: `@inject` with `ContentClientProtocol`, `CJRepositoryProtocol`, `CorrelationContext`
-- **Errors**: Use `raise_validation_error()` / `raise_processing_error()` from `huleedu_service_libs.error_handling`
+- **Error Handling**: Separate 404s for missing instruction vs Content Service errors, metrics on both success/failure paths
+- **Logging**: Includes correlation_id, storage_id, assignment_id, admin_user for traceability
 
-**`GET /admin/v1/student-prompts/assignment/<assignment_id>`** (~40 LoC):
-- **Flow**: Get `AssessmentInstruction` → Fetch from Content Service → Return prompt_text + metadata
-- **Response**: `{"assignment_id": "...", "storage_id": "...", "prompt_text": "...", "created_at": "..."}`
-- **404**: If no `student_prompt_storage_id`
+**`GET /admin/v1/student-prompts/assignment/<assignment_id>`** (87 LoC at lines 472-556):
+- **Flow**: Get `AssessmentInstruction` → Check storage_id exists → Fetch from Content Service → Return full context
+- **Response**: `{"assignment_id": "...", "student_prompt_storage_id": "...", "prompt_text": "...", "instructions_text": "...", "grade_scale": "...", "created_at": "..."}` (includes full instruction context per user requirement)
+- **404**: Separate errors for missing instruction vs missing prompt storage_id
+- **Traceability**: Passes `corr.uuid` to `fetch_content()` for Content Service correlation
 
-**Content Client** (already available at `services/cj_assessment_service/implementations/content_client_impl.py`):
-```python
-# Upload
-result = await content_client.store_content(content=text, content_type="text/plain")
-storage_id = result["content_id"]
+**Validation**: ✅ `pdm run typecheck-all` passes (no new errors)
 
-# Fetch
-text = await content_client.fetch_content(storage_id=storage_id, correlation_id=correlation_id)
-```
+## 📋 Remaining Work (Phase 5-7)
 
 ### Phase 5: CLI Tool Enhancement (~200 LoC)
 **File**: `services/cj_assessment_service/cli_admin.py`

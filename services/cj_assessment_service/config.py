@@ -112,6 +112,10 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
                     "HULEEDU_PROD_DB_PASSWORD environment variables"
                 )
 
+            # Type narrowing for MyPy (guaranteed non-None by validation above)
+            assert prod_host is not None
+            assert prod_password is not None
+
             return (
                 f"postgresql+asyncpg://{self._db_user}:{quote_plus(prod_password)}@"
                 f"{prod_host}:{prod_port}/huleedu_cj_assessment"

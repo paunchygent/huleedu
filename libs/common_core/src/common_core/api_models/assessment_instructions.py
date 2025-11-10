@@ -67,3 +67,25 @@ class AssessmentInstructionListResponse(BaseModel):
     total: int
     page: int = Field(ge=1, description="Current page (1-indexed)")
     page_size: int = Field(ge=1, le=200, description="Number of records per page")
+
+
+class StudentPromptUploadRequest(BaseModel):
+    """Request payload for uploading student prompt to assignment."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    assignment_id: str = Field(min_length=1, description="Assignment identifier")
+    prompt_text: str = Field(
+        min_length=10, description="Student prompt text to upload to Content Service"
+    )
+
+
+class StudentPromptResponse(BaseModel):
+    """Response model for student prompt with full instruction context."""
+
+    assignment_id: str
+    student_prompt_storage_id: str
+    prompt_text: str
+    instructions_text: str
+    grade_scale: str
+    created_at: datetime
