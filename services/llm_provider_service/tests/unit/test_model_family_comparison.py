@@ -97,7 +97,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[discovered_gpt5_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -122,7 +121,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[discovered_dalle_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -147,7 +145,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[discovered_gpt5_model],
             new_untracked_families=[discovered_dalle_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -168,7 +165,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -193,7 +189,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[discovered_gpt5_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -212,7 +207,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -233,7 +227,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[discovered_gpt5_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -254,7 +247,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[discovered_dalle_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -275,7 +267,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[discovered_gpt5_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -312,15 +303,11 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[discovered_gpt5_model],
             new_untracked_families=[],
             deprecated_models=["gpt-4-0314"],
-            updated_models=[
-                ("gpt-5-2025-08-07", discovered_gpt5_model),
-            ],
             breaking_changes=["API version changed"],
             is_up_to_date=False,
         )
 
         assert len(result.deprecated_models) == 1
-        assert len(result.updated_models) == 1
         assert len(result.breaking_changes) == 1
 
     def test_checked_at_field_defaults_to_today(self) -> None:
@@ -334,7 +321,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -352,7 +338,6 @@ class TestFamilyAwareComparison:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -382,7 +367,6 @@ class TestFamilyComparisonEdgeCases:
             new_models_in_tracked_families=[model, model],  # Duplicate
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -400,7 +384,6 @@ class TestFamilyComparisonEdgeCases:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -420,7 +403,6 @@ class TestFamilyComparisonEdgeCases:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )

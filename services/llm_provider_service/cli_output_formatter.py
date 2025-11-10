@@ -124,30 +124,9 @@ def format_comparison_table(result: ModelComparisonResult, verbose: bool = False
 
             table.add_row(*row)
 
-    # Add updated models
-    if result.updated_models:
-        if result.new_models_in_tracked_families or result.new_untracked_families:
-            table.add_row("", "", "", *[""] * (3 if verbose else 0))
-        table.add_row("[bold]Updated Models[/bold]", "", "", *[""] * (3 if verbose else 0))
-        for model_id, discovered in result.updated_models:
-            seen_model_ids.add(model_id)
-            row = ["⚠️  Updated", model_id, discovered.display_name]
-
-            if verbose:
-                api_ver = discovered.api_version or "N/A"
-                max_tok = str(discovered.max_tokens) if discovered.max_tokens else "N/A"
-                caps = ", ".join(discovered.capabilities[:3]) if discovered.capabilities else "N/A"
-                row.extend([api_ver, max_tok, caps])
-
-            table.add_row(*row)
-
     # Add deprecated models
     if result.deprecated_models:
-        if (
-            result.new_models_in_tracked_families
-            or result.new_untracked_families
-            or result.updated_models
-        ):
+        if result.new_models_in_tracked_families or result.new_untracked_families:
             table.add_row("", "", "", *[""] * (3 if verbose else 0))
         table.add_row("[bold]Deprecated Models[/bold]", "", "", *[""] * (3 if verbose else 0))
         for model_id in result.deprecated_models:
@@ -174,13 +153,11 @@ def format_summary(results: list[ModelComparisonResult]) -> None:
 
     total_in_family = sum(len(r.new_models_in_tracked_families) for r in results)
     total_untracked = sum(len(r.new_untracked_families) for r in results)
-    total_updated = sum(len(r.updated_models) for r in results)
     total_deprecated = sum(len(r.deprecated_models) for r in results)
     total_breaking = sum(len(r.breaking_changes) for r in results)
 
     console.print(f"🔄 In-family updates: {total_in_family}")
     console.print(f"ℹ️  Untracked families: {total_untracked}")
-    console.print(f"⚠️  Updated models: {total_updated}")
     console.print(f"🗑️  Deprecated models: {total_deprecated}")
     console.print(f"⛔ Breaking changes: {total_breaking}")
 

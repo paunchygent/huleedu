@@ -201,27 +201,6 @@ class CompatibilityReporter:
 
             lines.append("")
 
-        # Updated models section
-        if result.updated_models:
-            lines.extend(
-                [
-                    "## Updated Models",
-                    "",
-                    "The following models have metadata changes:",
-                    "",
-                ]
-            )
-
-            for model_id, discovered in result.updated_models:
-                lines.extend(
-                    [
-                        f"### {model_id}",
-                        f"- **Display Name**: {discovered.display_name}",
-                        "- **Status**: Metadata updated",
-                        "",
-                    ]
-                )
-
         # Breaking changes section
         if result.breaking_changes:
             lines.extend(

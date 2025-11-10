@@ -151,7 +151,6 @@ class OpenAIModelChecker:
         Identifies:
         - New models: in API but not in manifest
         - Deprecated models: in manifest but deprecated by provider
-        - Updated models: metadata changes (API version, capabilities)
         - Breaking changes: incompatible changes requiring manifest update
 
         Returns:
@@ -194,28 +193,14 @@ class OpenAIModelChecker:
             model_id for model_id in manifest_by_id.keys() if model_id not in discovered_by_id
         ]
 
-        # Identify updated models (metadata changes)
-        updated_models: list[tuple[str, DiscoveredModel]] = []
+        # Check for breaking changes (rare for OpenAI as they use 'v1' consistently)
         breaking_changes: list[str] = []
-
-        for model_id, manifest_model in manifest_by_id.items():
-            if model_id in discovered_by_id:
-                discovered_model = discovered_by_id[model_id]
-
-                # Check for API version changes (breaking for OpenAI is rare)
-                # OpenAI uses 'v1' consistently, so breaking changes are unlikely
-                # but we check for capability changes
-
-                # Check for capability changes (non-breaking but notable)
-                if self._has_capability_changes(manifest_model, discovered_model):
-                    updated_models.append((model_id, discovered_model))
 
         # Determine if manifest is up-to-date
         is_up_to_date = (
             len(new_in_tracked) == 0
             and len(new_untracked) == 0
             and len(deprecated_models) == 0
-            and len(updated_models) == 0
             and len(breaking_changes) == 0
         )
 
@@ -224,7 +209,6 @@ class OpenAIModelChecker:
             new_models_in_tracked_families=new_in_tracked,
             new_untracked_families=new_untracked,
             deprecated_models=deprecated_models,
-            updated_models=updated_models,
             breaking_changes=breaking_changes,
             is_up_to_date=is_up_to_date,
         )
@@ -236,7 +220,6 @@ class OpenAIModelChecker:
                 "new_in_tracked_count": len(new_in_tracked),
                 "new_untracked_count": len(new_untracked),
                 "deprecated_models_count": len(deprecated_models),
-                "updated_models_count": len(updated_models),
                 "breaking_changes_count": len(breaking_changes),
                 "is_up_to_date": is_up_to_date,
             },
@@ -306,27 +289,3 @@ class OpenAIModelChecker:
         # Include everything else (future models)
         return True
 
-    def _has_capability_changes(
-        self,
-        manifest_model: ModelConfig,
-        discovered_model: DiscoveredModel,
-    ) -> bool:
-        """Check if capabilities have changed between manifest and discovered model.
-
-        OpenAI's models API does not expose capability information (function_calling, json_mode, etc).
-        The API only returns: id, created, object, owned_by.
-
-        Discovered capabilities are inferred heuristically from model names (gpt-4/gpt-5 patterns),
-        not from actual API data. Comparing heuristic capabilities against detailed manifest
-        capabilities produces false positives. Since capabilities are static (determined by
-        model architecture), we skip this comparison.
-
-        Args:
-            manifest_model: Model from manifest
-            discovered_model: Model from API (with heuristic capabilities)
-
-        Returns:
-            False (capabilities comparison disabled for OpenAI)
-        """
-        # OpenAI API doesn't expose capabilities - skip comparison to avoid false positives
-        return False

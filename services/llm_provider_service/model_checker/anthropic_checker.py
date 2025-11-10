@@ -150,7 +150,6 @@ class AnthropicModelChecker:
         Identifies:
         - New models: in API but not in manifest
         - Deprecated models: in manifest but deprecated by provider
-        - Updated models: metadata changes (API version, capabilities)
         - Breaking changes: incompatible changes requiring manifest update
 
         Returns:
@@ -197,8 +196,7 @@ class AnthropicModelChecker:
             ).is_deprecated
         ]
 
-        # Identify updated models (metadata changes)
-        updated_models: list[tuple[str, DiscoveredModel]] = []
+        # Identify breaking changes (e.g., API version changes)
         breaking_changes: list[str] = []
 
         for model_id, manifest_model in manifest_by_id.items():
@@ -214,18 +212,12 @@ class AnthropicModelChecker:
                         f"{model_id}: API version changed from "
                         f"{manifest_model.api_version} to {discovered_model.api_version}"
                     )
-                    updated_models.append((model_id, discovered_model))
-
-                # Check for capability changes (non-breaking but notable)
-                elif self._has_capability_changes(manifest_model, discovered_model):
-                    updated_models.append((model_id, discovered_model))
 
         # Determine if manifest is up-to-date
         is_up_to_date = (
             len(new_in_tracked) == 0
             and len(new_untracked) == 0
             and len(deprecated_models) == 0
-            and len(updated_models) == 0
             and len(breaking_changes) == 0
         )
 
@@ -234,7 +226,6 @@ class AnthropicModelChecker:
             new_models_in_tracked_families=new_in_tracked,
             new_untracked_families=new_untracked,
             deprecated_models=deprecated_models,
-            updated_models=updated_models,
             breaking_changes=breaking_changes,
             is_up_to_date=is_up_to_date,
         )
@@ -246,7 +237,6 @@ class AnthropicModelChecker:
                 "new_in_tracked_count": len(new_in_tracked),
                 "new_untracked_count": len(new_untracked),
                 "deprecated_models_count": len(deprecated_models),
-                "updated_models_count": len(updated_models),
                 "breaking_changes_count": len(breaking_changes),
                 "is_up_to_date": is_up_to_date,
             },
@@ -310,26 +300,3 @@ class AnthropicModelChecker:
         # Include everything else (future models)
         return True
 
-    def _has_capability_changes(
-        self,
-        manifest_model: ModelConfig,
-        discovered_model: DiscoveredModel,
-    ) -> bool:
-        """Check if capabilities have changed between manifest and discovered model.
-
-        Anthropic's models API does not expose capability information (tool_use, vision, etc).
-        The API only returns: id, display_name, type, created_at.
-
-        Comparing empty discovered capabilities against manifest capabilities would
-        produce false positives for every model. Since capabilities are static
-        (determined by model architecture, not dynamic API data), we skip this comparison.
-
-        Args:
-            manifest_model: Model from manifest
-            discovered_model: Model from API (with empty capabilities)
-
-        Returns:
-            False (capabilities comparison disabled for Anthropic)
-        """
-        # Anthropic API doesn't expose capabilities - skip comparison to avoid false positives
-        return False

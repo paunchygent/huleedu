@@ -60,7 +60,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -83,7 +82,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[mock_tracked_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -106,7 +104,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[],
             new_untracked_families=[mock_untracked_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -129,7 +126,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[mock_tracked_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=["API version changed"],
             is_up_to_date=False,
         )
@@ -153,7 +149,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[mock_tracked_model],
             new_untracked_families=[mock_untracked_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -177,7 +172,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=["API version changed"],
             is_up_to_date=False,
         )
@@ -187,7 +181,6 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[mock_tracked_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -207,36 +200,12 @@ class TestExitCodeDetermination:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=["gpt-4-0314"],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,  # Note: is_up_to_date is False due to changes
         )
 
         # Despite is_up_to_date=False, exit code should still be 0
         # because deprecated models don't require action
-        exit_code = determine_exit_code([result])
-        assert exit_code == ExitCode.UP_TO_DATE
-        assert exit_code.value == 0
-
-    def test_exit_code_updated_models_do_not_trigger_warning(
-        self,
-        mock_tracked_model: DiscoveredModel,
-    ) -> None:
-        """Updated models alone don't trigger non-zero exit code.
-
-        Model metadata updates are informational and don't require action,
-        so they shouldn't change the exit code from UP_TO_DATE.
-        """
-        result = ModelComparisonResult(
-            provider=ProviderName.OPENAI,
-            new_models_in_tracked_families=[],
-            new_untracked_families=[],
-            deprecated_models=[],
-            updated_models=[("gpt-5-2025-08-07", mock_tracked_model)],
-            breaking_changes=[],
-            is_up_to_date=False,
-        )
-
         exit_code = determine_exit_code([result])
         assert exit_code == ExitCode.UP_TO_DATE
         assert exit_code.value == 0
@@ -267,7 +236,6 @@ class TestExitCodeDetermination:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[mock_untracked_model],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             ),
@@ -276,7 +244,6 @@ class TestExitCodeDetermination:
                 new_models_in_tracked_families=[mock_tracked_model],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             ),
@@ -320,7 +287,6 @@ class TestExitCodePriorityLogic:
             new_models_in_tracked_families=[tracked_model],
             new_untracked_families=[untracked_model],
             deprecated_models=["gpt-4-0314"],
-            updated_models=[],
             breaking_changes=["API version changed"],
             is_up_to_date=False,
         )
@@ -338,7 +304,6 @@ class TestExitCodePriorityLogic:
             new_models_in_tracked_families=[tracked_model],
             new_untracked_families=[untracked_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -358,7 +323,6 @@ class TestExitCodeEdgeCases:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=True,
             ),
@@ -367,7 +331,6 @@ class TestExitCodeEdgeCases:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=True,
             ),
@@ -391,7 +354,6 @@ class TestExitCodeEdgeCases:
             new_models_in_tracked_families=[tracked_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )

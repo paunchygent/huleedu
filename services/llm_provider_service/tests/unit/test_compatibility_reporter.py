@@ -35,7 +35,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
             checked_at=date(2025, 11, 9),
@@ -67,7 +66,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[new_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -104,7 +102,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[deprecated_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -126,7 +123,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[
                 "API version changed from 2023-01-01 to 2024-01-01",
                 "Structured output method changed from json to tool_use",
@@ -151,7 +147,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
             checked_at=date(2025, 11, 9),
@@ -172,7 +167,6 @@ class TestCompatibilityReporterJSON:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=["claude-haiku-4-5-20251001"],  # Current default
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -196,7 +190,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
             checked_at=date(2025, 11, 9),
@@ -227,7 +220,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[new_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -252,7 +244,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=["claude-2-old", "claude-instant-deprecated"],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -265,32 +256,6 @@ class TestCompatibilityReporterMarkdown:
         assert "`claude-2-old`" in markdown
         assert "`claude-instant-deprecated`" in markdown
 
-    def test_markdown_report_with_updated_models(self) -> None:
-        """Markdown report should show updated models."""
-        updated_model = DiscoveredModel(
-            model_id="claude-3-5-haiku-20241022",
-            display_name="Claude 3.5 Haiku (Updated)",
-        )
-
-        result = ModelComparisonResult(
-            provider=ProviderName.ANTHROPIC,
-            new_models_in_tracked_families=[],
-            new_untracked_families=[],
-            deprecated_models=[],
-            updated_models=[("claude-3-5-haiku-20241022", updated_model)],
-            breaking_changes=[],
-            is_up_to_date=False,
-            checked_at=date(2025, 11, 9),
-        )
-
-        reporter = CompatibilityReporter()
-        markdown = reporter.generate_markdown_report(result)
-
-        assert "## Updated Models" in markdown
-        assert "### claude-3-5-haiku-20241022" in markdown
-        assert "Claude 3.5 Haiku (Updated)" in markdown
-        assert "Metadata updated" in markdown
-
     def test_markdown_report_with_breaking_changes(self) -> None:
         """Markdown report should highlight breaking changes."""
         result = ModelComparisonResult(
@@ -298,7 +263,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[
                 "API version changed from 2023-01-01 to 2024-01-01",
                 "Default model changed from haiku to sonnet",
@@ -322,7 +286,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
             checked_at=date(2025, 11, 9),
@@ -345,7 +308,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[new_model],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -365,7 +327,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=["old-model"],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),
@@ -383,7 +344,6 @@ class TestCompatibilityReporterMarkdown:
             new_models_in_tracked_families=[],
             new_untracked_families=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=["Critical API change"],
             is_up_to_date=False,
             checked_at=date(2025, 11, 9),

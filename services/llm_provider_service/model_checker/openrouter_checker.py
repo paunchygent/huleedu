@@ -172,7 +172,6 @@ class OpenRouterModelChecker:
         Identifies:
         - New models: in API but not in manifest
         - Deprecated models: in manifest but deprecated by provider
-        - Updated models: metadata changes (API version, capabilities)
         - Breaking changes: incompatible changes requiring manifest update
 
         Returns:
@@ -215,24 +214,14 @@ class OpenRouterModelChecker:
             model_id for model_id in manifest_by_id.keys() if model_id not in discovered_by_id
         ]
 
-        # Identify updated models (metadata changes)
-        updated_models: list[tuple[str, DiscoveredModel]] = []
+        # Check for breaking changes (rare for OpenRouter as it's a pass-through)
         breaking_changes: list[str] = []
-
-        for model_id, manifest_model in manifest_by_id.items():
-            if model_id in discovered_by_id:
-                discovered_model = discovered_by_id[model_id]
-
-                # Check for capability changes (non-breaking but notable)
-                if self._has_capability_changes(manifest_model, discovered_model):
-                    updated_models.append((model_id, discovered_model))
 
         # Determine if manifest is up-to-date
         is_up_to_date = (
             len(new_in_tracked) == 0
             and len(new_untracked) == 0
             and len(deprecated_models) == 0
-            and len(updated_models) == 0
             and len(breaking_changes) == 0
         )
 
@@ -241,7 +230,6 @@ class OpenRouterModelChecker:
             new_models_in_tracked_families=new_in_tracked,
             new_untracked_families=new_untracked,
             deprecated_models=deprecated_models,
-            updated_models=updated_models,
             breaking_changes=breaking_changes,
             is_up_to_date=is_up_to_date,
         )
@@ -253,7 +241,6 @@ class OpenRouterModelChecker:
                 "new_in_tracked_count": len(new_in_tracked),
                 "new_untracked_count": len(new_untracked),
                 "deprecated_models_count": len(deprecated_models),
-                "updated_models_count": len(updated_models),
                 "breaking_changes_count": len(breaking_changes),
                 "is_up_to_date": is_up_to_date,
             },
@@ -323,28 +310,3 @@ class OpenRouterModelChecker:
 
         return False
 
-    def _has_capability_changes(
-        self,
-        manifest_model: ModelConfig,
-        discovered_model: DiscoveredModel,
-    ) -> bool:
-        """Check if capabilities have changed between manifest and discovered model.
-
-        OpenRouter's models API does not expose capability information (tool_use, vision, etc).
-        The API returns supported_parameters (API parameters like 'temperature', 'top_p'),
-        not model capabilities. Discovered capabilities are inferred heuristically from
-        model names, not from actual API data.
-
-        Comparing heuristic capabilities against manifest capabilities produces
-        false positives. Since capabilities are static (determined by upstream provider
-        and model architecture), we skip this comparison.
-
-        Args:
-            manifest_model: Model from manifest
-            discovered_model: Model from API (with heuristic capabilities)
-
-        Returns:
-            False (capabilities comparison disabled for OpenRouter)
-        """
-        # OpenRouter API doesn't expose capabilities - skip comparison to avoid false positives
-        return False

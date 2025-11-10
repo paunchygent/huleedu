@@ -125,7 +125,6 @@ class TestAnthropicFinancial:
         assert isinstance(result.new_models_in_tracked_families, list)
         assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
-        assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
 
 
@@ -206,7 +205,6 @@ class TestOpenAIFinancial:
         assert isinstance(result.new_models_in_tracked_families, list)
         assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
-        assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
 
 
@@ -294,7 +292,6 @@ class TestGoogleFinancial:
         assert isinstance(result.new_models_in_tracked_families, list)
         assert isinstance(result.new_untracked_families, list)
         assert isinstance(result.deprecated_models, list)
-        assert isinstance(result.updated_models, list)
         assert isinstance(result.breaking_changes, list)
 
 
@@ -389,7 +386,6 @@ class TestOpenRouterFinancial:
             assert isinstance(result.new_models_in_tracked_families, list)
             assert isinstance(result.new_untracked_families, list)
             assert isinstance(result.deprecated_models, list)
-            assert isinstance(result.updated_models, list)
             assert isinstance(result.breaking_changes, list)
         finally:
             await session.close()

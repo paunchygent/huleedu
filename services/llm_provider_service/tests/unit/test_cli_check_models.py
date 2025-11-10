@@ -218,7 +218,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=True,
             )
@@ -241,7 +240,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[new_model],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             )
@@ -264,7 +262,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[untracked_model],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             )
@@ -282,7 +279,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=["API version changed from v1 to v2"],
                 is_up_to_date=False,
             )
@@ -305,7 +301,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[new_model],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=["API version changed"],
                 is_up_to_date=False,
             )
@@ -324,7 +319,6 @@ class TestDetermineExitCode:
                 new_models_in_tracked_families=[],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=True,
             ),
@@ -335,7 +329,6 @@ class TestDetermineExitCode:
                 ],
                 new_untracked_families=[],
                 deprecated_models=[],
-                updated_models=[],
                 breaking_changes=[],
                 is_up_to_date=False,
             ),

@@ -168,7 +168,6 @@ class TestModelComparisonResult:
         assert result.new_models_in_tracked_families == []
         assert result.new_untracked_families == []
         assert result.deprecated_models == []
-        assert result.updated_models == []
         assert result.breaking_changes == []
         # Check checked_at defaults to today
         assert result.checked_at == date.today()
@@ -185,7 +184,6 @@ class TestModelComparisonResult:
             new_models_in_tracked_families=[new_model],
             new_untracked_families=[],
             deprecated_models=["old-model-123"],
-            updated_models=[("updated-model", new_model)],
             breaking_changes=["API version changed from v1 to v2"],
             is_up_to_date=False,
             checked_at=date(2024, 11, 8),
@@ -195,8 +193,6 @@ class TestModelComparisonResult:
         assert len(result.new_models_in_tracked_families) == 1
         assert result.new_models_in_tracked_families[0].model_id == "new-model"
         assert result.deprecated_models == ["old-model-123"]
-        assert len(result.updated_models) == 1
-        assert result.updated_models[0][0] == "updated-model"
         assert result.breaking_changes == ["API version changed from v1 to v2"]
         assert result.is_up_to_date is False
         assert result.checked_at == date(2024, 11, 8)
@@ -225,7 +221,6 @@ class TestModelComparisonResult:
             provider=ProviderName.ANTHROPIC,
             new_models=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=True,
         )
@@ -243,7 +238,6 @@ class TestModelComparisonResult:
             provider=ProviderName.ANTHROPIC,
             new_models=[new_model],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=[],
             is_up_to_date=False,
         )
@@ -256,7 +250,6 @@ class TestModelComparisonResult:
             provider=ProviderName.ANTHROPIC,
             new_models=[],
             deprecated_models=[],
-            updated_models=[],
             breaking_changes=["API version changed"],
             is_up_to_date=False,
         )
@@ -274,7 +267,6 @@ class TestModelComparisonResult:
         assert result.new_models_in_tracked_families == []
         assert result.new_untracked_families == []
         assert result.deprecated_models == []
-        assert result.updated_models == []
         assert result.breaking_changes == []
 
         # Verify they're independent instances
@@ -324,26 +316,3 @@ class TestModelComparisonResult:
         assert len(result.new_models_in_tracked_families) == 5
         assert all(isinstance(m, DiscoveredModel) for m in result.new_models_in_tracked_families)
 
-    def test_multiple_updated_models(self) -> None:
-        """ModelComparisonResult should handle multiple updated models."""
-        model = DiscoveredModel(
-            model_id="updated",
-            display_name="Updated",
-        )
-
-        updated = [
-            ("model-1", model),
-            ("model-2", model),
-            ("model-3", model),
-        ]
-
-        result = ModelComparisonResult(
-            provider=ProviderName.ANTHROPIC,
-            updated_models=updated,
-            is_up_to_date=False,
-        )
-
-        assert len(result.updated_models) == 3
-        assert all(isinstance(t, tuple) for t in result.updated_models)
-        assert all(isinstance(t[0], str) for t in result.updated_models)
-        assert all(isinstance(t[1], DiscoveredModel) for t in result.updated_models)
