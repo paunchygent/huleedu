@@ -20,6 +20,6 @@ def gather_git_sha(repo_root: Path) -> str:
             ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
             stderr=subprocess.STDOUT,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return "UNKNOWN"
     return result.decode().strip()

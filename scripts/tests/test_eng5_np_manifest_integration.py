@@ -218,6 +218,7 @@ class TestEventComposition:
             correlation_id=uuid.uuid4(),
             kafka_bootstrap="kafka:9092",
             kafka_client_id="test-client",
+            content_service_url="http://localhost:8001/v1/content",
             llm_overrides=LLMConfigOverrides(
                 provider_override=LLMProviderType.ANTHROPIC,
                 model_override="claude-haiku-4-5-20251001",
@@ -284,6 +285,7 @@ class TestEventComposition:
             correlation_id=uuid.uuid4(),
             kafka_bootstrap="kafka:9092",
             kafka_client_id="test-client",
+            content_service_url="http://localhost:8001/v1/content",
             llm_overrides=None,  # No overrides
             await_completion=False,
             completion_timeout=1800.0,

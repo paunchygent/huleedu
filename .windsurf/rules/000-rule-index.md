@@ -30,6 +30,7 @@ alwaysApply: false
   - [020.16-email-service-architecture.mdc](mdc:020.16-email-service-architecture.mdc): Email Service
   - [020.17-entitlements-service-architecture.mdc](mdc:020.17-entitlements-service-architecture.mdc): Entitlements Service
   - [020.18-language-tool-service-patterns.mdc](mdc:020.18-language-tool-service-patterns.mdc): Language Tool Service (Grammar checking via Java subprocess)
+  - [020.19-eng5-np-runner-container.mdc](mdc:020.19-eng5-np-runner-container.mdc): ENG5 NP Runner containerization patterns and volume mount standards
 - [030-event-driven-architecture-eda-standards.mdc](mdc:030-event-driven-architecture-eda-standards.mdc): Event-driven communication standards with header-first optimization
 
 ## Processing Flows

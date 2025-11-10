@@ -15,12 +15,14 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from scripts.cj_experiments_runners.eng5_np import __version__
 from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
+from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
 from scripts.cj_experiments_runners.eng5_np.environment import (
     gather_git_sha,
     repo_root_from_package,
 )
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 from scripts.cj_experiments_runners.eng5_np.inventory import (
+    apply_comparison_limit,
     build_essay_refs,
     collect_inventory,
     ensure_execute_requirements,
@@ -238,6 +240,10 @@ def main(
         "eng5-np-runner",
         help="Kafka client_id to use when publishing",
     ),
+    content_service_url: str = typer.Option(
+        os.getenv("CONTENT_SERVICE_URL", "http://localhost:8001/v1/content"),
+        help="Content Service upload endpoint",
+    ),
     llm_provider: str | None = typer.Option(
         None,
         help="Override LLM provider (e.g., openai, anthropic)",
@@ -256,6 +262,11 @@ def main(
         None,
         min=1,
         help="Override max completion tokens",
+    ),
+    max_comparisons: int | None = typer.Option(
+        None,
+        min=1,
+        help="Limit total comparisons (for testing/cost control)",
     ),
     await_completion: bool = typer.Option(
         False,
@@ -295,12 +306,14 @@ def main(
         correlation_id=uuid.uuid4(),
         kafka_bootstrap=kafka_bootstrap,
         kafka_client_id=kafka_client_id,
+        content_service_url=content_service_url,
         llm_overrides=_build_llm_overrides(
             provider=llm_provider,
             model=llm_model,
             temperature=llm_temperature,
             max_tokens=llm_max_tokens,
         ),
+        max_comparisons=max_comparisons,
         await_completion=await_completion,
         completion_timeout=completion_timeout,
     )
@@ -382,9 +395,30 @@ def main(
 
     if mode is RunnerMode.EXECUTE:
         ensure_execute_requirements(inventory)
+        limited_anchors, limited_students, _ = apply_comparison_limit(
+            anchors=inventory.anchor_docs.files,
+            students=inventory.student_docs.files,
+            max_comparisons=settings.max_comparisons,
+            emit_notice=False,
+        )
+        upload_targets = [*limited_anchors, *limited_students]
+        if not upload_targets:
+            raise RuntimeError("No essays available for upload; ensure dataset is populated")
+        typer.echo(
+            f"Uploading {len(upload_targets)} essays to Content Service at {settings.content_service_url}",
+            err=True,
+        )
+        storage_id_map = asyncio.run(
+            upload_essays_parallel(
+                records=upload_targets,
+                content_service_url=settings.content_service_url,
+            )
+        )
         essay_refs = build_essay_refs(
             anchors=inventory.anchor_docs.files,
             students=inventory.student_docs.files,
+            max_comparisons=settings.max_comparisons,
+            storage_id_map=storage_id_map,
         )
         prompt_ref = build_prompt_reference(inventory.prompt)
         envelope = compose_cj_assessment_request(

@@ -46,11 +46,43 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
 
 ### Containerized Execution Wrapper
 
-Run production-style jobs inside the dedicated runner container so Promtail captures
-structured stdout for Loki:
+#### Recommended: Automated Orchestration (pdm run eng5-runner)
+
+Use the automated wrapper script that handles infrastructure startup and health checks:
 
 ```bash
-docker compose run --rm \
+# The script automatically ensures Kafka, Zookeeper, Redis, CJ, and LLM Provider are running
+pdm run eng5-runner \
+  --mode execute \
+  --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
+  --await-completion \
+  --completion-timeout 1800
+```
+
+Use the same command for **plan** and **dry-run** steps:
+
+```bash
+# Infrastructure automatically started if needed
+pdm run eng5-runner --mode plan --batch-id eng5-plan-check
+pdm run eng5-runner --mode dry-run --batch-id eng5-dry --no-kafka
+```
+
+The wrapper script (`scripts/run_eng5_np_runner.sh`) performs the following checks:
+1. Verifies Kafka, Zookeeper, and Redis are running (starts them if needed)
+2. Ensures Kafka topic setup has completed successfully
+3. Verifies CJ Assessment and LLM Provider services are healthy (starts them if needed)
+4. Runs the eng5_np_runner container with all arguments passed through
+
+#### Manual: Direct Docker Compose (Advanced)
+
+For manual control or troubleshooting, run the container directly after ensuring infrastructure is up:
+
+```bash
+# First, ensure infrastructure and dependencies are running:
+pdm run dev-start cj_assessment_service llm_provider_service
+
+# Then run the container manually:
+docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm \
   eng5_np_runner \
   --mode execute \
   --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
@@ -58,12 +90,14 @@ docker compose run --rm \
   --completion-timeout 1800
 ```
 
-Use the same wrapper for the **plan** and **dry-run** steps to validate logging without
-touching Kafka:
+Manual execution for **plan** and **dry-run**:
 
 ```bash
-docker compose run --rm eng5_np_runner --mode plan --batch-id eng5-plan-check
-docker compose run --rm eng5_np_runner --mode dry-run --batch-id eng5-dry --no-kafka
+docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm \
+  eng5_np_runner --mode plan --batch-id eng5-plan-check
+
+docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm \
+  eng5_np_runner --mode dry-run --batch-id eng5-dry --no-kafka
 ```
 
 > ℹ️  When running outside Docker (e.g., `pdm run eng5-np-run`), pipe output through

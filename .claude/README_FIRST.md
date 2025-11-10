@@ -178,3 +178,10 @@ pdm run typecheck-all # Type checking
 - `generate_reports.py` now emits `rater_bias_posteriors_eb.csv` with empirical-Bayes posterior bias per rater on the grade-index scale.
 - Use `--bias-correction {on,off}` and `--compare-without-bias` to run EB and legacy consensus side-by-side; each invocation writes into `output/bayesian_consensus_model/<run_label or timestamp>/` by default (override with `--output-dir`), with comparison CSV/JSON saved alongside the bias-on results.
 - Each run also saves `rater_bias_vs_weight.png`, highlighting high-bias raters against their reliability weights for coaching review.
+
+### 8. ENG5 Runner Content Upload & Event Hardening (Nov 2025)
+- Execute-mode runner now uploads anchor/student essays to Content Service before composing CJ requests.
+- Kafka event collector validates envelopes via typed Pydantic models to avoid AttributeError on raw dict payloads.
+- docker-compose.eng5-runner wired with CONTENT_SERVICE_URL + content service dependency to keep uploads local when running in container.
+
+

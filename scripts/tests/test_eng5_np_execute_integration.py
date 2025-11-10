@@ -103,6 +103,7 @@ def _create_test_environment(tmp_path: Path) -> tuple[RunnerPaths, RunnerSetting
         correlation_id=uuid.uuid4(),
         kafka_bootstrap="kafka:9092",
         kafka_client_id="test-client",
+        content_service_url="http://localhost:8001/v1/content",
         llm_overrides=None,
         await_completion=False,
         completion_timeout=10.0,

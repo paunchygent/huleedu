@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import typer
 
@@ -131,18 +132,53 @@ def build_essay_refs(
     *,
     anchors: Sequence[FileRecord],
     students: Sequence[FileRecord],
+    max_comparisons: int | None = None,
+    storage_id_map: Mapping[str, str] | None = None,
 ) -> list:
-    """Create essay refs combining anchor and student files."""
+    """Create essay refs combining anchor and student files.
+
+    Args:
+        anchors: Anchor essay file records
+        students: Student essay file records
+        max_comparisons: Optional limit on total comparisons (anchor × student pairs).
+                       If specified, limits inputs to generate approximately this many comparisons.
+
+    Returns:
+        List of essay processing input references
+    """
 
     from common_core.metadata_models import EssayProcessingInputRefV1
 
+    limited_anchors, limited_students, _ = apply_comparison_limit(
+        anchors=anchors,
+        students=students,
+        max_comparisons=max_comparisons,
+    )
+
     refs: list[EssayProcessingInputRefV1] = []
-    refs.extend(_records_to_refs(anchors, prefix="anchor"))
-    refs.extend(_records_to_refs(students, prefix="student"))
+    refs.extend(
+        _records_to_refs(
+            limited_anchors,
+            prefix="anchor",
+            storage_id_map=storage_id_map,
+        )
+    )
+    refs.extend(
+        _records_to_refs(
+            limited_students,
+            prefix="student",
+            storage_id_map=storage_id_map,
+        )
+    )
     return refs
 
 
-def _records_to_refs(records: Sequence[FileRecord], prefix: str) -> list:
+def _records_to_refs(
+    records: Sequence[FileRecord],
+    *,
+    prefix: str,
+    storage_id_map: Mapping[str, str] | None,
+) -> list:
     from common_core.metadata_models import EssayProcessingInputRefV1
 
     refs: list[EssayProcessingInputRefV1] = []
@@ -151,7 +187,15 @@ def _records_to_refs(records: Sequence[FileRecord], prefix: str) -> list:
             continue
         essay_id = sanitize_identifier(record.path.stem)
         checksum = record.checksum or sha256_of_file(record.path)
-        text_storage_id = f"{prefix}::{checksum}"
+        if storage_id_map is None:
+            text_storage_id = f"{prefix}::{checksum}"
+        else:
+            try:
+                text_storage_id = storage_id_map[checksum]
+            except KeyError as exc:  # pragma: no cover - defensive guard
+                raise KeyError(
+                    f"Missing storage ID for checksum {checksum} ({record.path})"
+                ) from exc
         refs.append(
             EssayProcessingInputRefV1(
                 essay_id=essay_id,
@@ -159,3 +203,28 @@ def _records_to_refs(records: Sequence[FileRecord], prefix: str) -> list:
             )
         )
     return refs
+
+
+def apply_comparison_limit(
+    *,
+    anchors: Sequence[FileRecord],
+    students: Sequence[FileRecord],
+    max_comparisons: int | None,
+    emit_notice: bool = True,
+) -> tuple[list[FileRecord], list[FileRecord], int | None]:
+    """Return slices respecting the requested comparison limit."""
+
+    if max_comparisons is None:
+        return list(anchors), list(students), None
+
+    per_dimension = math.ceil(math.sqrt(max_comparisons))
+    limited_anchors = list(anchors[:per_dimension])
+    limited_students = list(students[:per_dimension])
+    actual_comparisons = len(limited_anchors) * len(limited_students)
+    if emit_notice and actual_comparisons > 0:
+        typer.echo(
+            f"ℹ️  Limiting to {len(limited_anchors)} anchors × {len(limited_students)} students "
+            f"= {actual_comparisons} comparisons (requested max: {max_comparisons})",
+            err=True,
+        )
+    return limited_anchors, limited_students, actual_comparisons

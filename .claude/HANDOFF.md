@@ -1,4 +1,82 @@
-# Handoff: Phase 2.5 Complete - LLM Model Version Management
+# Handoff: ENG5 NP Runner Execute-Mode Fixes
+
+## Status: 🔄 IN PROGRESS
+**Date**: 2025-11-10
+**Session**: Fix Plan ENG5 NP Runner Execute-Mode Failures
+
+### What Changed
+- **Event Collector Hardening**: `scripts/cj_experiments_runners/eng5_np/kafka_flow.py` now validates envelope data with the typed Pydantic models (LLMComparisonResultV1, CJAssessmentCompletedV1, AssessmentResultV1) before dereferencing attributes, eliminating the `'dict' object has no attribute ...` crash when EventEnvelope returns raw dicts.
+- **Async Content Upload Pipeline**: Added `content_upload.py`, CLI flag + settings, and inventory changes so execute mode uploads anchor/student essays to Content Service before composing CJ requests. Includes session cache keyed by checksum, semaphore-limited concurrency (default 10), and Docker compose wiring for `CONTENT_SERVICE_URL` + `depends_on`.
+- **Essay Ref Updates**: `build_essay_refs()` now accepts a checksum→storage_id map and uses real storage IDs instead of synthetic `anchor::checksum` placeholders. New helper `apply_comparison_limit()` keeps the batching math centralized.
+
+### Tests
+- `pdm run pytest-root scripts/tests/test_eng5_np_content_upload.py`
+- `pdm run pytest-root scripts/tests/test_eng5_np_runner.py`
+
+### Remaining Follow-Ups
+1. Run `pdm run eng5-runner --mode execute ...` against live stack to confirm execute-mode end-to-end (content upload + CJ callbacks) once Kafka/content service are online.
+2. Coordinate with DS/ops on Content Service retention expectations; uploads currently single-shot (no retry/backoff yet).
+3. Consider extending artefact manifest to record storage IDs alongside checksums for provenance.
+
+---
+
+# Handoff: ENG5 NP Runner Container Configuration Complete
+
+## Status: ✅ COMPLETE
+
+**Date**: 2025-11-10
+**Session**: ENG5 NP Runner Containerization Fix
+
+## Implementation Summary
+
+### Issue
+`pdm run eng5-runner` failed with `ModuleNotFoundError: No module named 'typer'` in containerized execution. Root causes:
+1. **Dependency Mount Conflict**: `docker-compose.eng5-runner.yml` mounted entire repo (`./:/app:cached`), overwriting container's populated `__pypackages__/3.11/lib/` with host's empty directory
+2. **Git Binary Missing**: `gather_git_sha()` raised uncaught `FileNotFoundError` when git binary unavailable in container
+
+### Files Modified
+
+**services/eng5_np_runner/Dockerfile** (20 LoC)
+- Added standard environment variable block (`PDM_USE_VENV=false`, `PYTHONPATH=/app`, `ENV_TYPE=docker`)
+- Implemented multi-stage build pattern matching other services
+- Copied CLI scripts into image during build
+- Separated `ENTRYPOINT`/`CMD` for proper argument handling
+
+**docker-compose.eng5-runner.yml** (40 LoC)
+- **Removed** `./:/app:cached` full repo mount (caused dependency overwrite)
+- **Added** specific source mounts only:
+  - `./scripts/cj_experiments_runners:/app/scripts/cj_experiments_runners:cached`
+  - `./libs/common_core/src:/app/libs/common_core/src:cached`
+  - `./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached`
+- Removed `PYTHONPATH` override (uses Dockerfile default `/app`)
+- Added `DEPS_IMAGE` build arg for base image resolution
+
+**scripts/cj_experiments_runners/eng5_np/environment.py:23** (1 LoC change)
+- Changed `except subprocess.CalledProcessError:` to `except (subprocess.CalledProcessError, FileNotFoundError):`
+- Handles missing git binary gracefully, returns `"UNKNOWN"` for metadata tracking
+
+### Pattern Alignment
+
+Solution follows established service containerization pattern:
+- Dependencies installed in `/app/__pypackages__/3.11/lib/` during build (via `huledu-deps:dev` base image)
+- Source code volume-mounted for hot-reload
+- No dependency directories mounted from host
+- Matches patterns in `cj_assessment_service`, `essay_lifecycle_service`, etc.
+
+### Verification
+
+✅ `pdm run eng5-runner --mode plan --batch-id test` completes successfully
+✅ All Python dependencies accessible (typer, aiohttp, common_core, etc.)
+✅ Git SHA gracefully falls back to "UNKNOWN" in containerized environment
+✅ Asset inventory, validation logging, and runner orchestration functional
+
+### Next Actions
+
+Consult `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` for execute-mode workflows. Runner container now ready for Phase 3.3 batch assessment execution.
+
+---
+
+# Previous Session: Phase 2.5 Complete - LLM Model Version Management
 
 ## Status: ✅ COMPLETE
 
@@ -88,6 +166,26 @@ CLI/Batch Runner
 ### Next Up
 
 - Stitch the CJ admin CLI login flow into the staged Identity tokens for `dev` once credentials land, then resume the Phase 3.2 deliverables (Step 4 docs/observability).
+
+## Session Update (2025-11-10) – ENG5 Runner container smoke test
+
+- Added the dedicated runner image and override compose file (`services/eng5_np_runner/Dockerfile`, `docker-compose.eng5-runner.yml`) so `docker compose … eng5_np_runner` can wrap the Typer CLI.
+- First `docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm eng5_np_runner --mode plan --batch-id eng5-plan-check` attempt recreated infrastructure containers; `kafka_topic_setup` exited `1` after exhausting retries with `KafkaConnectionError: Unable to bootstrap from [('kafka', 9092, <AddressFamily.AF_UNSPEC: 0>)]` because `kafka` was not resolvable yet inside the bootstrap container.
+- Root cause: invoking the one-off runner while the Kafka/Zookeeper stack was still provisioning—Compose spins up dependencies on-demand, but the bootstrap job begins before Docker DNS has registered the `kafka` hostname on the shared network when the infra stack is cold.
+
+### Next Steps
+
+1. Pre-start infra and the topic bootstrap in detached mode:
+   ```bash
+   docker compose -f docker-compose.yml up -d kafka zookeeper redis
+   docker compose -f docker-compose.yml up kafka_topic_setup
+   ```
+   Wait for `kafka_topic_setup` to finish successfully.
+2. Re-run the runner container with the override file:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm eng5_np_runner --mode plan --batch-id eng5-plan-check
+   ```
+3. For dry plumbing checks (before Kafka is healthy), supply `--no-kafka` to skip publishing while still exercising structured logging.
 
 ## Session Summary (2025-11-09) – Phase 3.2 Prompt Architecture: Execute-Mode Validation
 

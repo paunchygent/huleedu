@@ -1,0 +1,44 @@
+# Dedicated compose file for ENG5 NP runner container wrapper
+services:
+  eng5_np_runner:
+    build:
+      context: .
+      dockerfile: services/eng5_np_runner/Dockerfile
+      args:
+        DEPS_IMAGE: ${DEPS_IMAGE_TAG:-huledu-deps:dev}
+    profiles:
+      - eng5-runner
+    networks:
+      - huleedu_internal_network
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - ENV_TYPE=docker
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=INFO
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CJ_ASSESSMENT_SERVICE_URL=http://cj_assessment_service:8082
+      - LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8084
+      - CONTENT_SERVICE_URL=http://content_service:8000/v1/content
+    volumes:
+      # Mount only source code directories for hot-reload, NOT dependencies
+      - ./scripts/cj_experiments_runners:/app/scripts/cj_experiments_runners:cached
+      - ./libs/common_core/src:/app/libs/common_core/src:cached
+      - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
+      - ./test_uploads:/app/test_uploads:ro
+      - ./Documentation:/app/Documentation:ro
+      - ./.claude/research:/app/.claude/research
+      # Exclude __pycache__ directories
+      - /app/scripts/cj_experiments_runners/__pycache__
+    # Use CMD from Dockerfile, allow overriding with docker compose run args
+    command: ["--help"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      cj_assessment_service:
+        condition: service_healthy
+      llm_provider_service:
+        condition: service_healthy
+      content_service:
+        condition: service_healthy

@@ -170,6 +170,7 @@ def test_write_stub_creates_schema_compliant_file(tmp_path: Path) -> None:
         correlation_id=uuid.uuid4(),
         kafka_bootstrap="kafka:9092",
         kafka_client_id="test-client",
+        content_service_url="http://localhost:8001/v1/content",
         llm_overrides=None,
         await_completion=False,
         completion_timeout=1.0,
@@ -233,6 +234,7 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
         correlation_id=uuid.UUID(int=3),
         kafka_bootstrap="kafka:9092",
         kafka_client_id="test-client",
+        content_service_url="http://localhost:8001/v1/content",
         llm_overrides=None,
         await_completion=False,
         completion_timeout=1.0,
@@ -248,6 +250,29 @@ def test_compose_cj_request_generates_envelope(tmp_path: Path) -> None:
     assert envelope.data.language == Language.ENGLISH.value
     path = write_cj_request_envelope(envelope=envelope, output_dir=settings.output_dir)
     assert path.exists()
+
+
+def test_build_essay_refs_prefers_uploaded_storage_ids(tmp_path: Path) -> None:
+    anchor_file = tmp_path / "anchor.docx"
+    student_file = tmp_path / "student.docx"
+    anchor_file.write_text("anchor essay", encoding="utf-8")
+    student_file.write_text("student essay", encoding="utf-8")
+
+    anchor_record = FileRecord.from_path(anchor_file)
+    student_record = FileRecord.from_path(student_file)
+    storage_map = {
+        anchor_record.checksum: "storage-anchor-123",
+        student_record.checksum: "storage-student-456",
+    }
+
+    refs = build_essay_refs(
+        anchors=[anchor_record],
+        students=[student_record],
+        storage_id_map=storage_map,
+    )
+
+    assert refs[0].text_storage_id == "storage-anchor-123"
+    assert refs[1].text_storage_id == "storage-student-456"
 
 
 def test_hydrator_appends_llm_comparison_and_manifest(tmp_path: Path) -> None:
@@ -494,6 +519,7 @@ def test_stub_validates_against_schema(tmp_path: Path) -> None:
         correlation_id=uuid.uuid4(),
         kafka_bootstrap="kafka:9092",
         kafka_client_id="test-client",
+        content_service_url="http://localhost:8001/v1/content",
         llm_overrides=None,
         await_completion=False,
         completion_timeout=1.0,

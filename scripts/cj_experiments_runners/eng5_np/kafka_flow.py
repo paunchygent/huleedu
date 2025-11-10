@@ -237,12 +237,13 @@ class AssessmentEventCollector:
         topic = record.topic
         if topic == topic_name(ProcessingEvent.LLM_COMPARISON_RESULT):
             envelope = EventEnvelope[LLMComparisonResultV1].model_validate_json(payload)
-            metadata = envelope.data.request_metadata or {}
+            result_data = LLMComparisonResultV1.model_validate(envelope.data)
+            metadata = result_data.request_metadata or {}
             batch_hint = metadata.get("batch_id") or metadata.get("bos_batch_id")
             if batch_hint and batch_hint != self.settings.batch_id:
                 self._logger.debug(
                     "comparison_event_skipped",
-                    request_id=envelope.data.request_id,
+                    request_id=result_data.request_id,
                     comparison_batch=batch_hint,
                 )
                 return False
@@ -258,10 +259,11 @@ class AssessmentEventCollector:
 
         if topic == topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED):
             envelope = EventEnvelope[CJAssessmentCompletedV1].model_validate_json(payload)
-            if envelope.data.entity_id != self.settings.batch_id:
+            completion_data = CJAssessmentCompletedV1.model_validate(envelope.data)
+            if completion_data.entity_id != self.settings.batch_id:
                 self._logger.debug(
                     "completion_event_skipped",
-                    event_batch=envelope.data.entity_id,
+                    event_batch=completion_data.entity_id,
                 )
                 return False
             write_completion_event(envelope=envelope, output_dir=self.settings.output_dir)
@@ -278,10 +280,11 @@ class AssessmentEventCollector:
 
         if topic == topic_name(ProcessingEvent.ASSESSMENT_RESULT_PUBLISHED):
             envelope = EventEnvelope[AssessmentResultV1].model_validate_json(payload)
-            if envelope.data.batch_id != self.settings.batch_id:
+            result_data = AssessmentResultV1.model_validate(envelope.data)
+            if result_data.batch_id != self.settings.batch_id:
                 self._logger.debug(
                     "assessment_result_skipped",
-                    event_batch=envelope.data.batch_id,
+                    event_batch=result_data.batch_id,
                 )
                 return False
             self.hydrator.apply_assessment_result(envelope)

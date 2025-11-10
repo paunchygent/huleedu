@@ -37,6 +37,8 @@ class RunnerSettings:
     correlation_id: uuid.UUID
     kafka_bootstrap: str
     kafka_client_id: str
+    content_service_url: str
     llm_overrides: LLMConfigOverrides | None
-    await_completion: bool
-    completion_timeout: float
+    max_comparisons: int | None = None
+    await_completion: bool = False
+    completion_timeout: float = 1800.0
