@@ -28,4 +28,4 @@ FROM base AS development
 COPY --chown=appuser:appuser services/language_tool_service/ /app/services/language_tool_service/
 USER appuser
 WORKDIR /app
-CMD ["pdm", "run", "-p", "/app", "python", "services/language_tool_service/app.py"]
+CMD ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.language_tool_service.app:app", "--config", "python:services.language_tool_service.hypercorn_config"]
