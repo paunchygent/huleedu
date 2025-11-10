@@ -29,6 +29,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        student_prompt_storage_id: str | None = None,
         created_at: datetime | None = None,
     ) -> AssessmentInstruction:
         record = AssessmentInstruction()
@@ -38,6 +39,7 @@ class AssessmentInstructionStore:
         record.course_id = course_id
         record.instructions_text = instructions_text
         record.grade_scale = grade_scale
+        record.student_prompt_storage_id = student_prompt_storage_id
         record.created_at = created_at or datetime.now(UTC)
         return record
 
@@ -48,6 +50,7 @@ class AssessmentInstructionStore:
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        student_prompt_storage_id: str | None = None,
         created_at: datetime | None = None,
     ) -> AssessmentInstruction:
         """Create or update an instruction record."""
@@ -59,6 +62,7 @@ class AssessmentInstructionStore:
                 course_id=course_id,
                 instructions_text=instructions_text,
                 grade_scale=grade_scale,
+                student_prompt_storage_id=student_prompt_storage_id,
                 created_at=created_at,
             )
             self._records[key] = record
@@ -66,6 +70,7 @@ class AssessmentInstructionStore:
 
         existing.instructions_text = instructions_text
         existing.grade_scale = grade_scale
+        existing.student_prompt_storage_id = student_prompt_storage_id
         return existing
 
     def get(

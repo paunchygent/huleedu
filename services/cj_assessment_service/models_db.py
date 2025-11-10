@@ -395,10 +395,20 @@ class EventOutbox(Base):
 
 
 class AssessmentInstruction(Base):
-    """Assessment instructions for AI judges.
+    """Assignment-scoped assessment configuration (admin-only).
 
-    Stores predefined instructions that guide the AI in assessing essays.
-    Can be associated with either a specific assignment or a course (fallback).
+    Bridges two workflows:
+    - **Admin**: Creates instructions/anchors/prompt refs centrally for assignment_id
+    - **User**: Uploads prompts ad-hoc per batch, bypassing this table entirely
+
+    Purpose: Enables assignment-based batches to inherit all assessment metadata
+    (judge instructions, grade scale, anchors, student prompt) from a single
+    assignment_id lookup in batch_preparation.py.
+
+    Storage pattern: `student_prompt_storage_id` references Content Service (text
+    stored there, not here). Optional field - CJ runs without prompts.
+
+    Scope: XOR constraint ensures exactly one of assignment_id or course_id per record.
     """
 
     __tablename__ = "assessment_instructions"
@@ -411,6 +421,9 @@ class AssessmentInstruction(Base):
     instructions_text: Mapped[str] = mapped_column(Text, nullable=False)
     grade_scale: Mapped[str] = mapped_column(
         String(50), nullable=False, server_default="swedish_8_anchor", index=True
+    )
+    student_prompt_storage_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -140,8 +140,15 @@ class CJRepositoryProtocol(Protocol):
         course_id: str | None,
         instructions_text: str,
         grade_scale: str,
+        student_prompt_storage_id: str | None = None,
     ) -> Any:  # AssessmentInstruction
-        """Create or update assessment instructions for an assignment/course."""
+        """Create or update assignment-scoped assessment configuration.
+
+        `student_prompt_storage_id` enables admin prompt management (Content Service
+        reference, not prompt text). None on update preserves existing reference.
+
+        Raises ValueError if scope invalid (both/neither assignment_id/course_id).
+        """
         ...
 
     async def list_assessment_instructions(

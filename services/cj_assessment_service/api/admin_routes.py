@@ -95,6 +95,7 @@ def _serialize_instruction(model: AssessmentInstruction) -> AssessmentInstructio
         course_id=model.course_id,
         instructions_text=model.instructions_text,
         grade_scale=model.grade_scale,
+        student_prompt_storage_id=model.student_prompt_storage_id,
         created_at=model.created_at,
     )
 
@@ -116,7 +117,13 @@ async def upsert_assessment_instruction(  # type: ignore[override]
     repository: FromDishka[CJRepositoryProtocol],
     corr: FromDishka[CorrelationContext],
 ) -> tuple[dict[str, Any], int]:
-    """Create or update assessment instructions."""
+    """Create/update assignment-scoped assessment configuration (admin workflow).
+
+    Optional `student_prompt_storage_id` associates Content Service prompt reference.
+    Phase 4 adds dedicated prompt upload endpoint; currently provide pre-obtained storage_id.
+
+    User ad-hoc batches bypass this - provide prompt refs directly in batch registration.
+    """
 
     payload = await request.get_json()
     if not isinstance(payload, dict):
@@ -162,6 +169,7 @@ async def upsert_assessment_instruction(  # type: ignore[override]
                 course_id=req.course_id,
                 instructions_text=req.instructions_text,
                 grade_scale=req.grade_scale,
+                student_prompt_storage_id=req.student_prompt_storage_id,
             )
         except ValueError as exc:
             _record_admin_metric("upsert", "failure")

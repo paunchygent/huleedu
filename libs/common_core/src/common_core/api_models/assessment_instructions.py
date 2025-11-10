@@ -1,4 +1,12 @@
-"""API models for CJ assessment instruction administration."""
+"""API models for CJ assessment instruction administration.
+
+Admin workflow: Centralized assignment configuration (instructions + scale + prompt refs).
+User workflow: Ad-hoc batch registration with direct prompt upload (bypasses this).
+
+`student_prompt_storage_id` enables admins to associate prompts with assignment_id
+(stored by reference in Content Service, not in CJ database). Phase 4 adds dedicated
+prompt upload endpoints; currently admins provide pre-obtained storage_id.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +32,15 @@ class AssessmentInstructionBase(BaseModel):
         ..., min_length=10, description="Canonical instructions presented to assessors"
     )
     grade_scale: str = Field(..., description="Registered grade scale key")
+    student_prompt_storage_id: str | None = Field(
+        default=None,
+        max_length=255,
+        description=(
+            "Content Service storage reference for student prompt. Optional. "
+            "Enables assignment-scoped prompt management (admin workflow). "
+            "User ad-hoc batches provide prompt refs directly, bypassing this."
+        ),
+    )
 
     @model_validator(mode="after")
     def _xor_scope(self) -> "AssessmentInstructionBase":
