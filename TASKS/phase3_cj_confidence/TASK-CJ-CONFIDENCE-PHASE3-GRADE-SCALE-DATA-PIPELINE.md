@@ -78,6 +78,8 @@
 - ✅ Modularization (2025-11-09): Runner relocated from `.claude/research/scripts/eng5_np_batch_runner.py` into the `scripts/cj_experiments_runners/eng5_np/` package with SRP-friendly modules (`cli.py`, `kafka_flow.py`, `hydrator.py`, `events.py`, `artefact_io.py`, `requests.py`, etc.), keeping each file <500 LoC and enabling future ENG5/ENG6 runners to reuse the components.
 - ✅ Metadata assurance (2025-11-09): LLM provider queue processor now backfills `prompt_sha256` for error callbacks, and the ENG5 runner fails fast when any of `essay_a_id`/`essay_b_id`/`prompt_sha256` is missing to guarantee schema-complete `llm_comparisons`.
 - ✅ Metadata echo-back (2025-11-08): CJ’s `LLMInteractionImpl`/provider client now send `essay_a_id`/`essay_b_id` in the metadata for each comparison request, and the LLM Provider (all concrete providers + queue processor) computes and appends `prompt_sha256` before publishing callbacks. Tests cover the CJ client, interaction unit suite, and provider callback publisher.
+- 🔄 Structured logging (2025-11-10): `cli.py`, `hydrator.py`, and `kafka_flow.py` now emit JSON logs via `logging_support.py`, binding `batch_id`, `runner_mode`, `correlation_id`, and event counters for each execution path. Remaining work: surface Loki/Grafana verification steps in the runbook and confirm CLI helpers log validation artefacts for non-execute modes.
+- ✅ Structured logging verification (2025-11-10): `log_validation_state()` now runs for plan/dry-run/execute and the runbook documents containerized execution, Loki queries, and local log tee guidance. Integration suite (`scripts/tests/test_eng5_np_execute_integration.py -v`) and CJ ENG5 scale flows (`services/cj_assessment_service/tests/integration/test_eng5_scale_flows.py -v`) pass; `pdm run typecheck-all` clean. `bash scripts/eng5_np_preflight.sh` currently fails because `cj_assessment_service` container is not running (`pdm run dev-start cj_assessment_service` required before execute runs).
 - **Steps**
   1. Build ingestion runner leveraging new scale registry; load essays/anchors from `test_uploads/...`.
   2. Launch dev Docker stack (rule 080) and execute CJ pipeline with full instructions/prompt metadata.
@@ -89,6 +91,11 @@
   - JSON artefacts versioned + documented.
   - LLM cost tracked (metadata) for auditing.
   - Integration tests confirm CLI does not mutate persistent DB state.
+
+#### Phase 3.3 Working Decisions (2025-11-10)
+
+- Runner remains under `scripts/cj_experiments_runners/` long-term; execute-mode jobs will be containerized via a lightweight wrapper (`docker compose run eng5_np_runner …`) so Promtail captures stdout for Loki ingest without promoting the runner to a standalone microservice.
+- Local/manual executions should tee logs to a host file or run inside the container wrapper to preserve observability parity.
 
 #### Phase 3.3 Detailed Scope (2025-11-08)
 

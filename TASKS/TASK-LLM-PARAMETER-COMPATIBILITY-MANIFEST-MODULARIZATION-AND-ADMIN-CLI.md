@@ -3,11 +3,13 @@
 Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEMENT.md)
 
 ## Summary
+
 - Prevent 400s from OpenAI models by introducing model-aware capability validation without changing current defaults (prototyping).
 - Keep `model_manifest.py` small and maintainable by modularizing it by provider/family.
 - Provide an admin CLI to list, inspect, dry-run, and optionally call models with a minimal payload that mimics CJ Assessment/LLM Provider final requests.
 
 ## Goals
+
 - Maintain current runtime defaults and behavior.
 - Add a maintainable structure that supports:
   - Per-family capability presets to avoid duplication.
@@ -16,15 +18,18 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
 - Provide a CLI that allows real-world confirmation, avoiding assumptions.
 
 ## Non-Goals
+
 - No provider call-path behavior change in this task (e.g., no temperature gating, no endpoint switching, no `max_completion_tokens` changes).
 - No persistence layer for dynamic overrides (we will stub the integration points only).
 
 ## Assumptions
+
 - Defaults remain unchanged during prototyping.
 - `model_manifest.py` is the current import surface. We will keep it as a thin re-export after modularization.
 - Admin users can execute `pdm run`-based CLIs with the right API keys available via env vars.
 
 ## Scope & Deliverables
+
 - Modularization package under `services/llm_provider_service/manifest/` (no behavior change):
   - `types.py`: `ModelConfig`, `ModelRegistry`, `ProviderName`, `StructuredOutputMethod`.
   - `{openai,anthropic,google,openrouter}.py`: family presets, model lists, per-model validators.
@@ -44,23 +49,27 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
   - Mimic CJ’s final request shape for comparison tasks.
 
 ## Why a per-model `def validate_model_capability`?
+
 - Meets the “updated by API” spirit by providing a stable code contract for checks.
 - However, functions are static; true runtime updates require a dynamic overrides layer (env/Redis/API). The generic validator will apply overrides last. Therefore: a per-model function alone does not suffice for runtime updates; we add an override mechanism as an extension point.
 
 ## Design Details
 
 ### 1) Modularization (no behavior change)
+
 - Create `services/llm_provider_service/manifest/` with files listed above.
 - Move existing model definitions into provider-specific modules.
 - Keep `model_manifest.py` as a thin facade that re-exports the aggregated objects/functions.
 - File size and cognitive load drop; future additions occur in provider/family files.
 
 ### 2) Capability Taxonomy & Family Presets
+
 - In `openai.py`, define family presets applied to each model family (e.g., GPT-5, GPT-4.1, GPT-4o).
 - Individual models only specify deltas (e.g., `vision: True`).
 - This keeps each model entry compact and consistent.
 
 ### 3) Per-Model Validators & Registry
+
 - For each `model_id`, define a namespaced function that answers capability questions:
   - Example: `validate_model_capability__gpt_4o_mini_2024_07_18("supports_temperature") -> True`
 - Map model_id → function in `MODEL_VALIDATORS`.
@@ -70,11 +79,13 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
   3. If `Settings.ENABLE_DYNAMIC_CONFIG` and override exists, apply override (last).
 
 ### 4) Dynamic Overrides (optional, no default change)
+
 - Add an adapter interface (stub): `CapabilityOverrides.get(model_id) -> dict[str, Any] | None`.
 - Wire this into step (3) above; do not ship a real backend in this task.
 - This enables "updated by API" runtime changes without redeploying.
 
 ### 5) Admin CLI (Model Smoke Test)
+
 - Location: `services/llm_provider_service/admin_cli.py` (or `scripts/admin/llm_model_smoke_test.py`).
 - Commands:
   - `list-models --provider <openai|anthropic|...>`
@@ -99,11 +110,13 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
   - The `dry-run` will surface the recommended adjustments before we implement provider-side gating.
 
 ## Risks & Mitigations
+
 - Duplication across per-model functions: mitigated by family presets and generated helper to create validators.
 - Divergence between capabilities dict and validators: mitigated by unit tests and the generic validator precedence.
 - Runtime updates vs static validators: addressed via optional dynamic overrides (feature-gated).
 
 ## Testing Plan
+
 - Unit tests:
   - Aggregation and back-compat (`model_manifest.py` still re-exports helpers; defaults unchanged).
   - A few per-model validator functions return expected values for canonical capabilities.
@@ -112,6 +125,7 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
 - (Future when provider changes are implemented): tests for payload selection (temperature omission, token parameter switch, response_format gating).
 
 ## Acceptance Criteria
+
 - `model_manifest.py` remains import-compatible; no runtime defaults changed.
 - New `manifest/` package exists and aggregates to the same `SUPPORTED_MODELS` and helper functions.
 - Per-model validators present + registry, with generic validator precedence.
@@ -119,18 +133,22 @@ Parent: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEME
 - Unit tests for validators and CLI `dry-run` output are added and passing.
 
 ## Rollout
+
 - Phase 1 (this task): Modularization + validators + CLI (dry-run + call). No provider changes.
 - Phase 2 (separate task): Provider conditional parameter sending, endpoint selection, and token param switching; update CLI `dry-run` to match new behavior.
 
 ## Timeline
+
 - Phase 1: 0.5–1.5 days (implementation + tests + docs).
 - Phase 2: 1–2 days (provider changes + tests).
 
 ## Ownership
+
 - Primary: LLM Provider module owners
 - Review: Architect Lead (this task is aligned with Context7 and project rules)
 
 ## References
+
 - Parent Task: [TASK-LLM-MODEL-VERSION-MANAGEMENT.md](./TASK-LLM-MODEL-VERSION-MANAGEMENT.md)
 - Current manifest and provider code:
   - `services/llm_provider_service/model_manifest.py`

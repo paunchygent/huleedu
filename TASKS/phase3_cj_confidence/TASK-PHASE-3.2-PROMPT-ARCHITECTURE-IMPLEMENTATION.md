@@ -1,6 +1,6 @@
 # TASK: Phase 3.2 – Prompt Architecture Implementation
 
-**Status**: PLANNED  
+**Status**: ✅ COMPLETE  
 **Priority**: HIGH  
 **Estimated Effort**: 4–6 weeks  
 **Assignee**: TBD
@@ -137,9 +137,10 @@ The objective is to decouple student prompt payloads from registration forms whi
   - Executed targeted pytest runs (`services/api_gateway_service/tests/test_batch_registration_proxy.py`, `services/batch_orchestrator_service/tests -k "prompt or idempotency or batch_context"`) plus linted docs to enforce the new contract end-to-end.
   - Result Aggregator now persists `student_prompt_ref` inside `batch_results.batch_metadata`, with documentation in `services/result_aggregator_service/README.md` and integration tests covering round-trips.
 
-### Next Steps
-- Result Aggregator API responses (`/internal/v1/batches/...`) now surface `student_prompt_ref`; coordinate with dashboard/BI owners if they need to render prompt provenance.
-- Align Result Aggregator functional fixtures (Result Aggregator + end-to-end suites) with the new metadata once AI Feedback notebooks consume `student_prompt_ref`.
+### Completion Notes (2025-11-10)
+- Structured logging guidance captured in `documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` with container wrapper, Loki queries, and local `tee` usage for parity.
+- Runner CLI plan/dry-run/execute paths now emit `runner_validation_state` logs with manifest metrics; integration (`scripts/tests/test_eng5_np_execute_integration.py -v`) and scale flow tests (`services/cj_assessment_service/tests/integration/test_eng5_scale_flows.py -v`) passing; `pdm run typecheck-all` clean.
+- `bash scripts/eng5_np_preflight.sh` currently fails if `cj_assessment_service` container is stopped—start it via `pdm run dev-start cj_assessment_service` before execute-mode runs.
 
 ### Dispatcher Bridging Rules
 

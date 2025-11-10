@@ -127,6 +127,13 @@ CLI/Batch Runner
    - Validate that new logs appear in Loki with proper labels and that `huleedu_bcs_prompt_prerequisite_blocked_total` + runner metrics surface in Grafana dashboards.
    - Add any missing notes to `.claude/HANDOFF.md` if additional follow-up is required.
 
+## Session Summary (2025-11-10) – Phase 3.3 Runner Logging & Observability
+
+- `scripts/cj_experiments_runners/eng5_np/cli.py` now calls `log_validation_state()` for plan, dry-run, and execute paths using in-memory artefact data so we emit `runner_validation_state` logs even when JSON files are not present. @scripts/cj_experiments_runners/eng5_np/cli.py#321-455
+- Runbook updated with container wrapper commands (`docker compose run eng5_np_runner …`), Loki queries, and local `tee` guidance to keep structured logs. @documentation/OPERATIONS/ENG5-NP-RUNBOOK.md#44-114
+- Phase trackers updated: parent task records verification notes and Phase 3.2 task is marked complete with closing remarks. @TASKS/phase3_cj_confidence/TASK-CJ-CONFIDENCE-PHASE3-GRADE-SCALE-DATA-PIPELINE.md#72-82 @TASKS/phase3_cj_confidence/TASK-PHASE-3.2-PROMPT-ARCHITECTURE-IMPLEMENTATION.md#1-144
+- Validations run: `pdm run pytest-root scripts/tests/test_eng5_np_execute_integration.py -v`, `pdm run pytest-root services/cj_assessment_service/tests/integration/test_eng5_scale_flows.py -v`, `pdm run typecheck-all` (green). `bash scripts/eng5_np_preflight.sh` currently fails because `cj_assessment_service` container is stopped; remedy with `pdm run dev-start cj_assessment_service` before execute-mode runs.
+
 ## Session Summary (2025-11-09) – Phase 3.2 Typing & Test Hardening
 
 **Status:** Cleared the remaining MyPy/test blockers for the CJ admin surface so Phase 3.2 can keep moving without type ignores.
