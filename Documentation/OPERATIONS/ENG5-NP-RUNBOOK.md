@@ -44,6 +44,32 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
 4. On success the CLI prints a comparison/cost summary and the artefact lives under
    `.claude/research/data/eng5_np_2016/assessment_run.execute.json`.
 
+### Containerized Execution Wrapper
+
+Run production-style jobs inside the dedicated runner container so Promtail captures
+structured stdout for Loki:
+
+```bash
+docker compose run --rm \
+  eng5_np_runner \
+  --mode execute \
+  --batch-id eng5-execute-$(date +%Y%m%d-%H%M) \
+  --await-completion \
+  --completion-timeout 1800
+```
+
+Use the same wrapper for the **plan** and **dry-run** steps to validate logging without
+touching Kafka:
+
+```bash
+docker compose run --rm eng5_np_runner --mode plan --batch-id eng5-plan-check
+docker compose run --rm eng5_np_runner --mode dry-run --batch-id eng5-dry --no-kafka
+```
+
+> ℹ️  When running outside Docker (e.g., `pdm run eng5-np-run`), pipe output through
+> `tee` so logs persist locally for audits:
+> `pdm run eng5-np-run --mode execute ... | tee eng5_runner.log`
+
 ## Monitoring & Observability
 
 - **Kafka**: `pdm run dev-logs cj_assessment_service` to ensure callbacks stream without lag.
@@ -54,6 +80,38 @@ metadata-complete artefacts that power Phase 3.3 confidence analysis.
   for ENG5 prompt hydration and CJ runner monitoring panels.
 - **Runner summary**: after completion the CLI prints provider/model token and cost totals plus
   whether partial data occurred.
+
+### Structured JSON Logging
+
+- The runner configures `structlog` via `logging_support.configure_cli_logging()` with
+  `service_name="eng5-np-runner"` so every entry is JSON and includes
+  `correlation_id`, `batch_id`, and `runner_mode` bindings.
+- `log_validation_state()` is invoked for **plan**, **dry-run**, and **execute** flows.
+  The resulting log line (`runner_validation_state`) exposes manifest length, checksum,
+  and the embedded `validation.runner_status` block for downstream dashboards.
+- Hydrator and Kafka collector logs emit `collector_*` and `*_hydrated` events with
+  incrementing counters to track callback progress; expect these alongside
+  `runner_execution_complete` for execute mode.
+
+### Loki Query Examples
+
+Assuming Promtail ships container stdout, verify logs in Grafana Explore with:
+
+```logql
+{service_name="eng5-np-runner"} |= "runner_validation_state"
+```
+
+To isolate a specific batch / correlation ID:
+
+```logql
+{service_name="eng5-np-runner", batch_id="eng5-dry"} | json | correlation_id
+```
+
+Check for partial data warnings:
+
+```logql
+{service_name="eng5-np-runner"} |= "collector_timeout"
+```
 
 ## Validation Checklist
 
