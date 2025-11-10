@@ -378,6 +378,7 @@ dev-build-start = {shell = "scripts/dev.sh start $@"}  # Build with cache then s
 dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers
 dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers
 dev-logs = {shell = "scripts/dev.sh logs $@"}  # Follow development logs
+dev-ps = {shell = "scripts/dev.sh ps $@"}  # Show development container status
 dev-check = "scripts/dev.sh check"  # Check what needs rebuilding
 
 # Production Environment Commands (optimized, no debug)
@@ -405,7 +406,9 @@ kafka-setup = "python scripts/kafka_topic_bootstrap.py"  # Initialize Kafka topi
 docker-clean = "docker system prune -af"  # Clean Docker resources (use with caution)
 codex = "scripts/codex-exec"  # Start codex with full system access and high reasoning
 
-# Observability is integrated into main stack - use standard docker compose commands
+# Observability Stack Management
+obs-up = "docker compose up -d prometheus grafana loki jaeger promtail alertmanager"
+obs-down = "docker compose stop prometheus grafana loki jaeger promtail alertmanager"
 obs-restart = "docker compose restart prometheus grafana loki jaeger promtail alertmanager"
 obs-logs = "docker compose logs -f prometheus grafana loki jaeger promtail alertmanager"
 obs-status = "docker compose ps prometheus grafana loki jaeger promtail alertmanager"

@@ -250,6 +250,22 @@ logs_dev() {
     fi
 }
 
+# Show development container status
+ps_dev() {
+    local services=("$@")
+    local display="all services"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Container status (DEVELOPMENT): ${display}"
+
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
+    fi
+}
+
 # Check what needs rebuilding
 check_changes() {
     echo_info "Checking what might need rebuilding..."
@@ -301,6 +317,7 @@ show_help() {
     echo "  restart [services]       Restart containers"
     echo "  remove [services]        Remove containers (keeps images)"
     echo "  logs [services]          Follow logs (Ctrl+C to exit)"
+    echo "  ps [services]            Show container status"
     echo "  check                    Check what needs rebuilding"
     echo ""
     echo "Examples:"
@@ -342,6 +359,9 @@ case "$1" in
         ;;
     "logs")
         logs_dev "${@:2}"
+        ;;
+    "ps")
+        ps_dev "${@:2}"
         ;;
     "check")
         check_changes
