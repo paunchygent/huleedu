@@ -1,3 +1,138 @@
+# Handoff: Student Prompt Admin Management Implementation
+
+## Status: 🔄 IN PROGRESS (Phase 1-3 Complete, Phase 4-7 Pending)
+**Date**: 2025-11-10
+**Effort**: ~3-4 days remaining (7/20 tasks complete)
+
+---
+
+## Problem & Solution
+
+**Gap**: Admins create `AssessmentInstruction` (judge instructions + assignment_id + grade_scale + anchors) but have **no admin API/CLI pathway to add student prompts**. Users upload prompts to Content Service for ad-hoc batches but can't create AssessmentInstructions (admin-only). Assignment setup flow was fragmented.
+
+**Solution**: Add `student_prompt_storage_id` to `assessment_instructions` table. Provide admin endpoints/CLI to upload prompt text to Content Service and store reference alongside judge instructions. Batch preparation auto-looks up prompt when `assignment_id` provided.
+
+**Architecture**: Storage-by-reference pattern. Content Service owns prompt text (source of truth). CJ Assessment stores storage_id reference. Prompt flows: `assessment_instructions` → `batch_preparation.py` → `processing_metadata`.
+
+---
+
+## ✅ Completed (Phase 1-3)
+
+### Phase 1: Database Schema
+- **Migration**: `services/cj_assessment_service/alembic/versions/20251110_1200_add_student_prompt_to_instructions.py`
+- **Model**: `services/cj_assessment_service/models_db.py:415-417` added `student_prompt_storage_id: Mapped[str | None]`
+- **Schema**: `ALTER TABLE assessment_instructions ADD COLUMN student_prompt_storage_id VARCHAR(255) NULL; CREATE INDEX ix_..._student_prompt_storage_id;`
+
+### Phase 2: Repository Layer
+- **Protocol**: `services/cj_assessment_service/protocols.py:135-146` - added `student_prompt_storage_id: str | None = None` param
+- **Implementation**: `services/cj_assessment_service/implementations/db_access_impl.py:448-490` - upsert handles new field
+- **Test Helpers**: Updated `instruction_store.py:25-74` and all test mocks (6 files): `mocks.py`, `anchor_api_test_helpers.py`, `test_admin_routes.py`, `test_callback_state_manager*.py`, `test_single_essay_completion.py`, `test_workflow_continuation.py`
+
+### Phase 3: API Models & Existing Endpoint
+- **Models**: `libs/common_core/src/common_core/api_models/assessment_instructions.py:27-31` - added field to `AssessmentInstructionBase`
+- **Admin API**: `services/cj_assessment_service/api/admin_routes.py` - updated serializer (91-99) and upsert call (159-166)
+- **Endpoint**: `POST /admin/v1/assessment-instructions` now accepts optional `student_prompt_storage_id`
+
+**Validation**: ✅ `pdm run typecheck-all` passes (2 pre-existing errors unrelated)
+
+---
+
+## 📋 Remaining Work (Phase 4-7)
+
+### Phase 4: New Admin API Endpoints (~150 LoC)
+**File**: `services/cj_assessment_service/api/admin_routes.py`
+
+**`POST /admin/v1/student-prompts`** (~60 LoC):
+- **Pattern**: Follow `anchor_management.py:21-140`
+- **Flow**: Validate → Upload to Content Service (`ContentClientImpl.store_content()`) → Upsert `AssessmentInstruction` with storage_id → Return
+- **Request**: `{"assignment_id": "...", "prompt_text": "..."}`
+- **Response**: `{"storage_id": "...", "assignment_id": "...", "status": "uploaded"}`
+- **DI**: `@inject` with `ContentClientProtocol`, `CJRepositoryProtocol`, `CorrelationContext`
+- **Errors**: Use `raise_validation_error()` / `raise_processing_error()` from `huleedu_service_libs.error_handling`
+
+**`GET /admin/v1/student-prompts/assignment/<assignment_id>`** (~40 LoC):
+- **Flow**: Get `AssessmentInstruction` → Fetch from Content Service → Return prompt_text + metadata
+- **Response**: `{"assignment_id": "...", "storage_id": "...", "prompt_text": "...", "created_at": "..."}`
+- **404**: If no `student_prompt_storage_id`
+
+**Content Client** (already available at `services/cj_assessment_service/implementations/content_client_impl.py`):
+```python
+# Upload
+result = await content_client.store_content(content=text, content_type="text/plain")
+storage_id = result["content_id"]
+
+# Fetch
+text = await content_client.fetch_content(storage_id=storage_id, correlation_id=correlation_id)
+```
+
+### Phase 5: CLI Tool Enhancement (~200 LoC)
+**File**: `services/cj_assessment_service/cli_admin.py`
+
+1. **Add prompts sub-app** (line ~28):
+   ```python
+   prompts_app = typer.Typer(help="Manage student prompts")
+   app.add_typer(prompts_app, name="prompts")
+   ```
+
+2. **Upload command** (~70 LoC):
+   ```python
+   @prompts_app.command("upload")
+   def upload_prompt(
+       assignment_id: str = typer.Option(...),
+       prompt_file: Path | None = typer.Option(None),
+       prompt_text: str = typer.Option(""),
+   ):
+       # Load from file or inline → POST /student-prompts
+   ```
+
+3. **Get command** (~30 LoC): `@prompts_app.command("get")` → GET endpoint
+
+4. **Update instructions create** (line ~198-231): Add `--prompt-file`/`--prompt-text`, upload first, include `student_prompt_storage_id` in payload
+
+### Phase 6: Workflow Integration (~30 LoC)
+**File**: `services/cj_assessment_service/cj_core_logic/batch_preparation.py:52-80`
+
+**Logic**: When `assignment_id` provided but no explicit `student_prompt_storage_id`:
+```python
+if assignment_id and not prompt_storage_id:
+    instruction = await database.get_assessment_instruction(session, assignment_id=assignment_id, course_id=None)
+    if instruction and instruction.student_prompt_storage_id:
+        prompt_storage_id = instruction.student_prompt_storage_id
+```
+
+### Phase 7: Testing (~600 LoC)
+- **Unit tests**: `test_admin_prompts.py` (NEW), `test_cli_prompts.py` (NEW)
+- **Integration test**: `test_student_prompt_workflow.py` (NEW)
+- **Run existing**: `pdm run pytest-root services/cj_assessment_service/tests/unit/ -v`
+
+### Phase 8: Documentation (~100 LoC)
+- **Service README**: Add "Student Prompt Management" section with API/CLI examples
+- **Architecture Rules**: Update `.claude/rules/020.7-cj-assessment-service.mdc`
+
+---
+
+## Quick Start
+
+```bash
+# Review changes
+git diff HEAD -- services/cj_assessment_service/ libs/common_core/
+
+# Check typecheck
+pdm run typecheck-all
+
+# Start Phase 4: Open admin_routes.py, reference anchor_management.py pattern
+```
+
+**Key References**:
+1. `services/cj_assessment_service/api/anchor_management.py:21-140` (endpoint pattern)
+2. `services/cj_assessment_service/cli_admin.py:198-231` (CLI instructions create)
+3. `services/cj_assessment_service/implementations/content_client_impl.py` (Content Service client)
+4. `.claude/README_FIRST.md` (student_prompt_ref architecture)
+
+**Rules**: `.claude/rules/020-architectural-mandates.mdc`, `042-async-patterns-and-di.mdc`, `020.7-cj-assessment-service.mdc`, `075-test-creation-methodology.mdc`
+
+---
+
 # Handoff: ENG5 NP Runner Execute-Mode Fixes
 
 ## Status: 🔄 IN PROGRESS
