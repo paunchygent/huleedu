@@ -32,21 +32,34 @@ async def publish_envelope_to_kafka(
 ) -> None:
     """Publish the CJ request envelope to Kafka using ``KafkaBus``."""
 
+    logger = _LOGGER.bind(
+        batch_id=settings.batch_id,
+        kafka_client_id=settings.kafka_client_id,
+        kafka_bootstrap=settings.kafka_bootstrap,
+        runner_mode=settings.mode.value,
+        correlation_id=str(settings.correlation_id),
+    )
+
     kafka_bus = KafkaBus(
         client_id=settings.kafka_client_id,
         bootstrap_servers=settings.kafka_bootstrap,
     )
     await kafka_bus.start()
     try:
+        logger.debug(
+            "kafka_publish_started",
+            topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
+            request_correlation=str(envelope.correlation_id),
+        )
         await kafka_bus.publish(
             topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
             envelope=envelope,
             key=envelope.data.entity_id,
         )
-        _LOGGER.info(
+        logger.info(
             "kafka_publish_success",
-            batch_id=settings.batch_id,
             topic=topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED),
+            request_correlation=str(envelope.correlation_id),
         )
     finally:
         await kafka_bus.stop()
@@ -61,6 +74,15 @@ async def run_publish_and_capture(
     collector: AssessmentEventCollector | None = None
     collector_task: asyncio.Task[None] | None = None
 
+    logger = _LOGGER.bind(
+        batch_id=settings.batch_id,
+        kafka_client_id=settings.kafka_client_id,
+        kafka_bootstrap=settings.kafka_bootstrap,
+        await_completion=settings.await_completion,
+        runner_mode=settings.mode.value,
+        correlation_id=str(settings.correlation_id),
+    )
+
     if hydrator and settings.use_kafka and settings.await_completion:
         collector = AssessmentEventCollector(settings=settings, hydrator=hydrator)
         collector_task = asyncio.create_task(collector.consume())
@@ -73,14 +95,18 @@ async def run_publish_and_capture(
                 "Kafka publish succeeded -> topic "
                 f"{topic_name(ProcessingEvent.ELS_CJ_ASSESSMENT_REQUESTED)}"
             )
+            logger.info(
+                "runner_kafka_publish_completed",
+                await_completion=settings.await_completion,
+            )
         else:
             typer.echo("--no-kafka supplied; skipping publish and event capture.")
+            logger.info("runner_publish_skipped", reason="no_kafka")
 
         if collector:
             await collector.wait_for_completion()
-            _LOGGER.info(
+            logger.info(
                 "collector_completed",
-                batch_id=settings.batch_id,
                 event_counts=collector.observed_counts,
             )
 
@@ -108,6 +134,10 @@ class AssessmentEventCollector:
         self._logger = _LOGGER.bind(
             batch_id=settings.batch_id,
             kafka_group=f"{settings.kafka_client_id}-eng5np-{settings.batch_id}",
+            kafka_client_id=settings.kafka_client_id,
+            kafka_bootstrap=settings.kafka_bootstrap,
+            runner_mode=settings.mode.value,
+            correlation_id=str(settings.correlation_id),
         )
         self._observed_counts = {
             "llm_comparisons": 0,

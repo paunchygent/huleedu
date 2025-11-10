@@ -13,7 +13,7 @@
 #   1 - One or more checks failed
 #
 
-set -euo pipefail
+set -uo pipefail
 
 # Color codes for output
 RED='\033[0;31m'
@@ -46,7 +46,7 @@ print_info() {
 
 # Check 1: Docker services running
 print_check "Docker services (CJ Assessment Service)"
-if pdm run dev-ps 2>/dev/null | grep -q huleedu_cj_assessment_service; then
+if docker compose -f docker-compose.yml -f docker-compose.dev.yml ps cj_assessment_service 2>/dev/null | grep -q huleedu_cj_assessment_service; then
     print_pass "CJ Assessment Service container is running"
 else
     print_fail "CJ Assessment Service container not found. Run: pdm run dev-start cj_assessment_service"
@@ -64,7 +64,7 @@ fi
 if docker exec huleedu_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list &>/dev/null; then
     print_pass "Kafka broker is reachable and responsive"
 else
-    print_fail "Kafka broker not reachable. Check if Kafka container is running: pdm run dev-ps | grep kafka"
+    print_fail "Kafka broker not reachable. Check if Kafka container is running: docker compose -f docker-compose.yml -f docker-compose.dev.yml ps kafka"
 fi
 
 # Check 3: CJ Admin API and token validation
@@ -83,7 +83,8 @@ fi
 
 # Check 4: Source files present
 print_check "ENG5 NP source files"
-ROLE_MODELS_ROOT=".claude/research/prompts"
+# ENG5 NP dataset lives under test_uploads with spaces in path; keep everything quoted when used
+ROLE_MODELS_ROOT="test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016"
 
 # Expected files
 FILES_TO_CHECK=(

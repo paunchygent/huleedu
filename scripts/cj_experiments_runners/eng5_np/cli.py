@@ -32,6 +32,7 @@ from scripts.cj_experiments_runners.eng5_np.kafka_flow import (
 )
 from scripts.cj_experiments_runners.eng5_np.logging_support import (
     configure_cli_logging,
+    load_artefact_data,
     log_validation_state,
     print_run_summary,
     setup_cli_logger,
@@ -327,6 +328,32 @@ def main(
             prompt_path=str(inventory.prompt.path),
         )
         print_inventory(inventory)
+        plan_snapshot = {
+            "validation": {
+                "manifest": [],
+                "artefact_checksum": None,
+                "runner_status": {
+                    "mode": RunnerMode.PLAN.value,
+                    "partial_data": False,
+                    "timeout_seconds": 0.0,
+                    "observed_events": {
+                        "llm_comparisons": 0,
+                        "assessment_results": 0,
+                        "completions": 0,
+                    },
+                    "inventory": {
+                        "anchors": inventory.anchor_docs.count,
+                        "students": inventory.student_docs.count,
+                        "prompt_path": str(inventory.prompt.path),
+                    },
+                },
+            }
+        }
+        log_validation_state(
+            logger=logger,
+            artefact_path=settings.output_dir / f"assessment_run.{RunnerMode.PLAN.value}.json",
+            artefact_data=plan_snapshot,
+        )
         return
 
     schema = ensure_schema_available(paths.schema_path)
@@ -346,7 +373,11 @@ def main(
             "runner_dry_run_stub_created",
             artefact_path=str(artefact_path),
         )
-        log_validation_state(logger=logger, artefact_path=artefact_path)
+        log_validation_state(
+            logger=logger,
+            artefact_path=artefact_path,
+            artefact_data=load_artefact_data(artefact_path),
+        )
         return
 
     if mode is RunnerMode.EXECUTE:
@@ -417,7 +448,11 @@ def main(
             typer.echo("Kafka disabled; request not published.")
             logger.info("runner_request_skipped", reason="no_kafka")
 
-    log_validation_state(logger=logger, artefact_path=artefact_path)
+    log_validation_state(
+        logger=logger,
+        artefact_path=artefact_path,
+        artefact_data=load_artefact_data(artefact_path),
+    )
 
 
 if __name__ == "__main__":
