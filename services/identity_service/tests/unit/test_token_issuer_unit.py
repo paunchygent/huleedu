@@ -271,6 +271,8 @@ class TestRs256TokenIssuer:
         mock.JWT_RS256_PRIVATE_KEY_PATH = SecretStr("/test/key.pem")
         mock.JWT_RS256_PUBLIC_JWKS_KID = "test-kid"
         mock.JWT_ACCESS_TOKEN_EXPIRES_SECONDS = 3600
+        mock.JWT_ISSUER = "huleedu-identity-service"
+        mock.JWT_AUDIENCE = "huleedu-platform"
         mock.SERVICE_NAME = "identity_service"
         return mock
 
@@ -343,7 +345,7 @@ class TestRs256TokenIssuer:
             assert payload["sub"] == sample_user_id
             assert payload["org"] == sample_org_id
             assert payload["roles"] == roles
-            assert payload["iss"] == "identity_service"
+            assert payload["iss"] == "huleedu-identity-service"
             assert "exp" in payload
 
         def test_registers_jwk_on_initialization(

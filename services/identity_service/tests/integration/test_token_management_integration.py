@@ -77,7 +77,7 @@ class TestTokenManagementIntegration:
     @pytest.fixture
     async def database_engine(self, test_settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
         """Create async database engine with schema."""
-        engine = create_async_engine(test_settings.database_url)
+        engine = create_async_engine(test_settings.DATABASE_URL)
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

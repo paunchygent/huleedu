@@ -82,49 +82,30 @@ class Settings(SecureServiceSettings):
         return self.__str__()
 
     @property
-    def database_url(self) -> str:
-        """Return the PostgreSQL database URL for both runtime and migrations.
-
-        Environment-aware database connection as per Rule 085:
-        - If SERVICE_DATABASE_URL is set, use it (Docker/Prod override)
-        - Production: derive from HULEEDU_PROD_DB_* variables
-        - Development: use localhost with per-service port and .env creds
-        """
+    def DATABASE_URL(self) -> str:
+        """Return the PostgreSQL database URL for both runtime and migrations."""
         import os
 
-        # Override for containerized/prod usage
-        env_url = os.getenv("IDENTITY_SERVICE_DATABASE_URL") or os.getenv("SERVICE_DATABASE_URL")
-        if env_url:
-            return env_url
-
-        if self.is_production():
-            prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
-            prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
-            prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD")
-            db_user = os.getenv("HULEEDU_DB_USER", "huleedu_user")
-            if not all([prod_host, prod_password]):
-                raise ValueError(
-                    "Production environment requires HULEEDU_PROD_DB_HOST and "
-                    "HULEEDU_PROD_DB_PASSWORD."
-                )
-            return f"postgresql+asyncpg://{db_user}:{prod_password}@{prod_host}:{prod_port}/huleedu_identity"
+        env_type = os.getenv("ENV_TYPE", "development").lower()
+        if env_type == "docker":
+            dev_host = os.getenv("IDENTITY_SERVICE_DB_HOST", "identity_db")
+            dev_port_str = os.getenv("IDENTITY_SERVICE_DB_PORT", "5432")
         else:
-            # Development: local Docker DB port (next available slot)
-            db_user_env = os.getenv("HULEEDU_DB_USER")
-            db_password_env = os.getenv("HULEEDU_DB_PASSWORD")
+            dev_host = "localhost"
+            dev_port_str = "5442"
 
-            if not db_user_env or not db_password_env:
-                raise ValueError(
-                    "Missing required database credentials. Ensure HULEEDU_DB_USER and "
-                    "HULEEDU_DB_PASSWORD are set in .env."
-                )
+        dev_port = int(dev_port_str)
 
-            # Type narrowing after validation - mypy now knows these are not None
-            return f"postgresql+asyncpg://{db_user_env}:{db_password_env}@localhost:5442/huleedu_identity"
+        return self.build_database_url(
+            database_name="huleedu_identity",
+            service_env_var_prefix="IDENTITY_SERVICE",
+            dev_port=dev_port,
+            dev_host=dev_host,
+        )
 
     def get_database_url_masked(self) -> str:
         """Return database URL with masked password for logging."""
-        return self.database_url_masked(self.database_url)
+        return self.database_url_masked(self.DATABASE_URL)
 
 
 settings = Settings()

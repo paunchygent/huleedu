@@ -92,7 +92,7 @@ class CoreProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
-        engine = create_async_engine(settings.database_url, echo=False)
+        engine = create_async_engine(settings.DATABASE_URL, echo=False)
         return engine
 
     @provide(scope=Scope.APP)

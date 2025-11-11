@@ -22,6 +22,7 @@ from services.identity_service.di import (
     IdentityImplementationsProvider,
 )
 from services.identity_service.kafka_consumer import IdentityKafkaConsumer
+from services.identity_service.models_db import Base
 
 logger = create_service_logger("identity_service.startup")
 
@@ -52,6 +53,10 @@ async def initialize_services(app: Quart, settings: Settings) -> None:
         # Get database engine for health checks
         database_engine = await request_container.get(AsyncEngine)
         app.database_engine = database_engine  # type: ignore
+
+        # Initialize database schema (safety net for fresh databases)
+        async with database_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         relay_worker = await request_container.get(EventRelayWorker)
         await relay_worker.start()

@@ -162,7 +162,7 @@ class TestIdentityServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             expected_url = (
                 "postgresql+asyncpg://test_user:test_password@localhost:5442/huleedu_identity"
@@ -187,7 +187,7 @@ class TestIdentityServiceSettings:
         # Clear the .env loaded variables to avoid interference
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             # Now correctly uses production database configuration
             expected_url = "postgresql+asyncpg://test_user:secure_prod_password@prod.db.example.com:5433/huleedu_identity"
@@ -214,7 +214,7 @@ class TestIdentityServiceSettings:
             assert settings.ENVIRONMENT == Environment.PRODUCTION
 
             # Production URL uses the correct production configuration with default port
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             expected_production_url = "postgresql+asyncpg://test_user:secure_prod_password@prod.db.example.com:5432/huleedu_identity"
             assert database_url == expected_production_url
@@ -233,7 +233,7 @@ class TestIdentityServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            assert settings.database_url == override_url
+            assert settings.DATABASE_URL == override_url
 
     def test_database_url_generic_service_override(self) -> None:
         """Test generic SERVICE_DATABASE_URL env var overrides URL.
@@ -250,7 +250,7 @@ class TestIdentityServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            assert settings.database_url == override_url
+            assert settings.DATABASE_URL == override_url
 
     def test_database_url_production_validation_enforced(self) -> None:
         """Test that production validation is properly enforced with correct environment detection.
@@ -270,7 +270,7 @@ class TestIdentityServiceSettings:
 
             # Production validation should now be triggered and raise ValueError
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             # Verify the error mentions the missing production variables
             error_message = str(exc_info.value)
@@ -289,7 +289,7 @@ class TestIdentityServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             assert "HULEEDU_DB_USER" in str(exc_info.value)
 
@@ -304,7 +304,7 @@ class TestIdentityServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             assert "HULEEDU_DB_PASSWORD" in str(exc_info.value)
 
