@@ -32,6 +32,11 @@ alwaysApply: false
 - **Flow**: 
   - Requests: Event → `process_single_message()` → `run_cj_assessment_workflow()` → submit comparisons
   - Callbacks: Event → `process_llm_result()` → `continue_cj_assessment_workflow()` → state updates → publish result
+  - Batch preparation hydrates `student_prompt_storage_id` from the authoritative
+    `assessment_instructions` record when the incoming request lacks a prompt
+    reference but the instruction provides one. The hydrated storage reference is
+    subsequently resolved to prompt text via the Content Service during batch
+    metadata construction.
 
 ## 3. Core Components
 
@@ -47,6 +52,8 @@ alwaysApply: false
 | `batch_monitor.py` | Background monitoring for stuck batch detection and recovery |
 | `protocols.py` | All **typing.Protocol** contracts (ContentClient, Cache, LLMProvider, Repository, EventPublisher, RetryManager, LLMInteraction) |
 | `di.py` | `CJAssessmentServiceProvider` supplying Dishka providers & single `make_async_container` entry |
+| `api/admin_routes.py` | Admin endpoints for instructions (`/admin/v1/assessment-instructions`) and student prompts (`/admin/v1/student-prompts`) including storage-by-reference upload and retrieval workflows |
+| `cli_admin.py` | Typer CLI surface providing `prompts upload|get` commands that wrap the admin API and integrate with instruction creation |
 
 ## 4. Dependency Injection (Dishka)
 - DI container instantiated **before** Blueprint registration (see `app.py`) following Memory `55c2a6bd...`.
@@ -108,6 +115,9 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 - **Score Stability**: `SCORE_STABILITY_THRESHOLD` (0.05), `MAX_ITERATIONS` (5), `MAX_CONCURRENT_COMPARISONS` (100)
 - **Circuit Breaker**: `CIRCUIT_BREAKER_ENABLED`, `*_FAILURE_THRESHOLD`, `*_RECOVERY_TIMEOUT`, `*_SUCCESS_THRESHOLD`
 - **Metrics**: `METRICS_PORT` (default 9095), Redis idempotency TTL settings
+- **Admin Surface**: `CJ_ASSESSMENT_SERVICE_ENABLE_ADMIN_ENDPOINTS` (gates both
+  instructions and student prompt endpoints); requires shared JWT validation
+  settings to authenticate admin operators before prompt uploads are allowed.
 
 ## 9. Resilience & Observability
 ### 9.1. Circuit Breaker Protection
@@ -125,7 +135,10 @@ Key vars from `Settings` (env prefix `CJ_ASSESSMENT_SERVICE_`):
 - **Logging**: `huleedu_service_libs.logging_utils` with `correlation_id` extra, idempotency tracking
 
 ## 10. Security & Limits (Walking Skeleton)
-- No auth; internal service only.
+- Admin surface gated by shared JWT validation; `/admin/v1/**` routes require
+  Identity-issued tokens with `roles` containing `admin`. Prompt uploads are
+  rejected unless the assignment instruction already exists (prevents prompt
+  ingestion without authoritative metadata).
 - DB credentials via env vars; no secrets in repo.
 - Rate limit for LLM calls via semaphore-based concurrency control.
 - Batch monitoring with automatic recovery for stuck batches.

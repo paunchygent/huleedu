@@ -8,6 +8,27 @@ from enum import Enum
 
 
 class ErrorCode(str, Enum):
+    """Base error code enum with 42 cross-service error categories.
+
+    Provides generic error codes for common failure scenarios across all HuleEdu
+    services (validation, timeouts, auth, external service failures, etc.).
+
+    Extension Pattern:
+    - USE base ErrorCode values when error fits generic category (TIMEOUT,
+      VALIDATION_ERROR, RATE_LIMIT, etc.)
+    - EXTEND with service-specific enum (e.g., CJAssessmentErrorCode) ONLY when
+      error represents domain-specific business logic that can't be expressed
+      by generic codes
+    - Service-specific enums layer domain nuance on top while base ErrorCode
+      centralizes cross-service error buckets
+
+    Error codes integrate with SystemProcessingMetadata.error_info structure
+    for distributed tracing and operational context.
+
+    See: libs/huleedu_service_libs/error_handling/ for canonical error raising,
+    logging, and handling patterns tied to both base and extended error codes.
+    """
+
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"

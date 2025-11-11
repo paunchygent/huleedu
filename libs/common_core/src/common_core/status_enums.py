@@ -1,5 +1,11 @@
-"""
-common_core.status_enums - Enums for lifecycle, processing, and operation statuses.
+"""Status enums for lifecycle, processing, and operation state machines.
+
+ProcessingStage: Generic processing lifecycle (used in ProcessingUpdate events).
+EssayStatus: Fine-grained essay state machine through pipeline.
+BatchStatus: Batch-level state machine (GUEST vs REGULAR flows).
+BatchClientStatus: Simplified client-facing batch status.
+
+See: libs/common_core/docs/status-state-machines.md
 """
 
 from __future__ import annotations
@@ -9,6 +15,17 @@ from enum import Enum
 
 # --- System-level lifecycle stages ---
 class ProcessingStage(str, Enum):
+    """Generic processing lifecycle stages for thin events (ProcessingUpdate).
+
+    Used in state-tracking events (CJAssessmentCompletedV1, etc.). Represents
+    high-level processing outcome: success, failure, or cancellation.
+
+    terminal() returns states that end processing (COMPLETED, FAILED, CANCELLED).
+    active() returns non-terminal states (COMPLETED, INITIALIZED, PROCESSING).
+
+    See: libs/common_core/docs/dual-event-pattern.md
+    """
+
     PENDING = "pending"
     INITIALIZED = "initialized"
     PROCESSING = "processing"
@@ -18,15 +35,26 @@ class ProcessingStage(str, Enum):
 
     @classmethod
     def terminal(cls) -> set[ProcessingStage]:
+        """Return terminal states (no further processing)."""
         return {cls.COMPLETED, cls.FAILED, cls.CANCELLED}
 
     @classmethod
     def active(cls) -> set[ProcessingStage]:
+        """Return active (non-cancelled) states."""
         return {cls.COMPLETED, cls.INITIALIZED, cls.PROCESSING}
 
 
 # --- Fine-grained essay status values (granular state machine) ---
 class EssayStatus(str, Enum):
+    """Fine-grained essay state machine through processing pipeline.
+
+    Tracks essay from upload through all processing phases (spellcheck, NLP, CJ, etc.).
+    Each phase has AWAITING, IN_PROGRESS, SUCCESS, FAILED states.
+
+    Terminal states: ALL_PROCESSING_COMPLETED, ESSAY_CRITICAL_FAILURE.
+
+    See: libs/common_core/docs/status-state-machines.md
+    """
     # File Service Results Statuses
     UPLOADED = "uploaded"
     TEXT_EXTRACTED = "text_extracted"
@@ -73,6 +101,16 @@ class EssayStatus(str, Enum):
 
 # --- Batch status ---
 class BatchStatus(str, Enum):
+    """Batch-level state machine for GUEST and REGULAR batch flows.
+
+    GUEST flow: AWAITING_CONTENT_VALIDATION → AWAITING_PIPELINE_CONFIGURATION → READY_FOR_PIPELINE_EXECUTION → PROCESSING_PIPELINES → terminal.
+
+    REGULAR flow: AWAITING_CONTENT_VALIDATION → AWAITING_STUDENT_VALIDATION → STUDENT_VALIDATION_COMPLETED → READY_FOR_PIPELINE_EXECUTION → PROCESSING_PIPELINES → terminal.
+
+    Terminal states: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED_CRITICALLY, CANCELLED.
+
+    See: libs/common_core/docs/status-state-machines.md
+    """
     AWAITING_CONTENT_VALIDATION = "awaiting_content_validation"
     CONTENT_INGESTION_FAILED = "content_ingestion_failed"
     AWAITING_PIPELINE_CONFIGURATION = "awaiting_pipeline_configuration"
@@ -89,18 +127,14 @@ class BatchStatus(str, Enum):
 
 # --- Generic Statuses (New) ---
 class BatchClientStatus(str, Enum):
-    """
-    Client-facing batch status values for API responses and WebSocket events.
+    """Client-facing batch status for API responses and WebSocket events.
 
-    These statuses provide a simplified, semantic view of batch processing state
-    for frontend applications. Values are synchronized between REST API and
-    WebSocket notifications for consistency.
+    Simplified view of batch processing state for frontends. Synchronized between
+    REST API and WebSocket notifications.
 
-    Processing Flow:
-    PENDING_CONTENT → READY → PROCESSING → (COMPLETED_SUCCESSFULLY |
-    COMPLETED_WITH_FAILURES | FAILED)
+    Flow: PENDING_CONTENT → READY → PROCESSING → (COMPLETED_SUCCESSFULLY | COMPLETED_WITH_FAILURES | FAILED)
 
-    Terminal States: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED, CANCELLED
+    Terminal: COMPLETED_SUCCESSFULLY, COMPLETED_WITH_FAILURES, FAILED, CANCELLED.
     """
 
     # Initial states - batch not yet ready for processing
@@ -122,7 +156,7 @@ class BatchClientStatus(str, Enum):
 
 
 class ProcessingStatus(str, Enum):
-    """Generic processing statuses."""
+    """Generic processing status (simpler than ProcessingStage)."""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -131,7 +165,7 @@ class ProcessingStatus(str, Enum):
 
 
 class ValidationStatus(str, Enum):
-    """Status codes for validation operations."""
+    """Validation operation outcomes."""
 
     SUCCESS = "success"
     FAILURE = "failure"
@@ -139,7 +173,7 @@ class ValidationStatus(str, Enum):
 
 
 class OperationStatus(str, Enum):
-    """Status of operations for metrics collection."""
+    """Operation outcomes for metrics collection."""
 
     SUCCESS = "success"
     FAILED = "failed"
@@ -148,7 +182,7 @@ class OperationStatus(str, Enum):
 
 
 class CacheStatus(str, Enum):
-    """Status codes for cache operations."""
+    """Cache operation outcomes (Redis)."""
 
     OK = "ok"
     HIT = "hit"
@@ -158,7 +192,7 @@ class CacheStatus(str, Enum):
 
 # --- Spell-checker job status ---
 class SpellcheckJobStatus(str, Enum):
-    """Lifecycle of a spell-checker job handled by spellchecker_service."""
+    """Spellcheck job lifecycle in Spellchecker Service."""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -167,7 +201,7 @@ class SpellcheckJobStatus(str, Enum):
 
 
 class QueueStatus(str, Enum):
-    """Status codes for queued LLM requests."""
+    """LLM request queue status in LLM Provider Service."""
 
     QUEUED = "queued"
     PROCESSING = "processing"
@@ -177,49 +211,49 @@ class QueueStatus(str, Enum):
 
 
 class CircuitBreakerState(str, Enum):
-    """States of the circuit breaker for resilience patterns."""
+    """Circuit breaker states for resilience patterns (huleedu_service_libs)."""
 
-    CLOSED = "closed"  # Normal operation, requests allowed
-    OPEN = "open"  # Failure threshold exceeded, requests blocked
-    HALF_OPEN = "half_open"  # Testing if service recovered
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failure threshold exceeded, blocking requests
+    HALF_OPEN = "half_open"  # Testing recovery
 
 
 # --- CJ Assessment Batch State ---
 class CJBatchStateEnum(str, Enum):
-    """State machine for CJ assessment batch processing."""
+    """CJ assessment batch state machine (internal to CJ Service)."""
 
-    INITIALIZING = "INITIALIZING"  # Batch created, essays being prepared
-    GENERATING_PAIRS = "GENERATING_PAIRS"  # Creating comparison pairs
-    WAITING_CALLBACKS = "WAITING_CALLBACKS"  # Comparisons sent, awaiting results
-    SCORING = "SCORING"  # Calculating Bradley-Terry scores
-    COMPLETED = "COMPLETED"  # Successfully processed
-    FAILED = "FAILED"  # Processing failed
-    CANCELLED = "CANCELLED"  # Manually stopped
+    INITIALIZING = "INITIALIZING"
+    GENERATING_PAIRS = "GENERATING_PAIRS"
+    WAITING_CALLBACKS = "WAITING_CALLBACKS"  # Awaiting LLM callbacks
+    SCORING = "SCORING"  # Bradley-Terry calculation
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 # --- Student Association Status ---
 class StudentAssociationStatus(str, Enum):
-    """Status of student-essay associations in Class Management Service."""
+    """Student-essay association status (Class Management Service, REGULAR batches only)."""
 
     PENDING_VALIDATION = "pending_validation"
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
-    TIMEOUT_CONFIRMED = "timeout_confirmed"
+    TIMEOUT_CONFIRMED = "timeout_confirmed"  # Auto-confirmed after 24h
     NO_MATCH = "no_match"
 
 
 class AssociationValidationMethod(str, Enum):
-    """Method by which a student association was validated."""
+    """How student association was validated."""
 
-    HUMAN = "human"
-    TIMEOUT = "timeout"
-    AUTO = "auto"
+    HUMAN = "human"  # Teacher manually confirmed
+    TIMEOUT = "timeout"  # Auto-confirmed after timeout
+    AUTO = "auto"  # High-confidence auto-match
 
 
 class AssociationConfidenceLevel(str, Enum):
-    """Confidence level categories for student matching."""
+    """NLP student matching confidence levels."""
 
-    HIGH = "high"  # > 0.9 confidence
-    MEDIUM = "medium"  # 0.7 - 0.9 confidence
-    LOW = "low"  # < 0.7 confidence
-    NO_MATCH = "no_match"  # No viable match found
+    HIGH = "high"  # >0.9
+    MEDIUM = "medium"  # 0.7-0.9
+    LOW = "low"  # <0.7
+    NO_MATCH = "no_match"

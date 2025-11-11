@@ -98,8 +98,9 @@ and failure handling) follow `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md`.
 
 ## Admin API & CLI
 
-Phase 3.2 adds an authenticated admin surface for managing
-`assessment_instructions` without manual SQL:
+Phase 3.2 introduced an authenticated admin surface for managing
+`assessment_instructions`, and Phase 8 extends the surface to cover student
+prompt storage references end-to-end:
 
 - **HTTP blueprint**: `/admin/v1/assessment-instructions` (POST upsert, GET
   list, GET/DELETE per assignment, DELETE per course). Requests must include an
@@ -115,6 +116,32 @@ Phase 3.2 adds an authenticated admin surface for managing
   automation, and exposes `instructions create|list|get|delete` plus
   `scales list` commands.
 
+### Student Prompt Management
+
+- **Storage-by-reference**: `student_prompt_storage_id` lives on
+  `assessment_instructions`. Prompt text itself is persisted by the Content
+  Service; CJ only stores and propagates the storage reference.
+- **Upload workflow**: `POST /admin/v1/student-prompts` validates that the target
+  instruction exists, streams prompt text to Content Service via
+  `ContentClientProtocol.store_content()`, and re-upserts the instruction while
+  preserving grade scale and judge instructions metadata.
+- **Retrieval workflow**: `GET /admin/v1/student-prompts/assignment/{assignment_id}`
+  emits the authoritative prompt text and storage reference directly from the
+  Content Service while echoing the judge instructions metadata for UI review.
+- **CLI commands**: `pdm run cj-admin prompts upload` accepts either an inline
+  prompt or file path, performs xor validation, and mirrors the API response.
+  `pdm run cj-admin prompts get` fetches the same payload and optionally writes
+  it to disk. `pdm run cj-admin instructions create` can upload a prompt inline
+  during instruction creation via the shared helper.
+- **Batch integration**: `cj_core_logic/batch_preparation.py` auto-hydrates
+  `student_prompt_storage_id` whenever an assignment-scoped instruction supplies
+  one and the incoming request omits the field. The existing Content Service
+  hydration metric `huleedu_cj_prompt_fetch_failures_total{reason}` remains the
+  observability signal for downstream prompt fetch errors.
+- **Auditability**: Structured logs on both endpoints include
+  `assignment_id`, `student_prompt_storage_id`, `correlation_id`, and
+  `admin_user` (Identity `sub`).
+
 ### Admin API Endpoints
 
 | Method | Path | Description |
@@ -124,6 +151,8 @@ Phase 3.2 adds an authenticated admin surface for managing
 | `GET` | `/admin/v1/assessment-instructions/assignment/{assignment_id}` | Fetch the latest instructions for an assignment |
 | `DELETE` | `/admin/v1/assessment-instructions/assignment/{assignment_id}` | Remove assignment-scoped instructions |
 | `DELETE` | `/admin/v1/assessment-instructions/course/{course_id}` | Remove course fallback instructions |
+| `POST` | `/admin/v1/student-prompts` | Upload prompt text to Content Service and attach resulting storage ID to an existing assignment instruction |
+| `GET` | `/admin/v1/student-prompts/assignment/{assignment_id}` | Fetch hydrated prompt metadata (storage ID + prompt text + instructions context) for an assignment |
 
 **Enablement checklist**
 
@@ -156,6 +185,12 @@ pdm run cj-admin instructions create \
 
 # List ENG5 NP instructions
 pdm run cj-admin instructions list --grade-scale eng5_np_legacy_9_step
+
+# Upload a student prompt from file and verify hydration
+pdm run cj-admin prompts upload \
+  assignment-id 11111111-1111-1111-1111-111111111111 \
+  --prompt-file documentation/prompts/eng5_np_prompt.md
+pdm run cj-admin prompts get 11111111-1111-1111-1111-111111111111 --output-file ./prompt.md
 ```
 
 ## LLM Configuration & Dynamic Overrides

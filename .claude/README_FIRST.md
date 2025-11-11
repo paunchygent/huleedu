@@ -190,6 +190,19 @@ pdm run typecheck-all # Type checking
 - `scripts/cj_experiments_runners/eng5_np/{artefact_io,hydrator,kafka_flow,cli}.py` implement fail-fast metadata handling, duplicate suppression, manifest hashing, cost summaries, and schema-compliant document blobs; tests live in `scripts/tests/test_eng5_np_runner.py` (with `jsonschema` validation).
 - Execute-mode guidance consolidated into `Documentation/OPERATIONS/ENG5-NP-RUNBOOK.md` (prereqs, commands, monitoring, failure modes).
 
+### 19. Student Prompt Admin Management (Nov 2025)
+
+- Added nullable `student_prompt_storage_id` to CJ Assessment instructions (migration `20251110_1200_add_student_prompt_to_instructions.py`) and repository/API models so prompt references live with judge metadata.
+- Implemented admin REST endpoints (`POST /admin/v1/student-prompts`, `GET /admin/v1/student-prompts/assignment/<id>`) plus Typer CLI commands (`cj-admin prompts upload|get`) to upload and retrieve prompt text through the Content Service with Dishka-injected clients, correlation logging, and metrics.
+- Batch preparation now auto-hydrates prompts when only `assignment_id` is provided, aligning ENG5 runner + downstream pipelines; tests cover REST, CLI, and workflow integration (`test_student_prompt_workflow.py`).
+- Documentation and architecture rules updated (`services/cj_assessment_service/README.md`, `.claude/rules/020.7-cj-assessment-service.mdc`). Step 5 prompt-reference cleanup is complete across downstream consumers (NLP, CJ, Result Aggregator); ongoing focus is on monitoring `huleedu_{cj|nlp}_prompt_fetch_failures_total` and keeping new workflows reference-only.
+
+### 20. ENG5 Runner Content Upload & Event Hardening (Nov 2025)
+
+- Execute-mode runner now uploads anchor/student essays to Content Service before composing CJ requests.
+- Kafka event collector validates envelopes via typed Pydantic models to avoid AttributeError on raw dict payloads.
+- docker-compose.eng5-runner wired with CONTENT_SERVICE_URL + content service dependency to keep uploads local when running in container.
+
 ## Configuration Files
 
 - `.env` - Environment variables (not in git)

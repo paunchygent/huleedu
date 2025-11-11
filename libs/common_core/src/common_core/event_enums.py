@@ -1,5 +1,9 @@
-"""
-common_core.event_enums - Enums and helpers for the event-driven architecture.
+"""Event enum registry and topic_name() mapping for HuleEdu Kafka architecture.
+
+Central registry of all event types with explicit topic mapping. ALL events
+MUST be in ProcessingEvent enum and _TOPIC_MAPPING before use.
+
+See: libs/common_core/docs/event-registry.md
 """
 
 from __future__ import annotations
@@ -8,6 +12,20 @@ from enum import Enum
 
 
 class ProcessingEvent(str, Enum):
+    """Central registry of all Kafka event types.
+
+    100+ event constants organized by functional area. Each event must have
+    corresponding entry in _TOPIC_MAPPING to convert to Kafka topic string.
+
+    Usage: topic_name(ProcessingEvent.MY_EVENT) returns Kafka topic.
+    Raises ValueError if event not in _TOPIC_MAPPING.
+
+    Categories: Batch coordination, Essay lifecycle, Processing commands,
+    Processing results, Student matching, Class management, File management,
+    Result aggregation, LLM provider, Identity, Email, Entitlements, Resource tracking.
+
+    See: libs/common_core/docs/event-registry.md for full documentation.
+    """
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
     BATCH_ESSAYS_READY = "batch.essays.ready"
@@ -214,8 +232,25 @@ _TOPIC_MAPPING = {
 
 
 def topic_name(event: ProcessingEvent) -> str:
-    """
-    Convert a ProcessingEvent to its corresponding Kafka topic name.
+    """Convert ProcessingEvent enum to Kafka topic string.
+
+    Enforces explicit topic mapping. Raises ValueError with full list of mapped
+    events if event not in _TOPIC_MAPPING.
+
+    Args:
+        event: ProcessingEvent enum value
+
+    Returns:
+        Kafka topic string (e.g., "huleedu.cj_assessment.completed.v1")
+
+    Raises:
+        ValueError: If event not in _TOPIC_MAPPING with list of all mapped events
+
+    Example:
+        topic = topic_name(ProcessingEvent.CJ_ASSESSMENT_COMPLETED)
+        # Returns: "huleedu.cj_assessment.completed.v1"
+
+    See: libs/common_core/docs/event-registry.md
     """
     if event not in _TOPIC_MAPPING:
         mapped_events_summary = "\n".join(

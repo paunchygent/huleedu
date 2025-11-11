@@ -1,4 +1,12 @@
-"""common_core.metadata_models – Strongly-typed metadata building blocks"""
+"""Strongly-typed metadata building blocks for events and processing.
+
+SystemProcessingMetadata: Processing state and error tracking.
+StorageReferenceMetadata: Large payload references (>50KB threshold).
+EssayProcessingInputRefV1: Standard essay reference for processing services.
+PersonNameV1: Structured name model for identity and class management.
+
+See: libs/common_core/docs/storage-references.md
+"""
 
 from __future__ import annotations
 
@@ -28,20 +36,68 @@ __all__ = [
 
 
 class SystemProcessingMetadata(BaseModel):
-    entity_id: str
-    entity_type: str
-    parent_id: str | None = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    processing_stage: ProcessingStage | None = None
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    event: str | None = None  # Actual event name string, e.g., from ProcessingEvent enum
-    error_info: dict[str, Any] = Field(default_factory=dict)
+    """Processing state metadata for thin events (ProcessingUpdate).
+
+    Tracks processing lifecycle: timestamps, stage, errors. Used in thin events
+    for state management (ELS, BOS). Contains NO business data.
+
+    error_info structure:
+        {
+            "error_code": str,      # From ErrorCode or service-specific enum
+            "error_message": str,   # Human-readable description
+            "error_type": str,      # Exception class name
+            "context": dict         # Optional additional context
+        }
+
+    See: libs/common_core/docs/error-patterns.md
+    """
+
+    entity_id: str = Field(description="ID of entity being processed (batch_id, essay_id, etc.)")
+    entity_type: str = Field(description="Entity type (batch, essay, job, etc.)")
+    parent_id: str | None = Field(default=None, description="Parent entity ID if hierarchical")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Metadata creation timestamp UTC"
+    )
+    processing_stage: ProcessingStage | None = Field(
+        default=None, description="Current processing stage (PENDING, PROCESSING, COMPLETED, FAILED, etc.)"
+    )
+    started_at: datetime | None = Field(default=None, description="Processing start timestamp UTC")
+    completed_at: datetime | None = Field(default=None, description="Processing completion timestamp UTC")
+    event: str | None = Field(
+        default=None, description="Event name string from ProcessingEvent enum value"
+    )
+    error_info: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Error details on failure: error_code, error_message, error_type, context. See docs/error-patterns.md",
+    )
     model_config = {"populate_by_name": True}
 
 
 class StorageReferenceMetadata(BaseModel):
-    references: dict[ContentType, dict[str, str]] = Field(default_factory=dict)
+    """References to Content Service for large payloads (>50KB).
+
+    Pattern for handling event data >50KB. Store data in Content Service,
+    include storage_id reference in event instead of inline data.
+
+    Multiple ContentType references can exist in single instance. Each reference
+    contains storage_id (required) and path_hint (optional debugging aid).
+
+    Usage:
+        storage_ref = StorageReferenceMetadata()
+        storage_ref.add_reference(ContentType.CJ_RESULTS_JSON, storage_id, "cj/batch_123/results.json")
+        event_data.results_ref = storage_ref
+
+    Retrieval:
+        ref = event.results_ref.references[ContentType.CJ_RESULTS_JSON]
+        data = await content_service.fetch(ref["storage_id"], correlation_id)
+
+    See: libs/common_core/docs/storage-references.md
+    """
+
+    references: dict[ContentType, dict[str, str]] = Field(
+        default_factory=dict,
+        description='ContentType to {"storage_id": str, "path": str} mapping. storage_id required, path optional.',
+    )
 
     def add_reference(
         self,
@@ -49,22 +105,34 @@ class StorageReferenceMetadata(BaseModel):
         storage_id: str,
         path_hint: str | None = None,
     ) -> None:
+        """Add storage reference for ContentType.
+
+        Args:
+            ctype: ContentType enum value (CJ_RESULTS_JSON, STUDENT_PROMPT_TEXT, etc.)
+            storage_id: Content Service storage ID (required)
+            path_hint: Optional path for debugging (e.g., "cj/batch_123/results.json")
+        """
         self.references[ctype] = {"storage_id": storage_id, "path": path_hint or ""}
 
 
 class EssayProcessingInputRefV1(BaseModel):
-    """Reference to an essay and its text content for processing requests.
+    """Standard essay reference for processing service requests.
 
-    This is the minimal general-purpose contract for essay processing.
-    Specialized services should define their own input contracts when they
-    need additional metadata (following the pattern of AIFeedbackInputDataV1).
+    Minimal general-purpose contract used across ALL processing services (CJ, NLP, Spellcheck, AI Feedback).
+    Contains essay_id and text_storage_id (Content Service reference).
+
+    Specialized services define extended contracts when additional metadata needed
+    (e.g., AIFeedbackInputDataV1 adds student_id, class_context).
+
+    Producer: Essay Lifecycle Service (ELS)
+    Consumers: All processing services
     """
 
-    essay_id: str
-    text_storage_id: str
+    essay_id: str = Field(description="Unique essay identifier")
+    text_storage_id: str = Field(description="Content Service storage_id for essay text")
     spellcheck_metrics: "SpellcheckMetricsV1 | None" = Field(
         default=None,
-        description="Optional spellcheck metrics computed during previous phase",
+        description="Spellcheck metrics from Phase 2 (error_count, correction_count). Available for downstream services after spellcheck completes.",
     )
 
 
