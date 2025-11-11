@@ -146,3 +146,23 @@ class SecureServiceSettings(BaseSettings):
             )
 
         return {"host": prod_host, "port": prod_port, "password": prod_password, "user": db_user}
+
+    def build_database_url(
+        self,
+        *,
+        database_name: str,
+        service_env_var_prefix: str,
+        dev_port: int,
+        dev_host: str = "localhost",
+        url_encode_password: bool = True,
+    ) -> str:
+        from .database_utils import build_database_url as _build
+
+        return _build(
+            database_name=database_name,
+            service_env_var_prefix=service_env_var_prefix,
+            is_production=self.is_production(),
+            dev_port=dev_port,
+            dev_host=dev_host,
+            url_encode_password=url_encode_password,
+        )
