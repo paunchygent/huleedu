@@ -85,6 +85,11 @@ depends_on:
     condition: service_healthy
 ```
 
+### 3.4. Admin CLI Authentication Pattern
+- **MUST** ensure CJ admin commands have a valid JWT via the documented workflow in `services/cj_assessment_service/README.md`.
+- Preferred local setup: run `pdm run cj-admin login --email <admin>` once to populate `~/.huleedu/cj_admin_token.json`; mount that path into the runner container when needed.
+- Automation path: export a short-lived `CJ_ADMIN_TOKEN` in the shell (or compose env block) so CLI commands inherit it. See `services/cj_assessment_service/cli_admin.py` for token override and cache behavior.
+
 ## 4. Git SHA Metadata Handling
 
 ### 4.1. Environment Helper Pattern

@@ -6,9 +6,11 @@ The ENG5 NP runner requires a valid `assignment_id` that exists in the CJ Assess
 
 ## Prerequisites
 
-- CJ Assessment Service running and accessible
-- Admin JWT token with `admin` role
-- Assignment details (grade scale, instructions text)
+- CJ Assessment Service running and accessible (admin endpoints enabled)
+- Admin JWT token with `admin` role or `CJ_ADMIN_TOKEN` environment override configured
+- `pdm run cj-admin` CLI available (run `pdm install` first)
+- Assignment assets: grade scale + instructions text, **and** the prompt markdown file that will be uploaded by the CLI
+- Content Service reachable so prompt uploads succeed
 
 ## Step 1: Create Assessment Context
 
@@ -32,7 +34,41 @@ curl -X POST http://localhost:9095/admin/v1/assessment-instructions \
 - For assignment-specific instructions, set `assignment_id` and leave `course_id` null
 - For course-level fallback instructions, set `course_id` and leave `assignment_id` null
 
-## Step 1.5: Register Anchor Essays (One-time Setup)
+## Step 2: Upload Student Prompt via CJ Admin CLI
+
+The CJ service requires the student prompt to be stored by reference. Use the admin CLI to upload the prompt file so `student_prompt_storage_id` is persisted alongside the instructions record.
+
+```bash
+# Upload prompt text (recommended: use the canonical ENG5 prompt markdown file)
+pdm run cj-admin prompts upload \
+  --assignment-id eng5-np-batch-20250110 \
+  --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md"
+```
+
+This command performs the following:
+
+1. Authenticates via Identity (uses cached token or `CJ_ADMIN_TOKEN` override).
+2. Streams the prompt file to CJ's admin API, which forwards the body to the Content Service.
+3. Stores only the returned `student_prompt_storage_id` in the `assessment_instructions` table—prompt bodies are no longer kept inline.
+
+Verify the upload and capture the storage reference for observability records:
+
+```bash
+pdm run cj-admin prompts get eng5-np-batch-20250110
+```
+
+Expected response (truncated):
+
+```text
+Student Prompt Details
+Assignment ID: eng5-np-batch-20250110
+Prompt Storage ID: content-abc123
+Prompt SHA256: <hash>
+```
+
+Keep the CLI output (or rerun `prompts get`) handy when coordinating execute-mode validation—the ENG5 runner and downstream services rely on the storage ID only.
+
+## Step 3: Register Anchor Essays (One-time Setup)
 
 Anchor essays are **persistent** graded reference essays used to calibrate the grade projection system. They must be registered once per assignment and will be automatically loaded for all subsequent batches.
 
@@ -127,7 +163,7 @@ Expected output:
 - Not persisted in database
 - Runner treats them like student essays but marks as anchors
 
-## Step 2: Run the ENG5 NP Runner
+## Step 4: Run the ENG5 NP Runner
 
 Once the assignment context exists, run the runner with the matching `assignment_id`:
 
@@ -147,14 +183,16 @@ docker compose -f docker-compose.yml -f docker-compose.eng5-runner.yml run --rm 
 
 ## What Happens During Execution
 
-### With Registered Anchors (Recommended Path)
+### With Registered Prompt & Anchors (Recommended Path)
 
 1. **Content Upload**:
    - Runner uploads **only student essays** to Content Service
    - Anchors already registered, no need to re-upload
+   - Student prompt reference is auto-hydrated from the `assessment_instructions` record (no inline prompt text is read from disk at runtime)
 
 2. **CJ Assessment Request**:
    - Runner builds assessment request with student essay references
+   - CJ service automatically hydrates the stored `student_prompt_storage_id` for the batch metadata
    - CJ service automatically loads registered anchors for this `assignment_id`
    - Anchor loading process:
      - Query `anchor_essay_references` filtered by `assignment_id` + `grade_scale`
@@ -210,6 +248,12 @@ Expected response (200 OK):
 **Cause**: The `assignment_id` doesn't exist in `assessment_instructions` table
 
 **Solution**: Create the assignment context via admin API (Step 1)
+
+### Error: "Student prompt not found"
+
+**Cause**: Prompt upload step skipped or Content Service unavailable
+
+**Solution**: Repeat Step 2 (`cj-admin prompts upload`) once services are healthy
 
 ### Error: "Invalid grade for scale"
 
