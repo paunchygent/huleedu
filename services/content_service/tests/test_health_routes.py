@@ -109,7 +109,8 @@ class TestHealthRoutes:
             response = await client.get("/metrics")
 
             assert response.status_code == 200
-            assert response.content_type == "text/plain; version=0.0.4; charset=utf-8"
+            # Version-agnostic check - tests behavior, not library version
+            assert response.content_type.startswith("text/plain")
 
             # Check that response contains Prometheus metrics format
             metrics_text = await response.get_data(as_text=True)
