@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent
 from common_core.events.validation_events import (
     StudentAssociation,
@@ -190,6 +191,7 @@ class TestStudentAssociationsConfirmedV1:
         model = StudentAssociationsConfirmedV1(
             batch_id="batch_human",
             class_id="class_human",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 2, "timeout": 0, "auto": 0},
@@ -224,6 +226,7 @@ class TestStudentAssociationsConfirmedV1:
         model = StudentAssociationsConfirmedV1(
             batch_id="batch_timeout",
             class_id="class_timeout",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=True,
             validation_summary={"human": 0, "timeout": 2, "auto": 0},
@@ -269,6 +272,7 @@ class TestStudentAssociationsConfirmedV1:
         model = StudentAssociationsConfirmedV1(
             batch_id="batch_mixed",
             class_id="class_mixed",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 2, "timeout": 1, "auto": 1},
@@ -294,6 +298,7 @@ class TestStudentAssociationsConfirmedV1:
         original_event = StudentAssociationsConfirmedV1(
             batch_id="batch_serialize",
             class_id="class_serialize",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 1, "timeout": 0, "auto": 0},
@@ -328,6 +333,7 @@ class TestStudentAssociationsConfirmedV1:
         model = StudentAssociationsConfirmedV1(
             batch_id="batch_default",
             class_id="class_default",
+            course_code=CourseCode.ENG5,
             associations=[],
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
         )
@@ -339,6 +345,7 @@ class TestStudentAssociationsConfirmedV1:
         model = StudentAssociationsConfirmedV1(
             batch_id="batch_empty",
             class_id="class_empty",
+            course_code=CourseCode.ENG5,
             associations=[],
             timeout_triggered=True,
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
@@ -452,6 +459,7 @@ class TestRealWorldWorkflowScenarios:
         confirmed_event = StudentAssociationsConfirmedV1(
             batch_id="batch_9a_english_spring_2025",
             class_id="class_9a_english",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 3, "timeout": 0, "auto": 0},
@@ -498,6 +506,7 @@ class TestRealWorldWorkflowScenarios:
         timeout_event = StudentAssociationsConfirmedV1(
             batch_id="batch_timeout_scenario",
             class_id="class_timeout",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=True,
             validation_summary={"human": 0, "timeout": 2, "auto": 0},
@@ -519,6 +528,7 @@ class TestRealWorldWorkflowScenarios:
         guest_event = StudentAssociationsConfirmedV1(
             batch_id="batch_guest_error_case",
             class_id="guest_class_auto",
+            course_code=CourseCode.ENG5,
             associations=[],
             timeout_triggered=False,
             validation_summary={"human": 0, "timeout": 0, "auto": 0},
@@ -542,6 +552,7 @@ class TestRealWorldWorkflowScenarios:
         event = StudentAssociationsConfirmedV1(
             batch_id="batch_kafka_test",
             class_id="class_kafka_test",
+            course_code=CourseCode.ENG5,
             associations=associations,
             timeout_triggered=False,
             validation_summary={"human": 1, "timeout": 0, "auto": 0},

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from common_core.domain_enums import CourseCode
 from common_core.event_enums import ProcessingEvent, topic_name
 from common_core.events.nlp_events import (
     BatchAuthorMatchesSuggestedV1,
@@ -94,6 +95,7 @@ class TestBatchAuthorMatchesSuggestedV1:
             entity_type="batch",
             batch_id="batch-123",
             class_id="class-456",
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary={"total_essays": 1, "matched": 1, "no_match": 0, "errors": 0},
         )
@@ -122,6 +124,7 @@ class TestBatchAuthorMatchesSuggestedV1:
             entity_type="batch",
             batch_id="batch-no-match",
             class_id="class-789",
+            course_code=CourseCode.ENG5,
             match_results=match_results,
             processing_summary={"total_essays": 1, "matched": 0, "no_match": 1, "errors": 0},
         )

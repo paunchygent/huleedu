@@ -178,8 +178,9 @@ class TestTopicNameFunction:
             # Should start with 'huleedu'
             assert parts[0] == "huleedu", f"Topic {topic} should start with 'huleedu'"
 
-            # Should end with 'v1'
-            assert parts[-1] == "v1", f"Topic {topic} should end with 'v1'"
+            # Should end with version number (v1, v2, etc.)
+            assert parts[-1].startswith("v") and parts[-1][1:].isdigit(), \
+                f"Topic {topic} should end with a version (e.g., 'v1', 'v2'), got '{parts[-1]}'"
 
             # Should have at least 4 parts (huleedu.domain.entity.action.v1)
             assert len(parts) >= 4, f"Topic {topic} should have at least 4 parts"
