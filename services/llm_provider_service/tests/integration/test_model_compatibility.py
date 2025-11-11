@@ -22,11 +22,8 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import os
-from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -35,7 +32,6 @@ import aiohttp
 import pytest
 from anthropic import AsyncAnthropic
 from common_core import EssayComparisonWinner
-from openai import AsyncOpenAI
 from pydantic import SecretStr
 
 from services.llm_provider_service.config import Settings
@@ -48,7 +44,6 @@ from services.llm_provider_service.implementations.openai_provider_impl import (
 from services.llm_provider_service.model_checker.anthropic_checker import (
     AnthropicModelChecker,
 )
-from services.llm_provider_service.model_checker.openai_checker import OpenAIModelChecker
 from services.llm_provider_service.model_manifest import ProviderName, get_model_config
 from services.llm_provider_service.protocols import LLMRetryManagerProtocol
 from services.llm_provider_service.tests.integration.test_data_fixtures import (
@@ -126,7 +121,7 @@ class TestAnthropicModelCompatibility:
         # Get current default model from manifest
         model_config = get_model_config(ProviderName.ANTHROPIC)
         logger.info(
-            f"Testing Anthropic model compatibility",
+            "Testing Anthropic model compatibility",
             extra={
                 "model_id": model_config.model_id,
                 "api_version": model_config.api_version,
@@ -338,7 +333,7 @@ class TestOpenAIModelCompatibility:
         # Get current default model from manifest
         model_config = get_model_config(ProviderName.OPENAI)
         logger.info(
-            f"Testing OpenAI model compatibility",
+            "Testing OpenAI model compatibility",
             extra={"model_id": model_config.model_id},
         )
 

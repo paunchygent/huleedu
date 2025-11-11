@@ -23,9 +23,9 @@ from services.llm_provider_service.config import Settings
 from services.llm_provider_service.exceptions import HuleEduError
 from services.llm_provider_service.implementations.queue_processor_impl import QueueProcessorImpl
 from services.llm_provider_service.internal_models import LLMOrchestratorResponse
+from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.protocols import ComparisonProcessorProtocol
 from services.llm_provider_service.queue_models import QueuedRequest
-from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 
 
 @pytest.fixture

@@ -72,6 +72,22 @@ async def create_cj_batch(
             org_id=org_id,
         )
 
+        # Auto-hydrate student prompt from assignment instruction
+        if assignment_id and not prompt_storage_id:
+            instruction = await database.get_assessment_instruction(
+                session, assignment_id=assignment_id, course_id=None
+            )
+            if instruction and instruction.student_prompt_storage_id:
+                prompt_storage_id = instruction.student_prompt_storage_id
+                logger.info(
+                    "Auto-hydrated student prompt from instruction",
+                    extra={
+                        **log_extra,
+                        "assignment_id": assignment_id,
+                        "storage_id": prompt_storage_id,
+                    },
+                )
+
         if prompt_storage_id:
             metadata = cj_batch.processing_metadata or {}
             metadata["student_prompt_storage_id"] = prompt_storage_id

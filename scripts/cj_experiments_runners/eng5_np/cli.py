@@ -15,22 +15,22 @@ from common_core.events.cj_assessment_events import LLMConfigOverrides
 
 from scripts.cj_experiments_runners.eng5_np import __version__
 from scripts.cj_experiments_runners.eng5_np.artefact_io import write_stub_artefact
-from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
 from scripts.cj_experiments_runners.eng5_np.cj_client import (
     AnchorRegistrationError,
     register_anchor_essays,
 )
+from scripts.cj_experiments_runners.eng5_np.content_upload import upload_essays_parallel
 from scripts.cj_experiments_runners.eng5_np.environment import (
     gather_git_sha,
     repo_root_from_package,
 )
 from scripts.cj_experiments_runners.eng5_np.hydrator import AssessmentRunHydrator
 from scripts.cj_experiments_runners.eng5_np.inventory import (
+    FileRecord,
     apply_comparison_limit,
     build_essay_refs,
     collect_inventory,
     ensure_execute_requirements,
-    FileRecord,
     print_inventory,
     snapshot_directory,
 )

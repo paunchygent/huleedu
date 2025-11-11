@@ -15,8 +15,6 @@ from __future__ import annotations
 import json
 from datetime import date
 
-import pytest
-
 from services.llm_provider_service.compatibility_reporter import CompatibilityReporter
 from services.llm_provider_service.model_checker.base import (
     DiscoveredModel,

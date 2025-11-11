@@ -33,7 +33,6 @@ from services.llm_provider_service.model_checker.base import (
 )
 from services.llm_provider_service.model_checker.family_utils import extract_google_family
 from services.llm_provider_service.model_manifest import (
-    ModelConfig,
     ProviderName,
     list_models,
 )
@@ -304,4 +303,3 @@ class GoogleModelChecker:
 
         # Include everything else (future models)
         return True
-

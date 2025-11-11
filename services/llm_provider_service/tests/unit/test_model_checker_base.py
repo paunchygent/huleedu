@@ -315,4 +315,3 @@ class TestModelComparisonResult:
 
         assert len(result.new_models_in_tracked_families) == 5
         assert all(isinstance(m, DiscoveredModel) for m in result.new_models_in_tracked_families)
-

@@ -276,6 +276,7 @@ async def client(admin_app: Quart) -> AsyncIterator[QuartTestClient]:  # type: i
 def _patch_decode(monkeypatch: MonkeyPatch, roles: list[str] | None = None) -> None:
     from huleedu_service_libs import auth as auth_module
     from huleedu_service_libs.auth import jwt_utils
+
     from services.cj_assessment_service.api import admin_routes as admin_module
 
     def fake_decode(

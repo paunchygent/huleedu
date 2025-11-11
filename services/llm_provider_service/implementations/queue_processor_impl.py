@@ -27,12 +27,12 @@ from services.llm_provider_service.internal_models import (
     LLMOrchestratorResponse,
     LLMQueuedResult,
 )
+from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.protocols import (
     ComparisonProcessorProtocol,
     LLMEventPublisherProtocol,
     QueueManagerProtocol,
 )
-from services.llm_provider_service.prompt_utils import compute_prompt_sha256
 from services.llm_provider_service.queue_models import QueuedRequest
 
 logger = create_service_logger("llm_provider_service.queue_processor")

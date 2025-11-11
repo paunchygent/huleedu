@@ -15,30 +15,21 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import aiohttp
 import pytest
 from common_core import LLMProviderType
 from common_core.events.cj_assessment_events import LLMConfigOverrides
 from common_core.events.llm_provider_events import LLMComparisonResultV1, TokenUsage
-from common_core.metadata_models import EssayProcessingInputRefV1
 from huleedu_service_libs.error_handling import HuleEduError
 
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.implementations.llm_provider_service_client import (
     LLMProviderServiceClient,
 )
-from services.cj_assessment_service.implementations.llm_interaction_impl import (
-    LLMInteractionImpl,
-)
 from services.cj_assessment_service.implementations.retry_manager_impl import RetryManagerImpl
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
-from services.cj_assessment_service.tests.integration.callback_simulator import (
-    CallbackSimulator,
-)
 from services.llm_provider_service.model_manifest import ProviderName, get_model_config
 
 
@@ -189,7 +180,7 @@ Always respond with valid JSON."""
         # Verify async-only architecture: result should be None (queued for processing)
         assert result is None, "Expected None result for async-only architecture"
 
-        print(f"\n✅ Manifest-based Model Selection Test Passed:")
+        print("\n✅ Manifest-based Model Selection Test Passed:")
         print(f"- Model from manifest: {manifest_config.model_id}")
         print(f"- Provider: {manifest_config.provider}")
         print(f"- API Version: {manifest_config.api_version}")
@@ -216,7 +207,7 @@ Always respond with valid JSON."""
         # Step 1: Query manifest for default Anthropic model
         manifest_config = get_model_config(ProviderName.ANTHROPIC)
 
-        print(f"\nManifest Query Result:")
+        print("\nManifest Query Result:")
         print(f"- Model ID: {manifest_config.model_id}")
         print(f"- Display Name: {manifest_config.display_name}")
         print(f"- Release Date: {manifest_config.release_date}")
@@ -248,10 +239,10 @@ Respond with JSON: {'winner': 'Essay A' or 'Essay B', 'justification': '...', 'c
         # Step 4: Verify request queued
         assert result is None, "Expected async queuing (None result)"
 
-        print(f"\n✅ End-to-End Manifest Flow Test Passed:")
-        print(f"- Manifest query successful")
-        print(f"- Override built from manifest")
-        print(f"- Request queued for processing")
+        print("\n✅ End-to-End Manifest Flow Test Passed:")
+        print("- Manifest query successful")
+        print("- Override built from manifest")
+        print("- Request queued for processing")
         print(f"- Correlation ID: {correlation_id}")
 
     @pytest.mark.integration
@@ -304,9 +295,9 @@ Please respond with a JSON object containing:
         )
 
         assert result is None, "Service available and request queued successfully"
-        print(f"\n✅ Service Availability Check Passed:")
+        print("\n✅ Service Availability Check Passed:")
         print(f"- Service is available at {integration_settings.LLM_PROVIDER_SERVICE_URL}")
-        print(f"- Health check successful")
+        print("- Health check successful")
         print(f"- Request accepted with correlation ID: {correlation_id}")
 
     @pytest.mark.integration
@@ -348,7 +339,7 @@ Please respond with a JSON object containing:
             print("\n⚠️  Invalid model request queued (validation happens during processing)")
         except HuleEduError as e:
             # Service performed synchronous validation - this is also acceptable
-            print(f"\n✅ Invalid Model Rejection Test Passed:")
+            print("\n✅ Invalid Model Rejection Test Passed:")
             print(f"- Service rejected invalid model: {invalid_model_override.model_override}")
             print(f"- Error: {e.error_code}")
             assert "invalid" in str(e).lower() or "not found" in str(e).lower()
@@ -429,12 +420,12 @@ Please respond with a JSON object containing:
             # If manifest doesn't have cost info, just verify cost is non-negative
             assert sample_callback.cost_estimate >= 0.0
 
-        print(f"\n✅ Callback Event Structure Test Passed:")
+        print("\n✅ Callback Event Structure Test Passed:")
         print(f"- Provider field validated: {sample_callback.provider}")
         print(f"- Model field validated: {sample_callback.model}")
         print(f"- Token usage included: {sample_callback.token_usage.total_tokens} tokens")
         print(f"- Cost estimate validated: ${sample_callback.cost_estimate:.6f}")
-        print(f"- Request metadata includes essay IDs")
+        print("- Request metadata includes essay IDs")
         print(f"- Correlation ID preserved: {correlation_id}")
 
     @pytest.mark.integration
@@ -458,8 +449,8 @@ Please respond with a JSON object containing:
         assert anthropic_config.model_id is not None
         assert anthropic_config.api_version is not None
 
-        print(f"\n✅ Multi-Provider Manifest Test Passed:")
-        print(f"\nAnthropic:")
+        print("\n✅ Multi-Provider Manifest Test Passed:")
+        print("\nAnthropic:")
         print(f"- Model ID: {anthropic_config.model_id}")
         print(f"- Display Name: {anthropic_config.display_name}")
         print(f"- API Version: {anthropic_config.api_version}")

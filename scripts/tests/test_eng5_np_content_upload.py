@@ -6,8 +6,8 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import aiohttp
-from aiohttp import web
 import pytest
+from aiohttp import web
 
 from scripts.cj_experiments_runners.eng5_np import content_upload
 from scripts.cj_experiments_runners.eng5_np.content_upload import (
@@ -121,7 +121,9 @@ async def test_upload_docx_converts_to_text(tmp_path: Path, unused_tcp_port: int
 
 
 @pytest.mark.asyncio
-async def test_upload_essays_parallel_reuses_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+async def test_upload_essays_parallel_reuses_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     file_a = tmp_path / "a.docx"
     file_b = tmp_path / "b.docx"
     file_a.write_text("AAA", encoding="utf-8")
@@ -134,7 +136,9 @@ async def test_upload_essays_parallel_reuses_cache(monkeypatch: pytest.MonkeyPat
 
     calls: list[str] = []
 
-    async def fake_upload(path: Path, *, content_service_url: str, session: aiohttp.ClientSession) -> str:
+    async def fake_upload(
+        path: Path, *, content_service_url: str, session: aiohttp.ClientSession
+    ) -> str:
         del content_service_url, session
         calls.append(path.name)
         await asyncio.sleep(0)

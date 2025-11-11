@@ -1,8 +1,8 @@
 # Handoff: Student Prompt Admin Management Implementation
 
-## Status: 🔄 IN PROGRESS (Phase 1-4 Complete, Phase 5-7 Pending)
+## Status: 🔄 IN PROGRESS (Phase 1-6 Complete, Phase 7-8 Pending)
 **Date**: 2025-11-10
-**Effort**: ~2-3 days remaining (9/20 tasks complete)
+**Effort**: ~1-2 days remaining (testing and documentation)
 
 ---
 
@@ -61,42 +61,86 @@
 
 **Validation**: ✅ `pdm run typecheck-all` passes (no new errors)
 
-## 📋 Remaining Work (Phase 5-7)
+---
 
-### Phase 5: CLI Tool Enhancement (~200 LoC)
-**File**: `services/cj_assessment_service/cli_admin.py`
+## ✅ Phase 5: CLI Tool Enhancement (Complete - 205 LoC)
+**Date**: 2025-11-10
 
-1. **Add prompts sub-app** (line ~28):
-   ```python
-   prompts_app = typer.Typer(help="Manage student prompts")
-   app.add_typer(prompts_app, name="prompts")
-   ```
+**File Modified**: `services/cj_assessment_service/cli_admin.py`
 
-2. **Upload command** (~70 LoC):
-   ```python
-   @prompts_app.command("upload")
-   def upload_prompt(
-       assignment_id: str = typer.Option(...),
-       prompt_file: Path | None = typer.Option(None),
-       prompt_text: str = typer.Option(""),
-   ):
-       # Load from file or inline → POST /student-prompts
-   ```
+### 5.1 Prompts Sub-App (lines 29-30)
+- Added `prompts_app = typer.Typer(help="Manage student prompts for assignments")`
+- Registered with `app.add_typer(prompts_app, name="prompts")`
 
-3. **Get command** (~30 LoC): `@prompts_app.command("get")` → GET endpoint
+### 5.2 Upload Command (lines 291-356, ~66 LoC)
+- `@prompts_app.command("upload")`
+- **Parameters**: `assignment_id` (required), `prompt_file` (optional), `prompt_text` (optional)
+- **XOR validation**: Enforces exactly one of `prompt_file` or `prompt_text`
+- **Flow**: Read file content → POST to `/student-prompts` → Display storage_id and full response
+- **Error handling**: File not found, empty content, API errors with colored output
 
-4. **Update instructions create** (line ~198-231): Add `--prompt-file`/`--prompt-text`, upload first, include `student_prompt_storage_id` in payload
+### 5.3 Get Command (lines 441-487, ~47 LoC)
+- `@prompts_app.command("get")`
+- **Parameters**: `assignment_id` (positional), `output_file` (optional)
+- **Flow**: GET from `/student-prompts/assignment/{id}` → Display metadata + prompt text
+- **Output modes**: Write to file or print to stdout
+- **Type safety**: Added string validation for `prompt_text` field
 
-### Phase 6: Workflow Integration (~30 LoC)
-**File**: `services/cj_assessment_service/cj_core_logic/batch_preparation.py:52-80`
+### 5.4 Helper Function + Instructions Create Update (lines 200-315, ~116 LoC)
+- **Helper**: `_upload_prompt_helper(assignment_id, content) -> str` (lines 200-214)
+  - Calls `_admin_request("POST", "/student-prompts", ...)` and returns storage_id
+  - Used by `create_instruction` command
+- **Updated `create_instruction`** (lines 217-315):
+  - Added `prompt_file` and `prompt_text` options
+  - XOR validation for prompt parameters (both can be absent)
+  - Only allows prompts with `--assignment-id` (not `--course-id`)
+  - Calls helper if prompt provided, includes `student_prompt_storage_id` in payload
+  - Success message shows storage_id when prompt uploaded
 
-**Logic**: When `assignment_id` provided but no explicit `student_prompt_storage_id`:
+**Validation**: ✅ `pdm run typecheck-all` passes (no new errors)
+
+---
+
+## ✅ Phase 6: Workflow Integration (Complete - 15 LoC)
+**Date**: 2025-11-10
+
+**File Modified**: `services/cj_assessment_service/cj_core_logic/batch_preparation.py:75-89`
+
+### Auto-Hydration Logic
+**Insertion point**: Before metadata construction (after `create_new_cj_batch`, before `if prompt_storage_id:`)
+
+**Implementation**:
 ```python
+# Auto-hydrate student prompt from assignment instruction
 if assignment_id and not prompt_storage_id:
-    instruction = await database.get_assessment_instruction(session, assignment_id=assignment_id, course_id=None)
+    instruction = await database.get_assessment_instruction(
+        session, assignment_id=assignment_id, course_id=None
+    )
     if instruction and instruction.student_prompt_storage_id:
         prompt_storage_id = instruction.student_prompt_storage_id
+        logger.info(
+            "Auto-hydrated student prompt from instruction",
+            extra={
+                **log_extra,
+                "assignment_id": assignment_id,
+                "storage_id": prompt_storage_id,
+            },
+        )
 ```
+
+**Behavior**:
+- Only hydrates when `assignment_id` provided AND no explicit `student_prompt_storage_id`
+- Uses existing session (no new database connection)
+- Logs with full context (correlation_id, assignment_id, storage_id)
+- Does NOT fetch content from Content Service (only ID)
+- Does NOT modify existing `student_prompt_text` handling
+- Seamlessly integrates with existing metadata flow (lines 91-96)
+
+**Validation**: ✅ `pdm run typecheck-all` passes (no new errors)
+
+---
+
+## 📋 Remaining Work (Phase 7-8)
 
 ### Phase 7: Testing (~600 LoC)
 - **Unit tests**: `test_admin_prompts.py` (NEW), `test_cli_prompts.py` (NEW)

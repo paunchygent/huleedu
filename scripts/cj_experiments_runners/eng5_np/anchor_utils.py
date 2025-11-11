@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 GRADE_SUFFIX_RE = re.compile(r"[0-9]+$")
 
 

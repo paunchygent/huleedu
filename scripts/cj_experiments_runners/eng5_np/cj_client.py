@@ -10,7 +10,7 @@ import aiohttp
 
 from scripts.cj_experiments_runners.eng5_np.anchor_utils import extract_grade_from_filename
 from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord
-from scripts.cj_experiments_runners.eng5_np.text_extraction import extract_text, TextExtractionError
+from scripts.cj_experiments_runners.eng5_np.text_extraction import TextExtractionError, extract_text
 
 
 class AnchorRegistrationError(RuntimeError):
@@ -35,6 +35,7 @@ async def register_anchor_essays(
     responses: list[dict] = []
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
+
         async def _register(record: FileRecord) -> None:
             grade = extract_grade_from_filename(record.path.name)
             try:

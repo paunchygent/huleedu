@@ -36,7 +36,6 @@ from services.llm_provider_service.model_checker.base import (
 )
 from services.llm_provider_service.model_checker.family_utils import extract_openrouter_family
 from services.llm_provider_service.model_manifest import (
-    ModelConfig,
     ProviderName,
     list_models,
 )
@@ -309,4 +308,3 @@ class OpenRouterModelChecker:
                 return True
 
         return False
-

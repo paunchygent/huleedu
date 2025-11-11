@@ -8,11 +8,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import aiohttp
-from aiohttp.client_exceptions import ClientError, ContentTypeError
 import typer
+from aiohttp.client_exceptions import ClientError, ContentTypeError
 
 from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord
-from scripts.cj_experiments_runners.eng5_np.text_extraction import extract_text, TextExtractionError
+from scripts.cj_experiments_runners.eng5_np.text_extraction import TextExtractionError, extract_text
 from scripts.cj_experiments_runners.eng5_np.utils import sha256_of_file
 
 _UPLOAD_CACHE: dict[str, str] = {}
@@ -56,7 +56,10 @@ async def upload_essay_content(
 
             try:
                 payload = await response.json(content_type=None)
-            except (json.JSONDecodeError, ContentTypeError) as exc:  # pragma: no cover - network edge
+            except (
+                json.JSONDecodeError,
+                ContentTypeError,
+            ) as exc:  # pragma: no cover - network edge
                 raise ContentUploadError("Content Service returned invalid JSON") from exc
 
     except ClientError as exc:
@@ -110,6 +113,7 @@ async def upload_essays_parallel(
     storage_map = dict(cached)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
+
         async def _upload(checksum: str, record: FileRecord) -> None:
             async with semaphore:
                 storage_id = await upload_essay_content(
@@ -120,9 +124,7 @@ async def upload_essays_parallel(
             _UPLOAD_CACHE[checksum] = storage_id
             storage_map[checksum] = storage_id
 
-        await asyncio.gather(
-            *(_upload(checksum, record) for checksum, record in pending.items())
-        )
+        await asyncio.gather(*(_upload(checksum, record) for checksum, record in pending.items()))
 
     return storage_map
 

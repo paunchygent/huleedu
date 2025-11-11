@@ -27,7 +27,7 @@ from huleedu_service_libs.quart_app import HuleEduApp
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from services.cj_assessment_service.api import anchor_management, admin_routes
+from services.cj_assessment_service.api import admin_routes, anchor_management
 from services.cj_assessment_service.api.health_routes import health_bp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.di import CJAssessmentServiceProvider

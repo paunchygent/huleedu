@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from typing import Any
 
@@ -246,7 +245,7 @@ def dry_run_payload_cmd(
     if not config.supports_temperature:
         console.print("  • Model does NOT support temperature - using default value (1.0)")
     if config.uses_max_completion_tokens:
-        console.print(f"  • Model uses 'max_completion_tokens' instead of 'max_tokens'")
+        console.print("  • Model uses 'max_completion_tokens' instead of 'max_tokens'")
     console.print(f"  • Structured output method: {config.structured_output_method.value}")
 
 
@@ -270,7 +269,7 @@ def call_cmd(
         raise typer.Exit(code=1)
 
     if provider_enum != ProviderName.OPENAI:
-        console.print(f"[red]Currently only OpenAI provider is supported for 'call' command[/red]")
+        console.print("[red]Currently only OpenAI provider is supported for 'call' command[/red]")
         raise typer.Exit(code=1)
 
     # Run async call
@@ -329,7 +328,7 @@ async def _call_openai(
                 console.print(f"\n[bold]Response:[/bold]\n{response.justification}")
 
         except Exception as e:
-            console.print(f"\n[bold red]✗ API Call Failed[/bold red]")
+            console.print("\n[bold red]✗ API Call Failed[/bold red]")
             console.print(f"[red]Error: {str(e)}[/red]")
             raise typer.Exit(code=1)
 

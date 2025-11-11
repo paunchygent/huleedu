@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Mapping, TypeAlias, TypedDict, cast
+from typing import Mapping, TypeAlias, TypedDict, cast
 
 import httpx
 import typer
@@ -26,6 +25,8 @@ instructions_app = typer.Typer(help="Manage assessment instructions")
 app.add_typer(instructions_app, name="instructions")
 scales_app = typer.Typer(help="Inspect registered grade scales")
 app.add_typer(scales_app, name="scales")
+prompts_app = typer.Typer(help="Manage student prompts for assignments")
+app.add_typer(prompts_app, name="prompts")
 
 JSONPrimitive: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
@@ -195,6 +196,23 @@ def login(
     typer.echo(json.dumps({k: v for k, v in data.items() if k != "refresh_token"}, indent=2))
 
 
+def _upload_prompt_helper(assignment_id: str, content: str) -> str:
+    """Upload student prompt and return storage_id."""
+
+    payload: dict[str, JSONValue] = {
+        "assignment_id": assignment_id,
+        "prompt_text": content,
+    }
+    data = _admin_request("POST", "/student-prompts", json_body=payload)
+
+    if isinstance(data, dict):
+        storage_id = data.get("student_prompt_storage_id")
+        if isinstance(storage_id, str):
+            return storage_id
+        raise RuntimeError("student_prompt_storage_id not found in response")
+    raise RuntimeError("Unexpected response format from prompt upload")
+
+
 @instructions_app.command("create")
 def create_instruction(
     assignment_id: str = typer.Option("", help="Assignment ID (mutually exclusive with course)"),
@@ -206,13 +224,28 @@ def create_instruction(
         "", help="Inline instructions text when no file is given"
     ),
     grade_scale: str = typer.Option(..., help="Registered grade scale ID"),
+    prompt_file: Path | None = typer.Option(
+        None, help="Optional path to file containing student prompt"
+    ),
+    prompt_text: str = typer.Option("", help="Optional inline student prompt text"),
 ) -> None:
-    """Create or update assessment instructions."""
+    """Create or update assessment instructions with optional student prompt."""
 
+    # Validate assignment_id/course_id mutual exclusivity
     if bool(assignment_id) == bool(course_id):
         typer.secho("Provide exactly one of --assignment-id or --course-id", fg=typer.colors.RED)
         raise typer.Exit(code=2)
 
+    # Validate prompt_file/prompt_text mutual exclusivity (both can be absent)
+    if prompt_file and prompt_text:
+        typer.secho(
+            "Provide at most one of --prompt-file or --prompt-text",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    # Load instructions
     if instructions_file:
         instructions = instructions_file.read_text(encoding="utf-8")
     elif instructions_text:
@@ -220,12 +253,63 @@ def create_instruction(
     else:
         instructions = typer.prompt("Instructions text")
 
+    # Upload prompt if provided (only for assignment-level instructions)
+    student_prompt_storage_id: str | None = None
+    if prompt_file or prompt_text:
+        if not assignment_id:
+            typer.secho(
+                "Student prompt can only be uploaded with --assignment-id",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
+        # Read prompt content
+        if prompt_file:
+            if not prompt_file.exists():
+                typer.secho(
+                    f"Prompt file not found: {prompt_file}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+            try:
+                prompt_content = prompt_file.read_text(encoding="utf-8")
+            except Exception as e:
+                typer.secho(
+                    f"Failed to read prompt file: {e}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+        else:
+            prompt_content = prompt_text
+
+        # Validate and upload
+        if not prompt_content.strip():
+            typer.secho(
+                "Prompt content cannot be empty",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
+        student_prompt_storage_id = _upload_prompt_helper(assignment_id, prompt_content)
+        typer.secho(
+            f"Student prompt uploaded (storage_id: {student_prompt_storage_id})",
+            fg=typer.colors.GREEN,
+        )
+
+    # Create/update instruction
     payload: dict[str, JSONValue] = {
         "assignment_id": assignment_id or None,
         "course_id": course_id or None,
         "instructions_text": instructions,
         "grade_scale": grade_scale,
     }
+    if student_prompt_storage_id:
+        payload["student_prompt_storage_id"] = student_prompt_storage_id
+
     data = _admin_request("POST", "/assessment-instructions", json_body=payload)
     typer.echo(json.dumps(data, indent=2))
 
@@ -284,6 +368,122 @@ def list_scales() -> None:
 
     for scale_id, metadata in GRADE_SCALES.items():
         typer.echo(f"{scale_id}: {metadata.display_name} ({len(metadata.grades)} grades)")
+
+
+@prompts_app.command("upload")
+def upload_prompt(
+    assignment_id: str = typer.Option(..., help="Assignment ID for this prompt"),
+    prompt_file: Path | None = typer.Option(None, help="Path to file containing the prompt"),
+    prompt_text: str = typer.Option("", help="Inline prompt text when no file is given"),
+) -> None:
+    """Upload student prompt for an assignment (requires existing instruction)."""
+
+    # XOR validation: exactly one of prompt_file or prompt_text must be provided
+    if bool(prompt_file) == bool(prompt_text):
+        typer.secho(
+            "Provide exactly one of --prompt-file or --prompt-text",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    # Read from file if provided
+    if prompt_file:
+        if not prompt_file.exists():
+            typer.secho(
+                f"File not found: {prompt_file}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        try:
+            content = prompt_file.read_text(encoding="utf-8")
+        except Exception as e:
+            typer.secho(
+                f"Failed to read file: {e}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(code=1)
+    else:
+        content = prompt_text
+
+    # Validate content is not empty
+    if not content.strip():
+        typer.secho(
+            "Prompt content cannot be empty",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    # Upload prompt via API
+    payload: dict[str, JSONValue] = {
+        "assignment_id": assignment_id,
+        "prompt_text": content,
+    }
+    data = _admin_request("POST", "/student-prompts", json_body=payload)
+
+    # Extract and display key information
+    if isinstance(data, dict):
+        storage_id = data.get("student_prompt_storage_id", "unknown")
+        typer.secho("Student prompt uploaded successfully", fg=typer.colors.GREEN)
+        typer.echo(f"Assignment ID: {assignment_id}")
+        typer.echo(f"Storage ID: {storage_id}")
+        typer.echo("")
+        typer.echo(json.dumps(data, indent=2))
+    else:
+        typer.secho("Upload succeeded but response format unexpected", fg=typer.colors.YELLOW)
+        typer.echo(json.dumps(data, indent=2))
+
+
+@prompts_app.command("get")
+def get_prompt(
+    assignment_id: str = typer.Argument(..., help="Assignment ID to fetch prompt for"),
+    output_file: Path | None = typer.Option(None, help="Optional file path to write prompt to"),
+) -> None:
+    """Fetch student prompt for an assignment."""
+
+    # Fetch prompt via API
+    data = _admin_request("GET", f"/student-prompts/assignment/{assignment_id}")
+
+    if not isinstance(data, dict):
+        typer.secho("Unexpected response format", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    # Extract fields
+    storage_id = data.get("student_prompt_storage_id", "N/A")
+    grade_scale = data.get("grade_scale", "N/A")
+    created_at = data.get("created_at", "N/A")
+    prompt_text_value = data.get("prompt_text", "")
+
+    # Validate prompt_text is a string
+    if not isinstance(prompt_text_value, str):
+        typer.secho("prompt_text field is not a string", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    prompt_text: str = prompt_text_value
+
+    # Display metadata
+    typer.secho("Student Prompt Details", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"Assignment ID: {assignment_id}")
+    typer.echo(f"Storage ID: {storage_id}")
+    typer.echo(f"Grade Scale: {grade_scale}")
+    typer.echo(f"Created At: {created_at}")
+    typer.echo("")
+
+    # Handle output
+    if output_file:
+        try:
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            output_file.write_text(prompt_text, encoding="utf-8")
+            typer.secho(f"Prompt written to: {output_file}", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"Failed to write file: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+    else:
+        typer.secho("Prompt Text:", fg=typer.colors.CYAN)
+        typer.echo(prompt_text)
 
 
 if __name__ == "__main__":
