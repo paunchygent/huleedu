@@ -1,3 +1,125 @@
+# Handoff: Current Session - Database URL Centralization & ENG5 Validation
+
+## Status: 🔴 CRITICAL - BLOCKING TASKS IN PROGRESS
+**Date**: 2025-11-11
+**Session**: Database Password Encoding Fix + ENG5 CLI Validation
+
+## Current Work
+
+### 🟢 TASK-001: Database URL Centralization (BATCH 1 COMPLETE - 5/12 SERVICES MIGRATED)
+**Priority**: CRITICAL
+**Blocks**: TASK-002 (ENG5 CLI Validation)
+
+**Problem**: Database password with special characters (`#`, `@`, etc.) caused authentication failures across services due to improper URL encoding. 16/17 services had duplicate URL construction logic without password encoding.
+
+**Solution**: Centralize database URL construction in `huleedu_service_libs.config` with proper password encoding via `urllib.parse.quote_plus()`.
+
+**Phase 1 Complete** (2025-11-11):
+1. ✅ Shared utility created and tested: `libs/huleedu_service_libs/src/huleedu_service_libs/config/database_utils.py`
+2. ✅ Convenience method in `SecureServiceSettings.build_database_url()`
+3. ✅ Unit tests: 7/7 passing (encoding, overrides, errors, custom hosts)
+4. ✅ Identity Service migrated to uppercase `DATABASE_URL` (Rule 043 compliant)
+5. ✅ All Identity references updated (8 files: config, DI, alembic, 4 integration tests, 1 unit test)
+6. ✅ Validation passed: 534/535 unit tests, 1,222 files type-checked, container test successful
+7. ✅ Identity Service running with password `omT9VJ#1cvqPjuMzP5exdGp9h#m3zmQn` - no authentication errors
+
+**Batch 1 Complete** (2025-11-11):
+1. ✅ File Service: 212 tests passed, alembic simplified, container validated, override removed
+2. ✅ Result Aggregator Service: 288 tests passed, container validated, override removed
+3. ✅ Class Management Service: 155 tests passed, container validated, override removed
+4. ✅ Email Service: 142 tests passed, property renamed to uppercase, alembic + 2 test files updated, override removed
+5. ✅ All 4 services running healthy in Docker with special character password
+6. ✅ ~180 lines of duplicate code eliminated across Batch 1 services
+
+**Migration Progress**: 5/12 services complete (42%)
+
+**Remaining Work**:
+- ⏸️ Batch 2 (4 services): essay_lifecycle, nlp, batch_orchestrator, spellchecker
+- ⏸️ Batch 3 (3 services): entitlements, batch_conductor, cj_assessment
+- ⏸️ Remove 7 docker-compose DATABASE_URL overrides (Batch 2 + 3)
+
+**Files to Create/Modify**:
+- NEW: `libs/huleedu_service_libs/src/huleedu_service_libs/config/database_utils.py`
+- NEW: `libs/huleedu_service_libs/tests/config/test_database_utils.py`
+- MODIFY: `libs/huleedu_service_libs/src/huleedu_service_libs/config/__init__.py`
+- MODIFY: `libs/huleedu_service_libs/src/huleedu_service_libs/config/secure_base.py`
+- MODIFY: `services/identity_service/config.py` (pilot service)
+- MODIFY: `services/identity_service/startup_setup.py` (add schema auto-init)
+- MODIFY: 16 other service config.py files (after validation)
+- MODIFY: `docker-compose.services.yml` (remove 9 DATABASE_URL overrides)
+
+**See**: `TASKS/001-database-url-centralization.md` for complete implementation plan
+
+### 🟡 TASK-002: ENG5 CLI Validation (BLOCKED)
+**Priority**: HIGH
+**Blocked By**: TASK-001
+
+**Objective**: Validate complete ENG5 CJ Admin CLI workflow:
+- Admin authentication and token management
+- Assessment instructions management
+- Student prompt upload and retrieval
+- Anchor essay registration
+- End-to-end ENG5 runner execution
+- Metrics and observability validation
+
+**Prerequisites**:
+- Identity Service must start with special character password
+- All required services healthy (identity, content, cj_assessment, llm_provider)
+- Admin user seeded in Identity database
+
+**See**: `TASKS/002-eng5-cli-validation.md` for complete validation plan
+
+## Implementation Status
+
+**Current Phase**: ✅ Phase 1 Complete - Ready for Batch 1 Migration
+
+**Phase 1 Results** (Identity Service):
+- ✅ Property renamed: `database_url` → `DATABASE_URL` (Rule 043 compliant)
+- ✅ All 14 references updated across 8 files
+- ✅ Unit tests: 534/535 passed (33.23s)
+- ✅ Type check: 1,222 files, no issues
+- ✅ Container validated: Successful startup with special character password
+- ✅ Health endpoint: `{"status": "healthy", "database": {"status": "healthy"}}`
+- ✅ Schema auto-init: Tables created on fresh database
+
+**Next Steps - Batch 2 Migration** (4 services):
+1. Migrate Essay Lifecycle Service (uppercase ✅, add helper, 2 containers)
+2. Migrate NLP Service (lowercase ❌, add helper + uppercase rename)
+3. Migrate Batch Orchestrator Service (lowercase ❌, add helper + uppercase rename)
+4. Migrate Spellchecker Service (lowercase ❌, add helper + uppercase rename)
+5. Remove docker-compose overrides for Batch 2 services
+6. Validate each service with container tests
+7. Proceed to Batch 3 once Batch 2 validated
+8. After all batches complete, unblock TASK-002 and continue ENG5 validation
+
+## Phase 0 Complete: Documentation & Implementation Alignment (2025-11-11)
+
+**Decisions Finalized:**
+- ✅ Enforce uppercase `DATABASE_URL` per Rule 043 for all services
+- ✅ Migrate CJ Assessment to shared helper (eliminate bespoke implementation)
+- ✅ Use batch migration strategy (3-4 services per batch)
+- ✅ Accept existing Identity schema auto-init as complete
+
+**Implementation Validation:**
+- ✅ Shared utility `build_database_url()` in `huleedu_service_libs` tested (7/7 tests passing)
+- ✅ Identity Service using helper with ENV_TYPE-based dev host/port selection
+- ✅ Identity unit tests passing (34 tests)
+- ✅ Schema auto-init verified at `startup_setup.py:57-59`
+- 🟡 Identity needs uppercase property rename: `database_url` → `DATABASE_URL`
+
+**Remaining Work:**
+- 11/12 services need migration to shared helper
+- 11 docker-compose DATABASE_URL overrides need removal
+- 8 services need uppercase property rename (Rule 043 violation)
+- Identity container test with special character password pending
+
+**Batch Migration Plan:**
+- Batch 1 (4 services): class_management, file, result_aggregator, email
+- Batch 2 (4 services): essay_lifecycle, nlp, batch_orchestrator, spellchecker
+- Batch 3 (3 services): entitlements, batch_conductor, cj_assessment
+
+---
+
 # Handoff: Documentation Session 1 - Common Core Library
 
 ## Status: ✅ COMPLETE - 100% Coverage Achieved

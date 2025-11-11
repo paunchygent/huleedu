@@ -203,6 +203,27 @@ pdm run typecheck-all # Type checking
 - Kafka event collector validates envelopes via typed Pydantic models to avoid AttributeError on raw dict payloads.
 - docker-compose.eng5-runner wired with CONTENT_SERVICE_URL + content service dependency to keep uploads local when running in container.
 
+### 21. Database URL Centralization (Nov 2025) - Phase 1 Complete
+
+**Status**: ✅ Foundation & Identity Service complete, ready for Batch 1 (1/12 services migrated, validated)
+
+**Phase 1 Complete** (2025-11-11):
+- ✅ Shared utility `build_database_url()` with service override, prod/dev branches, password encoding
+- ✅ Unit tests: 7/7 passing (encoding, overrides, errors, custom hosts)
+- ✅ `SecureServiceSettings.build_database_url()` convenience method
+- ✅ Identity Service migrated to uppercase `DATABASE_URL` (Rule 043 compliant)
+- ✅ Identity schema auto-init confirmed (startup_setup.py:57-59)
+- ✅ Validation: 534/535 unit tests, 1,222 files type-checked, container test successful
+- ✅ Special character password working: `omT9VJ#1cvqPjuMzP5exdGp9h#m3zmQn` (# encoded correctly)
+
+**Ready for Batch 1** (4 services):
+- ⏸️ class_management, file, result_aggregator, email
+- ⏸️ Batch 2 (4 services): essay_lifecycle, nlp, batch_orchestrator, spellchecker
+- ⏸️ Batch 3 (3 services): entitlements, batch_conductor, cj_assessment
+- ⏸️ Remove 11 docker-compose `*_DATABASE_URL` overrides
+
+**Architecture Decision**: Uppercase `DATABASE_URL` enforced per Rule 043 for all services during migration.
+
 ## Configuration Files
 
 - `.env` - Environment variables (not in git)
