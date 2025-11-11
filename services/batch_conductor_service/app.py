@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 
 from quart_dishka import QuartDishka
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from huleedu_service_libs.logging_utils import (
     configure_service_logging,
@@ -22,6 +23,7 @@ from services.batch_conductor_service.api.pipeline_routes import pipeline_bp
 from services.batch_conductor_service.config import settings
 from services.batch_conductor_service.startup_setup import (
     create_container,
+    initialize_database_schema,
     initialize_metrics,
     shutdown_services,
 )
@@ -143,6 +145,17 @@ async def _monitor_kafka_consumer(app) -> None:
 
 app = HuleEduApp(__name__)
 
+# Initialize guaranteed infrastructure immediately (following cj_assessment pattern)
+app.database_engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    future=True,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    max_overflow=settings.DATABASE_MAX_OVERFLOW,
+    pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+    pool_recycle=settings.DATABASE_POOL_RECYCLE,
+)
+
 # Initialize service-specific attributes (following established patterns)
 app.kafka_consumer = None
 app.consumer_task = None
@@ -156,6 +169,9 @@ QuartDishka(app=app, container=container)
 async def startup() -> None:
     """Initialize middleware, metrics, and Kafka consumer."""
     try:
+        # Initialize database schema first
+        await initialize_database_schema(app)
+
         # Metrics rely on the DI container which is already wired
         await initialize_metrics(app, container)
         setup_metrics_middleware(

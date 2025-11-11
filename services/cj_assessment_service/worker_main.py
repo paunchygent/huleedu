@@ -174,7 +174,7 @@ async def main() -> None:
 
     # Initialize database engine for DI container
     engine = create_async_engine(
-        settings.database_url,
+        settings.DATABASE_URL,
         echo=False,
         future=True,
         pool_size=settings.DATABASE_POOL_SIZE,

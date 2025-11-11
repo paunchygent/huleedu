@@ -128,11 +128,6 @@ services:
       - BCS_HTTP_PORT=4002
       - BCS_REDIS_URL=redis://redis:6379
       # Database configuration
-      - BCS_DB_HOST=batch_conductor_db
-      - BCS_DB_PORT=5432
-      - BCS_DB_NAME=huleedu_batch_conductor
-      - BCS_DB_USER=${HULEEDU_DB_USER}
-      - BCS_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -170,8 +165,6 @@ services:
       - SPELLCHECKER_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPELLCHECKER_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - SPELLCHECKER_SERVICE_LOG_LEVEL=DEBUG
-      # Database configuration
-      - SPELLCHECKER_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@spellchecker_db:5432/huleedu_spellchecker
       - SPELLCHECKER_SERVICE_HTTP_PORT=8002
       - SPELLCHECKER_SERVICE_REDIS_URL=redis://redis:6379
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -217,11 +210,6 @@ services:
       - BATCH_ORCHESTRATOR_SERVICE_REDIS_URL=redis://redis:6379
       - BATCH_ORCHESTRATOR_SERVICE_ENVIRONMENT=${ENVIRONMENT:-production}
       # Database configuration
-      - BATCH_ORCHESTRATOR_DB_HOST=batch_orchestrator_db
-      - BATCH_ORCHESTRATOR_DB_PORT=5432
-      - BATCH_ORCHESTRATOR_DB_NAME=huleedu_batch_orchestrator
-      - BATCH_ORCHESTRATOR_DB_USER=${HULEEDU_DB_USER}
-      - BATCH_ORCHESTRATOR_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -268,8 +256,6 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
-      - ESSAY_LIFECYCLE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/huleedu_essay_lifecycle
-      - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/huleedu_essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
@@ -319,8 +305,6 @@ services:
       - ESSAY_LIFECYCLE_SERVICE_USE_MOCK_REPOSITORY=false
       - ESSAY_LIFECYCLE_SERVICE_DATABASE_PATH=/data/essay_lifecycle/essay_lifecycle.db
       # PostgreSQL configuration
-      - ESSAY_LIFECYCLE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/huleedu_essay_lifecycle
-      - ELS_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@essay_lifecycle_db:5432/huleedu_essay_lifecycle
       - ELS_DB_HOST=essay_lifecycle_db
       - ELS_DB_PORT=5432
       - ELS_DB_NAME=essay_lifecycle
@@ -411,9 +395,6 @@ services:
       - CJ_ASSESSMENT_SERVICE_REDIS_URL=redis://redis:6379
       - CJ_ASSESSMENT_SERVICE_LLM_PROVIDER_SERVICE_URL=http://llm_provider_service:8080/api/v1
       # Database configuration
-      - CJ_ASSESSMENT_SERVICE_DB_HOST=cj_assessment_db
-      - CJ_ASSESSMENT_SERVICE_DB_PORT=5432
-      - CJ_ASSESSMENT_SERVICE_DB_NAME=huleedu_cj_assessment
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       # Testing configuration handled by LLM Provider Service
@@ -649,8 +630,6 @@ services:
       - NLP_SERVICE_CONTENT_SERVICE_URL=http://content_service:8000/v1/content
       - NLP_SERVICE_LOG_LEVEL=INFO
       - NLP_SERVICE_REDIS_URL=redis://redis:6379
-      # Database configuration
-      - NLP_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@nlp_db:5432/huleedu_nlp
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=nlp_service
       - OTEL_TRACES_EXPORTER=otlp
@@ -799,12 +778,6 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - ENTITLEMENTS_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@entitlements_db:5432/huleedu_entitlements
-      - ENTITLEMENTS_SERVICE_DB_HOST=entitlements_db
-      - ENTITLEMENTS_SERVICE_DB_PORT=5432
-      - ENTITLEMENTS_SERVICE_DB_NAME=huleedu_entitlements
-      - ENTITLEMENTS_SERVICE_DB_USER=${HULEEDU_DB_USER}
-      - ENTITLEMENTS_SERVICE_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - ENTITLEMENTS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092

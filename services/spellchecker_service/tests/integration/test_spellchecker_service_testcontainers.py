@@ -257,7 +257,7 @@ class TestSpellcheckerServiceTestcontainers:
                 self._test_postgres_url = str(postgres_url)
 
             @property
-            def database_url(self) -> str:
+            def DATABASE_URL(self) -> str:
                 """Override database URL to use testcontainer PostgreSQL."""
                 return self._test_postgres_url
 
@@ -269,7 +269,7 @@ class TestSpellcheckerServiceTestcontainers:
         )
 
         print("🔧 Test settings configured:")
-        print(f"   Database URL: {settings.database_url}")
+        print(f"   Database URL: {settings.DATABASE_URL}")
         print(f"   Content Service URL: {settings.CONTENT_SERVICE_URL}")
         print(f"   Kafka Bootstrap: {settings.KAFKA_BOOTSTRAP_SERVERS}")
         print(f"   Redis URL: {settings.REDIS_URL}")

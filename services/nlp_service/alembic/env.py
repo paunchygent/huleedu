@@ -20,7 +20,7 @@ from services.nlp_service.models_db import Base
 config = context.config
 
 # Override sqlalchemy.url with service configuration
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

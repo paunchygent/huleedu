@@ -154,7 +154,7 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             expected_url = (
                 "postgresql+asyncpg://test_user:test_password@localhost:5444/huleedu_entitlements"
@@ -174,7 +174,7 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             expected_url = "postgresql+asyncpg://prod_user:secure_prod_password@prod.entitlements.example.com:5433/huleedu_entitlements"
             assert database_url == expected_url
@@ -190,7 +190,7 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
             expected_url = "postgresql+asyncpg://prod_user:secure_prod_password@prod.entitlements.example.com:5432/huleedu_entitlements"
             assert database_url == expected_url
@@ -207,7 +207,7 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            assert settings.database_url == override_url
+            assert settings.DATABASE_URL == override_url
 
     def test_database_url_production_missing_host_raises_error(self) -> None:
         """Test that missing production database host raises ValueError."""
@@ -221,7 +221,7 @@ class TestEntitlementsServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             error_message = str(exc_info.value)
             assert "Production environment requires" in error_message
@@ -240,7 +240,7 @@ class TestEntitlementsServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             error_message = str(exc_info.value)
             assert "Production environment requires" in error_message
@@ -258,7 +258,7 @@ class TestEntitlementsServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             error_message = str(exc_info.value)
             assert "HULEEDU_DB_USER" in error_message
@@ -275,7 +275,7 @@ class TestEntitlementsServiceSettings:
             settings = Settings()
 
             with pytest.raises(ValueError) as exc_info:
-                _ = settings.database_url
+                _ = settings.DATABASE_URL
 
             error_message = str(exc_info.value)
             assert "HULEEDU_DB_USER" in error_message
@@ -313,9 +313,10 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
-            expected_url = "postgresql+asyncpg://användare_åäö:lösenord_ÅÄÖ@localhost:5444/huleedu_entitlements"
+            # Password should be URL-encoded to handle special characters safely
+            expected_url = "postgresql+asyncpg://användare_åäö:l%C3%B6senord_%C3%85%C3%84%C3%96@localhost:5444/huleedu_entitlements"
             assert database_url == expected_url
 
     def test_swedish_database_credentials_in_production_url(self) -> None:
@@ -329,9 +330,10 @@ class TestEntitlementsServiceSettings:
 
         with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
-            database_url = settings.database_url
+            database_url = settings.DATABASE_URL
 
-            expected_url = "postgresql+asyncpg://användare_malmö:säkert_lösenord_ÅÄÖ@databas-stockholm.example.com:5432/huleedu_entitlements"
+            # Password should be URL-encoded to handle special characters safely
+            expected_url = "postgresql+asyncpg://användare_malmö:s%C3%A4kert_l%C3%B6senord_%C3%85%C3%84%C3%96@databas-stockholm.example.com:5432/huleedu_entitlements"
             assert database_url == expected_url
 
     def test_secrets_are_properly_masked_in_string_representation(self) -> None:

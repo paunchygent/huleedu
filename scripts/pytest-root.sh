@@ -72,7 +72,7 @@ for arg in "$@"; do
 done
 
 # Run pytest with repo config explicitly
-if ((${#REWRITTEN_ARGS[@]:-0} > 0)); then
+if ((${#REWRITTEN_ARGS[@]} > 0)); then
   exec pdm run -p "$ROOT" -- pytest -c "$ROOT/pyproject.toml" -m "" "${REWRITTEN_ARGS[@]}"
 else
   exec pdm run -p "$ROOT" -- pytest -c "$ROOT/pyproject.toml" -m ""

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from urllib.parse import quote_plus
-
 from common_core import Environment, LLMProviderType
 from common_core.event_enums import ProcessingEvent, topic_name
 from dotenv import find_dotenv, load_dotenv
@@ -85,72 +83,32 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     DATABASE_POOL_RECYCLE: int = 3600  # 1 hour
 
     @property
-    def database_url(self) -> str:
+    def DATABASE_URL(self) -> str:
         """Return the PostgreSQL database URL for both runtime and migrations.
 
-        Environment-aware database connection:
-        - DEVELOPMENT: Docker container (localhost with unique port)
-        - PRODUCTION: External managed database
+        Uses shared database URL helper to construct environment-aware connection strings.
+        Automatically handles password encoding and production/development environments.
         """
         import os
 
-        # Check for explicit override first (Docker environment, manual config)
-        env_url = os.getenv("CJ_ASSESSMENT_SERVICE_DATABASE_URL")
-        if env_url:
-            return env_url
-
-        # Environment-based configuration
-        if self.is_production():
-            # Production: External managed database
-            prod_host = os.getenv("HULEEDU_PROD_DB_HOST")
-            prod_port = os.getenv("HULEEDU_PROD_DB_PORT", "5432")
-            prod_password = os.getenv("HULEEDU_PROD_DB_PASSWORD")
-
-            if not all([prod_host, prod_password]):
-                raise ValueError(
-                    "Production environment requires HULEEDU_PROD_DB_HOST and "
-                    "HULEEDU_PROD_DB_PASSWORD environment variables"
-                )
-
-            # Type narrowing for MyPy (guaranteed non-None by validation above)
-            assert prod_host is not None
-            assert prod_password is not None
-
-            return (
-                f"postgresql+asyncpg://{self._db_user}:{quote_plus(prod_password)}@"
-                f"{prod_host}:{prod_port}/huleedu_cj_assessment"
-            )
+        # Determine host and port based on ENV_TYPE
+        env_type = os.getenv("ENV_TYPE", "development").lower()
+        if env_type == "docker":
+            dev_host = os.getenv("CJ_ASSESSMENT_SERVICE_DB_HOST", "cj_assessment_db")
+            dev_port_str = os.getenv("CJ_ASSESSMENT_SERVICE_DB_PORT", "5432")
         else:
-            # Development: Docker container (existing pattern)
-            db_user = os.getenv("HULEEDU_DB_USER", self.DB_USER)
-            db_password = os.getenv("HULEEDU_DB_PASSWORD")
+            dev_host = "localhost"
+            dev_port_str = "5434"
 
-            if not db_user or not db_password:
-                raise ValueError(
-                    "Missing required database credentials. Please ensure HULEEDU_DB_USER and "
-                    "HULEEDU_DB_PASSWORD are set in your .env file."
-                )
+        dev_port = int(dev_port_str)
 
-            env_type = os.getenv("ENV_TYPE", "development").lower()
-            if env_type == "docker":
-                host = os.getenv("CJ_ASSESSMENT_SERVICE_DB_HOST", "cj_assessment_db")
-                port = os.getenv("CJ_ASSESSMENT_SERVICE_DB_PORT", "5432")
-            else:
-                host = os.getenv("CJ_ASSESSMENT_SERVICE_DB_HOST", self.DB_HOST)
-                port = os.getenv("CJ_ASSESSMENT_SERVICE_DB_PORT", str(self.DB_PORT))
+        return self.build_database_url(
+            database_name="huleedu_cj_assessment",
+            service_env_var_prefix="CJ_ASSESSMENT_SERVICE",
+            dev_port=dev_port,
+            dev_host=dev_host,
+        )
 
-            db_name = os.getenv("CJ_ASSESSMENT_SERVICE_DB_NAME", self.DB_NAME)
-
-            return (
-                f"postgresql+asyncpg://{db_user}:{quote_plus(db_password)}@{host}:{port}/{db_name}"
-            )
-
-    @property
-    def _db_user(self) -> str:
-        """Database user for production connections."""
-        import os
-
-        return os.getenv("HULEEDU_DB_USER", "huleedu_user")
 
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI

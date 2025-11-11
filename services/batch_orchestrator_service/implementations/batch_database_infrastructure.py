@@ -32,7 +32,7 @@ class BatchDatabaseInfrastructure:
 
         # Create async engine with connection pooling
         self.engine = create_async_engine(
-            settings.database_url,
+            settings.DATABASE_URL,
             echo=False,
             future=True,
             pool_size=settings.DB_POOL_SIZE,

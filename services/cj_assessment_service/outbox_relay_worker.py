@@ -50,7 +50,7 @@ async def main() -> None:
 
     # Initialize database engine
     engine = create_async_engine(
-        settings.database_url,
+        settings.DATABASE_URL,
         echo=False,
         future=True,
         pool_size=5,  # Smaller pool for relay worker

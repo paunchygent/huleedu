@@ -190,7 +190,7 @@ class TestRepositoryImplementationComparison:
     def mock_settings_for_postgres(self) -> MagicMock:
         """Settings configured for PostgreSQL testing."""
         settings = MagicMock()
-        settings.database_url = "postgresql+asyncpg://test:test@localhost:5432/test"
+        settings.DATABASE_URL = "postgresql+asyncpg://test:test@localhost:5432/test"
         settings.DB_POOL_SIZE = 1
         settings.DB_MAX_OVERFLOW = 0
         return settings

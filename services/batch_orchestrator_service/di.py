@@ -242,7 +242,7 @@ class RepositoryAndPublishingProvider(Provider):
     async def provide_database_engine(self, settings: Settings) -> AsyncEngine:
         """Provide async database engine for outbox pattern."""
         engine = create_async_engine(
-            settings.database_url,
+            settings.DATABASE_URL,
             echo=False,
             future=True,
             pool_size=settings.DB_POOL_SIZE,

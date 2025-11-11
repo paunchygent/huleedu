@@ -155,7 +155,7 @@ class TestCommandHandlerOutboxIntegration:
             self.REDIS_URL = redis_url
 
         @property
-        def database_url(self) -> str:
+        def DATABASE_URL(self) -> str:
             """Override to return test database URL."""
             return str(object.__getattribute__(self, "_database_url"))
 
@@ -201,7 +201,7 @@ class TestCommandHandlerOutboxIntegration:
         from huleedu_service_libs.outbox import PostgreSQLOutboxRepository
         from sqlalchemy.ext.asyncio import create_async_engine
 
-        engine = create_async_engine(test_settings.database_url)
+        engine = create_async_engine(test_settings.DATABASE_URL)
 
         # Initialize schema for outbox
         from huleedu_service_libs.outbox.models import EventOutbox

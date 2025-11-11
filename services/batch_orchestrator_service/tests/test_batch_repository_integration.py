@@ -49,7 +49,7 @@ class TestPostgreSQLBatchRepositoryIntegration:
         elif "postgresql://" in connection_url:
             connection_url = connection_url.replace("postgresql://", "postgresql+asyncpg://")
 
-        settings.database_url = connection_url
+        settings.DATABASE_URL = connection_url
         settings.DB_POOL_SIZE = 2
         settings.DB_MAX_OVERFLOW = 1
         return settings

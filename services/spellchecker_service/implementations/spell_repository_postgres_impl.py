@@ -59,7 +59,7 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
             self.engine = engine
         else:
             self.engine = create_async_engine(
-                settings.database_url,
+                settings.DATABASE_URL,
                 echo=False,
                 future=True,
                 pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),
@@ -114,7 +114,7 @@ class PostgreSQLSpellcheckRepository(SpellcheckRepositoryProtocol):
                 correlation_id=uuid.uuid4(),  # Generate correlation_id for schema initialization
                 error_type=e.__class__.__name__,
                 error_details=str(e),
-                database_url=str(self.settings.database_url),
+                database_url=str(self.settings.DATABASE_URL),
             )
 
     @asynccontextmanager

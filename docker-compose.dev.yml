@@ -25,7 +25,7 @@ services:
       # Exclude __pycache__ and other build artifacts
       - /app/services/nlp_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
     # Override command for development with auto-reload if service supports it
@@ -44,9 +44,11 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/batch_orchestrator_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Essay Lifecycle Service - Worker Component
   essay_lifecycle_worker:
@@ -62,7 +64,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/essay_lifecycle_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -80,7 +82,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/essay_lifecycle_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -97,7 +99,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/class_management_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -131,7 +133,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/llm_provider_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -148,7 +150,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/api_gateway_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - API_GATEWAY_JWT_SECRET_KEY=test-secret-key
@@ -166,7 +168,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/result_aggregator_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -183,7 +185,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/websocket_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -200,7 +202,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/cj_assessment_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -218,7 +220,7 @@ services:
       - ./libs/huleedu_nlp_shared/src:/app/libs/huleedu_nlp_shared/src:cached
       - /app/services/spellchecker_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -235,7 +237,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/file_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -252,7 +254,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/content_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
 
@@ -289,7 +291,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/email_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - EMAIL_SERVICE_LOG_LEVEL=DEBUG
@@ -317,7 +319,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/entitlements_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - ENTITLEMENTS_SERVICE_LOG_LEVEL=DEBUG
@@ -341,7 +343,7 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/language_tool_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - LANGUAGE_TOOL_SERVICE_LOG_LEVEL=DEBUG

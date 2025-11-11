@@ -50,7 +50,7 @@ async def settings():
 @pytest.fixture
 async def postgres_repo(settings):
     """Provide a test PostgreSQL repository."""
-    repo = PostgreSQLBatchStateRepositoryImpl(database_url=settings.database_url)
+    repo = PostgreSQLBatchStateRepositoryImpl(database_url=settings.DATABASE_URL)
 
     # Clean up any existing test data
     from sqlalchemy import text

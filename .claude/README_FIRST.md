@@ -77,6 +77,12 @@ pdm run typecheck-all # Type checking
 
 ## Recent Decisions & Changes
 
+### 0. Codex Setup Script Hardening (Nov 2025)
+
+- `scripts/setup_huledu_environment.sh` now finds the repo root via env vars, Git metadata, and Codex `/workspace/<repo>` mounts before running PDM so sandboxes stop erroring out on `common_core`.
+- PDM caches/logs are redirected to `.pdm/` inside the repo (ignored via `.gitignore`) and `pdm install --group monorepo-tools --group dev` runs cleanly even when `$HOME` is read-only.
+- Script output advertises the Ruff/Mypy/Pytest/dev PDM scripts defined in `pyproject.toml`, so new agents follow Rule 081/083 conventions immediately.
+
 ### 1. Redis Caching for BCS Duplicate Calls
 
 **Issue**: BOS makes duplicate calls to BCS (preflight + handler) 9ms apart.

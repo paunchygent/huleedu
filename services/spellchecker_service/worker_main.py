@@ -65,7 +65,7 @@ async def main() -> None:
 
     # Initialize database engine
     engine = create_async_engine(
-        settings.database_url,
+        settings.DATABASE_URL,
         echo=False,
         future=True,
         pool_size=getattr(settings, "DATABASE_POOL_SIZE", 5),

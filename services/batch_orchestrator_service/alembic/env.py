@@ -30,7 +30,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the SQLAlchemy URL dynamically from service configuration
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata

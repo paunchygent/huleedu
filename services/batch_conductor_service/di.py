@@ -89,7 +89,7 @@ class EventDrivenServicesProvider(Provider):
 
             # Create PostgreSQL repository for permanent storage
             postgres_repo = postgres_batch_state_repository.PostgreSQLBatchStateRepositoryImpl(
-                database_url=settings.database_url
+                database_url=settings.DATABASE_URL
             )
 
             # Create Redis repository with PostgreSQL fallback

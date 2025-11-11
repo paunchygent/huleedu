@@ -51,7 +51,7 @@ class TestRepositorySelection:
             mock_settings_instance = mock_settings.return_value
             mock_settings_instance.ENVIRONMENT = "production"
             mock_settings_instance.USE_MOCK_REPOSITORY = False
-            mock_settings_instance.database_url = "postgresql+asyncpg://test:test@localhost/test"
+            mock_settings_instance.DATABASE_URL = "postgresql+asyncpg://test:test@localhost/test"
 
             provider = EventDrivenServicesProvider()
 

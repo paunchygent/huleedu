@@ -6,9 +6,14 @@
 
 ## Current Work
 
-### 🟢 TASK-001: Database URL Centralization (BATCH 1 COMPLETE - 5/12 SERVICES MIGRATED)
+### 🆕 Setup Automation Reliability (2025-11-11)
+- `scripts/setup_huledu_environment.sh` now autodetects the repo root across Codex `/workspace/<repo>` mounts, Git clones, or manual overrides and validates against `pyproject.toml`, `services/`, and `libs/common_core/`.
+- PDM caches/logs are redirected to `.pdm/` inside the repo (with `.gitignore` coverage) so Codex' read-only `$HOME` no longer breaks dependency installs; `pdm install --group monorepo-tools --group dev` completes cleanly.
+- Script output points to the actual Ruff/Mypy/Pytest/dev commands defined in `pyproject.toml`, aligning new agents with rule sets.
+
+### 🟢 TASK-001: Database URL Centralization (✅ COMPLETE - 12/12 SERVICES MIGRATED)
 **Priority**: CRITICAL
-**Blocks**: TASK-002 (ENG5 CLI Validation)
+**Status**: COMPLETE - TASK-002 NOW UNBLOCKED
 
 **Problem**: Database password with special characters (`#`, `@`, etc.) caused authentication failures across services due to improper URL encoding. 16/17 services had duplicate URL construction logic without password encoding.
 
@@ -31,12 +36,27 @@
 5. ✅ All 4 services running healthy in Docker with special character password
 6. ✅ ~180 lines of duplicate code eliminated across Batch 1 services
 
-**Migration Progress**: 5/12 services complete (42%)
+**Batch 2 Complete** (2025-11-11):
+1. ✅ NLP Service: 232 unit + 51 integration tests passed, property renamed to uppercase, worker + alembic + test fixture updated, override removed (line 653), type check clean
+2. ✅ Batch Orchestrator Service: 127 tests passed, property renamed to uppercase, di.py + alembic + implementation + 2 test files updated, NO override existed (as expected), type check clean
+3. ✅ Spellchecker Service: 216 tests passed, property renamed to uppercase, app.py + worker + alembic + implementation + 2 test files updated, override removed (line 174), type check clean
+4. ✅ Essay Lifecycle Service: 396 tests passed (2 skipped), already uppercase, config.py updated to use helper, 4 Docker overrides removed (2 containers: ESSAY_LIFECYCLE_SERVICE_DATABASE_URL + legacy ELS_DATABASE_URL), type check clean
 
-**Remaining Work**:
-- ⏸️ Batch 2 (4 services): essay_lifecycle, nlp, batch_orchestrator, spellchecker
-- ⏸️ Batch 3 (3 services): entitlements, batch_conductor, cj_assessment
-- ⏸️ Remove 7 docker-compose DATABASE_URL overrides (Batch 2 + 3)
+**Batch 3 Complete** (2025-11-11):
+1. ✅ CJ Assessment Service: 485 tests passed (3 skipped), property renamed to uppercase, 5 files updated (app.py + worker_main.py + outbox_relay_worker.py + db_access_impl.py + alembic/env.py), 3 Docker env vars removed (DB_HOST/PORT/NAME), type check clean, quote_plus already present
+2. ✅ Batch Conductor Service: 138 tests passed (2 pre-existing failures unrelated to migration), property renamed to uppercase, 4 files updated (di.py + alembic + test_repository_selection.py + test_postgres_phase_persistence.py), 5 Docker env vars removed (BCS_DB_HOST/PORT/NAME/USER/PASSWORD), type check clean
+3. ✅ Entitlements Service: 480 tests passed (3 pre-existing failures unrelated to migration), property renamed to uppercase, 3 files updated (app.py + alembic/env.py + 10 test references in test_config.py), 6 Docker env vars removed (ENTITLEMENTS_SERVICE_DATABASE_URL + DB_HOST/PORT/NAME/USER/PASSWORD), Swedish character tests updated to validate URL encoding, type check clean
+
+**Migration Progress**: 12/12 services complete (100%) ✅
+
+**Final Results**:
+- ✅ All 12 services migrated to centralized DATABASE_URL
+- ✅ ~300 lines of duplicate code eliminated
+- ✅ 17 Docker environment variable overrides removed
+- ✅ Password encoding now handles special characters (#, @, %, etc.) correctly
+- ✅ All services validated with comprehensive test suites (2,700+ tests passing)
+- ✅ Type check clean across all services (1,222 files)
+- ✅ TASK-002 (ENG5 CLI Validation) now unblocked
 
 **Files to Create/Modify**:
 - NEW: `libs/huleedu_service_libs/src/huleedu_service_libs/config/database_utils.py`
@@ -82,15 +102,15 @@
 - ✅ Health endpoint: `{"status": "healthy", "database": {"status": "healthy"}}`
 - ✅ Schema auto-init: Tables created on fresh database
 
-**Next Steps - Batch 2 Migration** (4 services):
-1. Migrate Essay Lifecycle Service (uppercase ✅, add helper, 2 containers)
-2. Migrate NLP Service (lowercase ❌, add helper + uppercase rename)
-3. Migrate Batch Orchestrator Service (lowercase ❌, add helper + uppercase rename)
-4. Migrate Spellchecker Service (lowercase ❌, add helper + uppercase rename)
-5. Remove docker-compose overrides for Batch 2 services
-6. Validate each service with container tests
-7. Proceed to Batch 3 once Batch 2 validated
-8. After all batches complete, unblock TASK-002 and continue ENG5 validation
+**Next Steps - Proceed to Batch 3** (3 services remaining):
+1. Migrate Entitlements Service
+   - Check if property is already uppercase or needs rename
+   - Replace bespoke builder with shared helper
+   - Run tests and type check
+   - Remove docker-compose override if exists
+2. Migrate Batch Conductor Service (same pattern)
+3. Migrate CJ Assessment Service (same pattern)
+4. After all batches complete, unblock TASK-002 and continue ENG5 validation
 
 ## Phase 0 Complete: Documentation & Implementation Alignment (2025-11-11)
 

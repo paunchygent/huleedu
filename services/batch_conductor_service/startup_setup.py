@@ -6,6 +6,7 @@ from dishka import AsyncContainer, make_async_container
 from quart import Quart
 
 from huleedu_service_libs.logging_utils import create_service_logger
+from huleedu_service_libs.quart_app import HuleEduApp
 from services.batch_conductor_service.di import (
     CoreInfrastructureProvider,
     EventDrivenServicesProvider,
@@ -23,6 +24,21 @@ def create_container() -> AsyncContainer:
         EventDrivenServicesProvider(),
         PipelineServicesProvider(),
     )
+
+
+async def initialize_database_schema(app: HuleEduApp) -> None:
+    """Initialize database schema using guaranteed infrastructure."""
+    try:
+        async with app.database_engine.begin() as conn:
+            from services.batch_conductor_service.models_db import Base
+
+            await conn.run_sync(Base.metadata.create_all)
+
+        logger.info("Database schema initialized successfully")
+
+    except Exception as e:
+        logger.critical("Failed to initialize database schema: %s", e, exc_info=True)
+        raise
 
 
 async def initialize_metrics(app: Quart, container: AsyncContainer) -> None:
