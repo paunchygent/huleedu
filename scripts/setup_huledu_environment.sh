@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# This script is intended to be run when setting up the HuleEdu development environment
-# for OpenAI Codex agent work in a browser-based sandbox environment.
-# It installs dependencies for the entire monorepo including all microservices.
+# This script bootstraps the HuleEdu development environment for OpenAI Codex
+# browser sandboxes (and local shells) by installing all monorepo dependencies.
 
-set -e # Exit immediately if a command exits with a non-zero status.
-set -o pipefail # The return value of a pipeline is the status of the last command to exit with a non-zero status, or zero if no command exited with a non-zero status.
+set -euo pipefail # Fail fast on unset vars, non-zero exits, or pipeline issues.
 
-# Optional: Uncomment for stricter error checking or debugging
-# set -u # Treat unset variables as an error.
+# Optional: Uncomment for verbose debugging.
 # set -x # Print commands and their arguments as they are executed.
 
 NC='\033[0m' # No Color
@@ -17,41 +14,89 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 
 echo -e "${BLUE}--- Starting HuleEdu Microservice Environment Setup ---${NC}"
-echo -e "${BLUE}This script sets up the complete HuleEdu monorepo for AI agent development${NC}"
+echo -e "${BLUE}Detecting project root for OpenAI Codex sandbox compatibility...${NC}"
 
-# Navigate to the project directory within the container
-# As per OpenAI Codex environment, the repository is cloned to /workspace/huledu-reboot
-# This script is located in scripts/ so we need to go up one level to reach project root
-PROJECT_DIR="/workspace/huledu-reboot"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_PARENT="$(dirname "$SCRIPT_DIR")"
 
-if [ -d "$PROJECT_DIR" ]; then
-  cd "$PROJECT_DIR"
-  echo -e "${GREEN}Changed directory to $(pwd)${NC}"
-else
-  # If running locally, use the calculated project root
-  if [ -d "$PROJECT_ROOT" ] && [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
-    cd "$PROJECT_ROOT"
-    echo -e "${GREEN}Changed directory to $(pwd) (calculated from script location)${NC}"
-  else
-    echo -e "${YELLOW}Project directory $PROJECT_DIR not found. Assuming current directory is the project root.${NC}"
-    # If the script is already in the project root (e.g. /workspace/huledu-reboot), this is fine.
-    # If not, the following commands might fail or operate on the wrong directory.
-  fi
-fi 
+is_repo_root() {
+    local dir="$1"
+    [[ -n "$dir" ]] || return 1
+    [[ -d "$dir" ]] || return 1
+    [[ -f "$dir/pyproject.toml" ]] || return 1
+    [[ -d "$dir/services" ]] || return 1
+    [[ -d "$dir/libs/common_core" ]] || return 1
+    [[ -d "$dir/libs/huleedu_service_libs" ]] || return 1
+}
 
-# Verify we're in the correct project by checking for key files
-if [ ! -f "pyproject.toml" ] || [ ! -d "services" ] || [ ! -d "common_core" ]; then
-    echo -e "${RED}Error: This doesn't appear to be the HuleEdu project root.${NC}"
-    echo -e "${RED}Expected files/directories: pyproject.toml, services/, common_core/${NC}"
+print_structure_error() {
+    echo -e "${RED}Error: Unable to locate the HuleEdu project root.${NC}"
+    echo -e "${RED}Expected to find pyproject.toml, services/, and libs/common_core/.${NC}"
     echo -e "${RED}Current directory: $(pwd)${NC}"
     echo -e "${RED}Directory contents:${NC}"
     ls -la
+}
+
+find_repo_root() {
+    local -a candidates=()
+
+    # Explicit overrides (environment variables take priority)
+    if [ -n "${HULEDU_REPO_ROOT:-}" ]; then candidates+=("$HULEDU_REPO_ROOT"); fi
+    if [ -n "${PROJECT_DIR:-}" ]; then candidates+=("$PROJECT_DIR"); fi
+
+    # Default Codex mount path (codex-universal maps repos to /workspace/<name>)
+    local codex_default="/workspace/huledu-reboot"
+    if [ -d "$codex_default" ]; then candidates+=("$codex_default"); fi
+
+    # Generic Codex mapping for arbitrary repo names
+    local codex_repo="/workspace/$(basename "$PROJECT_PARENT")"
+    if [ -d "$codex_repo" ]; then candidates+=("$codex_repo"); fi
+
+    # Git-based detection
+    if command -v git >/dev/null 2>&1; then
+        local git_root
+        git_root="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || true)"
+        if [ -n "$git_root" ]; then candidates+=("$git_root"); fi
+    fi
+
+    # Fall back to script parent and current working directory
+    candidates+=("$PROJECT_PARENT" "$(pwd)")
+
+    for dir in "${candidates[@]}"; do
+        if is_repo_root "$dir"; then
+            echo "$dir"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+if ! PROJECT_ROOT="$(find_repo_root)"; then
+    print_structure_error
     exit 1
 fi
 
+cd "$PROJECT_ROOT"
+echo -e "${GREEN}Changed directory to $(pwd)${NC}"
 echo -e "${GREEN}Confirmed HuleEdu project structure detected${NC}"
+
+# Ensure PDM caches/logs live inside the repo (Codex $HOME may be read-only)
+PDM_HOME_DIR="${PDM_HOME:-$PROJECT_ROOT/.pdm}"
+mkdir -p "$PDM_HOME_DIR"
+export PDM_HOME="$PDM_HOME_DIR"
+
+DEFAULT_PDM_LOG_DIR="${PDM_LOG_DIR:-$PDM_HOME/logs}"
+mkdir -p "$DEFAULT_PDM_LOG_DIR"
+export PDM_LOG_DIR="$DEFAULT_PDM_LOG_DIR"
+
+DEFAULT_PDM_CACHE_DIR="${PDM_CACHE_DIR:-$PDM_HOME/cache}"
+mkdir -p "$DEFAULT_PDM_CACHE_DIR"
+export PDM_CACHE_DIR="$DEFAULT_PDM_CACHE_DIR"
+
+DEFAULT_HISHEL_CACHE_DIR="${HISHEL_CACHE_DIR:-$DEFAULT_PDM_CACHE_DIR/hishel}"
+mkdir -p "$DEFAULT_HISHEL_CACHE_DIR"
+export HISHEL_CACHE_DIR="$DEFAULT_HISHEL_CACHE_DIR"
 
 # Check if PDM is installed
 if ! command -v pdm &> /dev/null; then
@@ -84,35 +129,31 @@ echo -e "${GREEN}PDM found. Version: $(pdm --version)${NC}"
 
 # Display project information
 echo -e "${BLUE}--- HuleEdu Monorepo Information ---${NC}"
-echo -e "${BLUE}This monorepo contains multiple microservices:${NC}"
+echo -e "${BLUE}Key components detected:${NC}"
 echo -e "${BLUE}  • Batch Orchestration Service (services/batch_orchestrator_service)${NC}"
 echo -e "${BLUE}  • Content Service (services/content_service)${NC}"
-echo -e "${BLUE}  • Spell Checker Service (services/spellchecker_service)${NC}"
-echo -e "${BLUE}  • Common Core Package (common_core)${NC}"
-echo -e "${BLUE}  • Service Libraries (libs)${NC}"
-echo -e "${YELLOW}  • Essay Service (services/essay_service) - [PLACEHOLDER - NOT YET IMPLEMENTED]${NC}"
+echo -e "${BLUE}  • Spellchecker Service (services/spellchecker_service)${NC}"
+echo -e "${BLUE}  • Common Core Library (libs/common_core)${NC}"
+echo -e "${BLUE}  • Shared Service Libraries (libs/huleedu_service_libs)${NC}"
 
 # Install project dependencies (including development dependencies and all services)
 echo -e "${BLUE}--- Installing HuleEdu Monorepo Dependencies ---${NC}"
-echo -e "${BLUE}Installing monorepo tools and dev dependencies...${NC}"
-pdm install -G monorepo-tools
-
-echo -e "${BLUE}Installing all services in editable mode for development...${NC}"
-pdm install -G dev
+echo -e "${BLUE}Installing base dependencies plus monorepo tooling and dev extras...${NC}"
+pdm install --group monorepo-tools --group dev
 
 echo -e "${GREEN}--- HuleEdu Environment Setup Complete ---${NC}"
 echo -e "${GREEN}All microservices are now installed in editable mode and ready for development.${NC}"
 echo -e "${BLUE}Available PDM scripts:${NC}"
-echo -e "${BLUE}  • pdm run format-all    - Format all code with Black and isort${NC}"
-echo -e "${BLUE}  • pdm run lint-all      - Lint all code with flake8${NC}"
-echo -e "${BLUE}  • pdm run typecheck-all - Type check all code with mypy${NC}"
-echo -e "${BLUE}  • pdm run test-all      - Run all tests with pytest${NC}"
-echo -e "${BLUE}  • pdm run docker-build  - Build Docker containers${NC}"
-echo -e "${BLUE}  • pdm run docker-up     - Start services with Docker Compose${NC}"
-echo -e "${BLUE}Individual service development:${NC}"
-echo -e "${BLUE}  • pdm run dev-content   - Run content service in dev mode${NC}"
-echo -e "${BLUE}  • pdm run dev-batch     - Run batch orchestrator service in dev mode${NC}"
-echo -e "${BLUE}  • pdm run -p services/spellchecker_service start_worker - Start spell checker worker${NC}"
+echo -e "${BLUE}  • pdm run format-all    - Format via Ruff (Rule 081/083)${NC}"
+echo -e "${BLUE}  • pdm run lint-all      - Ruff lint across the monorepo${NC}"
+echo -e "${BLUE}  • pdm run lint-fix      - Ruff autofix where possible${NC}"
+echo -e "${BLUE}  • pdm run typecheck-all - Mypy from repo root (strict mode)${NC}"
+echo -e "${BLUE}  • pdm run test-all      - Run pytest for the full suite${NC}"
+echo -e "${BLUE}  • pdm run dev           - Entry point for dev containers (see scripts/dev.sh)${NC}"
+echo -e "${BLUE}  • pdm run dev-start     - Start selected services without rebuild${NC}"
+echo -e "${BLUE}  • pdm run dev-build-start - Build + start selected services${NC}"
+echo -e "${BLUE}  • pdm run dev-logs      - Tail dev container logs${NC}"
+echo -e "${BLUE}  • pdm run codex         - Launch Codex CLI with repo presets${NC}"
 
 echo -e "${GREEN}Environment is ready for AI agent development work!${NC}"
 

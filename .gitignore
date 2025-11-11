@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .pdm-python
+.pdm/
 .venv/
 **/.env
 .DS_Store
