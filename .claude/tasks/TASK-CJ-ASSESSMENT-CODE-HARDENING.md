@@ -1,10 +1,23 @@
 # Task: CJ Assessment Service Code Hardening
 
+> **Autonomous Claude Execution Prompt**
+>
+> 1. **Cloud VM Context** — You are operating inside the HuleEdu Claude cloud VM. Before taking any action, review and comply with `.claude/rules/111-cloud-vm-execution-standards.mdc`, including PATH setup for `pdm` and the prohibition on Docker/service startups.
+>
+> 2. **Plan, Then Execute Sequentially** — Produce an explicit plan first. Execute exactly one planned task at a time to 100% completion before moving to the next. Re-plan if new information appears.
+>
+> 3. **Targeted Validation** — After completing each task, run the narrowest relevant `pdm run` quality checks or pytest nodes (include `-s` when debugging) to validate the change, and document the command and outcome.
+>
+> 4. **Task Document Updates** — Before ending the session, update this task document with clear progress notes so the next contributor can resume seamlessly. Follow Rule `090-documentation-standards.mdc` for concise, intent-focused updates.
+>
+> 5. **Rule Adherence** — Apply all referenced architecture, DI, testing, and documentation standards in this file without introducing new patterns or fallbacks.
+
 ## Objective
 
 Systematically audit and harden the entire CJ Assessment Service against drift arising from fast-paced prototyping and team coordination gaps.
 
 **Target Drift Patterns**:
+
 - Missing imports discovered at runtime
 - Magic strings instead of shared constants/enums
 - Dataclasses for boundary objects (should be Pydantic)
