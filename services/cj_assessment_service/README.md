@@ -113,8 +113,9 @@ prompt storage references end-to-end:
 - **Typer CLI**: `pdm run cj-admin …` authenticates via Identity
   `/v1/auth/login`, caches/refreshes tokens under
   `~/.huleedu/cj_admin_token.json`, supports `CJ_ADMIN_TOKEN` overrides for
-  automation, and exposes `instructions create|list|get|delete` plus
-  `scales list` commands.
+  automation, exposes `instructions create|list|get|delete`, `scales list`, and
+  provides a non-interactive token helper `pdm run cj-admin token issue` (reads
+  `CJ_ADMIN_EMAIL`/`CJ_ADMIN_PASSWORD` or accepts `--email/--password`).
 
 ### Student Prompt Management
 
@@ -175,6 +176,11 @@ Examples:
 ```bash
 # Obtain a token interactively (stores access + refresh tokens locally)
 pdm run cj-admin login --email ops@example.com
+
+# Issue token non-interactively (reads env vars, caches JWT)
+export CJ_ADMIN_EMAIL=ops@example.com
+export CJ_ADMIN_PASSWORD=dev-password
+pdm run cj-admin token issue
 
 # Create ENG5 NP instructions for a specific assignment
 pdm run cj-admin instructions create \

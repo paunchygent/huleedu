@@ -19,6 +19,8 @@ TOKEN_CACHE_PATH = Path(
     os.getenv("CJ_ADMIN_TOKEN_PATH", Path.home() / ".huleedu" / "cj_admin_token.json")
 )
 CJ_ADMIN_TOKEN_OVERRIDE = os.getenv("CJ_ADMIN_TOKEN")
+CJ_ADMIN_EMAIL = os.getenv("CJ_ADMIN_EMAIL")
+CJ_ADMIN_PASSWORD = os.getenv("CJ_ADMIN_PASSWORD")
 
 app = typer.Typer(help="CJ Assessment admin CLI")
 instructions_app = typer.Typer(help="Manage assessment instructions")
@@ -27,6 +29,8 @@ scales_app = typer.Typer(help="Inspect registered grade scales")
 app.add_typer(scales_app, name="scales")
 prompts_app = typer.Typer(help="Manage student prompts for assignments")
 app.add_typer(prompts_app, name="prompts")
+token_app = typer.Typer(help="Admin token utilities")
+app.add_typer(token_app, name="token")
 
 JSONPrimitive: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
@@ -195,6 +199,49 @@ def login(
     typer.secho("Login successful.", fg=typer.colors.GREEN)
     typer.echo(json.dumps({k: v for k, v in data.items() if k != "refresh_token"}, indent=2))
 
+
+@token_app.command("issue")
+def issue_token(
+    email: str | None = typer.Option(
+        None,
+        help="Identity admin email",
+        envvar="CJ_ADMIN_EMAIL",
+    ),
+    password: str | None = typer.Option(
+        None,
+        help="Identity admin password",
+        envvar="CJ_ADMIN_PASSWORD",
+        hide_input=True,
+    ),
+    cache: bool = typer.Option(
+        True,
+        help="Cache issued token to ~/.huleedu/cj_admin_token.json",
+        show_default=True,
+    ),
+) -> None:
+    """Issue an admin JWT non-interactively using provided credentials."""
+
+    resolved_email = email or CJ_ADMIN_EMAIL
+    resolved_password = password or CJ_ADMIN_PASSWORD
+
+    if not resolved_email or not resolved_password:
+        typer.secho(
+            "Email and password are required. Provide via --email/--password or "
+            "CJ_ADMIN_EMAIL/CJ_ADMIN_PASSWORD env vars.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    manager = AuthManager()
+    payload = manager.login(email=resolved_email, password=resolved_password)
+
+    if not cache:
+        # Remove cached file if it exists to avoid stale credentials when cache disabled
+        if TOKEN_CACHE_PATH.exists():
+            TOKEN_CACHE_PATH.unlink()
+
+    typer.echo(json.dumps({k: v for k, v in payload.items() if k != "refresh_token"}, indent=2))
 
 def _upload_prompt_helper(assignment_id: str, content: str) -> str:
     """Upload student prompt and return storage_id."""
