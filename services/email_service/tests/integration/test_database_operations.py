@@ -57,7 +57,7 @@ class TestEmailServiceDatabaseOperations:
             object.__setattr__(self, "_test_database_url", database_url)
 
         @property
-        def database_url(self) -> str:
+        def DATABASE_URL(self) -> str:
             return str(object.__getattribute__(self, "_test_database_url"))
 
     @pytest.fixture
@@ -76,7 +76,7 @@ class TestEmailServiceDatabaseOperations:
     async def database_engine(self, test_settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
         """Create async database engine and run migrations."""
         engine = create_async_engine(
-            test_settings.database_url,
+            test_settings.DATABASE_URL,
             pool_size=test_settings.DATABASE_POOL_SIZE,
             max_overflow=test_settings.DATABASE_MAX_OVERFLOW,
             pool_pre_ping=test_settings.DATABASE_POOL_PRE_PING,

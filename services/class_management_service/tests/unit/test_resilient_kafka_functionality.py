@@ -120,9 +120,9 @@ async def test_successful_publish(
     # Should publish successfully
     await resilient_publisher.publish(topic, sample_class_event)
 
-    # Verify delegate was called (note: includes key parameter)
+    # Verify delegate was called (note: includes key and headers parameters)
     cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
-        topic, sample_class_event, None
+        topic, sample_class_event, None, None
     )
 
     # Circuit breaker should remain closed
@@ -362,7 +362,7 @@ async def test_class_management_specific_events(
     # Should publish successfully
     await resilient_publisher.publish(topic, enrollment_event)
 
-    # Verify correct topic and event (with key parameter)
+    # Verify correct topic and event (with key and headers parameters)
     cast(AsyncMock, resilient_publisher.delegate.publish).assert_called_once_with(
-        topic, enrollment_event, None
+        topic, enrollment_event, None, None
     )

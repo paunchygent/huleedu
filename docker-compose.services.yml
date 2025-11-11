@@ -81,7 +81,6 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - RESULT_AGGREGATOR_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@result_aggregator_db:5432/huleedu_result_aggregator
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -367,7 +366,6 @@ services:
       - FILE_SERVICE_LOG_LEVEL=INFO
       - FILE_SERVICE_REDIS_URL=redis://redis:6379
       - FILE_SERVICE_ENVIRONMENT=${ENVIRONMENT:-production}
-      - FILE_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@file_service_db:5432/huleedu_file_service
       - HULEEDU_DB_USER=${HULEEDU_DB_USER}
       - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -505,7 +503,6 @@ services:
       - CLASS_MANAGEMENT_SERVICE_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - CLASS_MANAGEMENT_SERVICE_REDIS_URL=redis://redis:6379
       - CLASS_MANAGEMENT_SERVICE_LOG_LEVEL=INFO
-      - CLASS_MANAGEMENT_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@class_management_db:5432/huleedu_class_management
       - CLASS_MANAGEMENT_SERVICE_DB_HOST=class_management_db
       - CLASS_MANAGEMENT_SERVICE_DB_PORT=5432
       - CLASS_MANAGEMENT_SERVICE_DB_NAME=huleedu_class_management
@@ -680,7 +677,6 @@ services:
     environment:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - IDENTITY_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@identity_db:5432/huleedu_identity
       - IDENTITY_SERVICE_DB_HOST=identity_db
       - IDENTITY_SERVICE_DB_PORT=5432
       - IDENTITY_SERVICE_DB_NAME=huleedu_identity
@@ -741,7 +737,6 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=${ENVIRONMENT:-production}
       # Database configuration
-      - EMAIL_SERVICE_DATABASE_URL=postgresql+asyncpg://${HULEEDU_DB_USER}:${HULEEDU_DB_PASSWORD}@email_db:5432/huleedu_email
       - EMAIL_SERVICE_DB_HOST=email_db
       - EMAIL_SERVICE_DB_PORT=5432
       - EMAIL_SERVICE_DB_NAME=huleedu_email

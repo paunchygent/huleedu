@@ -70,7 +70,7 @@ def create_app(settings: Settings | None = None) -> HuleEduApp:
 
     # Initialize guaranteed infrastructure immediately
     app.database_engine = create_async_engine(
-        settings.database_url,
+        settings.DATABASE_URL,
         echo=False,
         future=True,
         pool_size=settings.DATABASE_POOL_SIZE,

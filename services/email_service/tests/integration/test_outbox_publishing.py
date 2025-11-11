@@ -83,7 +83,7 @@ class TestOutboxPublishingIntegration:
     async def database_engine(self, test_settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
         """Create async database engine with complete schema creation."""
         engine = create_async_engine(
-            test_settings.database_url,
+            test_settings.DATABASE_URL,
             echo=False,  # Enable for SQL debugging if needed
         )
 

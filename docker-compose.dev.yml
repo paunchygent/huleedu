@@ -269,10 +269,12 @@ services:
       - ./libs/huleedu_service_libs/src:/app/libs/huleedu_service_libs/src:cached
       - /app/services/identity_service/__pycache__
     environment:
-      - ENV_TYPE=development
+      - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
       - IDENTITY_SERVICE_LOG_LEVEL=DEBUG
+      - IDENTITY_SERVICE_DB_HOST=identity_db
+      - IDENTITY_SERVICE_DB_PORT=5432
 
   # Email Service with development optimizations
   email_service:
