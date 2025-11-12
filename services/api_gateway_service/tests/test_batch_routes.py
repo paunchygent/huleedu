@@ -7,7 +7,9 @@ authentication, rate limiting, and error handling.
 
 from __future__ import annotations
 
+import httpx
 import pytest
+import respx
 from dishka import make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi.testclient import TestClient
@@ -69,8 +71,18 @@ def client_with_mocks(container):
         yield client
 
 
+@pytest.fixture
+def mock_bos_preflight():
+    """Mock BOS preflight endpoint to return success by default."""
+    with respx.mock:
+        # Mock all preflight endpoints to return 200 OK by default
+        route = respx.post(url__regex=r".*/internal/v1/batches/.*/pipelines/.*/preflight")
+        route.return_value = httpx.Response(200, json={"allowed": True})
+        yield route
+
+
 @pytest.mark.asyncio
-async def test_successful_pipeline_request(client_with_mocks, mock_kafka_bus):
+async def test_successful_pipeline_request(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
     """Test successful pipeline request with valid ClientBatchPipelineRequestV1."""
     batch_id = "test_batch_123"
     request_data = {
@@ -132,7 +144,7 @@ async def test_batch_id_mismatch_validation(client_with_mocks):
 
 
 @pytest.mark.asyncio
-async def test_user_id_propagation(client_with_mocks, mock_kafka_bus):
+async def test_user_id_propagation(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
     """Test that authenticated user_id is properly propagated to the event."""
     batch_id = "test_batch_456"
     request_data = {
@@ -151,7 +163,7 @@ async def test_user_id_propagation(client_with_mocks, mock_kafka_bus):
 
 
 @pytest.mark.asyncio
-async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus):
+async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
     """Test error handling when Kafka publishing fails."""
     mock_kafka_bus.publish.side_effect = Exception("Kafka connection failed")
 
@@ -172,7 +184,7 @@ async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus)
 
 
 @pytest.mark.asyncio
-async def test_retry_request_handling(client_with_mocks, mock_kafka_bus):
+async def test_retry_request_handling(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
     """Test handling of retry requests with retry context."""
     batch_id = "test_batch_retry"
     request_data = {
@@ -243,7 +255,7 @@ async def test_invalid_enum_value_for_pipeline(client_with_mocks):
 
 
 @pytest.mark.asyncio
-async def test_correlation_id_generation(client_with_mocks, mock_kafka_bus):
+async def test_correlation_id_generation(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
     """Test that correlation IDs are properly generated and used."""
     batch_id = "test_batch_correlation"
     request_data = {
@@ -298,7 +310,7 @@ async def mock_kafka_bus_with_org(container_with_org):
 
 @pytest.mark.asyncio
 async def test_pipeline_request_includes_org_id_in_envelope_metadata(
-    client_with_org_mocks, mock_kafka_bus_with_org
+    client_with_org_mocks, mock_kafka_bus_with_org, mock_bos_preflight
 ):
     """org_id in DI should be recorded in envelope.metadata for downstream attribution."""
     batch_id = "test_batch_with_org"

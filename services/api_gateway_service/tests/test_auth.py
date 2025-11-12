@@ -165,7 +165,7 @@ class TestJWTAuthentication:
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request)
 
-        assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
+        assert "invalid token signature" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_malformed_token(self):
@@ -178,7 +178,7 @@ class TestJWTAuthentication:
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request)
 
-        assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
+        assert "invalid token" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_missing_authorization_header(self):
@@ -225,7 +225,7 @@ class TestJWTAuthentication:
         with pytest.raises(HuleEduError) as exc_info:
             await self._test_auth_through_container(mock_request)
 
-        assert "could not validate credentials" in exc_info.value.error_detail.message.lower()
+        assert "algorithm not allowed" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
     async def test_user_id_extraction_from_subject_claim(self):

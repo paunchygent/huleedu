@@ -7,7 +7,7 @@ FastAPI-specific settings and Svelte 5 + Vite frontend integration.
 
 from __future__ import annotations
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field
 from pydantic_settings import SettingsConfigDict
 
 from common_core.config_enums import Environment
@@ -64,19 +64,8 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
     )
 
     # Security
-    JWT_SECRET_KEY: SecretStr = Field(
-        default=SecretStr("a-very-secret-key-that-must-be-in-secrets-manager"),
-        description="JWT secret key for token signing and validation",
-    )
-    JWT_ALGORITHM: str = "HS256"
-    JWT_AUDIENCE: str = Field(
-        default="huleedu-platform",
-        description="Expected JWT audience for incoming tokens",
-    )
-    JWT_ISSUER: str = Field(
-        default="huleedu-identity-service",
-        description="Expected JWT issuer",
-    )
+    # JWT validation settings inherited from JWTValidationSettings
+    # Only override defaults here if needed for API Gateway specifically
     JWT_ORG_ID_CLAIM_NAMES: list[str] = Field(
         default_factory=lambda: ["org_id", "org", "organization_id"],
         description=(

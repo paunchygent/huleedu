@@ -98,6 +98,24 @@ def decode_and_validate_jwt(
             reason="invalid_signature",
             error=str(exc),
         )
+    except jwt_exceptions.InvalidAlgorithmError as exc:
+        raise_authentication_error(
+            service=service,
+            operation=operation,
+            message="Algorithm not allowed",
+            correlation_id=correlation_id,
+            reason="invalid_algorithm",
+            error=str(exc),
+        )
+    except jwt_exceptions.InvalidSubjectError as exc:
+        raise_authentication_error(
+            service=service,
+            operation=operation,
+            message="Subject must be a string",
+            correlation_id=correlation_id,
+            reason="invalid_subject",
+            error=str(exc),
+        )
     except jwt_exceptions.InvalidTokenError as exc:
         raise_authentication_error(
             service=service,

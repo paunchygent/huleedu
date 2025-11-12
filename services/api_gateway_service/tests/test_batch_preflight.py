@@ -14,7 +14,7 @@ from prometheus_client import CollectorRegistry
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from services.api_gateway_service.app.metrics import GatewayMetrics
-from services.api_gateway_service.protocols import HttpClientProtocol
+from services.api_gateway_service.protocols import HttpClientProtocol, MetricsProtocol
 
 
 class PreflightProvider(Provider):
@@ -31,6 +31,10 @@ class PreflightProvider(Provider):
 
     @provide(scope=Scope.APP)
     def provide_metrics(self, registry: CollectorRegistry) -> GatewayMetrics:
+        return GatewayMetrics(registry=registry)
+
+    @provide(scope=Scope.APP)
+    def provide_metrics_protocol(self, registry: CollectorRegistry) -> MetricsProtocol:
         return GatewayMetrics(registry=registry)
 
     @provide

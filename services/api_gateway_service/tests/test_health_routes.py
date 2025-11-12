@@ -166,7 +166,7 @@ class TestHealthRoutes:
 
             # Assert
             assert response.status_code == 200
-            assert response.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
+            assert response.headers["content-type"] == "text/plain; version=1.0.0; charset=utf-8"
 
             # Verify response contains Prometheus metrics format
             content = response.text
