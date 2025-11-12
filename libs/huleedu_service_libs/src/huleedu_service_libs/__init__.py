@@ -17,11 +17,13 @@ from .observability import (
 )
 from .quart_app import HuleEduApp
 from .redis_client import RedisClient
+from .utils import Result
 
 __all__ = [
     "HuleEduApp",
     "KafkaBus",
     "RedisClient",
+    "Result",
     "init_tracing",
     "trace_operation",
     "get_current_trace_id",
