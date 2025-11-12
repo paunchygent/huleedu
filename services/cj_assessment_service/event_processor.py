@@ -22,6 +22,7 @@ from common_core.events.llm_provider_events import LLMComparisonResultV1
 from common_core.metadata_models import StorageReferenceMetadata, SystemProcessingMetadata
 from common_core.models.error_models import ErrorDetail
 from common_core.status_enums import BatchStatus, ProcessingStage
+from huleedu_service_libs import Result
 from huleedu_service_libs.error_handling import HuleEduError
 from huleedu_service_libs.error_handling.error_detail_factory import (
     create_error_detail_with_context,
@@ -42,7 +43,7 @@ from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
-from services.cj_assessment_service.models_api import PromptHydrationFailure, Result
+from services.cj_assessment_service.models_api import PromptHydrationFailure
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -233,6 +234,21 @@ async def _process_cj_assessment_impl(
         else:
             prompt_text = None
 
+        (
+            judge_rubric_storage_id,
+            judge_rubric_text,
+        ) = await _hydrate_judge_rubric_context(
+            database=database,
+            content_client=content_client,
+            assignment_id=request_event_data.assignment_id,
+            correlation_id=envelope.correlation_id,
+            log_extra={
+                "event_id": str(envelope.event_id),
+                "bos_batch_id": str(request_event_data.entity_id),
+            },
+            prompt_failure_metric=prompt_failure_metric,
+        )
+
         log_extra: dict[str, Any] = {
             "correlation_id": str(envelope.correlation_id),
             "event_id": str(envelope.event_id),
@@ -240,6 +256,8 @@ async def _process_cj_assessment_impl(
         }
         if prompt_storage_id:
             log_extra["prompt_storage_id"] = prompt_storage_id
+        if judge_rubric_storage_id:
+            log_extra["judge_rubric_storage_id"] = judge_rubric_storage_id
 
         # Record queue latency metric if available
         if (
@@ -291,6 +309,8 @@ async def _process_cj_assessment_impl(
             "course_code": request_event_data.course_code,
             "student_prompt_text": prompt_text,
             "student_prompt_storage_id": prompt_storage_id,
+            "judge_rubric_text": judge_rubric_text,
+            "judge_rubric_storage_id": judge_rubric_storage_id,
             "llm_config_overrides": request_event_data.llm_config_overrides,
             # Identity fields for credit attribution (Phase 3: Entitlements integration)
             "user_id": request_event_data.user_id,
@@ -572,6 +592,88 @@ async def _hydrate_prompt_text(
             },
         )
         return Result.err(PromptHydrationFailure("unexpected_error", storage_id))
+
+
+async def _hydrate_judge_rubric_context(
+    *,
+    database: CJRepositoryProtocol,
+    content_client: ContentClientProtocol,
+    assignment_id: str | None,
+    correlation_id: UUID,
+    log_extra: dict[str, Any],
+    prompt_failure_metric: Any,
+) -> tuple[str | None, str | None]:
+    """Fetch judge rubric storage reference and text for the assignment, if available."""
+
+    if not assignment_id:
+        return None, None
+
+    try:
+        async with database.session() as session:
+            instruction = await database.get_assessment_instruction(
+                session,
+                assignment_id=assignment_id,
+                course_id=None,
+            )
+    except Exception:  # pragma: no cover - defensive guard
+        logger.error(
+            "Failed to load assessment instruction while hydrating judge rubric",
+            extra={**log_extra, "assignment_id": assignment_id},
+            exc_info=True,
+        )
+        _record_prompt_failure(prompt_failure_metric, "rubric_instruction_lookup_failed")
+        return None, None
+
+    if not instruction:
+        logger.debug(
+            "No assessment instruction found while hydrating judge rubric",
+            extra={**log_extra, "assignment_id": assignment_id},
+        )
+        return None, None
+
+    storage_id = getattr(instruction, "judge_rubric_storage_id", None)
+    if not storage_id:
+        return None, None
+
+    try:
+        rubric_text = await content_client.fetch_content(storage_id, correlation_id)
+        if not rubric_text:
+            logger.warning(
+                "Hydrated judge rubric text is empty",
+                extra={**log_extra, "storage_id": storage_id},
+            )
+            _record_prompt_failure(prompt_failure_metric, "rubric_empty_content")
+            return storage_id, None
+
+        logger.debug(
+            "Hydrated judge rubric text for CJ assessment batch",
+            extra={
+                **log_extra,
+                "storage_id": storage_id,
+                "rubric_preview": rubric_text[:100],
+            },
+        )
+        return storage_id, rubric_text
+
+    except HuleEduError as error:
+        logger.warning(
+            "Failed to fetch judge rubric text from Content Service",
+            extra={
+                **log_extra,
+                "storage_id": storage_id,
+                "error": getattr(error, "error_detail", str(error)),
+            },
+        )
+        _record_prompt_failure(prompt_failure_metric, "rubric_content_service_error")
+        return storage_id, None
+    except Exception:  # pragma: no cover - defensive guard
+        logger.error(
+            "Unexpected error fetching judge rubric text",
+            extra={**log_extra, "storage_id": storage_id},
+            exc_info=True,
+        )
+        _record_prompt_failure(prompt_failure_metric, "rubric_unexpected_error")
+        return storage_id, None
 
 
 # Helper functions for structured error handling

@@ -59,6 +59,8 @@ async def create_cj_batch(
         assignment_id = request_data.get("assignment_id")  # For anchor essay lookup
         prompt_storage_id = request_data.get("student_prompt_storage_id")
         prompt_text = request_data.get("student_prompt_text")
+        judge_rubric_storage_id = request_data.get("judge_rubric_storage_id")
+        judge_rubric_text = request_data.get("judge_rubric_text")
         # Identity fields for credit attribution (Phase 3: Entitlements integration)
         user_id = request_data.get("user_id")
         org_id = request_data.get("org_id")
@@ -79,21 +81,35 @@ async def create_cj_batch(
             org_id=org_id,
         )
 
-        # Auto-hydrate student prompt from assignment instruction
-        if assignment_id and not prompt_storage_id:
+        instruction = None
+        if assignment_id and (not prompt_storage_id or not judge_rubric_storage_id):
             instruction = await database.get_assessment_instruction(
                 session, assignment_id=assignment_id, course_id=None
             )
-            if instruction and instruction.student_prompt_storage_id:
-                prompt_storage_id = instruction.student_prompt_storage_id
-                logger.info(
-                    "Auto-hydrated student prompt from instruction",
-                    extra={
-                        **log_extra,
-                        "assignment_id": assignment_id,
-                        "storage_id": prompt_storage_id,
-                    },
-                )
+
+        # Auto-hydrate student prompt from assessment instruction when missing
+        if instruction and not prompt_storage_id and instruction.student_prompt_storage_id:
+            prompt_storage_id = instruction.student_prompt_storage_id
+            logger.info(
+                "Auto-hydrated student prompt from instruction",
+                extra={
+                    **log_extra,
+                    "assignment_id": assignment_id,
+                    "storage_id": prompt_storage_id,
+                },
+            )
+
+        # Auto-hydrate judge rubric reference from assessment instruction when missing
+        if instruction and not judge_rubric_storage_id and instruction.judge_rubric_storage_id:
+            judge_rubric_storage_id = instruction.judge_rubric_storage_id
+            logger.info(
+                "Auto-hydrated judge rubric reference from instruction",
+                extra={
+                    **log_extra,
+                    "assignment_id": assignment_id,
+                    "storage_id": judge_rubric_storage_id,
+                },
+            )
 
         # Hydration fallback if storage_id exists but text is missing
         if prompt_storage_id and not prompt_text:
@@ -125,14 +141,45 @@ async def create_cj_batch(
                             exc_info=True,
                         )
 
+        # Hydration fallback for judge rubric text
+        if judge_rubric_storage_id and not judge_rubric_text:
+            try:
+                judge_rubric_text = await content_client.fetch_content(
+                    judge_rubric_storage_id, correlation_id
+                )
+                logger.info(
+                    "Hydrated judge rubric text via fallback in batch creation",
+                    extra={**log_extra, "storage_id": judge_rubric_storage_id},
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to hydrate judge rubric in batch creation: {e}",
+                    extra={**log_extra, "storage_id": judge_rubric_storage_id},
+                )
+                if prompt_failure_metric:
+                    try:
+                        if hasattr(prompt_failure_metric, "labels"):
+                            prompt_failure_metric.labels(
+                                reason="batch_creation_rubric_hydration_failed"
+                            ).inc()
+                        else:
+                            prompt_failure_metric.inc()
+                    except Exception:  # pragma: no cover - defensive
+                        logger.debug(
+                            "Unable to increment rubric hydration failure metric in batch creation",
+                            exc_info=True,
+                        )
+
         # Use typed metadata with permissive merge
-        if prompt_storage_id or prompt_text:
+        typed_metadata = CJProcessingMetadata(
+            student_prompt_storage_id=prompt_storage_id,
+            student_prompt_text=prompt_text,
+            judge_rubric_storage_id=judge_rubric_storage_id,
+            judge_rubric_text=judge_rubric_text,
+        ).model_dump(exclude_none=True)
+        if typed_metadata:
             existing = cj_batch.processing_metadata or {}
-            typed = CJProcessingMetadata(
-                student_prompt_storage_id=prompt_storage_id,
-                student_prompt_text=prompt_text,
-            ).model_dump(exclude_none=True)
-            cj_batch.processing_metadata = {**existing, **typed}
+            cj_batch.processing_metadata = {**existing, **typed_metadata}
             await session.flush()
 
         # Store assignment_id if provided

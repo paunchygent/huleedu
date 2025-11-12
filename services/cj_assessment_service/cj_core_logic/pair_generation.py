@@ -88,6 +88,7 @@ async def generate_comparison_tasks(
                 essay_b,
                 assessment_instructions=assessment_context.get("assessment_instructions"),
                 student_prompt_text=assessment_context.get("student_prompt_text"),
+                judge_rubric_text=assessment_context.get("judge_rubric_text"),
             )
             task = ComparisonTask(essay_a=essay_a, essay_b=essay_b, prompt=prompt)
 
@@ -185,6 +186,7 @@ async def _fetch_assessment_context(
     # Extract context from processing metadata
     metadata = batch.processing_metadata or {}
     student_prompt_text = metadata.get("student_prompt_text")
+    judge_rubric_text = metadata.get("judge_rubric_text")
     assignment_id = metadata.get("assignment_id") or batch.assignment_id
 
     # Fetch assessment instructions if assignment_id is available
@@ -210,11 +212,16 @@ async def _fetch_assessment_context(
             "cj_batch_id": str(cj_batch_id),
             "has_instructions": assessment_instructions is not None,
             "has_student_prompt": student_prompt_text is not None,
+            "has_judge_rubric": judge_rubric_text is not None,
         },
     )
 
     # Warn if no context is available
-    if not assessment_instructions and not student_prompt_text:
+    if (
+        not assessment_instructions
+        and not student_prompt_text
+        and not judge_rubric_text
+    ):
         logger.warning(
             "No assessment context available for prompt building",
             extra={
@@ -225,6 +232,7 @@ async def _fetch_assessment_context(
     return {
         "assessment_instructions": assessment_instructions,
         "student_prompt_text": student_prompt_text,
+        "judge_rubric_text": judge_rubric_text,
     }
 
 
@@ -233,14 +241,16 @@ def _build_comparison_prompt(
     essay_b: EssayForComparison,
     assessment_instructions: str | None = None,
     student_prompt_text: str | None = None,
+    judge_rubric_text: str | None = None,
 ) -> str:
     """Build the comparison prompt for two essays with assessment context.
 
     Args:
         essay_a: First essay for comparison
         essay_b: Second essay for comparison
-        assessment_instructions: Assessment criteria and rubric from assignment
+        assessment_instructions: Assessment criteria supplied by teacher/admin
         student_prompt_text: Original student prompt showing what was asked
+        judge_rubric_text: Detailed judge rubric to guide evaluation
 
     Returns:
         Formatted prompt string for LLM comparison with full context
@@ -249,11 +259,14 @@ def _build_comparison_prompt(
 
     # Add student prompt context if available
     if student_prompt_text:
-        prompt_parts.append(f"**Assignment Prompt:**\n{student_prompt_text}")
+        prompt_parts.append(f"**Student Assignment:**\n{student_prompt_text}")
 
     # Add assessment instructions/rubric if available
     if assessment_instructions:
         prompt_parts.append(f"**Assessment Criteria:**\n{assessment_instructions}")
+
+    if judge_rubric_text:
+        prompt_parts.append(f"**Judge Instructions:**\n{judge_rubric_text}")
 
     # Add essays for comparison
     prompt_parts.append(f"**Essay A (ID: {essay_a.id}):**\n{essay_a.text_content}")
@@ -261,9 +274,10 @@ def _build_comparison_prompt(
 
     # Add response instructions
     prompt_parts.append(
-        "Compare these two essays based on the assessment criteria and assignment "
-        "prompt provided above. Determine which essay better fulfills the requirements. "
-        "Respond with JSON indicating the winner, justification, and confidence level (1-5)."
+        "Using the Student Assignment, Assessment Criteria, and Judge Instructions above, "
+        "determine which essay better fulfills the requirements. Respond with JSON indicating "
+        "the `winner` ('Essay A' or 'Essay B'), a brief `justification`, and a `confidence` "
+        "rating from 1-5 (5 = very confident). Provide a decisive judgment."
     )
 
     return "\n\n".join(prompt_parts)

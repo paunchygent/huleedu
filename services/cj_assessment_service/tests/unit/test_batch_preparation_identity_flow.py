@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -80,6 +80,8 @@ class TestIdentityThreadingInBatchCreation:
             "course_code": "ENG5",
             "student_prompt_text": "Compare essay quality",
             "student_prompt_storage_id": "prompt-storage-base",
+            "judge_rubric_text": "Judge rubric baseline",
+            "judge_rubric_storage_id": "rubric-storage-base",
             "essays_to_process": [
                 {"els_essay_id": "essay1", "text_storage_id": "storage1"},
                 {"els_essay_id": "essay2", "text_storage_id": "storage2"},
@@ -187,6 +189,18 @@ class TestIdentityThreadingInBatchCreation:
             ]
             == "Compare essay quality"
         )
+        assert (
+            mock_database.create_new_cj_batch.return_value.processing_metadata[
+                "judge_rubric_storage_id"
+            ]
+            == "rubric-storage-base"
+        )
+        assert (
+            mock_database.create_new_cj_batch.return_value.processing_metadata[
+                "judge_rubric_text"
+            ]
+            == "Judge rubric baseline"
+        )
 
     @pytest.mark.asyncio
     async def test_missing_user_id_validation(
@@ -285,6 +299,8 @@ class TestIdentityThreadingInBatchCreation:
         metadata = mock_batch.processing_metadata
         assert metadata["student_prompt_storage_id"] == "prompt-storage-base"
         assert metadata["student_prompt_text"] == "Hydrated prompt body"
+        assert metadata["judge_rubric_storage_id"] == "rubric-storage-base"
+        assert metadata["judge_rubric_text"] == "Judge rubric baseline"
         assert metadata["retry_count"] == 2
         assert success_counter.count == 1
         assert failure_counter.count == 0
@@ -327,10 +343,47 @@ class TestIdentityThreadingInBatchCreation:
         metadata = mock_batch.processing_metadata
         assert metadata["student_prompt_storage_id"] == "prompt-storage-base"
         assert "student_prompt_text" not in metadata
+        assert metadata["judge_rubric_storage_id"] == "rubric-storage-base"
+        assert metadata["judge_rubric_text"] == "Judge rubric baseline"
         assert metadata["retry_count"] == 2
         assert success_counter.count == 0
         assert failure_counter.count == 1
         assert failure_counter.labels_calls == [{"reason": "batch_creation_hydration_failed"}]
+
+    @pytest.mark.asyncio
+    async def test_create_cj_batch_hydrates_judge_rubric_text_when_missing(
+        self,
+        mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
+        base_request_data: dict[str, Any],
+    ) -> None:
+        """Judge rubric text should be hydrated when storage reference exists."""
+
+        mock_batch = mock_database.create_new_cj_batch.return_value
+        mock_batch.processing_metadata = {}
+        mock_content_client.fetch_content = AsyncMock(
+            side_effect=["Hydrated rubric guidance"]
+        )
+
+        request_data = {
+            **base_request_data,
+            "judge_rubric_text": None,
+        }
+
+        await create_cj_batch(
+            request_data=request_data,
+            correlation_id=uuid4(),
+            database=mock_database,
+            content_client=mock_content_client,
+            log_extra={},
+        )
+
+        metadata = mock_batch.processing_metadata
+        assert metadata["judge_rubric_storage_id"] == "rubric-storage-base"
+        assert metadata["judge_rubric_text"] == "Hydrated rubric guidance"
+        mock_content_client.fetch_content.assert_awaited_once_with(
+            "rubric-storage-base", ANY
+        )
 
     @pytest.mark.asyncio
     async def test_identity_field_precedence_over_defaults(

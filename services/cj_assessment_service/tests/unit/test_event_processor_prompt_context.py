@@ -220,3 +220,92 @@ async def test_process_message_increments_prompt_success_metric(
     converted_request_data = workflow_mock.call_args.kwargs["request_data"]
     assert converted_request_data["assignment_id"] == "assignment-909"
     assert converted_request_data["student_prompt_text"] == "Prompt body"
+
+
+@pytest.mark.asyncio
+async def test_process_message_hydrates_judge_rubric_text(
+    cj_assessment_request_data_with_overrides: ELS_CJAssessmentRequestV1,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ensure judge rubric storage/text are hydrated and forwarded in request data."""
+
+    from services.cj_assessment_service.tests.unit.mocks import MockDatabase
+
+    assignment_id = "assignment-judge-001"
+    prompt_storage = "prompt-storage-with-overrides"
+    rubric_storage = "rubric-storage-001"
+
+    event_data = cj_assessment_request_data_with_overrides.model_copy(
+        update={
+            "assignment_id": assignment_id,
+            "student_prompt_ref": cj_assessment_request_data_with_overrides.student_prompt_ref,
+        }
+    )
+
+    envelope: EventEnvelope[ELS_CJAssessmentRequestV1] = EventEnvelope(
+        event_id=uuid4(),
+        event_type="els.cj_assessment.requested.v1",
+        event_timestamp=datetime.now(UTC),
+        source_service="essay_lifecycle_service",
+        correlation_id=uuid4(),
+        data=event_data,
+    )
+
+    kafka_msg = _create_consumer_record(envelope.model_dump(mode="json"))
+
+    repository = MockDatabase()
+    repository._instruction_store.upsert(
+        assignment_id=assignment_id,
+        course_id=None,
+        instructions_text="Judge using rubric",
+        grade_scale="swedish_8_anchor",
+        student_prompt_storage_id=prompt_storage,
+        judge_rubric_storage_id=rubric_storage,
+    )
+
+    content_client = AsyncMock(spec=ContentClientProtocol)
+    content_client.fetch_content = AsyncMock(
+        side_effect=[
+            "Prompt body from Content Service",
+            "Judge rubric detailed guidance",
+        ]
+    )
+    event_publisher = AsyncMock(spec=CJEventPublisherProtocol)
+    llm_interaction = AsyncMock(spec=LLMInteractionProtocol)
+    workflow_mock = AsyncMock(return_value=Mock(rankings=[], batch_id="1"))
+    monkeypatch.setattr(
+        "services.cj_assessment_service.event_processor.run_cj_assessment_workflow",
+        workflow_mock,
+    )
+
+    metrics = {
+        "cj_comparisons_made": None,
+        "cj_assessment_duration_seconds": None,
+        "kafka_queue_latency_seconds": None,
+        "prompt_fetch_failures": DummyCounter(),
+        "prompt_fetch_success": DummyCounter(),
+    }
+    monkeypatch.setattr(
+        "services.cj_assessment_service.event_processor.get_business_metrics",
+        lambda: metrics,
+    )
+
+    settings = Mock(
+        MAX_PAIRWISE_COMPARISONS=100,
+        CJ_ASSESSMENT_FAILED_TOPIC="cj_assessment.failed.v1",
+        SERVICE_NAME="cj_assessment_service",
+    )
+
+    await process_single_message(
+        msg=kafka_msg,
+        database=repository,
+        content_client=content_client,
+        event_publisher=event_publisher,
+        llm_interaction=llm_interaction,
+        settings_obj=settings,
+    )
+
+    converted_request_data = workflow_mock.call_args.kwargs["request_data"]
+    assert converted_request_data["student_prompt_storage_id"] == prompt_storage
+    assert converted_request_data["judge_rubric_storage_id"] == rubric_storage
+    assert converted_request_data["judge_rubric_text"] == "Judge rubric detailed guidance"

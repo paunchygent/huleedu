@@ -22,7 +22,8 @@ from quart_dishka import QuartDishka
 from typer.testing import CliRunner
 
 from services.cj_assessment_service import cli_admin
-from services.cj_assessment_service.api import admin_routes
+from services.cj_assessment_service.api.admin import common as admin_common
+from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.cj_core_logic.batch_preparation import create_cj_batch
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
@@ -35,8 +36,8 @@ def _patch_decode(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_decode(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
         return {"sub": "admin-user", "roles": ["admin"]}
 
-    # Patch both the module used by the blueprint and the auth module
-    monkeypatch.setattr(admin_routes, "decode_and_validate_jwt", fake_decode)
+    # Patch both the shared auth helper and the global auth module
+    monkeypatch.setattr(admin_common, "decode_and_validate_jwt", fake_decode)
     monkeypatch.setattr(auth_module, "decode_and_validate_jwt", fake_decode)
 
 
@@ -71,7 +72,7 @@ async def test_student_prompt_workflow_end_to_end(
     QuartDishka(
         app=app, container=container
     )  # DI must be initialized before blueprint registration
-    app.register_blueprint(admin_routes.bp)
+    app.register_blueprint(student_prompts_bp)
 
     _patch_decode(monkeypatch)
 
