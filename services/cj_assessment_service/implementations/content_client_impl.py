@@ -127,24 +127,33 @@ class ContentClientImpl(ContentClientProtocol):
 
         async def _make_store_request() -> dict[str, str]:
             """Make the HTTP request to store content."""
-            url = f"{self.content_service_base_url}/store"
+            url = self.content_service_base_url
+            correlation_id = uuid4()
 
             async with self.session.post(
                 url,
-                json={"content": content, "content_type": content_type},
+                data=content.encode("utf-8"),
+                headers={"Content-Type": content_type},
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
-                if response.status == 200:
+                if response.status == 201:
                     result = await response.json()
-                    content_id = result.get("content_id", "")
+                    storage_id = result.get("storage_id")
+                    if not storage_id:
+                        raise_invalid_response(
+                            service="cj_assessment_service",
+                            operation="store_content",
+                            message="Content Service response missing storage_id",
+                            correlation_id=correlation_id,
+                        )
                     logger.debug(
                         "Successfully stored content in Content Service",
                         extra={
-                            "content_id": content_id,
+                            "storage_id": storage_id,
                             "content_length": len(content),
                         },
                     )
-                    return {"content_id": str(content_id)}
+                    return {"content_id": storage_id}
                 else:
                     error_text = await response.text()
                     raise_external_service_error(
@@ -152,7 +161,7 @@ class ContentClientImpl(ContentClientProtocol):
                         operation="store_content",
                         external_service="content_service",
                         message=f"Content Service error: HTTP {response.status}",
-                        correlation_id=uuid4(),  # Generate new UUID for error tracking
+                        correlation_id=correlation_id,
                         status_code=response.status,
                         error_text=error_text[:500],
                     )

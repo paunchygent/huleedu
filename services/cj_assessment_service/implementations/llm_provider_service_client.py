@@ -68,9 +68,11 @@ class LLMProviderServiceClient(LLMProviderProtocol):
             essay_a_start = essay_b_start = -1
 
             for i, line in enumerate(lines):
-                if line.strip().startswith("Essay A") and ":" in line:
+                stripped = line.strip()
+                # Handle both old format "Essay A:" and new format "**Essay A (ID: ...):**"
+                if (stripped.startswith("Essay A") or stripped.startswith("**Essay A")) and ":" in stripped:
                     essay_a_start = i + 1
-                elif line.strip().startswith("Essay B") and ":" in line:
+                elif (stripped.startswith("Essay B") or stripped.startswith("**Essay B")) and ":" in stripped:
                     essay_b_start = i + 1
 
             if essay_a_start == -1 or essay_b_start == -1:

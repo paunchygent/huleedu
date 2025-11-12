@@ -134,6 +134,38 @@ async with self.session_context() as session:
     await session.commit()
 ```
 
+## Testing with DI
+
+**Pure Implementation Pattern**:
+```python
+# Pure function for unit tests
+async def _operation_impl(
+    db_session: AsyncSession,
+    content_client: ContentClientProtocol,  # Explicit for testing
+    data: dict,
+) -> Result:
+    ...
+
+# Dishka wrapper for production
+async def operation(
+    db_session: FromDishka[AsyncSession],
+    content_client: FromDishka[ContentClientProtocol],
+    data: dict,
+) -> Result:
+    return await _operation_impl(db_session, content_client, data)
+
+# Unit test: call _impl directly
+async def test_operation(mock_client: AsyncMock):
+    result = await _operation_impl(
+        db_session=mock_session,
+        content_client=mock_client,
+        data=test_data,
+    )
+```
+
+**Use explicit parameters when**: Core to function contract, different implementations per test, fine-grained test control
+**Use Dishka injection when**: Infrastructure dependencies, singletons, request-scoped resources
+
 ## Issue Prevention
 
 1. **MissingGreenlet**: Repository-managed sessions

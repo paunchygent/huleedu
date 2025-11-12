@@ -42,7 +42,7 @@ alwaysApply: false
 - [040-service-implementation-guidelines.mdc](mdc:040-service-implementation-guidelines.mdc): High-level service implementation principles and stack requirements
 - [041-http-service-blueprint.mdc](mdc:041-http-service-blueprint.mdc): HTTP service architecture patterns and Blueprint implementation
 - [041.1-fastapi-integration-patterns.mdc](mdc:041.1-fastapi-integration-patterns.mdc): FastAPI integration patterns with comprehensive observability and testing
-- [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, and worker service structure
+- [042-async-patterns-and-di.mdc](mdc:042-async-patterns-and-di.mdc): Async patterns, protocols, dependency injection, worker service structure, and DI testing with pure implementation pattern
 - [042.1-transactional-outbox-pattern.mdc](mdc:042.1-transactional-outbox-pattern.mdc): Transactional outbox pattern as fallback for Kafka failures
 - [042.2-http-proxy-service-patterns.mdc](mdc:042.2-http-proxy-service-patterns.mdc): HTTP proxy service patterns for request forwarding, error handling, and observability
 - [043-service-configuration-and-logging.mdc](mdc:043-service-configuration-and-logging.mdc): Configuration management and logging standards
@@ -53,7 +53,7 @@ alwaysApply: false
 - [045-retry-logic.mdc](mdc:045-retry-logic.mdc): Natural retry via idempotency and user-initiated retry patterns
 - [046-docker-container-debugging.mdc](mdc:046-docker-container-debugging.mdc): Systematic Docker container discovery and debugging protocol
 - [047-security-configuration-standards.mdc](mdc:047-security-configuration-standards.mdc): Security configuration patterns for JWT, secrets management, and environment-aware security controls
-- [048-structured-error-handling-standards.mdc](mdc:048-structured-error-handling-standards.mdc): Structured error handling patterns and observability integration standards
+- [048-structured-error-handling-standards.mdc](mdc:048-structured-error-handling-standards.mdc): Exception-based error handling for boundaries, Result monad for internal control flow, error payload design
 - [049-smtp-email-provider-patterns.mdc](mdc:049-smtp-email-provider-patterns.mdc): SMTP email provider configuration patterns
 - [050-python-coding-standards.mdc](mdc:050-python-coding-standards.mdc): Python style, formatting, linting, typing, documentation
 - [051-pydantic-v2-standards.mdc](mdc:051-pydantic-v2-standards.mdc): Pydantic v2 usage patterns, serialization, and configuration standards
@@ -63,10 +63,10 @@ alwaysApply: false
 - [055-import-resolution-patterns.mdc](mdc:055-import-resolution-patterns.mdc): Import patterns to avoid module conflicts in monorepo
 
 ## Quality, Workflow & Documentation
-- [060-data-and-metadata-management.mdc](mdc:060-data-and-metadata-management.mdc): Data models and metadata management standards
+- [060-data-and-metadata-management.mdc](mdc:060-data-and-metadata-management.mdc): Data models, metadata management, typed metadata overlay pattern for gradual dict-to-Pydantic migration
 - [070-testing-and-quality-assurance.mdc](mdc:070-testing-and-quality-assurance.mdc): Testing strategies (unit, contract, integration, E2E) with Prometheus registry handling
 - [070.1-performance-testing-methodology.mdc](mdc:070.1-performance-testing-methodology.mdc): Performance testing methodology and patterns
-- [075-test-creation-methodology.mdc](mdc:075-test-creation-methodology.mdc): Systematic test creation methodology for comprehensive, maintainable test coverage following battle-tested patterns
+- [075-test-creation-methodology.mdc](mdc:075-test-creation-methodology.mdc): Systematic test creation methodology, JWT authentication testing, content client mocking patterns
 - [075.1-parallel-test-creation-methodology.mdc](mdc:075.1-parallel-test-creation-methodology.mdc): Parallel test creation with mandatory architect validation
 - **Observability (071.x)**
   - [071-observability-index.mdc](mdc:071-observability-index.mdc): Observability patterns index

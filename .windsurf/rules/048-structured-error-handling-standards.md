@@ -1,75 +1,77 @@
 ---
-description: Exception-based error handling pattern
-globs: 
+description: Exception-based error handling and Result monad patterns
+globs:
 alwaysApply: false
 ---
-# 048: Exception-Based Error Handling
+# 048: Error Handling Patterns
 
-## Architecture
-
-```python
-# Data (common_core) - PURE, NO METHODS
-class ErrorDetail(BaseModel):
-    error_code: ErrorCode
-    message: str
-    correlation_id: UUID
-    timestamp: datetime
-    service: str
-    operation: str
-    # ... only fields
-
-# Transport (service libs)
-class HuleEduError(Exception):
-    def __init__(self, error_detail: ErrorDetail)
-
-# Creation (service libs)
-raise_validation_error(service="x", operation="y", field="z", message="...", correlation_id=uuid)
-```
-
-## Patterns
+## Exception Pattern (Boundary Operations)
 
 ```python
-# PROTOCOL SIGNATURES
-async def fetch_content(self, content_id: str) -> str:  # NOT tuple
+# Protocol signatures - return values, not tuples
+async def fetch_content(self, content_id: str) -> str:
 
-# RAISING ERRORS
+# Raise exceptions for boundary violations
 raise_resource_not_found(
     service="my_service",
-    operation="get_item", 
+    operation="get_item",
     resource_type="Item",
     resource_id=item_id,
     correlation_id=self.correlation_id
 )
 
-# BOUNDARY HANDLERS ONLY
+# Boundary handlers only
 try:
     result = await service.operation()
 except HuleEduError:
-    # Already logged by exception
     raise
 ```
 
-## Prohibited
+## Result Monad Pattern (Internal Control Flow)
 
 ```python
-# NEVER
-return None, ErrorDetail(...)
-return result, None
-ErrorDetail.create_with_context()  # Use factory
-error_message: str fields
+from huleedu_service_libs import Result
+
+# Return Result for recoverable internal operations
+async def _hydrate_prompt_text(...) -> Result[str, PromptHydrationFailure]:
+    if not storage_id:
+        return Result.ok("")
+
+    try:
+        text = await client.fetch_content(storage_id)
+        return Result.ok(text) if text else Result.err(
+            PromptHydrationFailure(reason="empty_content", storage_id=storage_id)
+        )
+    except HuleEduError:
+        return Result.err(
+            PromptHydrationFailure(reason="content_service_error", storage_id=storage_id)
+        )
+
+# Caller inspects result
+result = await _hydrate_prompt_text(...)
+if result.is_ok:
+    text = result.value
+else:
+    failure = result.error
+    logger.warning(f"Hydration failed: {failure.reason}")
+
+# Error payload: frozen dataclass
+@dataclass(frozen=True)
+class PromptHydrationFailure:
+    reason: str
+    storage_id: str | None = None
 ```
+
+## Usage Decision
+
+- **Result**: Internal operations, recoverable failures, normal control flow
+- **Exception**: Boundary operations (HTTP/events), unexpected failures, cross-service violations
 
 ## Imports
 
 ```python
-# Core error handling (framework-agnostic) - USE MAIN MODULE
+from huleedu_service_libs import Result
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail
-
-# Framework-specific error handlers - USE FRAMEWORK SUBMODULES
-# FastAPI services:
-from huleedu_service_libs.error_handling.fastapi import register_error_handlers
-
-# Quart services:  
-from huleedu_service_libs.error_handling.quart import register_error_handlers, create_error_response
+from huleedu_service_libs.error_handling.quart import register_error_handlers
 ```

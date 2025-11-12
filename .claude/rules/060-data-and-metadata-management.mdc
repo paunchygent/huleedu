@@ -40,6 +40,28 @@ alwaysApply: false
 ### 3.2. Logging Includes Metadata
 - Logging **MUST** include relevant metadata, especially `correlation_id`
 
+### 3.3. Typed Metadata Overlay Pattern
+
+```python
+from pydantic import BaseModel, ConfigDict
+
+# Define typed model for known fields
+class CJProcessingMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    student_prompt_storage_id: str | None = None
+    student_prompt_text: str | None = None
+
+# Merge into existing dict (preserves unknown keys)
+existing_metadata = entity.processing_metadata or {}
+typed_metadata = CJProcessingMetadata(
+    student_prompt_storage_id="abc123"
+).model_dump(exclude_none=True)
+
+entity.processing_metadata = {**existing_metadata, **typed_metadata}
+```
+
+**Use for**: Gradual migration from dict to typed models, workflow systems with domain + dynamic fields
+
 ## 4. Data Schema Evolution
 
 ### 4.1. Backward Compatibility

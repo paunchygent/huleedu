@@ -163,6 +163,49 @@ async def test_service_method(self):
 - **MUST** test transaction handling and rollback scenarios
 - **SHOULD** use testcontainers for integration tests
 
+### 9.5. JWT Authentication Testing
+
+```python
+from huleedu_service_libs.tests.jwt_helpers import create_default_test_token
+
+# Basic token
+token = create_default_test_token("user-123")
+
+# Token with roles/org
+token = create_default_test_token(
+    "admin-456",
+    roles=["admin", "teacher"],
+    org_id="org-789",
+    expires_in=timedelta(hours=2)
+)
+
+# Negative testing: missing claims
+from huleedu_service_libs.tests.jwt_helpers import create_hs_token
+
+payload = {"sub": "user-123", "aud": "huleedu", "iss": "identity"}  # No exp
+token = create_hs_token(secret=settings.JWT_SECRET_KEY, payload=payload)
+```
+
+**Ref**: `libs/huleedu_service_libs/tests/jwt_helpers.py`, `services/api_gateway_service/tests/test_auth.py`
+
+### 9.6. Content Client Testing
+
+```python
+@pytest.fixture
+def mock_content_client() -> AsyncMock:
+    client = AsyncMock(spec=ContentClientProtocol)
+    client.fetch_content.return_value = "mock content"
+    return client
+
+# Call pure implementation with mock
+result = await _operation_impl(
+    content_client=mock_content_client,
+    ...
+)
+```
+
+**DO NOT** use `@patch` for protocol dependencies
+
 ## 10. Session Management
 
 ### 10.1. Todo List Usage

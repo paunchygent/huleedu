@@ -298,3 +298,179 @@ CREATE TABLE assessment_instructions (
 - `DELETE /admin/v1/assessment-instructions/course/<id>` - Delete course instructions
 
 All admin endpoints require `Authorization: Bearer <jwt>` with `admin` role.
+
+## Validated Test Examples
+
+This section documents end-to-end validated test workflows that confirm all components (Content Service, CJ Assessment, LLM Provider, prompt context hydration) are working correctly.
+
+### Test Assignment Setup (Validation)
+
+The following test assignment configuration has been validated to work correctly:
+
+```bash
+# Assignment ID for testing
+assignment_id="00000000-0000-0000-0000-000000000001"
+course_id="00000000-0000-0000-0000-000000000002"
+
+# Assessment context exists in database with:
+# - instructions_text: "Assess clarity, argumentation, and language use..."
+# - grade_scale: "eng5_np_legacy_9_step"
+# - student_prompt_storage_id: (stored in Content Service)
+```
+
+### Validated Workflow: Anchor Registration + Execution
+
+**Step 1: Register Anchor Essays**
+
+```bash
+pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
+  --assignment-id 00000000-0000-0000-0000-000000000001 \
+  --course-id 00000000-0000-0000-0000-000000000002 \
+  register-anchors \
+  --cj-service-url http://localhost:9095
+```
+
+**Expected Outcome:**
+- 12 anchor essays registered successfully
+- Each anchor stored in Content Service with unique `storage_id`
+- Database records created in `anchor_essay_references` table
+- Grades: A (2x), B (2x), C+ (1x), C- (1x), D+ (1x), D- (1x), E+ (1x), E- (1x), F+ (2x)
+
+**Verification:**
+```bash
+docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment \
+  -c "SELECT COUNT(*) FROM anchor_essay_references WHERE assignment_id = '00000000-0000-0000-0000-000000000001';"
+```
+
+Expected: 12 records
+
+**Step 2: Run Validation Test**
+
+```bash
+pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
+  --mode execute \
+  --assignment-id 00000000-0000-0000-0000-000000000001 \
+  --course-id 00000000-0000-0000-0000-000000000002 \
+  --batch-id validation-test-final \
+  --max-comparisons 2 \
+  --kafka-bootstrap localhost:9093 \
+  --await-completion \
+  --completion-timeout 60 \
+  --verbose
+```
+
+**Expected Outcome:**
+- 4 student essays uploaded to Content Service
+- 12 anchor essays loaded from database (no re-upload)
+- Total: 16 essays in comparison pool
+- 5 comparison tasks generated (limited by `--max-comparisons 2` means 2 per essay)
+- All comparison tasks queued to LLM Provider Service (HTTP 202)
+- LLM callbacks received via Kafka
+- Grade projections calculated
+
+**Key Validation Points:**
+
+1. **Content Service Integration:**
+   - Student essays stored with valid `storage_id`
+   - Anchors loaded from existing registrations
+   - No 405 errors from Content Service
+
+2. **Context Hydration (Critical):**
+   - CJ service logs show: `has_instructions: True, has_student_prompt: True`
+   - Prompts include both assignment instructions and student prompt text
+   - Prompt format validated by LLM Provider Service
+
+3. **Prompt Structure:**
+   ```
+   **Assignment Prompt:**
+   <student prompt text from Content Service>
+
+   **Assessment Criteria:**
+   <assessment instructions from database>
+
+   **Essay A (ID: ELS_...):**
+   <essay text>
+
+   **Essay B (ID: ELS_...):**
+   <essay text>
+
+   Compare these two essays based on the assessment criteria...
+   ```
+
+**Verification Commands:**
+
+```bash
+# Check CJ batch was created
+docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment \
+  -c "SELECT id, bos_batch_id, expected_essay_count, status FROM cj_batch_uploads WHERE bos_batch_id = 'validation-test-final';"
+
+# Check comparison pairs generated
+docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment \
+  -c "SELECT COUNT(*) FROM cj_comparison_pairs WHERE cj_batch_id = <cj_batch_id>;"
+
+# Check CJ service logs for context fetching
+docker logs huleedu-cj-assessment-1 2>&1 | grep "Fetched assessment context"
+# Expected: has_instructions: True, has_student_prompt: True
+
+# Check LLM Provider received requests
+docker logs huleedu-llm-provider-1 2>&1 | grep "Queued comparison request"
+```
+
+**Test Results (2025-11-12):**
+
+- **Correlation ID:** `4d6fe37b-74d4-4df1-bb50-34e1c8b3f5c2`
+- **CJ Batch ID:** 10
+- **Status:** ✅ All components working correctly
+- **Essays:** 4 student + 12 anchors = 16 total
+- **Comparisons:** 5 tasks generated and queued
+- **Context:** Both instructions and student prompt included in all comparison prompts
+- **Callbacks:** Received within milliseconds via Kafka
+
+### Common Issues and Fixes
+
+**Issue 1: "HTTP 405 Method Not Allowed" from Content Service**
+
+**Symptom:**
+```
+Error registering anchor: 405 Client Error: Method Not Allowed
+```
+
+**Cause:** CJ service's Content Service client using wrong endpoint or payload format
+
+**Fix:** Verify `content_client_impl.py` uses:
+- Endpoint: `/v1/content` (not `/store`)
+- Payload: Raw bytes with `Content-Type` header (not JSON)
+- Expected status: 201 (not 200)
+
+**Issue 2: "[VALIDATION_ERROR] Invalid prompt format: Could not extract essays"**
+
+**Symptom:**
+```
+[VALIDATION_ERROR] Invalid prompt format: Could not extract essays
+service=cj_assessment_service operation=generate_comparison
+```
+
+**Cause:** LLM Provider Service essay extraction regex doesn't handle markdown format `**Essay A (ID: ...):**`
+
+**Fix:** Verify `llm_provider_service_client.py` line 73 checks for both:
+- `stripped.startswith("Essay A")`  # Old format
+- `stripped.startswith("**Essay A")`  # New markdown format
+
+**Issue 3: Context not included in prompts**
+
+**Symptom:** CJ logs show `has_instructions: False` or `has_student_prompt: False`
+
+**Diagnosis:**
+```bash
+# Check if assignment context exists
+curl -H "Authorization: Bearer <admin-jwt>" \
+  http://localhost:9095/admin/v1/assessment-instructions/assignment/<assignment-id>
+
+# Check if student prompt is uploaded
+pdm run cj-admin prompts get <assignment-id>
+```
+
+**Fix:**
+- Ensure Step 1 (create assessment context) completed successfully
+- Ensure Step 2 (upload student prompt) completed successfully
+- Verify `processing_metadata` in `cj_batch_uploads` contains `student_prompt_text`
