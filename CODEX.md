@@ -190,9 +190,10 @@ pdm run dev-build [service]          # Build images with cache (doesn't start)
 pdm run dev-build-start [service]    # Build with cache then start
 pdm run dev-build-clean [service]    # Build without cache (slow, use when needed)
 pdm run dev-restart [service]        # Restart running containers (for volume-mounted code changes)
+pdm run dev-recreate [service]       # Force container recreation to pick up env var changes
 pdm run dev-stop [service]           # Stop running containers
 pdm run dev-logs [service]           # Follow container logs
-pdm run dev-check                    # Check what files changed (hints at rebuild needs)
+pdm run dev-check                    # Check what needs rebuilding
 
 # Production (optimized)
 pdm run prod-build [service]         # Build for production with cache
