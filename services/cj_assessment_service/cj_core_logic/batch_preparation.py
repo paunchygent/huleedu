@@ -13,7 +13,8 @@ from huleedu_service_libs.logging_utils import create_service_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
-from services.cj_assessment_service.models_api import EssayForComparison
+from services.cj_assessment_service.metrics import get_business_metrics
+from services.cj_assessment_service.models_api import CJProcessingMetadata, EssayForComparison
 from services.cj_assessment_service.models_db import CJBatchUpload
 from services.cj_assessment_service.protocols import (
     CJRepositoryProtocol,
@@ -27,6 +28,7 @@ async def create_cj_batch(
     request_data: dict[str, Any],
     correlation_id: UUID,
     database: CJRepositoryProtocol,
+    content_client: ContentClientProtocol,
     log_extra: dict[str, Any],
 ) -> int:
     """Create a new CJ batch record and return its ID.
@@ -44,6 +46,11 @@ async def create_cj_batch(
         ValueError: If required fields are missing
     """
     async with database.session() as session:
+        # Prepare shared metrics instances once per batch creation
+        business_metrics = get_business_metrics()
+        prompt_success_metric = business_metrics.get("prompt_fetch_success")
+        prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
+
         # Extract data from request
         bos_batch_id = request_data.get("bos_batch_id")
         language = request_data.get("language", "en")
@@ -88,12 +95,44 @@ async def create_cj_batch(
                     },
                 )
 
-        if prompt_storage_id:
-            metadata = cj_batch.processing_metadata or {}
-            metadata["student_prompt_storage_id"] = prompt_storage_id
-            if prompt_text:
-                metadata["student_prompt_text"] = prompt_text
-            cj_batch.processing_metadata = metadata
+        # Hydration fallback if storage_id exists but text is missing
+        if prompt_storage_id and not prompt_text:
+            try:
+                prompt_text = await content_client.fetch_content(prompt_storage_id, correlation_id)
+                logger.info(
+                    "Hydrated prompt text via fallback in batch creation",
+                    extra={**log_extra, "storage_id": prompt_storage_id},
+                )
+                if prompt_text and prompt_success_metric:
+                    try:
+                        prompt_success_metric.inc()
+                    except Exception:  # pragma: no cover - defensive
+                        logger.debug(
+                            "Unable to increment prompt success metric in batch creation",
+                            exc_info=True,
+                        )
+            except Exception as e:
+                logger.error(
+                    f"Failed to hydrate prompt in batch creation: {e}",
+                    extra={**log_extra, "storage_id": prompt_storage_id},
+                )
+                if prompt_failure_metric:
+                    try:
+                        prompt_failure_metric.labels(reason="batch_creation_hydration_failed").inc()
+                    except Exception:  # pragma: no cover - defensive
+                        logger.debug(
+                            "Unable to increment prompt failure metric in batch creation",
+                            exc_info=True,
+                        )
+
+        # Use typed metadata with permissive merge
+        if prompt_storage_id or prompt_text:
+            existing = cj_batch.processing_metadata or {}
+            typed = CJProcessingMetadata(
+                student_prompt_storage_id=prompt_storage_id,
+                student_prompt_text=prompt_text,
+            ).model_dump(exclude_none=True)
+            cj_batch.processing_metadata = {**existing, **typed}
             await session.flush()
 
         # Store assignment_id if provided

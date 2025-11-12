@@ -213,6 +213,15 @@ async def _fetch_assessment_context(
         },
     )
 
+    # Warn if no context is available
+    if not assessment_instructions and not student_prompt_text:
+        logger.warning(
+            "No assessment context available for prompt building",
+            extra={
+                "cj_batch_id": str(cj_batch_id),
+            },
+        )
+
     return {
         "assessment_instructions": assessment_instructions,
         "student_prompt_text": student_prompt_text,

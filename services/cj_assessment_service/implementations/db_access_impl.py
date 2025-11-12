@@ -443,6 +443,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             "instructions_text": instruction.instructions_text,
             "grade_scale": instruction.grade_scale,
             "instruction_id": instruction.id,
+            "student_prompt_storage_id": instruction.student_prompt_storage_id,
         }
 
     async def upsert_assessment_instruction(

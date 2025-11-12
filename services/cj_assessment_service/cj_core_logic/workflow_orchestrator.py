@@ -78,6 +78,7 @@ async def run_cj_assessment_workflow(
             request_data,
             correlation_id,
             database,
+            content_client,
             log_extra,
         )
 

@@ -42,6 +42,7 @@ from services.cj_assessment_service.cj_core_logic.workflow_orchestrator import (
 )
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.metrics import get_business_metrics
+from services.cj_assessment_service.models_api import PromptHydrationFailure, Result
 from services.cj_assessment_service.protocols import (
     CJEventPublisherProtocol,
     CJRepositoryProtocol,
@@ -191,6 +192,7 @@ async def _process_cj_assessment_impl(
     duration_metric = business_metrics.get("cj_assessment_duration_seconds")
     kafka_queue_latency_metric = business_metrics.get("kafka_queue_latency_seconds")
     prompt_failure_metric = business_metrics.get("prompt_fetch_failures")
+    prompt_success_metric = business_metrics.get("prompt_fetch_success")
 
     try:
         logger.info(f"Processing CJ assessment message: {msg.topic}:{msg.partition}:{msg.offset}")
@@ -209,7 +211,7 @@ async def _process_cj_assessment_impl(
             prompt_failure_metric=prompt_failure_metric,
         )
 
-        prompt_text = await _hydrate_prompt_text(
+        prompt_result = await _hydrate_prompt_text(
             storage_id=prompt_storage_id,
             content_client=content_client,
             correlation_id=envelope.correlation_id,
@@ -219,6 +221,18 @@ async def _process_cj_assessment_impl(
             },
             prompt_failure_metric=prompt_failure_metric,
         )
+        # Unpack Result - default to None on errors or empty content
+        if prompt_result.is_ok:
+            hydrated_prompt = prompt_result.value
+            prompt_text = hydrated_prompt or None
+            if prompt_text and prompt_success_metric:
+                try:
+                    prompt_success_metric.inc()
+                except Exception:  # pragma: no cover - defensive
+                    logger.debug("Unable to increment prompt success metric", exc_info=True)
+        else:
+            prompt_text = None
+
         log_extra: dict[str, Any] = {
             "correlation_id": str(envelope.correlation_id),
             "event_id": str(envelope.event_id),
@@ -271,6 +285,7 @@ async def _process_cj_assessment_impl(
 
         converted_request_data = {
             "bos_batch_id": str(request_event_data.entity_id),
+            "assignment_id": request_event_data.assignment_id,
             "essays_to_process": essays_to_process,
             "language": request_event_data.language,
             "course_code": request_event_data.course_code,
@@ -495,10 +510,16 @@ async def _hydrate_prompt_text(
     correlation_id: UUID,
     log_extra: dict[str, Any],
     prompt_failure_metric: Any,
-) -> str | None:
-    """Fetch prompt text from Content Service for CJ assessment."""
+) -> Result[str, PromptHydrationFailure]:
+    """Fetch prompt text from Content Service for CJ assessment.
+
+    Returns:
+        Result.ok(text) on success
+        Result.ok("") if storage_id is None (caller treats as missing prompt)
+        Result.err(PromptHydrationFailure) on various failure modes
+    """
     if storage_id is None:
-        return None
+        return Result.ok("")
 
     try:
         prompt_text = await content_client.fetch_content(storage_id, correlation_id)
@@ -512,8 +533,10 @@ async def _hydrate_prompt_text(
                     "prompt_preview": prompt_text[:100],
                 },
             )
-            return prompt_text
+            return Result.ok(prompt_text)
 
+        # Empty content when storage_id exists is an error
+        _record_prompt_failure(prompt_failure_metric, "empty_content")
         logger.warning(
             "Hydrated student prompt text is empty for CJ assessment batch",
             extra={
@@ -522,7 +545,7 @@ async def _hydrate_prompt_text(
                 "prompt_storage_id": storage_id,
             },
         )
-        return ""
+        return Result.err(PromptHydrationFailure("empty_content", storage_id))
 
     except HuleEduError as error:
         _record_prompt_failure(prompt_failure_metric, "content_service_error")
@@ -535,6 +558,7 @@ async def _hydrate_prompt_text(
                 "error": getattr(error, "error_detail", str(error)),
             },
         )
+        return Result.err(PromptHydrationFailure("content_service_error", storage_id))
     except Exception as error:  # pragma: no cover - defensive guardrail
         _record_prompt_failure(prompt_failure_metric, "unexpected_error")
         logger.error(
@@ -547,8 +571,7 @@ async def _hydrate_prompt_text(
                 "error": str(error),
             },
         )
-
-    return None
+        return Result.err(PromptHydrationFailure("unexpected_error", storage_id))
 
 
 # Helper functions for structured error handling

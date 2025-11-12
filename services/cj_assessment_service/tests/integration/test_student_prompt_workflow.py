@@ -158,6 +158,7 @@ async def test_student_prompt_workflow_end_to_end(
         request_data=request_data_hydrate,
         correlation_id=uuid4(),
         database=postgres_repository,
+        content_client=mock_content_client,
         log_extra={"test": "student_prompt_integration"},
     )
 
@@ -192,6 +193,7 @@ async def test_student_prompt_workflow_end_to_end(
         request_data=request_data_explicit,
         correlation_id=uuid4(),
         database=postgres_repository,
+        content_client=mock_content_client,
         log_extra={"test": "student_prompt_integration"},
     )
 

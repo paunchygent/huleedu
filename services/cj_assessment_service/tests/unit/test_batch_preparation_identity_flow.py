@@ -7,6 +7,7 @@ from request data to database operations for credit attribution.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
@@ -14,10 +15,11 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.cj_assessment_service.cj_core_logic import batch_preparation
 from services.cj_assessment_service.cj_core_logic.batch_preparation import create_cj_batch
 from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_db import CJBatchUpload
-from services.cj_assessment_service.protocols import CJRepositoryProtocol
+from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
 
 
 class TestIdentityThreadingInBatchCreation:
@@ -41,6 +43,33 @@ class TestIdentityThreadingInBatchCreation:
         mock_db.create_new_cj_batch.return_value = mock_batch
 
         return mock_db
+
+    @pytest.fixture
+    def mock_content_client(self) -> AsyncMock:
+        """Create mock content client protocol."""
+        return AsyncMock(spec=ContentClientProtocol)
+
+    @staticmethod
+    def _build_metric_counters() -> tuple[SimpleNamespace, SimpleNamespace]:
+        """Create counters emulating minimal Prometheus Counter API."""
+
+        class Counter(SimpleNamespace):
+            def __init__(self) -> None:
+                super().__init__(count=0)
+
+            def inc(self) -> None:
+                self.count += 1
+
+        class LabelledCounter(Counter):
+            def __init__(self) -> None:
+                super().__init__()
+                self.labels_calls: list[dict[str, str]] = []
+
+            def labels(self, **labels: str) -> "LabelledCounter":
+                self.labels_calls.append(labels)
+                return self
+
+        return Counter(), LabelledCounter()
 
     @pytest.fixture
     def base_request_data(self) -> dict[str, Any]:
@@ -90,6 +119,7 @@ class TestIdentityThreadingInBatchCreation:
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
         user_id: str,
         org_id: str | None,
         expected_user_id: str | None,
@@ -119,6 +149,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=correlation_id,
             database=mock_database,
+            content_client=mock_content_client,
             log_extra=log_extra,
         )
 
@@ -162,6 +193,7 @@ class TestIdentityThreadingInBatchCreation:
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test behavior when user_id is missing from request_data."""
         # Arrange - Request data without user_id
@@ -174,6 +206,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=correlation_id,
             database=mock_database,
+            content_client=mock_content_client,
             log_extra=log_extra,
         )
 
@@ -187,6 +220,7 @@ class TestIdentityThreadingInBatchCreation:
     async def test_missing_required_fields_with_identity_fields_present(
         self,
         mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test ValueError when bos_batch_id missing but identity fields present."""
         # Arrange
@@ -206,6 +240,7 @@ class TestIdentityThreadingInBatchCreation:
                 request_data=request_data,
                 correlation_id=correlation_id,
                 database=mock_database,
+                content_client=mock_content_client,
                 log_extra={},
             )
 
@@ -213,10 +248,96 @@ class TestIdentityThreadingInBatchCreation:
         mock_database.create_new_cj_batch.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_create_cj_batch_hydrates_prompt_with_fallback(
+        self,
+        mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+        base_request_data: dict[str, Any],
+    ) -> None:
+        """Fallback hydration populates metadata and increments success metric."""
+
+        success_counter, failure_counter = self._build_metric_counters()
+        mock_batch = mock_database.create_new_cj_batch.return_value
+        mock_batch.processing_metadata = {"retry_count": 2}
+        monkeypatch.setattr(
+            batch_preparation,
+            "get_business_metrics",
+            lambda: {
+                "prompt_fetch_success": success_counter,
+                "prompt_fetch_failures": failure_counter,
+            },
+        )
+
+        mock_content_client.fetch_content.return_value = "Hydrated prompt body"
+
+        request_data = {**base_request_data, "student_prompt_text": None}
+
+        cj_batch_id = await create_cj_batch(
+            request_data=request_data,
+            correlation_id=uuid4(),
+            database=mock_database,
+            content_client=mock_content_client,
+            log_extra={},
+        )
+
+        assert cj_batch_id == 12345
+        metadata = mock_batch.processing_metadata
+        assert metadata["student_prompt_storage_id"] == "prompt-storage-base"
+        assert metadata["student_prompt_text"] == "Hydrated prompt body"
+        assert metadata["retry_count"] == 2
+        assert success_counter.count == 1
+        assert failure_counter.count == 0
+
+    @pytest.mark.asyncio
+    async def test_create_cj_batch_records_metric_on_fallback_failure(
+        self,
+        mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+        base_request_data: dict[str, Any],
+    ) -> None:
+        """Fallback failure emits labelled failure metric without clobbering metadata."""
+
+        success_counter, failure_counter = self._build_metric_counters()
+        mock_batch = mock_database.create_new_cj_batch.return_value
+        mock_batch.processing_metadata = {"retry_count": 2}
+        monkeypatch.setattr(
+            batch_preparation,
+            "get_business_metrics",
+            lambda: {
+                "prompt_fetch_success": success_counter,
+                "prompt_fetch_failures": failure_counter,
+            },
+        )
+
+        mock_content_client.fetch_content.side_effect = RuntimeError("boom")
+
+        request_data = {**base_request_data, "student_prompt_text": None}
+
+        cj_batch_id = await create_cj_batch(
+            request_data=request_data,
+            correlation_id=uuid4(),
+            database=mock_database,
+            content_client=mock_content_client,
+            log_extra={},
+        )
+
+        assert cj_batch_id == 12345
+        metadata = mock_batch.processing_metadata
+        assert metadata["student_prompt_storage_id"] == "prompt-storage-base"
+        assert "student_prompt_text" not in metadata
+        assert metadata["retry_count"] == 2
+        assert success_counter.count == 0
+        assert failure_counter.count == 1
+        assert failure_counter.labels_calls == [{"reason": "batch_creation_hydration_failed"}]
+
+    @pytest.mark.asyncio
     async def test_identity_field_precedence_over_defaults(
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test that explicit identity fields are passed through correctly."""
         # Arrange
@@ -231,6 +352,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=uuid4(),
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 
@@ -261,6 +383,7 @@ class TestIdentityThreadingInBatchCreation:
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
         user_id_value: str,
         org_id_value: str,
         description: str,
@@ -278,6 +401,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=uuid4(),
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 
@@ -291,6 +415,7 @@ class TestIdentityThreadingInBatchCreation:
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test assignment_id storage works alongside identity field processing."""
         # Arrange
@@ -311,6 +436,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=uuid4(),
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 
@@ -327,6 +453,7 @@ class TestIdentityThreadingInBatchCreation:
         self,
         mock_database: AsyncMock,
         base_request_data: dict[str, Any],
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test complete identity threading workflow with comprehensive validation."""
         # Arrange
@@ -343,6 +470,7 @@ class TestIdentityThreadingInBatchCreation:
             request_data=request_data,
             correlation_id=correlation_id,
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 
@@ -385,9 +513,12 @@ class TestIdentityFieldDefaultBehavior:
     async def test_no_identity_fields_in_request_data(
         self,
         mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
     ) -> None:
         """Test behavior when no identity fields are present in request_data."""
         # Arrange
+        mock_database.get_assessment_instruction.return_value = None
+
         request_data = {
             "bos_batch_id": "no-identity-batch",
             "language": "sv",
@@ -402,6 +533,7 @@ class TestIdentityFieldDefaultBehavior:
             request_data=request_data,
             correlation_id=uuid4(),
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 
@@ -425,6 +557,7 @@ class TestIdentityFieldDefaultBehavior:
     async def test_partial_identity_field_scenarios(
         self,
         mock_database: AsyncMock,
+        mock_content_client: AsyncMock,
         user_id: str | None,
         org_id: str | None,
         description: str,
@@ -446,6 +579,7 @@ class TestIdentityFieldDefaultBehavior:
             request_data=request_data,
             correlation_id=uuid4(),
             database=mock_database,
+            content_client=mock_content_client,
             log_extra={},
         )
 

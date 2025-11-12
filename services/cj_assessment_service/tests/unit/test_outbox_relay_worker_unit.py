@@ -394,6 +394,7 @@ class TestEventRelayWorker:
         """Verify worker continues after transient repository errors."""
         # Given
         call_count = 0
+        second_poll = asyncio.Event()
 
         class FlakyRepository(FakeOutboxRepository):
             async def get_unpublished_events(self, limit: int = 100) -> list[OutboxEvent]:
@@ -401,6 +402,7 @@ class TestEventRelayWorker:
                 call_count += 1
                 if call_count == 1:
                     raise Exception("Database timeout")
+                second_poll.set()
                 return []
 
         repository = FlakyRepository()
@@ -413,8 +415,10 @@ class TestEventRelayWorker:
 
         # When
         await worker.start()
-        await asyncio.sleep(0.2)  # Allow multiple poll cycles
-        await worker.stop()
+        try:
+            await asyncio.wait_for(second_poll.wait(), timeout=1.0)
+        finally:
+            await worker.stop()
 
         # Then
         assert call_count >= 2  # Should have retried after error
