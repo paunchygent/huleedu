@@ -180,6 +180,10 @@ class TestEventProcessorIdentityThreading:
         assert (
             converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
+        assert "judge_rubric_text" in converted_request_data
+        assert "judge_rubric_storage_id" in converted_request_data
+        assert converted_request_data["judge_rubric_text"] is None
+        assert converted_request_data["judge_rubric_storage_id"] is None
 
         mock_content_client.fetch_content.assert_any_await(
             "prompt-storage-with-overrides", envelope.correlation_id
@@ -243,6 +247,8 @@ class TestEventProcessorIdentityThreading:
             "course_code",
             "student_prompt_text",
             "student_prompt_storage_id",
+            "judge_rubric_text",
+            "judge_rubric_storage_id",
             "llm_config_overrides",
             "user_id",
             "org_id",
@@ -265,6 +271,8 @@ class TestEventProcessorIdentityThreading:
         assert (
             converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
+        assert converted_request_data["judge_rubric_text"] is None
+        assert converted_request_data["judge_rubric_storage_id"] is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -406,6 +414,10 @@ class TestEventProcessorIdentityThreading:
         assert (
             converted_request_data["student_prompt_storage_id"] == "prompt-storage-with-overrides"
         )
+        assert "judge_rubric_text" in converted_request_data
+        assert "judge_rubric_storage_id" in converted_request_data
+        assert converted_request_data["judge_rubric_text"] is None
+        assert converted_request_data["judge_rubric_storage_id"] is None
 
     @pytest.mark.asyncio
     async def test_correlation_id_preservation_with_identities(

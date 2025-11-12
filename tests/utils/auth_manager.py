@@ -10,6 +10,13 @@ Based on testing best practices:
 - Configurable user contexts
 - JWT standard compliance
 - Easy migration to real auth services
+
+Note: For simple JWT token creation in unit tests, prefer the new shared helpers:
+    from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers
+
+AuthTestManager in this module is designed for functional/integration tests
+that need full user management and lifecycle testing. For unit tests that
+only need JWT tokens, use the simpler jwt_helpers module.
 """
 
 import time
@@ -339,3 +346,14 @@ def create_test_teacher() -> AuthTestUser:
 def create_test_admin() -> AuthTestUser:
     """Create a new test admin user."""
     return test_auth_manager.create_admin_user()
+
+
+__all__ = [
+    "AuthTestManager",
+    "AuthTestUser",
+    "create_test_admin",
+    "create_test_teacher",
+    "get_auth_headers_for_user",
+    "get_default_auth_headers",
+    "test_auth_manager",
+]

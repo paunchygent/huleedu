@@ -191,6 +191,7 @@ class MockRepository(CJRepositoryProtocol):
         instructions_text: str,
         grade_scale: str,
         student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
         return self._instruction_store.upsert(
             assignment_id=assignment_id,
@@ -198,6 +199,7 @@ class MockRepository(CJRepositoryProtocol):
             instructions_text=instructions_text,
             grade_scale=grade_scale,
             student_prompt_storage_id=student_prompt_storage_id,
+            judge_rubric_storage_id=judge_rubric_storage_id,
         )
 
     async def list_assessment_instructions(
