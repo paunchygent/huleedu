@@ -1,6 +1,6 @@
 # Cloud Environment Instructions for Claude Instances
 
-**READ THIS FIRST when working in Claude Code cloud environment (Claude.ai web interface)**
+**READ THIS FIRST when working in Claude Code cloud environment (Claude.ai web interface NOT CLI)**
 
 ## Environment Overview
 

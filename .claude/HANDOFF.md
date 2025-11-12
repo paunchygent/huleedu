@@ -33,22 +33,33 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 **Known Issues Requiring Resolution**:
 
 ⚠️ **Issue #1: Wrong Student Prompt Content**
-- **Problem**: `student_prompt_text` in `processing_metadata` contains LLM judge rubric, NOT actual student assignment prompt
+- **Problem**: `student_prompt_storage_id` points to judge rubric file instead of student assignment
 - **Impact**: LLM judges essays without knowing what students were asked to write about
-- **Current**: "Assignment Prompt" section shows "You are an impartial CJ assessor..." (judge instructions)
-- **Missing**: Actual student-facing assignment prompt ("Write an essay about role models...")
-- **Root Cause**: Semantic confusion - field name implies student prompt but contains judge rubric
+- **Current State**:
+  - File: `llm_prompt_cj_assessment_eng5.md` (judge instructions) ❌
+  - Should be: `eng5_np_vt_2017_essay_instruction.md` (student assignment) ✅
+- **Root Cause**: Data uploaded to wrong field during setup
+- **Solution**:
+  - Add `judge_rubric_storage_id` column to `assessment_instructions`
+  - Upload correct student assignment to `student_prompt_storage_id`
+  - Upload judge rubric to new `judge_rubric_storage_id`
+  - Keep field names (avoid ~25 file cascade)
 - **Task**: `.claude/TASKS/TASK-FIX-CJ-LLM-PROMPT-CONSTRUCTION.md`
+- **Contracts**: `.claude/TASKS/CONTRACTS-BEFORE-AFTER.md`
 
 ⚠️ **Issue #2: Essay Content Duplication**
-- **Problem**: Each essay sent twice in every LLM request (once with IDs, once plain)
-- **Impact**: Doubles token usage (~50% waste), potentially confuses LLM
-- **Flow**:
-  1. CJ service includes essays in prompt: `**Essay A (ID: ...):** <text>`
-  2. LLM Provider extracts essays from prompt
-  3. Anthropic provider appends essays again: `Essay A:\n<text>`
-- **Root Cause**: Protocol mismatch - CJ sends complete prompt, LLM Provider expects template
+- **Problem**: Each essay sent twice in every LLM request
+- **Impact**: Doubles token usage (~50% waste)
+- **Flow**: CJ includes → LLM extracts → Anthropic appends
+- **Root Cause**: Protocol mismatch across service boundary
+- **Solution**:
+  - CJ sends complete prompt (essays included)
+  - Make `essay_a`/`essay_b` optional in `LLMComparisonRequest`
+  - Provider uses prompt as-is when essays not provided
+  - Maintain backwards compatibility
+- **Coordination**: Feature branch spanning CJ + LLM Provider services
 - **Task**: `.claude/TASKS/TASK-FIX-CJ-LLM-PROMPT-CONSTRUCTION.md`
+- **Contracts**: `.claude/TASKS/CONTRACTS-BEFORE-AFTER.md`
 
 **Current Prompt Structure** (Validated 2025-11-12):
 ```
@@ -67,16 +78,26 @@ Essay A: <text> ❌ Duplicate
 Essay B: <text> ❌ Duplicate
 ```
 
-**Next Steps**:
-- Fix semantic confusion in prompt metadata (Issue #1)
-- Resolve protocol mismatch to eliminate duplication (Issue #2)
-- Re-run validation with correct prompts
-- Verify grade projections with full context
+**Implementation Phases**:
+1. **Phase 0**: Data correction (upload correct files, create migration script)
+2. **Phase 1**: Fix prompt source (add `judge_rubric_storage_id`, update context fetching)
+3. **Phase 2**: Remove duplication (coordinated contract changes across services)
+4. **Phase 3**: End-to-end validation (verify correct prompts, token reduction)
 
-**Files**:
+**Key Decisions Made**:
+- ✅ Student prompt source: Already wired via `assessment_instructions` table
+- ✅ Field naming: Keep existing, fix data (avoids ~25 file changes)
+- ✅ Duplication fix: Option B - CJ sends complete prompt, LLM uses as-is
+- ✅ Judge rubric: New `judge_rubric_storage_id` column (maintains flexibility)
+
+**Files Modified** (7 core + tests):
 - `services/cj_assessment_service/cj_core_logic/pair_generation.py`
 - `services/cj_assessment_service/event_processor.py`
-- `services/llm_provider_service/implementations/llm_provider_service_client.py`
+- `services/cj_assessment_service/implementations/llm_provider_service_client.py`
+- `services/llm_provider_service/api_models.py`
+- `services/llm_provider_service/implementations/llm_orchestrator_impl.py`
+- `services/llm_provider_service/implementations/*_provider_impl.py` (3 files)
+- Migration: `alembic/versions/XXXX_add_judge_rubric_storage_id.py`
 
 ---
 
