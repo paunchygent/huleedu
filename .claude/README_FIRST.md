@@ -225,9 +225,26 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 
 ### 10. CJ Prompt Hydration (Nov 2025)
 
-- CJ event processor fetches `student_prompt_ref` locally, increments `huleedu_cj_prompt_fetch_failures_total{reason=…}` and `huleedu_cj_prompt_fetch_success_total`, and forwards prompt metadata into workflow orchestration.
-- Batch preparation falls back to Content Service hydration when stored text is missing; merges `CJProcessingMetadata` into existing `processing_metadata` without dropping ancillary keys.
-- Repository context now returns `student_prompt_storage_id` so anchor workflows and runners stay in sync; new tests exercise the Result contract, metadata merge, and metrics exposure (`pdm run pytest-root services/cj_assessment_service/tests -k 'prompt_context or fallback'`).
+**Completed (2025-11-12)**: Prompt context persistence hardening with Result monad pattern, typed metadata overlay, and fallback hydration.
+
+**Implementation**:
+- Added `Result[T,E]` monad for typed success/failure handling (non-exception control flow)
+- Created `PromptHydrationFailure` dataclass for typed error payloads
+- Implemented `CJProcessingMetadata` Pydantic model for typed metadata overlay pattern
+- Event processor: `_hydrate_prompt_text()` returns `Result[str, PromptHydrationFailure]`
+- Batch preparation: Fallback to Content Service hydration when text missing; typed metadata merge preserves unknown keys (`{**existing, **typed.model_dump(exclude_none=True)}`)
+- Workflow orchestrator: Threaded `content_client` through batch creation (later re-aligned with Dishka DI)
+- Metrics: Added `huleedu_cj_prompt_fetch_success_total` counter alongside existing `failures_total{reason}`
+- Repository: Returns `student_prompt_storage_id` for anchor workflow synchronization
+
+**Test Coverage**: 31/31 passing (5 updated files, 2 new test files) | Typecheck clean
+
+**Architecture Notes**:
+- Result monad used for internal control flow, exceptions for boundary operations
+- Typed metadata overlay balances type safety with extensibility (forbids unknown fields in model, preserves them in dict merge)
+- Content client initially threaded explicitly for testability, pending DI re-alignment
+
+**Ref**: `TASKS/CJ_PROMPT_CONTEXT_PERSISTENCE_PLAN.md` (completed 2025-11-12)
 
 ### 11. Prompt Reference Migration Step 5 Docs & Observability (2025-11-06)
 
@@ -285,9 +302,17 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 
 ### 20. ENG5 Runner Content Upload & Event Hardening (Nov 2025)
 
-- Execute-mode runner now uploads anchor/student essays to Content Service before composing CJ requests.
-- Kafka event collector validates envelopes via typed Pydantic models to avoid AttributeError on raw dict payloads.
-- docker-compose.eng5-runner wired with CONTENT_SERVICE_URL + content service dependency to keep uploads local when running in container.
+**Completed (2025-11-12)**: Runner infrastructure validated with storage ID fixes, batch validation, and Kafka DNS resolution.
+
+**Implementation**:
+- Storage ID format fix: Removed `prompt::` prefix in runner, now sends raw Content Service UUIDs
+- Batch validation: Added defensive guard for empty batch_id with clear error messaging
+- Kafka DNS fix: Changed default from `localhost:9092` (internal) to `localhost:9093` (external listener)
+- Content upload: Runner uploads essays to Content Service before event composition
+- Event validation: Kafka collector uses typed Pydantic models to prevent AttributeError on raw dict payloads
+- Docker compose: Wired CONTENT_SERVICE_URL + content service dependency for local execution
+
+**Validation**: Integration test confirmed end-to-end flow (Runner → Kafka → CJ service), correlation_id tracing working, all storage IDs are 32-char UUIDs
 
 ### 21. Database URL Centralization (Nov 2025) - Phase 1 Complete
 
