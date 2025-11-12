@@ -7,10 +7,69 @@ The ENG5 NP runner requires a valid `assignment_id` that exists in the CJ Assess
 ## Prerequisites
 
 - CJ Assessment Service running and accessible (admin endpoints enabled)
-- Admin JWT token with `admin` role or `CJ_ADMIN_TOKEN` environment override configured
 - `pdm run cj-admin` CLI available (run `pdm install` first)
 - Assignment assets: grade scale + instructions text, **and** the prompt markdown file that will be uploaded by the CLI
 - Content Service reachable so prompt uploads succeed
+- Admin credentials or JWT token (see Authentication Setup below)
+
+## Authentication Setup
+
+All admin CLI commands require authentication. Choose one of the following methods:
+
+### Option A: Environment Variable Token (Recommended for CI/Automation)
+
+```bash
+export CJ_ADMIN_TOKEN="your-jwt-token-here"
+# Token checked first by AuthManager (no login needed)
+```
+
+The `CJ_ADMIN_TOKEN` environment variable provides a direct token override, bypassing cached tokens and login prompts. This is ideal for automated scripts and CI/CD pipelines.
+
+### Option B: Issue Token with Credentials (Recommended for Development)
+
+```bash
+# Set credentials in environment
+export CJ_ADMIN_EMAIL="admin@example.com"
+export CJ_ADMIN_PASSWORD="your-password"
+
+# Generate and cache token (reusable across commands)
+pdm run cj-admin token issue
+
+# Token cached to ~/.huleedu/cj_admin_token.json
+# Auto-refreshed when expired
+```
+
+This method caches the token locally, so you don't need to re-authenticate for subsequent commands. The token is automatically refreshed when it expires.
+
+### Option C: Interactive Login
+
+```bash
+pdm run cj-admin login
+# Prompts for email/password
+# Caches token for reuse
+```
+
+This method prompts for credentials interactively and caches the token for future use.
+
+### Authentication Priority
+
+The CLI checks for authentication in this order:
+1. `CJ_ADMIN_TOKEN` environment variable (highest priority)
+2. Cached token in `~/.huleedu/cj_admin_token.json`
+3. Prompt for interactive login (lowest priority)
+
+### Token Management Commands
+
+```bash
+# Issue token non-interactively
+pdm run cj-admin token issue
+
+# Issue token without caching (prints to stdout only)
+pdm run cj-admin token issue --no-cache
+
+# View current token status
+cat ~/.huleedu/cj_admin_token.json
+```
 
 ## Step 1: Create Assessment Context
 
@@ -34,15 +93,17 @@ curl -X POST http://localhost:9095/admin/v1/assessment-instructions \
 - For assignment-specific instructions, set `assignment_id` and leave `course_id` null
 - For course-level fallback instructions, set `course_id` and leave `assignment_id` null
 
-## Step 2: Upload Student Prompt via CJ Admin CLI
+## Step 2: Upload Student Assignment Prompt via CJ Admin CLI
+
+**IMPORTANT:** The student prompt is the assignment text that students saw when writing their essays (e.g., "Write a text about role models..."). This is NOT the judge rubric used for assessment.
 
 The CJ service requires the student prompt to be stored by reference. Use the admin CLI to upload the prompt file so `student_prompt_storage_id` is persisted alongside the instructions record.
 
 ```bash
-# Upload prompt text (recommended: use the canonical ENG5 prompt markdown file)
+# Upload student-facing assignment prompt (what students saw)
 pdm run cj-admin prompts upload \
   --assignment-id eng5-np-batch-20250110 \
-  --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md"
+  --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md"
 ```
 
 This command performs the following:
@@ -68,7 +129,41 @@ Prompt SHA256: <hash>
 
 Keep the CLI output (or rerun `prompts get`) handy when coordinating execute-mode validation—the ENG5 runner and downstream services rely on the storage ID only.
 
-## Step 3: Register Anchor Essays (One-time Setup)
+## Step 3: Upload Judge Rubric via CJ Admin CLI
+
+**IMPORTANT:** The judge rubric contains LLM instructions and assessment criteria (e.g., "You are an impartial judge..."). This is separate from the student prompt.
+
+Upload the judge rubric that the LLM will use to assess essays:
+
+```bash
+# Upload judge rubric (LLM assessment instructions)
+pdm run cj-admin rubrics upload \
+  --assignment-id eng5-np-batch-20250110 \
+  --rubric-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md"
+```
+
+This command:
+
+1. Authenticates via Identity (uses cached token or `CJ_ADMIN_TOKEN` override).
+2. Uploads the rubric to Content Service via CJ's admin API.
+3. Stores the returned `judge_rubric_storage_id` in the `assessment_instructions` table.
+
+Verify the upload:
+
+```bash
+pdm run cj-admin rubrics get eng5-np-batch-20250110
+```
+
+Expected response:
+
+```text
+Judge Rubric for eng5-np-batch-20250110
+Storage ID: content-xyz789
+Grade Scale: eng5_np_legacy_9_step
+Created At: <timestamp>
+```
+
+## Step 4: Register Anchor Essays (One-time Setup)
 
 Anchor essays are **persistent** graded reference essays used to calibrate the grade projection system. They must be registered once per assignment and will be automatically loaded for all subsequent batches.
 
@@ -163,7 +258,7 @@ Expected output:
 - Not persisted in database
 - Runner treats them like student essays but marks as anchors
 
-## Step 4: Run the ENG5 NP Runner
+## Step 5: Run the ENG5 NP Runner
 
 Once the assignment context exists, run the runner with the matching `assignment_id`:
 
@@ -251,9 +346,15 @@ Expected response (200 OK):
 
 ### Error: "Student prompt not found"
 
-**Cause**: Prompt upload step skipped or Content Service unavailable
+**Cause**: Student prompt upload step skipped or Content Service unavailable
 
 **Solution**: Repeat Step 2 (`cj-admin prompts upload`) once services are healthy
+
+### Error: "Judge rubric not found"
+
+**Cause**: Judge rubric upload step skipped or Content Service unavailable
+
+**Solution**: Repeat Step 3 (`cj-admin rubrics upload`) once services are healthy
 
 ### Error: "Invalid grade for scale"
 
@@ -281,6 +382,8 @@ CREATE TABLE assessment_instructions (
     course_id VARCHAR(50),
     instructions_text TEXT NOT NULL,
     grade_scale VARCHAR(50) NOT NULL DEFAULT 'swedish_8_anchor',
+    student_prompt_storage_id VARCHAR(255),      -- References Content Service (student-facing assignment)
+    judge_rubric_storage_id VARCHAR(255),         -- References Content Service (LLM assessment criteria)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT chk_context_type CHECK (
         (assignment_id IS NOT NULL AND course_id IS NULL) OR
@@ -291,11 +394,20 @@ CREATE TABLE assessment_instructions (
 
 ## Available Admin Endpoints
 
+### Assessment Instructions
 - `POST /admin/v1/assessment-instructions` - Create or update instructions
 - `GET /admin/v1/assessment-instructions` - List all instructions (paginated)
 - `GET /admin/v1/assessment-instructions/assignment/<id>` - Get by assignment ID
 - `DELETE /admin/v1/assessment-instructions/assignment/<id>` - Delete assignment instructions
 - `DELETE /admin/v1/assessment-instructions/course/<id>` - Delete course instructions
+
+### Student Prompts
+- `POST /admin/v1/student-prompts` - Upload student prompt (sets `student_prompt_storage_id`)
+- `GET /admin/v1/student-prompts/assignment/<id>` - Get student prompt with hydrated text
+
+### Judge Rubrics
+- `POST /admin/v1/judge-rubrics` - Upload judge rubric (sets `judge_rubric_storage_id`)
+- `GET /admin/v1/judge-rubrics/assignment/<id>` - Get judge rubric with hydrated text
 
 All admin endpoints require `Authorization: Bearer <jwt>` with `admin` role.
 
@@ -315,7 +427,8 @@ course_id="00000000-0000-0000-0000-000000000002"
 # Assessment context exists in database with:
 # - instructions_text: "Assess clarity, argumentation, and language use..."
 # - grade_scale: "eng5_np_legacy_9_step"
-# - student_prompt_storage_id: (stored in Content Service)
+# - student_prompt_storage_id: (stored in Content Service - student-facing assignment)
+# - judge_rubric_storage_id: (stored in Content Service - LLM assessment criteria)
 ```
 
 ### Validated Workflow: Anchor Registration + Execution
@@ -376,17 +489,22 @@ pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
    - No 405 errors from Content Service
 
 2. **Context Hydration (Critical):**
-   - CJ service logs show: `has_instructions: True, has_student_prompt: True`
-   - Prompts include both assignment instructions and student prompt text
+   - CJ service logs show: `has_instructions: True, has_student_prompt: True, has_judge_rubric: True`
+   - Prompts include student assignment, assessment instructions, and judge rubric
    - Prompt format validated by LLM Provider Service
 
 3. **Prompt Structure:**
    ```
-   **Assignment Prompt:**
-   <student prompt text from Content Service>
+   **Student Assignment:**
+   <student-facing assignment text from student_prompt_storage_id>
+   Example: "Write a text where you discuss role models..."
 
-   **Assessment Criteria:**
-   <assessment instructions from database>
+   **Assessment Rubric:**
+   <LLM judge instructions from judge_rubric_storage_id>
+   Example: "You are an impartial judge. Assess based on..."
+
+   **Assessment Instructions:**
+   <general assessment criteria from database instructions_text>
 
    **Essay A (ID: ELS_...):**
    <essay text>
@@ -410,7 +528,7 @@ docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessme
 
 # Check CJ service logs for context fetching
 docker logs huleedu-cj-assessment-1 2>&1 | grep "Fetched assessment context"
-# Expected: has_instructions: True, has_student_prompt: True
+# Expected: has_instructions: True, has_student_prompt: True, has_judge_rubric: True
 
 # Check LLM Provider received requests
 docker logs huleedu-llm-provider-1 2>&1 | grep "Queued comparison request"
@@ -458,7 +576,7 @@ service=cj_assessment_service operation=generate_comparison
 
 **Issue 3: Context not included in prompts**
 
-**Symptom:** CJ logs show `has_instructions: False` or `has_student_prompt: False`
+**Symptom:** CJ logs show `has_instructions: False`, `has_student_prompt: False`, or `has_judge_rubric: False`
 
 **Diagnosis:**
 ```bash
@@ -468,9 +586,13 @@ curl -H "Authorization: Bearer <admin-jwt>" \
 
 # Check if student prompt is uploaded
 pdm run cj-admin prompts get <assignment-id>
+
+# Check if judge rubric is uploaded
+pdm run cj-admin rubrics get <assignment-id>
 ```
 
 **Fix:**
 - Ensure Step 1 (create assessment context) completed successfully
 - Ensure Step 2 (upload student prompt) completed successfully
-- Verify `processing_metadata` in `cj_batch_uploads` contains `student_prompt_text`
+- Ensure Step 3 (upload judge rubric) completed successfully
+- Verify `processing_metadata` in `cj_batch_uploads` contains both `student_prompt_text` and `judge_rubric_text`

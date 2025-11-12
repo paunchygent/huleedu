@@ -12,7 +12,7 @@
 
 ## Status
 
-**OPEN** - Not started
+**IN PROGRESS** – Phase 1.4 complete (admin rubric endpoints refactored to DI-based auth, tests passing).
 
 ## Objective
 
