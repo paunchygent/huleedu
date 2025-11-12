@@ -13,6 +13,40 @@ This document contains ONLY current/next-session work. All completed tasks, arch
 
 ## Current Session Work (2025-11-12)
 
+### ✅ CRITICAL BUG FIX: LLM Prompt Construction
+
+**Status**: Prompt fix COMPLETE ✅ | Anchor registration PENDING ⏸️ | Validation test PENDING ⏸️
+
+**Problem**: CJ Assessment Service was sending **generic hardcoded prompts** to LLM judges, completely ignoring:
+- Assessment instructions from `assessment_instructions.instructions_text`
+- Student prompt context from `student_prompt_storage_id`
+- Assignment-specific rubrics and criteria
+
+**Impact**: All essay comparisons were judged using generic criteria instead of assignment requirements
+
+**Solution**: Modified `services/cj_assessment_service/cj_core_logic/pair_generation.py`
+
+**Changes**:
+1. Added `_fetch_assessment_context()` (lines 153-214):
+   - Queries `CJBatchUpload.processing_metadata` for `student_prompt_text` and `assignment_id`
+   - Queries `AssessmentInstruction` table for `instructions_text`
+   - Returns both context elements
+
+2. Updated `_build_comparison_prompt()` (lines 217-255):
+   - Accepts `assessment_instructions` and `student_prompt_text` parameters
+   - Builds structured prompts with:
+     - **Assignment Prompt** section (student prompt)
+     - **Assessment Criteria** section (instructions)
+     - Essay A and B texts
+     - Response instructions
+   - NO backwards compatibility fallback
+
+3. Modified `generate_comparison_tasks()` (lines 21-105):
+   - Calls `_fetch_assessment_context(db_session, cj_batch_id)`
+   - Passes context to `_build_comparison_prompt()`
+
+**Type Checking**: ✅ PASSED
+
 ### ✅ Complete: ENG5 Kafka DNS Fix & Infrastructure Validation
 
 **Status**: Kafka DNS fix ✅ implemented and validated, Runner now reaching CJ service; new data blockers ⚠️ surfaced downstream
@@ -101,6 +135,86 @@ if not settings.batch_id or settings.batch_id.strip() == "":
 ---
 
 ## Next Session Priority
+
+### 🔴 URGENT: Complete Prompt Fix Validation
+
+**Immediate Actions Required**:
+
+1. **Register Anchor Essays** (BLOCKED on CLI syntax)
+   ```bash
+   # Correct syntax (global options BEFORE subcommand):
+   pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
+     --assignment-id 00000000-0000-0000-0000-000000000001 \
+     --course-id 00000000-0000-0000-0000-000000000002 \
+     register-anchors \
+     --cj-service-url http://localhost:9095
+   ```
+
+   **What it does**:
+   - Reads 12 DOCX files from `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/anchor_essays/`
+   - Extracts grades from filenames (A1→A, F+1→F+, etc.)
+   - Uploads text to Content Service
+   - Creates 12 `AnchorEssayReference` records
+
+2. **Verify Registration**:
+   ```bash
+   docker exec huleedu_cj_assessment_db psql -U huleedu_user -d huleedu_cj_assessment -c "
+   SELECT id, grade, LEFT(text_storage_id, 12) || '...' as storage_id
+   FROM anchor_essay_references
+   WHERE assignment_id = '00000000-0000-0000-0000-000000000001'
+   ORDER BY grade;"
+   ```
+   Expected: 12 rows with grades A(2), B(2), C+, C-, D+, D-, E+, E-, F+(2)
+
+3. **Run End-to-End Validation Test**:
+   ```bash
+   pdm run python -m scripts.cj_experiments_runners.eng5_np.cli \
+     --mode execute \
+     --assignment-id 00000000-0000-0000-0000-000000000001 \
+     --course-id 00000000-0000-0000-0000-000000000002 \
+     --batch-id validation-prompt-fix-$(date +%Y%m%d-%H%M) \
+     --max-comparisons 5 \
+     --kafka-bootstrap localhost:9093 \
+     --await-completion \
+     --completion-timeout 180 \
+     --verbose 2>&1 | tee /tmp/validation_with_context.log
+   ```
+
+4. **Verify Prompts Include Context**:
+   ```bash
+   # Check logs for context fetching
+   grep "Fetched assessment context" /tmp/validation_with_context.log
+
+   # Inspect actual prompts (if debug logging enabled)
+   grep -A 20 "Assignment Prompt:" /tmp/validation_with_context.log | head -50
+   ```
+
+**Success Criteria**:
+- ✅ 12 anchors registered in database
+- ✅ LLM prompts include **Assignment Prompt** section
+- ✅ LLM prompts include **Assessment Criteria** section
+- ✅ Grade projections calculated (not skipped)
+- ✅ No "No anchor essays available" warnings
+
+**Key Technical Details**:
+- **LLM Model**: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
+- **Provider**: Anthropic (NOT mock - verify `USE_MOCK_LLM` is unset)
+- **Grade Scale**: `eng5_np_legacy_9_step` (9 grades: F+ to A)
+- **Data Flow**:
+  1. Event → `student_prompt_text` stored in `CJBatchUpload.processing_metadata`
+  2. Pair generation → fetches context from batch + `AssessmentInstruction` table
+  3. Prompt building → includes both student prompt AND instructions
+  4. LLM submission → receives full context
+
+**Files Modified This Session**:
+- `services/cj_assessment_service/cj_core_logic/pair_generation.py`
+
+**Related Files** (for context):
+- `services/cj_assessment_service/event_processor.py:202-278` (prompt extraction)
+- `services/cj_assessment_service/cj_core_logic/batch_preparation.py:76-97` (metadata storage)
+- `scripts/cj_experiments_runners/eng5_np/cli.py:60-108` (anchor registration)
+
+---
 
 ### 🟢 TASK-002: ENG5 CLI Validation (UNBLOCKED)
 

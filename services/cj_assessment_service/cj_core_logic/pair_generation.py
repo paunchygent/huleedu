@@ -49,6 +49,9 @@ async def generate_comparison_tasks(
         },
     )
 
+    # Fetch assessment context (instructions and student prompt) from batch metadata
+    assessment_context = await _fetch_assessment_context(db_session, cj_batch_id)
+
     # Get existing comparison pairs to avoid duplicates
     existing_comparison_ids = await _fetch_existing_comparison_ids(db_session, cj_batch_id)
 
@@ -79,8 +82,13 @@ async def generate_comparison_tasks(
                 )
                 break
 
-            # Create comparison task
-            prompt = _build_comparison_prompt(essay_a, essay_b)
+            # Create comparison task with assessment context
+            prompt = _build_comparison_prompt(
+                essay_a,
+                essay_b,
+                assessment_instructions=assessment_context.get("assessment_instructions"),
+                student_prompt_text=assessment_context.get("student_prompt_text"),
+            )
             task = ComparisonTask(essay_a=essay_a, essay_b=essay_b, prompt=prompt)
 
             comparison_tasks.append(task)
@@ -142,28 +150,106 @@ async def _fetch_existing_comparison_ids(
     return normalized_pairs
 
 
-def _build_comparison_prompt(essay_a: EssayForComparison, essay_b: EssayForComparison) -> str:
-    """Build the comparison prompt for two essays.
+async def _fetch_assessment_context(
+    db_session: AsyncSession,
+    cj_batch_id: int,
+) -> dict[str, str | None]:
+    """Fetch assessment context from batch and assignment records.
+
+    Retrieves assessment instructions and student prompt text to include in LLM prompts.
+
+    Args:
+        db_session: Database session
+        cj_batch_id: Internal CJ batch ID
+
+    Returns:
+        Dictionary with keys 'assessment_instructions' and 'student_prompt_text'
+    """
+    from services.cj_assessment_service.models_db import (
+        AssessmentInstruction,
+        CJBatchUpload,
+    )
+
+    # Fetch batch record with processing metadata
+    batch_stmt = select(CJBatchUpload).where(CJBatchUpload.id == cj_batch_id)
+    batch_result = await db_session.execute(batch_stmt)
+    batch = batch_result.scalar_one_or_none()
+
+    if not batch:
+        logger.warning(
+            f"No batch found for CJ batch ID {cj_batch_id}",
+            extra={"cj_batch_id": str(cj_batch_id)},
+        )
+        return {"assessment_instructions": None, "student_prompt_text": None}
+
+    # Extract context from processing metadata
+    metadata = batch.processing_metadata or {}
+    student_prompt_text = metadata.get("student_prompt_text")
+    assignment_id = metadata.get("assignment_id")
+
+    # Fetch assessment instructions if assignment_id is available
+    assessment_instructions = None
+    if assignment_id:
+        instruction_stmt = select(AssessmentInstruction).where(
+            AssessmentInstruction.assignment_id == assignment_id
+        )
+        instruction_result = await db_session.execute(instruction_stmt)
+        instruction = instruction_result.scalar_one_or_none()
+
+        if instruction:
+            assessment_instructions = instruction.instructions_text
+
+    logger.debug(
+        f"Fetched assessment context for batch {cj_batch_id}",
+        extra={
+            "cj_batch_id": str(cj_batch_id),
+            "has_instructions": assessment_instructions is not None,
+            "has_student_prompt": student_prompt_text is not None,
+        },
+    )
+
+    return {
+        "assessment_instructions": assessment_instructions,
+        "student_prompt_text": student_prompt_text,
+    }
+
+
+def _build_comparison_prompt(
+    essay_a: EssayForComparison,
+    essay_b: EssayForComparison,
+    assessment_instructions: str | None = None,
+    student_prompt_text: str | None = None,
+) -> str:
+    """Build the comparison prompt for two essays with assessment context.
 
     Args:
         essay_a: First essay for comparison
         essay_b: Second essay for comparison
+        assessment_instructions: Assessment criteria and rubric from assignment
+        student_prompt_text: Original student prompt showing what was asked
 
     Returns:
-        Formatted prompt string for LLM comparison
+        Formatted prompt string for LLM comparison with full context
     """
-    # This would use the configured prompt template from settings
-    # For now, use a simple template
-    prompt = f"""Compare these two essays and determine which is better written.
+    prompt_parts = []
 
-Essay A (ID: {essay_a.id}):
-{essay_a.text_content}
+    # Add student prompt context if available
+    if student_prompt_text:
+        prompt_parts.append(f"**Assignment Prompt:**\n{student_prompt_text}")
 
-Essay B (ID: {essay_b.id}):
-{essay_b.text_content}
+    # Add assessment instructions/rubric if available
+    if assessment_instructions:
+        prompt_parts.append(f"**Assessment Criteria:**\n{assessment_instructions}")
 
-Please evaluate based on clarity, structure, argument quality, and writing mechanics.
-Respond with JSON indicating the winner, justification, and confidence level (1-5).
-"""
+    # Add essays for comparison
+    prompt_parts.append(f"**Essay A (ID: {essay_a.id}):**\n{essay_a.text_content}")
+    prompt_parts.append(f"**Essay B (ID: {essay_b.id}):**\n{essay_b.text_content}")
 
-    return prompt
+    # Add response instructions
+    prompt_parts.append(
+        "Compare these two essays based on the assessment criteria and assignment "
+        "prompt provided above. Determine which essay better fulfills the requirements. "
+        "Respond with JSON indicating the winner, justification, and confidence level (1-5)."
+    )
+
+    return "\n\n".join(prompt_parts)
