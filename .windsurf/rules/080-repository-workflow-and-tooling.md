@@ -41,6 +41,14 @@ alwaysApply: false
 ### 4.1. PDM Environment
 - Work within PDM-managed virtual environment (`pdm shell` or `pdm run`)
 
+### 4.2. Database Reset Procedure
+- Use `pdm run db-reset` (wrapper for `scripts/reset-dev-databases.sh`) whenever you need to rebuild **all** development databases from scratch.
+- The script:
+  - auto-detects every `services/*_service` that ships Alembic migrations and has a `<service>_db` container
+  - stops/removes the corresponding database containers and their `${COMPOSE_PROJECT_NAME}_${service}_db_data` volumes
+  - restarts fresh Postgres containers, waits for `pg_isready`, and runs `../../.venv/bin/alembic upgrade head`
+- **Destructive:** wipes all dev data; do **not** run unless you intend to nuke every service database.
+
 ## 5. Monorepo Structure
 
 ### 5.1. `common/` Directory

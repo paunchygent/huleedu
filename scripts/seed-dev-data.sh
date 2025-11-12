@@ -1,18 +1,21 @@
 #!/bin/bash
 # Seed development databases with test data
 
-set -e
+set -euo pipefail
+
+if [ ! -f .env ]; then
+  echo "❌ .env file not found. Please create it before seeding."
+  exit 1
+fi
+
 source .env
 
 echo "🌱 Seeding development databases with test data..."
 
-# Create seed data script directory if it doesn't exist
+# Ensure seed script directory exists for future additions
 mkdir -p database/seed-scripts
 
-# TODO: Implement service-specific seed scripts
-echo "📝 TODO: Create seed scripts in database/seed-scripts/"
-echo "   - database/seed-scripts/seed_class_management.py" 
-echo "   - database/seed-scripts/seed_batch_orchestrator.py"
-echo "   - etc."
+echo "📘 Seeding Class Management Service courses..."
+pdm run python scripts/seed_courses.py
 
-echo "✅ Development database seeding ready for implementation"
+echo "✅ Development database seeding complete"

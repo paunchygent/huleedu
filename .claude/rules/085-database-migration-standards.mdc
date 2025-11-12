@@ -29,7 +29,24 @@ cd services/<service>
 ../../.venv/bin/alembic revision --autogenerate -m "description"
 ```
 
-## 4. Prohibited Practices
+### Recommended Dev Reset Workflow
+- Use `pdm run db-reset` (wrapper for `scripts/reset-dev-databases.sh`) when you need a clean slate across all dev databases.
+- The script autodiscovers Alembic-enabled services, stops the matching `<service>_db` containers, deletes the `*_db_data` volumes, restarts fresh Postgres instances, waits for `pg_isready`, and runs `../../.venv/bin/alembic upgrade head` per service.
+- **Destructive:** drops every dev database; do not run if you need to preserve local data.
+
+## 4. Automated Safety Checks (MANDATORY)
+
+- **Service-level smoke test:** every service MUST provide an automated check (CI or
+  local script) that provisions an ephemeral PostgreSQL instance (TestContainers or
+  docker-compose) and runs `../../.venv/bin/alembic upgrade head`. This regression test
+  guards against enum/type duplication and other DDL conflicts before migrations merge.
+- **Enum creation policy:** prefer SQLAlchemy-managed enums over ad-hoc `CREATE TYPE`
+  statements. Use `postgresql.ENUM(..., name="<enum_name>")` and let Alembic emit the
+  DDL, or set `create_type=False` when the enum already exists. Manual
+  `op.execute("CREATE TYPE ...")` MUST be accompanied by `create_type=False` on any
+  `postgresql.ENUM` columns referencing the type to avoid duplicate creation errors.
+
+## 5. Prohibited Practices
 
 **FORBIDDEN:**
 - PDM service-specific commands (`pdm run -p services/<service>`)
@@ -39,7 +56,7 @@ cd services/<service>
 - Applying migrations without state analysis
 - Absolute imports in alembic/env.py
 
-## 5. Post-Migration Verification
+## 6. Post-Migration Verification
 
 **MUST verify after migration:**
 ```bash
@@ -67,7 +84,7 @@ docker exec huleedu_<service>_db psql -U huleedu_user -d <db_name> -c "\d <table
 | `nlp_service` | `huleedu_nlp_db` | `huleedu_nlp` | 5440 |
 | `email_service` | `huleedu_email_db` | `huleedu_email` | 5443 |
 
-## 6. Secure Configuration Pattern (MANDATORY)
+## 7. Secure Configuration Pattern (MANDATORY)
 
 **All service config.py files MUST implement secure credential loading:**
 
@@ -108,7 +125,7 @@ def database_url(self) -> str:
 - **Clear error messages** - Guide developers to proper configuration
 - **Environment precedence** - Docker can override with specific URLs
 
-## 7. Operational Services (VERIFIED)
+## 8. Operational Services (VERIFIED)
 
 **All 8 Alembic-enabled services are fully operational with secure configuration:**
 
