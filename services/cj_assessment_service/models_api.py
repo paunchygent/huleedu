@@ -10,16 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Generic, TypeVar
 from uuid import UUID
 
 from common_core import EssayComparisonWinner
 from common_core.error_enums import ErrorCode
 from common_core.models.error_models import ErrorDetail as CanonicalErrorDetail
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-T = TypeVar("T")
-E = TypeVar("E")
 
 
 class EssayForComparison(BaseModel):
@@ -150,52 +146,6 @@ class PromptHydrationFailure:
     storage_id: str | None = None
 
 
-@dataclass(frozen=True)
-class Result(Generic[T, E]):
-    """Result monad for discriminated union of success/failure states.
-
-    Provides a lightweight Result type for operations that may fail,
-    avoiding exception-based control flow in non-boundary code.
-    """
-
-    _value: T | None = None
-    _error: E | None = None
-
-    @classmethod
-    def ok(cls, value: T) -> Result[T, E]:
-        """Create a successful Result wrapping a value."""
-        return cls(_value=value, _error=None)
-
-    @classmethod
-    def err(cls, error: E) -> Result[T, E]:
-        """Create a failed Result wrapping an error."""
-        return cls(_value=None, _error=error)
-
-    @property
-    def is_ok(self) -> bool:
-        """Check if this Result represents success."""
-        return self._error is None
-
-    @property
-    def is_err(self) -> bool:
-        """Check if this Result represents failure."""
-        return self._error is not None
-
-    @property
-    def value(self) -> T:
-        """Get the success value. Raises ValueError if called on Result.err."""
-        if self._error is not None:
-            raise ValueError("Called value on Result.err")
-        return self._value  # type: ignore
-
-    @property
-    def error(self) -> E:
-        """Get the error. Raises ValueError if called on Result.ok."""
-        if self._error is None:
-            raise ValueError("Called error on Result.ok")
-        return self._error
-
-
 class CJProcessingMetadata(BaseModel):
     """Typed metadata model for CJ batch processing context.
 
@@ -207,3 +157,5 @@ class CJProcessingMetadata(BaseModel):
 
     student_prompt_storage_id: str | None = None
     student_prompt_text: str | None = None
+    judge_rubric_storage_id: str | None = None
+    judge_rubric_text: str | None = None

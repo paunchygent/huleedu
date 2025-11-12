@@ -455,11 +455,12 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
         instructions_text: str,
         grade_scale: str,
         student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
         """Create or update assignment-scoped assessment configuration.
 
-        Storage-by-reference: `student_prompt_storage_id` is Content Service pointer,
-        not prompt text. None on update preserves existing reference.
+        Storage-by-reference: `student_prompt_storage_id` and `judge_rubric_storage_id`
+        are Content Service pointers, not prompt text. None on update preserves existing reference.
         """
         self._validate_instruction_scope(assignment_id, course_id)
 
@@ -479,6 +480,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
             instruction.instructions_text = instructions_text
             instruction.grade_scale = grade_scale
             instruction.student_prompt_storage_id = student_prompt_storage_id
+            instruction.judge_rubric_storage_id = judge_rubric_storage_id
         else:
             instruction = AssessmentInstruction(
                 assignment_id=assignment_id,
@@ -486,6 +488,7 @@ class PostgreSQLCJRepositoryImpl(CJRepositoryProtocol):
                 instructions_text=instructions_text,
                 grade_scale=grade_scale,
                 student_prompt_storage_id=student_prompt_storage_id,
+                judge_rubric_storage_id=judge_rubric_storage_id,
             )
             session.add(instruction)
 

@@ -141,11 +141,13 @@ class CJRepositoryProtocol(Protocol):
         instructions_text: str,
         grade_scale: str,
         student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
     ) -> Any:  # AssessmentInstruction
         """Create or update assignment-scoped assessment configuration.
 
-        `student_prompt_storage_id` enables admin prompt management (Content Service
-        reference, not prompt text). None on update preserves existing reference.
+        `student_prompt_storage_id` and `judge_rubric_storage_id` enable admin prompt
+        management (Content Service references, not prompt text). None on update
+        preserves existing reference.
 
         Raises ValueError if scope invalid (both/neither assignment_id/course_id).
         """

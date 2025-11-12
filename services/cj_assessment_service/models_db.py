@@ -402,11 +402,11 @@ class AssessmentInstruction(Base):
     - **User**: Uploads prompts ad-hoc per batch, bypassing this table entirely
 
     Purpose: Enables assignment-based batches to inherit all assessment metadata
-    (judge instructions, grade scale, anchors, student prompt) from a single
+    (judge instructions, grade scale, anchors, student prompt, judge rubric) from a single
     assignment_id lookup in batch_preparation.py.
 
-    Storage pattern: `student_prompt_storage_id` references Content Service (text
-    stored there, not here). Optional field - CJ runs without prompts.
+    Storage pattern: `student_prompt_storage_id` and `judge_rubric_storage_id` reference
+    Content Service (text stored there, not here). Both optional - CJ runs without prompts.
 
     Scope: XOR constraint ensures exactly one of assignment_id or course_id per record.
     """
@@ -423,6 +423,9 @@ class AssessmentInstruction(Base):
         String(50), nullable=False, server_default="swedish_8_anchor", index=True
     )
     student_prompt_storage_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    judge_rubric_storage_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -89,3 +89,25 @@ class StudentPromptResponse(BaseModel):
     instructions_text: str
     grade_scale: str
     created_at: datetime
+
+
+class JudgeRubricUploadRequest(BaseModel):
+    """Request payload for uploading judge rubric to assignment."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    assignment_id: str = Field(min_length=1, description="Assignment identifier")
+    rubric_text: str = Field(
+        min_length=10, description="Judge rubric text to upload to Content Service"
+    )
+
+
+class JudgeRubricResponse(BaseModel):
+    """Response model for judge rubric with full instruction context."""
+
+    assignment_id: str
+    judge_rubric_storage_id: str
+    rubric_text: str
+    instructions_text: str
+    grade_scale: str
+    created_at: datetime
