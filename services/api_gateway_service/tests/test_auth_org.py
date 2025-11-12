@@ -13,10 +13,10 @@ from uuid import uuid4
 import jwt
 import pytest
 from fastapi import Request
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
 
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.config import settings
-from services.api_gateway_service.tests.test_auth import TestJWTAuthentication
 
 
 class TestJWTOrgIdExtraction:
@@ -33,9 +33,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_extract_org_id_from_org_id_claim(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"org_id": "org-123"})
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"org_id": "org-123"})
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -44,9 +43,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_extract_org_id_from_org_alias_claim(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"org": "ORG-ALIAS"})
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"org": "ORG-ALIAS"})
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -55,9 +53,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_extract_org_id_from_organization_id_claim(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"organization_id": "org-xyz"})
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"organization_id": "org-xyz"})
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -66,9 +63,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_no_org_claims_returns_none(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_test_token("user-1")
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1")
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -77,9 +73,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_empty_org_id_is_ignored(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"org_id": "   "})
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"org_id": "   "})
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -88,9 +83,8 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_non_string_org_id_is_ignored(self):
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims("user-1", {"org_id": 12345})
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"org_id": 12345})
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -101,11 +95,13 @@ class TestJWTOrgIdExtraction:
     async def test_org_id_provider_expired_token(self):
         from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
 
-        auth = TestJWTAuthentication()
-        token = auth.create_token_with_claims(
-            "user-1", {"org_id": "org-1"}, exp_delta=timedelta(hours=-1)
+        headers = build_jwt_headers(
+            settings,
+            subject="user-1",
+            extra_claims={"org_id": "org-1"},
+            expires_in=timedelta(hours=-1)
         )
-        mock_request = self._create_mock_request(f"Bearer {token}")
+        mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
         bearer_token = provider.extract_bearer_token(mock_request)
@@ -118,8 +114,8 @@ class TestJWTOrgIdExtraction:
 
         # Build token without exp
         payload = {"sub": "user-1", "org_id": "org-1"}
-        secret_key = TestJWTAuthentication._get_secret_key_value()  # reuse helper for consistency
-        token = jwt.encode(payload, secret_key, algorithm=settings.JWT_ALGORITHM)
+        assert settings.JWT_SECRET_KEY is not None
+        token = create_jwt(settings.JWT_SECRET_KEY.get_secret_value(), payload, algorithm=settings.JWT_ALGORITHM)
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         provider = AuthProvider()

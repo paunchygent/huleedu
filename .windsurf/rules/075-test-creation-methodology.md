@@ -101,6 +101,42 @@ async def test_service_method(self):
 - **MUST** use `make_async_container` with test `Provider`
 - **PATTERN**: Bind protocols to mocks with appropriate scopes
 
+### 6.3. JWT Authentication Testing
+
+**Shared JWT Helpers** (`huleedu_service_libs.testing.jwt_helpers`):
+- **MUST** use shared helpers for JWT token creation in unit tests
+- **FORBIDDEN**: Local JWT encoding or helper duplication
+
+**Common patterns**:
+```python
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
+
+# Standard user token (HTTP integration tests)
+headers = build_jwt_headers(settings, subject="user-123")
+response = await client.post("/endpoint", headers=headers, json=data)
+
+# Admin token with roles
+headers = build_jwt_headers(settings, subject="admin", roles=["admin"])
+
+# Expired token (for expiry testing)
+headers = build_jwt_headers(settings, subject="user-123", expires_in=timedelta(hours=-1))
+
+# Missing claim (for validation testing)
+headers = build_jwt_headers(settings, subject="user-123", omit_claims=["exp"])
+
+# Custom claims
+headers = build_jwt_headers(settings, extra_claims={"org_id": "org-123"})
+
+# Raw token for validator testing (non-HTTP)
+token = create_jwt(
+    secret=settings.JWT_SECRET_KEY.get_secret_value(),
+    payload={"sub": "user-123", "exp": timestamp, "aud": "...", "iss": "..."},
+    algorithm=settings.JWT_ALGORITHM,
+)
+```
+
+**For functional/integration tests**: Use `AuthTestManager` from `tests.utils.auth_manager` when you need full user lifecycle management.
+
 ## 7. Anti-Patterns to Avoid
 
 ### 7.1. Forbidden Practices

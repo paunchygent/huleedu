@@ -7,19 +7,20 @@ from typing import Any, AsyncContextManager, AsyncIterator, cast
 from uuid import UUID, uuid4
 
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
 from huleedu_service_libs.error_handling.quart import register_error_handlers
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers
 from quart import Quart
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.api import admin_routes
+from services.cj_assessment_service.api.admin import student_prompts_bp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.protocols import CJRepositoryProtocol, ContentClientProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from pydantic import SecretStr
 
 
 class AdminRepositoryMock(CJRepositoryProtocol):
@@ -45,6 +46,7 @@ class AdminRepositoryMock(CJRepositoryProtocol):
         instructions_text: str,
         grade_scale: str,
         student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
     ) -> Any:
         record = self._instruction_store.upsert(
             assignment_id=assignment_id,
@@ -52,11 +54,13 @@ class AdminRepositoryMock(CJRepositoryProtocol):
             instructions_text=instructions_text,
             grade_scale=grade_scale,
             student_prompt_storage_id=student_prompt_storage_id,
+            judge_rubric_storage_id=judge_rubric_storage_id,
         )
         self.records.append(
             {
                 "assignment_id": assignment_id,
                 "student_prompt_storage_id": student_prompt_storage_id,
+                "judge_rubric_storage_id": judge_rubric_storage_id,
             }
         )
         return record
@@ -218,7 +222,10 @@ def correlation_context() -> CorrelationContext:
 def settings() -> Settings:
     cfg = Settings()
     cfg.ENABLE_ADMIN_ENDPOINTS = True
+    cfg.JWT_SECRET_KEY = SecretStr("unit-test-secret")
     return cfg
+
+
 
 
 @pytest.fixture
@@ -247,7 +254,7 @@ def admin_app(
 
     container = make_async_container(TestProvider())
     QuartDishka(app=app, container=container)
-    app.register_blueprint(admin_routes.bp)
+    app.register_blueprint(student_prompts_bp)
 
     @app.after_serving
     async def cleanup() -> None:  # pragma: no cover - defensive cleanup
@@ -262,24 +269,14 @@ async def client(admin_app: Quart) -> AsyncIterator[QuartTestClient]:
         yield test_client
 
 
-def _patch_decode(monkeypatch: MonkeyPatch) -> None:
-    from huleedu_service_libs import auth as auth_module
-    from huleedu_service_libs.auth import jwt_utils
-
-    from services.cj_assessment_service.api import admin_routes as admin_module
-
-    def fake_decode(
-        token: str,
-        settings: Settings,
-        correlation_id: UUID,
-        service: str,
-        operation: str,
-    ) -> dict[str, Any]:
-        return {"sub": "admin-user", "roles": ["admin"]}
-
-    monkeypatch.setattr(jwt_utils, "decode_and_validate_jwt", fake_decode)
-    monkeypatch.setattr(auth_module, "decode_and_validate_jwt", fake_decode)
-    monkeypatch.setattr(admin_module, "decode_and_validate_jwt", fake_decode)
+@pytest.fixture
+def admin_headers(settings: Settings) -> dict[str, str]:
+    return build_jwt_headers(
+        settings,
+        subject="test-admin-user",
+        roles=["admin"],
+        extra_claims={"email": "test-admin-user@admin.test"},
+    )
 
 
 @pytest.mark.asyncio
@@ -295,14 +292,12 @@ async def test_prompt_upload_success(
     client: QuartTestClient,
     admin_repo: AdminRepositoryMock,
     content_client: ContentClientMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
     prompt_text: str,
 ) -> None:
-    _patch_decode(monkeypatch)
-
     response = await client.post(
         "/admin/v1/student-prompts",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
         json={"assignment_id": "assignment-1", "prompt_text": prompt_text},
     )
 
@@ -322,14 +317,13 @@ async def test_prompt_upload_success(
 async def test_prompt_upload_instruction_missing(
     client: QuartTestClient,
     admin_repo: AdminRepositoryMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     admin_repo._instruction_store.delete(assignment_id="assignment-1", course_id=None)
 
     response = await client.post(
         "/admin/v1/student-prompts",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
         json={"assignment_id": "assignment-1", "prompt_text": "valid prompt text"},
     )
 
@@ -340,14 +334,13 @@ async def test_prompt_upload_instruction_missing(
 async def test_prompt_upload_missing_storage_id(
     client: QuartTestClient,
     content_client: ContentClientMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     content_client.set_store_response({})
 
     response = await client.post(
         "/admin/v1/student-prompts",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
         json={"assignment_id": "assignment-1", "prompt_text": "valid prompt body"},
     )
 
@@ -357,13 +350,11 @@ async def test_prompt_upload_missing_storage_id(
 @pytest.mark.asyncio
 async def test_prompt_upload_validation_error(
     client: QuartTestClient,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
-
     response = await client.post(
         "/admin/v1/student-prompts",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
         json={"assignment_id": "assignment-1", "prompt_text": "short"},
     )
 
@@ -374,14 +365,13 @@ async def test_prompt_upload_validation_error(
 async def test_prompt_get_success(
     client: QuartTestClient,
     content_client: ContentClientMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     content_client.set_fetch_text("Fetched prompt text")
 
     response = await client.get(
         "/admin/v1/student-prompts/assignment/assignment-1",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -398,14 +388,13 @@ async def test_prompt_get_success(
 async def test_prompt_get_instruction_missing(
     client: QuartTestClient,
     admin_repo: AdminRepositoryMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     admin_repo._instruction_store.delete(assignment_id="assignment-1", course_id=None)
 
     response = await client.get(
         "/admin/v1/student-prompts/assignment/assignment-1",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 404
@@ -415,9 +404,8 @@ async def test_prompt_get_instruction_missing(
 async def test_prompt_get_missing_storage_id(
     client: QuartTestClient,
     admin_repo: AdminRepositoryMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     admin_repo._instruction_store.upsert(
         assignment_id="assignment-1",
         course_id=None,
@@ -428,7 +416,7 @@ async def test_prompt_get_missing_storage_id(
 
     response = await client.get(
         "/admin/v1/student-prompts/assignment/assignment-1",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 404
@@ -438,14 +426,13 @@ async def test_prompt_get_missing_storage_id(
 async def test_prompt_get_content_service_failure(
     client: QuartTestClient,
     content_client: ContentClientMock,
-    monkeypatch: MonkeyPatch,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
     content_client._raise_fetch = RuntimeError("fetch_failed")
 
     response = await client.get(
         "/admin/v1/student-prompts/assignment/assignment-1",
-        headers={"Authorization": "Bearer token"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 500

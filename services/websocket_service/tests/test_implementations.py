@@ -17,7 +17,10 @@ import jwt
 import pytest
 from fastapi import WebSocket
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError
+from huleedu_service_libs.testing.jwt_helpers import create_jwt
+from pydantic import SecretStr
 
+from services.websocket_service.config import Settings
 from services.websocket_service.implementations.jwt_validator import JWTValidator
 from services.websocket_service.implementations.message_listener import RedisMessageListener
 from services.websocket_service.implementations.websocket_manager import WebSocketManager
@@ -161,39 +164,53 @@ class TestWebSocketManager:
 class TestJWTValidator:
     """Test suite for JWT token validator."""
 
+    @pytest.fixture
+    def settings(self) -> Settings:
+        """Provide test settings for JWT validation."""
+        return Settings(
+            SERVICE_NAME="websocket_service",
+            JWT_SECRET_KEY=SecretStr("test-secret"),
+        )
+
     @pytest.mark.asyncio
-    async def test_validate_valid_token(self) -> None:
+    async def test_validate_valid_token(self, settings: Settings) -> None:
         """Test validation of a valid JWT token."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         # Create a valid token
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
-            "aud": "huleedu-platform",
-            "iss": "huleedu-identity-service",
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
         }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         user_id = await validator.validate_token(token)
 
         assert user_id == "user123"
 
     @pytest.mark.asyncio
-    async def test_validate_expired_token(self) -> None:
+    async def test_validate_expired_token(self, settings: Settings) -> None:
         """Test validation of an expired token."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         # Create an expired token
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) - timedelta(hours=1)).timestamp(),
-            "aud": "huleedu-platform",
-            "iss": "huleedu-identity-service",
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
         }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
@@ -201,14 +218,17 @@ class TestJWTValidator:
         assert "token has expired" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
-    async def test_validate_token_missing_exp(self) -> None:
+    async def test_validate_token_missing_exp(self, settings: Settings) -> None:
         """Test validation of token without expiration."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         # Create token without exp
-        payload = {"sub": "user123", "aud": "huleedu-platform", "iss": "huleedu-identity-service"}
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        payload = {"sub": "user123", "aud": settings.JWT_AUDIENCE, "iss": settings.JWT_ISSUER}
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
@@ -216,18 +236,21 @@ class TestJWTValidator:
         assert "missing expiration" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
-    async def test_validate_token_missing_sub(self) -> None:
+    async def test_validate_token_missing_sub(self, settings: Settings) -> None:
         """Test validation of token without subject."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         # Create token without sub
         payload = {
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
-            "aud": "huleedu-platform",
-            "iss": "huleedu-identity-service",
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
         }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
@@ -235,18 +258,18 @@ class TestJWTValidator:
         assert "missing subject" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
-    async def test_validate_invalid_signature(self) -> None:
+    async def test_validate_invalid_signature(self, settings: Settings) -> None:
         """Test validation of token with invalid signature."""
-        validator = JWTValidator(secret_key="correct-secret")
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         # Create token with different secret
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
-            "aud": "huleedu-platform",
-            "iss": "huleedu-identity-service",
+            "aud": settings.JWT_AUDIENCE,
+            "iss": settings.JWT_ISSUER,
         }
-        token = jwt.encode(payload, "wrong-secret", algorithm="HS256")
+        token = create_jwt(secret="wrong-secret", payload=payload, algorithm=settings.JWT_ALGORITHM)
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
@@ -264,18 +287,21 @@ class TestJWTValidator:
         assert "invalid token" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
-    async def test_invalid_audience_rejection(self) -> None:
+    async def test_invalid_audience_rejection(self, settings: Settings) -> None:
         """Token with wrong audience should be rejected by audience validation."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
             "aud": "wrong-audience",
-            "iss": "huleedu-identity-service",
+            "iss": settings.JWT_ISSUER,
         }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)
@@ -283,18 +309,21 @@ class TestJWTValidator:
         assert "aud" in exc_info.value.error_detail.message.lower()
 
     @pytest.mark.asyncio
-    async def test_invalid_issuer_rejection(self) -> None:
+    async def test_invalid_issuer_rejection(self, settings: Settings) -> None:
         """Token with wrong issuer should be rejected by issuer validation."""
-        secret = "test-secret"
-        validator = JWTValidator(secret_key=secret)
+        validator = JWTValidator(secret_key=settings.JWT_SECRET_KEY.get_secret_value())
 
         payload = {
             "sub": "user123",
             "exp": (datetime.now(UTC) + timedelta(hours=1)).timestamp(),
-            "aud": "huleedu-platform",
+            "aud": settings.JWT_AUDIENCE,
             "iss": "wrong-issuer",
         }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        token = create_jwt(
+            secret=settings.JWT_SECRET_KEY.get_secret_value(),
+            payload=payload,
+            algorithm=settings.JWT_ALGORITHM,
+        )
 
         with pytest.raises(HuleEduError) as exc_info:
             await validator.validate_token(token)

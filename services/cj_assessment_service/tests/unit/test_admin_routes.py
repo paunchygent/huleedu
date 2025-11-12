@@ -5,23 +5,24 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any, AsyncContextManager, AsyncIterator, cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 from dishka import Provider, Scope, make_async_container, provide
 from huleedu_service_libs.error_handling.correlation import CorrelationContext
 from huleedu_service_libs.error_handling.quart import register_error_handlers
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers
 from quart import Quart
 from quart.typing import TestClientProtocol as QuartTestClient
 from quart_dishka import QuartDishka
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.cj_assessment_service.api import admin_routes
+from services.cj_assessment_service.api.admin import instructions_bp
 from services.cj_assessment_service.config import Settings
 from services.cj_assessment_service.models_db import AssessmentInstruction
 from services.cj_assessment_service.protocols import CJRepositoryProtocol
 from services.cj_assessment_service.tests.unit.instruction_store import AssessmentInstructionStore
+from pydantic import SecretStr
 
 
 class AdminRepositoryMock(CJRepositoryProtocol):
@@ -46,6 +47,7 @@ class AdminRepositoryMock(CJRepositoryProtocol):
         instructions_text: str,
         grade_scale: str,
         student_prompt_storage_id: str | None = None,
+        judge_rubric_storage_id: str | None = None,
     ) -> AssessmentInstruction:
         return self._instruction_store.upsert(
             assignment_id=assignment_id,
@@ -53,6 +55,7 @@ class AdminRepositoryMock(CJRepositoryProtocol):
             instructions_text=instructions_text,
             grade_scale=grade_scale,
             student_prompt_storage_id=student_prompt_storage_id,
+            judge_rubric_storage_id=judge_rubric_storage_id,
         )
 
     async def list_assessment_instructions(
@@ -225,6 +228,7 @@ def admin_repo() -> AdminRepositoryMock:
 def settings() -> Settings:
     s = Settings()
     s.ENABLE_ADMIN_ENDPOINTS = True
+    s.JWT_SECRET_KEY = SecretStr("unit-test-secret")
     return s
 
 
@@ -258,7 +262,7 @@ def admin_app(
 
     container = make_async_container(TestProvider())
     QuartDishka(app=app, container=container)
-    app.register_blueprint(admin_routes.bp)
+    app.register_blueprint(instructions_bp)
 
     @app.after_serving
     async def cleanup() -> None:
@@ -273,35 +277,31 @@ async def client(admin_app: Quart) -> AsyncIterator[QuartTestClient]:  # type: i
         yield test_client
 
 
-def _patch_decode(monkeypatch: MonkeyPatch, roles: list[str] | None = None) -> None:
-    from huleedu_service_libs import auth as auth_module
-    from huleedu_service_libs.auth import jwt_utils
-
-    from services.cj_assessment_service.api import admin_routes as admin_module
-
-    def fake_decode(
-        token: str,
-        settings: Settings,
-        correlation_id: UUID,
-        service: str,
-        operation: str,
-    ) -> dict[str, Any]:
-        return {"sub": "admin-user", "roles": roles or ["admin"]}
-
-    monkeypatch.setattr(jwt_utils, "decode_and_validate_jwt", fake_decode)
-    monkeypatch.setattr(auth_module, "decode_and_validate_jwt", fake_decode)
-    monkeypatch.setattr(admin_module, "decode_and_validate_jwt", fake_decode)
+@pytest.fixture
+def admin_headers(settings: Settings) -> dict[str, str]:
+    return build_jwt_headers(
+        settings,
+        subject="test-admin-user",
+        roles=["admin"],
+        extra_claims={"email": "test-admin-user@admin.test"},
+    )
 
 
 @pytest.mark.asyncio
 async def test_upsert_instruction_requires_admin(
-    client: QuartTestClient, monkeypatch: MonkeyPatch
+    client: QuartTestClient,
+    settings: Settings,
 ) -> None:
-    _patch_decode(monkeypatch, roles=["analyst"])
+    headers = build_jwt_headers(
+        settings,
+        subject="test-admin-user",
+        roles=["analyst"],
+        extra_claims={"email": "test-admin-user@admin.test"},
+    )
 
     response = await client.post(
         "/admin/v1/assessment-instructions",
-        headers={"Authorization": "Bearer fake"},
+        headers=headers,
         json={
             "assignment_id": "a-1",
             "instructions_text": "Grade for clarity",
@@ -314,13 +314,12 @@ async def test_upsert_instruction_requires_admin(
 
 @pytest.mark.asyncio
 async def test_upsert_and_get_instruction(
-    client: QuartTestClient, monkeypatch: MonkeyPatch
+    client: QuartTestClient,
+    admin_headers: dict[str, str],
 ) -> None:
-    _patch_decode(monkeypatch)
-
     resp = await client.post(
         "/admin/v1/assessment-instructions",
-        headers={"Authorization": "Bearer fake"},
+        headers=admin_headers,
         json={
             "assignment_id": "assignment-1",
             "instructions_text": "Grade for clarity and structure",
@@ -331,7 +330,7 @@ async def test_upsert_and_get_instruction(
 
     resp_get = await client.get(
         "/admin/v1/assessment-instructions/assignment/assignment-1",
-        headers={"Authorization": "Bearer fake"},
+        headers=admin_headers,
     )
     assert resp_get.status_code == 200
     fetched = await resp_get.get_json()
@@ -340,10 +339,10 @@ async def test_upsert_and_get_instruction(
 
 @pytest.mark.asyncio
 async def test_list_and_delete_instructions(
-    client: QuartTestClient, monkeypatch: MonkeyPatch, admin_repo: AdminRepositoryMock
+    client: QuartTestClient,
+    admin_headers: dict[str, str],
+    admin_repo: AdminRepositoryMock,
 ) -> None:
-    _patch_decode(monkeypatch)
-
     admin_repo.seed_instruction(
         assignment_id="assignment-a",
         course_id=None,
@@ -361,7 +360,7 @@ async def test_list_and_delete_instructions(
 
     resp = await client.get(
         "/admin/v1/assessment-instructions?page=1&page_size=10&grade_scale=swedish_8_anchor",
-        headers={"Authorization": "Bearer fake"},
+        headers=admin_headers,
     )
     assert resp.status_code == 200
     payload = await resp.get_json()
@@ -369,6 +368,6 @@ async def test_list_and_delete_instructions(
 
     delete_resp = await client.delete(
         "/admin/v1/assessment-instructions/assignment/assignment-a",
-        headers={"Authorization": "Bearer fake"},
+        headers=admin_headers,
     )
     assert delete_resp.status_code == 200
