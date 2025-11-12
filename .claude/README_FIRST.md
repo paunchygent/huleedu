@@ -67,17 +67,97 @@ pdm run pytest-root -m integration  # Only integration tests
 ```bash
 # Service management
 pdm run dev-restart [service]    # Restart service
+pdm run dev-recreate [service]   # Force container recreation to pick up env var changes
 pdm run dev-logs [service]        # View logs
 
 # Code quality
 pdm run lint-all      # Run linter
 pdm run format-all    # Format code
 pdm run typecheck-all # Type checking
+
+# Database reset (DESTROYS all *_db_data volumes, reruns Alembic via .venv)
+pdm run db-reset
 ```
+
+### Hot-Reload Development Workflow
+
+**Status:** ✅ **Fully Deployed** - All Quart services use Hypercorn `--reload`, verified working
+
+All services automatically detect code changes and restart without manual intervention:
+
+```bash
+# 1. Start services in development mode
+pdm run dev-start
+
+# 2. Edit code in any service directory (e.g., services/content_service/)
+# - Changes to .py files trigger automatic reload
+# - Service shuts down gracefully and restarts (~9-11 seconds)
+# - NO manual restart or rebuild required
+
+# 3. Watch logs to see reload in action
+pdm run dev-logs content_service
+# Look for: "shutdown completed" → "startup completed successfully"
+```
+
+**Architecture Decision: Hypercorn for All Quart Services**
+
+All 11 Quart services use Hypercorn directly (not `quart run`) for:
+- ✅ **Dev/Prod Parity**: Same ASGI server in both environments (only `--reload` differs)
+- ✅ **Explicit Configuration**: All flags visible (`--bind`, `--worker-class`, `--reload`)
+- ✅ **Production Control**: Can add workers, TLS, logging without switching tools
+- ✅ **Consistency**: Matches `uvicorn` pattern used for FastAPI services
+
+**Services with Hypercorn `--reload`:**
+- batch_conductor_service ✅ (tested and verified)
+- batch_orchestrator_service ✅
+- class_management_service ✅
+- llm_provider_service ✅
+- result_aggregator_service ✅
+- file_service ✅
+- content_service ✅ (tested and verified)
+- identity_service ✅
+- email_service ✅
+- entitlements_service ✅
+- language_tool_service ✅
+
+**Services with uvicorn `--reload`:**
+- api_gateway_service ✅ (FastAPI)
+- websocket_service ✅ (FastAPI)
+
+**Important Notes:**
+- Hot-reload uses volume mounts (`docker-compose.dev.yml`)
+- Changes to dependencies (pyproject.toml) still require `pdm run dev-build`
+- Worker services (essay_lifecycle_worker, nlp_service worker mode) don't need hot-reload
 
 ## Recent Decisions & Changes
 
-### 0. Codex Setup Script Hardening (Nov 2025)
+### 0. Hot-Reload Standardization on Hypercorn (Nov 2025)
+
+**Completed**: All 11 Quart services migrated to Hypercorn `--reload` for automatic code reload in development.
+
+**Rationale**:
+- **Dev/Prod Parity**: Same ASGI server (Hypercorn) in development and production, differing only by `--reload` flag
+- **Explicit Configuration**: All server flags (`--bind`, `--worker-class`, `--reload`) visible in compose commands
+- **Production Ready**: Can add workers, TLS, custom logging without switching to a different server
+- **Consistency**: Matches FastAPI services which use `uvicorn --reload` (also direct ASGI server invocation)
+
+**Implementation**:
+- Updated `docker-compose.dev.yml`: All Quart services now use `python -m hypercorn ... --reload`
+- Pattern: `hypercorn services.<name>.app:app --bind 0.0.0.0:<port> --worker-class asyncio --reload`
+- Tested: content_service and batch_conductor_service verified with ~9-11 second reload cycle
+- All 11 services healthy and running
+
+**Before** (old pattern):
+```bash
+command: ["pdm", "run", "-p", "/app", "quart", "--app", "app:app", "--debug", "run", "--host", "0.0.0.0", "-p", "8000"]
+```
+
+**After** (standardized pattern):
+```bash
+command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.content_service.app:app", "--bind", "0.0.0.0:8000", "--worker-class", "asyncio", "--reload"]
+```
+
+### 1. Codex Setup Script Hardening (Nov 2025)
 
 - `scripts/setup_huledu_environment.sh` now finds the repo root via env vars, Git metadata, and Codex `/workspace/<repo>` mounts before running PDM so sandboxes stop erroring out on `common_core`.
 - PDM caches/logs are redirected to `.pdm/` inside the repo (ignored via `.gitignore`) and `pdm install --group monorepo-tools --group dev` runs cleanly even when `$HOME` is read-only.
