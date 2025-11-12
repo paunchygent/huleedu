@@ -58,9 +58,7 @@ def compose_cj_assessment_request(
         raise ValueError("At least one essay is required to compose CJ request")
 
     if not settings.batch_id or settings.batch_id.strip() == "":
-        raise ValueError(
-            "batch_id cannot be empty - must be provided via --batch-id CLI argument"
-        )
+        raise ValueError("batch_id cannot be empty - must be provided via --batch-id CLI argument")
 
     system_metadata = SystemProcessingMetadata(
         entity_id=settings.batch_id,

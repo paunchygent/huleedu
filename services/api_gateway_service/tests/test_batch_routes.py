@@ -163,7 +163,9 @@ async def test_user_id_propagation(client_with_mocks, mock_kafka_bus, mock_bos_p
 
 
 @pytest.mark.asyncio
-async def test_kafka_publish_failure_handling(client_with_mocks, mock_kafka_bus, mock_bos_preflight):
+async def test_kafka_publish_failure_handling(
+    client_with_mocks, mock_kafka_bus, mock_bos_preflight
+):
     """Test error handling when Kafka publishing fails."""
     mock_kafka_bus.publish.side_effect = Exception("Kafka connection failed")
 

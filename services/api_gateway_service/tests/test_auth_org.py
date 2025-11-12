@@ -118,9 +118,8 @@ class TestJWTOrgIdExtraction:
 
         # Build token without exp
         payload = {"sub": "user-1", "org_id": "org-1"}
-        token = jwt.encode(
-            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
-        )
+        secret_key = TestJWTAuthentication._get_secret_key_value()  # reuse helper for consistency
+        token = jwt.encode(payload, secret_key, algorithm=settings.JWT_ALGORITHM)
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         provider = AuthProvider()

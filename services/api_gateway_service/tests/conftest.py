@@ -15,6 +15,7 @@ import httpx
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from prometheus_client import CollectorRegistry
+from pydantic import SecretStr
 
 from huleedu_service_libs.kafka_client import KafkaBus
 from huleedu_service_libs.protocols import AtomicRedisClientProtocol
@@ -128,6 +129,21 @@ def mock_redis_client():
 def mock_kafka_bus():
     """Mock Kafka bus fixture for batch and other tests."""
     return AsyncMock(spec=KafkaBus)
+
+
+@pytest.fixture(autouse=True)
+def configure_jwt_secret(monkeypatch: pytest.MonkeyPatch):
+    """Ensure JWT secret is available for tests using HS algorithms."""
+
+    previous_secret = settings.JWT_SECRET_KEY
+    test_secret = SecretStr("test-secret-key")
+    settings.JWT_SECRET_KEY = test_secret
+    monkeypatch.setenv("API_GATEWAY_JWT_SECRET_KEY", test_secret.get_secret_value())
+
+    try:
+        yield
+    finally:
+        settings.JWT_SECRET_KEY = previous_secret
 
 
 @pytest.fixture
