@@ -20,13 +20,33 @@ depends_on = None
 
 def upgrade() -> None:
     """Create initial schema for Essay Lifecycle Service."""
-    # Create essay_status_enum
+    # Create essay_status_enum if it does not already exist
     op.execute(
-        "CREATE TYPE essay_status_enum AS ENUM ("
-        "'unregistered', 'awaiting_content', 'content_provided', 'processing', "
-        "'spellcheck_complete', 'nlp_complete', 'cj_assessment_complete', "
-        "'ai_feedback_complete', 'completed', 'failed'"
-        ")"
+        sa.text(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_type
+                    WHERE typname = 'essay_status_enum'
+                ) THEN
+                    CREATE TYPE essay_status_enum AS ENUM (
+                        'unregistered',
+                        'awaiting_content',
+                        'content_provided',
+                        'processing',
+                        'spellcheck_complete',
+                        'nlp_complete',
+                        'cj_assessment_complete',
+                        'ai_feedback_complete',
+                        'completed',
+                        'failed'
+                    );
+                END IF;
+            END$$;
+            """
+        )
     )
 
     # Create essay_states table
@@ -36,7 +56,7 @@ def upgrade() -> None:
         sa.Column("batch_id", sa.String(length=255), nullable=True),
         sa.Column(
             "current_status",
-            postgresql.ENUM("essay_status_enum", name="essay_status_enum"),
+            postgresql.ENUM(name="essay_status_enum", create_type=False),
             nullable=False,
         ),
         sa.Column("processing_metadata", sa.JSON(), nullable=False),
@@ -127,4 +147,4 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_essay_states_batch_id"), table_name="essay_states")
     op.drop_table("essay_states")
 
-    op.execute("DROP TYPE essay_status_enum")
+    op.execute(sa.text("DROP TYPE IF EXISTS essay_status_enum"))

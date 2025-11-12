@@ -60,10 +60,10 @@ def upgrade() -> None:
         unique=False,
         postgresql_where=sa.text("published_at IS NULL"),
     )
-    op.drop_index(op.f("ix_email_outbox_correlation"), table_name="email_outbox_events")
-    op.drop_index(op.f("ix_email_outbox_events_topic"), table_name="email_outbox_events")
-    op.drop_index(op.f("ix_email_outbox_unpublished_priority"), table_name="email_outbox_events")
-    op.drop_table("email_outbox_events")
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_email_outbox_correlation"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_email_outbox_events_topic"))
+    op.execute(sa.text("DROP INDEX IF EXISTS ix_email_outbox_unpublished_priority"))
+    op.execute(sa.text("DROP TABLE IF EXISTS email_outbox_events"))
     # ### end Alembic commands ###
 
 

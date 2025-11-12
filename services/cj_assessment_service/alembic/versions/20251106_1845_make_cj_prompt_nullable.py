@@ -5,7 +5,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20251106_1845"
-down_revision = "20251103_2305_add_grade_scale_to_instructions"
+down_revision = "f83f2988a7c2"
 branch_labels = None
 depends_on = None
 

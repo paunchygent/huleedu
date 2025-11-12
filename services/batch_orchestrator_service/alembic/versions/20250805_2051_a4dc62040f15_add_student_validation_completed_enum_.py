@@ -22,8 +22,20 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Add the new enum value to batch_status_enum
     op.execute(
-        "ALTER TYPE batch_status_enum ADD VALUE IF NOT EXISTS "
-        "'student_validation_completed' AFTER 'awaiting_student_validation'"
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_enum
+                WHERE enumlabel = 'student_validation_completed'
+                  AND enumtypid = 'batch_status_enum'::regtype
+            ) THEN
+                ALTER TYPE batch_status_enum
+                ADD VALUE 'student_validation_completed';
+            END IF;
+        END$$;
+        """
     )
 
 

@@ -21,20 +21,47 @@ def upgrade() -> None:
     """Create initial schema for Batch Orchestrator Service."""
     # Create batch_status_enum
     op.execute(
-        "CREATE TYPE batch_status_enum AS ENUM ("
-        "'awaiting_content_validation', 'processing', 'completed', 'failed', 'cancelled')"
+        sa.text(
+            """
+            CREATE TYPE batch_status_enum AS ENUM (
+                'awaiting_content_validation',
+                'processing',
+                'completed',
+                'failed',
+                'cancelled'
+            )
+            """
+        )
     )
 
     # Create pipeline_phase_enum
     op.execute(
-        "CREATE TYPE pipeline_phase_enum AS ENUM ("
-        "'spellcheck', 'nlp_analysis', 'cj_assessment', 'ai_feedback')"
+        sa.text(
+            """
+            CREATE TYPE pipeline_phase_enum AS ENUM (
+                'spellcheck',
+                'nlp_analysis',
+                'cj_assessment',
+                'ai_feedback'
+            )
+            """
+        )
     )
 
     # Create phase_status_enum
     op.execute(
-        "CREATE TYPE phase_status_enum AS ENUM ("
-        "'pending', 'initiated', 'in_progress', 'completed', 'failed', 'cancelled')"
+        sa.text(
+            """
+            CREATE TYPE phase_status_enum AS ENUM (
+                'pending',
+                'initiated',
+                'in_progress',
+                'completed',
+                'failed',
+                'cancelled'
+            )
+            """
+        )
     )
 
     # Create batches table
@@ -45,7 +72,9 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
-            "status", postgresql.ENUM("batch_status_enum", name="batch_status_enum"), nullable=False
+            "status",
+            postgresql.ENUM(name="batch_status_enum", create_type=False),
+            nullable=False,
         ),
         sa.Column("requested_pipelines", sa.JSON(), nullable=True),
         sa.Column("pipeline_configuration", sa.JSON(), nullable=True),
@@ -69,11 +98,13 @@ def upgrade() -> None:
         sa.Column("batch_id", sa.String(length=36), nullable=False),
         sa.Column(
             "phase",
-            postgresql.ENUM("pipeline_phase_enum", name="pipeline_phase_enum"),
+            postgresql.ENUM(name="pipeline_phase_enum", create_type=False),
             nullable=False,
         ),
         sa.Column(
-            "status", postgresql.ENUM("phase_status_enum", name="phase_status_enum"), nullable=False
+            "status",
+            postgresql.ENUM(name="phase_status_enum", create_type=False),
+            nullable=False,
         ),
         sa.Column("phase_started_at", sa.DateTime(), nullable=True),
         sa.Column("phase_completed_at", sa.DateTime(), nullable=True),
@@ -159,6 +190,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_batches_correlation_id"), table_name="batches")
     op.drop_table("batches")
 
-    op.execute("DROP TYPE phase_status_enum")
-    op.execute("DROP TYPE pipeline_phase_enum")
-    op.execute("DROP TYPE batch_status_enum")
+    op.execute(sa.text("DROP TYPE IF EXISTS phase_status_enum"))
+    op.execute(sa.text("DROP TYPE IF EXISTS pipeline_phase_enum"))
+    op.execute(sa.text("DROP TYPE IF EXISTS batch_status_enum"))

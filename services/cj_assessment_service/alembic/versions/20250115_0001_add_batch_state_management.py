@@ -20,9 +20,28 @@ depends_on = None
 def upgrade() -> None:
     # Create batch state enum
     op.execute(
-        "CREATE TYPE cj_batch_state_enum AS ENUM "
-        "('INITIALIZING', 'GENERATING_PAIRS', 'WAITING_CALLBACKS', "
-        "'SCORING', 'COMPLETED', 'FAILED', 'CANCELLED')"
+        sa.text(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_type
+                    WHERE typname = 'cj_batch_state_enum'
+                ) THEN
+                    CREATE TYPE cj_batch_state_enum AS ENUM (
+                        'INITIALIZING',
+                        'GENERATING_PAIRS',
+                        'WAITING_CALLBACKS',
+                        'SCORING',
+                        'COMPLETED',
+                        'FAILED',
+                        'CANCELLED'
+                    );
+                END IF;
+            END$$;
+            """
+        )
     )
 
     # Create batch states table
@@ -31,15 +50,9 @@ def upgrade() -> None:
         sa.Column("batch_id", sa.Integer(), nullable=False),
         sa.Column(
             "state",
-            sa.Enum(
-                "INITIALIZING",
-                "GENERATING_PAIRS",
-                "WAITING_CALLBACKS",
-                "SCORING",
-                "COMPLETED",
-                "FAILED",
-                "CANCELLED",
+            postgresql.ENUM(
                 name="cj_batch_state_enum",
+                create_type=False,
             ),
             nullable=False,
         ),
@@ -92,4 +105,4 @@ def downgrade() -> None:
     op.drop_column("cj_comparison_pairs", "request_correlation_id")
     op.drop_index(op.f("ix_cj_batch_states_state"), table_name="cj_batch_states")
     op.drop_table("cj_batch_states")
-    op.execute("DROP TYPE cj_batch_state_enum")
+    op.execute(sa.text("DROP TYPE IF EXISTS cj_batch_state_enum"))
