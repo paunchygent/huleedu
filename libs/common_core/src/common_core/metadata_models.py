@@ -59,10 +59,13 @@ class SystemProcessingMetadata(BaseModel):
         default_factory=lambda: datetime.now(UTC), description="Metadata creation timestamp UTC"
     )
     processing_stage: ProcessingStage | None = Field(
-        default=None, description="Current processing stage (PENDING, PROCESSING, COMPLETED, FAILED, etc.)"
+        default=None,
+        description="Current processing stage (PENDING, PROCESSING, COMPLETED, FAILED, etc.)",
     )
     started_at: datetime | None = Field(default=None, description="Processing start timestamp UTC")
-    completed_at: datetime | None = Field(default=None, description="Processing completion timestamp UTC")
+    completed_at: datetime | None = Field(
+        default=None, description="Processing completion timestamp UTC"
+    )
     event: str | None = Field(
         default=None, description="Event name string from ProcessingEvent enum value"
     )

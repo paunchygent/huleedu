@@ -225,9 +225,9 @@ command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.con
 
 ### 10. CJ Prompt Hydration (Nov 2025)
 
-- CJ event processor fetches `student_prompt_ref` locally, increments `huleedu_cj_prompt_fetch_failures_total{reason=…}`, and forwards prompt metadata into workflow orchestration.
-- CJ repository/models now allow nullable `essay_instructions`; metadata captures `student_prompt_storage_id` for batch auditing (migration `20251106_1845_make_cj_prompt_nullable.py`).
-- Tests updated to cover success/failure hydration paths (`pdm run pytest-root services/cj_assessment_service/tests -k 'event_processor or batch_preparation'`) with type safety validated via `pdm run typecheck-all`.
+- CJ event processor fetches `student_prompt_ref` locally, increments `huleedu_cj_prompt_fetch_failures_total{reason=…}` and `huleedu_cj_prompt_fetch_success_total`, and forwards prompt metadata into workflow orchestration.
+- Batch preparation falls back to Content Service hydration when stored text is missing; merges `CJProcessingMetadata` into existing `processing_metadata` without dropping ancillary keys.
+- Repository context now returns `student_prompt_storage_id` so anchor workflows and runners stay in sync; new tests exercise the Result contract, metadata merge, and metrics exposure (`pdm run pytest-root services/cj_assessment_service/tests -k 'prompt_context or fallback'`).
 
 ### 11. Prompt Reference Migration Step 5 Docs & Observability (2025-11-06)
 

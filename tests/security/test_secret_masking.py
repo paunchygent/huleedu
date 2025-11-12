@@ -259,7 +259,9 @@ class TestSecretAccess:
         settings = APIGatewaySettings()
 
         # Should be able to get secret value
-        jwt_secret = settings.JWT_SECRET_KEY.get_secret_value()
+        jwt_secret_field = settings.JWT_SECRET_KEY
+        assert jwt_secret_field is not None, "JWT secret key must be configured for tests"
+        jwt_secret = jwt_secret_field.get_secret_value()
         assert isinstance(jwt_secret, str)
         assert len(jwt_secret) > 0
 

@@ -26,6 +26,7 @@ class ProcessingEvent(str, Enum):
 
     See: libs/common_core/docs/event-registry.md for full documentation.
     """
+
     # -------------  Batch coordination events  -------------#
     BATCH_ESSAYS_REGISTERED = "batch.essays.registered"
     BATCH_ESSAYS_READY = "batch.essays.ready"

@@ -35,12 +35,10 @@ class NotificationEmailRequestedV1(BaseModel):
     template_id: str = Field(
         description="Email template identifier recognized by Email Service. Templates define subject, HTML body, and variable placeholders."
     )
-    to: EmailStr = Field(
-        description="Recipient email address. Validated by Pydantic EmailStr."
-    )
+    to: EmailStr = Field(description="Recipient email address. Validated by Pydantic EmailStr.")
     variables: Dict[str, str] = Field(
         default_factory=dict,
-        description="Template variables for email personalization (e.g., user_name, verification_link). Keys match template placeholders."
+        description="Template variables for email personalization (e.g., user_name, verification_link). Keys match template placeholders.",
     )
     category: Literal[
         "verification",

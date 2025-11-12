@@ -93,10 +93,7 @@ def build_database_url(
         # URL-encode password to handle special characters
         password = quote_plus(prod_password) if url_encode_password else prod_password
 
-        return (
-            f"postgresql+asyncpg://{db_user}:{password}@"
-            f"{prod_host}:{prod_port}/{database_name}"
-        )
+        return f"postgresql+asyncpg://{db_user}:{password}@{prod_host}:{prod_port}/{database_name}"
     else:
         # Development: Docker container with port mapping or local PostgreSQL
         dev_user = os.getenv("HULEEDU_DB_USER")
@@ -111,7 +108,4 @@ def build_database_url(
         # URL-encode password to handle special characters
         password = quote_plus(db_password) if url_encode_password else db_password
 
-        return (
-            f"postgresql+asyncpg://{dev_user}:{password}@"
-            f"{dev_host}:{dev_port}/{database_name}"
-        )
+        return f"postgresql+asyncpg://{dev_user}:{password}@{dev_host}:{dev_port}/{database_name}"

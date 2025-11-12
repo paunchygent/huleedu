@@ -113,9 +113,7 @@ class TestBuildDatabaseUrl:
                 dev_host="localhost",
                 url_encode_password=False,
             )
-        assert url == (
-            "postgresql+asyncpg://huleedu_user:pa#ss@localhost:5442/huleedu_identity"
-        )
+        assert url == ("postgresql+asyncpg://huleedu_user:pa#ss@localhost:5442/huleedu_identity")
 
     def test_custom_dev_host(self) -> None:
         env = {

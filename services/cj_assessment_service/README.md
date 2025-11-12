@@ -317,8 +317,7 @@ LOG_LEVEL=INFO
   - `bos_batch_id` (str): Reference to originating BOS batch
   - `status` (enum): Current processing state
   - `expected_essay_count` (int): Number of essays to process
-  - `processing_metadata`: Includes `student_prompt_storage_id` and optional `student_prompt_text` populated after hydration
-  - `processing_metadata`: Includes `student_prompt_storage_id` and a boolean `student_prompt_text_present` to signal successful prompt retrieval
+  - `processing_metadata`: Includes `student_prompt_storage_id` and optional `student_prompt_text` populated after hydration; additional keys (e.g., retry metadata) are preserved when new prompt data merges in
 
 #### `cj_processed_essays`
 
@@ -434,6 +433,7 @@ pdm run python app.py
 
 - **Metrics**: Prometheus metrics exposed on configured `METRICS_PORT` (default: 9090)
   - `huleedu_cj_prompt_fetch_failures_total{reason}` tracks prompt hydration failures (Content Service errors, missing refs, legacy fallbacks)
+  - `huleedu_cj_prompt_fetch_success_total` counts successful student prompt hydrations across event processing and batch preparation
   - Existing counters/histograms for CJ workflow throughput, callbacks, retries, and circuit breakers remain unchanged
 - **Logging**: Structured logging via `huleedu_service_libs.logging_utils`
 - **Health Checks**: Service responsiveness (extensible to database/Kafka connectivity)

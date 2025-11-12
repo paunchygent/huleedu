@@ -70,21 +70,13 @@ class EssayProcessingCounts(BaseModel):
     and determining phase completion criteria.
     """
 
-    total: int = Field(
-        default=0,
-        description="Total number of essays in the batch for this phase"
-    )
+    total: int = Field(default=0, description="Total number of essays in the batch for this phase")
     pending_dispatch_or_processing: int = Field(
-        default=0,
-        description="Essays not yet dispatched or currently being processed"
+        default=0, description="Essays not yet dispatched or currently being processed"
     )
-    successful: int = Field(
-        default=0,
-        description="Essays that completed processing successfully"
-    )
+    successful: int = Field(default=0, description="Essays that completed processing successfully")
     failed: int = Field(
-        default=0,
-        description="Essays that failed processing (validation, service errors, etc.)"
+        default=0, description="Essays that failed processing (validation, service errors, etc.)"
     )
 
 
@@ -98,27 +90,26 @@ class PipelineStateDetail(BaseModel):
 
     status: PipelineExecutionStatus = Field(
         default=PipelineExecutionStatus.REQUESTED_BY_USER,
-        description="Current execution status of this pipeline phase. See PipelineExecutionStatus for state transitions."
+        description="Current execution status of this pipeline phase. See PipelineExecutionStatus for state transitions.",
     )
     essay_counts: EssayProcessingCounts = Field(
         default_factory=EssayProcessingCounts,
-        description="Essay-level processing counts within this phase. Updated as essays complete."
+        description="Essay-level processing counts within this phase. Updated as essays complete.",
     )
     started_at: datetime | None = Field(
         default=None,
-        description="Timestamp when phase processing started (DISPATCH_INITIATED → IN_PROGRESS). UTC timezone."
+        description="Timestamp when phase processing started (DISPATCH_INITIATED → IN_PROGRESS). UTC timezone.",
     )
     completed_at: datetime | None = Field(
-        default=None,
-        description="Timestamp when phase reached terminal status. UTC timezone."
+        default=None, description="Timestamp when phase reached terminal status. UTC timezone."
     )
     error_info: dict[str, Any] | None = Field(
         default=None,
-        description="Error details for FAILED status. Contains error_code, message, service context. Follows SystemProcessingMetadata.error_info structure."
+        description="Error details for FAILED status. Contains error_code, message, service context. Follows SystemProcessingMetadata.error_info structure.",
     )
     progress_percentage: float | None = Field(
         default=None,
-        description="Optional progress percentage (0.0-100.0) for IN_PROGRESS phases. Calculated from essay_counts: (successful + failed) / total * 100."
+        description="Optional progress percentage (0.0-100.0) for IN_PROGRESS phases. Calculated from essay_counts: (successful + failed) / total * 100.",
     )
 
 
@@ -137,31 +128,29 @@ class ProcessingPipelineState(BaseModel):
     Storage: BOS database, updated by BCS via ProcessingPipelineStatusUpdatedV1 events
     """
 
-    batch_id: str = Field(
-        description="Batch identifier this pipeline state belongs to"
-    )
+    batch_id: str = Field(description="Batch identifier this pipeline state belongs to")
     requested_pipelines: list[str] = Field(
         description="User-requested pipeline names (e.g., ['spellcheck', 'nlp', 'cj_assessment']). Determines which phase fields are populated."
     )
     spellcheck: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,
-        description="Spellcheck phase execution state. Only populated if 'spellcheck' in requested_pipelines."
+        description="Spellcheck phase execution state. Only populated if 'spellcheck' in requested_pipelines.",
     )
     nlp: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,
-        description="NLP phase execution state. Only populated if 'nlp' in requested_pipelines."
+        description="NLP phase execution state. Only populated if 'nlp' in requested_pipelines.",
     )
     ai_feedback: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,
-        description="AI Feedback phase execution state. Only populated if 'ai_feedback' in requested_pipelines."
+        description="AI Feedback phase execution state. Only populated if 'ai_feedback' in requested_pipelines.",
     )
     cj_assessment: PipelineStateDetail | None = Field(
         default_factory=PipelineStateDetail,
-        description="CJ Assessment phase execution state. Only populated if 'cj_assessment' in requested_pipelines."
+        description="CJ Assessment phase execution state. Only populated if 'cj_assessment' in requested_pipelines.",
     )
     last_updated: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        description="Timestamp of most recent pipeline state update. UTC timezone. Updated on every phase status change."
+        description="Timestamp of most recent pipeline state update. UTC timezone. Updated on every phase status change.",
     )
 
     def get_pipeline(self, name: str) -> PipelineStateDetail | None:

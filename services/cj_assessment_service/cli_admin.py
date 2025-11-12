@@ -243,6 +243,7 @@ def issue_token(
 
     typer.echo(json.dumps({k: v for k, v in payload.items() if k != "refresh_token"}, indent=2))
 
+
 def _upload_prompt_helper(assignment_id: str, content: str) -> str:
     """Upload student prompt and return storage_id."""
 

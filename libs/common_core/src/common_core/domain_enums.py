@@ -27,16 +27,24 @@ class ContentType(str, Enum):
     See: libs/common_core/docs/storage-references.md
     """
 
-    ORIGINAL_ESSAY = "original_essay"  # Producer: essay_lifecycle_service | Consumer: pipeline services
+    ORIGINAL_ESSAY = (
+        "original_essay"  # Producer: essay_lifecycle_service | Consumer: pipeline services
+    )
     CORRECTED_TEXT = "corrected_text"  # Producer: spellchecker_service | Consumer: nlp_service, result_aggregator_service
-    PROCESSING_LOG = "processing_log"  # Producer: multiple services | Consumer: observability/audit systems
-    NLP_METRICS_JSON = "nlp_metrics_json"  # Producer: nlp_service | Consumer: result_aggregator_service, analytics
+    PROCESSING_LOG = (
+        "processing_log"  # Producer: multiple services | Consumer: observability/audit systems
+    )
+    NLP_METRICS_JSON = (
+        "nlp_metrics_json"  # Producer: nlp_service | Consumer: result_aggregator_service, analytics
+    )
     STUDENT_FACING_AI_FEEDBACK_TEXT = "student_facing_ai_feedback_text"  # Producer: llm_provider_service/ai_feedback | Consumer: result_aggregator_service
     AI_EDITOR_REVISION_TEXT = "ai_editor_revision_text"  # Producer: llm_provider_service/ai_editor | Consumer: result_aggregator_service
     AI_DETAILED_ANALYSIS_JSON = "ai_detailed_analysis_json"  # Producer: llm_provider_service/ai_analysis | Consumer: result_aggregator_service, analytics
     GRAMMAR_ANALYSIS_JSON = "grammar_analysis_json"  # Producer: nlp_service (LanguageTool integration) | Consumer: result_aggregator_service
     CJ_RESULTS_JSON = "cj_results_json"  # Producer: cj_assessment_service | Consumer: result_aggregator_service, analytics
-    RAW_UPLOAD_BLOB = "raw_upload_blob"  # Producer: file_service | Consumer: reprocessing/audit workflows
+    RAW_UPLOAD_BLOB = (
+        "raw_upload_blob"  # Producer: file_service | Consumer: reprocessing/audit workflows
+    )
     EXTRACTED_PLAINTEXT = "extracted_plaintext"  # Producer: file_service | Consumer: spellchecker_service, nlp_service
     STUDENT_PROMPT_TEXT = "student_prompt_text"  # Producer: batch_orchestrator_service (teacher upload) | Consumer: cj_assessment_service, nlp_service
 

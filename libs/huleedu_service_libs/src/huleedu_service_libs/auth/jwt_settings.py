@@ -45,7 +45,12 @@ class JWTValidationSettings:
     def get_jwt_verification_key(self) -> str:
         """Resolve the key used to verify JWT signatures."""
 
-        if self._uses_hmac() and self.JWT_SECRET_KEY is not None:
+        if self._uses_hmac():
+            if self.JWT_SECRET_KEY is None:
+                raise ValueError(
+                    "JWT_SECRET_KEY must be configured when using an HS* JWT algorithm"
+                )
+
             return self.JWT_SECRET_KEY.get_secret_value()
 
         if self.JWT_PUBLIC_KEY:

@@ -109,7 +109,6 @@ class Settings(SecureServiceSettings, JWTValidationSettings):
             dev_host=dev_host,
         )
 
-
     # Default LLM provider for centralized service requests
     DEFAULT_LLM_PROVIDER: LLMProviderType = LLMProviderType.OPENAI
     DEFAULT_LLM_MODEL: str = Field(

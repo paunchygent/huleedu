@@ -55,6 +55,7 @@ class EssayStatus(str, Enum):
 
     See: libs/common_core/docs/status-state-machines.md
     """
+
     # File Service Results Statuses
     UPLOADED = "uploaded"
     TEXT_EXTRACTED = "text_extracted"
@@ -111,6 +112,7 @@ class BatchStatus(str, Enum):
 
     See: libs/common_core/docs/status-state-machines.md
     """
+
     AWAITING_CONTENT_VALIDATION = "awaiting_content_validation"
     CONTENT_INGESTION_FAILED = "content_ingestion_failed"
     AWAITING_PIPELINE_CONFIGURATION = "awaiting_pipeline_configuration"
