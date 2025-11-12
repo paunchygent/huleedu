@@ -185,7 +185,7 @@ async def _fetch_assessment_context(
     # Extract context from processing metadata
     metadata = batch.processing_metadata or {}
     student_prompt_text = metadata.get("student_prompt_text")
-    assignment_id = metadata.get("assignment_id")
+    assignment_id = metadata.get("assignment_id") or batch.assignment_id
 
     # Fetch assessment instructions if assignment_id is available
     assessment_instructions = None
@@ -198,6 +198,11 @@ async def _fetch_assessment_context(
 
         if instruction:
             assessment_instructions = instruction.instructions_text
+        else:
+            logger.warning(
+                "No assessment instruction found for assignment",
+                extra={"cj_batch_id": str(cj_batch_id), "assignment_id": assignment_id},
+            )
 
     logger.debug(
         f"Fetched assessment context for batch {cj_batch_id}",

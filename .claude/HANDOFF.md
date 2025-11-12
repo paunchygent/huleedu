@@ -118,6 +118,23 @@ if not settings.batch_id or settings.batch_id.strip() == "":
    - `grep -i "collector_timeout"` to detect waiting issues.
 2. **Capture correlation_id**:
    - `CORRELATION_ID=$(grep -oE '[0-9a-f-]{36}' /tmp/eng5_localhost_test.log | head -1)`
+
+### 🔄 In Progress: CJ Prompt Context Persistence Hardening
+
+**Status**: Plan under review ⚠️
+
+**Scope**: Single refactor pass to enforce typed prompt metadata, guarantee assignment/prompt propagation, and expand telemetry. Touches event processor, batch preparation, workflow orchestrator, repository contract, pair generation, metrics, and targeted test fixtures.
+
+**Key Decisions Pending**:
+- Replace ad-hoc prompt hydration returns with a `Result` object (or equivalent) instead of bare strings.
+- Merge typed `CJProcessingMetadata` into existing `processing_metadata` without dropping unknown keys.
+- Thread `ContentClientProtocol` through `create_cj_batch` and all calling tests.
+- Extend prompt hydration metrics using existing counters to avoid duplications.
+
+**Risks/Follow-ups**:
+- Ensure new error types align with `huleedu_service_libs.error_handling` factories (no direct subclassing of `HuleEduError`).
+- Update fixtures in `services/cj_assessment_service/tests/fixtures/` to supply mocked content clients.
+- Re-run `pdm run typecheck-all` and full CJ suite after refactor.
 3. **CJ service logs**:
    - `docker logs huleedu_cj_assessment_service 2>&1 | grep -A10 -B5 "$CORRELATION_ID"`
    - Confirms message consumption and surfaces DB/content errors.

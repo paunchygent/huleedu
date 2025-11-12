@@ -364,8 +364,7 @@ typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --sho
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"
-test-expensive = "pytest -m 'financial or slow or docker' -v --tb=short"
-test-financial = "pytest -m financial -v --tb=short"
+test-financial = "pytest -m 'financial or docker or e2e' -v --tb=short"
 test-providers = "pytest services/*/tests/integration/ -m 'financial or slow or docker' -v"
 pytest-root = "scripts/pytest-root.sh"
 

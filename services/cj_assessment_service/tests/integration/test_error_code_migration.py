@@ -21,18 +21,17 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 import pytest
+from common_core.error_enums import ErrorCode
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
-from common_core.error_enums import ErrorCode
+from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 from services.cj_assessment_service.models_db import (
-    Base,
     CJBatchUpload,
     ComparisonPair,
     ProcessedEssay,
 )
-from services.cj_assessment_service.enums_db import CJBatchStatusEnum
 
 
 @pytest.fixture(scope="module")
@@ -52,9 +51,7 @@ async def migration_engine(
     migration_postgres_container: PostgresContainer,
 ) -> AsyncGenerator[AsyncEngine, None]:
     """Create engine for migration testing."""
-    database_url = migration_postgres_container.get_connection_url().replace(
-        "psycopg2", "asyncpg"
-    )
+    database_url = migration_postgres_container.get_connection_url().replace("psycopg2", "asyncpg")
 
     engine = create_async_engine(
         database_url,
@@ -136,7 +133,7 @@ def run_alembic_upgrade(container: PostgresContainer) -> subprocess.CompletedPro
 
 
 @pytest.mark.integration
-@pytest.mark.expensive
+@pytest.mark.slow
 class TestErrorCodeMigration:
     """Test error_code ENUM to VARCHAR migration."""
 
@@ -155,9 +152,7 @@ class TestErrorCodeMigration:
 
         # Assert migration succeeded
         assert result.returncode == 0, (
-            f"Alembic upgrade failed:\n"
-            f"STDOUT: {result.stdout}\n"
-            f"STDERR: {result.stderr}"
+            f"Alembic upgrade failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
         )
 
         # Verify schema was created
@@ -191,12 +186,10 @@ class TestErrorCodeMigration:
 
             # After migration, should be VARCHAR(100), not ENUM
             assert column_info[0] == "character varying", (
-                f"error_code column should be 'character varying', "
-                f"got: {column_info[0]}"
+                f"error_code column should be 'character varying', got: {column_info[0]}"
             )
             assert column_info[1] == 100, (
-                f"error_code column should have max length 100, "
-                f"got: {column_info[1]}"
+                f"error_code column should have max length 100, got: {column_info[1]}"
             )
 
     async def test_error_code_accepts_string_values(
@@ -394,9 +387,7 @@ class TestErrorCodeMigration:
         """
         # Run migrations first time
         result1 = run_alembic_upgrade(migration_postgres_container)
-        assert result1.returncode == 0, (
-            f"First migration run failed:\n{result1.stderr}"
-        )
+        assert result1.returncode == 0, f"First migration run failed:\n{result1.stderr}"
 
         # Run migrations second time (should be idempotent)
         result2 = run_alembic_upgrade(migration_postgres_container)
