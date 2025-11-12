@@ -376,7 +376,8 @@ dev-build-clean = {shell = "scripts/dev.sh build-clean $@"}  # Clean build for d
 dev-start = {shell = "scripts/dev.sh start-nobuild $@"}  # Start development environment (no rebuild, fast)
 dev-build-start = {shell = "scripts/dev.sh start $@"}  # Build with cache then start development environment
 dev-stop = {shell = "scripts/dev.sh stop $@"}  # Stop development containers
-dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers
+dev-restart = {shell = "scripts/dev.sh restart $@"}  # Restart development containers (does NOT pick up env var changes)
+dev-recreate = {shell = "scripts/dev.sh recreate $@"}  # Force recreate containers (picks up env var changes)
 dev-logs = {shell = "scripts/dev.sh logs $@"}  # Follow development logs
 dev-ps = {shell = "scripts/dev.sh ps $@"}  # Show development container status
 dev-check = "scripts/dev.sh check"  # Check what needs rebuilding

@@ -26,6 +26,14 @@ SCRIPT_DIR=$(cd -- "$(dirname "$0")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 DEPS_IMAGE_TAG=""
 
+# IMPORTANT: Source .env file to ensure docker-compose uses .env values
+# This overrides any conflicting shell environment variables
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a  # automatically export all variables
+    source "$REPO_ROOT/.env"
+    set +a
+fi
+
 echo_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -214,6 +222,27 @@ restart_dev() {
     echo_dev "Development containers restarted"
 }
 
+# Force recreate development containers (picks up env var changes)
+recreate_dev() {
+    local services=("$@")
+    local display="all containers"
+    if [ ${#services[@]} -gt 0 ]; then
+        display="${services[*]}"
+    fi
+    echo_dev "Force recreating DEVELOPMENT containers: ${display}"
+    echo_warn "This will recreate containers to pick up configuration changes"
+    echo_info "Use this when docker-compose.yml environment variables changed"
+
+    if [ ${#services[@]} -gt 0 ]; then
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build "${services[@]}"
+    else
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate --no-build
+    fi
+
+    echo_dev "Development containers recreated"
+    echo_info "Containers will use updated environment variables"
+}
+
 # Remove development containers (preserves images)
 remove_dev() {
     local services=("$@")
@@ -314,7 +343,8 @@ show_help() {
     echo "  start [services]         Build with cache + start with hot-reload"
     echo "  start-nobuild [services] Start with hot-reload (no rebuild, fast)"
     echo "  stop [services]          Stop containers"
-    echo "  restart [services]       Restart containers"
+    echo "  restart [services]       Restart containers (does NOT pick up env changes)"
+    echo "  recreate [services]      Force recreate containers (picks up env var changes)"
     echo "  remove [services]        Remove containers (keeps images)"
     echo "  logs [services]          Follow logs (Ctrl+C to exit)"
     echo "  ps [services]            Show container status"
@@ -353,6 +383,9 @@ case "$1" in
         ;;
     "restart")
         restart_dev "${@:2}"
+        ;;
+    "recreate")
+        recreate_dev "${@:2}"
         ;;
     "remove")
         remove_dev "${@:2}"

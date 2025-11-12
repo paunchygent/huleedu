@@ -98,6 +98,7 @@ CMD ["pdm", "run", "start"]
 pdm run dev-start [service]          # Start with hot-reload
 pdm run dev-logs [service]           # View logs
 pdm run dev-build-clean [service]    # Clean build
+pdm run dev-recreate [service]       # Force container recreation to pick up env var changes
 pdm run dev-check                    # Check what needs rebuilding
 ```
 

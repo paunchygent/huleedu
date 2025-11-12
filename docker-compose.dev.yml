@@ -8,6 +8,10 @@ x-build-args-deps: &deps-build-args
   args:
     DEPS_IMAGE: ${DEPS_IMAGE_TAG:-huledu-deps:dev}
 
+x-huleedu-db-env: &huleedu-db-env
+  HULEEDU_DB_USER: ${HULEEDU_DB_USER}
+  HULEEDU_DB_PASSWORD: ${HULEEDU_DB_PASSWORD}
+
 services:
   # NLP Service with development optimizations
   nlp_service:
@@ -28,6 +32,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
     # Override command for development with auto-reload if service supports it
     # command: ["pdm", "run", "dev"]  # Uncomment if you add a dev script
 
@@ -38,6 +44,7 @@ services:
       dockerfile: services/batch_orchestrator_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.batch_orchestrator_service.app:app", "--bind", "0.0.0.0:5000", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/batch_orchestrator_service:/app/services/batch_orchestrator_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -67,6 +74,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Essay Lifecycle Service - API Component
   essay_lifecycle_api:
@@ -85,6 +94,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Class Management Service
   class_management_service:
@@ -93,6 +104,7 @@ services:
       dockerfile: services/class_management_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.class_management_service.app:app", "--bind", "0.0.0.0:5002", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/class_management_service:/app/services/class_management_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -102,6 +114,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Batch Conductor Service
   batch_conductor_service:
@@ -110,6 +124,7 @@ services:
       dockerfile: services/batch_conductor_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.batch_conductor_service.app:app", "--bind", "0.0.0.0:4002", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/batch_conductor_service:/app/services/batch_conductor_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -119,6 +134,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # LLM Provider Service
   llm_provider_service:
@@ -127,6 +144,7 @@ services:
       dockerfile: services/llm_provider_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.llm_provider_service.app:app", "--bind", "0.0.0.0:8080", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/llm_provider_service:/app/services/llm_provider_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -144,6 +162,7 @@ services:
       dockerfile: services/api_gateway_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "uvicorn", "services.api_gateway_service.app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
     volumes:
       - ./services/api_gateway_service:/app/services/api_gateway_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -162,6 +181,7 @@ services:
       dockerfile: services/result_aggregator_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.result_aggregator_service.app:app", "--bind", "0.0.0.0:4003", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/result_aggregator_service:/app/services/result_aggregator_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -171,6 +191,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # WebSocket Service
   websocket_service:
@@ -179,6 +201,7 @@ services:
       dockerfile: services/websocket_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "uvicorn", "services.websocket_service.main:app", "--reload", "--host", "0.0.0.0", "--port", "8080"]
     volumes:
       - ./services/websocket_service:/app/services/websocket_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -205,6 +228,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Spellchecker Service (add missing services that we already optimized)
   spellchecker_service:
@@ -231,6 +256,7 @@ services:
       dockerfile: services/file_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.file_service.app:app", "--bind", "0.0.0.0:7001", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/file_service:/app/services/file_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -240,6 +266,8 @@ services:
       - ENV_TYPE=docker
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Content Service
   content_service:
@@ -248,6 +276,7 @@ services:
       dockerfile: services/content_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.content_service.app:app", "--bind", "0.0.0.0:8000", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/content_service:/app/services/content_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -265,6 +294,7 @@ services:
       dockerfile: services/identity_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.identity_service.app:app", "--bind", "0.0.0.0:7005", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/identity_service:/app/services/identity_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -277,6 +307,8 @@ services:
       - IDENTITY_SERVICE_LOG_LEVEL=DEBUG
       - IDENTITY_SERVICE_DB_HOST=identity_db
       - IDENTITY_SERVICE_DB_PORT=5432
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Email Service with development optimizations
   email_service:
@@ -285,6 +317,7 @@ services:
       dockerfile: services/email_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.email_service.app:app", "--bind", "0.0.0.0:8080", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/email_service:/app/services/email_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -305,6 +338,8 @@ services:
       - EMAIL_SMTP_TIMEOUT=${EMAIL_SMTP_TIMEOUT:-30}
       - EMAIL_DEFAULT_FROM_EMAIL=${EMAIL_DEFAULT_FROM_EMAIL:-noreply@hule.education}
       - EMAIL_DEFAULT_FROM_NAME=${EMAIL_DEFAULT_FROM_NAME:-HuleEdu}
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Entitlements Service with development optimizations
   entitlements_service:
@@ -313,6 +348,7 @@ services:
       dockerfile: services/entitlements_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.entitlements_service.app:app", "--bind", "0.0.0.0:8083", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/entitlements_service:/app/services/entitlements_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached
@@ -329,6 +365,8 @@ services:
       - OTEL_SERVICE_NAME=entitlements_service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
+      - HULEEDU_DB_USER=${HULEEDU_DB_USER}
+      - HULEEDU_DB_PASSWORD=${HULEEDU_DB_PASSWORD}
 
   # Language Tool Service with development optimizations
   language_tool_service:
@@ -337,6 +375,7 @@ services:
       dockerfile: services/language_tool_service/Dockerfile.dev
       target: development
       <<: *deps-build-args
+    command: ["pdm", "run", "-p", "/app", "python", "-m", "hypercorn", "services.language_tool_service.app:app", "--bind", "0.0.0.0:8085", "--worker-class", "asyncio", "--reload"]
     volumes:
       - ./services/language_tool_service:/app/services/language_tool_service:cached
       - ./libs/common_core/src:/app/libs/common_core/src:cached

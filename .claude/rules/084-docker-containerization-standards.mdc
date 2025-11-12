@@ -91,6 +91,9 @@ pdm run dev-start
 
 # Start without rebuilding (images must already exist)
 pdm run dev-start-nobuild
+
+# Force container recreation to pick up environment changes
+pdm run dev-recreate <service_a> <service_b>
 ```
 `dev-build` and `dev-build-clean` automatically compute the dependency hash, rebuild Dockerfile.deps when needed, and pass the resulting `DEPS_IMAGE_TAG` to `docker compose build` for the requested services.
 
