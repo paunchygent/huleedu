@@ -10,7 +10,11 @@ from typing import Iterable, Mapping, Sequence
 import typer
 
 from scripts.cj_experiments_runners.eng5_np.paths import RunnerPaths
-from scripts.cj_experiments_runners.eng5_np.utils import sanitize_identifier, sha256_of_file
+from scripts.cj_experiments_runners.eng5_np.utils import (
+    generate_essay_id,
+    sanitize_identifier,
+    sha256_of_file,
+)
 
 
 @dataclass(frozen=True)
@@ -185,7 +189,7 @@ def _records_to_refs(
     for record in records:
         if not record.exists:
             continue
-        essay_id = sanitize_identifier(record.path.stem)
+        essay_id = generate_essay_id(record.path.stem, max_length=36)
         checksum = record.checksum or sha256_of_file(record.path)
         if storage_id_map is None:
             text_storage_id = f"{prefix}::{checksum}"

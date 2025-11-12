@@ -17,13 +17,13 @@ DOCX_XML_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/m
 def extract_text(path: Path) -> str:
     """Return UTF-8 text for the given essay file.
 
-    Supports text and DOCX files. Raises ``TextExtractionError`` for other
+    Supports text, markdown, and DOCX files. Raises ``TextExtractionError`` for other
     formats or malformed payloads so the caller can decide whether to
     fallback to a different workflow.
     """
 
     suffix = path.suffix.lower()
-    if suffix == ".txt":
+    if suffix in {".txt", ".md"}:
         try:
             return path.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:  # pragma: no cover - depends on file contents

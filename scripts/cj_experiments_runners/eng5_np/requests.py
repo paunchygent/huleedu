@@ -21,13 +21,23 @@ from scripts.cj_experiments_runners.eng5_np.inventory import FileRecord
 from scripts.cj_experiments_runners.eng5_np.settings import RunnerSettings
 
 
-def build_prompt_reference(record: FileRecord) -> StorageReferenceMetadata | None:
-    """Build a StorageReferenceMetadata entry for the student prompt."""
+def build_prompt_reference(
+    record: FileRecord, storage_id: str | None = None
+) -> StorageReferenceMetadata | None:
+    """Build a StorageReferenceMetadata entry for the student prompt.
 
+    Args:
+        record: File record for the prompt file
+        storage_id: Content Service storage ID (required if prompt exists)
+
+    Returns:
+        StorageReferenceMetadata with prompt reference, or None if prompt doesn't exist
+    """
     if not record.exists:
         return None
+    if storage_id is None:
+        raise ValueError("storage_id is required when prompt file exists")
     reference = StorageReferenceMetadata()
-    storage_id = f"prompt::{record.checksum}"
     reference.add_reference(
         ContentType.STUDENT_PROMPT_TEXT,
         storage_id=storage_id,
@@ -46,6 +56,11 @@ def compose_cj_assessment_request(
 
     if not essay_refs:
         raise ValueError("At least one essay is required to compose CJ request")
+
+    if not settings.batch_id or settings.batch_id.strip() == "":
+        raise ValueError(
+            "batch_id cannot be empty - must be provided via --batch-id CLI argument"
+        )
 
     system_metadata = SystemProcessingMetadata(
         entity_id=settings.batch_id,

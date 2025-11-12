@@ -47,6 +47,70 @@ Admin user must exist in Identity Service with:
 
 ## Validation Plan
 
+### Current Validation Snapshot (2025-11-12 16:10 UTC)
+
+**Status**: ✅ CJ Service Internal Blocker RESOLVED
+
+**Migration Completed**: error_code ENUM→VARCHAR(100)
+- Migration file: `services/cj_assessment_service/alembic/versions/20251112_0445_fix_error_code_enum_to_varchar.py`
+- Revision: `52a8b9c3e4f1`
+- TestContainer smoke tests: 5/5 PASSED
+- Load test validation: 5 comparison pairs processed successfully
+- Database schema confirmed: VARCHAR(100), ENUM removed
+- Report: `.claude/research/data/eng5_np_2016/cj_load_test_report_mig_test_15comp.md`
+
+**Resolved Issues**:
+- ✅ Kafka DNS issue resolved by switching ENG5 runner default bootstrap to `localhost:9093`
+- ✅ Runner publishes to `huleedu.els.cj_assessment.requested.v1` successfully
+- ✅ CJ Assessment service consumes events (confirmed via `correlation_id`)
+- ✅ Database schema mismatch (error_code ENUM vs VARCHAR) - FIXED via migration
+- ✅ Batch ID validation guard added to prevent empty CLI inputs
+- ✅ Content Service storage ID format issues resolved (64-char SHA256 accepted)
+- ✅ Essay ID length mismatch resolved (tested with 36-char IDs)
+
+**Remaining Blockers**: NONE for basic CJ workflow
+
+**Next Steps**:
+1. Run full end-to-end test with complete essay set
+2. Validate assignment ID and grade scale handling
+3. Complete validation report per Step 7
+
+**How to Verify Kafka Publishing & CJ Processing**
+
+1. Capture runner output to a log, e.g. `... 2>&1 | tee /tmp/eng5_localhost_test.log`.
+2. Confirm publish succeeded:
+
+   ```bash
+   grep -i "kafka_publish" /tmp/eng5_localhost_test.log
+   grep -i "collector_timeout" /tmp/eng5_localhost_test.log
+   ```
+
+3. Extract correlation ID for cross-service tracing:
+
+   ```bash
+   CORRELATION_ID=$(grep -oE '[0-9a-f-]{36}' /tmp/eng5_localhost_test.log | head -1)
+   ```
+
+4. Inspect CJ Assessment service:
+
+   ```bash
+   docker logs huleedu_cj_assessment_service 2>&1 | grep -A10 -B5 "$CORRELATION_ID"
+   ```
+
+5. Check Content Service when prompt hydration fails:
+
+   ```bash
+   docker logs huleedu_content_service 2>&1 | grep -A5 -B5 "$CORRELATION_ID"
+   ```
+
+6. Ensure required services are healthy prior to each run:
+
+   ```bash
+   docker ps | grep huleedu | grep -E "(kafka|content_service|cj_assessment|llm_provider)"
+   ```
+
+---
+
 ### Step 0: Admin User Setup
 
 **Create admin user** in Identity Service database:

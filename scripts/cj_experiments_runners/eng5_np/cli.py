@@ -291,7 +291,7 @@ def main(
         help="Optional override for artefact output directory",
     ),
     kafka_bootstrap: str = typer.Option(
-        os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"),
+        os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9093"),
         help="Kafka bootstrap servers (host:port, comma separated)",
     ),
     kafka_client_id: str = typer.Option(
@@ -526,7 +526,32 @@ def main(
             max_comparisons=None,
             storage_id_map=storage_id_map,
         )
-        prompt_ref = build_prompt_reference(inventory.prompt)
+
+        # Upload prompt file if it exists
+        prompt_storage_id: str | None = None
+        if inventory.prompt.exists:
+            from scripts.cj_experiments_runners.eng5_np.content_upload import (
+                upload_essay_content,
+            )
+            import aiohttp
+
+            async def _upload_prompt() -> str:
+                timeout = aiohttp.ClientTimeout(total=300)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    return await upload_essay_content(
+                        inventory.prompt.path,
+                        content_service_url=settings.content_service_url,
+                        session=session,
+                    )
+
+            prompt_storage_id = asyncio.run(_upload_prompt())
+            logger.info(
+                "prompt_uploaded",
+                storage_id=prompt_storage_id,
+                path=str(inventory.prompt.path),
+            )
+
+        prompt_ref = build_prompt_reference(inventory.prompt, storage_id=prompt_storage_id)
         envelope = compose_cj_assessment_request(
             settings=settings,
             essay_refs=essay_refs,
