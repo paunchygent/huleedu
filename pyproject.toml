@@ -361,6 +361,8 @@ typecheck-all = "mypy --config-file pyproject.toml --follow-imports=silent servi
 typecheck-libs = {shell = "cd libs && mypy -p common_core -p huleedu_service_libs --show-error-codes"}
 typecheck-common-core = {shell = "cd libs && mypy -p common_core --show-error-codes"}
 typecheck-service-libs = {shell = "cd libs && mypy -p huleedu_service_libs --show-error-codes"}
+validate-config = "python scripts/validate_service_config.py"  # Validate service configurations against docker-compose
+validate-config-strict = "python scripts/validate_service_config.py --strict"  # Validate with warnings as errors
 test-all = "pytest"
 test-parallel = "pytest -n auto"
 test-sequential = "pytest -n 0"
