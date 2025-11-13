@@ -14,8 +14,8 @@ from uuid import uuid4
 import jwt
 import pytest
 from fastapi import Request
-from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
 
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.config import settings
 
@@ -174,7 +174,9 @@ class TestJWTAuthentication:
         }
         # Create token with different algorithm
         assert settings.JWT_SECRET_KEY is not None
-        wrong_algorithm_token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm="HS512")
+        wrong_algorithm_token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm="HS512"
+        )
         mock_request = self._create_mock_request(f"Bearer {wrong_algorithm_token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -214,7 +216,9 @@ class TestJWTAuthentication:
             "iss": settings.JWT_ISSUER,
         }
         assert settings.JWT_SECRET_KEY is not None
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         result = await self._test_auth_through_container(mock_request)
@@ -232,7 +236,9 @@ class TestJWTAuthentication:
             "iss": settings.JWT_ISSUER,
         }
         assert settings.JWT_SECRET_KEY is not None
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -252,7 +258,9 @@ class TestJWTAuthentication:
             "iss": settings.JWT_ISSUER,
         }
         assert settings.JWT_SECRET_KEY is not None
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -274,7 +282,9 @@ class TestJWTAuthentication:
             "iss": settings.JWT_ISSUER,
         }
         assert settings.JWT_SECRET_KEY is not None
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:
@@ -295,7 +305,9 @@ class TestJWTAuthentication:
             "iss": "wrong-issuer",
         }
         assert settings.JWT_SECRET_KEY is not None
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
+        token = jwt.encode(
+            payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         with pytest.raises(HuleEduError) as exc_info:

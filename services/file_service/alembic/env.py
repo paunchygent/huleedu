@@ -11,12 +11,13 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
+
+# Import service configuration and models
+from huleedu_service_libs.outbox.models import Base as OutboxBase
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# Import service configuration and models
-from huleedu_service_libs.outbox.models import Base as OutboxBase
 from services.file_service.config import Settings
 
 # Alembic Config object

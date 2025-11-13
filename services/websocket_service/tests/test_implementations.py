@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import jwt
 import pytest
 from fastapi import WebSocket
 from huleedu_service_libs.error_handling.huleedu_error import HuleEduError

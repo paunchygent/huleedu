@@ -10,11 +10,10 @@ from datetime import timedelta
 from unittest.mock import Mock
 from uuid import uuid4
 
-import jwt
 import pytest
 from fastapi import Request
-from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
 
+from huleedu_service_libs.testing.jwt_helpers import build_jwt_headers, create_jwt
 from services.api_gateway_service.app.auth_provider import AuthProvider
 from services.api_gateway_service.config import settings
 
@@ -53,7 +52,9 @@ class TestJWTOrgIdExtraction:
 
     @pytest.mark.asyncio
     async def test_extract_org_id_from_organization_id_claim(self):
-        headers = build_jwt_headers(settings, subject="user-1", extra_claims={"organization_id": "org-xyz"})
+        headers = build_jwt_headers(
+            settings, subject="user-1", extra_claims={"organization_id": "org-xyz"}
+        )
         mock_request = self._create_mock_request(headers["Authorization"])
 
         provider = AuthProvider()
@@ -99,7 +100,7 @@ class TestJWTOrgIdExtraction:
             settings,
             subject="user-1",
             extra_claims={"org_id": "org-1"},
-            expires_in=timedelta(hours=-1)
+            expires_in=timedelta(hours=-1),
         )
         mock_request = self._create_mock_request(headers["Authorization"])
 
@@ -115,7 +116,9 @@ class TestJWTOrgIdExtraction:
         # Build token without exp
         payload = {"sub": "user-1", "org_id": "org-1"}
         assert settings.JWT_SECRET_KEY is not None
-        token = create_jwt(settings.JWT_SECRET_KEY.get_secret_value(), payload, algorithm=settings.JWT_ALGORITHM)
+        token = create_jwt(
+            settings.JWT_SECRET_KEY.get_secret_value(), payload, algorithm=settings.JWT_ALGORITHM
+        )
         mock_request = self._create_mock_request(f"Bearer {token}")
 
         provider = AuthProvider()
