@@ -106,6 +106,28 @@ def test_build_comparison_prompt_orders_sections_correctly() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fetch_assessment_context_detects_legacy_prompt() -> None:
+    """Legacy prompt text should be reassigned to judge rubric and cleared from student prompt."""
+
+    legacy_prompt = "You are an impartial comparative judgement assessor. Respond with JSON."
+    batch = SimpleNamespace(
+        processing_metadata={"student_prompt_text": legacy_prompt},
+        assignment_id="assignment-legacy",
+    )
+    instruction = SimpleNamespace(instructions_text="Teacher rubric text")
+
+    session = AsyncMock()
+    session.execute = AsyncMock(side_effect=[FakeResult(batch), FakeResult(instruction)])
+
+    result = await _fetch_assessment_context(session, cj_batch_id=512)
+
+    assert result["student_prompt_text"] is None
+    assert result["judge_rubric_text"] == legacy_prompt
+    assert result["assessment_instructions"] == "Teacher rubric text"
+    assert session.execute.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_fetch_assessment_context_warns_when_instruction_missing() -> None:
     """Verify missing instructions returns None for both context fields.
 

@@ -15,6 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.cj_assessment_service.models_api import ComparisonTask, EssayForComparison
 from services.cj_assessment_service.models_db import ComparisonPair as CJ_ComparisonPair
 
+_LEGACY_PROMPT_PATTERNS = (
+    "you are an impartial comparative judgement assessor",
+    "comparison_result",
+    "respond with json",
+    "judge instructions",
+)
+
 logger = create_service_logger("cj_assessment_service.pair_generation")
 
 
@@ -216,6 +223,20 @@ async def _fetch_assessment_context(
         },
     )
 
+    # Detect legacy data where student prompt actually contains judge rubric text
+    legacy_prompt_reason = _detect_legacy_prompt(student_prompt_text)
+    if legacy_prompt_reason:
+        logger.warning(
+            "Detected legacy student prompt that matches judge rubric heuristics",
+            extra={
+                "cj_batch_id": str(cj_batch_id),
+                "legacy_reason": legacy_prompt_reason,
+            },
+        )
+        if student_prompt_text and not judge_rubric_text:
+            judge_rubric_text = student_prompt_text
+        student_prompt_text = None
+
     # Warn if no context is available
     if (
         not assessment_instructions
@@ -234,6 +255,20 @@ async def _fetch_assessment_context(
         "student_prompt_text": student_prompt_text,
         "judge_rubric_text": judge_rubric_text,
     }
+
+
+def _detect_legacy_prompt(student_prompt_text: str | None) -> str | None:
+    """Return reason string if prompt looks like mis-labelled judge rubric text."""
+
+    if not student_prompt_text:
+        return None
+
+    lowered = student_prompt_text.lower()
+    for pattern in _LEGACY_PROMPT_PATTERNS:
+        if pattern in lowered:
+            return pattern
+
+    return None
 
 
 def _build_comparison_prompt(
