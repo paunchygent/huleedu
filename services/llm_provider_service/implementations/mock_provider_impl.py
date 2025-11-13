@@ -35,8 +35,6 @@ class MockProviderImpl(LLMProviderProtocol):
     async def generate_comparison(
         self,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
@@ -46,9 +44,7 @@ class MockProviderImpl(LLMProviderProtocol):
         """Generate mock comparison result.
 
         Args:
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
@@ -74,7 +70,7 @@ class MockProviderImpl(LLMProviderProtocol):
             )
 
         # Build deterministic prompt hash for downstream auditing
-        full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
+        full_prompt = user_prompt
         prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
         # Randomly select winner with slight bias towards Essay B
@@ -105,8 +101,8 @@ class MockProviderImpl(LLMProviderProtocol):
 
         justification = random.choice(justification_options[winner])
 
-        # Calculate mock token usage
-        prompt_tokens = len(user_prompt.split()) + len(essay_a.split()) + len(essay_b.split())
+        # Calculate mock token usage (essays are now embedded in user_prompt)
+        prompt_tokens = len(user_prompt.split())
         completion_tokens = len(justification.split()) + 10  # Add some for structure
         total_tokens = prompt_tokens + completion_tokens
 
@@ -134,11 +130,3 @@ class MockProviderImpl(LLMProviderProtocol):
             f"Mock provider generated response: winner={winner.value}, confidence={confidence}"
         )
         return response
-
-    def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:
-        """Format the comparison prompt similarly to production providers."""
-
-        formatted = user_prompt.replace("{essay_a}", essay_a).replace("{essay_b}", essay_b)
-        if "{essay_a}" not in user_prompt and "{essay_b}" not in user_prompt:
-            formatted = f"{user_prompt}\n\nEssay A:\n{essay_a}\n\nEssay B:\n{essay_b}"
-        return formatted

@@ -130,10 +130,15 @@ class TestAnthropicModelCompatibility:
 
         # Use representative essays from test fixtures
         correlation_id = uuid4()
+        user_prompt = f"""{REPRESENTATIVE_COMPARISON_PROMPT}
+
+**Essay A (ID: essay_a_strong):**
+{ESSAY_A_STRONG}
+
+**Essay B (ID: essay_b_weak):**
+{ESSAY_B_WEAK}"""
         response = await anthropic_provider.generate_comparison(
-            user_prompt=REPRESENTATIVE_COMPARISON_PROMPT,
-            essay_a=ESSAY_A_STRONG,
-            essay_b=ESSAY_B_WEAK,
+            user_prompt=user_prompt,
             correlation_id=correlation_id,
         )
 
@@ -146,8 +151,8 @@ class TestAnthropicModelCompatibility:
 
         # Validate justification quality
         assert len(response.justification) > 0, "Justification should be non-empty"
-        assert len(response.justification) <= 50, (
-            f"Justification enforced to max 50 chars by validator, got: {len(response.justification)}"
+        assert len(response.justification) <= 500, (
+            f"Justification accepted up to max 500 chars by validator, got: {len(response.justification)}"
         )
         assert isinstance(response.justification, str), "Justification must be string"
 
@@ -190,10 +195,15 @@ class TestAnthropicModelCompatibility:
         This test verifies that the provider implementation correctly extracts
         structured data from Anthropic's tool use response format.
         """
+        user_prompt = f"""{REPRESENTATIVE_COMPARISON_PROMPT}
+
+**Essay A (ID: short_a):**
+{SHORT_ESSAY_A}
+
+**Essay B (ID: short_b):**
+{SHORT_ESSAY_B}"""
         response = await anthropic_provider.generate_comparison(
-            user_prompt=REPRESENTATIVE_COMPARISON_PROMPT,
-            essay_a=SHORT_ESSAY_A,
-            essay_b=SHORT_ESSAY_B,
+            user_prompt=user_prompt,
             correlation_id=uuid4(),
         )
 
@@ -338,10 +348,15 @@ class TestOpenAIModelCompatibility:
         )
 
         # Make actual API call using short essays for cost control
+        user_prompt = f"""{REPRESENTATIVE_COMPARISON_PROMPT}
+
+**Essay A (ID: short_a):**
+{SHORT_ESSAY_A}
+
+**Essay B (ID: short_b):**
+{SHORT_ESSAY_B}"""
         response = await openai_provider.generate_comparison(
-            user_prompt=REPRESENTATIVE_COMPARISON_PROMPT,
-            essay_a=SHORT_ESSAY_A,
-            essay_b=SHORT_ESSAY_B,
+            user_prompt=user_prompt,
             correlation_id=uuid4(),
         )
 
@@ -349,8 +364,8 @@ class TestOpenAIModelCompatibility:
         assert response is not None
         assert response.winner in [EssayComparisonWinner.ESSAY_A, EssayComparisonWinner.ESSAY_B]
         assert len(response.justification) > 0, "Justification should be non-empty"
-        assert len(response.justification) <= 50, (
-            f"Justification enforced to max 50 chars by validator, got: {len(response.justification)}"
+        assert len(response.justification) <= 500, (
+            f"Justification accepted up to max 500 chars by validator, got: {len(response.justification)}"
         )
         assert 1.0 <= response.confidence <= 5.0
         assert response.model == model_config.model_id
@@ -411,11 +426,16 @@ class TestErrorHandling:
         )
 
         # Should raise appropriate error for auth failure
+        user_prompt = """Simple test prompt
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content"""
         with pytest.raises(Exception) as exc_info:
             await provider.generate_comparison(
-                user_prompt="Simple test prompt",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt=user_prompt,
                 correlation_id=uuid4(),
             )
 

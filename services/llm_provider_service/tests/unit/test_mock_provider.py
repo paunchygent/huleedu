@@ -22,9 +22,13 @@ async def test_mock_provider_successful_comparison() -> None:
     # Act
     correlation_id = uuid4()
     result = await provider.generate_comparison(
-        user_prompt="Compare these essays",
-        essay_a="This is essay A about climate change.",
-        essay_b="This is essay B about global warming.",
+        user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+This is essay A about climate change.
+
+**Essay B (ID: test_b):**
+This is essay B about global warming.""",
         correlation_id=correlation_id,
     )
 
@@ -50,9 +54,13 @@ async def test_mock_provider_with_overrides() -> None:
     # Act
     correlation_id = uuid4()
     result = await provider.generate_comparison(
-        user_prompt="Compare these essays",
-        essay_a="Essay A content",
-        essay_b="Essay B content",
+        user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
         model_override="custom-model-v2",
         correlation_id=correlation_id,
     )
@@ -75,16 +83,24 @@ async def test_mock_provider_token_calculation() -> None:
     # Act
     correlation_id = uuid4()
     result_short = await provider.generate_comparison(
-        user_prompt="Compare",
-        essay_a=short_essay,
-        essay_b=short_essay,
+        user_prompt=f"""Compare
+
+**Essay A (ID: test_a):**
+{short_essay}
+
+**Essay B (ID: test_b):**
+{short_essay}""",
         correlation_id=correlation_id,
     )
 
     result_long = await provider.generate_comparison(
-        user_prompt="Compare",
-        essay_a=long_essay,
-        essay_b=long_essay,
+        user_prompt=f"""Compare
+
+**Essay A (ID: test_a):**
+{long_essay}
+
+**Essay B (ID: test_b):**
+{long_essay}""",
         correlation_id=correlation_id,
     )
 
@@ -108,9 +124,13 @@ async def test_mock_provider_error_simulation() -> None:
 
         try:
             result = await provider.generate_comparison(
-                user_prompt="Compare",
-                essay_a="Essay A",
-                essay_b="Essay B",
+                user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+Essay A
+
+**Essay B (ID: test_b):**
+Essay B""",
                 correlation_id=correlation_id,
             )
             # If we get here, no error occurred

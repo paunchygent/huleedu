@@ -39,7 +39,7 @@ class TestStandardizedLLMResponse:
 
     def test_justification_too_long_fails(self) -> None:
         """Test that long justifications fail strict validation."""
-        long_text = "A" * 60  # More than 50 chars
+        long_text = "A" * 501  # More than 500 chars
         with pytest.raises(ValueError):
             StandardizedLLMResponse(winner="Essay A", justification=long_text, confidence=2.5)
 
@@ -165,8 +165,8 @@ class TestValidateAndNormalizeResponse:
         assert validated.confidence == 5.0
 
     def test_justification_normalization(self) -> None:
-        """Test that justifications are normalized to proper length."""
-        # Test short justification gets padded
+        """Test that justifications are preserved up to 500 characters."""
+        # Test short justification is preserved as-is
         short_response = {
             "winner": "Essay A",
             "justification": "Short",  # Less than 10 chars
@@ -176,21 +176,21 @@ class TestValidateAndNormalizeResponse:
         correlation_id = uuid4()
         validated = validate_and_normalize_response(short_response, correlation_id=correlation_id)
         assert validated is not None
-        assert len(validated.justification) >= 10
-        assert "clear choice" in validated.justification
+        assert validated.justification == "Short"
 
-        # Test long justification gets truncated
-        long_response = {
+        # Test medium justification is preserved (up to 500 chars)
+        medium_text = "A" * 100  # 100 chars - well within limit
+        medium_response = {
             "winner": "Essay B",
-            "justification": "A" * 60,  # More than 50 chars
+            "justification": medium_text,
             "confidence": 4.0,
         }
 
         correlation_id = uuid4()
-        validated = validate_and_normalize_response(long_response, correlation_id=correlation_id)
+        validated = validate_and_normalize_response(medium_response, correlation_id=correlation_id)
         assert validated is not None
-        assert len(validated.justification) == 50
-        assert validated.justification.endswith("...")
+        assert validated.justification == medium_text
+        assert len(validated.justification) == 100
 
 
 class TestProviderFormatCompatibility:

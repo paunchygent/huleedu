@@ -90,12 +90,17 @@ class TestQueueProcessorCompletionRemoval:
     def sample_request(self) -> QueuedRequest:
         """Sample queued request for testing."""
         correlation_id = uuid4()
+        user_prompt = """Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content"""
         return QueuedRequest(
             queue_id=uuid4(),
             request_data=LLMComparisonRequest(
-                user_prompt="Compare these essays",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt=user_prompt,
                 callback_topic="test.callback.topic",
                 correlation_id=correlation_id,
             ),
@@ -230,12 +235,17 @@ class TestQueueProcessorCompletionRemoval:
         requests = []
         for i in range(5):
             correlation_id = uuid4()
+            user_prompt = f"""Compare essays {i}
+
+**Essay A (ID: essay_a_{i}):**
+Essay A {i}
+
+**Essay B (ID: essay_b_{i}):**
+Essay B {i}"""
             request = QueuedRequest(
                 queue_id=uuid4(),
                 request_data=LLMComparisonRequest(
-                    user_prompt=f"Compare essays {i}",
-                    essay_a=f"Essay A {i}",
-                    essay_b=f"Essay B {i}",
+                    user_prompt=user_prompt,
                     callback_topic="test.callback.topic",
                     correlation_id=correlation_id,
                 ),

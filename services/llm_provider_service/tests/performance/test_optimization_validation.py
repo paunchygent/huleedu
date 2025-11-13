@@ -429,9 +429,13 @@ class TestRedisOptimizations:
         requests = []
         for i in range(3):
             request_data = LLMComparisonRequest(
-                user_prompt="Compare these essays",
-                essay_a=f"Essay A {i}",
-                essay_b=f"Essay B {i}",
+                user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{i}):**
+Essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Essay B {i}""",
                 callback_topic="test.callback.topic",
             )
             request = QueuedRequest(

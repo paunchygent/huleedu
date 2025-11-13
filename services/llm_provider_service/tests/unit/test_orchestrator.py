@@ -134,9 +134,13 @@ async def test_orchestrator_successful_comparison(
     # Act
     result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
-        user_prompt="Compare these essays",
-        essay_a="Essay A content",
-        essay_b="Essay B content",
+        user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
         correlation_id=correlation_id,
         callback_topic=callback_topic,
     )
@@ -163,9 +167,13 @@ async def test_orchestrator_provider_not_found(orchestrator: LLMOrchestratorImpl
     with pytest.raises(HuleEduError) as exc_info:
         await orchestrator.perform_comparison(
             provider=LLMProviderType.GOOGLE,  # Valid provider type but not configured in test setup
-            user_prompt="Compare",
-            essay_a="A",
-            essay_b="B",
+            user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
             correlation_id=correlation_id,
         )
 
@@ -214,9 +222,13 @@ async def test_orchestrator_queues_when_provider_unavailable(
     # Act
     result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
+        user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
         correlation_id=correlation_id,
         callback_topic="huleedu.cj_assessment.completed.v1",
     )
@@ -268,9 +280,13 @@ async def test_orchestrator_provider_error(
     # Act - With callback_topic provided, request gets queued regardless of provider issues
     result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
+        user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
         correlation_id=correlation_id,
         callback_topic=callback_topic,
     )
@@ -352,9 +368,13 @@ async def test_orchestrator_with_overrides(
     # Act
     result = await orchestrator.perform_comparison(
         provider=LLMProviderType.MOCK,
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
+        user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
         correlation_id=correlation_id,
         callback_topic=callback_topic,
         model_override="overridden-model",

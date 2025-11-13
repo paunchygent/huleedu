@@ -102,13 +102,12 @@ async def generate_comparison(
                 result = await orchestrator.perform_comparison(
                     provider=provider_override,
                     user_prompt=comparison_request.user_prompt,
-                    essay_a=comparison_request.essay_a,
-                    essay_b=comparison_request.essay_b,
                     correlation_id=correlation_id,
                     model_override=model_override,
                     temperature_override=temperature_override,
                     system_prompt_override=system_prompt_override,
                     callback_topic=comparison_request.callback_topic,
+                    request_metadata=comparison_request.metadata,
                 )
             except HuleEduError as error:
                 # Track metrics for error

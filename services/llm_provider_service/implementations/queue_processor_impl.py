@@ -187,8 +187,6 @@ class QueueProcessorImpl:
                 result = await self.comparison_processor.process_comparison(
                     provider=provider,
                     user_prompt=req_data.user_prompt,
-                    essay_a=req_data.essay_a,
-                    essay_b=req_data.essay_b,
                     correlation_id=req_data.correlation_id or request.queue_id,
                     **overrides,
                 )
@@ -442,9 +440,7 @@ class QueueProcessorImpl:
                 request_id=str(request.queue_id),
                 correlation_id=request.correlation_id or request.queue_id,
                 winner=result.winner,
-                justification=(
-                    result.justification[:50] if result.justification else None
-                ),  # Enforce max length - 50 characters NOT 500!
+                justification=result.justification,
                 confidence=result.confidence * 4 + 1,  # Convert 0-1 to 1-5 scale
                 error_detail=None,
                 provider=result.provider,
@@ -529,8 +525,6 @@ class QueueProcessorImpl:
                     request_meta["prompt_sha256"] = compute_prompt_sha256(
                         provider=provider_hint,
                         user_prompt=request.request_data.user_prompt,
-                        essay_a=request.request_data.essay_a,
-                        essay_b=request.request_data.essay_b,
                     )
                 except Exception as exc:  # pragma: no cover - defensive guard
                     logger.warning(

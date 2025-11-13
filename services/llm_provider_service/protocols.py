@@ -20,8 +20,6 @@ class LLMProviderProtocol(Protocol):
     async def generate_comparison(
         self,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
@@ -31,9 +29,7 @@ class LLMProviderProtocol(Protocol):
         """Generate LLM comparison response.
 
         Args:
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
@@ -56,19 +52,17 @@ class LLMOrchestratorProtocol(Protocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
+        request_metadata: Dict[str, Any] | None = None,
         **overrides: Any,
     ) -> LLMQueuedResult:
         """Perform LLM comparison with provider selection.
 
         Args:
             provider: LLM provider to use
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID
+            request_metadata: Arbitrary metadata to echo back in callbacks
             **overrides: Additional parameter overrides
 
         Returns:
@@ -83,8 +77,6 @@ class LLMOrchestratorProtocol(Protocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
@@ -95,9 +87,7 @@ class LLMOrchestratorProtocol(Protocol):
 
         Args:
             provider: LLM provider to use
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID
             **overrides: Additional parameter overrides
 
@@ -384,8 +374,6 @@ class ComparisonProcessorProtocol(Protocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
     ) -> "LLMOrchestratorResponse":
@@ -396,9 +384,7 @@ class ComparisonProcessorProtocol(Protocol):
 
         Args:
             provider: LLM provider to use
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID
             **overrides: Additional parameter overrides
 

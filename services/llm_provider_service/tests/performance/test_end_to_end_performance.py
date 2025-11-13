@@ -181,9 +181,13 @@ class TestEndToEndPerformance:
                     try:
                         result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,  # Mock to avoid API costs
-                            user_prompt="Compare these essays",
-                            essay_a=f"Load test essay A {request_id}",
-                            essay_b=f"Load test essay B {request_id}",
+                            user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{request_id}):**
+Load test essay A {request_id}
+
+**Essay B (ID: test_b_{request_id}):**
+Load test essay B {request_id}""",
                             correlation_id=uuid4(),
                             callback_topic=performance_callback_topic,
                             model="mock-model",
@@ -274,9 +278,13 @@ class TestEndToEndPerformance:
                 try:
                     result = await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,
-                        user_prompt=prompt,
-                        essay_a=f"{workload_name} essay A {request_id}",
-                        essay_b=f"{workload_name} essay B {request_id}",
+                        user_prompt=f"""{prompt}
+
+**Essay A (ID: test_a_{workload_name}_{request_id}):**
+{workload_name} essay A {request_id}
+
+**Essay B (ID: test_b_{workload_name}_{request_id}):**
+{workload_name} essay B {request_id}""",
                         correlation_id=uuid4(),
                         callback_topic=f"{performance_callback_topic}_{workload_name}",
                         model="mock-model",
@@ -377,9 +385,13 @@ class TestEndToEndPerformance:
                     try:
                         result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,
-                            user_prompt="Sustained load test",
-                            essay_a=f"Sustained essay A {req_id}",
-                            essay_b=f"Sustained essay B {req_id}",
+                            user_prompt=f"""Sustained load test
+
+**Essay A (ID: test_a_{req_id}):**
+Sustained essay A {req_id}
+
+**Essay B (ID: test_b_{req_id}):**
+Sustained essay B {req_id}""",
                             correlation_id=uuid4(),
                             callback_topic=f"{performance_callback_topic}_sustained_{req_id}",
                             model="mock-model",

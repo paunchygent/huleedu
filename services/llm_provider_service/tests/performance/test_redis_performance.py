@@ -96,9 +96,13 @@ class TestRedisPerformance:
         requests = []
         for i in range(10):
             request_data = LLMComparisonRequest(
-                user_prompt="Compare these essays",
-                essay_a=f"Essay A {i}",
-                essay_b=f"Essay B {i}",
+                user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{i}):**
+Essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Essay B {i}""",
                 callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
@@ -140,9 +144,13 @@ class TestRedisPerformance:
             test_requests = []
             for i in range(5):
                 request_data = LLMComparisonRequest(
-                    user_prompt="Compare these essays",
-                    essay_a=f"Test essay A {i}",
-                    essay_b=f"Test essay B {i}",
+                    user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{i}):**
+Test essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Test essay B {i}""",
                     callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
@@ -186,9 +194,13 @@ class TestRedisPerformance:
         requests = []
         for i in range(20):
             request_data = LLMComparisonRequest(
-                user_prompt=f"Batch test prompt {i}",
-                essay_a=f"Batch essay A {i}",
-                essay_b=f"Batch essay B {i}",
+                user_prompt=f"""Batch test prompt {i}
+
+**Essay A (ID: test_a_{i}):**
+Batch essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Batch essay B {i}""",
                 callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
@@ -231,9 +243,13 @@ class TestRedisPerformance:
             # Add real test data to Redis
             for i in range(5):
                 request_data = LLMComparisonRequest(
-                    user_prompt="Memory test",
-                    essay_a=f"Memory essay A {i}",
-                    essay_b=f"Memory essay B {i}",
+                    user_prompt=f"""Memory test
+
+**Essay A (ID: test_a_{i}):**
+Memory essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Memory essay B {i}""",
                     callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
@@ -282,9 +298,13 @@ class TestRedisPerformance:
             start_time = time.perf_counter()
 
             request_data = LLMComparisonRequest(
-                user_prompt=f"Concurrent test {operation_id}",
-                essay_a=f"Concurrent essay A {operation_id}",
-                essay_b=f"Concurrent essay B {operation_id}",
+                user_prompt=f"""Concurrent test {operation_id}
+
+**Essay A (ID: test_a_{operation_id}):**
+Concurrent essay A {operation_id}
+
+**Essay B (ID: test_b_{operation_id}):**
+Concurrent essay B {operation_id}""",
                 callback_topic="test.callback.topic",
             )
             request = QueuedRequest(
@@ -342,9 +362,13 @@ class TestRedisPerformance:
 
             try:
                 request_data = LLMComparisonRequest(
-                    user_prompt=f"Resilience test {operation_id}",
-                    essay_a=f"Resilience essay A {operation_id}",
-                    essay_b=f"Resilience essay B {operation_id}",
+                    user_prompt=f"""Resilience test {operation_id}
+
+**Essay A (ID: test_a_{operation_id}):**
+Resilience essay A {operation_id}
+
+**Essay B (ID: test_b_{operation_id}):**
+Resilience essay B {operation_id}""",
                     callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(

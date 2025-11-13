@@ -180,8 +180,6 @@ class ErrorTriggeringMockProvider:
     async def generate_comparison(
         self,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: uuid.UUID,
         system_prompt_override: Optional[str] = None,
         model_override: Optional[str] = None,
@@ -343,10 +341,16 @@ async def test_queue_processor_handles_mock_provider_errors(di_container: AsyncC
         request_id = uuid.uuid4()
         correlation_id = uuid.uuid4()
 
+        user_prompt = f"""Compare these essays - attempt {i}
+
+**Essay A (ID: essay_a_{i}):**
+Essay A content for attempt {i}
+
+**Essay B (ID: essay_b_{i}):**
+Essay B content for attempt {i}"""
+
         request_data = LLMComparisonRequest(
-            user_prompt=f"Compare these essays - attempt {i}",
-            essay_a=f"Essay A content for attempt {i}",
-            essay_b=f"Essay B content for attempt {i}",
+            user_prompt=user_prompt,
             callback_topic="test.callback.topic",
             correlation_id=correlation_id,
             llm_config_overrides=LLMConfigOverrides(
@@ -452,10 +456,16 @@ async def test_queue_processor_error_within_context_manager(di_container: AsyncC
     request_id = uuid.uuid4()
     correlation_id = uuid.uuid4()
 
+    user_prompt = """Test error handling with trace context
+
+**Essay A (ID: essay_a_trace):**
+Essay A with trace
+
+**Essay B (ID: essay_b_trace):**
+Essay B with trace"""
+
     request_data = LLMComparisonRequest(
-        user_prompt="Test error handling with trace context",
-        essay_a="Essay A with trace",
-        essay_b="Essay B with trace",
+        user_prompt=user_prompt,
         callback_topic="test.callback.topic",
         correlation_id=correlation_id,
         llm_config_overrides=LLMConfigOverrides(

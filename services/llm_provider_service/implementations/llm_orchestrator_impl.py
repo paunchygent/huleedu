@@ -64,9 +64,8 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
+        request_metadata: Dict[str, Any] | None = None,
         callback_topic: str | None = None,
         **overrides: Any,
     ) -> LLMQueuedResult:
@@ -74,10 +73,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         Args:
             provider: LLM provider to use
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID
+            request_metadata: Arbitrary metadata to echo back in callbacks
             **overrides: Additional parameter overrides
 
         Returns:
@@ -86,7 +84,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         Raises:
             HuleEduError: On any failure to perform comparison
         """
-        start_time = time.time()
+        time.time()
 
         # Validate provider exists
         if provider not in self.providers:
@@ -120,11 +118,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         return await self._queue_request(
             provider=provider,
             user_prompt=user_prompt,
-            essay_a=essay_a,
-            essay_b=essay_b,
             correlation_id=correlation_id,
+            request_metadata=request_metadata,
             overrides=overrides,
-            start_time=start_time,
             callback_topic=callback_topic,
         )
 
@@ -132,8 +128,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
@@ -144,9 +138,7 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
 
         Args:
             provider: LLM provider to use
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID
             **overrides: Additional parameter overrides
 
@@ -176,8 +168,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         return await self._make_direct_llm_request(
             provider=provider,
             user_prompt=user_prompt,
-            essay_a=essay_a,
-            essay_b=essay_b,
             correlation_id=correlation_id,
             overrides=overrides,
             start_time=start_time,
@@ -187,11 +177,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
+        request_metadata: Dict[str, Any] | None,
         overrides: Dict[str, Any],
-        start_time: float,
         callback_topic: str | None = None,
     ) -> LLMQueuedResult:
         """Queue a request when provider is unavailable."""
@@ -214,11 +202,9 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         # Create queued request
         request_data = LLMComparisonRequest(
             user_prompt=user_prompt,
-            essay_a=essay_a,
-            essay_b=essay_b,
             callback_topic=callback_topic,
             correlation_id=correlation_id,
-            metadata=overrides,
+            metadata=request_metadata or {},
         )
 
         # Capture current trace context for queue processing
@@ -288,8 +274,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         overrides: dict[str, Any],
         start_time: float,
@@ -307,8 +291,6 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
                 # Call the provider with tracing context
                 result = await provider_impl.generate_comparison(
                     user_prompt=user_prompt,
-                    essay_a=essay_a,
-                    essay_b=essay_b,
                     correlation_id=correlation_id,
                     system_prompt_override=overrides.get("system_prompt_override"),
                     model_override=overrides.get("model_override"),
@@ -469,13 +451,17 @@ class LLMOrchestratorImpl(LLMOrchestratorProtocol):
             )
 
         try:
-            # Simple test prompt
-            test_prompt = "Complete this sentence in exactly 5 words: The weather today is"
+            # Simple test prompt with embedded essays
+            test_prompt = """Complete this sentence in exactly 5 words: The weather today is
+
+**Essay A (ID: test_a):**
+Test essay A
+
+**Essay B (ID: test_b):**
+Test essay B"""
 
             await self.providers[provider].generate_comparison(
                 user_prompt=test_prompt,
-                essay_a="Test essay A",
-                essay_b="Test essay B",
                 correlation_id=correlation_id,
             )
 

@@ -162,9 +162,13 @@ class TestSingleRequestPerformance:
 
         result = await orchestrator.perform_comparison(
             provider=LLMProviderType.MOCK,
-            user_prompt="Compare these essays",
-            essay_a="Sample essay A content",
-            essay_b="Sample essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Sample essay A content
+
+**Essay B (ID: test_b):**
+Sample essay B content""",
             correlation_id=uuid4(),
             callback_topic="test_callback_topic",
             model="mock-model",
@@ -206,9 +210,13 @@ class TestSingleRequestPerformance:
 
             result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
-                user_prompt="Compare these essays",
-                essay_a=f"Sample essay A content {i}",
-                essay_b=f"Sample essay B content {i}",
+                user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{i}):**
+Sample essay A content {i}
+
+**Essay B (ID: test_b_{i}):**
+Sample essay B content {i}""",
                 correlation_id=uuid4(),
                 callback_topic=f"test_callback_topic_{i}",
                 model="mock-model",
@@ -258,9 +266,13 @@ class TestSingleRequestPerformance:
             # Warm up (eliminate cold start effects)
             warmup_result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
-                user_prompt="Warmup",
-                essay_a="Warmup A",
-                essay_b="Warmup B",
+                user_prompt="""Warmup
+
+**Essay A (ID: warmup_a):**
+Warmup A
+
+**Essay B (ID: warmup_b):**
+Warmup B""",
                 correlation_id=uuid4(),
                 callback_topic="warmup_topic",
                 model="mock-model",
@@ -278,9 +290,13 @@ class TestSingleRequestPerformance:
 
             result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,
-                user_prompt="Test",
-                essay_a="A",
-                essay_b="B",
+                user_prompt="""Test
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
                 correlation_id=uuid4(),
                 callback_topic="overhead_test_topic",
                 model="mock-model",

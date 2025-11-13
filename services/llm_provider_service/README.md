@@ -234,6 +234,7 @@ overrides = LLMConfigOverrides(
     provider_override=LLMProviderType.ANTHROPIC,
     model_override=config.model_id,  # From manifest
     temperature_override=0.3,
+    system_prompt_override="Custom CJ prompt",
 )
 ```
 

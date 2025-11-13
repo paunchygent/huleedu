@@ -38,7 +38,7 @@ class StandardizedLLMResponse(BaseModel):
         pattern=rf"^({EssayComparisonWinner.ESSAY_A.value}|{EssayComparisonWinner.ESSAY_B.value})$",
     )
     justification: str = Field(
-        description="Brief explanation of the choice (max 50 characters)", max_length=50
+        description="Explanation of the choice (max 500 characters)", max_length=500
     )
     confidence: float = Field(description="Confidence score between 1.0 and 5.0", ge=1.0, le=5.0)
 
@@ -137,12 +137,8 @@ def _fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         confidence = 3.0
 
-    # Efficient justification normalization - keep brief for cost control
+    # Normalize justification - accept up to 500 characters
     justification = str(justification).strip()
-    if len(justification) > 50:
-        justification = justification[:47] + "..."
-    elif len(justification) < 10:
-        justification = justification + " - clear choice"
 
     return {"winner": winner, "justification": justification, "confidence": confidence}
 
@@ -250,12 +246,8 @@ def _ultra_fast_normalize_fields(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     # Simple confidence clamping
     confidence = max(1.0, min(5.0, confidence))
 
-    # Simple justification handling - keep brief for cost control
+    # Simple justification handling - accept up to 500 characters
     justification = justification.strip()
-    if len(justification) > 50:
-        justification = justification[:50]
-    elif len(justification) < 10:
-        justification = justification + " - choice"
 
     return {"winner": winner, "justification": justification, "confidence": confidence}
 
@@ -315,8 +307,8 @@ STANDARDIZED_RESPONSE_SCHEMA = {
         },
         "justification": {
             "type": "string",
-            "maxLength": 50,
-            "description": "Brief explanation of why this essay was chosen (max 50 characters)",
+            "maxLength": 500,
+            "description": "Explanation of why this essay was chosen (max 500 characters)",
         },
         "confidence": {
             "type": "number",

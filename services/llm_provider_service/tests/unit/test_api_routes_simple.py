@@ -47,14 +47,20 @@ async def test_comparison_request_model_validation() -> None:
     """Test LLMComparisonRequest model validation."""
     # Act - Valid request
     request = LLMComparisonRequest(
-        user_prompt="Compare these essays",
-        essay_a="Essay A content",
-        essay_b="Essay B content",
+        user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
         callback_topic="test.callback.topic",
     )
 
     # Assert
-    assert request.user_prompt == "Compare these essays"
+    assert "Compare these essays" in request.user_prompt
+    assert "Essay A (ID: test_a)" in request.user_prompt
+    assert "Essay B (ID: test_b)" in request.user_prompt
     assert request.llm_config_overrides is None
     assert request.correlation_id is None
 
@@ -64,9 +70,13 @@ async def test_comparison_request_with_overrides() -> None:
     """Test LLMComparisonRequest with config overrides."""
     # Act
     request = LLMComparisonRequest(
-        user_prompt="Compare",
-        essay_a="A",
-        essay_b="B",
+        user_prompt="""Compare
+
+**Essay A (ID: test_a):**
+A
+
+**Essay B (ID: test_b):**
+B""",
         callback_topic="test.callback.topic",
         llm_config_overrides=LLMConfigOverrides(
             provider_override=LLMProviderType.ANTHROPIC,

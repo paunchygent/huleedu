@@ -40,8 +40,6 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
         self,
         provider: LLMProviderType,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         **overrides: Any,
     ) -> LLMOrchestratorResponse:
@@ -58,8 +56,6 @@ class ComparisonProcessorImpl(ComparisonProcessorProtocol):
             # Call the provider with parameters
             result = await provider_impl.generate_comparison(
                 user_prompt=user_prompt,
-                essay_a=essay_a,
-                essay_b=essay_b,
                 correlation_id=correlation_id,
                 system_prompt_override=overrides.get("system_prompt_override"),
                 model_override=overrides.get("model_override"),

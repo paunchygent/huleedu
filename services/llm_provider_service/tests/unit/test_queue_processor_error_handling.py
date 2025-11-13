@@ -93,9 +93,13 @@ class TestQueueProcessorErrorHandling:
         correlation_id = uuid.uuid4()
 
         request_data = LLMComparisonRequest(
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             callback_topic="llm.comparison.callback",
             correlation_id=correlation_id,
             llm_config_overrides=LLMConfigOverrides(
@@ -160,9 +164,13 @@ class TestQueueProcessorErrorHandling:
         correlation_id = uuid.uuid4()
 
         request_data = LLMComparisonRequest(
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             callback_topic="llm.comparison.callback",
             correlation_id=correlation_id,
         )
@@ -214,9 +222,13 @@ class TestQueueProcessorErrorHandling:
         correlation_id = uuid.uuid4()
 
         request_data = LLMComparisonRequest(
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             callback_topic="llm.comparison.callback",
             correlation_id=correlation_id,
         )

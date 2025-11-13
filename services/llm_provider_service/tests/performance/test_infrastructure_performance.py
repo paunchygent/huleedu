@@ -194,9 +194,13 @@ class TestInfrastructurePerformance:
 
             result = await orchestrator.perform_comparison(
                 provider=LLMProviderType.MOCK,  # Mock provider to avoid API costs
-                user_prompt="Compare these two essays for infrastructure testing",
-                essay_a="Sample essay A content for infrastructure testing",
-                essay_b="Sample essay B content for infrastructure testing",
+                user_prompt="""Compare these two essays for infrastructure testing
+
+**Essay A (ID: test_a):**
+Sample essay A content for infrastructure testing
+
+**Essay B (ID: test_b):**
+Sample essay B content for infrastructure testing""",
                 correlation_id=uuid4(),
                 callback_topic="test.callback.topic",
                 model="mock-model",
@@ -244,9 +248,13 @@ class TestInfrastructurePerformance:
                 try:
                     result = await orchestrator.perform_comparison(
                         provider=LLMProviderType.MOCK,  # Mock to avoid API costs
-                        user_prompt=f"Compare these essays for infrastructure test {request_id}",
-                        essay_a=f"Infrastructure test essay A {request_id}",
-                        essay_b=f"Infrastructure test essay B {request_id}",
+                        user_prompt=f"""Compare these essays for infrastructure test {request_id}
+
+**Essay A (ID: test_a_{request_id}):**
+Infrastructure test essay A {request_id}
+
+**Essay B (ID: test_b_{request_id}):**
+Infrastructure test essay B {request_id}""",
                         correlation_id=uuid4(),
                         callback_topic=f"test.callback.topic.{request_id}",
                         model="mock-model",
@@ -314,9 +322,13 @@ class TestInfrastructurePerformance:
             requests = []
             for i in range(10):
                 request_data = LLMComparisonRequest(
-                    user_prompt="Compare these essays",
-                    essay_a=f"Queue test essay A {i}",
-                    essay_b=f"Queue test essay B {i}",
+                    user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{i}):**
+Queue test essay A {i}
+
+**Essay B (ID: test_b_{i}):**
+Queue test essay B {i}""",
                     callback_topic="test.callback.topic",
                 )
                 request = QueuedRequest(
@@ -441,12 +453,16 @@ class TestInfrastructurePerformance:
                 ) -> Tuple[float, bool, LLMQueuedResult | None]:
                     start = time.perf_counter()
                     try:
-                        prompt = f"Compare these essays for infrastructure load test {request_id}"
+                        prompt = f"""Compare these essays for infrastructure load test {request_id}
+
+**Essay A (ID: test_a_{request_id}):**
+Infrastructure load test essay A {request_id}
+
+**Essay B (ID: test_b_{request_id}):**
+Infrastructure load test essay B {request_id}"""
                         result = await orchestrator.perform_comparison(
                             provider=LLMProviderType.MOCK,
                             user_prompt=prompt,
-                            essay_a=f"Infrastructure load test essay A {request_id}",
-                            essay_b=f"Infrastructure load test essay B {request_id}",
                             correlation_id=uuid4(),
                             callback_topic=f"test.e2e.callback.topic.{request_id}",
                             model="mock-model",

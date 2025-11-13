@@ -163,9 +163,13 @@ class TestConcurrentPerformance:
             try:
                 result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,  # Mock to avoid API costs
-                    user_prompt="Compare these essays",
-                    essay_a=f"Sample essay A content {request_id}",
-                    essay_b=f"Sample essay B content {request_id}",
+                    user_prompt=f"""Compare these essays
+
+**Essay A (ID: test_a_{request_id}):**
+Sample essay A content {request_id}
+
+**Essay B (ID: test_b_{request_id}):**
+Sample essay B content {request_id}""",
                     correlation_id=uuid4(),
                     callback_topic=f"test.concurrent.perf.req_{request_id}",
                     model="mock-model",
@@ -222,9 +226,13 @@ class TestConcurrentPerformance:
             try:
                 result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
-                    user_prompt="Stress test comparison",
-                    essay_a=f"Stress essay A {request_id}",
-                    essay_b=f"Stress essay B {request_id}",
+                    user_prompt=f"""Stress test comparison
+
+**Essay A (ID: test_a_{request_id}):**
+Stress essay A {request_id}
+
+**Essay B (ID: test_b_{request_id}):**
+Stress essay B {request_id}""",
                     correlation_id=uuid4(),
                     callback_topic=f"test.concurrent.stress.req_{request_id}",
                     model="mock-model",
@@ -283,9 +291,13 @@ class TestConcurrentPerformance:
             try:
                 result = await orchestrator.perform_comparison(
                     provider=LLMProviderType.MOCK,
-                    user_prompt="Burst test comparison",
-                    essay_a=f"Burst {burst_id} essay A {request_id}",
-                    essay_b=f"Burst {burst_id} essay B {request_id}",
+                    user_prompt=f"""Burst test comparison
+
+**Essay A (ID: test_a_{burst_id}_{request_id}):**
+Burst {burst_id} essay A {request_id}
+
+**Essay B (ID: test_b_{burst_id}_{request_id}):**
+Burst {burst_id} essay B {request_id}""",
                     correlation_id=uuid4(),
                     callback_topic=f"test.concurrent.burst.b{burst_id}_r{request_id}",
                     model="mock-model",
@@ -367,9 +379,13 @@ class TestConcurrentPerformance:
             try:
                 result = await orchestrator.perform_comparison(
                     provider=provider,
-                    user_prompt="Mixed provider test",
-                    essay_a=f"Essay A for {provider.value} {request_id}",
-                    essay_b=f"Essay B for {provider.value} {request_id}",
+                    user_prompt=f"""Mixed provider test
+
+**Essay A (ID: test_a_{provider.value}_{request_id}):**
+Essay A for {provider.value} {request_id}
+
+**Essay B (ID: test_b_{provider.value}_{request_id}):**
+Essay B for {provider.value} {request_id}""",
                     correlation_id=uuid4(),
                     callback_topic=f"test.concurrent.mixed.{provider.value}_{request_id}",
                     model="mock-model",

@@ -50,8 +50,6 @@ class GoogleProviderImpl(LLMProviderProtocol):
     async def generate_comparison(
         self,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
@@ -61,9 +59,7 @@ class GoogleProviderImpl(LLMProviderProtocol):
         """Generate LLM comparison response.
 
         Args:
-            user_prompt: The comparison prompt template
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: Complete comparison prompt with essays embedded
             correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
@@ -96,22 +92,14 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 details={"provider": "google"},
             )
 
-        # Prepare the full prompt with essays
-        full_prompt = self._format_comparison_prompt(user_prompt, essay_a, essay_b)
+        # Use the complete prompt with essays already embedded
+        full_prompt = user_prompt
         prompt_sha256 = hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
         # Use system prompt from override or default comparison prompt
         system_prompt = (
             system_prompt_override
-            or "You are an expert essay evaluator. "
-            "Compare the two essays and return your analysis as JSON. "
-            "You MUST respond with a JSON object containing exactly these fields: "
-            '{"winner": "Essay A" or "Essay B", "justification": "brief explanation '
-            '(max 50 chars)", '
-            '"confidence": 1.0-5.0}. '
-            "The winner must be either 'Essay A' or 'Essay B', justification must be brief "
-            "(max 50 characters), "
-            "and confidence must be a float between 1.0 and 5.0."
+            or "You are an LLM comparison engine. Follow the caller-supplied instructions and ensure your output satisfies the required tool schema."
         )
 
         # Execute with retry
@@ -347,23 +335,3 @@ class GoogleProviderImpl(LLMProviderProtocol):
                 correlation_id=correlation_id,
                 details={"provider": "google"},
             )
-
-    def _format_comparison_prompt(self, user_prompt: str, essay_a: str, essay_b: str) -> str:
-        """Format the comparison prompt with essays.
-
-        Args:
-            user_prompt: The prompt template
-            essay_a: First essay
-            essay_b: Second essay
-
-        Returns:
-            Formatted prompt
-        """
-        # Simple formatting - could be enhanced with template engine
-        formatted = user_prompt.replace("{essay_a}", essay_a).replace("{essay_b}", essay_b)
-
-        # If no placeholders found, append essays
-        if "{essay_a}" not in user_prompt and "{essay_b}" not in user_prompt:
-            formatted = f"{user_prompt}\n\nEssay A:\n{essay_a}\n\nEssay B:\n{essay_b}"
-
-        return formatted

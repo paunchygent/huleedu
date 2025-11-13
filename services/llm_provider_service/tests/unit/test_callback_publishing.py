@@ -101,9 +101,13 @@ def sample_request() -> QueuedRequest:
     queue_id = uuid4()
 
     request_data = LLMComparisonRequest(
-        user_prompt="Compare these essays",
-        essay_a="Essay A content",
-        essay_b="Essay B content",
+        user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
         callback_topic="test.callback.topic",
         correlation_id=correlation_id,
         metadata={"test": "metadata"},
@@ -215,14 +219,14 @@ class TestSuccessCallbackPublishing:
         assert 1.0 <= event_data.confidence <= 5.0
 
     @pytest.mark.asyncio
-    async def test_success_callback_justification_truncation(
+    async def test_success_callback_justification_preserved(
         self,
         queue_processor: QueueProcessorImpl,
         sample_request: QueuedRequest,
         successful_llm_response: LLMOrchestratorResponse,
         mock_event_publisher: AsyncMock,
     ) -> None:
-        """Test that justification is properly truncated to 50 characters."""
+        """Test that justification is preserved up to 500 characters."""
         # Arrange - set long justification
         long_justification = "This is a very long justification that should be truncated"
         successful_llm_response.justification = long_justification
@@ -235,8 +239,8 @@ class TestSuccessCallbackPublishing:
         envelope = call_args[1]["envelope"]
         event_data = envelope.data
 
-        assert len(event_data.justification) == 50
-        assert event_data.justification == long_justification[:50]
+        assert event_data.justification == long_justification
+        assert len(event_data.justification) <= 500
 
     @pytest.mark.asyncio
     async def test_success_callback_token_usage_mapping(
@@ -485,8 +489,6 @@ class TestErrorCallbackPublishing:
         expected_hash = compute_prompt_sha256(
             provider=LLMProviderType.OPENAI,
             user_prompt=sample_request.request_data.user_prompt,
-            essay_a=sample_request.request_data.essay_a,
-            essay_b=sample_request.request_data.essay_b,
         )
 
         assert event_data.request_metadata["prompt_sha256"] == expected_hash

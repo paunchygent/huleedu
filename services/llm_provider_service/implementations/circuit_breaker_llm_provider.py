@@ -47,8 +47,6 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
     async def generate_comparison(
         self,
         user_prompt: str,
-        essay_a: str,
-        essay_b: str,
         correlation_id: UUID,
         system_prompt_override: str | None = None,
         model_override: str | None = None,
@@ -58,9 +56,7 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
         """Generate LLM comparison with circuit breaker protection.
 
         Args:
-            user_prompt: The comparison prompt
-            essay_a: First essay to compare
-            essay_b: Second essay to compare
+            user_prompt: The complete comparison prompt with essays embedded
             correlation_id: Request correlation ID for tracing
             system_prompt_override: Optional system prompt override
             model_override: Optional model override
@@ -79,8 +75,6 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
             extra={
                 "correlation_id": str(correlation_id),
                 "user_prompt_length": len(user_prompt),
-                "essay_a_length": len(essay_a),
-                "essay_b_length": len(essay_b),
                 "model_override": model_override,
                 "provider": self._delegate.__class__.__name__,
             },
@@ -88,8 +82,6 @@ class CircuitBreakerLLMProvider(LLMProviderProtocol):
         return await self._circuit_breaker.call(
             self._delegate.generate_comparison,
             user_prompt,
-            essay_a,
-            essay_b,
             correlation_id,
             system_prompt_override,
             model_override,

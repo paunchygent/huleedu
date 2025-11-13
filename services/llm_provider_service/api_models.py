@@ -18,11 +18,13 @@ class LLMConfigOverrides(BaseModel):
 
 
 class LLMComparisonRequest(BaseModel):
-    """Request model for LLM essay comparison."""
+    """Request model for LLM essay comparison.
 
-    user_prompt: str = Field(..., description="The comparison prompt")
-    essay_a: str = Field(..., description="First essay to compare")
-    essay_b: str = Field(..., description="Second essay to compare")
+    Note: Essays should be embedded directly in the user_prompt field.
+    This ensures efficient token usage and clear separation of concerns.
+    """
+
+    user_prompt: str = Field(..., description="The complete comparison prompt including essays")
 
     # REQUIRED callback topic for async processing
     callback_topic: str = Field(

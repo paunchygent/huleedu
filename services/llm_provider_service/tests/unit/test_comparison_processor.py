@@ -96,9 +96,13 @@ class TestSuccessfulComparison:
         time.time()
         result = await comparison_processor.process_comparison(
             provider=LLMProviderType.MOCK,
-            user_prompt="Compare these essays on climate change",
-            essay_a="Essay A content with detailed analysis of climate data.",
-            essay_b="Essay B content discussing environmental policies.",
+            user_prompt="""Compare these essays on climate change
+
+**Essay A (ID: test_a):**
+Essay A content with detailed analysis of climate data.
+
+**Essay B (ID: test_b):**
+Essay B content discussing environmental policies.""",
             correlation_id=correlation_id,
         )
         time.time()
@@ -143,9 +147,13 @@ class TestSuccessfulComparison:
         # Act
         await comparison_processor.process_comparison(
             provider=LLMProviderType.MOCK,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
         )
 
@@ -206,9 +214,13 @@ class TestSuccessfulComparison:
         # Act
         result = await comparison_processor.process_comparison(
             provider=provider_type,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
         )
 
@@ -241,18 +253,26 @@ class TestParameterOverrides:
         # Act
         await comparison_processor.process_comparison(
             provider=LLMProviderType.OPENAI,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
             **overrides,
         )
 
         # Assert - Provider was called with all overrides
         mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
             system_prompt_override="Custom system prompt for testing",
             model_override="gpt-4-custom",
@@ -275,18 +295,26 @@ class TestParameterOverrides:
         # Act - Only specify temperature override
         await comparison_processor.process_comparison(
             provider=LLMProviderType.ANTHROPIC,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
             temperature_override=0.1,
         )
 
         # Assert - Unspecified overrides are None
         mock_provider.generate_comparison.assert_called_once_with(
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
             system_prompt_override=None,
             model_override=None,
@@ -327,9 +355,13 @@ class TestSwedishCharacterHandling:
         # Act
         result = await comparison_processor.process_comparison(
             provider=LLMProviderType.OPENAI,
-            user_prompt="Jämför dessa uppsatser på svenska",
-            essay_a="Uppsats A handlar om klimatförändringen och dess påverkan på miljön.",
-            essay_b="Uppsats B diskuterar hållbarhet och återvinning i det svenska samhället.",
+            user_prompt="""Jämför dessa uppsatser på svenska
+
+**Essay A (ID: test_a):**
+Uppsats A handlar om klimatförändringen och dess påverkan på miljön.
+
+**Essay B (ID: test_b):**
+Uppsats B diskuterar hållbarhet och återvinning i det svenska samhället.""",
             correlation_id=correlation_id,
         )
 
@@ -338,10 +370,10 @@ class TestSwedishCharacterHandling:
         assert "bättre förståelse" in result.justification
         assert "svenska uttryck" in result.justification
 
-        # Assert - Provider was called with Swedish content
+        # Assert - Provider was called with Swedish content (essays now in user_prompt)
         call_args = mock_provider.generate_comparison.call_args
-        assert "klimatförändringen" in call_args[1]["essay_a"]
-        assert "återvinning" in call_args[1]["essay_b"]
+        assert "klimatförändringen" in call_args[1]["user_prompt"]
+        assert "återvinning" in call_args[1]["user_prompt"]
         assert "Jämför" in call_args[1]["user_prompt"]
 
 
@@ -378,9 +410,13 @@ class TestProviderErrorHandling:
         with pytest.raises(HuleEduError) as exc_info:
             await comparison_processor.process_comparison(
                 provider=LLMProviderType.OPENAI,
-                user_prompt="Compare these essays",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
                 correlation_id=correlation_id,
             )
 
@@ -424,9 +460,13 @@ class TestProviderErrorHandling:
         with pytest.raises(HuleEduError) as exc_info:
             await comparison_processor.process_comparison(
                 provider=LLMProviderType.GOOGLE,
-                user_prompt="Compare these essays",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
                 correlation_id=correlation_id,
             )
 
@@ -475,9 +515,13 @@ class TestProviderErrorHandling:
         with pytest.raises(HuleEduError):
             await comparison_processor.process_comparison(
                 provider=provider_type,
-                user_prompt="Compare these essays",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
                 correlation_id=correlation_id,
             )
 
@@ -506,9 +550,13 @@ class TestEventPublishing:
         # Act
         await comparison_processor.process_comparison(
             provider=LLMProviderType.MOCK,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
         )
 
@@ -549,9 +597,13 @@ class TestEventPublishing:
         # Act
         await comparison_processor.process_comparison(
             provider=LLMProviderType.MOCK,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
         )
 
@@ -579,9 +631,13 @@ class TestEventPublishing:
         with pytest.raises(HuleEduError):
             await comparison_processor.process_comparison(
                 provider=LLMProviderType.OPENAI,
-                user_prompt="Compare these essays",
-                essay_a="Essay A content",
-                essay_b="Essay B content",
+                user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
                 correlation_id=correlation_id,
             )
 
@@ -625,9 +681,13 @@ class TestCostEstimation:
         # Act
         result = await comparison_processor.process_comparison(
             provider=LLMProviderType.OPENAI,
-            user_prompt="Compare these essays",
-            essay_a="Essay A content",
-            essay_b="Essay B content",
+            user_prompt="""Compare these essays
+
+**Essay A (ID: test_a):**
+Essay A content
+
+**Essay B (ID: test_b):**
+Essay B content""",
             correlation_id=correlation_id,
         )
 
