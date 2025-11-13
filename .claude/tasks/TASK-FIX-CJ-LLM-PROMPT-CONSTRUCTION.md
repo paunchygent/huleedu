@@ -14,6 +14,11 @@
 
 **IN PROGRESS** – Phase 1.4 complete (admin rubric endpoints refactored to DI-based auth, tests passing).
 
+**2025-11-13 session notes**
+- Identity dev issuer now signs HS256 tokens, so CJ admin CLI can log in directly (no manual `CJ_ADMIN_TOKEN`).
+- `_fetch_assessment_context()` ships with rubric-detection heuristics; see `services/cj_assessment_service/cj_core_logic/pair_generation.py`.
+- Targeted test run: `pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation_context.py -k legacy` (pass).
+
 ## Objective
 
 Fix two critical issues in CJ Assessment → LLM Provider prompt construction:
@@ -263,18 +268,27 @@ request_body = {
 ## Implementation Checklist
 
 ### Phase 0: Data Correction (PREREQUISITE)
-- [ ] **Upload correct student assignment prompt** for test assignment
+**Status – 2025-11-13 verification:** `docker exec huleedu_cj_assessment_db psql ...` queries show
+`cj_batch_uploads.processing_metadata` currently contains only
+`student_prompt_storage_id` keys (no inline `student_prompt_text` / `judge_rubric_text`), and
+`assessment_instructions` is empty. No migration script is required **yet**, but ENG5 docs/CLI
+still tell contributors to upload the rubric file as the student prompt, so fix the docs and
+re-run the uploads with the correct assets to keep future data clean.
+
+**Note:** Identity’s dev token issuer now signs tokens with real HS256 signatures using the shared
+`JWT_SECRET_KEY`, so the CJ admin CLI can authenticate via `pdm run cj-admin login` without the
+manual `CJ_ADMIN_TOKEN` override.
+- [x] **Upload correct student assignment prompt** for test assignment (2025-11-13)
   ```bash
   pdm run cj-admin prompts upload \
     --assignment-id 00000000-0000-0000-0000-000000000001 \
     --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md"
   ```
-- [ ] **Verify storage ID updated** in `assessment_instructions` table
-- [ ] **Create data migration script** for existing batches with wrong content
-  - Script: `services/cj_assessment_service/scripts/migrate_prompt_metadata.py`
-  - Hydrate correct content from Content Service using `student_prompt_storage_id`
-  - Update `processing_metadata` JSON for affected batches
-- [ ] **Update ASSIGNMENT_SETUP.md** to clarify judge rubric vs student prompt
+- [x] **Verify storage ID updated** in `assessment_instructions` table (`2ff7b21dcbc1403592bd4f2d804c0075` for assignment `00000000-0000-0000-0000-000000000001`)
+- [ ] **(Optional)** Draft migration script scaffolding for future regressions
+  - Script path: `services/cj_assessment_service/scripts/migrate_prompt_metadata.py`
+  - Should hydrate via Content Service if legacy rows ever reappear
+- [x] **Update ASSIGNMENT_SETUP.md** to clarify judge rubric vs student prompt (already matched; verified 2025-11-13)
   - Current line 42-45: States "Upload prompt text" but example is rubric file
   - Add section distinguishing student assignment from judge assessment instructions
 
@@ -312,9 +326,9 @@ request_body = {
   - File: `services/cj_assessment_service/cj_core_logic/pair_generation.py:231-269`
   - "Assignment Prompt" → `student_prompt_text` (actual assignment)
   - "Assessment Rubric" → `judge_rubric` (from config/settings)
-- [ ] **Add fallback detection** for old data in `_fetch_assessment_context()`
-  - Log warning if `student_prompt_text` starts with "You are an impartial"
-  - Attempt recovery or fail gracefully
+- [x] **Add fallback detection** for old data in `_fetch_assessment_context()`
+  - Log warning if `student_prompt_text` matches rubric heuristics ("You are an impartial", `comparison_result`, etc.)
+  - Move legacy text into `judge_rubric_text` and clear `student_prompt_text` to prevent leakage
 - [ ] **Run targeted tests**:
   ```bash
   pdm run pytest-root services/cj_assessment_service/tests/unit/test_pair_generation.py -k prompt_context -s
@@ -464,12 +478,17 @@ request_body = {
   - File: `services/cj_assessment_service/api/admin_routes.py:344-477`
 
 **Critical Data Correction Required**:
-- Current `student_prompt_storage_id` points to `llm_prompt_cj_assessment_eng5.md` (judge rubric)
-  - Location: `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md`
-- Actual student assignment text: `eng5_np_vt_2017_essay_instruction.md`
-  - Location: `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md`
+- Historically the ENG5 CLI instructions told people to upload `llm_prompt_cj_assessment_eng5.md`
+  (judge rubric) as the "student prompt"; the real student assignment text lives in
+  `eng5_np_vt_2017_essay_instruction.md`.
+- 2025-11-13 DB verification shows no inline `student_prompt_text` rows (only
+  `student_prompt_storage_id="prompt-storage-llm"` placeholders), so nothing needs migrating
+  today, but we still need to re-upload the correct file and fix the docs before new batches are
+  registered.
 
-**Action**: Must upload correct file OR migrate existing `student_prompt_storage_id` values.
+**Action**: Update the docs/CLI flow so assignment uploads point to
+`eng5_np_vt_2017_essay_instruction.md`, then re-upload prompts/rubrics for the ENG5 assignment and
+only build a migration if future data drifts again.
 
 ### 2. Metadata Field Naming → **Keep Existing + Fix Data** ✅
 

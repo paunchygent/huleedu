@@ -34,8 +34,8 @@ All services must be running and healthy:
 **Location**: `test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/`
 
 Required files:
-- `eng5_np_vt_2017_essay_instruction.md` (Judge instructions)
-- `llm_prompt_cj_assessment_eng5.md` (Student prompt)
+- `eng5_np_vt_2017_essay_instruction.md` (Student assignment prompt)
+- `llm_prompt_cj_assessment_eng5.md` (Judge rubric / LLM instructions)
 - `anchor_essays/*.docx` (12 anchor files: A1, A2, B1, B2, C+, C-, D+, D-, E+, E-, F+1, F+2)
 - `student_essays/*.docx` (12 student essays for assessment)
 
@@ -236,7 +236,7 @@ pdm run cj-admin instructions get $ASSIGNMENT_ID
 ```bash
 pdm run cj-admin prompts upload \
   --assignment-id $ASSIGNMENT_ID \
-  --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md"
+  --prompt-file "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md"
 ```
 
 **Expected Output**:
@@ -256,7 +256,7 @@ pdm run cj-admin prompts get $ASSIGNMENT_ID --output-file /tmp/prompt_verify.md
 **Verification**:
 ```bash
 # Compare original and retrieved
-diff "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/llm_prompt_cj_assessment_eng5.md" /tmp/prompt_verify.md
+diff "test_uploads/ANCHOR ESSAYS/ROLE_MODELS_ENG5_NP_2016/eng5_np_vt_2017_essay_instruction.md" /tmp/prompt_verify.md
 ```
 
 **Checklist**:
