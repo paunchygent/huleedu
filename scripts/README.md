@@ -4,6 +4,78 @@ This directory contains project-level scripts and utilities for the HuleEdu micr
 
 ## Available Scripts
 
+### Task Management Utilities (TASKS/)
+
+#### `scripts/task_mgmt/*`
+
+Utilities to keep TASKS/ organized and agent-friendly.
+
+**Commands**:
+
+```bash
+# Create a new task with front matter
+python scripts/task_mgmt/new_task.py --title "Svelte 5 + Vite CORS" --domain frontend
+
+# Validate front matter across TASKS/ (excludes archive by default)
+python scripts/task_mgmt/validate_front_matter.py --verbose
+
+# Generate TASKS/INDEX.md (by domain/status/program)
+python scripts/task_mgmt/index_tasks.py
+
+# Archive a task to archive/YYYY/MM/{domain}/ and set status=archived
+python scripts/task_mgmt/archive_task.py --path TASKS/<relative-path>.md [--git]
+```
+
+These scripts are standard-library only and harness-independent for LLM Agent use.
+
+### Configuration Validation
+
+#### `validate_service_config.py`
+
+**Purpose**: Validates service configurations against docker-compose setup to catch configuration drift issues.
+
+**Usage**:
+
+```bash
+# Basic validation
+pdm run validate-config
+
+# Strict mode (treat warnings as errors)
+pdm run validate-config-strict
+
+# Direct execution
+python scripts/validate_service_config.py
+python scripts/validate_service_config.py --strict
+```
+
+**What it checks**:
+
+- ✅ JWT configuration for services using authentication
+- ✅ Database environment variables
+- ✅ Kafka configuration
+- ✅ Port conflicts across services
+- ✅ Service dependency consistency
+
+**When to use**:
+
+- Before committing configuration changes
+- After adding JWT authentication to a service
+- When adding new services
+- In CI/CD pipelines to prevent config drift
+
+**Example output**:
+
+```
+🔍 Validating Service Configurations...
+
+✅ cj_assessment_service
+✅ api_gateway_service
+❌ new_service
+   ERROR: Inherits JWTValidationSettings but missing NEW_SERVICE_JWT_SECRET_KEY
+
+❌ 1 configuration error(s) found
+```
+
 ### Environment Setup
 
 #### `setup_huledu_environment.sh`
@@ -110,6 +182,11 @@ Scripts are organized by purpose:
 
 ``` text
 scripts/
+├── task_mgmt/                     # TASKS/ management utilities
+│   ├── new_task.py                # Scaffold a new task with front matter
+│   ├── validate_front_matter.py   # Validate required fields/enums/dates
+│   ├── index_tasks.py             # Generate TASKS/INDEX.md
+│   └── archive_task.py            # Move a task to archive/YYYY/MM/{domain}
 ├── tests/                         # Test automation scripts
 │   ├── functional_tests.sh        # Existing functional test runner
 │   ├── quick_validation_test.sh   # Existing quick validation
